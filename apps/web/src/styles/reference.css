@@ -1315,6 +1315,36 @@ small,
   gap: 8px;
   margin-top: 20px;
 }
+.verbalization-editor {
+  margin: 18px 0 4px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.verbalization-editor .mapping-heading {
+  width: 100%;
+  margin: 0;
+}
+.verbalization-editor h3 {
+  font-size: 12px;
+}
+.verbalization-editor .muted {
+  line-height: 1.7;
+}
+.verbalization-line {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+}
+.verbalization-line input {
+  flex: 1;
+  font-size: 12px;
+}
+.attribute-reading > td {
+  background: var(--color-surface-soft);
+  padding: 4px 16px 14px;
+}
 .expression-list {
   margin-top: 16px;
 }
