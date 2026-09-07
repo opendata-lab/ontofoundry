@@ -1,4 +1,11 @@
-import { ArrowLeft, Box, Plus, Save, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Box,
+  MessageSquareText,
+  Plus,
+  Save,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { modelingApi } from "../api/client";
@@ -6,7 +13,27 @@ import type { Draft, ObjectDefinition, LinkDefinition } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useModeling } from "../hooks/useModeling";
 import { MappingForm } from "../components/MappingForm";
+import { VerbalizationEditor } from "../components/VerbalizationEditor";
+import { placeholders, valueConcept } from "../lib/verbalization";
 import { usePageTab } from "../hooks/usePageTab";
+
+// A reading the writer left blank is not a reading; keeping it would fail the
+// model's non-empty rule at save time.
+function clearBlankReadings<T extends ObjectDefinition | LinkDefinition>(
+  type: T,
+): T {
+  const clean = (lines: string[] | undefined) =>
+    (lines ?? []).map((line) => line.trim()).filter(Boolean);
+  if ("attributes" in type)
+    return {
+      ...type,
+      attributes: type.attributes.map((item) => ({
+        ...item,
+        verbalizes: clean(item.verbalizes),
+      })),
+    };
+  return { ...type, verbalizes: clean(type.verbalizes) };
+}
 
 export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
   const { workspace } = useWorkspaceContext();
@@ -21,6 +48,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [reading, setReading] = useState("");
   const [dirty, setDirty] = useState(false);
   const [issues, setIssues] = useState<string[]>([]);
   usePageTab({
@@ -79,15 +107,16 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
     model.setError("");
     setIssues([]);
     const next = structuredClone(draft);
-    if ("attributes" in type)
+    const trimmed = clearBlankReadings(type);
+    if ("attributes" in trimmed)
       next.object_types = [
-        ...next.object_types.filter((t) => t.id !== type.id),
-        type,
+        ...next.object_types.filter((t) => t.id !== trimmed.id),
+        trimmed,
       ];
     else
       next.link_types = [
-        ...next.link_types.filter((t) => t.id !== type.id),
-        type,
+        ...next.link_types.filter((t) => t.id !== trimmed.id),
+        trimmed,
       ];
     try {
       const result = await modelingApi.save(model.session!, next);
@@ -246,6 +275,17 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                   <option value="one_to_one">一对一</option>
                 </select>
               </label>
+              <VerbalizationEditor
+                label="自然语言读法"
+                concepts={placeholders([
+                  draft.object_types.find((t) => t.id === type.source_type_id)
+                    ?.technical_name,
+                  draft.object_types.find((t) => t.id === type.target_type_id)
+                    ?.technical_name,
+                ])}
+                value={type.verbalizes}
+                onChange={(verbalizes) => change({ verbalizes })}
+              />
             </>
           )}
           {relation && step === 2 && "source_type_id" in type && (
@@ -368,11 +408,12 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                     <th>数据类型</th>
                     <th>标识</th>
                     <th>必填</th>
+                    <th>读法</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {type.attributes.map((a, i) => (
+                  {type.attributes.flatMap((a, i) => [
                     <tr key={a.id}>
                       <td>
                         <input
@@ -465,6 +506,19 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                       </td>
                       <td>
                         <button
+                          className="button button--text"
+                          type="button"
+                          aria-expanded={reading === a.id}
+                          onClick={() =>
+                            setReading(reading === a.id ? "" : a.id)
+                          }
+                        >
+                          <MessageSquareText size={13} />
+                          {a.verbalizes?.length ? "已自定义" : "默认"}
+                        </button>
+                      </td>
+                      <td>
+                        <button
                           className="icon-button"
                           type="button"
                           aria-label={"删除属性 " + (i + 1)}
@@ -479,8 +533,31 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                           <Trash2 size={14} />
                         </button>
                       </td>
-                    </tr>
-                  ))}
+                    </tr>,
+                    reading === a.id ? (
+                      <tr key={a.id + ":reading"} className="attribute-reading">
+                        <td colSpan={7}>
+                          <VerbalizationEditor
+                            label={
+                              "「" + (a.name || a.technical_name) + "」读法"
+                            }
+                            concepts={placeholders([
+                              type.technical_name,
+                              valueConcept(type.technical_name, a),
+                            ])}
+                            value={a.verbalizes}
+                            onChange={(verbalizes) =>
+                              change({
+                                attributes: type.attributes.map((x) =>
+                                  x.id === a.id ? { ...x, verbalizes } : x,
+                                ),
+                              })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ) : null,
+                  ])}
                 </tbody>
               </table>
               {!type.attributes.length && (
