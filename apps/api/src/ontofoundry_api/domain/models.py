@@ -366,9 +366,17 @@ class DocumentLink(BaseModel):
 
 
 class DataMapping(BaseModel):
+    """Where an object type's data sits, not which connection reads it.
+
+    The model names a data source (`connection_alias`) plus the table, key column
+    and field columns. Which credentials serve that alias is workspace
+    configuration, resolved at query time, so a published version carries no
+    connection identifiers or secrets and stays portable between environments.
+    """
+
     id: UUID
     type_id: UUID
-    connection_id: UUID
+    connection_alias: str = Field(min_length=1, max_length=120)
     table_name: str = Field(min_length=1, max_length=240)
     schema_name: str | None = None
     key_column: str = Field(min_length=1, max_length=240)

@@ -63,7 +63,7 @@ def mapped_session(client, monkeypatch):
         {
             "id": str(uuid4()),
             "type_id": supplier["id"],
-            "connection_id": cid,
+            "connection_alias": "测试连接",
             "table_name": "suppliers",
             "key_column": "code",
             "fields": {"supplier_code": "code"},
@@ -71,7 +71,7 @@ def mapped_session(client, monkeypatch):
         {
             "id": str(uuid4()),
             "type_id": material["id"],
-            "connection_id": cid,
+            "connection_alias": "测试连接",
             "table_name": "materials",
             "key_column": "code",
             "fields": {"material_name": "name"},
@@ -145,9 +145,9 @@ def test_mapping_preview_parameterizes_keys_and_reports_missing_columns(
     )
 
 
-def test_cross_connection_is_not_federated(client, mapped_session):
+def test_two_data_sources_are_not_federated(client, mapped_session):
     session, supplier, _ = mapped_session
-    session["draft"]["mappings"][1]["connection_id"] = str(uuid4())
+    session["draft"]["mappings"][1]["connection_alias"] = "另一个数据源"
     saved = client.put(
         ROOT + "/sessions/" + session["id"],
         json={"revision": session["revision"], "draft": session["draft"]},
@@ -158,7 +158,7 @@ def test_cross_connection_is_not_federated(client, mapped_session):
         json={"session_id": session["id"], "type_id": supplier["id"], "key": "S1"},
     ).json()
     assert len(result["objects"]) == 1
-    assert any("跨连接" in warning for warning in result["warnings"])
+    assert any("不同数据源" in warning for warning in result["warnings"])
 
 
 def test_published_public_type_service_does_not_leak_database_join_columns(

@@ -171,7 +171,9 @@ export type DocumentLink = {
 export type DataMapping = {
   id: string;
   type_id: string;
-  connection_id: string;
+  // The data source's name, not a connection id: the published model carries no
+  // credentials, and the workspace binds the name to a connection at query time.
+  connection_alias: string;
   table_name: string;
   schema_name: string | null;
   key_column: string;
