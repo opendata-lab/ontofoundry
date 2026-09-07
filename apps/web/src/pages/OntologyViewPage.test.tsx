@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
+import { api, modelingApi } from "../api/client";
 import type { TypeGraph, Workspace, WorkspaceOverview } from "../api/types";
 import { OntologyViewPage } from "./OntologyViewPage";
 
@@ -17,6 +17,7 @@ vi.mock("../hooks/useWorkspaceContext", () => ({
 }));
 vi.mock("../api/client", () => ({
   api: { overview: vi.fn(), exportUrl: vi.fn(() => "/export") },
+  modelingApi: { importOssie: vi.fn() },
 }));
 vi.mock("../components/OntologyGraph", () => ({
   OntologyGraph: ({ graph, mode }: { graph: TypeGraph; mode: string }) => (
@@ -249,6 +250,64 @@ describe("本体视图", () => {
       screen.queryByRole("region", { name: "已发布本体分层总览" }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "开始建模" })).toBeInTheDocument();
+  });
+
+  it("imports an Ossie file into a reviewable draft and reports what it dropped", async () => {
+    const document = {
+      version: "0.2.0.dev0",
+      name: "crm",
+      ontology: [{ concept: "customer", type: "EntityType" }],
+    };
+    vi.mocked(modelingApi.importOssie).mockResolvedValue({
+      id: "session-1",
+      title: "导入 crm",
+      import_report: {
+        name: "crm",
+        description: "",
+        mode: "merge",
+        counts: {
+          objects_added: 3,
+          objects_updated: 1,
+          links_added: 2,
+          links_updated: 0,
+          attributes_added: 4,
+          attributes_updated: 0,
+        },
+        skipped: [
+          { path: "customer.sold_to", reason: "2 个 role 的关系暂不支持" },
+        ],
+        notes: ["合并模式：文件之外的已有对象、实例与数据映射保持不变"],
+      },
+    } as never);
+    show();
+    fireEvent.click(await screen.findByRole("tab", { name: "语义视图" }));
+    fireEvent.click(screen.getByRole("button", { name: "导入" }));
+    fireEvent.change(screen.getByLabelText("选择 Ossie JSON 文件"), {
+      target: {
+        files: [
+          new File([JSON.stringify(document)], "crm.ossie.json", {
+            type: "application/json",
+          }),
+        ],
+      },
+    });
+    const button = await screen.findByRole("button", {
+      name: /导入 crm\.ossie\.json/,
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByText(/已生成建模草稿/)).toBeInTheDocument();
+    expect(modelingApi.importOssie).toHaveBeenCalledWith(
+      "w",
+      document,
+      "merge",
+    );
+    expect(screen.getByText("2 个 role 的关系暂不支持")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "打开导入草稿" })).toHaveAttribute(
+      "href",
+      "/builder?session=session-1",
+    );
+    expect(api.overview).toHaveBeenCalledTimes(1);
   });
 
   it("offers an explicit retry without retry loops or fake fallback data", async () => {

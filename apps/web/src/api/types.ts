@@ -200,6 +200,24 @@ export type ModelingSession = {
   updated_at: string;
   validation?: VersionSummary["validation"];
 };
+export type OssieImportReport = {
+  name: string;
+  description: string;
+  mode: "merge" | "replace";
+  counts: {
+    objects_added: number;
+    objects_updated: number;
+    links_added: number;
+    links_updated: number;
+    attributes_added: number;
+    attributes_updated: number;
+  };
+  skipped: { path: string; reason: string }[];
+  notes: string[];
+};
+export type OssieImportResult = ModelingSession & {
+  import_report: OssieImportReport;
+};
 export type Material = {
   id: string;
   name: string;

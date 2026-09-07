@@ -8,6 +8,7 @@ import type {
   Draft,
   ModelingSession,
   Material,
+  OssieImportResult,
   Capabilities,
   DataConnection,
   DataTable,
@@ -183,6 +184,17 @@ export const modelingApi = {
       { revision: s.revision, message },
     ),
   snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  importOssie: (
+    id: string,
+    document: unknown,
+    mode: "merge" | "replace",
+    title?: string,
+  ) =>
+    workspaceRequest<OssieImportResult>(id, "/imports/ossie", {
+      document,
+      mode,
+      ...(title ? { title } : {}),
+    }),
   materials: (id: string) =>
     workspaceRequest<{ items: Material[] }>(id, "/materials"),
   upload: (id: string, file: File) =>

@@ -18,6 +18,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
+from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import _all_graph, version_summary
 from ontofoundry_api.services.workspaces import (
@@ -436,6 +437,52 @@ def published_snapshot(
         if version
         else OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
     )
+
+
+class OssieImport(BaseModel):
+    document: dict
+    mode: str = Field(default="merge", pattern="^(merge|replace)$")
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+
+
+@router.post("/imports/ossie", status_code=201)
+def import_ossie_document(
+    workspace_id: str,
+    body: OssieImport,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """Read an Ossie file into a new modeling session. Publishing stays explicit."""
+    require_member(db, workspace_id, user.id)
+    space = get_workspace(db, workspace_id)
+    version = (
+        db.get(OntologyVersionRecord, space.current_version_id)
+        if space.current_version_id
+        else None
+    )
+    try:
+        draft, report = import_ossie(
+            body.document,
+            workspace_id=workspace_id,
+            base=version.snapshot_json if version else None,
+            mode=body.mode,
+        )
+    except (OssieImportError, ValidationError, ValueError) as exc:
+        raise HTTPException(422, f"导入失败：{exc}") from exc
+    item = ModelingSessionRecord(
+        id=str(uuid4()),
+        workspace_id=workspace_id,
+        created_by=user.id,
+        title=body.title or f"导入 {report['name'] or 'Ossie 本体'}",
+        base_version_id=space.current_version_id,
+        draft_json=draft,
+    )
+    db.add(item)
+    db.commit()
+    result = session_data(item)
+    result["import_report"] = report
+    result["validation"] = validate_draft(draft, space)
+    return result
 
 
 @router.get("/capabilities")

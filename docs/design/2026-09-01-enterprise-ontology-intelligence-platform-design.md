@@ -485,7 +485,8 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 | OntoFoundry 内部模型 | Apache Ossie 0.2.0.dev0 输出 |
 |---|---|
 | Object Type | `ontology[]` 中 `type: EntityType` 的 component |
-| 属性 | 一个 `ValueType` component，加所属 EntityType 中指向它的 relationship |
+| 普通属性 | 所属 EntityType 中指向内置值概念的 relationship，不额外包装 ValueType |
+| 标识属性 | 一个 `ValueType` component（`extends` 内置值类型），加指向它的 relationship，并进入 `identify_by` |
 | Link Type | 起点 EntityType component 中的一条 relationship，终点和自关联角色编译为 roles，基数编译为 multiplicity |
 | 约束 | ontology、component 或 relationship 的 `requires` |
 | 派生规则 | component 或 relationship 的 `derived_by`，V0.1 只表达和校验引用，不执行 |
@@ -499,7 +500,34 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 - requires、derived_by 除可确定引用外，不宣称完成业务语义验证；
 - JSON 语法和官方 Schema 通过且语义 lint 0 error 才可发布；warning 展示但不阻塞。
 
-UUID、中文显示名、标签、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性输出，确保相同快照得到相同 SHA-256。
+UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性输出，确保相同快照得到相同 SHA-256。
+
+中文显示名、标签和属性必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。UUID、文档实例和证据仍然只在 OntoFoundry 快照里。
+
+### 9.1 导入：Ossie 是更宽的语言
+
+Ossie 能表达的结构比内置模型多。导入按“能表示就导入，不能表示就报告”处理，不猜测、不静默丢弃：
+
+| Apache Ossie 构造 | 内置模型对应 | 导入行为 |
+|---|---|---|
+| `EntityType` component | 业务对象 | 直接导入；concept 作技术名，中文名取自扩展，否则用 concept |
+| `ValueType` component | 无独立概念，只有属性的值类型 | 沿 `extends` 追到内置值类型后折叠为 string/integer/… 并记录说明 |
+| 内置值概念 String/Integer/Decimal/Float/Boolean/Date/DateTime | 属性的七种 value_kind | 一一对应 |
+| 内置实体 `Any` | 无 | 指向 `Any` 的关系跳过并报告 |
+| relationship（role 指向值概念） | 属性 | 导入为属性；被 `identify_by` 命中时置为标识属性 |
+| relationship（role 指向实体） | 本体关系 | 导入为关系。Ossie 的关系名是概念内的局部名，内置模型的关系技术名全局唯一，重名时加后缀并保留原名在业务名称里 |
+| roles 数量 ≠ 1（一元、三元及以上） | 无 | 跳过并报告：内置模型只有二元关系 |
+| `multiplicity`：ManyToOne / OneToOne / 省略 | many_to_one / one_to_one / many_to_many | 一一对应。内置 one_to_many 在导出时翻转两端写成 ManyToOne，导入回来是语义等价、方向相反的 many_to_one |
+| `extends`（实体继承） | 无继承 | 把父概念的关系展开复制到子对象，并记录说明；`identify_by` 同样按最近祖先继承 |
+| `identify_by`（指向属性关系） | 属性的 identifier | 支持，含复合标识 |
+| `identify_by`（指向实体关系） | 无 | 跳过并报告：内置模型的标识只能是属性 |
+| `requires` / `derived_by`（SQL 表达式） | 无规则与派生模型 | 跳过并报告；这与“规则缺少可靠表达式时保持待澄清”一致 |
+| `ontology_mappings` + `semantic_model` | 数据映射（连接、表、键列、字段字典） | 不导入。两者形状不同：Ossie 用表达式映射自带的逻辑模型，平台用真实连接配置，需在“数据映射”页按连接重建 |
+| `verbalizes` | 无存储 | 不导入；导出时按名称模板重新生成，手写读法在往返中丢失 |
+| `ai_context` | 由空间名称与描述生成 | 只读取其中的 `ontofoundry` 扩展 |
+| 无对应 | UUID、文档实例、实例关系、证据、数据映射、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
+
+导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须先通过官方 JSON Schema，否则整份拒绝。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
 
 ## 10. 本体服务：REST API 与 MCP
 
@@ -530,6 +558,8 @@ V0.1 的本体服务只读：
 - GET /api/v1/ontology/workspaces/{id}/objects/{ref}：实例详情；
 - GET /api/v1/ontology/workspaces/{id}/objects/{ref}/neighborhood：实例关系展开；
 - GET /api/v1/ontology/workspaces/{id}/versions/{versionId}/export：下载标准 Ossie JSON。
+
+导入属于建模管理接口，不在只读服务里：POST /api/v1/workspaces/{id}/imports/ossie 接收一份 Ossie JSON 和 `mode`（merge/replace），成员权限，返回新建的建模会话、导入报告和校验结果；它不会发布任何版本。
 
 列表统一使用游标分页；实例邻域显式限制深度、节点数、行数和超时。证据引用和短片段随类型或实例详情返回，不设置独立证据接口。API 不提供任意 SQL、任意图查询语言或直接下载完整源文档。
 
@@ -924,6 +954,29 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 验证：前端 31 项自动化测试通过（新增 9 项布局与边几何单元测试，覆盖确定性、卡片不重叠、属性绕排、扇形偏移方向、边界锚点、自环与重合节点），后端 40 项测试通过；前后端 lint、TypeScript 与生产构建通过。真实浏览器复核示例空间：侧栏只剩六项，全局视图服务层进入发布页，语义视图与显示属性可读，悬停高亮一跳邻域，点关系标签打开关系检查器；缩略图在 168×104 下完整显示全图，拖动 40px 对应画布平移约 441px（缩放比约 11），滚轮缩放正常，无浏览器错误。本轮浏览器操作没有写入、生成或发布数据。示例空间只有 5 个对象和 12 个属性，尚未在数百节点的真实模型上做过布局性能与可读性验证。
 
 截图：`output/playwright/semantic-graph-refit-20260907.png`、`semantic-attributes-refit-20260907.png`、`semantic-focus-refit-20260907.png`、`semantic-edge-label-20260907.png`、`global-service-entry-20260907.png`、`minimap-fixed-20260907.png`。
+
+### 17.8 Apache Ossie 导入与往返（2026-09-07）
+
+此前只有导出。本轮补齐导入，并按第 9.1 节的差异表处理内置模型装不下的构造。
+
+本轮实现：
+
+- 新增 `ossie/importer.py`：官方 Schema 先行拒绝非法文件；EntityType 转业务对象，指向值概念的 relationship 转属性，指向实体的 relationship 转关系；`extends` 的关系与 `identify_by` 展开复制；ValueType 沿 `extends` 折叠为内置值类型；一元/n 元关系、`requires`、`derived_by`、`ontology_mappings`、指向 `Any` 或未定义概念的关系、以实体关系作标识全部进入报告，不静默丢弃。
+- 新增 POST `/imports/ossie`（成员权限）：导入结果是一个建模会话草稿，附导入报告与校验结果，发布仍是单独操作。合并模式按技术名新增或更新并保留本地中文名、文档实例与数据映射；替换模式只保留文件内容。
+- 导出增加 `ai_context.ontofoundry` 命名空间扩展，携带中文显示名、标签和属性必填标记。官方 schema 只在 `ai_context` 允许额外属性，这是标准内唯一可用的位置；扩展缺失时导入仍可工作。属性必填此前在导出中完全丢失，现在可以往返。
+- 前端在语义视图工具栏加“导入”，对话框选择文件与合并/替换方式，导入后展示计数、说明与“未导入的内容”表，并可直接打开草稿。
+
+| 消融对照 | 相同输入下观察结果 | 决定 |
+|---|---|---|
+| 导入直接改已发布模型 | 一次误导入即成为企业标准，且会删除文件之外的对象 | 导入只生成草稿，发布仍需显式操作 |
+| 默认替换整份模型 | 示例空间导入 crm 后，5 个已有对象、文档实例与映射会在发布时消失 | 默认合并，替换是显式选项并明确提示后果 |
+| 遇到不支持的构造直接失败 | 带 `requires` 或三元关系的文件将完全无法导入 | 导入可用部分，逐条报告未导入内容与原因 |
+| 把 `requires`/`derived_by` 猜成内置约束 | 平台没有表达式模型，任何转换都是伪造语义 | 只报告，不转换 |
+| 不写 `ai_context` 扩展，靠 description 猜中文名 | 往返后“物料”会变成描述句或 `material` | 用标准允许的开放字段承载显示名、标签与必填 |
+
+验证：后端 48 项测试通过（新增 8 项：自家导出往返一致且可再次编译发布、重复导入得到同一批 UUID、外部文件逐项报告继承展开/值概念折叠/n 元关系/表达式/映射/标识限制、合并保留实例与映射、替换语义、非法文件拒绝、接口不发布任何版本）；前端 32 项测试通过（新增导入对话框流程）；前后端 lint、TypeScript、生产构建通过。真实浏览器用 crm 样例走完“导入 → 报告 → 打开草稿”，草稿显示 8 个实体（5 个原有 + 3 个导入），未发布任何版本。样例规模仍然很小，没有在数百概念、深继承或带完整 `ontology_mappings` 的真实文件上验证过。
+
+截图：`output/playwright/ossie-import-dialog-20260907.png`、`ossie-import-report-20260907.png`、`ossie-import-draft-20260907.png`。
 
 ## 参考资料
 

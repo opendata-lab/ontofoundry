@@ -15,6 +15,13 @@ from ontofoundry_api.domain.models import (
 from .validator import semantics_can_run, validate_schema, validate_semantics
 
 OSSIE_VERSION = "0.2.0.dev0"
+# Ossie forbids extra properties everywhere except inside ai_context, which the
+# official schema declares as an open object. The business names, tags and
+# required flags the workspace shows have no field of their own in the standard,
+# so they ride there under our own key; every other consumer can ignore it, and
+# import works without it.
+EXTENSION_KEY = "ontofoundry"
+EXTENSION_VERSION = "1"
 
 VALUE_BASES = {
     ValueKind.STRING: "String",
@@ -92,10 +99,16 @@ def compile_ossie(
 
     value_components: list[dict[str, Any]] = []
     entity_components: list[dict[str, Any]] = []
+    display_names: dict[str, str] = {}
+    tags: dict[str, list[str]] = {}
+    required_attributes: list[str] = []
 
     for object_type in objects:
         relationships: list[dict[str, Any]] = []
         identifiers: list[str] = []
+        display_names[object_type.technical_name] = object_type.name
+        if object_type.tags:
+            tags[object_type.technical_name] = sorted(object_type.tags)
 
         for attribute in sorted(
             object_type.attributes, key=lambda item: item.technical_name.casefold()
@@ -134,6 +147,10 @@ def compile_ossie(
                 identifiers.append(attribute.technical_name)
             else:
                 relationship["multiplicity"] = "ManyToOne"
+            key = f"{object_type.technical_name}.{attribute.technical_name}"
+            display_names[key] = attribute.name
+            if attribute.required:
+                required_attributes.append(key)
             relationships.append(relationship)
 
         for link in sorted(
@@ -152,6 +169,10 @@ def compile_ossie(
                     target.technical_name,
                 )
             )
+            key = f"{object_type.technical_name}.{link.technical_name}"
+            display_names[key] = link.name
+            if link.tags:
+                tags[key] = sorted(link.tags)
 
         component: dict[str, Any] = {
             "concept": object_type.technical_name,
@@ -177,6 +198,12 @@ def compile_ossie(
         "ai_context": {
             "instructions": "依据已发布的业务对象、属性和关系解释企业业务语义",
             "synonyms": [ontology_description] if ontology_description else [],
+            EXTENSION_KEY: {
+                "version": EXTENSION_VERSION,
+                "display_names": display_names,
+                "tags": tags,
+                "required_attributes": sorted(required_attributes),
+            },
         },
         "ontology": components,
     }
