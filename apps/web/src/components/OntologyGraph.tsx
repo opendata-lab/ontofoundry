@@ -138,9 +138,14 @@ function OntologyEdgeView({
       ? selfLoopGeometry(from, data.loop)
       : edgeGeometry(from, to, data.offset);
   const relation = data.item.kind === "link_type";
+  const inheritance = data.item.kind === "extends";
   const className = classes(
     "ontology-edge",
-    relation ? "ontology-edge--relation" : "ontology-edge--attribute",
+    relation
+      ? "ontology-edge--relation"
+      : inheritance
+        ? "ontology-edge--extends"
+        : "ontology-edge--attribute",
     data.emphasis === "dimmed" && "is-dimmed",
     data.emphasis === "match" && "is-match",
     selected && "is-selected",
@@ -154,7 +159,7 @@ function OntologyEdgeView({
         className={className}
         interactionWidth={18}
       />
-      {relation && (
+      {(relation || inheritance) && (
         <EdgeLabelRenderer>
           <button
             type="button"
@@ -220,12 +225,12 @@ function buildElements(graph: TypeGraph, mode: "global" | "semantic") {
         offset: offsets.get(item.id) ?? 0,
         loop,
       },
-      // Relations carry direction, attributes do not. Marker colour comes from
-      // CSS: SVG presentation attributes cannot read design tokens.
+      // Relations and inheritance carry direction, attributes do not. Marker
+      // colour comes from CSS: SVG presentation attributes cannot read tokens.
       markerEnd:
-        item.kind === "link_type"
-          ? { type: MarkerType.ArrowClosed, width: 13, height: 13 }
-          : undefined,
+        item.kind === "attribute"
+          ? undefined
+          : { type: MarkerType.ArrowClosed, width: 13, height: 13 },
     };
   });
   return { nodes, edges: flowEdges };

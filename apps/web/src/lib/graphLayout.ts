@@ -7,7 +7,7 @@ export type LayoutNode = {
 };
 export type LayoutEdge = {
   id: string;
-  kind: "attribute" | "link_type";
+  kind: "attribute" | "link_type" | "extends";
   source: string;
   target: string;
 };
@@ -42,8 +42,7 @@ function seed(count: number, index: number): Point {
   };
 }
 
-function simulate(ids: string[], links: [number, number][]) {
-  const count = ids.length;
+function simulate(count: number, links: [number, number][]) {
   const x = new Float64Array(count);
   const y = new Float64Array(count);
   for (let i = 0; i < count; i++) {
@@ -197,6 +196,65 @@ function satelliteDirection(
   return Math.atan2(base.y, base.x) || 0;
 }
 
+/** Groups of node indices that are reachable from each other. */
+function components(count: number, links: [number, number][]): number[][] {
+  const parent = [...Array(count)].map((_, index) => index);
+  const find = (index: number): number => {
+    while (parent[index] !== index) {
+      parent[index] = parent[parent[index]];
+      index = parent[index];
+    }
+    return index;
+  };
+  for (const [a, b] of links) {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootA] = rootB;
+  }
+  const grouped = new Map<number, number[]>();
+  for (let index = 0; index < count; index++) {
+    const root = find(index);
+    grouped.set(root, [...(grouped.get(root) ?? []), index]);
+  }
+  // Biggest first so the main model sits at the top left of the canvas.
+  return [...grouped.values()].sort(
+    (one, two) => two.length - one.length || one[0] - two[0],
+  );
+}
+
+/** Shelf packing: parts sit side by side and wrap into a landscape block. */
+function packComponents(
+  boxes: { indices: number[]; width: number; height: number }[],
+  points: Point[],
+) {
+  const gap = 120;
+  // Count the gap as part of each part's footprint, then aim for a block
+  // wider than it is tall.
+  const area = boxes.reduce(
+    (sum, box) => sum + (box.width + gap) * (box.height + gap),
+    0,
+  );
+  const target = Math.max(boxes[0]?.width ?? 0, Math.sqrt(area * 1.9));
+  let cursorX = 0;
+  let cursorY = 0;
+  let rowHeight = 0;
+  for (const box of boxes) {
+    if (cursorX > 0 && cursorX + box.width > target) {
+      cursorX = 0;
+      cursorY += rowHeight + gap;
+      rowHeight = 0;
+    }
+    for (const index of box.indices) {
+      points[index] = {
+        x: points[index].x + cursorX,
+        y: points[index].y + cursorY,
+      };
+    }
+    cursorX += box.width + gap;
+    rowHeight = Math.max(rowHeight, box.height);
+  }
+}
+
 /**
  * Centre positions for every node. Object types run through the force
  * simulation; value types are fanned around the object that declares them so
@@ -226,23 +284,57 @@ export function layoutGraph(
     if (a === undefined || b === undefined || a === b) continue;
     links.push([a, b]);
   }
-  const { x, y } = simulate(
-    anchors.map((node) => node.id),
-    links,
-  );
-  const points = anchors.map((_, index) => ({ x: x[index], y: y[index] }));
-  alignToCanvas(points);
-  // Widen before collision removal: the canvas is landscape, the layout should be too.
-  for (const point of points) {
-    point.x *= 1.18;
-    point.y *= 0.82;
+  // Unconnected parts of a model repel each other without any edge pulling them
+  // back, which leaves the canvas mostly empty. Lay each part out on its own,
+  // then pack the parts.
+  const points = anchors.map(() => ({ x: 0, y: 0 }));
+  const groups = components(anchors.length, links);
+  const boxes: { indices: number[]; width: number; height: number }[] = [];
+  for (const indices of groups) {
+    const local = new Map(indices.map((index, position) => [index, position]));
+    const inner: [number, number][] = links
+      .filter(([a]) => local.has(a))
+      .map(([a, b]) => [local.get(a)!, local.get(b)!]);
+    const { x, y } = simulate(indices.length, inner);
+    const laid = indices.map((_, position) => ({
+      x: x[position],
+      y: y[position],
+    }));
+    alignToCanvas(laid);
+    // Widen before collision removal: the canvas is landscape, so should the graph.
+    for (const point of laid) {
+      point.x *= 1.18;
+      point.y *= 0.82;
+    }
+    const scale = densityScale(laid, inner);
+    for (const point of laid) {
+      point.x *= scale;
+      point.y *= scale;
+    }
+    separate(laid);
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const point of laid) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+    indices.forEach((index, position) => {
+      points[index] = {
+        x: laid[position].x - minX,
+        y: laid[position].y - minY,
+      };
+    });
+    boxes.push({
+      indices,
+      width: maxX - minX + NODE_WIDTH,
+      height: maxY - minY + NODE_HEIGHT,
+    });
   }
-  const scale = densityScale(points, links);
-  for (const point of points) {
-    point.x *= scale;
-    point.y *= scale;
-  }
-  separate(points);
+  packComponents(boxes, points);
   const positions = new Map<string, Point>();
   anchors.forEach((node, index) => positions.set(node.id, points[index]));
 

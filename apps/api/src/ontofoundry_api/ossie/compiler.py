@@ -6,6 +6,7 @@ from collections import defaultdict
 from typing import Any
 
 from ontofoundry_api.domain.models import (
+    AttributeDefinition,
     LinkTypeDefinition,
     Multiplicity,
     OntologyDraft,
@@ -51,23 +52,41 @@ def _value_concept(object_key: str, attribute_key: str) -> str:
     return f"{object_key}_{attribute_key}_value"
 
 
+def link_verbalizations(
+    link: LinkTypeDefinition, source_key: str, target_key: str
+) -> list[str]:
+    """The standard reading of a relation, used when the model stores none."""
+    role_name = link.target_role_name or ("related" if source_key == target_key else None)
+    target_ref = target_key + (":" + role_name if role_name else "")
+    if link.multiplicity == Multiplicity.ONE_TO_MANY:
+        return [
+            f"{{{target_ref}}}{link.name}{{{source_key}}}",
+            f"{{{source_key}}}是{{{target_ref}}}通过“{link.name}”关联的对象",
+        ]
+    return [
+        f"{{{source_key}}}{link.name}{{{target_ref}}}",
+        f"{{{target_ref}}}是{{{source_key}}}通过“{link.name}”关联的对象",
+    ]
+
+
+def attribute_verbalizations(
+    attribute: AttributeDefinition, object_key: str, value_concept: str
+) -> list[str]:
+    return [f"{{{object_key}}}的{attribute.name}是{{{value_concept}}}"]
+
+
 def _compile_link_relationship(
     link: LinkTypeDefinition,
     source_key: str,
     target_key: str,
 ) -> dict[str, Any]:
     role_name = link.target_role_name or ("related" if source_key == target_key else None)
-    target_ref = target_key + (":" + role_name if role_name else "")
-    forward = f"{{{source_key}}}{link.name}{{{target_ref}}}"
-    backward = f"{{{target_ref}}}是{{{source_key}}}通过“{link.name}”关联的对象"
-    if link.multiplicity == Multiplicity.ONE_TO_MANY:
-        forward = f"{{{target_ref}}}{link.name}{{{source_key}}}"
-        backward = f"{{{source_key}}}是{{{target_ref}}}通过“{link.name}”关联的对象"
     relationship: dict[str, Any] = {
         "name": link.technical_name,
         "description": link.description or f"{link.name}：{source_key} 到 {target_key}",
         "roles": [{"concept": target_key}],
-        "verbalizes": [forward, backward],
+        # Hand-written readings win; otherwise the standard one is generated.
+        "verbalizes": link.verbalizes or link_verbalizations(link, source_key, target_key),
     }
     if role_name:
         relationship["roles"][0]["name"] = role_name
@@ -76,6 +95,10 @@ def _compile_link_relationship(
         relationship["multiplicity"] = multiplicity
     if link.multiplicity == Multiplicity.ONE_TO_MANY:
         relationship["multiplicity"] = "ManyToOne"
+    if link.requires:
+        relationship["requires"] = list(link.requires)
+    if link.derived_by:
+        relationship["derived_by"] = list(link.derived_by)
     return relationship
 
 
@@ -90,12 +113,7 @@ def compile_ossie(
     by_id = {item.id: item for item in objects}
     links_by_source: dict[Any, list[LinkTypeDefinition]] = defaultdict(list)
     for link in draft.link_types:
-        owner = (
-            link.target_type_id
-            if link.multiplicity == Multiplicity.ONE_TO_MANY
-            else link.source_type_id
-        )
-        links_by_source[owner].append(link)
+        links_by_source[link.owner_type_id].append(link)
 
     value_components: list[dict[str, Any]] = []
     entity_components: list[dict[str, Any]] = []
@@ -109,6 +127,11 @@ def compile_ossie(
         display_names[object_type.technical_name] = object_type.name
         if object_type.tags:
             tags[object_type.technical_name] = sorted(object_type.tags)
+        # A composite identifier can pair attributes with identifying relations,
+        # so a lone identifier is only OneToOne when nothing else identifies.
+        identifier_count = sum(item.identifier for item in object_type.attributes) + sum(
+            link.identifier for link in links_by_source[object_type.id]
+        )
 
         for attribute in sorted(
             object_type.attributes, key=lambda item: item.technical_name.casefold()
@@ -131,22 +154,22 @@ def compile_ossie(
                 "name": attribute.technical_name,
                 "description": attribute.description or attribute.name,
                 "roles": [{"concept": value_concept}],
-                "verbalizes": [
-                    (
-                        f"{{{object_type.technical_name}}}的{attribute.name}"
-                        f"是{{{value_concept}}}"
-                    )
-                ],
+                "verbalizes": attribute.verbalizes
+                or attribute_verbalizations(
+                    attribute, object_type.technical_name, value_concept
+                ),
             }
             if attribute.identifier:
                 relationship["multiplicity"] = (
-                    "OneToOne"
-                    if sum(a.identifier for a in object_type.attributes) == 1
-                    else "ManyToOne"
+                    "OneToOne" if identifier_count == 1 else "ManyToOne"
                 )
                 identifiers.append(attribute.technical_name)
             else:
                 relationship["multiplicity"] = "ManyToOne"
+            if attribute.requires:
+                relationship["requires"] = list(attribute.requires)
+            if attribute.derived_by:
+                relationship["derived_by"] = list(attribute.derived_by)
             key = f"{object_type.technical_name}.{attribute.technical_name}"
             display_names[key] = attribute.name
             if attribute.required:
@@ -169,6 +192,8 @@ def compile_ossie(
                     target.technical_name,
                 )
             )
+            if link.identifier:
+                identifiers.append(link.technical_name)
             key = f"{object_type.technical_name}.{link.technical_name}"
             display_names[key] = link.name
             if link.tags:
@@ -179,8 +204,18 @@ def compile_ossie(
             "type": "EntityType",
             "description": object_type.description or object_type.name,
         }
+        if object_type.extends:
+            component["extends"] = sorted(
+                by_id[parent].technical_name
+                for parent in object_type.extends
+                if parent in by_id
+            )
         if identifiers:
             component["identify_by"] = sorted(identifiers)
+        if object_type.requires:
+            component["requires"] = list(object_type.requires)
+        if object_type.derived_by:
+            component["derived_by"] = list(object_type.derived_by)
         if relationships:
             component["relationships"] = sorted(
                 relationships, key=lambda item: item["name"].casefold()
@@ -191,7 +226,7 @@ def compile_ossie(
         value_components + entity_components,
         key=lambda item: (item["type"], item["concept"].casefold()),
     )
-    return {
+    document: dict[str, Any] = {
         "version": OSSIE_VERSION,
         "name": ontology_name,
         "description": ontology_description,
@@ -207,6 +242,9 @@ def compile_ossie(
         },
         "ontology": components,
     }
+    if draft.requires:
+        document["requires"] = list(draft.requires)
+    return document
 
 
 def validate_ossie(document: dict[str, Any]) -> dict[str, Any]:

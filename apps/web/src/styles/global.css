@@ -618,6 +618,12 @@ table {
   stroke-width: 1.4;
 }
 
+.ontology-edge--extends {
+  stroke: var(--color-object);
+  stroke-dasharray: 8 4;
+  stroke-width: 1.4;
+}
+
 .ontology-edge--attribute {
   stroke: var(--color-attribute);
   stroke-dasharray: 4 4;
@@ -661,6 +667,11 @@ table {
   border-color: transparent;
   opacity: 0.14;
   pointer-events: none;
+}
+
+.ontology-edge__label.ontology-edge--extends {
+  border-color: var(--color-object-soft);
+  color: var(--color-object);
 }
 
 .ontology-edge__label.is-match,
