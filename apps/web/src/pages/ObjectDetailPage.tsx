@@ -13,6 +13,58 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { usePageTab } from "../hooks/usePageTab";
+import type { Draft, ObjectDefinition } from "../api/types";
+
+// Expressions are stored and reference-checked, never executed by the platform.
+function ExpressionList({
+  label,
+  items,
+  empty,
+}: {
+  label: string;
+  items?: string[];
+  empty?: string;
+}) {
+  if (!items?.length)
+    return empty ? (
+      <p className="muted">
+        {label}：{empty}
+      </p>
+    ) : null;
+  return (
+    <div className="expression-list">
+      <h3>{label}</h3>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>
+            <code>{item}</code>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Supertypes closest first, mirroring how the model resolves inheritance.
+function inheritedAttributes(draft: Draft, type: ObjectDefinition) {
+  const byId = new Map(draft.object_types.map((item) => [item.id, item]));
+  const seen = new Set<string>([type.id]);
+  const frontier = [...(type.extends ?? [])];
+  const rows: {
+    attribute: ObjectDefinition["attributes"][number];
+    from: string;
+  }[] = [];
+  while (frontier.length) {
+    const parentId = frontier.shift()!;
+    const parent = byId.get(parentId);
+    if (!parent || seen.has(parentId)) continue;
+    seen.add(parentId);
+    for (const attribute of parent.attributes)
+      rows.push({ attribute, from: parent.name });
+    frontier.push(...(parent.extends ?? []));
+  }
+  return rows;
+}
 
 export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
   const { typeId } = useParams();
@@ -36,6 +88,8 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
         <Link to="../objects">返回业务对象</Link>
       </div>
     );
+  const inherited =
+    "attributes" in type ? inheritedAttributes(draft, type) : [];
   const edit = async () => {
     try {
       const s = sessionId
@@ -132,11 +186,30 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                   <dt>标签</dt>
                   <dd>{type.tags.join(" · ") || "—"}</dd>
                 </div>
+                {"attributes" in type && (
+                  <div>
+                    <dt>继承自</dt>
+                    <dd>
+                      {(type.extends ?? [])
+                        .map(
+                          (id) =>
+                            draft.object_types.find((t) => t.id === id)?.name ??
+                            id,
+                        )
+                        .join(" · ") || "—"}
+                    </dd>
+                  </div>
+                )}
                 <div className="wide">
                   <dt>描述</dt>
                   <dd>{type.description || "尚未填写"}</dd>
                 </div>
               </dl>
+              <ExpressionList label="约束（requires）" items={type.requires} />
+              <ExpressionList
+                label="派生规则（derived_by）"
+                items={type.derived_by}
+              />
             </section>
             {"attributes" in type ? (
               <section className="detail-section">
@@ -149,6 +222,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                       <th>类型</th>
                       <th>标识</th>
                       <th>必填</th>
+                      <th>来源</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -159,6 +233,17 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                         <td>{a.value_kind}</td>
                         <td>{a.identifier ? "是" : "—"}</td>
                         <td>{a.required ? "是" : "—"}</td>
+                        <td>—</td>
+                      </tr>
+                    ))}
+                    {inherited.map(({ attribute, from }) => (
+                      <tr key={attribute.id} className="is-inherited">
+                        <td>{attribute.name}</td>
+                        <td>{attribute.technical_name}</td>
+                        <td>{attribute.value_kind}</td>
+                        <td>{attribute.identifier ? "是" : "—"}</td>
+                        <td>{attribute.required ? "是" : "—"}</td>
+                        <td>继承自 {from}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -179,6 +264,22 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                   }
                 </p>
                 <p className="muted">基数：{type.multiplicity}</p>
+                {type.identifier && (
+                  <p className="muted">用作标识：被引用对象通过这条关系识别</p>
+                )}
+                <ExpressionList
+                  label="约束（requires）"
+                  items={type.requires}
+                />
+                <ExpressionList
+                  label="派生规则（derived_by）"
+                  items={type.derived_by}
+                />
+                <ExpressionList
+                  label="自然语言读法（verbalizes）"
+                  items={type.verbalizes}
+                  empty="按标准模板生成"
+                />
               </section>
             )}
           </>

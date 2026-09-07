@@ -26,6 +26,14 @@ def validate_technical_name(value: str) -> str:
 
 
 NonEmptyText = Annotated[str, Field(min_length=1, max_length=240)]
+# Ossie expressions are ANSI SQL text. The platform stores and reference-checks
+# them through the official lint; it never executes them.
+Expression = Annotated[str, Field(min_length=1, max_length=480)]
+Expressions = Annotated[list[Expression], Field(default_factory=list, max_length=20)]
+Verbalizations = Annotated[
+    list[Annotated[str, Field(min_length=1, max_length=480)]],
+    Field(default_factory=list, max_length=8),
+]
 
 
 class ValueKind(StrEnum):
@@ -53,6 +61,11 @@ class AttributeDefinition(BaseModel):
     value_kind: ValueKind = ValueKind.STRING
     required: bool = False
     identifier: bool = False
+    # Compiles to a relationship, so it carries the same Ossie fields a
+    # relationship does. Empty verbalizes means "generate the standard reading".
+    requires: Expressions
+    derived_by: Expressions
+    verbalizes: Verbalizations
 
     _normalize_name = field_validator("name")(normalize_display_name)
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
@@ -64,6 +77,11 @@ class ObjectTypeDefinition(BaseModel):
     technical_name: NonEmptyText
     description: str = ""
     tags: list[str] = Field(default_factory=list)
+    # Ossie `extends`: supertypes of this concept. A child holds only what it
+    # adds; inherited attributes and relationships are read through the chain.
+    extends: list[UUID] = Field(default_factory=list, max_length=8)
+    requires: Expressions
+    derived_by: Expressions
     attributes: list[AttributeDefinition] = Field(default_factory=list)
 
     _normalize_name = field_validator("name")(normalize_display_name)
@@ -95,21 +113,98 @@ class LinkTypeDefinition(BaseModel):
     multiplicity: Multiplicity = Multiplicity.MANY_TO_ONE
     source_role_name: str | None = None
     target_role_name: str | None = None
+    # Referent identification: the object is identified through this relation,
+    # e.g. an order line identified by its order plus a line number.
+    identifier: bool = False
+    requires: Expressions
+    derived_by: Expressions
+    verbalizes: Verbalizations
     tags: list[str] = Field(default_factory=list)
     data_join: DataJoin | None = None
 
     _normalize_name = field_validator("name")(normalize_display_name)
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
 
+    @property
+    def owner_type_id(self) -> UUID:
+        """Concept the compiled relationship hangs under (its first role).
+
+        Ossie has no OneToMany, so a one-to-many link is written from the many
+        side; everything else is written from its source.
+        """
+        return (
+            self.target_type_id
+            if self.multiplicity == Multiplicity.ONE_TO_MANY
+            else self.source_type_id
+        )
+
+    @model_validator(mode="after")
+    def ensure_identifier_is_functional(self) -> LinkTypeDefinition:
+        if self.identifier and self.multiplicity not in (
+            Multiplicity.MANY_TO_ONE,
+            Multiplicity.ONE_TO_ONE,
+        ):
+            raise ValueError(
+                f"{self.name}：作为标识的关系必须是多对一或一对一，"
+                "否则无法唯一确定被标识的对象"
+            )
+        return self
+
 
 class OntologyDraft(BaseModel):
     schema_version: str = "1"
     workspace_id: UUID
+    # Ossie ontology-level `requires`: constraints over the whole population.
+    requires: Expressions
     object_types: list[ObjectTypeDefinition] = Field(default_factory=list)
     link_types: list[LinkTypeDefinition] = Field(default_factory=list)
     objects: list[DocumentObject] = Field(default_factory=list)
     links: list[DocumentLink] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
+
+    def ancestors(self, type_id: UUID) -> list[ObjectTypeDefinition]:
+        """Supertypes closest first, without repeats or infinite loops.
+
+        A type reachable from itself is returned too, so a cycle is visible to
+        the validator instead of being silently skipped.
+        """
+        by_id = {item.id: item for item in self.object_types}
+        ordered: list[ObjectTypeDefinition] = []
+        seen: set[UUID] = set()
+        frontier = list(by_id[type_id].extends) if type_id in by_id else []
+        while frontier:
+            parent_id = frontier.pop(0)
+            if parent_id in seen or parent_id not in by_id:
+                continue
+            seen.add(parent_id)
+            parent = by_id[parent_id]
+            ordered.append(parent)
+            frontier.extend(parent.extends)
+        return ordered
+
+    def effective_attributes(self, type_id: UUID) -> list[AttributeDefinition]:
+        """Own attributes plus everything inherited through `extends`."""
+        by_id = {item.id: item for item in self.object_types}
+        if type_id not in by_id:
+            return []
+        items = list(by_id[type_id].attributes)
+        for parent in self.ancestors(type_id):
+            items.extend(parent.attributes)
+        return items
+
+    def descendants(self, type_id: UUID) -> set[UUID]:
+        """The type itself and every type that extends it, directly or not."""
+        found = {type_id}
+        changed = True
+        while changed:
+            changed = False
+            for item in self.object_types:
+                if item.id in found:
+                    continue
+                if found & set(item.extends):
+                    found.add(item.id)
+                    changed = True
+        return found
 
     @model_validator(mode="after")
     def validate_graph(self) -> OntologyDraft:
@@ -129,17 +224,11 @@ class OntologyDraft(BaseModel):
             raise ValueError("模型项标识重复")
         object_names = [normalize_display_name(item.name) for item in self.object_types]
         object_keys = [item.technical_name.casefold() for item in self.object_types]
-        link_names = [normalize_display_name(item.name) for item in self.link_types]
-        link_keys = [item.technical_name.casefold() for item in self.link_types]
 
         if len(object_names) != len(set(object_names)):
             raise ValueError("工作空间中存在同名业务对象")
         if len(object_keys) != len(set(object_keys)):
             raise ValueError("工作空间中存在技术名冲突的业务对象")
-        if len(link_names) != len(set(link_names)):
-            raise ValueError("工作空间中存在同名本体关系")
-        if len(link_keys) != len(set(link_keys)):
-            raise ValueError("工作空间中存在技术名冲突的本体关系")
 
         missing = {
             endpoint
@@ -149,13 +238,43 @@ class OntologyDraft(BaseModel):
         }
         if missing:
             raise ValueError("本体关系引用了不存在的业务对象")
-        type_by_id = {t.id: t for t in self.object_types}
+        for item in self.object_types:
+            for parent_id in item.extends:
+                if parent_id not in object_ids:
+                    raise ValueError(f"{item.name} 继承了不存在的业务对象")
+                if parent_id == item.id:
+                    raise ValueError(f"{item.name} 不能继承自己")
+            if item.id in {parent.id for parent in self.ancestors(item.id)}:
+                raise ValueError(f"{item.name} 的继承关系形成了循环")
+
+        # Ossie keeps one relationship namespace per concept, shared by
+        # attributes and relations, and inherited by subtypes.
+        for item in self.object_types:
+            owned = [
+                link
+                for link in self.link_types
+                if link.owner_type_id == item.id
+                or link.owner_type_id in {p.id for p in self.ancestors(item.id)}
+            ]
+            names = [
+                normalize_display_name(entry.name)
+                for entry in [*self.effective_attributes(item.id), *owned]
+            ]
+            keys = [
+                entry.technical_name.casefold()
+                for entry in [*self.effective_attributes(item.id), *owned]
+            ]
+            if len(names) != len(set(names)):
+                raise ValueError(f"{item.name} 的属性与关系中存在同名项（含继承）")
+            if len(keys) != len(set(keys)):
+                raise ValueError(f"{item.name} 的属性与关系中存在技术名冲突（含继承）")
+
         instances = {o.id: o for o in self.objects}
         relations = {r.id: r for r in self.link_types}
         for item in self.objects:
             if item.type_id not in object_ids:
                 raise ValueError("文档实例必须绑定已存在的业务对象类型")
-            keys = {a.technical_name for a in type_by_id[item.type_id].attributes}
+            keys = {a.technical_name for a in self.effective_attributes(item.type_id)}
             if set(item.values) - keys:
                 raise ValueError("实例含未定义的属性")
         for item in self.links:
@@ -163,10 +282,10 @@ class OntologyDraft(BaseModel):
             source, target = instances.get(item.source_id), instances.get(item.target_id)
             if not relation or not source or not target:
                 raise ValueError("实例关系引用无效")
-            if (
-                source.type_id != relation.source_type_id
-                or target.type_id != relation.target_type_id
-            ):
+            # A subtype object is usable wherever its supertype is expected.
+            if source.type_id not in self.descendants(
+                relation.source_type_id
+            ) or target.type_id not in self.descendants(relation.target_type_id):
                 raise ValueError("实例关系端点类型不匹配")
         mapped_ids = [m.type_id for m in self.mappings]
         if len(mapped_ids) != len(set(mapped_ids)):
@@ -174,7 +293,7 @@ class OntologyDraft(BaseModel):
         for mapping in self.mappings:
             if mapping.type_id not in object_ids:
                 raise ValueError("映射引用了不存在的业务对象")
-            attrs = {a.technical_name for a in type_by_id[mapping.type_id].attributes}
+            attrs = {a.technical_name for a in self.effective_attributes(mapping.type_id)}
             if set(mapping.fields) - attrs:
                 raise ValueError("映射引用了未定义的属性")
             if "__key" in mapping.fields:

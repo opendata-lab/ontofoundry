@@ -89,10 +89,39 @@ describe("图谱布局", () => {
       { id: "b", kind: "object_type" },
     ];
     const points = layoutGraph(nodes, []);
+    const [one, two] = [points.get("a")!, points.get("b")!];
     expect(points.size).toBe(2);
-    expect(distance(points.get("a")!, points.get("b")!)).toBeGreaterThan(
-      NODE_WIDTH,
-    );
+    expect(
+      Math.abs(one.x - two.x) >= NODE_WIDTH ||
+        Math.abs(one.y - two.y) >= NODE_HEIGHT,
+    ).toBe(true);
+  });
+
+  it("packs unconnected parts instead of letting them drift apart", () => {
+    const first = model(6);
+    const second = model(4);
+    const nodes = [
+      ...first.nodes,
+      ...second.nodes.map((node) => ({ ...node, id: "b" + node.id })),
+    ];
+    const edges = [
+      ...first.edges,
+      ...second.edges.map((edge) => ({
+        ...edge,
+        id: "b" + edge.id,
+        source: "b" + edge.source,
+        target: "b" + edge.target,
+      })),
+    ];
+    const points = layoutGraph(nodes, edges);
+    const xs = [...points.values()].map((p) => p.x);
+    const ys = [...points.values()].map((p) => p.y);
+    const width = Math.max(...xs) - Math.min(...xs);
+    const height = Math.max(...ys) - Math.min(...ys);
+    // Two chains of five relations each: without packing the two parts drift
+    // to opposite corners and the canvas has to zoom far out to fit them.
+    expect(width).toBeLessThan(2600);
+    expect(height).toBeLessThan(1400);
   });
 });
 

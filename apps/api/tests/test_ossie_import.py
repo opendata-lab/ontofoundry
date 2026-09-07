@@ -1,6 +1,16 @@
-import pytest
+from uuid import UUID, uuid4
 
-from ontofoundry_api.domain.models import OntologyDraft
+import pytest
+from pydantic import ValidationError
+
+from ontofoundry_api.domain.models import (
+    AttributeDefinition,
+    LinkTypeDefinition,
+    Multiplicity,
+    ObjectTypeDefinition,
+    OntologyDraft,
+    ValueKind,
+)
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
@@ -164,37 +174,223 @@ def test_imported_model_still_compiles_and_validates():
     assert report["publishable"] is True
 
 
-def test_foreign_file_reports_every_construct_it_cannot_represent():
+def test_foreign_file_keeps_inheritance_identifiers_and_expressions():
     payload, report = import_ossie(
         foreign_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
     )
     model = OntologyDraft.model_validate(payload)
     by_key = {item.technical_name: item for item in model.object_types}
-    reasons = {item["path"]: item["reason"] for item in report["skipped"]}
+    customer, order, party = by_key["customer"], by_key["order"], by_key["party"]
 
-    # Inheritance is flattened, including the identifier it carries.
-    customer = by_key["customer"]
-    assert [a.technical_name for a in customer.attributes] == [
-        "party_code",
+    # extends is kept as inheritance, not copied into the child.
+    assert customer.extends == [party.id]
+    assert [a.technical_name for a in customer.attributes] == ["credit_limit"]
+    assert [a.technical_name for a in model.effective_attributes(customer.id)] == [
         "credit_limit",
+        "party_code",
     ]
-    assert customer.attributes[0].identifier is True
-    assert customer.attributes[1].value_kind == "decimal"
-    assert any("继承自 party" in note for note in report["notes"])
+    assert party.attributes[0].identifier is True
+    assert party.attributes[0].value_kind == "string"
 
-    # A ValueType chain collapses onto the built-in it extends, and says so.
-    assert customer.attributes[0].value_kind == "string"
+    # Expressions land on the concept and the relationship that carry them.
+    assert model.requires == ["EXISTS (customer)"]
+    assert customer.requires == ["customer.status = 'active'"]
+    placed_by = next(i for i in model.link_types if i.technical_name == "placed_by")
+    assert placed_by.derived_by == ["SELECT 1"]
+    # An entity relationship can identify its concept, as Ossie allows.
+    assert placed_by.identifier is True
+    assert placed_by.verbalizes == ["{order} placed by {customer}"]
+    assert order.attributes == []
+
+    # A collapsed value concept is only reported when something is lost.
     assert any("party_code_value" in note for note in report["notes"])
+
+
+def test_foreign_file_reports_only_what_it_cannot_represent():
+    payload, report = import_ossie(
+        foreign_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    reasons = {item["path"]: item["reason"] for item in report["skipped"]}
 
     assert "role" in reasons["customer.sold_to"]
     assert "role" in reasons["order.cancelled"]
     assert "Any" in reasons["customer.anything"]
-    assert "表达式" in reasons["ontology.requires"]
-    assert "表达式" in reasons["customer.requires"]
-    assert "表达式" in reasons["order.placed_by.derived_by"]
     assert "ontology_mappings" in reasons
-    assert "标识" in reasons["order.identify_by[placed_by]"]
+    # Expressions and identifying relations are supported now, so they are gone
+    # from the report.
+    assert not [path for path in reasons if path.endswith("requires")]
+    assert not [path for path in reasons if path.endswith("derived_by")]
+    assert "order.identify_by[placed_by]" not in reasons
     assert [item.technical_name for item in model.link_types] == ["placed_by"]
+
+
+def rich_draft():
+    """A model that uses every Ossie construct the internal model now carries."""
+    space = UUID(str(DEMO_WORKSPACE_ID))
+    party = ObjectTypeDefinition(
+        id=uuid4(),
+        name="往来单位",
+        technical_name="party",
+        description="企业往来的单位",
+        attributes=[
+            AttributeDefinition(
+                id=uuid4(),
+                name="单位编号",
+                technical_name="party_code",
+                value_kind=ValueKind.STRING,
+                identifier=True,
+                required=True,
+                requires=["party.party_code IS NOT NULL"],
+            )
+        ],
+    )
+    customer = ObjectTypeDefinition(
+        id=uuid4(),
+        name="客户",
+        technical_name="customer",
+        description="买方",
+        extends=[party.id],
+        requires=["EXISTS (customer.orders)"],
+        tags=["销售"],
+        attributes=[
+            AttributeDefinition(
+                id=uuid4(),
+                name="信用额度",
+                technical_name="credit_limit",
+                value_kind=ValueKind.DECIMAL,
+                verbalizes=["{customer}的信用额度上限是{Decimal}"],
+            )
+        ],
+    )
+    order = ObjectTypeDefinition(
+        id=uuid4(),
+        name="订单",
+        technical_name="sales_order",
+        attributes=[
+            AttributeDefinition(
+                id=uuid4(),
+                name="行号",
+                technical_name="line_no",
+                value_kind=ValueKind.INTEGER,
+                identifier=True,
+            )
+        ],
+    )
+    placed_by = LinkTypeDefinition(
+        id=uuid4(),
+        name="下单客户",
+        technical_name="placed_by",
+        source_type_id=order.id,
+        target_type_id=customer.id,
+        multiplicity=Multiplicity.MANY_TO_ONE,
+        identifier=True,
+        derived_by=["SELECT 1"],
+        verbalizes=["{sales_order}由{customer}下单"],
+    )
+    # Same relationship name under a different concept: legal in Ossie, and now
+    # legal here too because the name only has to be unique inside its concept.
+    referred_by = LinkTypeDefinition(
+        id=uuid4(),
+        name="推荐人",
+        technical_name="placed_by",
+        source_type_id=customer.id,
+        target_type_id=party.id,
+        multiplicity=Multiplicity.MANY_TO_ONE,
+    )
+    return OntologyDraft(
+        workspace_id=space,
+        requires=["EXISTS (party)"],
+        object_types=[party, customer, order],
+        link_types=[placed_by, referred_by],
+    )
+
+
+def test_rich_model_survives_a_full_round_trip_and_stays_publishable():
+    draft = rich_draft()
+    document = compile_ossie(draft, ontology_name="crm", ontology_description="客户模型")
+    assert validate_ossie(document)["publishable"] is True
+
+    components = {item["concept"]: item for item in document["ontology"]}
+    assert components["customer"]["extends"] == ["party"]
+    assert components["sales_order"]["identify_by"] == ["line_no", "placed_by"]
+    assert components["customer"]["requires"] == ["EXISTS (customer.orders)"]
+    assert document["requires"] == ["EXISTS (party)"]
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    by_key = {item.technical_name: item for item in imported.object_types}
+
+    assert report["skipped"] == []
+    assert by_key["customer"].extends == [by_key["party"].id]
+    assert by_key["customer"].requires == ["EXISTS (customer.orders)"]
+    assert by_key["customer"].attributes[0].verbalizes == [
+        "{customer}的信用额度上限是{Decimal}"
+    ]
+    assert imported.requires == ["EXISTS (party)"]
+    order_link = next(
+        item
+        for item in imported.link_types
+        if item.source_type_id == by_key["sales_order"].id
+    )
+    assert order_link.identifier is True
+    assert order_link.derived_by == ["SELECT 1"]
+    assert order_link.verbalizes == ["{sales_order}由{customer}下单"]
+    # Both relationships keep the same technical name under different concepts.
+    assert sorted(item.technical_name for item in imported.link_types) == [
+        "placed_by",
+        "placed_by",
+    ]
+    assert (
+        validate_ossie(
+            compile_ossie(imported, ontology_name="crm", ontology_description="客户模型")
+        )["publishable"]
+        is True
+    )
+
+
+def test_model_rejects_what_ossie_would_reject():
+    draft = rich_draft()
+    cycle = draft.model_dump(mode="json")
+    cycle["object_types"][0]["extends"] = [cycle["object_types"][1]["id"]]
+    with pytest.raises(ValidationError, match="循环"):
+        OntologyDraft.model_validate(cycle)
+
+    clash = draft.model_dump(mode="json")
+    clash["object_types"][1]["attributes"][0]["technical_name"] = "party_code"
+    with pytest.raises(ValidationError, match="技术名冲突"):
+        OntologyDraft.model_validate(clash)
+
+    loose = draft.model_dump(mode="json")
+    loose["link_types"][0]["multiplicity"] = "many_to_many"
+    with pytest.raises(ValidationError, match="标识"):
+        OntologyDraft.model_validate(loose)
+
+
+def test_hand_written_reading_outside_the_relationship_is_regenerated():
+    document = foreign_document()
+    for component in document["ontology"]:
+        if component["concept"] == "order":
+            component["relationships"][0]["verbalizes"] = ["{order} for {party}"]
+    payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    model = OntologyDraft.model_validate(payload)
+    reasons = {item["path"]: item["reason"] for item in report["skipped"]}
+
+    assert "order.placed_by.verbalizes" in reasons
+    assert (
+        next(
+            item for item in model.link_types if item.technical_name == "placed_by"
+        ).verbalizes
+        == []
+    )
+    assert (
+        validate_ossie(compile_ossie(model, ontology_name="crm", ontology_description=""))[
+            "publishable"
+        ]
+        is True
+    )
 
 
 def test_merge_keeps_existing_model_instances_and_mappings():

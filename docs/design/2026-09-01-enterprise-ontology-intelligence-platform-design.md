@@ -485,13 +485,17 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 | OntoFoundry 内部模型 | Apache Ossie 0.2.0.dev0 输出 |
 |---|---|
 | Object Type | `ontology[]` 中 `type: EntityType` 的 component |
+| Object Type 的 `extends` | component 的 `extends`（父概念技术名） |
 | 普通属性 | 所属 EntityType 中指向内置值概念的 relationship，不额外包装 ValueType |
 | 标识属性 | 一个 `ValueType` component（`extends` 内置值类型），加指向它的 relationship，并进入 `identify_by` |
-| Link Type | 起点 EntityType component 中的一条 relationship，终点和自关联角色编译为 roles，基数编译为 multiplicity |
+| Link Type | 首 role 概念的 component 中的一条 relationship，终点和自关联角色编译为 roles，基数编译为 multiplicity |
+| 标识关系（Link Type 的 identifier） | 该 relationship 的名字进入所属 component 的 `identify_by` |
 | 约束 | ontology、component 或 relationship 的 `requires` |
 | 派生规则 | component 或 relationship 的 `derived_by`，V0.1 只表达和校验引用，不执行 |
-| 数据映射 | `ontology_mappings`，只在有真实数据集、字段和 Join 证据时生成 |
-| Object、Link、中文名、标签和证据 | 只进入 OntoFoundry 快照，不写入 Ossie JSON |
+| 自然语言读法 | relationship 的 `verbalizes`；模型没有存读法时按名称模板生成 |
+| 中文名、标签、属性必填 | `ai_context.ontofoundry` 命名空间扩展 |
+| 数据映射 | `ontology_mappings`，只在有真实数据集、字段和 Join 证据时生成（尚未实现） |
+| Object、Link、UUID 和证据 | 只进入 OntoFoundry 快照，不写入 Ossie JSON |
 
 - 只从有证据的材料生成概念、关系和表达式；
 - 无真实逻辑模型证据时不猜 ontology mappings；
@@ -504,30 +508,45 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 
 中文显示名、标签和属性必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。UUID、文档实例和证据仍然只在 OntoFoundry 快照里。
 
-### 9.1 导入：Ossie 是更宽的语言
+### 9.1 Ossie 构造到内置模型的对照
 
-Ossie 能表达的结构比内置模型多。导入按“能表示就导入，不能表示就报告”处理，不猜测、不静默丢弃：
+内置模型按 Ossie 的构造扩展过一轮，目标是双向翻译：本平台导出的文件重新导入后得到同一个模型，外部文件导入后仍能编译回通过官方 Schema 与语义 lint 的 Ossie。下表是权威对照，“状态”一列说明这条构造是否往返无损。
 
-| Apache Ossie 构造 | 内置模型对应 | 导入行为 |
+| Apache Ossie 构造 | 内置模型 | 状态与说明 |
 |---|---|---|
-| `EntityType` component | 业务对象 | 直接导入；concept 作技术名，中文名取自扩展，否则用 concept |
-| `ValueType` component | 无独立概念，只有属性的值类型 | 沿 `extends` 追到内置值类型后折叠为 string/integer/… 并记录说明 |
-| 内置值概念 String/Integer/Decimal/Float/Boolean/Date/DateTime | 属性的七种 value_kind | 一一对应 |
-| 内置实体 `Any` | 无 | 指向 `Any` 的关系跳过并报告 |
-| relationship（role 指向值概念） | 属性 | 导入为属性；被 `identify_by` 命中时置为标识属性 |
-| relationship（role 指向实体） | 本体关系 | 导入为关系。Ossie 的关系名是概念内的局部名，内置模型的关系技术名全局唯一，重名时加后缀并保留原名在业务名称里 |
-| roles 数量 ≠ 1（一元、三元及以上） | 无 | 跳过并报告：内置模型只有二元关系 |
-| `multiplicity`：ManyToOne / OneToOne / 省略 | many_to_one / one_to_one / many_to_many | 一一对应。内置 one_to_many 在导出时翻转两端写成 ManyToOne，导入回来是语义等价、方向相反的 many_to_one |
-| `extends`（实体继承） | 无继承 | 把父概念的关系展开复制到子对象，并记录说明；`identify_by` 同样按最近祖先继承 |
-| `identify_by`（指向属性关系） | 属性的 identifier | 支持，含复合标识 |
-| `identify_by`（指向实体关系） | 无 | 跳过并报告：内置模型的标识只能是属性 |
-| `requires` / `derived_by`（SQL 表达式） | 无规则与派生模型 | 跳过并报告；这与“规则缺少可靠表达式时保持待澄清”一致 |
-| `ontology_mappings` + `semantic_model` | 数据映射（连接、表、键列、字段字典） | 不导入。两者形状不同：Ossie 用表达式映射自带的逻辑模型，平台用真实连接配置，需在“数据映射”页按连接重建 |
-| `verbalizes` | 无存储 | 不导入；导出时按名称模板重新生成，手写读法在往返中丢失 |
-| `ai_context` | 由空间名称与描述生成 | 只读取其中的 `ontofoundry` 扩展 |
-| 无对应 | UUID、文档实例、实例关系、证据、数据映射、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
+| `EntityType` component | 业务对象（Object Type） | 双向无损。concept 作技术名，中文名来自扩展，缺失时用 concept |
+| `extends`（实体继承） | Object Type 的 `extends`（多父） | 双向无损。子对象只存自己新增的属性与关系，继承链上的内容按需解析；校验拒绝环与重名 |
+| `ValueType` component | 属性的 `value_kind` | 有损：值概念本身不保留。沿 `extends` 追到内置值类型；只有被多个关系共用、带自己的 `requires`/`derived_by`、或经由中间值概念时才提示——单一属性上的具名值类型本来就等于“属性 + 值类型” |
+| 内置值概念 String/Integer/Decimal/Float/Boolean/Date/DateTime | 七种 value_kind | 双向无损 |
+| 内置实体 `Any` | 无 | 不支持：指向 `Any` 的关系跳过并报告，它没有对应的业务对象 |
+| relationship（role 指向值概念） | 属性 | 双向无损 |
+| relationship（role 指向实体） | 本体关系（Link Type） | 双向无损。关系名在 Ossie 是概念内的局部名，内置模型同样只要求在所属概念内唯一（属性与关系共用一个命名空间，并对子类型生效） |
+| roles 数量 ≠ 1（一元、三元及以上） | 无 | 不支持：跳过并报告，内置模型只有二元关系 |
+| `multiplicity`：ManyToOne / OneToOne / 省略 | many_to_one / one_to_one / many_to_many | 双向无损。内置 one_to_many 在导出时翻转两端写成 ManyToOne，导入回来是语义等价、方向相反的 many_to_one |
+| `identify_by`（指向属性关系） | 属性的 identifier | 双向无损，含复合标识 |
+| `identify_by`（指向实体关系） | Link Type 的 identifier | 双向无损。这是 Ossie 的 referent identification（如订单行由订单加行号标识）；校验要求这条关系是多对一或一对一 |
+| `requires`（ontology / concept / relationship） | 本体、对象、属性、关系上的 `requires` | 双向无损。表达式按文本存储，由官方语义 lint 校验引用，平台不执行 |
+| `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
+| `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损。与标准模板一致的读法不存储（避免改名后变成陈述旧名的死文本）；手写读法按新概念名改写后存储；引用了这条关系之外概念的读法会被丢弃并报告，否则会编译出非法 verbalization |
+| `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
+| `ontology_mappings` + `semantic_model` | 数据映射（连接、表、键列、字段字典） | 尚未翻译：Ossie 用表达式映射自带的逻辑模型，平台用真实连接配置，导入时报告并要求在“数据映射”页按连接重建 |
+| 无对应 | UUID、文档实例、实例关系、证据、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
+
+同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
 
 导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须先通过官方 JSON Schema，否则整份拒绝。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
+
+### 9.2 内置模型为支持双向翻译新增的字段
+
+| 字段 | 位置 | 作用 |
+|---|---|---|
+| `extends: [UUID]` | Object Type | 继承父概念；实例可用于父概念声明的关系端点，属性按继承链解析 |
+| `identifier: bool` | Link Type | 这条关系参与标识来源对象，编译进 `identify_by` |
+| `requires: [表达式]` | 本体、Object Type、属性、Link Type | 约束表达式，纯文本存储 |
+| `derived_by: [表达式]` | Object Type、属性、Link Type | 派生表达式，纯文本存储 |
+| `verbalizes: [读法]` | 属性、Link Type | 手写自然语言读法；为空表示按模板生成 |
+
+表达式和读法都有长度与条数上限，避免把整段文档塞进模型。平台不解析、不执行表达式：语义由官方 lint 在发布门槛处检查，业务正确性仍需人工复核。
 
 ## 10. 本体服务：REST API 与 MCP
 
@@ -978,7 +997,31 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 
 截图：`output/playwright/ossie-import-dialog-20260907.png`、`ossie-import-report-20260907.png`、`ossie-import-draft-20260907.png`。
 
-## 参考资料
+### 17.9 内置模型对齐 Ossie，支持双向翻译（2026-09-07）
+
+评审指出：把继承展开复制、把标识关系和表达式当作“不支持”上报，是内置模型能力不足，不是 Ossie 的问题。本轮扩展内置模型，让两边可以互相翻译，对照表见第 9.1、9.2 节。
+
+本轮实现：
+
+- 内置模型新增 `extends`（对象继承）、Link Type 的 `identifier`（referent identification）、四处 `requires`、三处 `derived_by`、属性与关系的 `verbalizes`。校验相应加强：继承不能成环或与祖先重名；标识关系必须是多对一或一对一；实例值与映射字段按继承链解析；父概念上的关系接受子类型实例。
+- 关系命名改为与 Ossie 一致的概念内局部名：属性与关系在同一个概念里共用一个命名空间并对子类型生效，不同概念可以各有同名关系。这同时堵住了一个旧漏洞——同一概念下属性与关系重名会编译出重复的 relationship。
+- 导入不再展开继承、不再丢弃表达式和标识关系；`verbalizes` 按新概念名改写后存储，与模板一致的读法不存储，引用关系之外概念的读法丢弃并报告。值概念折叠只在真正有损时提示。
+- 编译器输出 `extends`、`identify_by`（含标识关系）、各级 `requires`/`derived_by` 和存储的读法；REST/MCP 的类型详情补充 `supertypes` 与 `inherited_attributes`，图谱增加继承边。
+- 本体详情页显示父概念、继承来的属性、约束、派生规则与读法；语义图谱用蓝色虚线画继承。
+
+| 消融对照 | 相同输入下观察结果 | 决定 |
+|---|---|---|
+| 继续把父概念的关系复制进子对象 | 子对象凭空多出父概念的属性，改父概念要手工同步每个子对象，导出也丢掉 `extends` | 内置模型直接支持继承 |
+| 值概念一律提示“已折叠” | 自家导出往返也会刷出提示，真正的损失被淹没 | 只在共用、带表达式或有中间概念时提示 |
+| 关系技术名保持全局唯一 | 两个概念各有 `owned_by` 的合法文件被迫改名，往返后与原文件不一致 | 命名空间与 Ossie 对齐到概念内 |
+| 原样保存 `verbalizes` | 标识属性的读法引用文件里的值概念名，重新编译即报 UNKNOWN_VERBALIZATION_ROLE | 改写占位符，与模板一致则不存储 |
+| 平台解析或执行表达式 | 需要实现 SQL 方言与执行器，且无法保证与消费端一致 | 只存储与引用校验，执行留给消费端 |
+
+顺带修掉一个由此暴露的布局缺陷：导入后模型出现互不相连的两块，力导向把两块推到画布两端，适配后缩到 0.35 倍、标签无法辨认。现在按连通分量分别布局再做货架式装箱，两块并排或换行排列。
+
+验证：后端 52 项测试通过（新增继承/标识关系/表达式/读法的完整往返、概念内同名关系、模型校验拒绝成环与非功能标识、读法越界回退），前端 33 项测试通过（新增分量装箱布局）；前后端 lint、TypeScript 与生产构建通过。真实浏览器把 crm 样例导入并发布到示例空间：语义图谱两块模型都可读，继承画成蓝色虚线，对象详情显示父概念、继承来的属性与约束。仍未完成：`ontology_mappings` 与数据映射的双向翻译、表达式与读法的编辑界面（当前只读展示，靠导入或 API 写入）。
+
+截图：`output/playwright/ossie-inheritance-graph-20260907.png`、`ossie-inherited-detail-20260907.png`。
 
 - [Apache Ossie Ontology Specification](https://github.com/apache/ossie/blob/main/ontology/ontology.md)
 - [Apache Ossie Ontology JSON Schema](https://github.com/apache/ossie/blob/main/ontology/ontology.json)

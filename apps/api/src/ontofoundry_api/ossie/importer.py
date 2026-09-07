@@ -1,10 +1,11 @@
 """Read Apache Ossie ontology JSON into the internal model.
 
-Ossie is the wider language: it has concept inheritance, n-ary relationships,
-value types with their own semantics and SQL expressions, none of which the
-internal object/attribute/link model can hold. Nothing is guessed here — every
-construct that cannot be represented is reported instead of being silently
-dropped, so the user reviewing the imported draft can see what was left behind.
+The internal model carries the Ossie constructs it can: entity inheritance,
+identifying relations, constraints, derivations and hand-written readings all
+survive a round trip. What remains outside it — n-ary and unary relationships,
+value concepts as first-class concepts, `Any`, ontology_mappings — is reported
+rather than guessed at, so the user reviewing the draft sees what was left
+behind. See section 9.1 of the design document for the full correspondence.
 """
 
 from __future__ import annotations
@@ -24,7 +25,12 @@ from ontofoundry_api.domain.models import (
     ValueKind,
 )
 
-from .compiler import EXTENSION_KEY, VALUE_BASES
+from .compiler import (
+    EXTENSION_KEY,
+    VALUE_BASES,
+    attribute_verbalizations,
+    link_verbalizations,
+)
 from .validator import validate_schema
 
 MAX_COMPONENTS = 2000
@@ -34,6 +40,7 @@ MULTIPLICITY_BY_OSSIE = {
     "ManyToOne": Multiplicity.MANY_TO_ONE,
 }
 NON_IDENTIFIER_RE = re.compile(r"[^A-Za-z0-9_]+")
+PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
 class OssieImportError(ValueError):
@@ -111,80 +118,108 @@ def _resolve_value_kind(
     )
 
 
-def _flatten_relationships(
-    concept: str,
-    entities: dict[str, dict[str, Any]],
-    report: Report,
-    seen: set[str] | None = None,
-) -> list[dict[str, Any]]:
-    """Inherited relationships first, then the concept's own; child wins by name.
-
-    The internal model has no inheritance, so an extending entity has to carry a
-    copy of what it inherits or the imported model would be missing attributes.
-    """
-    seen = seen or set()
-    if concept in seen:
-        return []
-    seen.add(concept)
-    component = entities.get(concept, {})
-    merged: dict[str, dict[str, Any]] = {}
-    for parent in component.get("extends") or []:
+def _parents(
+    concept: str, entities: dict[str, dict[str, Any]], report: Report
+) -> list[str]:
+    """Entity supertypes that are actually defined in the file."""
+    found: list[str] = []
+    for parent in entities.get(concept, {}).get("extends") or []:
         parent_name = str(parent)
-        if parent_name == "Any":
+        if parent_name == "Any":  # implicit root, not a business object
             continue
         if parent_name not in entities:
             report.skip(
                 f"{concept}.extends[{parent_name}]",
-                "父概念未在文件中定义，未展开继承",
+                "父概念未在文件中定义，继承未建立",
             )
             continue
-        report.note(
-            f"{concept} 继承自 {parent_name}：内置模型没有继承，已把父概念的关系复制进来"
+        found.append(parent_name)
+    return found
+
+
+def _expressions(holder: dict[str, Any], field: str) -> list[str]:
+    return [str(item) for item in holder.get(field) or [] if str(item).strip()]
+
+
+def _retarget(text: str, mapping: dict[str, str]) -> str | None:
+    """Rewrite `{concept}` placeholders onto the names the compiler will emit.
+
+    Returns None when the reading mentions anything outside this relationship —
+    the compiler could only emit an invalid verbalization for that.
+    """
+    outside = False
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal outside
+        concept, _, role = match.group(1).partition(":")
+        target = mapping.get(concept)
+        if target is None:
+            outside = True
+            return match.group(0)
+        return "{" + target + (":" + role if role else "") + "}"
+
+    result = PLACEHOLDER_RE.sub(replace, text)
+    return None if outside else result
+
+
+def _keep_verbalizations(
+    written: list[str],
+    generated: list[str],
+    mapping: dict[str, str],
+    path: str,
+    report: Report,
+) -> list[str]:
+    """Keep hand-written readings, drop the ones we would have to mangle."""
+    if not written:
+        return []
+    retargeted = [_retarget(text, mapping) for text in written]
+    if any(text is None for text in retargeted):
+        report.skip(
+            f"{path}.verbalizes",
+            "自然语言读法引用了这条关系之外的概念，导入后按标准模板重新生成",
         )
-        for relationship in _flatten_relationships(parent_name, entities, report, seen):
-            merged[str(relationship.get("name"))] = relationship
-    for relationship in component.get("relationships") or []:
-        if isinstance(relationship, dict):
-            merged[str(relationship.get("name"))] = relationship
-    return list(merged.values())
+        return []
+    return [] if retargeted == generated else [text for text in retargeted if text]
 
 
-def _flatten_identifiers(
+def _value_concept_loss(
     concept: str,
-    entities: dict[str, dict[str, Any]],
-    seen: set[str] | None = None,
-) -> set[str]:
-    """A concept's own identify_by, or the nearest ancestor's when it has none."""
-    seen = seen or set()
-    if concept in seen:
-        return set()
-    seen.add(concept)
-    component = entities.get(concept, {})
-    own = {str(item) for item in component.get("identify_by") or []}
-    if own:
-        return own
-    for parent in component.get("extends") or []:
-        inherited = _flatten_identifiers(str(parent), entities, seen)
-        if inherited:
-            return inherited
-    return set()
+    values: dict[str, dict[str, Any]],
+    uses: dict[str, int],
+    kind: ValueKind,
+) -> str | None:
+    """What a named value concept loses when it becomes an attribute value kind.
 
-
-def _expression_skips(
-    holder: dict[str, Any], path: str, report: Report, subject: str
-) -> None:
-    for field, label in (("requires", "约束"), ("derived_by", "派生规则")):
-        count = len(holder.get(field) or [])
-        if count:
-            report.skip(
-                f"{path}.{field}",
-                f"{subject}：{count} 条{label}（SQL 表达式）暂不支持，内置模型没有规则表达式",
-            )
+    A value concept used by exactly one relationship, extending a built-in
+    directly and carrying no constraints, is precisely “attribute + value kind”.
+    Anything else — sharing, an intermediate concept, its own rules — does not
+    survive, and the user should hear about it.
+    """
+    if concept in VALUE_KIND_BY_CONCEPT:
+        return None
+    component = values.get(concept, {})
+    if uses.get(concept, 0) > 1:
+        return (
+            f"值概念 {concept} 被 {uses[concept]} 个关系共用：内置模型的值类型跟着属性走，"
+            f"导入后这些属性只是同为 {kind.value}，不再共享同一个值概念"
+        )
+    if component.get("requires") or component.get("derived_by"):
+        return (
+            f"值概念 {concept} 自带约束或派生规则：内置模型的属性只保留基础类型 "
+            f"{kind.value}，这些表达式没有承载位置"
+        )
+    chain = [str(item) for item in component.get("extends") or []]
+    if any(parent not in VALUE_KIND_BY_CONCEPT for parent in chain):
+        return (
+            f"值概念 {concept} 经 {'、'.join(chain)} 才继承到内置类型 {kind.value}："
+            "中间的值概念不保留"
+        )
+    return None
 
 
 def parse_ossie(
     document: dict[str, Any], *, workspace_id: str
-) -> tuple[list[ObjectTypeDefinition], list[LinkTypeDefinition], Report]:
+) -> tuple[list[ObjectTypeDefinition], list[LinkTypeDefinition], list[str], Report]:
     """Turn a schema-valid Ossie document into internal types plus a report."""
     if not isinstance(document, dict):
         raise OssieImportError("文件内容不是 JSON 对象")
@@ -218,7 +253,7 @@ def parse_ossie(
     elif entities:
         report.note("文件没有中文显示名，业务名称先使用 concept 名称，可在草稿里修改")
 
-    _expression_skips(document, "ontology", report, "本体")
+    ontology_requires = _expressions(document, "requires")
     if document.get("ontology_mappings"):
         report.skip(
             "ontology_mappings",
@@ -226,28 +261,44 @@ def parse_ossie(
             "数据映射请在“数据映射”页按连接配置",
         )
 
+    # A value concept only loses something when it is shared, sits behind other
+    # value concepts, or carries its own constraints; a plain named string is
+    # exactly an attribute plus its value kind.
+    value_uses: dict[str, int] = {}
+    for component in entities.values():
+        for relationship in component.get("relationships") or []:
+            roles = (
+                relationship.get("roles") or [] if isinstance(relationship, dict) else []
+            )
+            if len(roles) == 1 and isinstance(roles[0], dict):
+                target = str(roles[0].get("concept") or "")
+                if target in values:
+                    value_uses[target] = value_uses.get(target, 0) + 1
+
     object_types: list[ObjectTypeDefinition] = []
     by_concept_id: dict[str, UUID] = {}
+    parents_by_concept: dict[str, list[str]] = {}
     pending_links: list[dict[str, Any]] = []
     taken_object_names: set[str] = set()
     taken_object_keys: set[str] = set()
 
     for concept in sorted(entities):
         component = entities[concept]
-        _expression_skips(component, concept, report, f"概念 {concept}")
         technical_name = _unique(_sanitize(concept), taken_object_keys)
         label = str(display_names.get(concept) or concept).strip() or concept
-        identifiers = _flatten_identifiers(concept, entities)
+        identifiers = {str(item) for item in component.get("identify_by") or []}
+        parents_by_concept[concept] = _parents(concept, entities, report)
         attributes: list[AttributeDefinition] = []
         taken_attribute_names: set[str] = set()
         taken_attribute_keys: set[str] = set()
         used_identifiers: set[str] = set()
 
-        for relationship in _flatten_relationships(concept, entities, report):
+        for relationship in component.get("relationships") or []:
+            if not isinstance(relationship, dict):
+                continue
             name = str(relationship.get("name") or "")
             path = f"{concept}.{name}"
             roles = relationship.get("roles") or []
-            _expression_skips(relationship, path, report, f"关系 {name}")
             if len(roles) != 1:
                 report.skip(
                     path,
@@ -259,31 +310,46 @@ def parse_ossie(
             target = str(role.get("concept") or "")
             key = f"{concept}.{name}"
             title = str(display_names.get(key) or name).strip() or name
+            verbalizes = [
+                str(item) for item in relationship.get("verbalizes") or [] if str(item)
+            ]
 
             if target in VALUE_KIND_BY_CONCEPT or target in values:
                 kind, problem = _resolve_value_kind(target, values)
                 if problem:
                     report.note(problem)
-                elif (
-                    target not in VALUE_KIND_BY_CONCEPT
-                    and target != f"{concept}_{name}_value"
-                ):
-                    report.note(
-                        f"值概念 {target} 已折叠为内置类型 {kind.value}："
-                        "内置模型用属性的值类型表示，不保留独立值概念"
-                    )
+                else:
+                    loss = _value_concept_loss(target, values, value_uses, kind)
+                    if loss:
+                        report.note(loss)
                 attribute_key = _unique(_sanitize(name), taken_attribute_keys)
-                attributes.append(
-                    AttributeDefinition(
-                        id=_identity(workspace_id, f"attribute:{concept}.{name}"),
-                        name=_unique(title, taken_attribute_names, "·"),
-                        technical_name=attribute_key,
-                        description=str(relationship.get("description") or ""),
-                        value_kind=kind,
-                        required=key in required_keys,
-                        identifier=name in identifiers,
-                    )
+                identifier = name in identifiers
+                attribute = AttributeDefinition(
+                    id=_identity(workspace_id, f"attribute:{concept}.{name}"),
+                    name=_unique(title, taken_attribute_names, "·"),
+                    technical_name=attribute_key,
+                    description=str(relationship.get("description") or ""),
+                    value_kind=kind,
+                    required=key in required_keys,
+                    identifier=identifier,
+                    requires=_expressions(relationship, "requires"),
+                    derived_by=_expressions(relationship, "derived_by"),
                 )
+                # Identifier attributes are re-exported behind a generated value
+                # concept, so readings must be retargeted onto that name.
+                emitted_value = (
+                    f"{technical_name}_{attribute_key}_value"
+                    if identifier
+                    else VALUE_BASES[kind]
+                )
+                attribute.verbalizes = _keep_verbalizations(
+                    verbalizes,
+                    attribute_verbalizations(attribute, technical_name, emitted_value),
+                    {concept: technical_name, target: emitted_value},
+                    path,
+                    report,
+                )
+                attributes.append(attribute)
                 used_identifiers.add(name)
                 continue
 
@@ -298,13 +364,12 @@ def parse_ossie(
                         "multiplicity": relationship.get("multiplicity"),
                         "role_name": role.get("name"),
                         "tags": tag_map.get(key),
+                        "identifier": name in identifiers,
+                        "requires": _expressions(relationship, "requires"),
+                        "derived_by": _expressions(relationship, "derived_by"),
+                        "verbalizes": verbalizes,
                     }
                 )
-                if name in identifiers:
-                    report.skip(
-                        f"{concept}.identify_by[{name}]",
-                        "以实体关系作为标识暂不支持，内置模型的标识只能是属性",
-                    )
                 used_identifiers.add(name)
                 continue
 
@@ -328,15 +393,28 @@ def parse_ossie(
                 technical_name=technical_name,
                 description=str(component.get("description") or ""),
                 tags=[str(tag) for tag in tags] if isinstance(tags, list) else [],
+                requires=_expressions(component, "requires"),
+                derived_by=_expressions(component, "derived_by"),
                 attributes=attributes,
             )
         )
         by_concept_id[concept] = object_types[-1].id
 
+    keys_by_concept = {
+        concept: item.technical_name
+        for concept, item in zip(sorted(entities), object_types, strict=True)
+    }
+    for concept, item in zip(sorted(entities), object_types, strict=True):
+        item.extends = [
+            by_concept_id[parent]
+            for parent in parents_by_concept.get(concept, [])
+            if parent in by_concept_id
+        ]
+
     link_types: list[LinkTypeDefinition] = []
-    # Ossie relationship names are local to their concept; ours are global.
-    taken_link_names: set[str] = set()
-    taken_link_keys: set[str] = set()
+    # Relationship names are local to their concept in Ossie and in the internal
+    # model alike, so names only need to be unique inside the owning concept.
+    taken_by_owner: dict[str, tuple[set[str], set[str]]] = {}
     for link in pending_links:
         source_id = by_concept_id.get(link["source"])
         target_id = by_concept_id.get(link["target"])
@@ -349,21 +427,41 @@ def parse_ossie(
         if link["source"] == link["target"] and role_name == "related":
             role_name = None
         tags = link["tags"]
-        link_types.append(
-            LinkTypeDefinition(
-                id=_identity(workspace_id, f"link:{link['source']}.{link['name']}"),
-                name=_unique(link["title"], taken_link_names, "·"),
-                # Relationship names are local to their concept in Ossie but global here.
-                technical_name=_unique(_sanitize(link["name"]), taken_link_keys),
-                description=link["description"],
-                source_type_id=source_id,
-                target_type_id=target_id,
-                multiplicity=multiplicity,
-                target_role_name=str(role_name) if role_name else None,
-                tags=[str(tag) for tag in tags] if isinstance(tags, list) else [],
-            )
+        names, keys = taken_by_owner.setdefault(link["source"], (set(), set()))
+        identifier = bool(link["identifier"]) and multiplicity in (
+            Multiplicity.MANY_TO_ONE,
+            Multiplicity.ONE_TO_ONE,
         )
-    return object_types, link_types, report
+        if link["identifier"] and not identifier:
+            report.skip(
+                f"{link['source']}.identify_by[{link['name']}]",
+                "作为标识的关系必须是多对一或一对一，文件里的基数无法唯一确定对象，标识未设置",
+            )
+        candidate = LinkTypeDefinition(
+            id=_identity(workspace_id, f"link:{link['source']}.{link['name']}"),
+            name=_unique(link["title"], names, "·"),
+            technical_name=_unique(_sanitize(link["name"]), keys),
+            description=link["description"],
+            source_type_id=source_id,
+            target_type_id=target_id,
+            multiplicity=multiplicity,
+            target_role_name=str(role_name) if role_name else None,
+            identifier=identifier,
+            requires=link["requires"],
+            derived_by=link["derived_by"],
+            tags=[str(tag) for tag in tags] if isinstance(tags, list) else [],
+        )
+        source_key = keys_by_concept[link["source"]]
+        target_key = keys_by_concept[link["target"]]
+        candidate.verbalizes = _keep_verbalizations(
+            link["verbalizes"],
+            link_verbalizations(candidate, source_key, target_key),
+            {link["source"]: source_key, link["target"]: target_key},
+            f"{link['source']}.{link['name']}",
+            report,
+        )
+        link_types.append(candidate)
+    return object_types, link_types, ontology_requires, report
 
 
 def _merge(
@@ -399,6 +497,10 @@ def _merge(
         if imported.description:
             current.description = imported.description
         current.tags = sorted({*current.tags, *imported.tags})
+        if imported.requires:
+            current.requires = imported.requires
+        if imported.derived_by:
+            current.derived_by = imported.derived_by
         # Keep the local business name: it is what the workspace already reads.
         attributes = {item.technical_name.casefold(): item for item in current.attributes}
         for attribute in imported.attributes:
@@ -410,33 +512,64 @@ def _merge(
             found.value_kind = attribute.value_kind
             found.identifier = attribute.identifier
             found.required = attribute.required
+            found.requires = attribute.requires
+            found.derived_by = attribute.derived_by
+            found.verbalizes = attribute.verbalizes
             if attribute.description:
                 found.description = attribute.description
             counts["attributes_updated"] += 1
 
     by_key = {item.technical_name.casefold(): item.id for item in merged.object_types}
     id_by_import = {item.id: item.technical_name.casefold() for item in objects}
-    link_index = {item.technical_name.casefold(): item for item in merged.link_types}
-    link_names = {item.name.casefold() for item in merged.link_types}
+    for imported in objects:
+        current = existing.get(imported.technical_name.casefold())
+        parents = [
+            by_key[id_by_import[parent]]
+            for parent in imported.extends
+            if parent in id_by_import and id_by_import[parent] in by_key
+        ]
+        if current is not None and parents:
+            current.extends = parents
+
+    # Relationship names live inside their owning concept, so a file's `owned_by`
+    # updates that concept's `owned_by` and never another concept's.
+    def link_key(link: LinkTypeDefinition, owner: UUID) -> tuple[str, str]:
+        return (str(owner), link.technical_name.casefold())
+
+    link_index = {link_key(item, item.owner_type_id): item for item in merged.link_types}
     for imported in links:
         source = by_key.get(id_by_import.get(imported.source_type_id, ""))
         target = by_key.get(id_by_import.get(imported.target_type_id, ""))
         if source is None or target is None:  # pragma: no cover - endpoints always known
             report.skip(imported.technical_name, "关系两端的业务对象没有导入成功")
             continue
-        current = link_index.get(imported.technical_name.casefold())
+        imported.source_type_id, imported.target_type_id = source, target
+        current = link_index.get(link_key(imported, imported.owner_type_id))
         if current is None:
-            imported.name = _unique(imported.name, link_names, "·")
-            imported.technical_name = _unique(imported.technical_name, set(link_index))
-            imported.source_type_id, imported.target_type_id = source, target
+            owned = [
+                item
+                for key, item in link_index.items()
+                if key[0] == str(imported.owner_type_id)
+            ]
+            imported.name = _unique(
+                imported.name, {item.name.casefold() for item in owned}, "·"
+            )
+            imported.technical_name = _unique(
+                imported.technical_name,
+                {item.technical_name.casefold() for item in owned},
+            )
             merged.link_types.append(imported)
-            link_index[imported.technical_name.casefold()] = imported
+            link_index[link_key(imported, imported.owner_type_id)] = imported
             counts["links_added"] += 1
             continue
         counts["links_updated"] += 1
         current.source_type_id, current.target_type_id = source, target
         current.multiplicity = imported.multiplicity
         current.target_role_name = imported.target_role_name
+        current.identifier = imported.identifier
+        current.requires = imported.requires
+        current.derived_by = imported.derived_by
+        current.verbalizes = imported.verbalizes
         if imported.description:
             current.description = imported.description
         current.tags = sorted({*current.tags, *imported.tags})
@@ -456,7 +589,7 @@ def import_ossie(
         raise OssieImportError(
             "文件不符合 Apache Ossie 0.2.0.dev0 结构：" + schema_issues[0]["message"]
         )
-    objects, links, report = parse_ossie(document, workspace_id=workspace_id)
+    objects, links, requires, report = parse_ossie(document, workspace_id=workspace_id)
     if not objects:
         raise OssieImportError("文件里没有可导入的 EntityType 概念")
 
@@ -483,11 +616,16 @@ def import_ossie(
             report.note("替换模式：文件之外的业务对象与关系会在发布时消失")
         draft = OntologyDraft(
             workspace_id=UUID(str(workspace_id)),
+            requires=requires,
             object_types=objects,
             link_types=links,
         )
     else:
         draft, counts = _merge(base_draft, objects, links, report)
+        draft.requires = [
+            *draft.requires,
+            *[item for item in requires if item not in draft.requires],
+        ]
         report.note("合并模式：文件之外的已有对象、实例与数据映射保持不变")
 
     payload = draft.model_dump(mode="json")

@@ -28,6 +28,11 @@ export type AttributeDefinition = {
   value_kind: string;
   required: boolean;
   identifier: boolean;
+  // Ossie relationship fields: constraints, derivations and readings.
+  requires?: string[];
+  derived_by?: string[];
+  verbalizes?: string[];
+  declared_by?: string;
 };
 
 export type ObjectType = {
@@ -37,8 +42,13 @@ export type ObjectType = {
   technical_name: string;
   description: string;
   tags: string[];
+  extends?: string[];
+  requires?: string[];
+  derived_by?: string[];
   attributes: AttributeDefinition[];
   attribute_count: number;
+  supertypes?: { id: string; name: string; technical_name: string }[];
+  inherited_attributes?: AttributeDefinition[];
 };
 
 export type LinkType = {
@@ -52,6 +62,10 @@ export type LinkType = {
   target_type_id: string;
   multiplicity: string;
   attribute_count: 0;
+  identifier?: boolean;
+  requires?: string[];
+  derived_by?: string[];
+  verbalizes?: string[];
   data_join?: { source_column: string; target_column: string } | null;
 };
 
@@ -94,7 +108,7 @@ export type GraphNode = {
 
 export type GraphEdge = {
   id: string;
-  kind: "attribute" | "link_type";
+  kind: "attribute" | "link_type" | "extends";
   label: string;
   technical_name: string;
   source: string;
@@ -165,6 +179,7 @@ export type DataMapping = {
 export type Draft = {
   schema_version: string;
   workspace_id: string;
+  requires?: string[];
   object_types: ObjectDefinition[];
   link_types: LinkDefinition[];
   objects: DocumentObject[];

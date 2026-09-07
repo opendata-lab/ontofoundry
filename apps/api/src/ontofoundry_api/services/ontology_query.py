@@ -84,15 +84,43 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     return result
 
 
+def _supertypes(type_id: str, by_id: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ancestors closest first; consumers should not have to walk `extends`."""
+    ordered: list[dict[str, Any]] = []
+    seen: set[str] = {type_id}
+    frontier = list(by_id.get(type_id, {}).get("extends", []))
+    while frontier:
+        parent_id = str(frontier.pop(0))
+        if parent_id in seen or parent_id not in by_id:
+            continue
+        seen.add(parent_id)
+        ordered.append(by_id[parent_id])
+        frontier.extend(by_id[parent_id].get("extends", []))
+    return ordered
+
+
 def _type_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    objects = [
-        {
-            **item,
-            "kind": "object_type",
-            "attribute_count": len(item.get("attributes", [])),
-        }
-        for item in snapshot.get("object_types", [])
-    ]
+    by_id = {str(item["id"]): item for item in snapshot.get("object_types", [])}
+    objects = []
+    for item in snapshot.get("object_types", []):
+        supertypes = _supertypes(str(item["id"]), by_id)
+        inherited = [
+            {**attribute, "declared_by": parent["id"]}
+            for parent in supertypes
+            for attribute in parent.get("attributes", [])
+        ]
+        objects.append(
+            {
+                **item,
+                "kind": "object_type",
+                "supertypes": [
+                    {key: parent[key] for key in ("id", "name", "technical_name")}
+                    for parent in supertypes
+                ],
+                "inherited_attributes": inherited,
+                "attribute_count": len(item.get("attributes", [])) + len(inherited),
+            }
+        )
     links = [
         {
             **{key: value for key, value in item.items() if key != "data_join"},
@@ -191,6 +219,19 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                     "target": value_id,
                 }
             )
+        # Inheritance is part of the picture: a subtype points at its supertypes.
+        for parent in object_type.get("extends", []):
+            edges.append(
+                {
+                    "id": f"extends:{object_type['id']}:{parent}",
+                    "kind": "extends",
+                    "label": "继承",
+                    "technical_name": "extends",
+                    "source": object_type["id"],
+                    "target": parent,
+                    "description": f"{object_type['name']} 继承自上级业务对象",
+                }
+            )
     for link in snapshot.get("link_types", []):
         edges.append(
             {
@@ -203,6 +244,7 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                 "multiplicity": link["multiplicity"],
                 "description": link.get("description", ""),
                 "tags": link.get("tags", []),
+                "identifier": link.get("identifier", False),
             }
         )
     return nodes, edges
