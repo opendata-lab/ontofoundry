@@ -1616,46 +1616,44 @@ small,
   max-width: 600px;
 }
 .ontology-node {
-  min-width: unset;
-  max-width: 190px;
-  padding: 8px 12px !important;
-  border-radius: 9px !important;
+  min-width: 132px;
+  max-width: 208px;
+  min-height: 40px;
+  padding: 7px 10px;
+  border-radius: 9px;
   gap: 8px;
-  box-shadow: 0 1px 3px var(--color-shadow) !important;
-  background: var(--color-surface) !important;
-  border: 1px solid var(--color-rule) !important;
 }
-.ontology-node__icon {
-  width: 26px !important;
-  height: 26px !important;
-  background: var(--color-object-soft) !important;
-  color: var(--color-object) !important;
-  border-radius: 6px !important;
+.ontology-node--value {
+  min-width: 104px;
+  min-height: 34px;
+  max-width: 168px;
 }
-.ontology-node--value .ontology-node__icon {
-  background: var(--color-attribute-soft) !important;
-  color: var(--color-attribute) !important;
-}
-.ontology-node strong {
-  font-size: 12px !important;
-  font-weight: 500 !important;
-}
-.ontology-node small {
+/* 值类型卡片只留业务名称，技术名在检查器里看，画布保持一行高度。 */
+.ontology-node--value small {
   display: none;
 }
-.ontology-node .react-flow__handle {
-  width: 4px;
-  height: 4px;
-  opacity: 0;
+.ontology-node__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
 }
-.ontology-edge .react-flow__edge-path {
-  stroke: var(--color-graph-edge) !important;
-  stroke-width: 1.2 !important;
+.ontology-node strong {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
 }
-.ontology-edge--attribute .react-flow__edge-path {
-  stroke: var(--color-attribute) !important;
-  stroke-dasharray: 3 3;
-  opacity: 0.6;
+.ontology-node small {
+  font-size: 9px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+.ontology-node__count {
+  font-size: 9px;
+}
+.ontology-edge__label {
+  font-size: 10px;
+  max-width: 118px;
+  padding: 0 7px;
 }
 .react-flow__edge-text {
   fill: var(--color-muted);
@@ -1671,11 +1669,11 @@ small,
   height: 27px !important;
   border: 0 !important;
 }
+/* 尺寸由组件的 style 给出，React Flow 用同一组数值计算视野框，这里只做外观。 */
 .react-flow__minimap {
-  width: 140px;
-  height: 85px;
   border: 1px solid var(--color-rule);
   border-radius: 4px;
+  overflow: hidden;
 }
 .react-flow__attribution {
   font-size: 8px !important;

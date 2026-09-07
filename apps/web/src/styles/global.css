@@ -511,72 +511,193 @@ table {
 .ontology-node {
   align-items: center;
   background: var(--color-surface);
-  border: 1px solid currentColor;
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 3px var(--color-shadow);
   color: var(--color-object);
   display: flex;
   gap: var(--space-xs);
-  min-height: 48px;
+  min-height: 46px;
   min-width: 164px;
   padding: var(--space-xs) var(--space-sm);
-  transition: opacity var(--dur-short) var(--ease-out);
+  transition:
+    opacity var(--dur-short) var(--ease-out),
+    box-shadow var(--dur-micro) var(--ease-out),
+    border-color var(--dur-micro) var(--ease-out);
 }
 
 .ontology-node--value {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-sm);
+  border-style: dashed;
   color: var(--color-attribute);
   min-height: 40px;
-  min-width: 190px;
+  min-width: 150px;
 }
 
 .ontology-node.is-dimmed {
-  opacity: 0.22;
+  box-shadow: none;
+  opacity: 0.2;
+}
+
+.ontology-node.is-match {
+  border-color: var(--color-accent);
+}
+
+.ontology-node.is-focused,
+.ontology-node.is-selected {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
 .ontology-node__icon {
   align-items: center;
-  background: currentColor;
+  background: var(--color-ink-2);
   border-radius: var(--radius-xs);
   color: var(--color-surface);
   display: flex;
+  flex: none;
   height: 26px;
   justify-content: center;
   width: 26px;
 }
 
-.ontology-node > span:last-of-type {
+.ontology-node--value .ontology-node__icon {
+  background: var(--color-attribute-soft);
+  color: var(--color-attribute);
+}
+
+.ontology-node__text {
   display: grid;
+  min-width: 0;
+}
+
+.ontology-node__count {
+  background: var(--color-surface-soft);
+  border-radius: 999px;
+  color: var(--color-muted);
+  flex: none;
+  font-size: 10px;
+  margin-left: auto;
+  padding: 1px 7px;
 }
 
 .ontology-node strong {
   color: var(--color-ink);
   font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ontology-node small {
   color: var(--color-muted);
   font-family: var(--font-mono);
   font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ontology-node .react-flow__handle {
-  background: currentColor;
-  border: 2px solid var(--color-surface);
-  height: 8px;
-  width: 8px;
+  background: transparent;
+  border: 0;
+  height: 1px;
+  min-height: 1px;
+  min-width: 1px;
+  opacity: 0;
+  width: 1px;
 }
 
-.ontology-edge path {
-  stroke-width: 1.5;
+.react-flow__edge.selected .ontology-edge,
+.ontology-edge {
+  transition: opacity var(--dur-short) var(--ease-out);
 }
 
-.ontology-edge--relation path {
-  stroke: var(--color-relation);
+.ontology-edge--relation {
+  stroke: var(--color-graph-edge);
+  stroke-width: 1.4;
 }
 
-.ontology-edge--attribute path {
+.ontology-edge--attribute {
   stroke: var(--color-attribute);
-  stroke-dasharray: 4 3;
+  stroke-dasharray: 4 4;
+  stroke-width: 1.2;
+  opacity: 0.65;
+}
+
+.ontology-edge.is-dimmed {
+  opacity: 0.12;
+}
+
+.ontology-edge--relation.is-match,
+.ontology-edge--relation.is-selected {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+}
+
+.ontology-edge__label {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 140px;
+  overflow: hidden;
+  padding: 1px var(--space-xs);
+  pointer-events: all;
+  position: absolute;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ontology-edge__label:hover {
+  border-color: var(--color-rule-strong);
+  color: var(--color-ink-2);
+}
+
+.ontology-edge__label.is-dimmed {
+  border-color: transparent;
+  opacity: 0.14;
+  pointer-events: none;
+}
+
+.ontology-edge__label.is-match,
+.ontology-edge__label.is-selected {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.react-flow {
+  --xy-edge-stroke: var(--color-graph-edge);
+  --xy-edge-stroke-selected: var(--color-accent);
+  --xy-edge-stroke-width: 1.4;
+  background: var(--color-canvas);
+}
+
+/* Minimap colours live here: SVG presentation attributes cannot read tokens. */
+.react-flow__minimap {
+  background: var(--color-surface);
+}
+
+/* Everything outside the viewport is shaded, so the bright rectangle reads as
+   the part of the graph currently on screen. */
+.react-flow__minimap-mask {
+  fill: var(--color-ink);
+  fill-opacity: 0.07;
+  stroke: var(--color-rule-strong);
+  stroke-width: 1;
+}
+
+.react-flow__minimap-node {
+  fill: var(--color-object-soft);
+  stroke: var(--color-rule-strong);
+  stroke-width: 2;
+}
+
+.react-flow__minimap-node.value_type {
+  fill: var(--color-attribute-soft);
 }
 
 .react-flow__controls {

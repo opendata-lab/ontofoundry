@@ -3,7 +3,6 @@ import {
   Database,
   GitBranch,
   Network,
-  Rocket,
   Search,
   Settings,
   Sparkles,
@@ -28,13 +27,14 @@ import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
 
+// 发布与服务不再占一级导航：发布是本体视图、对象目录和建模工作台上的操作，
+// 版本与服务说明作为它的二级页面打开。
 const navigation = [
   { to: "view", label: "本体视图", icon: Network },
   { to: "objects", label: "业务对象", icon: Box },
   { to: "relations", label: "本体关系", icon: GitBranch },
   { to: "mappings", label: "数据映射", icon: Database },
   { to: "builder", label: "本体自动构建", icon: Sparkles },
-  { to: "delivery", label: "发布与服务", icon: Rocket },
   { to: "settings", label: "空间设置", icon: Settings },
 ];
 export function AppShell() {
@@ -125,7 +125,7 @@ export function AppShell() {
             .filter(
               (n) =>
                 workspace.role ||
-                ["view", "objects", "relations", "delivery"].includes(n.to),
+                ["view", "objects", "relations"].includes(n.to),
             )
             .map(({ to, label, icon: Icon }) => (
               <NavLink

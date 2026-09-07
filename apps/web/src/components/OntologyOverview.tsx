@@ -146,13 +146,15 @@ export function OntologyOverview({
                       浏览业务对象
                       <ArrowUpRight size={12} />
                     </Link>
+                  ) : layer.id === "service" ? (
+                    // 发布与服务没有一级导航入口，服务层是它在全局视图里的入口。
+                    <Link to="../delivery">
+                      发布与服务
+                      <ArrowUpRight size={12} />
+                    </Link>
                   ) : details ? (
-                    <Link
-                      to={
-                        layer.id === "mapping" ? "../mappings" : "../delivery"
-                      }
-                    >
-                      {layer.id === "mapping" ? "管理映射" : "发布与服务"}
+                    <Link to="../mappings">
+                      管理映射
                       <ArrowUpRight size={12} />
                     </Link>
                   ) : null}
