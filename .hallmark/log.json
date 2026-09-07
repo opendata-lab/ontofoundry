@@ -1,0 +1,38 @@
+[
+  {
+    "date": "2026-09-04",
+    "macrostructure": "Workbench",
+    "theme": "Cobalt",
+    "enrichment": "Tier-B semantic SVG",
+    "brief": "OntoFoundry ontology engineering local interactive prototype",
+    "navigation": "Application side rail",
+    "footer": "None — full-height professional application",
+    "knobs": {
+      "shell": "persistent taxonomy navigation",
+      "routes": "catalog to detail to instance drill-down",
+      "modeling": "sources, conversation, model list and semantic overview",
+      "resultViews": "two tabs after ablation",
+      "semanticColor": "object, link, attribute, rule, instance and mapping",
+      "embed": "1280px desktop canvas scales proportionally to narrower containers"
+    },
+    "preEmitCritique": "P5 H5 E5 S5 R5 V4",
+    "slopTest": "58/58 pass"
+  },
+  {
+    "date": "2026-09-07",
+    "macrostructure": "Layered overview within existing Workbench",
+    "theme": "studied-DNA (20260904-144738.jpg, existing app tokens)",
+    "brief": "Separate published layered global overview from semantic TBox graph; remove redundant modeling copy",
+    "navigation": "Existing application sidebar unchanged",
+    "knobs": {
+      "global": "left layer rail with four transparent SVG planes",
+      "data": "published snapshot, bounded previews, membership-aware private layers",
+      "semantic": "separate 2D renderer, owner-aware attribute filtering",
+      "embed": "proportional desktop scaling; rail and graph share fitted height"
+    },
+    "preEmitCritique": "P4 H4 E4 S5 R4 V4",
+    "verification": "40 API tests, 13 frontend tests, lint/build, browser 320/375/414/768/1280/1440/1920 widths; no new dependencies",
+    "slopTest": "Scoped reference-aligned review: real data, tokens reused, no fake chrome, explicit empty/error states. Existing Chinese UI fonts and desktop scaling retained per user; not a mobile-building claim.",
+    "contrast": "New overview muted labels >= 4.56:1, node labels >= 10.92:1, active tab 5.31:1"
+  }
+]

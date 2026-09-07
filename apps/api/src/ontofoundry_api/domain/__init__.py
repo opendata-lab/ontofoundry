@@ -1,0 +1,1 @@
+"""Internal ontology domain model."""

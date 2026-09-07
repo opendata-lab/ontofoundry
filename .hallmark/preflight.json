@@ -1,0 +1,17 @@
+{
+  "date": "2026-09-04",
+  "codebaseScan": {
+    "designDocs": [],
+    "frontendFramework": null,
+    "existingTokens": null,
+    "hallmarkStamp": null
+  },
+  "decision": "No pre-flight signals — proceeding with full Hallmark stack.",
+  "filesPlanned": [
+    "tokens.css",
+    "prototype/ontofoundry-prototype.html",
+    "docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md",
+    ".hallmark/log.json"
+  ],
+  "deletions": []
+}

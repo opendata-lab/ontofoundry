@@ -1,0 +1,223 @@
+/* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4
+ * macrostructure: layered-overview · genre: modern-minimal · theme: studied-DNA (20260904-144738.jpg, existing app tokens)
+ * Reference: stacked ontology planes; no invented business layers or decorative 3D runtime. */
+.ontology-overview {
+  container-type: size;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  padding: var(--space-xl) var(--space-lg) var(--space-lg) var(--space-xl);
+}
+/* Rail and planes share the same fitted height, including narrow embedded views. */
+.overview-layer-rail,
+.overview-stage {
+  height: min(100cqh, calc((100cqw - 196px) * 640 / 880));
+  align-self: center;
+}
+.overview-layer-rail {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  padding-block: var(--space-lg);
+  min-height: 0;
+}
+.overview-layer-item {
+  position: relative;
+  padding: var(--space-sm) var(--space-xs) var(--space-xs) var(--space-lg);
+  border-left: 1px dashed var(--color-rule-strong);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-xs);
+  color: var(--color-ink);
+}
+.overview-layer-item:last-child {
+  border-color: transparent;
+}
+.overview-layer-title {
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: var(--space-2xs) 0;
+  font-size: 14px;
+  font-weight: 600;
+  position: relative;
+  white-space: nowrap;
+}
+.layer-rail-dot {
+  position: absolute;
+  left: -29px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--layer-color);
+}
+.overview-layer-title[aria-pressed="true"] {
+  color: var(--layer-color);
+}
+.overview-layer-title[aria-pressed="true"]::after {
+  content: " ·";
+}
+.overview-layer-counts {
+  display: grid;
+  gap: var(--space-2xs);
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.overview-layer-action {
+  min-height: 18px;
+}
+.overview-layer-action a,
+.overview-layer-action button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: 12px;
+  color: var(--color-accent);
+  border: 0;
+  background: none;
+  padding: 0;
+  white-space: nowrap;
+}
+.layer-restricted {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.overview-stage {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: clip;
+}
+.overview-stage > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.layer-service {
+  --layer-color: var(--color-rule-label);
+  --layer-fill: var(--color-rule-label-soft);
+}
+.layer-semantic {
+  --layer-color: var(--color-object);
+  --layer-fill: var(--color-object-soft);
+}
+.layer-instance {
+  --layer-color: var(--color-attribute);
+  --layer-fill: var(--color-attribute-soft);
+}
+.layer-mapping {
+  --layer-color: var(--color-relation);
+  --layer-fill: var(--color-relation-soft);
+}
+.overview-plane {
+  transition: opacity var(--dur-micro) var(--ease-out);
+}
+.layer-plane-surface {
+  fill: var(--layer-fill);
+  fill-opacity: 0.6;
+  stroke: var(--layer-color);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+}
+.layer-grid-line {
+  fill: none;
+  stroke: var(--color-rule-strong);
+  stroke-width: 0.4;
+}
+.layer-plane-grid {
+  opacity: 0.22;
+}
+.layer-binding {
+  stroke: var(--color-graph-edge);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+  opacity: 0.55;
+}
+.layer-relation {
+  stroke: var(--layer-color);
+  stroke-opacity: 0.45;
+  stroke-width: 1;
+}
+.overview-plane.is-muted .layer-plane-surface,
+.overview-plane.is-muted .layer-plane-grid,
+.overview-plane.is-muted .layer-relation {
+  opacity: 0.3;
+}
+.layer-bindings.is-muted {
+  opacity: 0.15;
+}
+.layer-data-node,
+.layer-service-marker {
+  fill: var(--layer-color);
+}
+.layer-data-node {
+  cursor: pointer;
+}
+.layer-data-node text,
+.layer-service-marker text {
+  font-family: var(--font-body);
+  font-size: 12px;
+  fill: var(--color-ink-2);
+}
+.layer-hit-area {
+  fill: transparent;
+  stroke: transparent;
+}
+.layer-data-node:focus-visible {
+  outline: none;
+}
+.layer-data-node:focus-visible .layer-hit-area {
+  stroke: var(--color-focus);
+  stroke-width: 2;
+}
+.layer-data-node:active {
+  opacity: 0.6;
+}
+.layer-empty-label {
+  text-anchor: middle;
+  font-family: var(--font-body);
+  font-size: 12px;
+  fill: var(--color-muted);
+}
+.overview-controls {
+  position: absolute;
+  bottom: var(--space-sm);
+  right: var(--space-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-xs);
+  padding: var(--space-2xs);
+}
+.overview-controls span {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: center;
+}
+@media (hover: hover) {
+  .overview-layer-title:hover {
+    color: var(--layer-color);
+  }
+  .layer-data-node:hover .layer-hit-area {
+    fill: var(--layer-fill);
+    stroke: var(--layer-color);
+    stroke-width: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-plane {
+    transition: none;
+  }
+}

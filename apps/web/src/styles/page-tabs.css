@@ -1,0 +1,117 @@
+.ref-page {
+  display: flex;
+  flex-direction: column;
+}
+.route-tabs {
+  display: flex;
+  gap: 3px;
+  flex: 0 0 36px;
+  min-width: 0;
+  padding: 4px 10px 0;
+  background: #f3f5f7;
+  border-bottom: 1px solid var(--color-rule-soft);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.route-tab {
+  display: flex;
+  flex: none;
+  align-items: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  color: var(--color-muted);
+}
+.route-tab.is-active {
+  background: var(--color-surface);
+  border-color: var(--color-rule-soft);
+  color: var(--color-accent);
+}
+.route-tab > [role="tab"] {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px 0 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.route-tab > [role="tab"] span {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.route-tab > [role="tab"] svg {
+  flex: none;
+}
+.tab-close {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin-right: 5px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--color-muted);
+}
+.tab-close:hover {
+  background: #e5eaf0;
+  color: var(--color-ink);
+}
+.route-tab:hover:not(.is-active) {
+  background: #eaf0f6;
+}
+.route-tab button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.tab-dirty {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: #d58b20;
+}
+.route-panels {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+.route-panel {
+  height: 100%;
+  min-width: 0;
+  overflow: auto;
+}
+.route-panel[hidden] {
+  display: none;
+}
+.tab-confirm {
+  width: 420px;
+}
+.tab-confirm p {
+  padding: 8px 0 20px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tab-confirm footer {
+  justify-content: flex-end;
+}
+.tab-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 18px;
+  font-size: 12px;
+  background: #fff8e8;
+}
+.tab-notice button {
+  border: 0;
+  background: transparent;
+}

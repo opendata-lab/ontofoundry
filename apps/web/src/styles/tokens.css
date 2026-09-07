@@ -1,0 +1,77 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench · theme: Cobalt · nav: N13 command search + application sidebar · footer: none */
+:root {
+  color-scheme: light;
+
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-surface-raised: #fcfcfd;
+  --color-surface-soft: #f3f5f7;
+  --color-rule-soft: #edf0f3;
+  --color-rule: #e2e6eb;
+  --color-rule-strong: #b9c3d1;
+  --color-ink: #20252d;
+  --color-ink-2: #303842;
+  --color-muted: #67717e;
+  --color-subtle: #6e7680;
+  --color-accent: #0061ef;
+  --color-accent-hover: #004fca;
+  --color-accent-ink: #ffffff;
+  --color-accent-soft: #e8f4ff;
+  --color-focus: #0055d4;
+  --color-success: oklch(43% 0.128 151);
+  --color-success-soft: oklch(94% 0.035 151);
+  --color-danger: oklch(48% 0.17 26);
+  --color-danger-soft: oklch(95% 0.034 26);
+  --color-object: #1261d2;
+  --color-object-soft: #e9f2ff;
+  --color-relation: #117c99;
+  --color-relation-soft: #e8f6fc;
+  --color-attribute: #087d69;
+  --color-attribute-soft: #e7f5f0;
+  --color-overlay: oklch(18% 0.03 257 / 0.52);
+  --color-shadow: oklch(20% 0.03 257 / 0.08);
+
+  --font-display: var(--font-body);
+  --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  --color-graph-edge: #9ca5ae;
+  --color-rule-label: #716096;
+  --color-rule-label-soft: #f2edf9;
+  --color-step-wash: #e7f8ff;
+  --ref-sidebar: clamp(184px, 14.4vw, 208px);
+}
