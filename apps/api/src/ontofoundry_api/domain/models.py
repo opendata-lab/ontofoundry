@@ -61,6 +61,12 @@ class AttributeDefinition(BaseModel):
     value_kind: ValueKind = ValueKind.STRING
     required: bool = False
     identifier: bool = False
+    # Name of the Ossie value concept this attribute points at. Empty means the
+    # compiler decides: the built-in value type, or a generated one for an
+    # identifier. Keeping the name means an imported concept — including one
+    # shared by several attributes — is written back under its own name, so
+    # verbalizations that mention it stay valid without being rewritten.
+    value_concept: str | None = None
     # Compiles to a relationship, so it carries the same Ossie fields a
     # relationship does. Empty verbalizes means "generate the standard reading".
     requires: Expressions
@@ -69,6 +75,18 @@ class AttributeDefinition(BaseModel):
 
     _normalize_name = field_validator("name")(normalize_display_name)
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
+
+    @field_validator("value_concept")
+    @classmethod
+    def check_value_concept(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            return None
+        if len(value) > 240:
+            raise ValueError("值概念名称过长")
+        return value
 
 
 class ObjectTypeDefinition(BaseModel):
@@ -268,6 +286,23 @@ class OntologyDraft(BaseModel):
                 raise ValueError(f"{item.name} 的属性与关系中存在同名项（含继承）")
             if len(keys) != len(set(keys)):
                 raise ValueError(f"{item.name} 的属性与关系中存在技术名冲突（含继承）")
+
+        # A named value concept is one concept in the exported document, so every
+        # attribute pointing at it must agree on the base type, and the name may
+        # not collide with a business object.
+        kinds_by_concept: dict[str, ValueKind] = {}
+        for item in self.object_types:
+            for attribute in item.attributes:
+                concept = attribute.value_concept
+                if not concept:
+                    continue
+                if concept.casefold() in {
+                    entry.technical_name.casefold() for entry in self.object_types
+                }:
+                    raise ValueError(f"值概念 {concept} 与业务对象的技术名冲突")
+                known = kinds_by_concept.setdefault(concept, attribute.value_kind)
+                if known != attribute.value_kind:
+                    raise ValueError(f"值概念 {concept} 被用于两种不同的值类型")
 
         instances = {o.id: o for o in self.objects}
         relations = {r.id: r for r in self.link_types}

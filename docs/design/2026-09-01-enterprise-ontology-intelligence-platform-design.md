@@ -516,7 +516,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 |---|---|---|
 | `EntityType` component | 业务对象（Object Type） | 双向无损。concept 作技术名，中文名来自扩展，缺失时用 concept |
 | `extends`（实体继承） | Object Type 的 `extends`（多父） | 双向无损。子对象只存自己新增的属性与关系，继承链上的内容按需解析；校验拒绝环与重名 |
-| `ValueType` component | 属性的 `value_kind` | 有损：值概念本身不保留。沿 `extends` 追到内置值类型；只有被多个关系共用、带自己的 `requires`/`derived_by`、或经由中间值概念时才提示——单一属性上的具名值类型本来就等于“属性 + 值类型” |
+| `ValueType` component | 属性的 `value_kind` + `value_concept`（概念名） | 名称与共用关系双向无损：属性记住它指向的值概念名，导出时按同一个名字写回一个 component，多个属性共用则仍是一个概念。有损的只有值概念自带的 `requires`/`derived_by` 和 `extends` 链上的中间概念（导出统一写成直接继承内置类型），这两种情况才提示 |
 | 内置值概念 String/Integer/Decimal/Float/Boolean/Date/DateTime | 七种 value_kind | 双向无损 |
 | 内置实体 `Any` | 无 | 不支持：指向 `Any` 的关系跳过并报告，它没有对应的业务对象 |
 | relationship（role 指向值概念） | 属性 | 双向无损 |
@@ -527,7 +527,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `identify_by`（指向实体关系） | Link Type 的 identifier | 双向无损。这是 Ossie 的 referent identification（如订单行由订单加行号标识）；校验要求这条关系是多对一或一对一 |
 | `requires`（ontology / concept / relationship） | 本体、对象、属性、关系上的 `requires` | 双向无损。表达式按文本存储，由官方语义 lint 校验引用，平台不执行 |
 | `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
-| `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损。与标准模板一致的读法不存储（避免改名后变成陈述旧名的死文本）；手写读法按新概念名改写后存储；引用了这条关系之外概念的读法会被丢弃并报告，否则会编译出非法 verbalization |
+| `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损，原样存取，不解析也不改写占位符。与标准模板一致的读法不存储（避免改名后留下陈述旧名的死文本）。这条成立的前提是导入不给概念改名：值概念按原名写回，读法里的 `{值概念}` 才仍是这条关系的合法 role |
 | `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
 | `ontology_mappings` + `semantic_model` | 数据映射（连接、表、键列、字段字典） | 尚未翻译：Ossie 用表达式映射自带的逻辑模型，平台用真实连接配置，导入时报告并要求在“数据映射”页按连接重建 |
 | 无对应 | UUID、文档实例、实例关系、证据、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
@@ -545,6 +545,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `requires: [表达式]` | 本体、Object Type、属性、Link Type | 约束表达式，纯文本存储 |
 | `derived_by: [表达式]` | Object Type、属性、Link Type | 派生表达式，纯文本存储 |
 | `verbalizes: [读法]` | 属性、Link Type | 手写自然语言读法；为空表示按模板生成 |
+| `value_concept: str?` | 属性 | 属性指向的 Ossie 值概念名；为空表示由编译器决定（内置类型，或标识属性的生成名）。校验要求同名值概念的值类型一致，且不与业务对象技术名冲突 |
 
 表达式和读法都有长度与条数上限，避免把整段文档塞进模型。平台不解析、不执行表达式：语义由官方 lint 在发布门槛处检查，业务正确性仍需人工复核。
 

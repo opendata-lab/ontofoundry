@@ -369,28 +369,75 @@ def test_model_rejects_what_ossie_would_reject():
         OntologyDraft.model_validate(loose)
 
 
-def test_hand_written_reading_outside_the_relationship_is_regenerated():
-    document = foreign_document()
-    for component in document["ontology"]:
-        if component["concept"] == "order":
-            component["relationships"][0]["verbalizes"] = ["{order} for {party}"]
+def test_readings_and_their_value_concepts_survive_verbatim():
+    """No placeholder rewriting: the concepts a reading names are kept as well."""
+    payload, _ = import_ossie(
+        foreign_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    party = next(i for i in model.object_types if i.technical_name == "party")
+    code = party.attributes[0]
+
+    assert code.value_concept == "party_code_value"
+    assert code.verbalizes == ["{party} code {party_code_value}"]
+
+    document = compile_ossie(model, ontology_name="crm", ontology_description="")
+    concepts = {item["concept"]: item for item in document["ontology"]}
+    relationship = concepts["party"]["relationships"][0]
+
+    # The value concept is written back under its own name, so the reading the
+    # file shipped still points at a real role of this relationship.
+    assert relationship["roles"] == [{"concept": "party_code_value"}]
+    assert relationship["verbalizes"] == ["{party} code {party_code_value}"]
+    assert concepts["party_code_value"]["extends"] == ["String"]
+    assert validate_ossie(document)["publishable"] is True
+
+
+def test_one_value_concept_shared_by_several_attributes_stays_one_concept():
+    document = {
+        "version": "0.2.0.dev0",
+        "name": "codes",
+        "ontology": [
+            {"concept": "sku", "type": "ValueType", "extends": ["String"]},
+            {
+                "concept": "product",
+                "type": "EntityType",
+                "relationships": [
+                    {
+                        "name": "code",
+                        "roles": [{"concept": "sku"}],
+                        "verbalizes": ["{product} has {sku}"],
+                        "multiplicity": "ManyToOne",
+                    }
+                ],
+            },
+            {
+                "concept": "listing",
+                "type": "EntityType",
+                "relationships": [
+                    {
+                        "name": "code",
+                        "roles": [{"concept": "sku"}],
+                        "verbalizes": ["{listing} lists {sku}"],
+                        "multiplicity": "ManyToOne",
+                    }
+                ],
+            },
+        ],
+    }
     payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     model = OntologyDraft.model_validate(payload)
-    reasons = {item["path"]: item["reason"] for item in report["skipped"]}
 
-    assert "order.placed_by.verbalizes" in reasons
-    assert (
-        next(
-            item for item in model.link_types if item.technical_name == "placed_by"
-        ).verbalizes
-        == []
-    )
-    assert (
-        validate_ossie(compile_ossie(model, ontology_name="crm", ontology_description=""))[
-            "publishable"
-        ]
-        is True
-    )
+    assert [item.attributes[0].value_concept for item in model.object_types] == [
+        "sku",
+        "sku",
+    ]
+    assert report["skipped"] == []
+
+    rewritten = compile_ossie(model, ontology_name="codes", ontology_description="")
+    values = [item for item in rewritten["ontology"] if item["type"] == "ValueType"]
+    assert [item["concept"] for item in values] == ["sku"]
+    assert validate_ossie(rewritten)["publishable"] is True
 
 
 def test_merge_keeps_existing_model_instances_and_mappings():
