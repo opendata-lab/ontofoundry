@@ -1,6 +1,7 @@
 import {
   Download,
   Search,
+  Upload,
   X,
   Plus,
   Rocket,
@@ -20,6 +21,7 @@ import {
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { EmptyModel } from "../components/EmptyModel";
 import { OntologyOverview } from "../components/OntologyOverview";
+import { OssieImportDialog } from "../components/OssieImportDialog";
 
 export function OntologyViewPage() {
   const { workspace } = useWorkspaceContext();
@@ -31,6 +33,7 @@ export function OntologyViewPage() {
   const [tag, setTag] = useState("");
   const [attributes, setAttributes] = useState(false);
   const [selected, setSelected] = useState<SelectedGraphItem>(null);
+  const [importing, setImporting] = useState(false);
   const load = () => setAttempt((value) => value + 1);
   const switchMode = (value: "global" | "semantic") => {
     setMode(value);
@@ -181,6 +184,12 @@ export function OntologyViewPage() {
               </Link>
             </>
           )}
+          {workspace.role && (
+            <button className="view-tool" onClick={() => setImporting(true)}>
+              <Upload size={15} />
+              <span>导入</span>
+            </button>
+          )}
           {overview && (
             <a
               className="view-tool"
@@ -283,6 +292,15 @@ export function OntologyViewPage() {
           </aside>
         )}
       </div>
+      {importing && (
+        <OssieImportDialog
+          workspaceId={workspace.id}
+          onClose={(imported) => {
+            setImporting(false);
+            if (imported) load();
+          }}
+        />
+      )}
     </div>
   );
 }
