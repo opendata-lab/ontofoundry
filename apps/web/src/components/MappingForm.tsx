@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Database } from "lucide-react";
-import { workspaceRequest } from "../api/client";
-import type { DataMapping, DataTable, ObjectDefinition } from "../api/types";
+import { modelingApi, workspaceRequest } from "../api/client";
+import type {
+  DataConnection,
+  DataMapping,
+  DataTable,
+  ObjectDefinition,
+} from "../api/types";
 import { DatasetPicker } from "./DatasetPicker";
 
 export function MappingForm({
@@ -23,7 +28,17 @@ export function MappingForm({
   const [preview, setPreview] = useState<Record<string, unknown>[] | null>(
     null,
   );
-  const connectionId = mapping?.connection_id;
+  // The model names a data source; the connection that serves that name is
+  // workspace configuration, resolved here only to read columns and preview.
+  const [connections, setConnections] = useState<DataConnection[]>([]);
+  useEffect(() => {
+    modelingApi
+      .connections(workspaceId)
+      .then((r) => setConnections(r.items))
+      .catch(() => setConnections([]));
+  }, [workspaceId]);
+  const alias = mapping?.connection_alias;
+  const connectionId = connections.find((c) => c.name === alias)?.id;
   const tableName = mapping?.table_name;
   useEffect(() => {
     setColumns([]);
@@ -57,11 +72,19 @@ export function MappingForm({
             <span>
               <strong>{mapping?.table_name || "选择数据表"}</strong>
               <small>
-                {mapping ? "点击更换数据集" : "MySQL / PostgreSQL / Doris"}
+                {mapping
+                  ? "数据源 " + mapping.connection_alias + " · 点击更换数据集"
+                  : "MySQL / PostgreSQL / Doris"}
               </small>
             </span>
           </button>
         </>
+      )}
+      {mapping && alias && !connectionId && (
+        <p className="inline-error">
+          模型引用的数据源「{alias}
+          」在本空间还没有配置连接，字段与预览暂不可用。
+        </p>
       )}
       {mapping ? (
         <>
@@ -192,7 +215,7 @@ export function MappingForm({
           onChange({
             id: mapping?.id ?? crypto.randomUUID(),
             type_id: type.id,
-            connection_id: c.id,
+            connection_alias: c.name,
             table_name: t.name,
             schema_name: t.schema,
             key_column: "",

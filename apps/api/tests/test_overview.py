@@ -61,7 +61,7 @@ def add_private_test_snapshot(client):
                 "id": f"m{i}",
                 "type_id": type_id,
                 "table_name": f"private-table-{i}",
-                "connection_id": "private-connection",
+                "connection_alias": "private-connection",
                 "fields": {"name": "private-column"},
             }
             for i in range(30)

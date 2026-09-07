@@ -13,6 +13,7 @@ from ontofoundry_api.domain.models import (
     ValueKind,
 )
 
+from .mappings import compile_mappings
 from .validator import semantics_can_run, validate_schema, validate_semantics
 
 OSSIE_VERSION = "0.2.0.dev0"
@@ -249,6 +250,11 @@ def compile_ossie(
     }
     if draft.requires:
         document["requires"] = list(draft.requires)
+    # Data mappings travel as ontology_mappings: table, key column and the
+    # column behind each attribute, with no connection or credentials.
+    ontology_mappings = compile_mappings(draft.mappings, objects, draft.link_types)
+    if ontology_mappings:
+        document["ontology_mappings"] = ontology_mappings
     return document
 
 

@@ -72,7 +72,7 @@ V0.1 的 Link Type 是有方向的二元关系，产品层只要求“起点 Obj
 | 实例来源 | 形成方式 | 存储与版本 | 用途 |
 |---|---|---|---|
 | 文档原生实例 | 从 Markdown 抽取 Object 和 Link，经用户确认 | 保存于 OntoFoundry，随空间版本发布 | 从实例归纳本体；没有数据映射时仍可浏览实例 |
-| 数据映射实例 | 按 Object Type、属性、Link Type 到表、字段、主键、Join 的映射查询 | 不复制业务行，只版本化映射 | 实时查看数据库中已有实例及关系 |
+| 数据映射实例 | 按 Object Type、属性、Link Type 到数据源、表、字段、主键、Join 的映射查询 | 不复制业务行，只版本化映射；映射不含连接凭据 | 实时查看数据库中已有实例及关系 |
 
 两类实例可以在同一实例画布中展示，但通过来源样式区分，不自动做实体融合，也不把文档事实写回业务数据库。
 
@@ -235,7 +235,9 @@ V0.1 直接连接：
 
 空间管理员配置只读连接。凭据用部署级主密钥加密，API 永不回传明文。连接测试和查询设置超时、限行和只读事务；只允许参数化 SELECT。
 
-数据集是表或视图，字段是列。Object Type 至少映射标识字段；属性映射值字段；Link Type 映射同一连接内的 Join 条件。跨连接 Link Type 可以存在于模型中，但实例图标记“不可查询”，不在应用内拼接两边大表。
+数据集是表或视图，字段是列。Object Type 至少映射标识字段；属性映射值字段；Link Type 映射同一数据源内的 Join 条件。跨数据源的 Link Type 可以存在于模型中，但实例图标记“不可查询”，不在应用内拼接两边大表。
+
+映射写的是数据源名称、表、键列和字段列，不含连接标识与凭据：已发布版本因此可以在环境之间搬运，查询时再由工作空间把名称解析成配置好的只读连接。数据连接名称在空间内唯一；名称没有对应连接时，映射页与实例查询都明确提示未配置，而不是查询失败。
 
 ### 6.2 实例图谱
 
@@ -494,7 +496,7 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 | 派生规则 | component 或 relationship 的 `derived_by`，V0.1 只表达和校验引用，不执行 |
 | 自然语言读法 | relationship 的 `verbalizes`；模型没有存读法时按名称模板生成 |
 | 中文名、标签、属性必填 | `ai_context.ontofoundry` 命名空间扩展 |
-| 数据映射 | `ontology_mappings`，只在有真实数据集、字段和 Join 证据时生成（尚未实现） |
+| 数据映射 | `ontology_mappings`：每个数据源一份 OntologyMap，表与键列进 `semantic_model.datasets`，属性列进 dataset 字段与 `link_mappings`，关系 Join 进 `semantic_model.relationships` |
 | Object、Link、UUID 和证据 | 只进入 OntoFoundry 快照，不写入 Ossie JSON |
 
 - 只从有证据的材料生成概念、关系和表达式；
@@ -529,7 +531,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
 | `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损，原样存取，不解析也不改写占位符。与标准模板一致的读法不存储（避免改名后留下陈述旧名的死文本）。这条成立的前提是导入不给概念改名：值概念按原名写回，读法里的 `{值概念}` 才仍是这条关系的合法 role |
 | `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
-| `ontology_mappings` + `semantic_model` | 数据映射（连接、表、键列、字段字典） | 尚未翻译：Ossie 用表达式映射自带的逻辑模型，平台用真实连接配置，导入时报告并要求在“数据映射”页按连接重建 |
+| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损，限于单列表达式。dataset 名用概念的技术名，`source` 是 `schema.table`，键列取 `primary_key` 或对象映射表达式，属性列取 `link_mappings` 的对象映射表达式。计算列、`referent_mappings`、多层 `link_mappings` 报告后跳过，不从任意 SQL 里猜列名 |
 | 无对应 | UUID、文档实例、实例关系、证据、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
 
 同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
@@ -546,6 +548,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `derived_by: [表达式]` | Object Type、属性、Link Type | 派生表达式，纯文本存储 |
 | `verbalizes: [读法]` | 属性、Link Type | 手写自然语言读法；为空表示按模板生成 |
 | `value_concept: str?` | 属性 | 属性指向的 Ossie 值概念名；为空表示由编译器决定（内置类型，或标识属性的生成名）。校验要求同名值概念的值类型一致，且不与业务对象技术名冲突 |
+| `connection_alias: str` | 数据映射 | 取代原来的 `connection_id`：模型只写数据源名称，凭据与连接配置留在工作空间，查询时按名称解析 |
 
 表达式和读法都有长度与条数上限，避免把整段文档塞进模型。平台不解析、不执行表达式：语义由官方 lint 在发布门槛处检查，业务正确性仍需人工复核。
 

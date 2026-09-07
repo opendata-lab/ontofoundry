@@ -1,3 +1,4 @@
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -216,7 +217,7 @@ def test_foreign_file_reports_only_what_it_cannot_represent():
     assert "role" in reasons["customer.sold_to"]
     assert "role" in reasons["order.cancelled"]
     assert "Any" in reasons["customer.anything"]
-    assert "ontology_mappings" in reasons
+    assert "dataset" in reasons["ontology_mappings[0].customer"]
     # Expressions and identifying relations are supported now, so they are gone
     # from the report.
     assert not [path for path in reasons if path.endswith("requires")]
@@ -438,6 +439,121 @@ def test_one_value_concept_shared_by_several_attributes_stays_one_concept():
     values = [item for item in rewritten["ontology"] if item["type"] == "ValueType"]
     assert [item["concept"] for item in values] == ["sku"]
     assert validate_ossie(rewritten)["publishable"] is True
+
+
+def mapped_draft():
+    """The demo model with two tables mapped and one relation joined."""
+    draft = build_demo_draft()
+    payload = draft.model_dump(mode="json")
+    supplier = next(
+        item for item in payload["object_types"] if item["technical_name"] == "supplier"
+    )
+    material = next(
+        item for item in payload["object_types"] if item["technical_name"] == "material"
+    )
+    payload["mappings"] = [
+        {
+            "id": str(uuid4()),
+            "type_id": supplier["id"],
+            "connection_alias": "erp",
+            "table_name": "suppliers",
+            "schema_name": "public",
+            "key_column": "code",
+            "fields": {"supplier_code": "code", "supplier_name": "name"},
+        },
+        {
+            "id": str(uuid4()),
+            "type_id": material["id"],
+            "connection_alias": "erp",
+            "table_name": "materials",
+            "schema_name": None,
+            "key_column": "code",
+            "fields": {"material_code": "code"},
+        },
+    ]
+    for link in payload["link_types"]:
+        if link["technical_name"] == "supplies":
+            link["data_join"] = {
+                "source_column": "code",
+                "target_column": "supplier_code",
+            }
+    return OntologyDraft.model_validate(payload)
+
+
+def test_data_mappings_travel_as_ontology_mappings_without_connections():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    assert validate_ossie(document)["publishable"] is True
+
+    maps = document["ontology_mappings"]
+    assert [item["name"] for item in maps] == ["erp"]
+    datasets = {item["name"]: item for item in maps[0]["semantic_model"]["datasets"]}
+    assert datasets["supplier"]["source"] == "public.suppliers"
+    assert datasets["supplier"]["primary_key"] == ["code"]
+    assert maps[0]["semantic_model"]["relationships"][0]["from_columns"] == ["code"]
+    # No credentials, host or connection id anywhere in the published document.
+    assert "connection" not in json.dumps(document).lower()
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    names = {item.id: item.technical_name for item in imported.object_types}
+    shape = {
+        names[item.type_id]: (
+            item.connection_alias,
+            item.schema_name,
+            item.table_name,
+            item.key_column,
+            item.fields,
+        )
+        for item in imported.mappings
+    }
+    source_names = {item.id: item.technical_name for item in draft.object_types}
+    original = {
+        source_names[item.type_id]: (
+            item.connection_alias,
+            item.schema_name,
+            item.table_name,
+            item.key_column,
+            item.fields,
+        )
+        for item in draft.mappings
+    }
+
+    assert shape == original
+    assert report["skipped"] == []
+    joins = {
+        item.technical_name: item.data_join
+        for item in imported.link_types
+        if item.data_join
+    }
+    assert joins["supplies"].source_column == "code"
+    assert joins["supplies"].target_column == "supplier_code"
+
+
+def test_computed_mapping_expressions_are_reported_not_guessed():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    mapping = document["ontology_mappings"][0]["concept_mappings"][0]
+    mapping["link_mappings"][0]["object_mapping"]["expression"] = "UPPER(code)"
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    dropped = mapping["link_mappings"][0]["relationship"]
+
+    assert any("单列表达式" in item["reason"] for item in report["skipped"])
+    assert all(
+        dropped not in item.fields
+        for item in imported.mappings
+        if item.type_id
+        == next(
+            entry.id
+            for entry in imported.object_types
+            if entry.technical_name == mapping["concept"]
+        )
+    )
 
 
 def test_merge_keeps_existing_model_instances_and_mappings():

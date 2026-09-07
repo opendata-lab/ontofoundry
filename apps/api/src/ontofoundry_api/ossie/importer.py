@@ -18,6 +18,7 @@ from uuid import UUID, uuid5
 
 from ontofoundry_api.domain.models import (
     AttributeDefinition,
+    DataMapping,
     LinkTypeDefinition,
     Multiplicity,
     ObjectTypeDefinition,
@@ -31,6 +32,7 @@ from .compiler import (
     attribute_verbalizations,
     link_verbalizations,
 )
+from .mappings import parse_joins, parse_mappings
 from .validator import validate_schema
 
 MAX_COMPONENTS = 2000
@@ -179,7 +181,13 @@ def _value_concept_loss(
 
 def parse_ossie(
     document: dict[str, Any], *, workspace_id: str
-) -> tuple[list[ObjectTypeDefinition], list[LinkTypeDefinition], list[str], Report]:
+) -> tuple[
+    list[ObjectTypeDefinition],
+    list[LinkTypeDefinition],
+    list[DataMapping],
+    list[str],
+    Report,
+]:
     """Turn a schema-valid Ossie document into internal types plus a report."""
     if not isinstance(document, dict):
         raise OssieImportError("文件内容不是 JSON 对象")
@@ -214,12 +222,6 @@ def parse_ossie(
         report.note("文件没有中文显示名，业务名称先使用 concept 名称，可在草稿里修改")
 
     ontology_requires = _expressions(document, "requires")
-    if document.get("ontology_mappings"):
-        report.skip(
-            "ontology_mappings",
-            f"{len(document['ontology_mappings'])} 组 ontology_mappings（逻辑模型映射）暂不导入，"
-            "数据映射请在“数据映射”页按连接配置",
-        )
 
     object_types: list[ObjectTypeDefinition] = []
     by_concept_id: dict[str, UUID] = {}
@@ -399,13 +401,17 @@ def parse_ossie(
             ),
         )
         link_types.append(candidate)
-    return object_types, link_types, ontology_requires, report
+    # Mappings need the finished types, so they are read last.
+    parse_joins(document, object_types, link_types)
+    mappings = parse_mappings(document, object_types, workspace_id, report.skip)
+    return object_types, link_types, mappings, ontology_requires, report
 
 
 def _merge(
     base: OntologyDraft,
     objects: list[ObjectTypeDefinition],
     links: list[LinkTypeDefinition],
+    mappings: list[DataMapping],
     report: Report,
 ) -> tuple[OntologyDraft, dict[str, int]]:
     """Add or update by technical name; never remove what the file omits."""
@@ -416,6 +422,7 @@ def _merge(
         "links_updated": 0,
         "attributes_added": 0,
         "attributes_updated": 0,
+        "mappings_added": 0,
     }
     merged = base.model_copy(deep=True)
     existing = {item.technical_name.casefold(): item for item in merged.object_types}
@@ -512,6 +519,22 @@ def _merge(
         if imported.description:
             current.description = imported.description
         current.tags = sorted({*current.tags, *imported.tags})
+
+    # A workspace's own mapping points at tables it has already checked, so the
+    # file only fills in objects that have none.
+    mapped = {item.type_id for item in merged.mappings}
+    for mapping in mappings:
+        type_id = by_key.get(id_by_import.get(mapping.type_id, ""))
+        if type_id is None or type_id in mapped:
+            continue
+        mapping.type_id = type_id
+        merged.mappings.append(mapping)
+        mapped.add(type_id)
+        counts["mappings_added"] += 1
+    if counts["mappings_added"]:
+        report.note(
+            "数据映射按文件里的数据源名称导入；请在“数据映射”页确认这些名称已配置连接"
+        )
     return merged, counts
 
 
@@ -528,7 +551,9 @@ def import_ossie(
         raise OssieImportError(
             "文件不符合 Apache Ossie 0.2.0.dev0 结构：" + schema_issues[0]["message"]
         )
-    objects, links, requires, report = parse_ossie(document, workspace_id=workspace_id)
+    objects, links, mappings, requires, report = parse_ossie(
+        document, workspace_id=workspace_id
+    )
     if not objects:
         raise OssieImportError("文件里没有可导入的 EntityType 概念")
 
@@ -546,21 +571,26 @@ def import_ossie(
             "attributes_added": sum(len(item.attributes) for item in objects),
             "attributes_updated": 0,
         }
-        dropped = len(base_draft.objects) + len(base_draft.links) + len(base_draft.mappings)
-        if dropped:
+        counts["mappings_added"] = len(mappings)
+        if base_draft.objects or base_draft.links:
             report.note(
-                "替换模式：文档实例、实例关系与数据映射不会保留，发布后当前模型将被文件内容整体替换"
+                "替换模式：文档实例与实例关系不会保留，发布后当前模型将被文件内容整体替换"
             )
         elif base_draft.object_types:
             report.note("替换模式：文件之外的业务对象与关系会在发布时消失")
+        if mappings:
+            report.note(
+                "数据映射按文件里的数据源名称导入；请在“数据映射”页确认这些名称已配置连接"
+            )
         draft = OntologyDraft(
             workspace_id=UUID(str(workspace_id)),
             requires=requires,
             object_types=objects,
             link_types=links,
+            mappings=mappings,
         )
     else:
-        draft, counts = _merge(base_draft, objects, links, report)
+        draft, counts = _merge(base_draft, objects, links, mappings, report)
         draft.requires = [
             *draft.requires,
             *[item for item in requires if item not in draft.requires],

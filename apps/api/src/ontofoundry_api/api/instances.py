@@ -12,8 +12,8 @@ from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.connections import (
     PreviewRequest,
     connect_readonly,
-    get_connection,
     query_mapping,
+    resolve_alias,
 )
 from ontofoundry_api.api.modeling import (
     get_modeling_session,
@@ -49,7 +49,7 @@ def database_object(type_id, row):
 def related_rows(
     db, wid, settings, source_mapping, target_mapping, join, key, forward, limit
 ):
-    item = get_connection(db, wid, str(source_mapping.connection_id))
+    item = resolve_alias(db, wid, source_mapping.connection_alias)
     with connect_readonly(item, settings) as conn:
         metadata = MetaData()
         source = Table(
@@ -144,8 +144,8 @@ def neighborhood(
                 if not relation.data_join or not source or not target:
                     warnings.add(f"{relation.name}：未配置完整关系映射")
                     continue
-                if source.connection_id != target.connection_id:
-                    warnings.add(f"{relation.name}：跨连接关系不可查询")
+                if source.connection_alias != target.connection_alias:
+                    warnings.add(f"{relation.name}：两端在不同数据源，关系不可查询")
                     continue
                 for forward in (True, False):
                     if current["type_id"] != endpoints[0 if forward else 1]:

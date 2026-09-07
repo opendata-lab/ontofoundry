@@ -39,6 +39,22 @@ def get_connection(db, wid, cid):
     return item
 
 
+def resolve_alias(db, wid, alias: str):
+    """Bind a mapping's data source name to a configured connection.
+
+    The published model only names the source, so a workspace that has not
+    configured that name yet gets a precise message instead of a broken query.
+    """
+    item = db.scalar(
+        select(ConnectionRecord).where(
+            ConnectionRecord.workspace_id == wid, ConnectionRecord.name == alias
+        )
+    )
+    if not item:
+        raise HTTPException(422, f"映射使用的数据源“{alias}”还没有在本空间配置连接")
+    return item
+
+
 @contextmanager
 def connect_readonly(item, settings):
     if not settings.connection_key:
@@ -132,6 +148,14 @@ def create_connection(
         encrypted = Fernet(key.encode()).encrypt(body.password.encode()).decode()
     except ValueError as exc:
         raise HTTPException(503, "连接加密主密钥格式无效") from exc
+    # Mappings name their data source, so the name has to identify one connection.
+    if db.scalar(
+        select(ConnectionRecord).where(
+            ConnectionRecord.workspace_id == workspace_id,
+            ConnectionRecord.name == body.name,
+        )
+    ):
+        raise HTTPException(409, "本空间已有同名数据连接，请换一个名称")
     item = ConnectionRecord(
         id=str(uuid4()),
         workspace_id=workspace_id,
@@ -211,7 +235,7 @@ class PreviewRequest(BaseModel):
 
 def query_mapping(db, workspace_id, body, settings):
     mapping = body.mapping
-    item = get_connection(db, workspace_id, str(mapping.connection_id))
+    item = resolve_alias(db, workspace_id, mapping.connection_alias)
     with connect_readonly(item, settings) as conn:
         table = Table(
             mapping.table_name, MetaData(), schema=mapping.schema_name, autoload_with=conn
