@@ -28,6 +28,7 @@ export type AttributeDefinition = {
   value_kind: string;
   required: boolean;
   identifier: boolean;
+  value_concept?: string | null;
   // Ossie relationship fields: constraints, derivations and readings.
   requires?: string[];
   derived_by?: string[];

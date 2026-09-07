@@ -136,11 +136,16 @@ def compile_ossie(
         for attribute in sorted(
             object_type.attributes, key=lambda item: item.technical_name.casefold()
         ):
-            value_concept = VALUE_BASES[attribute.value_kind]
-            if attribute.identifier:
-                value_concept = _value_concept(
-                    object_type.technical_name, attribute.technical_name
-                )
+            # A stored concept name wins; otherwise identifiers get a generated
+            # value concept and plain attributes point at the built-in type.
+            value_concept = attribute.value_concept or (
+                _value_concept(object_type.technical_name, attribute.technical_name)
+                if attribute.identifier
+                else VALUE_BASES[attribute.value_kind]
+            )
+            if value_concept not in VALUE_BASES.values() and value_concept not in {
+                item["concept"] for item in value_components
+            }:
                 value_components.append(
                     {
                         "concept": value_concept,

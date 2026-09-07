@@ -40,7 +40,6 @@ MULTIPLICITY_BY_OSSIE = {
     "ManyToOne": Multiplicity.MANY_TO_ONE,
 }
 NON_IDENTIFIER_RE = re.compile(r"[^A-Za-z0-9_]+")
-PLACEHOLDER_RE = re.compile(r"\{([^{}]+)\}")
 
 
 class OssieImportError(ValueError):
@@ -141,68 +140,29 @@ def _expressions(holder: dict[str, Any], field: str) -> list[str]:
     return [str(item) for item in holder.get(field) or [] if str(item).strip()]
 
 
-def _retarget(text: str, mapping: dict[str, str]) -> str | None:
-    """Rewrite `{concept}` placeholders onto the names the compiler will emit.
+def _keep_verbalizations(written: list[str], generated: list[str]) -> list[str]:
+    """Readings are stored verbatim; the concepts they mention are kept too.
 
-    Returns None when the reading mentions anything outside this relationship —
-    the compiler could only emit an invalid verbalization for that.
+    Only a reading the compiler would produce anyway is dropped, so renaming an
+    attribute in the workspace does not leave text stating the old name.
     """
-    outside = False
-
-    def replace(match: re.Match[str]) -> str:
-        nonlocal outside
-        concept, _, role = match.group(1).partition(":")
-        target = mapping.get(concept)
-        if target is None:
-            outside = True
-            return match.group(0)
-        return "{" + target + (":" + role if role else "") + "}"
-
-    result = PLACEHOLDER_RE.sub(replace, text)
-    return None if outside else result
-
-
-def _keep_verbalizations(
-    written: list[str],
-    generated: list[str],
-    mapping: dict[str, str],
-    path: str,
-    report: Report,
-) -> list[str]:
-    """Keep hand-written readings, drop the ones we would have to mangle."""
-    if not written:
-        return []
-    retargeted = [_retarget(text, mapping) for text in written]
-    if any(text is None for text in retargeted):
-        report.skip(
-            f"{path}.verbalizes",
-            "自然语言读法引用了这条关系之外的概念，导入后按标准模板重新生成",
-        )
-        return []
-    return [] if retargeted == generated else [text for text in retargeted if text]
+    return [] if not written or written == generated else written
 
 
 def _value_concept_loss(
     concept: str,
     values: dict[str, dict[str, Any]],
-    uses: dict[str, int],
     kind: ValueKind,
 ) -> str | None:
-    """What a named value concept loses when it becomes an attribute value kind.
+    """What a named value concept loses on the way in.
 
-    A value concept used by exactly one relationship, extending a built-in
-    directly and carrying no constraints, is precisely “attribute + value kind”.
-    Anything else — sharing, an intermediate concept, its own rules — does not
-    survive, and the user should hear about it.
+    The name is kept, so a concept shared by several attributes is written back
+    as the same single concept. What the internal model has no place for is the
+    concept's own rules and any intermediate concept in its `extends` chain.
     """
     if concept in VALUE_KIND_BY_CONCEPT:
         return None
     component = values.get(concept, {})
-    if uses.get(concept, 0) > 1:
-        return (
-            f"值概念 {concept} 被 {uses[concept]} 个关系共用：内置模型的值类型跟着属性走，"
-            f"导入后这些属性只是同为 {kind.value}，不再共享同一个值概念"
-        )
     if component.get("requires") or component.get("derived_by"):
         return (
             f"值概念 {concept} 自带约束或派生规则：内置模型的属性只保留基础类型 "
@@ -261,20 +221,6 @@ def parse_ossie(
             "数据映射请在“数据映射”页按连接配置",
         )
 
-    # A value concept only loses something when it is shared, sits behind other
-    # value concepts, or carries its own constraints; a plain named string is
-    # exactly an attribute plus its value kind.
-    value_uses: dict[str, int] = {}
-    for component in entities.values():
-        for relationship in component.get("relationships") or []:
-            roles = (
-                relationship.get("roles") or [] if isinstance(relationship, dict) else []
-            )
-            if len(roles) == 1 and isinstance(roles[0], dict):
-                target = str(roles[0].get("concept") or "")
-                if target in values:
-                    value_uses[target] = value_uses.get(target, 0) + 1
-
     object_types: list[ObjectTypeDefinition] = []
     by_concept_id: dict[str, UUID] = {}
     parents_by_concept: dict[str, list[str]] = {}
@@ -319,7 +265,7 @@ def parse_ossie(
                 if problem:
                     report.note(problem)
                 else:
-                    loss = _value_concept_loss(target, values, value_uses, kind)
+                    loss = _value_concept_loss(target, values, kind)
                     if loss:
                         report.note(loss)
                 attribute_key = _unique(_sanitize(name), taken_attribute_keys)
@@ -332,22 +278,15 @@ def parse_ossie(
                     value_kind=kind,
                     required=key in required_keys,
                     identifier=identifier,
+                    # Keep the file's own value concept so it is written back
+                    # under the same name and readings stay valid untouched.
+                    value_concept=target if target in values else None,
                     requires=_expressions(relationship, "requires"),
                     derived_by=_expressions(relationship, "derived_by"),
                 )
-                # Identifier attributes are re-exported behind a generated value
-                # concept, so readings must be retargeted onto that name.
-                emitted_value = (
-                    f"{technical_name}_{attribute_key}_value"
-                    if identifier
-                    else VALUE_BASES[kind]
-                )
                 attribute.verbalizes = _keep_verbalizations(
                     verbalizes,
-                    attribute_verbalizations(attribute, technical_name, emitted_value),
-                    {concept: technical_name, target: emitted_value},
-                    path,
-                    report,
+                    attribute_verbalizations(attribute, technical_name, target),
                 )
                 attributes.append(attribute)
                 used_identifiers.add(name)
@@ -451,14 +390,13 @@ def parse_ossie(
             derived_by=link["derived_by"],
             tags=[str(tag) for tag in tags] if isinstance(tags, list) else [],
         )
-        source_key = keys_by_concept[link["source"]]
-        target_key = keys_by_concept[link["target"]]
         candidate.verbalizes = _keep_verbalizations(
             link["verbalizes"],
-            link_verbalizations(candidate, source_key, target_key),
-            {link["source"]: source_key, link["target"]: target_key},
-            f"{link['source']}.{link['name']}",
-            report,
+            link_verbalizations(
+                candidate,
+                keys_by_concept[link["source"]],
+                keys_by_concept[link["target"]],
+            ),
         )
         link_types.append(candidate)
     return object_types, link_types, ontology_requires, report
@@ -510,6 +448,7 @@ def _merge(
                 counts["attributes_added"] += 1
                 continue
             found.value_kind = attribute.value_kind
+            found.value_concept = attribute.value_concept
             found.identifier = attribute.identifier
             found.required = attribute.required
             found.requires = attribute.requires
