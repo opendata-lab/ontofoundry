@@ -488,7 +488,7 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 |---|---|
 | Object Type | `ontology[]` 中 `type: EntityType` 的 component |
 | Object Type 的 `extends` | component 的 `extends`（父概念技术名） |
-| 普通属性 | 所属 EntityType 中指向内置值概念的 relationship，不额外包装 ValueType |
+| 普通属性 | 所属 EntityType 中指向内置值概念的 relationship，不额外包装 ValueType；角色名与基数按模型写回，模型没有基数时才推断 |
 | 标识属性 | 一个 `ValueType` component（`extends` 内置值类型），加指向它的 relationship，并进入 `identify_by` |
 | Link Type | 首 role 概念的 component 中的一条 relationship，终点和自关联角色编译为 roles，基数编译为 multiplicity |
 | 标识关系（Link Type 的 identifier） | 该 relationship 的名字进入所属 component 的 `identify_by` |
@@ -554,6 +554,8 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `derived_by: [表达式]` | Object Type、属性、Link Type | 派生表达式，纯文本存储 |
 | `verbalizes: [读法]` | 属性、Link Type | 手写自然语言读法；为空表示按模板生成 |
 | `value_concept: str?` | 属性 | 属性指向的 Ossie 值概念名；为空表示由编译器决定（内置类型，或标识属性的生成名）。校验要求同名值概念的值类型一致，且不与业务对象技术名冲突 |
+| `target_role_name: str?` | 属性 | 属性值角色的 Ossie 角色名。读法按 `{概念:角色名}` 引用它，丢掉就会把文件自带的读法变成未知角色 |
+| `multiplicity` | 属性 | 文件声明的基数；为空才由编译器按 `identifier` 推断。“唯一的标识”并不总意味着值唯一 |
 | `connection_alias: str` | 数据映射 | 取代原来的 `connection_id`：模型只写数据源名称，凭据与连接配置留在工作空间，查询时按名称解析 |
 | `reified_from` | Object Type | 事实对象的出处：所属概念、关系技术名、隐含首角色、其余角色（成员技术名 + Ossie 角色名）、基数、读法。导出据此写回原来的 n 元关系；没有这个标记的对象仍然是普通概念 |
 | `metrics: [Metric]` | 本体草稿 | 指标：名称、技术名、说明、所属数据源名称、ANSI SQL 表达式和可选值类型。校验要求该数据源至少有一个数据映射，否则导出时没有 `semantic_model` 可以承载它 |
@@ -562,7 +564,7 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 
 事实对象在界面上是普通业务对象：可以浏览、改名、加标签，它的每个角色都是一条可见的二元关系。两处例外要说明白：它不允许配置数据映射（文件里没有这个概念，映射无处附着，编辑页直接说明原因），并且它各个角色成员的中文名不随文件往返——角色成员名按 Ossie 角色名或概念名生成，导出时不写进扩展。事实对象自身的中文名和标签走所属关系的扩展键，正常往返。
 
-Ossie 的 `description` 是必填的，导出会用业务名称补上空描述。导入因此丢弃与生成值完全相同的描述，否则第二次往返会把生成的标签变成手写内容，改名后还会留下陈述旧名的死文本——和读法的处理原则一致。
+`description` 在标准里是可选的，并且表示一句解释而不是标签，所以模型里没有描述时导出直接省略这个字段，不用业务名称顶替。旧版本会顶替，它导出的文件仍可导入：与生成值完全相同的描述在导入时丢弃，否则生成的标签会变成手写内容，改名后还会留下陈述旧名的死文本——和读法的处理原则一致。
 
 ## 10. 本体服务：REST API 与 MCP
 
@@ -1059,6 +1061,18 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 | n 元关系继续跳过 | 架构治理这类文件的核心事实整条丢失，导入后模型不可用 | 对象化并记录出处，导出写回原关系 |
 
 验证：后端 62 项测试通过（新增 link_mappings 树形导出与手写树导入、三元关系往返为同一条关系、事实对象拒绝映射、指标往返、指标数据源校验、标识指向内置值概念的往返），前端 36 项测试通过；前后端 lint、TypeScript 与生产构建通过。另用一份 7 元 `component.call_observation` 的手写文件验证：导入拆出 4 个属性 + 3 条关系，导出写回同一条 7 元关系，官方 Schema 与语义 lint 均通过，再导入再导出稳定不变。仍未验证：数百概念规模的真实文件、带 `referent_mappings` 的映射、一元关系。
+
+真实文件实测（两份外部文件，`architecture_governance` 29 概念 96 关系、`account_model_v2` 21 概念 46 关系）暴露并修掉三个往返缺陷，都是"导出把文件里没有的东西写进去、把文件里有的东西丢掉"：
+
+| 缺陷 | 现象 | 决定 |
+|---|---|---|
+| 属性的值角色不存角色名 | 文件写 `{"concept":"String","name":"issue_args"}`，读法引用 `{String:issue_args}`；导出写成无名角色，官方 lint 报 30 条 UNKNOWN_VERBALIZATION_ROLE | 属性增加 `target_role_name`，导入导出透传，生成的读法也按 `{概念:角色名}` |
+| 标识属性的基数由编译器推断 | 文件里 `kafka_topic.topic_name` 是 ManyToOne，导出因为"只有一个标识"改成 OneToOne | 属性增加 `multiplicity`，文件声明的优先，为空才推断 |
+| 空描述用业务名称顶替 | `description` 在标准里可选，导出却给 45 条本来没有描述的关系凭空写上技术名 | 没有描述就不写这个字段 |
+
+修完之后两份文件的 `ontology` 段落**逐字段完全一致**（顺序无关比较），官方 Schema 与语义 lint 均 0 error 0 warning，再往返稳定不变。`architecture_governance` 的 8 条 n 元关系（4/6/7/8 元）全部拆成事实对象并原样写回。
+
+仍然有损的只剩 `ontology_mappings`，而且不是"跳过"，是**用我们自己的视图替换了文件里手写的逻辑模型**：41 个 dataset 只写回 11 个且改用概念技术名，371 个字段的 `datatype`、290 条字段描述、53 个 `dimension`、`semantic_model.description` 与 `ai_context.instructions`、14 条 `semantic_model.relationships`、27 个指标的 `ai_context.synonyms` 全部丢失；94 处映射到 n 元关系的深层 `link_mappings` 与 10 处 `referent_mappings` 报告后跳过。这一段的方向选择见下一轮。
 
 - [Apache Ossie Ontology Specification](https://github.com/apache/ossie/blob/main/ontology/ontology.md)
 - [Apache Ossie Ontology JSON Schema](https://github.com/apache/ossie/blob/main/ontology/ontology.json)

@@ -83,10 +83,23 @@ def link_verbalizations(
     ]
 
 
+def attribute_role(attribute: AttributeDefinition, value_concept: str) -> dict[str, Any]:
+    """The value role, named when the file named it."""
+    return {
+        "concept": value_concept,
+        **({"name": attribute.target_role_name} if attribute.target_role_name else {}),
+    }
+
+
 def attribute_verbalizations(
     attribute: AttributeDefinition, object_key: str, value_concept: str
 ) -> list[str]:
-    return [f"{{{object_key}}}的{attribute.name}是{{{value_concept}}}"]
+    # A named role is addressed as `{concept:role}`; using the bare concept
+    # would not resolve.
+    reference = value_concept + (
+        ":" + attribute.target_role_name if attribute.target_role_name else ""
+    )
+    return [f"{{{object_key}}}的{attribute.name}是{{{reference}}}"]
 
 
 def _compile_link_relationship(
@@ -97,7 +110,7 @@ def _compile_link_relationship(
     role_name = link.target_role_name or ("related" if source_key == target_key else None)
     relationship: dict[str, Any] = {
         "name": link.technical_name,
-        "description": link.description or f"{link.name}：{source_key} 到 {target_key}",
+        **({"description": link.description} if link.description else {}),
         "roles": [{"concept": target_key}],
         # Hand-written readings win; otherwise the standard one is generated.
         "verbalizes": link.verbalizes or link_verbalizations(link, source_key, target_key),
@@ -137,7 +150,9 @@ def compile_ossie(
     tags: dict[str, list[str]] = {}
     required_attributes: list[str] = []
 
-    def declare_value(concept: str, attribute: AttributeDefinition, owner_label: str) -> str:
+    def declare_value(
+        concept: str, attribute: AttributeDefinition, owner_label: str
+    ) -> str:
         if concept not in VALUE_BASES.values() and concept not in {
             item["concept"] for item in value_components
         }:
@@ -145,8 +160,11 @@ def compile_ossie(
                 {
                     "concept": concept,
                     "type": "ValueType",
-                    "description": attribute.description
-                    or f"{owner_label}的{attribute.name}",
+                    **(
+                        {"description": attribute.description}
+                        if attribute.description
+                        else {}
+                    ),
                     "extends": [VALUE_BASES[attribute.value_kind]],
                 }
             )
@@ -185,11 +203,13 @@ def compile_ossie(
             roles.append({"concept": concept, **({"name": role.name} if role.name else {})})
         relationship: dict[str, Any] = {
             "name": marker.technical_name,
-            "description": fact.description or fact.name,
+            **({"description": fact.description} if fact.description else {}),
             "roles": roles,
             "verbalizes": list(marker.verbalizes),
         }
-        multiplicity = OSSIE_MULTIPLICITY.get(marker.multiplicity or Multiplicity.MANY_TO_MANY)
+        multiplicity = OSSIE_MULTIPLICITY.get(
+            marker.multiplicity or Multiplicity.MANY_TO_MANY
+        )
         if multiplicity:
             relationship["multiplicity"] = multiplicity
         if fact.requires:
@@ -224,20 +244,24 @@ def compile_ossie(
             )
             relationship: dict[str, Any] = {
                 "name": attribute.technical_name,
-                "description": attribute.description or attribute.name,
-                "roles": [{"concept": value_concept}],
+                **({"description": attribute.description} if attribute.description else {}),
+                "roles": [attribute_role(attribute, value_concept)],
                 "verbalizes": attribute.verbalizes
                 or attribute_verbalizations(
                     attribute, object_type.technical_name, value_concept
                 ),
             }
+            # A stated multiplicity wins; otherwise a lone identifier is the
+            # object's unique key and everything else is many-to-one.
+            relationship["multiplicity"] = OSSIE_MULTIPLICITY.get(
+                attribute.multiplicity or Multiplicity.MANY_TO_MANY
+            ) or (
+                "OneToOne"
+                if attribute.identifier and identifier_count == 1
+                else "ManyToOne"
+            )
             if attribute.identifier:
-                relationship["multiplicity"] = (
-                    "OneToOne" if identifier_count == 1 else "ManyToOne"
-                )
                 identifiers.append(attribute.technical_name)
-            else:
-                relationship["multiplicity"] = "ManyToOne"
             if attribute.requires:
                 relationship["requires"] = list(attribute.requires)
             if attribute.derived_by:
@@ -276,7 +300,10 @@ def compile_ossie(
         component: dict[str, Any] = {
             "concept": object_type.technical_name,
             "type": "EntityType",
-            "description": object_type.description or object_type.name,
+            # `description` is optional in the standard, and it means an
+            # explanation, not a label — inventing one from the business name
+            # would put a short label where a sentence belongs.
+            **({"description": object_type.description} if object_type.description else {}),
         }
         if object_type.extends:
             component["extends"] = sorted(
@@ -353,9 +380,7 @@ def _attach_metrics(
             {
                 "name": metric.technical_name,
                 "expression": {
-                    "dialects": [
-                        {"dialect": "ANSI_SQL", "expression": metric.expression}
-                    ]
+                    "dialects": [{"dialect": "ANSI_SQL", "expression": metric.expression}]
                 },
                 **({"description": metric.description} if metric.description else {}),
                 **(

@@ -956,3 +956,105 @@ def test_an_identifier_pointing_at_a_builtin_keeps_that_concept_name():
     relationship = rewritten["ontology"][0]["relationships"][0]
     assert relationship["roles"] == [{"concept": "String"}]
     assert relationship["verbalizes"] == ["{component} code {String}"]
+
+
+def named_role_document():
+    """Roles carry names, and the readings address them by those names."""
+    return {
+        "version": "0.2.0.dev0",
+        "name": "gov",
+        "description": "治理",
+        "ontology": [
+            {
+                "concept": "arch_issue",
+                "type": "EntityType",
+                "identify_by": ["issue_key"],
+                "relationships": [
+                    {
+                        "name": "issue_key",
+                        "roles": [{"concept": "String", "name": "issue_key"}],
+                        "multiplicity": "ManyToOne",
+                        "verbalizes": ["{arch_issue} 的编号是 {String:issue_key}"],
+                    },
+                    {
+                        "name": "issue_args",
+                        "roles": [{"concept": "String", "name": "issue_args"}],
+                        "multiplicity": "ManyToOne",
+                        "verbalizes": ["{arch_issue} 的参数是 {String:issue_args}"],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def test_a_named_value_role_keeps_its_name_and_its_readings():
+    """Dropping the role name turns every {Concept:role} placeholder in the
+    file's own readings into an unknown role on the way back out."""
+    document = named_role_document()
+    payload, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    model = OntologyDraft.model_validate(payload)
+    issue = model.object_types[0]
+    assert [(a.technical_name, a.target_role_name) for a in issue.attributes] == [
+        ("issue_key", "issue_key"),
+        ("issue_args", "issue_args"),
+    ]
+
+    rewritten = compile_ossie(model, ontology_name="gov", ontology_description="治理")
+    assert validate_ossie(rewritten)["publishable"] is True
+
+    def by_name(component):
+        return {item["name"]: item for item in component["relationships"]}
+
+    assert by_name(rewritten["ontology"][0]) == by_name(document["ontology"][0])
+
+    # The generated reading uses the same {concept:role} form, so an attribute
+    # that never had a hand-written one still lints.
+    plain = model.model_copy(deep=True)
+    next(
+        a for a in plain.object_types[0].attributes if a.technical_name == "issue_args"
+    ).verbalizes = []
+    generated = compile_ossie(plain, ontology_name="gov", ontology_description="治理")
+    assert validate_ossie(generated)["publishable"] is True
+    assert "{String:issue_args}" in by_name(generated["ontology"][0])["issue_args"][
+        "verbalizes"
+    ][0]
+
+
+def test_the_files_own_attribute_multiplicity_wins():
+    """Being the only identifier does not always mean the value is unique."""
+    document = named_role_document()
+    payload, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    model = OntologyDraft.model_validate(payload)
+    key = next(a for a in model.object_types[0].attributes if a.identifier)
+    assert key.multiplicity == Multiplicity.MANY_TO_ONE
+
+    rewritten = compile_ossie(model, ontology_name="gov", ontology_description="治理")
+    written = next(
+        r for r in rewritten["ontology"][0]["relationships"] if r["name"] == "issue_key"
+    )
+    assert written["multiplicity"] == "ManyToOne"
+
+    # A hand-built attribute states nothing, so the compiler still decides.
+    key.multiplicity = None
+    derived = compile_ossie(model, ontology_name="gov", ontology_description="治理")
+    assert (
+        next(
+            r for r in derived["ontology"][0]["relationships"] if r["name"] == "issue_key"
+        )["multiplicity"]
+        == "OneToOne"
+    )
+
+
+def test_an_absent_description_is_not_invented():
+    """`description` is optional and means an explanation, not a label."""
+    document = named_role_document()
+    payload, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    rewritten = compile_ossie(
+        OntologyDraft.model_validate(payload),
+        ontology_name="gov",
+        ontology_description="治理",
+    )
+    component = rewritten["ontology"][0]
+    assert "description" not in component
+    assert all("description" not in item for item in component["relationships"])

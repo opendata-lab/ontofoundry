@@ -70,7 +70,11 @@ def compile_mappings(
                     "name": dataset,
                     "source": _source(mapping),
                     "primary_key": [mapping.key_column],
-                    "description": object_type.description or object_type.name,
+                    **(
+                        {"description": object_type.description}
+                        if object_type.description
+                        else {}
+                    ),
                     # Inside a semantic model an expression is dialect-tagged;
                     # on the ontology side it is a plain string.
                     "fields": [
@@ -99,9 +103,7 @@ def compile_mappings(
                             "children": [
                                 {
                                     "relationship": name,
-                                    "object_mapping": {
-                                        "expression": f"{dataset}.{column}"
-                                    },
+                                    "object_mapping": {"expression": f"{dataset}.{column}"},
                                 }
                                 for name, column in sorted(mapping.fields.items())
                             ],
@@ -161,7 +163,9 @@ def compile_mappings(
     return documents
 
 
-def _column(expression: Any, dataset: str, fields: dict[str, str] | None = None) -> str | None:
+def _column(
+    expression: Any, dataset: str, fields: dict[str, str] | None = None
+) -> str | None:
     match = COLUMN_RE.match(str(expression or ""))
     if not match:
         return None
@@ -195,9 +199,7 @@ def _dataset_fields(dataset: dict[str, Any]) -> dict[str, str]:
     return resolved
 
 
-def _link_nodes(
-    nodes: Any, depth: int = 1
-) -> list[tuple[int, dict[str, Any]]]:
+def _link_nodes(nodes: Any, depth: int = 1) -> list[tuple[int, dict[str, Any]]]:
     """Every link mapping with the arity its level implies.
 
     A root without children is read as arity two: that is the flat shape older

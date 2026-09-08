@@ -29,6 +29,8 @@ export type AttributeDefinition = {
   required: boolean;
   identifier: boolean;
   value_concept?: string | null;
+  // Ossie role name on the value role; readings address the role by it.
+  target_role_name?: string | null;
   // Ossie relationship fields: constraints, derivations and readings.
   requires?: string[];
   derived_by?: string[];

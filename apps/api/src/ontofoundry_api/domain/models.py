@@ -67,6 +67,15 @@ class AttributeDefinition(BaseModel):
     # shared by several attributes — is written back under its own name, so
     # verbalizations that mention it stay valid without being rewritten.
     value_concept: str | None = None
+    # Ossie role name on the value role, when the file gives one. It is what
+    # readings address the role by (`{String:issue_args}`), so dropping it turns
+    # every such placeholder into an unknown role on the way back out.
+    target_role_name: str | None = Field(default=None, max_length=240)
+    # How many values an object may have. None lets the compiler decide from
+    # `identifier`, which is what hand-built attributes rely on; a file that
+    # states it keeps its own answer, since "the only identifier" does not
+    # always mean the value is unique.
+    multiplicity: Multiplicity | None = None
     # Compiles to a relationship, so it carries the same Ossie fields a
     # relationship does. Empty verbalizes means "generate the standard reading".
     requires: Expressions

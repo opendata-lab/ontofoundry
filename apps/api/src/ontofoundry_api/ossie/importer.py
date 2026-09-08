@@ -147,11 +147,13 @@ def _expressions(holder: dict[str, Any], field: str) -> list[str]:
 
 
 def _keep_description(written: str, generated: str) -> str:
-    """Drop a description the compiler would write anyway.
+    """Drop a description that is really a business name in disguise.
 
-    Ossie has no optional description, so export fills an empty one from the
-    business name. Storing that text back would turn a generated label into
-    hand-written content and leave it stating the old name after a rename.
+    `description` is optional in the standard and means an explanation, so
+    export now omits an empty one instead of filling it from the name. Earlier
+    versions did fill it, and files they wrote are still imported: taking that
+    text back would turn a generated label into hand-written content and leave
+    it stating the old name after a rename.
     """
     return "" if written == generated else written
 
@@ -226,9 +228,7 @@ def _parse_metrics(
                 report.skip(path, "指标缺少名称或表达式，未导入")
                 continue
             if len(written) > 1:
-                report.note(
-                    f"指标 {name} 有多种方言的表达式，只保留 ANSI SQL 一种"
-                )
+                report.note(f"指标 {name} 有多种方言的表达式，只保留 ANSI SQL 一种")
             datatype = str(item.get("datatype") or "")
             kind = VALUE_KIND_BY_CONCEPT.get(datatype)
             if datatype and kind is None:
@@ -429,7 +429,9 @@ def parse_ossie(
                 continue
             name = str(relationship.get("name") or "")
             path = f"{concept}.{name}"
-            roles = [item for item in relationship.get("roles") or [] if isinstance(item, dict)]
+            roles = [
+                item for item in relationship.get("roles") or [] if isinstance(item, dict)
+            ]
             key = f"{concept}.{name}"
             title = str(display_names.get(key) or name).strip() or name
             verbalizes = [
@@ -493,6 +495,10 @@ def parse_ossie(
                         if target in values
                         or (identifier and target in VALUE_KIND_BY_CONCEPT)
                         else None
+                    ),
+                    target_role_name=str(role.get("name")) if role.get("name") else None,
+                    multiplicity=MULTIPLICITY_BY_OSSIE.get(
+                        str(relationship.get("multiplicity") or "")
                     ),
                     requires=_expressions(relationship, "requires"),
                     derived_by=_expressions(relationship, "derived_by"),
@@ -692,6 +698,8 @@ def _merge(
                 continue
             found.value_kind = attribute.value_kind
             found.value_concept = attribute.value_concept
+            found.target_role_name = attribute.target_role_name
+            found.multiplicity = attribute.multiplicity
             found.identifier = attribute.identifier
             found.required = attribute.required
             found.requires = attribute.requires
@@ -778,7 +786,9 @@ def _merge(
             "数据映射按文件里的数据源名称导入；请在“数据映射”页确认这些名称已配置连接"
         )
 
-    known = {(item.connection_alias, item.technical_name.casefold()) for item in merged.metrics}
+    known = {
+        (item.connection_alias, item.technical_name.casefold()) for item in merged.metrics
+    }
     for metric in metrics:
         if (metric.connection_alias, metric.technical_name.casefold()) in known:
             continue

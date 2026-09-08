@@ -23,15 +23,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 
 SKILL_ROOT = Path(__file__).resolve().parent
-ONTOLOGY_SCHEMA_PATH = (
-    SKILL_ROOT / "assets/vendor/apache-ossie/ontology/ontology.json"
-)
-CORE_SCHEMA_PATH = (
-    SKILL_ROOT / "assets/vendor/apache-ossie/core-spec/osi-schema.json"
-)
+ONTOLOGY_SCHEMA_PATH = SKILL_ROOT / "assets/vendor/apache-ossie/ontology/ontology.json"
+CORE_SCHEMA_PATH = SKILL_ROOT / "assets/vendor/apache-ossie/core-spec/osi-schema.json"
 CORE_SCHEMA_RAW_URI = (
-    "https://raw.githubusercontent.com/apache/ossie/main/"
-    "core-spec/osi-schema.json"
+    "https://raw.githubusercontent.com/apache/ossie/main/core-spec/osi-schema.json"
 )
 
 # ontology.md lists these as the complete set of built-in concepts. Core
@@ -150,9 +145,7 @@ def validate_schema(data: Any) -> List[Issue]:
             code = "SCHEMA_REQUIRED"
         elif error.validator == "type":
             code = "SCHEMA_TYPE"
-        result.append(
-            issue(code, json_path(error.absolute_path), error.message)
-        )
+        result.append(issue(code, json_path(error.absolute_path), error.message))
     return result
 
 
@@ -298,8 +291,7 @@ def inheritance_issues(
         if not isinstance(parents, list):
             return False
         return any(
-            isinstance(parent, str)
-            and reaches_builtin_value(parent, visiting | {name})
+            isinstance(parent, str) and reaches_builtin_value(parent, visiting | {name})
             for parent in parents
         )
 
@@ -352,9 +344,7 @@ def relationship_issues(
             relationship_base = f"{base}.relationships[{relationship_position}]"
             relationship_name = relationship.get("name")
             if isinstance(relationship_name, str) and relationship_name:
-                relationship_index[concept_name].setdefault(
-                    relationship_name, relationship
-                )
+                relationship_index[concept_name].setdefault(relationship_name, relationship)
             elif relationship_name == "":
                 result.append(
                     issue(
@@ -668,13 +658,9 @@ def validate_semantics(data: Any) -> List[Issue]:
 
     result.extend(expression_issues(data))
     result.extend(inheritance_issues(concepts, concept_paths))
-    relationship_result, relationships = relationship_issues(
-        concepts, concept_paths
-    )
+    relationship_result, relationships = relationship_issues(concepts, concept_paths)
     result.extend(relationship_result)
-    result.extend(
-        identifier_issues(concepts, concept_paths, relationships)
-    )
+    result.extend(identifier_issues(concepts, concept_paths, relationships))
     result.extend(mapping_reference_issues(data, concepts))
     return result
 
@@ -722,14 +708,10 @@ def print_report(
     semantic_status: str = "passed",
 ) -> None:
     errors = [
-        item
-        for item in schema_issues + semantic_issues
-        if item["severity"] == "error"
+        item for item in schema_issues + semantic_issues if item["severity"] == "error"
     ]
     warnings = [
-        item
-        for item in schema_issues + semantic_issues
-        if item["severity"] == "warning"
+        item for item in schema_issues + semantic_issues if item["severity"] == "warning"
     ]
 
     print("# Apache Ossie Validation Report\n")
@@ -743,16 +725,12 @@ def print_report(
     if errors:
         print("## Errors\n")
         for item in errors:
-            print(
-                f"- **{item['code']}** @ `{item['path']}`: {item['message']}"
-            )
+            print(f"- **{item['code']}** @ `{item['path']}`: {item['message']}")
         print()
     if warnings:
         print("## Warnings\n")
         for item in warnings:
-            print(
-                f"- **{item['code']}** @ `{item['path']}`: {item['message']}"
-            )
+            print(f"- **{item['code']}** @ `{item['path']}`: {item['message']}")
         print()
 
     if not errors and not warnings:
@@ -789,20 +767,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         target,
         schema_issues,
         semantic_issues,
-        semantic_status=semantic_lint_status(
-            semantic_issues, args.schema_only, lint_ran
-        ),
+        semantic_status=semantic_lint_status(semantic_issues, args.schema_only, lint_ran),
     )
 
     errors = [
-        item
-        for item in schema_issues + semantic_issues
-        if item["severity"] == "error"
+        item for item in schema_issues + semantic_issues if item["severity"] == "error"
     ]
     warnings = [
-        item
-        for item in schema_issues + semantic_issues
-        if item["severity"] == "warning"
+        item for item in schema_issues + semantic_issues if item["severity"] == "warning"
     ]
     if errors:
         return 2
