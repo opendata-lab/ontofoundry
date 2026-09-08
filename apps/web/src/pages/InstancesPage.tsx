@@ -352,7 +352,6 @@ export function InstancesPage() {
       ) : graphOpen ? (
         <div className="instance-graph">
           <OntologyGraph
-            mode="semantic"
             query=""
             graph={{
               workspace_id: workspace.id,

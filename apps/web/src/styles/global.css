@@ -526,14 +526,6 @@ table {
     border-color var(--dur-micro) var(--ease-out);
 }
 
-.ontology-node--value {
-  border-radius: var(--radius-sm);
-  border-style: dashed;
-  color: var(--color-attribute);
-  min-height: 40px;
-  min-width: 150px;
-}
-
 .ontology-node.is-dimmed {
   box-shadow: none;
   opacity: 0.2;
@@ -559,11 +551,6 @@ table {
   height: 26px;
   justify-content: center;
   width: 26px;
-}
-
-.ontology-node--value .ontology-node__icon {
-  background: var(--color-attribute-soft);
-  color: var(--color-attribute);
 }
 
 .ontology-node__text {
@@ -622,13 +609,6 @@ table {
   stroke: var(--color-object);
   stroke-dasharray: 8 4;
   stroke-width: 1.4;
-}
-
-.ontology-edge--attribute {
-  stroke: var(--color-attribute);
-  stroke-dasharray: 4 4;
-  stroke-width: 1.2;
-  opacity: 0.65;
 }
 
 .ontology-edge.is-dimmed {
@@ -705,10 +685,6 @@ table {
   fill: var(--color-object-soft);
   stroke: var(--color-rule-strong);
   stroke-width: 2;
-}
-
-.react-flow__minimap-node.value_type {
-  fill: var(--color-attribute-soft);
 }
 
 .react-flow__controls {

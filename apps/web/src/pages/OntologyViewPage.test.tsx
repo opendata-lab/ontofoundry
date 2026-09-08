@@ -20,8 +20,8 @@ vi.mock("../api/client", () => ({
   modelingApi: { importOssie: vi.fn() },
 }));
 vi.mock("../components/OntologyGraph", () => ({
-  OntologyGraph: ({ graph, mode }: { graph: TypeGraph; mode: string }) => (
-    <div data-testid="semantic-graph" data-mode={mode}>
+  OntologyGraph: ({ graph }: { graph: TypeGraph }) => (
+    <div data-testid="semantic-graph" data-edges={graph.edges.length}>
       {graph.nodes.map((n) => (
         <span key={n.id}>{n.label}</span>
       ))}
@@ -149,28 +149,34 @@ describe("本体视图", () => {
     expect(screen.getByText("暂无已发布文档实例")).toBeInTheDocument();
     expect(screen.getByText("暂无已发布数据映射")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "语义视图" }));
-    expect(screen.getByTestId("semantic-graph")).toHaveAttribute(
-      "data-mode",
-      "semantic",
-    );
     expect(container.querySelectorAll("[data-layer]")).toHaveLength(0);
-    expect(screen.queryByText("物料编号")).not.toBeInTheDocument();
     expect(api.exportUrl).toHaveBeenLastCalledWith("w", "v2");
-    fireEvent.click(screen.getByRole("checkbox", { name: "显示属性" }));
-    expect(screen.getByText("物料编号")).toBeInTheDocument();
+    // Attributes are entity fields, so the value type and the attribute edge
+    // that carries it never reach the canvas, and there is no toggle for them.
+    expect(screen.queryByText("物料编号")).not.toBeInTheDocument();
+    expect(screen.getByTestId("semantic-graph")).toHaveAttribute(
+      "data-edges",
+      "1",
+    );
+    expect(
+      screen.queryByRole("checkbox", { name: "显示属性" }),
+    ).not.toBeInTheDocument();
+    // The count still comes from the published version, not from the canvas.
+    expect(screen.getByText("属性 1")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "图谱标签" }), {
       target: { value: "采购" },
     });
-    expect(screen.getByText("物料编号")).toBeInTheDocument();
+    expect(screen.getByText("物料")).toBeInTheDocument();
     expect(screen.queryByText("供应商")).not.toBeInTheDocument();
+    expect(screen.getByTestId("semantic-graph")).toHaveAttribute(
+      "data-edges",
+      "0",
+    );
     fireEvent.click(screen.getByRole("tab", { name: "全局" }));
     expect(container.querySelectorAll("[data-layer]")).toHaveLength(4);
     expect(
       screen.getByRole("button", { name: "查看本体：供应商" }),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("checkbox", { name: "显示属性" }),
-    ).not.toBeInTheDocument();
   });
 
   it("supports node details, layer navigation, zoom reset and keyboard tabs", async () => {

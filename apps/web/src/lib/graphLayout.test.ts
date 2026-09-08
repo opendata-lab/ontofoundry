@@ -9,37 +9,41 @@ import {
   selfLoopGeometry,
   type LayoutEdge,
   type LayoutNode,
+  type Point,
 } from "./graphLayout";
 
-function model(objectCount: number, attributes: Record<string, number> = {}) {
+/** A chain of object types, each related to the one before it. */
+function model(objectCount: number) {
   const nodes: LayoutNode[] = [];
   const edges: LayoutEdge[] = [];
   for (let i = 0; i < objectCount; i++) {
     const id = "o" + i;
-    nodes.push({ id, kind: "object_type" });
-    if (i)
-      edges.push({
-        id: "rel" + i,
-        kind: "link_type",
-        source: "o" + (i - 1),
-        target: id,
-      });
-    for (let a = 0; a < (attributes[id] ?? 0); a++) {
-      const value = id + "-v" + a;
-      nodes.push({ id: value, kind: "value_type" });
-      edges.push({ id: value, kind: "attribute", source: id, target: value });
-    }
+    nodes.push({ id });
+    if (i) edges.push({ id: "rel" + i, source: "o" + (i - 1), target: id });
   }
   return { nodes, edges };
 }
 
-function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+/** Pairs of cards whose rectangles overlap on screen. */
+function overlapping(nodes: LayoutNode[], points: Map<string, Point>) {
+  const pairs: string[] = [];
+  for (const a of nodes)
+    for (const b of nodes) {
+      if (a.id >= b.id) continue;
+      const one = points.get(a.id)!;
+      const two = points.get(b.id)!;
+      if (
+        Math.abs(one.x - two.x) < NODE_WIDTH &&
+        Math.abs(one.y - two.y) < NODE_HEIGHT
+      )
+        pairs.push(a.id + "/" + b.id);
+    }
+  return pairs;
 }
 
 describe("图谱布局", () => {
   it("places every node once, deterministically, inside a positive canvas", () => {
-    const { nodes, edges } = model(9, { o0: 3, o4: 7 });
+    const { nodes, edges } = model(9);
     const first = layoutGraph(nodes, edges);
     const second = layoutGraph(nodes, edges);
     expect(first.size).toBe(nodes.length);
@@ -54,40 +58,32 @@ describe("图谱布局", () => {
   it("keeps object cards from overlapping instead of stacking them in one column", () => {
     const { nodes, edges } = model(12);
     const points = layoutGraph(nodes, edges);
-    const objects = nodes.filter((n) => n.kind === "object_type");
     const columns = new Set<number>();
-    for (const node of objects) columns.add(Math.round(points.get(node.id)!.x));
+    for (const node of nodes) columns.add(Math.round(points.get(node.id)!.x));
     expect(columns.size).toBeGreaterThan(1);
-    for (const a of objects)
-      for (const b of objects) {
-        if (a.id >= b.id) continue;
-        const one = points.get(a.id)!;
-        const two = points.get(b.id)!;
-        const clearX = Math.abs(one.x - two.x) >= NODE_WIDTH;
-        const clearY = Math.abs(one.y - two.y) >= NODE_HEIGHT;
-        expect(clearX || clearY).toBe(true);
-      }
+    expect(overlapping(nodes, points)).toEqual([]);
   });
 
-  it("orbits attributes around the object that declares them", () => {
-    const { nodes, edges } = model(4, { o1: 6 });
-    const points = layoutGraph(nodes, edges);
-    const owner = points.get("o1")!;
-    const values = [...Array(6)].map((_, a) => points.get("o1-v" + a)!);
-    for (const value of values) {
-      expect(distance(value, owner)).toBeGreaterThan(120);
-      expect(distance(value, owner)).toBeLessThan(420);
+  it("leaves no card sitting on another, however big the model gets", () => {
+    // The canvas used to crowd once a model outgrew a fixed pass budget, which
+    // read on screen as broken rather than dense.
+    for (const size of [30, 80, 160]) {
+      const { nodes, edges } = model(size);
+      // Cross relations: a real model is a web, not a chain.
+      for (let i = 0; i < size; i += 3)
+        edges.push({
+          id: "cross" + i,
+          source: "o" + i,
+          target: "o" + ((i * 7 + 5) % size),
+        });
+      const points = layoutGraph(nodes, edges);
+      expect(points.size).toBe(size);
+      expect(overlapping(nodes, points)).toEqual([]);
     }
-    for (const a of values)
-      for (const b of values)
-        if (a !== b) expect(distance(a, b)).toBeGreaterThan(40);
   });
 
   it("lays out a graph that has no edges at all", () => {
-    const nodes: LayoutNode[] = [
-      { id: "a", kind: "object_type" },
-      { id: "b", kind: "object_type" },
-    ];
+    const nodes: LayoutNode[] = [{ id: "a" }, { id: "b" }];
     const points = layoutGraph(nodes, []);
     const [one, two] = [points.get("a")!, points.get("b")!];
     expect(points.size).toBe(2);
@@ -128,10 +124,10 @@ describe("图谱布局", () => {
 describe("平行关系", () => {
   it("fans relations that share a pair and leaves a lone relation straight", () => {
     const edges: LayoutEdge[] = [
-      { id: "r1", kind: "link_type", source: "a", target: "b" },
-      { id: "r2", kind: "link_type", source: "a", target: "b" },
-      { id: "r3", kind: "link_type", source: "b", target: "a" },
-      { id: "solo", kind: "link_type", source: "b", target: "c" },
+      { id: "r1", source: "a", target: "b" },
+      { id: "r2", source: "a", target: "b" },
+      { id: "r3", source: "b", target: "a" },
+      { id: "solo", source: "b", target: "c" },
     ];
     const offsets = parallelOffsets(edges);
     expect(offsets.get("solo")).toBe(0);
