@@ -5,9 +5,14 @@ and its relationships — in different shapes. Ossie declares a logical
 `semantic_model` and maps concepts onto it with expressions; the internal model
 names a data source, a table, a key column and a column per attribute. The
 translation only handles the plain `dataset.column` expressions this writes;
-anything more (computed SQL, referent chains, nested link mappings) is reported
-rather than half-read, because guessing a column out of arbitrary SQL would
-silently produce a wrong mapping.
+anything more (computed SQL, referent chains) is reported rather than half-read,
+because guessing a column out of arbitrary SQL would silently produce a wrong
+mapping.
+
+Link mappings are trees, and the spec ties a node's level to the arity of the
+relationship it names: a top-level node names a unary relationship, its children
+name binary ones, and so on. So the concept's own objects are mapped once at the
+root and every attribute hangs under it as a child.
 """
 
 from __future__ import annotations
@@ -79,16 +84,28 @@ def compile_mappings(
                     ],
                 }
             )
+            # The root node maps this concept's own objects; every binary
+            # relationship read from the same table is a child of it, which is
+            # what the spec's level-equals-arity rule requires.
             concept_mappings.append(
                 {
                     "concept": dataset,
                     "object_mappings": [{"expression": f"{dataset}.{mapping.key_column}"}],
                     "link_mappings": [
                         {
-                            "relationship": name,
-                            "object_mapping": {"expression": f"{dataset}.{column}"},
+                            "object_mapping": {
+                                "expression": f"{dataset}.{mapping.key_column}"
+                            },
+                            "children": [
+                                {
+                                    "relationship": name,
+                                    "object_mapping": {
+                                        "expression": f"{dataset}.{column}"
+                                    },
+                                }
+                                for name, column in sorted(mapping.fields.items())
+                            ],
                         }
-                        for name, column in sorted(mapping.fields.items())
                     ],
                 }
             )
@@ -114,7 +131,7 @@ def compile_mappings(
                 (item for item in concept_mappings if item["concept"] == owner), None
             )
             if entry is not None:
-                entry["link_mappings"].append(
+                entry["link_mappings"][0]["children"].append(
                     {
                         "relationship": link.technical_name,
                         "object_mapping": {
@@ -123,6 +140,12 @@ def compile_mappings(
                         },
                     }
                 )
+
+        for entry in concept_mappings:
+            # A root that maps nothing further is noise; the object mapping
+            # above already says how the concept's objects are found.
+            if not entry["link_mappings"][0]["children"]:
+                del entry["link_mappings"]
 
         semantic_model: dict[str, Any] = {"name": alias, "datasets": datasets}
         if relationships:
@@ -138,13 +161,56 @@ def compile_mappings(
     return documents
 
 
-def _column(expression: Any, dataset: str) -> str | None:
+def _column(expression: Any, dataset: str, fields: dict[str, str] | None = None) -> str | None:
     match = COLUMN_RE.match(str(expression or ""))
     if not match:
         return None
     if match.group("dataset") and match.group("dataset") != dataset:
         return None
-    return match.group("column")
+    name = match.group("column")
+    # A dataset may declare logical fields over its own columns, in which case
+    # the mapping names the field and the column is one level down.
+    return (fields or {}).get(name, name)
+
+
+def _dataset_fields(dataset: dict[str, Any]) -> dict[str, str]:
+    """Logical field name to physical column, for the plain single-column ones."""
+    resolved: dict[str, str] = {}
+    for field in dataset.get("fields") or []:
+        if not isinstance(field, dict):
+            continue
+        name = str(field.get("name") or "")
+        dialects = (field.get("expression") or {}).get("dialects") or []
+        text = next(
+            (
+                str(item.get("expression"))
+                for item in dialects
+                if isinstance(item, dict) and item.get("dialect") == "ANSI_SQL"
+            ),
+            None,
+        )
+        match = COLUMN_RE.match(text or "")
+        if name and match and match.group("column") != name:
+            resolved[name] = match.group("column")
+    return resolved
+
+
+def _link_nodes(
+    nodes: Any, depth: int = 1
+) -> list[tuple[int, dict[str, Any]]]:
+    """Every link mapping with the arity its level implies.
+
+    A root without children is read as arity two: that is the flat shape older
+    OntoFoundry exports wrote, and reading it keeps those files importable.
+    """
+    found: list[tuple[int, dict[str, Any]]] = []
+    for node in nodes if isinstance(nodes, list) else []:
+        if not isinstance(node, dict):
+            continue
+        children = [item for item in node.get("children") or [] if isinstance(item, dict)]
+        found.append((2 if depth == 1 and not children else depth, node))
+        found.extend(_link_nodes(children, depth + 1))
+    return found
 
 
 def parse_mappings(
@@ -167,6 +233,13 @@ def parse_mappings(
             for item in model.get("datasets") or []
             if isinstance(item, dict)
         }
+        if model.get("custom_extensions") or any(
+            item.get("custom_extensions") for item in datasets.values()
+        ):
+            skip(
+                f"ontology_mappings[{index}].custom_extensions",
+                "厂商扩展（custom_extensions）没有对应位置，未导入",
+            )
         for concept_mapping in entry.get("concept_mappings") or []:
             if not isinstance(concept_mapping, dict):
                 continue
@@ -190,15 +263,35 @@ def parse_mappings(
                 for item in object_mappings
             ):
                 skip(path, "referent_mappings（按引用关系定位对象）暂不支持")
+
+            nodes = _link_nodes(concept_mapping.get("link_mappings"))
+            # The root of the tree maps the concept's own objects, so it names
+            # the same column `object_mappings` does — either one identifies the
+            # dataset and the key column.
+            root = next((node for arity, node in nodes if arity == 1), None)
+            root_expression = (
+                (root.get("object_mapping") or {}).get("expression") if root else None
+            )
             dataset_name = next(
-                (name for name in datasets if str(expression or "").startswith(f"{name}.")),
+                (
+                    name
+                    for name in datasets
+                    for text in (str(expression or ""), str(root_expression or ""))
+                    if text.startswith(f"{name}.")
+                ),
                 concept if concept in datasets else None,
             )
             dataset = datasets.get(dataset_name or "")
             if dataset is None:
                 skip(path, "找不到这个概念对应的 dataset")
                 continue
-            key_column = _column(expression, dataset_name or "")
+            if dataset.get("unique_keys"):
+                skip(f"{path}.unique_keys", "dataset 的唯一键在内置模型里没有位置，未导入")
+            columns = _dataset_fields(dataset)
+
+            key_column = _column(expression, dataset_name or "", columns) or _column(
+                root_expression, dataset_name or "", columns
+            )
             if not key_column:
                 keys = dataset.get("primary_key") or []
                 key_column = str(keys[0]) if keys else None
@@ -208,17 +301,24 @@ def parse_mappings(
 
             attributes = {item.technical_name for item in object_type.attributes}
             fields: dict[str, str] = {}
-            for link_mapping in concept_mapping.get("link_mappings") or []:
-                if not isinstance(link_mapping, dict):
-                    continue
+            for arity, link_mapping in nodes:
                 name = str(link_mapping.get("relationship") or "")
-                if link_mapping.get("children"):
-                    skip(f"{path}.{name}", "多层 link_mappings 暂不支持")
+                if arity == 1:
+                    if name:
+                        skip(f"{path}.{name}", "一元关系的映射暂不支持")
+                    continue
+                if arity > 2:
+                    skip(
+                        f"{path}.{name or '(未命名)'}",
+                        "三元及以上关系的映射暂不支持，内置模型只有二元关系",
+                    )
+                    continue
                 if name not in attributes:
                     continue  # relations are mapped through data_join, not fields
                 column = _column(
                     (link_mapping.get("object_mapping") or {}).get("expression"),
                     dataset_name or "",
+                    columns,
                 )
                 if not column:
                     skip(f"{path}.{name}", "字段映射不是单列表达式，未导入这一列")

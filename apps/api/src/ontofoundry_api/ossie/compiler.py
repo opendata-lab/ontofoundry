@@ -8,7 +8,9 @@ from typing import Any
 from ontofoundry_api.domain.models import (
     AttributeDefinition,
     LinkTypeDefinition,
+    MetricDefinition,
     Multiplicity,
+    ObjectTypeDefinition,
     OntologyDraft,
     ValueKind,
 )
@@ -51,6 +53,17 @@ def sha256_json(data: Any) -> str:
 
 def _value_concept(object_key: str, attribute_key: str) -> str:
     return f"{object_key}_{attribute_key}_value"
+
+
+def attribute_value_concept(
+    object_type: ObjectTypeDefinition, attribute: AttributeDefinition
+) -> str:
+    """A stored concept name wins; otherwise identifiers get a generated one."""
+    return attribute.value_concept or (
+        _value_concept(object_type.technical_name, attribute.technical_name)
+        if attribute.identifier
+        else VALUE_BASES[attribute.value_kind]
+    )
 
 
 def link_verbalizations(
@@ -110,8 +123,10 @@ def compile_ossie(
     ontology_description: str,
 ) -> dict[str, Any]:
     """Compile the internal graph into deterministic Apache Ossie JSON."""
-    objects = sorted(draft.object_types, key=lambda item: item.technical_name.casefold())
-    by_id = {item.id: item for item in objects}
+    all_objects = sorted(
+        draft.object_types, key=lambda item: item.technical_name.casefold()
+    )
+    by_id = {item.id: item for item in all_objects}
     links_by_source: dict[Any, list[LinkTypeDefinition]] = defaultdict(list)
     for link in draft.link_types:
         links_by_source[link.owner_type_id].append(link)
@@ -121,6 +136,71 @@ def compile_ossie(
     display_names: dict[str, str] = {}
     tags: dict[str, list[str]] = {}
     required_attributes: list[str] = []
+
+    def declare_value(concept: str, attribute: AttributeDefinition, owner_label: str) -> str:
+        if concept not in VALUE_BASES.values() and concept not in {
+            item["concept"] for item in value_components
+        }:
+            value_components.append(
+                {
+                    "concept": concept,
+                    "type": "ValueType",
+                    "description": attribute.description
+                    or f"{owner_label}的{attribute.name}",
+                    "extends": [VALUE_BASES[attribute.value_kind]],
+                }
+            )
+        return concept
+
+    # An object that stands in for an n-ary relationship is not a concept of its
+    # own in the file: it is written back as the relationship its owner declared.
+    facts = [item for item in all_objects if item.reified_from]
+    objects = [item for item in all_objects if not item.reified_from]
+    reified_by_owner: dict[Any, list[dict[str, Any]]] = defaultdict(list)
+    for fact in facts:
+        marker = fact.reified_from
+        assert marker is not None  # narrowed by the filter above
+        owner = by_id.get(marker.owner_type_id)
+        if owner is None:  # pragma: no cover - the draft validator rejects this
+            continue
+        members = {item.technical_name: item for item in fact.attributes}
+        relations = {item.technical_name: item for item in links_by_source[fact.id]}
+        roles: list[dict[str, Any]] = []
+        for role in marker.roles:
+            attribute = members.get(role.member)
+            if attribute is not None:
+                concept = declare_value(
+                    attribute_value_concept(fact, attribute), attribute, fact.name
+                )
+            elif role.member in relations:
+                link = relations[role.member]
+                other = by_id[
+                    link.source_type_id
+                    if link.multiplicity == Multiplicity.ONE_TO_MANY
+                    else link.target_type_id
+                ]
+                concept = other.technical_name
+            else:  # pragma: no cover - the draft validator rejects this
+                continue
+            roles.append({"concept": concept, **({"name": role.name} if role.name else {})})
+        relationship: dict[str, Any] = {
+            "name": marker.technical_name,
+            "description": fact.description or fact.name,
+            "roles": roles,
+            "verbalizes": list(marker.verbalizes),
+        }
+        multiplicity = OSSIE_MULTIPLICITY.get(marker.multiplicity or Multiplicity.MANY_TO_MANY)
+        if multiplicity:
+            relationship["multiplicity"] = multiplicity
+        if fact.requires:
+            relationship["requires"] = list(fact.requires)
+        if fact.derived_by:
+            relationship["derived_by"] = list(fact.derived_by)
+        reified_by_owner[owner.id].append(relationship)
+        key = f"{owner.technical_name}.{marker.technical_name}"
+        display_names[key] = fact.name
+        if fact.tags:
+            tags[key] = sorted(fact.tags)
 
     for object_type in objects:
         relationships: list[dict[str, Any]] = []
@@ -137,25 +217,11 @@ def compile_ossie(
         for attribute in sorted(
             object_type.attributes, key=lambda item: item.technical_name.casefold()
         ):
-            # A stored concept name wins; otherwise identifiers get a generated
-            # value concept and plain attributes point at the built-in type.
-            value_concept = attribute.value_concept or (
-                _value_concept(object_type.technical_name, attribute.technical_name)
-                if attribute.identifier
-                else VALUE_BASES[attribute.value_kind]
+            value_concept = declare_value(
+                attribute_value_concept(object_type, attribute),
+                attribute,
+                object_type.name,
             )
-            if value_concept not in VALUE_BASES.values() and value_concept not in {
-                item["concept"] for item in value_components
-            }:
-                value_components.append(
-                    {
-                        "concept": value_concept,
-                        "type": "ValueType",
-                        "description": attribute.description
-                        or f"{object_type.name}的{attribute.name}",
-                        "extends": [VALUE_BASES[attribute.value_kind]],
-                    }
-                )
             relationship: dict[str, Any] = {
                 "name": attribute.technical_name,
                 "description": attribute.description or attribute.name,
@@ -205,6 +271,8 @@ def compile_ossie(
             if link.tags:
                 tags[key] = sorted(link.tags)
 
+        relationships.extend(reified_by_owner[object_type.id])
+
         component: dict[str, Any] = {
             "concept": object_type.technical_name,
             "type": "EntityType",
@@ -232,6 +300,11 @@ def compile_ossie(
         value_components + entity_components,
         key=lambda item: (item["type"], item["concept"].casefold()),
     )
+    # Data mappings travel as ontology_mappings: table, key column and the
+    # column behind each attribute, with no connection or credentials. Metrics
+    # join the semantic model of the data source they measure.
+    ontology_mappings = compile_mappings(draft.mappings, objects, draft.link_types)
+    _attach_metrics(ontology_mappings, draft.metrics, display_names)
     document: dict[str, Any] = {
         "version": OSSIE_VERSION,
         "name": ontology_name,
@@ -250,12 +323,51 @@ def compile_ossie(
     }
     if draft.requires:
         document["requires"] = list(draft.requires)
-    # Data mappings travel as ontology_mappings: table, key column and the
-    # column behind each attribute, with no connection or credentials.
-    ontology_mappings = compile_mappings(draft.mappings, objects, draft.link_types)
     if ontology_mappings:
         document["ontology_mappings"] = ontology_mappings
     return document
+
+
+def metric_key(metric: MetricDefinition) -> str:
+    """Extension key for a metric's business name, kept out of the concept space."""
+    return f"metric:{metric.connection_alias}.{metric.technical_name}"
+
+
+def _attach_metrics(
+    ontology_mappings: list[dict[str, Any]],
+    metrics: list[MetricDefinition],
+    display_names: dict[str, str],
+) -> None:
+    """Write metrics into the semantic model of the data source they measure."""
+    by_alias: dict[str, list[MetricDefinition]] = defaultdict(list)
+    for metric in metrics:
+        by_alias[metric.connection_alias].append(metric)
+    for entry in ontology_mappings:
+        items = sorted(
+            by_alias.get(str(entry["name"]), []),
+            key=lambda item: item.technical_name.casefold(),
+        )
+        if not items:
+            continue
+        entry["semantic_model"]["metrics"] = [
+            {
+                "name": metric.technical_name,
+                "expression": {
+                    "dialects": [
+                        {"dialect": "ANSI_SQL", "expression": metric.expression}
+                    ]
+                },
+                **({"description": metric.description} if metric.description else {}),
+                **(
+                    {"datatype": VALUE_BASES[metric.value_kind]}
+                    if metric.value_kind
+                    else {}
+                ),
+            }
+            for metric in items
+        ]
+        for metric in items:
+            display_names[metric_key(metric)] = metric.name
 
 
 def validate_ossie(document: dict[str, Any]) -> dict[str, Any]:

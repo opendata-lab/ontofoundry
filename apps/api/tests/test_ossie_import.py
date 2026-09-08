@@ -214,8 +214,7 @@ def test_foreign_file_reports_only_what_it_cannot_represent():
     model = OntologyDraft.model_validate(payload)
     reasons = {item["path"]: item["reason"] for item in report["skipped"]}
 
-    assert "role" in reasons["customer.sold_to"]
-    assert "role" in reasons["order.cancelled"]
+    assert "一元关系" in reasons["order.cancelled"]
     assert "Any" in reasons["customer.anything"]
     assert "dataset" in reasons["ontology_mappings[0].customer"]
     # Expressions and identifying relations are supported now, so they are gone
@@ -223,7 +222,27 @@ def test_foreign_file_reports_only_what_it_cannot_represent():
     assert not [path for path in reasons if path.endswith("requires")]
     assert not [path for path in reasons if path.endswith("derived_by")]
     assert "order.identify_by[placed_by]" not in reasons
-    assert [item.technical_name for item in model.link_types] == ["placed_by"]
+    # The ternary relationship became a fact object with one relation per role.
+    assert "customer.sold_to" not in reasons
+    fact = next(i for i in model.object_types if i.technical_name == "customer_sold_to")
+    assert fact.reified_from is not None
+    assert fact.reified_from.owner_type_id == next(
+        i.id for i in model.object_types if i.technical_name == "customer"
+    )
+    assert [role.member for role in fact.reified_from.roles] == ["order", "broker"]
+    assert fact.reified_from.roles[1].name == "broker"
+    assert fact.reified_from.verbalizes == [
+        "{customer} sold {order} via {party:broker}"
+    ]
+    assert sorted(
+        item.technical_name for item in model.link_types if item.source_type_id == fact.id
+    ) == ["broker", "customer", "order"]
+    assert sorted(item.technical_name for item in model.link_types) == [
+        "broker",
+        "customer",
+        "order",
+        "placed_by",
+    ]
 
 
 def rich_draft():
@@ -536,12 +555,13 @@ def test_computed_mapping_expressions_are_reported_not_guessed():
     draft = mapped_draft()
     document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
     mapping = document["ontology_mappings"][0]["concept_mappings"][0]
-    mapping["link_mappings"][0]["object_mapping"]["expression"] = "UPPER(code)"
+    child = mapping["link_mappings"][0]["children"][0]
+    child["object_mapping"]["expression"] = "UPPER(code)"
     payload, report = import_ossie(
         document, workspace_id=str(draft.workspace_id), mode="replace"
     )
     imported = OntologyDraft.model_validate(payload)
-    dropped = mapping["link_mappings"][0]["relationship"]
+    dropped = child["relationship"]
 
     assert any("单列表达式" in item["reason"] for item in report["skipped"])
     assert all(
@@ -571,7 +591,9 @@ def test_merge_keeps_existing_model_instances_and_mappings():
     assert {"supplier", "material", "customer", "order"} <= keys
     assert len(merged.objects) == len(draft.objects)
     assert len(merged.mappings) == len(draft.mappings)
-    assert report["counts"]["objects_added"] == 3
+    # party, customer, order plus the fact object the ternary relationship
+    # unpacked into.
+    assert report["counts"]["objects_added"] == 4
     assert report["counts"]["objects_updated"] == 0
 
 
@@ -641,7 +663,7 @@ def test_import_endpoint_creates_a_reviewable_session_without_publishing(client)
     body = response.json()
 
     assert body["title"] == "导入 crm"
-    assert body["import_report"]["counts"]["objects_added"] == 3
+    assert body["import_report"]["counts"]["objects_added"] == 4
     assert body["validation"]["publishable"] is True
     assert {item["technical_name"] for item in body["draft"]["object_types"]} >= {
         "supplier",
@@ -660,3 +682,277 @@ def test_import_endpoint_rejects_invalid_files(client):
     )
     assert response.status_code == 422
     assert "导入失败" in response.json()["detail"]
+
+
+def test_link_mappings_are_trees_whose_level_matches_the_relationship_arity():
+    """The spec ties a node's level to arity: the concept's own objects at the
+    root, its binary relationships as children."""
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    supplier = next(
+        item
+        for item in document["ontology_mappings"][0]["concept_mappings"]
+        if item["concept"] == "supplier"
+    )
+    root = supplier["link_mappings"][0]
+    assert "relationship" not in root
+    assert root["object_mapping"]["expression"] == "supplier.code"
+    assert {child["relationship"] for child in root["children"]} == {
+        "supplier_code",
+        "supplier_name",
+        "supplies",
+    }
+    assert all("children" not in child for child in root["children"])
+    assert validate_ossie(document)["publishable"] is True
+
+
+def test_tree_link_mappings_written_by_hand_are_read_back():
+    """A file that maps a field through a dataset field and a nested tree."""
+    document = foreign_document()
+    document["ontology_mappings"] = [
+        {
+            "name": "crm",
+            "semantic_model": {
+                "name": "crm",
+                "datasets": [
+                    {
+                        "name": "customer",
+                        "source": "public.customers",
+                        "primary_key": ["id"],
+                        "unique_keys": [["email"]],
+                        "fields": [
+                            {
+                                "name": "limit_amount",
+                                "expression": {
+                                    "dialects": [
+                                        {
+                                            "dialect": "ANSI_SQL",
+                                            "expression": "CREDIT_LIMIT",
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                ],
+            },
+            "concept_mappings": [
+                {
+                    "concept": "customer",
+                    "link_mappings": [
+                        {
+                            "object_mapping": {"expression": "customer.id"},
+                            "children": [
+                                {
+                                    "relationship": "credit_limit",
+                                    "object_mapping": {
+                                        "expression": "customer.limit_amount"
+                                    },
+                                    "children": [
+                                        {
+                                            "relationship": "too_deep",
+                                            "object_mapping": {
+                                                "expression": "customer.x"
+                                            },
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    ]
+    payload, report = import_ossie(
+        document, workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    customer = next(i for i in model.object_types if i.technical_name == "customer")
+    mapping = next(i for i in model.mappings if i.type_id == customer.id)
+
+    # The root gives the key column; the child gives the attribute column, and
+    # the dataset's own field declaration resolves it to the real column.
+    assert (mapping.schema_name, mapping.table_name) == ("public", "customers")
+    assert mapping.key_column == "id"
+    assert mapping.fields == {"credit_limit": "CREDIT_LIMIT"}
+    reasons = {item["path"]: item["reason"] for item in report["skipped"]}
+    assert "三元及以上" in reasons["ontology_mappings[0].customer.too_deep"]
+    assert "唯一键" in reasons["ontology_mappings[0].customer.unique_keys"]
+
+
+def test_ternary_relationship_survives_a_round_trip_as_a_fact_object():
+    document = foreign_document()
+    payload, _ = import_ossie(
+        document, workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    rewritten = compile_ossie(
+        model, ontology_name="crm", ontology_description="Customer model"
+    )
+
+    # The fact object is not a concept of its own in the file…
+    assert "customer_sold_to" not in {item["concept"] for item in rewritten["ontology"]}
+    customer = next(i for i in rewritten["ontology"] if i["concept"] == "customer")
+    sold_to = next(i for i in customer["relationships"] if i["name"] == "sold_to")
+    original = next(
+        i
+        for i in next(c for c in document["ontology"] if c["concept"] == "customer")[
+            "relationships"
+        ]
+        if i["name"] == "sold_to"
+    )
+    # …it is written back as the same ternary relationship, roles in order.
+    assert sold_to["roles"] == original["roles"]
+    assert sold_to["verbalizes"] == original["verbalizes"]
+    assert validate_ossie(rewritten)["publishable"] is True
+
+    again, _ = import_ossie(rewritten, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    assert (
+        compile_ossie(
+            OntologyDraft.model_validate(again),
+            ontology_name="crm",
+            ontology_description="Customer model",
+        )
+        == rewritten
+    )
+
+
+def test_a_fact_object_cannot_carry_a_data_mapping():
+    payload, _ = import_ossie(
+        foreign_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    fact = next(
+        item
+        for item in payload["object_types"]
+        if item["technical_name"] == "customer_sold_to"
+    )
+    payload["mappings"] = [
+        {
+            "id": str(uuid4()),
+            "type_id": fact["id"],
+            "connection_alias": "crm",
+            "table_name": "sales",
+            "key_column": "id",
+            "fields": {},
+        }
+    ]
+    with pytest.raises(ValidationError, match="事实对象"):
+        OntologyDraft.model_validate(payload)
+
+
+def metric_draft():
+    draft = mapped_draft()
+    payload = draft.model_dump(mode="json")
+    payload["metrics"] = [
+        {
+            "id": str(uuid4()),
+            "name": "在库物料数",
+            "technical_name": "material_count",
+            "description": "已登记物料的数量",
+            "connection_alias": "erp",
+            "expression": "COUNT(DISTINCT material.code)",
+            "value_kind": "integer",
+        }
+    ]
+    return OntologyDraft.model_validate(payload)
+
+
+def test_metrics_travel_in_the_semantic_model_of_their_data_source():
+    draft = metric_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    assert validate_ossie(document)["publishable"] is True
+
+    metrics = document["ontology_mappings"][0]["semantic_model"]["metrics"]
+    assert metrics == [
+        {
+            "name": "material_count",
+            "expression": {
+                "dialects": [
+                    {
+                        "dialect": "ANSI_SQL",
+                        "expression": "COUNT(DISTINCT material.code)",
+                    }
+                ]
+            },
+            "description": "已登记物料的数量",
+            "datatype": "Integer",
+        }
+    ]
+    # The business name has no field in the standard, so it rides in the
+    # namespaced extension beside the concept names.
+    extension = document["ai_context"]["ontofoundry"]["display_names"]
+    assert extension["metric:erp.material_count"] == "在库物料数"
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    assert [
+        (
+            item.name,
+            item.technical_name,
+            item.description,
+            item.connection_alias,
+            item.expression,
+            item.value_kind,
+        )
+        for item in imported.metrics
+    ] == [
+        (
+            "在库物料数",
+            "material_count",
+            "已登记物料的数量",
+            "erp",
+            "COUNT(DISTINCT material.code)",
+            "integer",
+        )
+    ]
+    assert report["counts"]["metrics_added"] == 1
+    assert report["skipped"] == []
+
+
+def test_a_metric_needs_a_data_source_that_is_actually_mapped():
+    payload = metric_draft().model_dump(mode="json")
+    payload["metrics"][0]["connection_alias"] = "没有映射的库"
+    with pytest.raises(ValidationError, match="还没有任何数据映射"):
+        OntologyDraft.model_validate(payload)
+
+
+def test_an_identifier_pointing_at_a_builtin_keeps_that_concept_name():
+    """Wrapping it in a generated value concept would rename the role the
+    file's own readings mention, and the lint would then reject them."""
+    document = {
+        "version": "0.2.0.dev0",
+        "name": "arch",
+        "description": "架构治理",
+        "ontology": [
+            {
+                "concept": "component",
+                "type": "EntityType",
+                "description": "组件",
+                "identify_by": ["code"],
+                "relationships": [
+                    {
+                        "name": "code",
+                        "roles": [{"concept": "String"}],
+                        "multiplicity": "OneToOne",
+                        "verbalizes": ["{component} code {String}"],
+                    }
+                ],
+            }
+        ],
+    }
+    payload, _ = import_ossie(
+        document, workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    code = model.object_types[0].attributes[0]
+    assert (code.identifier, code.value_concept) == (True, "String")
+
+    rewritten = compile_ossie(model, ontology_name="arch", ontology_description="架构治理")
+    assert validate_ossie(rewritten)["publishable"] is True
+    assert [item["concept"] for item in rewritten["ontology"]] == ["component"]
+    relationship = rewritten["ontology"][0]["relationships"][0]
+    assert relationship["roles"] == [{"concept": "String"}]
+    assert relationship["verbalizes"] == ["{component} code {String}"]

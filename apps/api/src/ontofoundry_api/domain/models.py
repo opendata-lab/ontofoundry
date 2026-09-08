@@ -89,6 +89,39 @@ class AttributeDefinition(BaseModel):
         return value
 
 
+class ReifiedRole(BaseModel):
+    """One position of an n-ary relationship, played through a member of the fact object."""
+
+    # Technical name of the attribute or relation that carries this position.
+    member: NonEmptyText
+    # Ossie role name, kept only when the file gave one.
+    name: str | None = Field(default=None, max_length=240)
+
+
+class ReifiedRelationship(BaseModel):
+    """Where a fact object came from.
+
+    Ossie relationships take any number of roles; the internal model has only
+    binary ones. A relationship of arity three or more is unpacked into an
+    object of its own whose relations are the role players — what fact-based
+    modelling calls objectifying a fact. This marker remembers the original, so
+    export writes that relationship back instead of an entity the file never
+    declared, and the file survives a round trip unchanged.
+    """
+
+    # The concept the relationship is declared in; its implicit first role.
+    owner_type_id: UUID
+    technical_name: NonEmptyText
+    owner_role: ReifiedRole
+    # Roles two and up, in the file's order.
+    roles: list[ReifiedRole] = Field(min_length=1, max_length=16)
+    # None means the file omitted it.
+    multiplicity: Multiplicity | None = None
+    verbalizes: Verbalizations
+
+    _validate_technical_name = field_validator("technical_name")(validate_technical_name)
+
+
 class ObjectTypeDefinition(BaseModel):
     id: UUID
     name: NonEmptyText
@@ -101,6 +134,8 @@ class ObjectTypeDefinition(BaseModel):
     requires: Expressions
     derived_by: Expressions
     attributes: list[AttributeDefinition] = Field(default_factory=list)
+    # Set only on objects that stand in for an n-ary relationship.
+    reified_from: ReifiedRelationship | None = None
 
     _normalize_name = field_validator("name")(normalize_display_name)
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
@@ -169,6 +204,29 @@ class LinkTypeDefinition(BaseModel):
         return self
 
 
+class MetricDefinition(BaseModel):
+    """A quantitative measure over the mapped tables of one data source.
+
+    Ossie keeps metrics in `semantic_model.metrics`, beside the datasets their
+    expression reads, so a metric belongs to a data source rather than to a
+    business object. Like every other expression the platform stores it as text
+    and never executes it.
+    """
+
+    id: UUID
+    name: NonEmptyText
+    technical_name: NonEmptyText
+    description: str = ""
+    connection_alias: str = Field(min_length=1, max_length=120)
+    expression: Expression
+    # None means the file left the type unstated, or it is outside the seven
+    # kinds the platform models.
+    value_kind: ValueKind | None = None
+
+    _normalize_name = field_validator("name")(normalize_display_name)
+    _validate_technical_name = field_validator("technical_name")(validate_technical_name)
+
+
 class OntologyDraft(BaseModel):
     schema_version: str = "1"
     workspace_id: UUID
@@ -179,6 +237,7 @@ class OntologyDraft(BaseModel):
     objects: list[DocumentObject] = Field(default_factory=list)
     links: list[DocumentLink] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
+    metrics: list[MetricDefinition] = Field(default_factory=list)
 
     def ancestors(self, type_id: UUID) -> list[ObjectTypeDefinition]:
         """Supertypes closest first, without repeats or infinite loops.
@@ -235,6 +294,7 @@ class OntologyDraft(BaseModel):
                 *self.objects,
                 *self.links,
                 *self.mappings,
+                *self.metrics,
             ]
         ]
         ids += [a.id for t in self.object_types for a in t.attributes]
@@ -304,6 +364,42 @@ class OntologyDraft(BaseModel):
                 if known != attribute.value_kind:
                     raise ValueError(f"值概念 {concept} 被用于两种不同的值类型")
 
+        # A fact object stands in for a relationship of its owner, so it has to
+        # keep pointing at a live owner and at members that really exist. The
+        # relationship it compiles back to shares the owner's namespace.
+        for item in self.object_types:
+            marker = item.reified_from
+            if marker is None:
+                continue
+            owner = next(
+                (entry for entry in self.object_types if entry.id == marker.owner_type_id),
+                None,
+            )
+            if owner is None:
+                raise ValueError(f"{item.name} 记录的 n 元关系所属对象不存在")
+            members = {entry.technical_name for entry in item.attributes} | {
+                link.technical_name
+                for link in self.link_types
+                if link.owner_type_id == item.id
+            }
+            for role in [marker.owner_role, *marker.roles]:
+                if role.member not in members:
+                    raise ValueError(
+                        f"{item.name} 的 n 元关系角色 {role.member} 没有对应的属性或关系"
+                    )
+            taken = {
+                entry.technical_name.casefold()
+                for entry in self.effective_attributes(owner.id)
+            } | {
+                link.technical_name.casefold()
+                for link in self.link_types
+                if link.owner_type_id == owner.id
+            }
+            if marker.technical_name.casefold() in taken:
+                raise ValueError(
+                    f"{owner.name} 中已有名为 {marker.technical_name} 的属性或关系"
+                )
+
         instances = {o.id: o for o in self.objects}
         relations = {r.id: r for r in self.link_types}
         for item in self.objects:
@@ -325,9 +421,15 @@ class OntologyDraft(BaseModel):
         mapped_ids = [m.type_id for m in self.mappings]
         if len(mapped_ids) != len(set(mapped_ids)):
             raise ValueError("每个业务对象只允许一个数据映射")
+        reified_ids = {item.id for item in self.object_types if item.reified_from}
         for mapping in self.mappings:
             if mapping.type_id not in object_ids:
                 raise ValueError("映射引用了不存在的业务对象")
+            if mapping.type_id in reified_ids:
+                # The concept does not exist in the exported ontology — the fact
+                # is written back as its owner's relationship — so a mapping on
+                # it would have nothing to attach to.
+                raise ValueError("n 元关系拆出的事实对象暂不支持配置数据映射")
             attrs = {a.technical_name for a in self.effective_attributes(mapping.type_id)}
             if set(mapping.fields) - attrs:
                 raise ValueError("映射引用了未定义的属性")
@@ -339,6 +441,26 @@ class OntologyDraft(BaseModel):
                 relation.target_type_id,
             } <= set(mapped_ids):
                 raise ValueError("配置关系映射前，请先配置两端业务对象的数据映射")
+
+        # A metric is written into the semantic model of its data source, and a
+        # semantic model needs at least one dataset, so an alias without any
+        # mapping has nowhere to carry the metric.
+        aliases = {mapping.connection_alias for mapping in self.mappings}
+        by_alias: dict[str, list[MetricDefinition]] = {}
+        for metric in self.metrics:
+            if metric.connection_alias not in aliases:
+                raise ValueError(
+                    f"指标 {metric.name} 所在的数据源“{metric.connection_alias}”"
+                    "还没有任何数据映射"
+                )
+            by_alias.setdefault(metric.connection_alias, []).append(metric)
+        for alias, items in by_alias.items():
+            names = [normalize_display_name(item.name) for item in items]
+            keys = [item.technical_name.casefold() for item in items]
+            if len(names) != len(set(names)):
+                raise ValueError(f"数据源“{alias}”中存在同名指标")
+            if len(keys) != len(set(keys)):
+                raise ValueError(f"数据源“{alias}”中存在技术名冲突的指标")
         return self
 
 

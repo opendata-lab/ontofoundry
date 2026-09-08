@@ -65,7 +65,7 @@ V0.1 不保留“项目”“业务域”“子图”等长期实体。一个工
 
 Apache Ossie 主要承载 Object Type、Link Type、属性、规则、约束和 ontology mappings。OntoFoundry 补充中文显示名、稳定 UUID、标签、Object、Link、来源证据和版本信息。
 
-V0.1 的 Link Type 是有方向的二元关系，产品层只要求“起点 Object Type、关系名称、终点 Object Type 和基数”。同一类型自关联时可在高级区命名两端角色。需要三个及以上参与方的事实先建模为一个 Object Type，再用多个二元 Link Type 连接；V0.1 不提供独立的 n 元关系编辑器。
+V0.1 的 Link Type 是有方向的二元关系，产品层只要求“起点 Object Type、关系名称、终点 Object Type 和基数”。同一类型自关联时可在高级区命名两端角色。需要三个及以上参与方的事实先建模为一个 Object Type，再用多个二元 Link Type 连接；V0.1 不提供独立的 n 元关系编辑器。导入 Apache Ossie 文件时这一步是自动的：n 元关系拆成一个事实对象加若干二元关系，并记住它的出处，导出时写回同一条 n 元关系（见 9.1）。
 
 ### 2.3 两类彼此独立的实例
 
@@ -497,6 +497,8 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 | 自然语言读法 | relationship 的 `verbalizes`；模型没有存读法时按名称模板生成 |
 | 中文名、标签、属性必填 | `ai_context.ontofoundry` 命名空间扩展 |
 | 数据映射 | `ontology_mappings`：每个数据源一份 OntologyMap，表与键列进 `semantic_model.datasets`，属性列进 dataset 字段与 `link_mappings`，关系 Join 进 `semantic_model.relationships` |
+| 指标 | 对应数据源的 `semantic_model.metrics`：表达式写成 ANSI SQL 方言对象，值类型写 `datatype`，中文名进 `ai_context.ontofoundry` 扩展 |
+| 事实对象（由 n 元关系拆出） | 不写成 component，而是按 `reified_from` 记下的角色顺序写回所属概念里的那条 n 元关系 |
 | Object、Link、UUID 和证据 | 只进入 OntoFoundry 快照，不写入 Ossie JSON |
 
 - 只从有证据的材料生成概念、关系和表达式；
@@ -523,7 +525,8 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | 内置实体 `Any` | 无 | 不支持：指向 `Any` 的关系跳过并报告，它没有对应的业务对象 |
 | relationship（role 指向值概念） | 属性 | 双向无损 |
 | relationship（role 指向实体） | 本体关系（Link Type） | 双向无损。关系名在 Ossie 是概念内的局部名，内置模型同样只要求在所属概念内唯一（属性与关系共用一个命名空间，并对子类型生效） |
-| roles 数量 ≠ 1（一元、三元及以上） | 无 | 不支持：跳过并报告，内置模型只有二元关系 |
+| roles 数量 ≥ 2（三元及以上） | 事实对象（Object Type + `reified_from`）+ 每个角色一条二元关系或属性 | 双向无损。导入把关系对象化：关系本身成为一个对象，隐含的首个角色和其余角色各成为它的一条二元关系或属性；`reified_from` 记住所属概念、关系名、角色顺序、角色名、基数和读法，导出按原样写回同一条 n 元关系，事实对象本身不出现在文件里 |
+| roles 数量 = 0（一元关系） | 无 | 不支持：跳过并报告，内置模型没有可以承载“只涉及一个概念的事实”的构造 |
 | `multiplicity`：ManyToOne / OneToOne / 省略 | many_to_one / one_to_one / many_to_many | 双向无损。内置 one_to_many 在导出时翻转两端写成 ManyToOne，导入回来是语义等价、方向相反的 many_to_one |
 | `identify_by`（指向属性关系） | 属性的 identifier | 双向无损，含复合标识 |
 | `identify_by`（指向实体关系） | Link Type 的 identifier | 双向无损。这是 Ossie 的 referent identification（如订单行由订单加行号标识）；校验要求这条关系是多对一或一对一 |
@@ -531,7 +534,10 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
 | `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损，原样存取，不解析也不改写占位符。与标准模板一致的读法不存储（避免改名后留下陈述旧名的死文本）。这条成立的前提是导入不给概念改名：值概念按原名写回，读法里的 `{值概念}` 才仍是这条关系的合法 role |
 | `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
-| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损，限于单列表达式。dataset 名用概念的技术名，`source` 是 `schema.table`，键列取 `primary_key` 或对象映射表达式，属性列取 `link_mappings` 的对象映射表达式。计算列、`referent_mappings`、多层 `link_mappings` 报告后跳过，不从任意 SQL 里猜列名 |
+| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损，限于单列表达式。dataset 名用概念的技术名，`source` 是 `schema.table`，键列取 `primary_key`、对象映射表达式或树根的对象映射。计算列、`referent_mappings`、`unique_keys`、`custom_extensions` 报告后跳过，不从任意 SQL 里猜列名 |
+| `link_mappings`（树） | 数据映射的字段字典 | 双向无损。规范要求节点层级等于它所命名关系的元数，因此导出把概念自身的对象映射写在树根，属性与关系映射作为二层子节点；导入按层级还原，一层的命名关系（一元）和三层及以下（n 元）报告后跳过。没有子节点的树根按旧版扁平写法读取，保证早期导出的文件仍可导入 |
+| `semantic_model.metrics` | 指标（Metric） | 双向无损，限于 ANSI SQL 方言。指标属于数据源而不是某个业务对象；多方言表达式只保留 ANSI SQL 一种并提示，`datatype` 超出七种内置值类型时按未声明导入 |
+| `dataset.fields` | 属性列 | 单向读取：字段名到单列表达式的映射用于把 `link_mappings` 里的字段名解析成真实列名；导出仍按属性列直接生成 fields |
 | 无对应 | UUID、文档实例、实例关系、证据、关系 Join 列 | 标准里没有这些构造，只存在于 OntoFoundry 快照 |
 
 同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
@@ -549,8 +555,14 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `verbalizes: [读法]` | 属性、Link Type | 手写自然语言读法；为空表示按模板生成 |
 | `value_concept: str?` | 属性 | 属性指向的 Ossie 值概念名；为空表示由编译器决定（内置类型，或标识属性的生成名）。校验要求同名值概念的值类型一致，且不与业务对象技术名冲突 |
 | `connection_alias: str` | 数据映射 | 取代原来的 `connection_id`：模型只写数据源名称，凭据与连接配置留在工作空间，查询时按名称解析 |
+| `reified_from` | Object Type | 事实对象的出处：所属概念、关系技术名、隐含首角色、其余角色（成员技术名 + Ossie 角色名）、基数、读法。导出据此写回原来的 n 元关系；没有这个标记的对象仍然是普通概念 |
+| `metrics: [Metric]` | 本体草稿 | 指标：名称、技术名、说明、所属数据源名称、ANSI SQL 表达式和可选值类型。校验要求该数据源至少有一个数据映射，否则导出时没有 `semantic_model` 可以承载它 |
 
 表达式和读法都有长度与条数上限，避免把整段文档塞进模型。平台不解析、不执行表达式：语义由官方 lint 在发布门槛处检查，业务正确性仍需人工复核。
+
+事实对象在界面上是普通业务对象：可以浏览、改名、加标签，它的每个角色都是一条可见的二元关系。两处例外要说明白：它不允许配置数据映射（文件里没有这个概念，映射无处附着，编辑页直接说明原因），并且它各个角色成员的中文名不随文件往返——角色成员名按 Ossie 角色名或概念名生成，导出时不写进扩展。事实对象自身的中文名和标签走所属关系的扩展键，正常往返。
+
+Ossie 的 `description` 是必填的，导出会用业务名称补上空描述。导入因此丢弃与生成值完全相同的描述，否则第二次往返会把生成的标签变成手写内容，改名后还会留下陈述旧名的死文本——和读法的处理原则一致。
 
 ## 10. 本体服务：REST API 与 MCP
 
@@ -1026,6 +1038,27 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 验证：后端 52 项测试通过（新增继承/标识关系/表达式/读法的完整往返、概念内同名关系、模型校验拒绝成环与非功能标识、读法越界回退），前端 33 项测试通过（新增分量装箱布局）；前后端 lint、TypeScript 与生产构建通过。真实浏览器把 crm 样例导入并发布到示例空间：语义图谱两块模型都可读，继承画成蓝色虚线，对象详情显示父概念、继承来的属性与约束。仍未完成：`ontology_mappings` 与数据映射的双向翻译、表达式与读法的编辑界面（当前只读展示，靠导入或 API 写入）。
 
 截图：`output/playwright/ossie-inheritance-graph-20260907.png`、`ossie-inherited-detail-20260907.png`。
+
+### 17.10 link_mappings 树、n 元关系对象化与指标（2026-09-08）
+
+三处按 Apache Ossie 规范补齐的改造，都是先前“报告后跳过”的位置。
+
+**link_mappings 是树，不是平铺列表。** 规范写明“节点层级必须与它所命名关系的元数一致”：树根命名一元关系，二层命名二元关系。此前导出把属性映射平铺在一层，导入遇到带 `children` 的树则整表丢弃——两个方向都不对。现在导出把概念自身的对象映射写成树根，属性与关系映射作为二层子节点；导入按层级还原，并对一层的命名关系和三层及以下报告后跳过。没有子节点的树根按旧的扁平写法读取，早期导出的文件仍然可以导入。顺带补上两处遗漏：`dataset.fields` 里的单列字段定义用于把字段名解析成真实列名，`unique_keys` 与 `custom_extensions` 明确报告未导入。
+
+**n 元关系对象化，并记住出处。** 三元及以上的关系不再跳过，而是拆成一个事实对象：关系本身成为对象，隐含的首个角色和其余角色各成为它的一条二元关系或属性。这解决了“7 元的 `component.call_observation` 整条丢失”，但直接引出一个问题——再导出时文件跟原来就不一样了。所以对象上带 `reified_from`，记住所属概念、关系名、角色顺序、角色名、基数和读法；编译器看到这个标记就写回原来那条 n 元关系，事实对象本身不作为 component 出现。手工建的普通对象没有这个标记，仍然导出为实体，行为不变。代价是事实对象不能配置数据映射（文件里没有这个概念，映射无处附着），编辑页直接说明原因；它各个角色成员的中文名也不随文件往返。
+
+**指标成为内置模型的对象。** `MetricDefinition`（名称、技术名、说明、数据源名称、ANSI SQL 表达式、可选值类型）进入草稿，编译进对应数据源的 `semantic_model.metrics`，导入按同样形状读回，中文名走 `ai_context.ontofoundry` 扩展。指标属于数据源而不是某个业务对象——这是规范的位置，表达式跨表。校验要求该数据源至少有一个数据映射，否则 `semantic_model` 没有 dataset 可以承载它。当前只有只读展示（数据映射页），编辑界面与 `requires`/`derived_by` 一起留在下一档。
+
+顺带修掉两个由此暴露的往返缺陷：
+
+| 消融对照 | 相同输入下观察结果 | 决定 |
+|---|---|---|
+| 标识属性一律包一个生成的值概念 | 文件里 `identify_by` 指向内置 `String` 时，导出把 role 改名成 `x_y_value`，文件自带的读法立刻报 UNKNOWN_VERBALIZATION_ROLE | 文件直接指向内置值概念时按原名保留 |
+| 原样保存导入的 `description` | Ossie 的 description 必填，导出用业务名称补空值；再导入就把生成的标签变成手写内容，要两轮才收敛 | 与生成值相同的描述不存储，和读法同一个原则 |
+| 事实对象允许配置数据映射 | 映射编译时指向一个文件里不存在的概念，语义 lint 报未知概念 | 模型层直接拒绝，编辑页说明原因 |
+| n 元关系继续跳过 | 架构治理这类文件的核心事实整条丢失，导入后模型不可用 | 对象化并记录出处，导出写回原关系 |
+
+验证：后端 62 项测试通过（新增 link_mappings 树形导出与手写树导入、三元关系往返为同一条关系、事实对象拒绝映射、指标往返、指标数据源校验、标识指向内置值概念的往返），前端 36 项测试通过；前后端 lint、TypeScript 与生产构建通过。另用一份 7 元 `component.call_observation` 的手写文件验证：导入拆出 4 个属性 + 3 条关系，导出写回同一条 7 元关系，官方 Schema 与语义 lint 均通过，再导入再导出稳定不变。仍未验证：数百概念规模的真实文件、带 `referent_mappings` 的映射、一元关系。
 
 - [Apache Ossie Ontology Specification](https://github.com/apache/ossie/blob/main/ontology/ontology.md)
 - [Apache Ossie Ontology JSON Schema](https://github.com/apache/ossie/blob/main/ontology/ontology.json)

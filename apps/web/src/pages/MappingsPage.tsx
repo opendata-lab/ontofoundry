@@ -141,6 +141,40 @@ export function MappingsPage() {
             })}
           </tbody>
         </table>
+        <h2>指标</h2>
+        <p className="muted">
+          指标是数据源上的度量表达式，发布时写进 Apache Ossie
+          语义模型。当前由导入或 API 写入，界面只读展示。
+        </p>
+        {snapshot.draft?.metrics?.length ? (
+          <table className="ref-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th>数据源</th>
+                <th>类型</th>
+                <th>表达式</th>
+              </tr>
+            </thead>
+            <tbody>
+              {snapshot.draft.metrics.map((m) => (
+                <tr key={m.id}>
+                  <td>
+                    {m.name}
+                    <small>{m.technical_name}</small>
+                  </td>
+                  <td>{m.connection_alias}</td>
+                  <td>{m.value_kind ?? "未声明"}</td>
+                  <td>
+                    <code>{m.expression}</code>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted">本空间还没有指标。</p>
+        )}
       </div>
       <DatasetPicker
         workspaceId={workspace.id}

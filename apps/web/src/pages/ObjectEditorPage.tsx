@@ -353,25 +353,38 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                 })}
             </>
           )}
-          {!relation && "attributes" in type && (step === 1 || step === 3) && (
-            <MappingForm
-              workspaceId={workspace.id}
-              type={type}
-              mapping={mapping}
-              fieldsOnly={step === 3}
-              onChange={(m) => {
-                setDirty(true);
-                setDraft({
-                  ...draft,
-                  mappings: [
-                    ...draft.mappings.filter((x) => x.type_id !== type.id),
-                    m,
-                  ],
-                });
-                setSaved(false);
-              }}
-            />
-          )}
+          {!relation &&
+            "attributes" in type &&
+            (step === 1 || step === 3) &&
+            type.reified_from && (
+              <p className="muted">
+                这是从 Apache Ossie 的 {type.reified_from.roles.length + 1}{" "}
+                元关系拆出的事实对象，发布时写回原来的关系而不是一个独立概念，
+                因此暂不支持配置数据映射。
+              </p>
+            )}
+          {!relation &&
+            "attributes" in type &&
+            (step === 1 || step === 3) &&
+            !type.reified_from && (
+              <MappingForm
+                workspaceId={workspace.id}
+                type={type}
+                mapping={mapping}
+                fieldsOnly={step === 3}
+                onChange={(m) => {
+                  setDirty(true);
+                  setDraft({
+                    ...draft,
+                    mappings: [
+                      ...draft.mappings.filter((x) => x.type_id !== type.id),
+                      m,
+                    ],
+                  });
+                  setSaved(false);
+                }}
+              />
+            )}
           {!relation && step === 2 && "attributes" in type && (
             <>
               <div className="mapping-heading">

@@ -50,6 +50,16 @@ export type ObjectType = {
   attribute_count: number;
   supertypes?: { id: string; name: string; technical_name: string }[];
   inherited_attributes?: AttributeDefinition[];
+  // Set on objects that stand in for an Ossie relationship of arity three or
+  // more; they export as that relationship, not as a concept of their own.
+  reified_from?: {
+    owner_type_id: string;
+    technical_name: string;
+    owner_role: { member: string; name: string | null };
+    roles: { member: string; name: string | null }[];
+    multiplicity: string | null;
+    verbalizes: string[];
+  } | null;
 };
 
 export type LinkType = {
@@ -179,6 +189,17 @@ export type DataMapping = {
   key_column: string;
   fields: Record<string, string>;
 };
+export type MetricDefinition = {
+  id: string;
+  name: string;
+  technical_name: string;
+  description: string;
+  // A metric measures the tables of one data source, so it belongs to the alias
+  // rather than to a business object — the same place Ossie keeps it.
+  connection_alias: string;
+  expression: string;
+  value_kind: string | null;
+};
 export type Draft = {
   schema_version: string;
   workspace_id: string;
@@ -188,6 +209,7 @@ export type Draft = {
   objects: DocumentObject[];
   links: DocumentLink[];
   mappings: DataMapping[];
+  metrics?: MetricDefinition[];
 };
 export type Candidate = {
   id: string;
