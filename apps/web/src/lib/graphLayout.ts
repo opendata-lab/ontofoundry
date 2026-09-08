@@ -1,16 +1,8 @@
 // Deterministic geometry for the ontology canvas: a fixed force layout plus the
 // floating-edge maths React Flow does not provide. Pure functions so the same
 // model always draws the same picture and can be tested without a DOM.
-export type LayoutNode = {
-  id: string;
-  kind: "object_type" | "value_type";
-};
-export type LayoutEdge = {
-  id: string;
-  kind: "attribute" | "link_type" | "extends";
-  source: string;
-  target: string;
-};
+export type LayoutNode = { id: string };
+export type LayoutEdge = { id: string; source: string; target: string };
 export type Point = { x: number; y: number };
 export type Rect = { x: number; y: number; width: number; height: number };
 
@@ -20,9 +12,6 @@ const IDEAL_DISTANCE = 250;
 // The simulation only fixes relative placement; this is the density the canvas
 // is finally scaled to, so a five-node chain and a fifty-node web read alike.
 const TARGET_EDGE_LENGTH = 250;
-const VALUE_RING = 158;
-const VALUE_RING_STEP = 96;
-const VALUE_PER_RING = 5;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const MARGIN = 60;
 const PARALLEL_GAP = 40;
@@ -102,12 +91,12 @@ function simulate(count: number, links: [number, number][]) {
 
 // Pull overlapping cards apart along their shallowest axis; screens are wide, so
 // horizontal room is cheaper than vertical room.
-function separate(
-  points: Point[],
-  gapX = NODE_WIDTH + 52,
-  gapY = NODE_HEIGHT + 46,
-) {
-  for (let pass = 0; pass < 60; pass++) {
+function separate(points: Point[]) {
+  const gapX = NODE_WIDTH + 52;
+  const gapY = NODE_HEIGHT + 46;
+  // Every card is the same size now, so this converges quickly; the ceiling is
+  // only there so a pathological model cannot hang the canvas.
+  for (let pass = 0; pass < 200; pass++) {
     let moved = false;
     for (let i = 0; i < points.length; i++) {
       for (let j = i + 1; j < points.length; j++) {
@@ -176,26 +165,6 @@ function densityScale(points: Point[], links: [number, number][]) {
   return Math.min(2.5, Math.max(0.35, TARGET_EDGE_LENGTH / median));
 }
 
-// Attributes belong on the side of a card that its relations do not use, so the
-// relation lanes and their labels stay clear.
-function satelliteDirection(
-  base: Point,
-  positions: Map<string, Point>,
-  neighbours: string[] | undefined,
-) {
-  let x = 0;
-  let y = 0;
-  for (const id of neighbours ?? []) {
-    const other = positions.get(id);
-    if (!other) continue;
-    const length = Math.hypot(other.x - base.x, other.y - base.y) || 1;
-    x += (other.x - base.x) / length;
-    y += (other.y - base.y) / length;
-  }
-  if (Math.hypot(x, y) > 0.15) return Math.atan2(-y, -x);
-  return Math.atan2(base.y, base.x) || 0;
-}
-
 /** Groups of node indices that are reachable from each other. */
 function components(count: number, links: [number, number][]): number[][] {
   const parent = [...Array(count)].map((_, index) => index);
@@ -256,39 +225,26 @@ function packComponents(
 }
 
 /**
- * Centre positions for every node. Object types run through the force
- * simulation; value types are fanned around the object that declares them so
- * attributes read as satellites instead of a second column.
+ * Centre positions for every node, from one force simulation per connected
+ * part of the model.
  */
 export function layoutGraph(
   nodes: LayoutNode[],
   edges: LayoutEdge[],
 ): Map<string, Point> {
-  const objectIds = new Set(
-    nodes.filter((node) => node.kind === "object_type").map((node) => node.id),
-  );
-  const owners = new Map<string, string>();
-  for (const edge of edges) {
-    if (edge.kind !== "attribute") continue;
-    if (!objectIds.has(edge.source) || objectIds.has(edge.target)) continue;
-    if (!owners.has(edge.target)) owners.set(edge.target, edge.source);
-  }
-  const anchors = nodes.filter(
-    (node) => node.kind === "object_type" || !owners.has(node.id),
-  );
-  const anchorIndex = new Map(anchors.map((node, index) => [node.id, index]));
+  const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
   const links: [number, number][] = [];
   for (const edge of edges) {
-    const a = anchorIndex.get(edge.source);
-    const b = anchorIndex.get(edge.target);
+    const a = nodeIndex.get(edge.source);
+    const b = nodeIndex.get(edge.target);
     if (a === undefined || b === undefined || a === b) continue;
     links.push([a, b]);
   }
   // Unconnected parts of a model repel each other without any edge pulling them
   // back, which leaves the canvas mostly empty. Lay each part out on its own,
   // then pack the parts.
-  const points = anchors.map(() => ({ x: 0, y: 0 }));
-  const groups = components(anchors.length, links);
+  const points = nodes.map(() => ({ x: 0, y: 0 }));
+  const groups = components(nodes.length, links);
   const boxes: { indices: number[]; width: number; height: number }[] = [];
   for (const indices of groups) {
     const local = new Map(indices.map((index, position) => [index, position]));
@@ -336,57 +292,7 @@ export function layoutGraph(
   }
   packComponents(boxes, points);
   const positions = new Map<string, Point>();
-  anchors.forEach((node, index) => positions.set(node.id, points[index]));
-
-  const satellites = new Map<string, string[]>();
-  for (const node of nodes) {
-    const owner = owners.get(node.id);
-    if (!owner || !positions.has(owner)) continue;
-    satellites.set(owner, [...(satellites.get(owner) ?? []), node.id]);
-  }
-  const relatives = new Map<string, string[]>();
-  for (const edge of edges) {
-    if (edge.kind !== "link_type") continue;
-    if (!positions.has(edge.source) || !positions.has(edge.target)) continue;
-    relatives.set(edge.source, [
-      ...(relatives.get(edge.source) ?? []),
-      edge.target,
-    ]);
-    relatives.set(edge.target, [
-      ...(relatives.get(edge.target) ?? []),
-      edge.source,
-    ]);
-  }
-  for (const [owner, values] of satellites) {
-    const base = positions.get(owner)!;
-    const outward = satelliteDirection(base, positions, relatives.get(owner));
-    values.forEach((id, index) => {
-      const ring = Math.floor(index / VALUE_PER_RING);
-      const inRing = Math.min(
-        VALUE_PER_RING,
-        values.length - ring * VALUE_PER_RING,
-      );
-      const slot = index % VALUE_PER_RING;
-      const span = Math.min(
-        Math.PI * 0.95,
-        0.34 * Math.max(inRing - 1, 0) + 0.2,
-      );
-      const angle =
-        outward + (inRing > 1 ? (slot / (inRing - 1) - 0.5) * span : 0);
-      const radius = VALUE_RING + ring * VALUE_RING_STEP;
-      positions.set(id, {
-        x: base.x + Math.cos(angle) * radius,
-        y: base.y + Math.sin(angle) * radius * 0.9,
-      });
-    });
-  }
-
-  // Satellites are placed geometrically, so give the whole picture one last
-  // narrow-gap pass to stop attribute cards from sitting on their neighbours.
-  const placed = nodes.filter((node) => positions.has(node.id));
-  const all = placed.map((node) => positions.get(node.id)!);
-  separate(all, NODE_WIDTH - 32, NODE_HEIGHT + 12);
-  placed.forEach((node, index) => positions.set(node.id, all[index]));
+  nodes.forEach((node, index) => positions.set(node.id, points[index]));
 
   let minX = Infinity;
   let minY = Infinity;

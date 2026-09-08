@@ -390,7 +390,6 @@ export function ModelResults({
           {model?.object_types.length ? (
             <OntologyGraph
               graph={draftGraph(model)}
-              mode="semantic"
               query=""
               onSelect={() => undefined}
             />

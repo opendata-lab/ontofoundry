@@ -17,7 +17,7 @@ import {
   useInternalNode,
   useNodesState,
 } from "@xyflow/react";
-import { Box, Braces } from "lucide-react";
+import { Box } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -75,12 +75,11 @@ function classes(...values: (string | false | undefined)[]) {
 
 function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
   const { item, emphasis, focused } = data;
-  const isObject = item.kind === "object_type";
   return (
     <div
       className={classes(
         "ontology-node",
-        isObject ? "ontology-node--object" : "ontology-node--value",
+        "ontology-node--object",
         emphasis === "dimmed" && "is-dimmed",
         emphasis === "match" && "is-match",
         focused && "is-focused",
@@ -90,13 +89,15 @@ function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
     >
       <Handle type="target" position={Position.Left} />
       <span className="ontology-node__icon">
-        {isObject ? <Box size={14} /> : <Braces size={13} />}
+        <Box size={14} />
       </span>
       <span className="ontology-node__text">
         <strong>{item.label}</strong>
         <small>{item.technical_name}</small>
       </span>
-      {isObject && !!item.attribute_count && (
+      {/* Attributes are not drawn as nodes; this badge and the inspector are
+          how a card reports how many it declares. */}
+      {!!item.attribute_count && (
         <span className="ontology-node__count">{item.attribute_count}</span>
       )}
       <Handle type="source" position={Position.Right} />
@@ -137,15 +138,11 @@ function OntologyEdgeView({
     source === target
       ? selfLoopGeometry(from, data.loop)
       : edgeGeometry(from, to, data.offset);
-  const relation = data.item.kind === "link_type";
-  const inheritance = data.item.kind === "extends";
   const className = classes(
     "ontology-edge",
-    relation
-      ? "ontology-edge--relation"
-      : inheritance
-        ? "ontology-edge--extends"
-        : "ontology-edge--attribute",
+    data.item.kind === "extends"
+      ? "ontology-edge--extends"
+      : "ontology-edge--relation",
     data.emphasis === "dimmed" && "is-dimmed",
     data.emphasis === "match" && "is-match",
     selected && "is-selected",
@@ -159,28 +156,26 @@ function OntologyEdgeView({
         className={className}
         interactionWidth={18}
       />
-      {(relation || inheritance) && (
-        <EdgeLabelRenderer>
-          <button
-            type="button"
-            className={classes(
-              "ontology-edge__label",
-              "nodrag",
-              "nopan",
-              className,
-            )}
-            style={{
-              transform: `translate(-50%, -50%) translate(${geometry.labelX}px, ${geometry.labelY}px)`,
-            }}
-            onClick={(event) => {
-              event.stopPropagation();
-              select(data.item);
-            }}
-          >
-            {data.item.label}
-          </button>
-        </EdgeLabelRenderer>
-      )}
+      <EdgeLabelRenderer>
+        <button
+          type="button"
+          className={classes(
+            "ontology-edge__label",
+            "nodrag",
+            "nopan",
+            className,
+          )}
+          style={{
+            transform: `translate(-50%, -50%) translate(${geometry.labelX}px, ${geometry.labelY}px)`,
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            select(data.item);
+          }}
+        >
+          {data.item.label}
+        </button>
+      </EdgeLabelRenderer>
     </>
   );
 }
@@ -188,14 +183,14 @@ function OntologyEdgeView({
 const nodeTypes = { ontology: OntologyNodeView };
 const edgeTypes = { ontology: OntologyEdgeView };
 
-function buildElements(graph: TypeGraph, mode: "global" | "semantic") {
-  const shown =
-    mode === "global"
-      ? graph.nodes.filter((node) => node.kind === "object_type")
-      : graph.nodes;
+// Attributes are entity fields, not graph nodes: only object types are drawn,
+// and only the edges that run between two of them.
+function buildElements(graph: TypeGraph) {
+  const shown = graph.nodes.filter((node) => node.kind === "object_type");
   const ids = new Set(shown.map((node) => node.id));
   const edges = graph.edges.filter(
-    (edge) => ids.has(edge.source) && ids.has(edge.target),
+    (edge) =>
+      edge.kind !== "attribute" && ids.has(edge.source) && ids.has(edge.target),
   );
   const positions = layoutGraph(shown, edges);
   const offsets = parallelOffsets(edges);
@@ -225,12 +220,9 @@ function buildElements(graph: TypeGraph, mode: "global" | "semantic") {
         offset: offsets.get(item.id) ?? 0,
         loop,
       },
-      // Relations and inheritance carry direction, attributes do not. Marker
-      // colour comes from CSS: SVG presentation attributes cannot read tokens.
-      markerEnd:
-        item.kind === "attribute"
-          ? undefined
-          : { type: MarkerType.ArrowClosed, width: 13, height: 13 },
+      // Marker colour comes from CSS: SVG presentation attributes cannot read
+      // tokens.
+      markerEnd: { type: MarkerType.ArrowClosed, width: 13, height: 13 },
     };
   });
   return { nodes, edges: flowEdges };
@@ -246,16 +238,14 @@ function matches(item: ApiGraphNode, query: string) {
 
 export function OntologyGraph({
   graph,
-  mode,
   query,
   onSelect,
 }: {
   graph: TypeGraph;
-  mode: "global" | "semantic";
   query: string;
   onSelect: (item: SelectedGraphItem) => void;
 }) {
-  const elements = useMemo(() => buildElements(graph, mode), [graph, mode]);
+  const elements = useMemo(() => buildElements(graph), [graph]);
   const [nodes, setNodes, onNodesChange] = useNodesState(elements.nodes);
   const [focus, setFocus] = useState("");
   const [hover, setHover] = useState("");
@@ -372,7 +362,7 @@ export function OntologyGraph({
             item: (edge.data as OntologyEdgeData).item,
           })
         }
-        aria-label={mode === "semantic" ? "语义图谱" : "图谱概览"}
+        aria-label="语义图谱"
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -389,7 +379,6 @@ export function OntologyGraph({
           pannable
           zoomable
           nodeBorderRadius={3}
-          nodeClassName={(node) => (node as OntologyFlowNode).data.item.kind}
           style={{ width: 168, height: 104, marginRight: 52 }}
         />
       </ReactFlow>

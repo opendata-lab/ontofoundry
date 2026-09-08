@@ -295,7 +295,7 @@ V0.1 直接连接：
 
 全局沿用参考图“左侧层级索引 + 右侧透视层板”的布局，按本平台已确定的能力展示四层：服务层（REST API / MCP）、语义模型层（业务对象 / 本体关系 / 属性）、实例与证据层（文档实例 / 实例关系 / 来源材料）、数据映射层（已发布对象映射）。这是同一模型的阅读视角，不新增业务层存储、审批或执行引擎。服务名称表示提供的接口方式，不表示连接已启用或有调用流量；数据库实例按需查询，不编造全库实例数量。语义视图则是独立的二维 TBox 关系图。
 
-全局左侧显示同一已发布快照的真实总数，右侧显示有限节点预览及已有的关系和映射连线。无实例或映射时保留空层并明确提示，不填充演示节点；非成员的实例和映射层显示“仅空间成员可见”，不能用 0 冒充无数据。选层可聚焦并进入相应业务入口，选本体节点打开详情检查器；支持缩放和适配。概览不受语义视图的标签、搜索或“显示属性”影响。
+全局左侧显示同一已发布快照的真实总数，右侧显示有限节点预览及已有的关系和映射连线。无实例或映射时保留空层并明确提示，不填充演示节点；非成员的实例和映射层显示“仅空间成员可见”，不能用 0 冒充无数据。选层可聚焦并进入相应业务入口，选本体节点打开详情检查器；支持缩放和适配。概览不受语义视图的标签和搜索影响。
 
 以下搜索、筛选、邻域展开和检查器布局专用于语义视图；全局不放一排对分层总览无效的筛选控件。界面保留稳定导航与中央大画布，检查器由选择触发，不预占空白栏。
 
@@ -312,20 +312,20 @@ V0.1 直接连接：
 
 左侧不是第二套导航，而是当前查询的图例、数量和匹配结果；没有搜索和筛选时默认折叠。右侧检查器由节点或边选择触发，未选择时不保留空白面板，让画布获得空间。标签只改变筛选和着色，不制造“子图”概念。
 
-“语义视图”只呈现 TBox 中的 Object Type、Value Type 与 Link Type，不混入任何 Object、Link、数据库表或文档实例。全局中的实例、映射节点仅作成员可见的已发布预览；完整内容仍进入实例详情、独立实例图谱或对象映射页查看。
+“语义视图”只呈现 TBox，不混入任何 Object、Link、数据库表或文档实例。画布上的节点只有 Object Type，边只有 Link Type 与继承；Value Type 是 Object Type 的字段，和规则、约束、映射一样属于检查器内容，不画成节点。属性画成节点会让画布的节点数翻三到四倍，把业务结构埋掉，而读者真正要看的是对象之间的关系。卡片右上角的计数和检查器里的属性列表负责回答“这个对象有多少属性、分别是什么”。全局中的实例、映射节点仅作成员可见的已发布预览；完整内容仍进入实例详情、独立实例图谱或对象映射页查看。
 
 核心操作：
 
 - 按中文名、技术名和描述搜索；
-- 按 Object Type、Value Type、Link Type、规则状态和标签筛选；
+- 按 Object Type、Link Type、规则状态和标签筛选；
 - 聚焦节点、仅看邻居、折叠或展开后继；
 - 查看属性、关系、规则、约束、映射、标签和最近变更；
 - 从节点发起“在会话中修改”；
 - 查看当前版本 Diff 或下载 Ossie JSON。
 
-已发布画布不直接编辑。图谱执行一次确定性力导向布局：同一模型每次得到同一张图，布局按最长轴摆正、按中位关系长度定密度，属性作为卫星挂在所属对象背离关系的一侧；布局只在打开或模型变化时算一次，不自动漂浮或持续运动。关系线在卡片边界上浮动连接，同一对节点之间的多条关系按扇形分开，名称落在线上的胶囊标签里，可直接点选。点击节点只选中，双击或 Enter 聚焦一跳邻域；Esc 清除选择，`/` 聚焦搜索。搜索结果高亮并在结果列表定位，不能只靠缩放动画表达。超过 300 个可见节点时停止自动扩展，提示增加筛选条件。
+已发布画布不直接编辑。图谱执行一次确定性力导向布局：同一模型每次得到同一张图，布局按最长轴摆正、按中位关系长度定密度，互不连通的部分各自布局后再装箱，最后消除卡片重叠；布局只在打开或模型变化时算一次，不自动漂浮或持续运动。关系线在卡片边界上浮动连接，同一对节点之间的多条关系按扇形分开，名称落在线上的胶囊标签里，可直接点选。点击节点只选中，双击或 Enter 聚焦一跳邻域；Esc 清除选择，`/` 聚焦搜索。搜索结果高亮并在结果列表定位，不能只靠缩放动画表达。超过 300 个可见节点时停止自动扩展，提示增加筛选条件。
 
-节点编码同时使用形状、短标签和颜色：Object Type 为圆角矩形，Value Type 为窄矩形，Link Type 显示为带名称的关系线。规则、约束和映射是检查器中的属性，不额外画成满屏节点。无发布版本时画布显示一句说明和“开始第一次建模”；无搜索结果时保留条件并提供“清除筛选”。
+节点编码同时使用形状、短标签和颜色：Object Type 为圆角矩形，Link Type 显示为带名称的关系线，继承为蓝色虚线。Value Type、规则、约束和映射都是检查器中的内容，不额外画成满屏节点。无发布版本时画布显示一句说明和“开始第一次建模”；无搜索结果时保留条件并提供“清除筛选”。
 
 ### 7.3 建模工作台
 
@@ -722,6 +722,7 @@ V0.1 不自动重试模型请求；网络、429、5xx、认证和输入问题都
 | [DataHub](https://github.com/datahub-project/datahub) | 约 12.6k stars；2026-09-03 有推送 | 元数据图谱、术语、治理和资产检索 UX | 重点是数据目录和治理，不是形式化本体编辑与文档实例平台 |
 | [OntoGPT](https://github.com/monarch-initiative/ontogpt) | 约 1k stars；2026-06-22 有提交 | 模板约束的 LLM 结构化抽取、证据和本体术语复用 | 偏 Python 与生物医学管线，不是多用户可视化工作台 |
 | [Microsoft GraphRAG](https://github.com/microsoft/graphrag) | 约 35.8k stars；2026-08-24 有维护提交，官方明确处于维护模式 | 从文本发现实体、关系和声明，社区采用度高 | 输出是面向检索的候选事实网络，不是正式本体工程；不宜押注新功能演进 |
+| [Microsoft Ontology-Playground](https://github.com/microsoft/Ontology-Playground) | MIT；纯静态无后端，面向 Fabric IQ 教学 | 实体属性收在实体内部不画成节点，图只有实体与关系；Cytoscape.js + fcose 布局；PNG 导出、图例、重置布局 | 没有版本、发布、合并、实例、映射与服务；图模型无继承边和双模式，布局参数是按 70×70 圆形节点调的 |
 
 [OpenSPG](https://github.com/OpenSPG/openspg) 与 [KAG](https://github.com/OpenSPG/KAG) 有建模、规则和检索参考价值，但主分支最近提交分别停留在 2025-06-29 和 2026-01-28，不作为“目前持续活跃维护”的首选基础。[OntoFlow](https://github.com/ThutmoseAI/OntoFlow) 与 [ontograph-core](https://github.com/openshuyi/ontograph-core) 更接近产品叙事，但仓库规模和采用度尚不足以证明成熟。
 
@@ -730,6 +731,7 @@ V0.1 不自动重试模型请求；网络、429、5xx、认证和输入问题都
 - 用 Apache Ossie 做标准，不把它误当运行时；
 - 优先复用许可证清晰且能独立迁移的 Ossie Visualizer 代码；代码不可得或边界不清时重建画布；
 - 借鉴 WebProtégé 的检查器、DataHub 的资产 UX、TerminusDB 的 Diff；
+- 采纳 Ontology-Playground“属性是实体字段、不是图节点”的取舍，但不移植其画布代码：实测同题对比中它的 fcose 参数在我们 176×46 的宽卡片上交叉更多、卡片相叠，且质量最好的一档不确定，每次打开换一张图；
 - 不引入 TypeDB 或图数据库解决数百节点问题；
 - 不用 GraphRAG 替代本体候选确认；
 - 不复制 Semantica 的全功能面。
@@ -1027,6 +1029,23 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 
 截图：`output/playwright/ossie-inheritance-graph-20260907.png`、`ossie-inherited-detail-20260907.png`。
 
+### 17.10 属性不再画成图节点（2026-09-08）
+
+起因是评估要不要移植 [Microsoft Ontology-Playground](https://github.com/microsoft/Ontology-Playground) 的画布代码。结论是不移植，但采纳它的一个建模取舍：属性是实体的字段，不是图节点。
+
+同题实测（同一批合成本体，fcose 用其仓库原参数，节点尺寸按我们真实卡片给足；见 §13 表格）：我们的布局在边交叉上少 2–3 倍、快 4–7 倍且确定性，fcose 只在“卡片不相叠”一项领先，而它质量最好的 `randomize: true` 每次打开换一张图。真正的缺陷因此定位在我们自己的消重叠步骤上：它按固定 60 轮、对所有节点用同一套间距，属性卡一多就跑不完，52 对象 + 169 属性的模型有 87 对卡片相叠、最深 28px。
+
+属性不画之后这个缺陷不复存在，画布节点数降到原来的四分之一左右：
+
+- 语义视图只画 Object Type 节点和 Link Type / 继承边；`buildElements` 与页面筛选都过滤掉 `value_type` 节点和 `attribute` 边。
+- 删除“显示属性”开关。属性数量由卡片右上角计数给出，明细在检查器和本体详情页。
+- `graphLayout.ts` 从 477 行减到 383 行：卫星环绕（`satelliteDirection`、`VALUE_RING*`）和收尾的窄间距消重叠整体删除，`LayoutNode` / `LayoutEdge` 不再需要 `kind`。消重叠上限从 60 轮提到 200 轮——现在卡片尺寸统一，这个上限只用来兜底。
+- `OntologyGraph` 去掉 `mode` 属性：三个调用点原本一律传 `semantic`，`global` 分支是死代码。
+
+后端 `_all_graph` 未改，REST 与 MCP 返回的图仍含 `value_type` 节点与 `attribute` 边，消费端契约不变。
+
+验证：前端 36 项测试通过（新增“任意规模零重叠”，覆盖 30 / 80 / 160 对象含交叉关系；本体视图断言属性节点与属性边都进不了画布，属性计数改从已发布版本 `counts.attributes` 读取），lint、TypeScript 与生产构建通过。布局实测 10 / 33 / 57 / 104 / 168 个对象各跑一次：重叠对数全部为 0，耗时 9–74ms，两次布局结果一致。尚未在真实浏览器复核本轮改动。
+
 - [Apache Ossie Ontology Specification](https://github.com/apache/ossie/blob/main/ontology/ontology.md)
 - [Apache Ossie Ontology JSON Schema](https://github.com/apache/ossie/blob/main/ontology/ontology.json)
 - [Apache Ossie Validator](https://github.com/apache/ossie/blob/main/validation/validate.py)
@@ -1038,6 +1057,7 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 - [Semantica](https://github.com/semantica-agi/semantica)
 - [OntoGPT](https://github.com/monarch-initiative/ontogpt)
 - [Microsoft GraphRAG](https://github.com/microsoft/graphrag)
+- [Microsoft Ontology-Playground](https://github.com/microsoft/Ontology-Playground)
 - [OpenSPG](https://github.com/OpenSPG/openspg)
 - [KAG](https://github.com/OpenSPG/KAG)
 - [MCP 2026-07-28 Streamable HTTP](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/transports/streamable-http.mdx)

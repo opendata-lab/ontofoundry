@@ -31,7 +31,6 @@ export function OntologyViewPage() {
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
-  const [attributes, setAttributes] = useState(false);
   const [selected, setSelected] = useState<SelectedGraphItem>(null);
   const [importing, setImporting] = useState(false);
   const load = () => setAttempt((value) => value + 1);
@@ -58,30 +57,22 @@ export function OntologyViewPage() {
     };
   }, [workspace.id, workspace.current_version, attempt]);
   const graph = overview?.graph;
+  // Attributes are entity fields rather than nodes of their own, so the canvas
+  // carries object types and the edges between them and nothing else.
   const visible = useMemo(() => {
     if (!graph) return null;
-    const objectIds = new Set(
-      graph.nodes
-        .filter(
-          (n) => n.kind === "object_type" && (!tag || n.tags.includes(tag)),
-        )
-        .map((n) => n.id),
-    );
-    const attributeIds = new Set(
-      graph.edges
-        .filter((e) => e.kind === "attribute" && objectIds.has(e.source))
-        .map((e) => e.target),
-    );
     const nodes = graph.nodes.filter(
-      (n) => objectIds.has(n.id) || (attributes && attributeIds.has(n.id)),
+      (n) => n.kind === "object_type" && (!tag || n.tags.includes(tag)),
     );
     const ids = new Set(nodes.map((n) => n.id));
     return {
       ...graph,
       nodes,
-      edges: graph.edges.filter((e) => ids.has(e.source) && ids.has(e.target)),
+      edges: graph.edges.filter(
+        (e) => e.kind !== "attribute" && ids.has(e.source) && ids.has(e.target),
+      ),
     };
-  }, [graph, attributes, tag]);
+  }, [graph, tag]);
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (workspace.current_version && (!overview || !visible))
     return <LoadingSurface label="正在读取本体图谱…" />;
@@ -159,14 +150,6 @@ export function OntologyViewPage() {
               <option key={t}>{t}</option>
             ))}
           </select>
-          <label className="show-attributes">
-            <input
-              type="checkbox"
-              checked={attributes}
-              onChange={(e) => setAttributes(e.target.checked)}
-            />
-            显示属性
-          </label>
           <div className="toolbar-spacer" />
           {workspace.role && (
             <>
@@ -216,9 +199,8 @@ export function OntologyViewPage() {
           />
         ) : visible?.nodes.length ? (
           <OntologyGraph
-            key={String(attributes) + tag}
+            key={tag}
             graph={visible}
-            mode="semantic"
             query={query}
             onSelect={setSelected}
           />
@@ -250,7 +232,7 @@ export function OntologyViewPage() {
             </span>
             <span>
               <Braces size={12} />
-              属性 {graph.nodes.length - objects.length}
+              属性 {overview?.version.counts.attributes ?? 0}
             </span>
           </div>
         )}
