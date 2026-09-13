@@ -6,7 +6,7 @@ import hmac
 import json
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import urlencode
 
 import httpx
@@ -17,7 +17,11 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.config import Settings
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import ServiceTokenRecord, UserRecord
+from ontofoundry_api.db_models import (
+    ServiceTokenRecord,
+    ServiceTokenScopeRecord,
+    UserRecord,
+)
 from ontofoundry_api.services.workspaces import ensure_dev_user, upsert_oauth_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -31,6 +35,8 @@ class Principal:
     subject: str
     display_name: str
     email: str | None
+    service_token_id: str | None = None
+    scopes: frozenset[str] = frozenset()
 
 
 def _settings(request: Request) -> Settings:
@@ -134,7 +140,18 @@ def ontology_principal(request: Request, session: Session = Depends(get_db)) -> 
         ):
             raise HTTPException(401, "本体服务令牌无效或不属于当前空间")
         user = session.get(UserRecord, record.created_by)
-        return _principal(user)
+        if not user:
+            raise HTTPException(401, "令牌签发用户不存在")
+        scopes = session.scalars(
+            select(ServiceTokenScopeRecord.scope).where(
+                ServiceTokenScopeRecord.token_id == record.id
+            )
+        ).all()
+        return replace(
+            _principal(user),
+            service_token_id=record.id,
+            scopes=frozenset(["ontology:read", *scopes]),
+        )
     return current_principal(request, session)
 
 

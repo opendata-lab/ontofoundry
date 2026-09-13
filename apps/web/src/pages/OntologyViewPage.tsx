@@ -1,3 +1,4 @@
+import { OntologyReading } from "../components/OntologyReading";
 import {
   Download,
   Search,
@@ -28,6 +29,9 @@ export function OntologyViewPage() {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"global" | "semantic">("global");
+  const [readingMode, setReadingMode] = useState<
+    "graph" | "business" | "technical"
+  >("graph");
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
@@ -130,6 +134,26 @@ export function OntologyViewPage() {
       </div>
       {mode === "semantic" && (
         <div className="view-toolbar">
+          <div className="reading-switch">
+            {(
+              [
+                ["graph", "图谱"],
+                ["business", "业务"],
+                ["technical", "技术"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                aria-pressed={readingMode === key}
+                onClick={() => {
+                  setReadingMode(key);
+                  setSelected(null);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <span className="view-kind">实体</span>
           <label className="ref-search">
             <input
@@ -191,7 +215,17 @@ export function OntologyViewPage() {
         role="tabpanel"
         aria-labelledby={"view-tab-" + mode}
       >
-        {overview && objects.length && mode === "global" ? (
+        {overview && mode === "semantic" && readingMode !== "graph" && graph ? (
+          <OntologyReading
+            workspaceId={workspace.id}
+            versionId={overview.version.version_id}
+            mode={readingMode}
+            graph={visible ?? graph}
+            query={query}
+            tag={tag}
+            member={!!workspace.role}
+          />
+        ) : overview && objects.length && mode === "global" ? (
           <OntologyOverview
             overview={overview}
             onSemantic={() => switchMode("semantic")}
@@ -220,7 +254,7 @@ export function OntologyViewPage() {
             )}
           </div>
         )}
-        {mode === "semantic" && graph && (
+        {mode === "semantic" && readingMode === "graph" && graph && (
           <div className="view-legend">
             <span>
               <Box size={12} />

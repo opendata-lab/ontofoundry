@@ -111,6 +111,7 @@ export const api = {
         suffix,
     );
   },
+  definition: (workspaceId: string, versionId: string) => request<unknown>("/api/v1/ontology/workspaces/" + workspaceId + "/versions/" + versionId + "/export"),
   exportUrl: (workspaceId: string, versionId: string) =>
     "/api/v1/ontology/workspaces/" +
     workspaceId +
@@ -169,6 +170,12 @@ export const modelingApi = {
     workspaceRequest<ModelingSession>(
       s.workspace_id,
       "/sessions/" + s.id + "/cancel",
+      {},
+    ),
+  sync: (workspaceId: string, sessionId: string) =>
+    workspaceRequest<ModelingSession>(
+      workspaceId,
+      "/sessions/" + sessionId + "/sync",
       {},
     ),
   validate: (s: ModelingSession) =>

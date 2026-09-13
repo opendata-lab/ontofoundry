@@ -1,3 +1,4 @@
+import { ReleaseReview, HistoryComparison } from "../components/ReleaseReview";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Download, Rocket, KeyRound, Trash2 } from "lucide-react";
@@ -22,19 +23,23 @@ export function DeliveryPage() {
   );
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reviewDirty, setReviewDirty] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [result, setResult] = useState("");
   const [conflict, setConflict] = useState<{
     current_version_id: string;
     conflicts: MergeConflict[];
   } | null>(null);
   const [choices, setChoices] = useState<Record<string, string>>({});
-  const [tokens, setTokens] = useState<{ id: string; name: string }[]>([]);
+  const [tokens, setTokens] = useState<
+    { id: string; name: string; scopes?: string[] }[]
+  >([]);
   const [token, setToken] = useState("");
   const { setError } = model;
   usePageTab({
     title: model.session ? `发布 · ${model.session.title}` : undefined,
-    dirty: !!message.trim() || Object.keys(choices).length > 0,
-    busy,
+    dirty: reviewDirty || !!message.trim() || Object.keys(choices).length > 0,
+    busy: busy || reviewBusy,
   });
   const loadVersions = useCallback(
     () =>
@@ -55,7 +60,7 @@ export function DeliveryPage() {
         .catch((e: Error) => setError(e.message));
   }, [workspace.id, workspace.role, loadVersions, setError]);
   const publish = async () => {
-    if (!model.session) return;
+    if (!model.session || busy || reviewBusy || reviewDirty) return;
     setBusy(true);
     model.setError("");
     setConflict(null);
@@ -108,6 +113,7 @@ export function DeliveryPage() {
             </p>
             <select
               aria-label="选择发布草稿"
+              disabled={busy || reviewBusy || reviewDirty}
               value={model.session?.id ?? ""}
               onChange={(e) => model.select(e.target.value)}
             >
@@ -120,6 +126,14 @@ export function DeliveryPage() {
             </select>
             {model.session && (
               <>
+                <ReleaseReview
+                  key={model.session.id}
+                  session={model.session}
+                  onSaved={model.setSession}
+                  disabled={busy}
+                  onDirtyChange={setReviewDirty}
+                  onBusyChange={setReviewBusy}
+                />
                 <div className="release-stats">
                   <span>
                     实体 <b>{model.session.draft.object_types.length}</b>
@@ -162,19 +176,21 @@ export function DeliveryPage() {
                   </Link>
                   <button
                     className="button button--secondary"
-                    disabled={busy}
-                    onClick={() =>
+                    disabled={busy || reviewBusy || reviewDirty}
+                    onClick={() => {
+                      setBusy(true);
                       modelingApi
                         .validate(model.session!)
                         .then(setReport)
                         .catch((e: Error) => model.setError(e.message))
-                    }
+                        .finally(() => setBusy(false));
+                    }}
                   >
                     校验 JSON
                   </button>
                   <button
                     className="button button--primary"
-                    disabled={busy}
+                    disabled={busy || reviewBusy || reviewDirty}
                     onClick={publish}
                   >
                     <Rocket size={14} />
@@ -274,6 +290,9 @@ export function DeliveryPage() {
         {model.error && <p className="inline-error">{model.error}</p>}
         <section className="detail-section">
           <h2>已发布版本</h2>
+          {workspace.role && versions.length > 0 && (
+            <HistoryComparison workspaceId={workspace.id} versions={versions} />
+          )}
           <table className="ref-table">
             <thead>
               <tr>
@@ -314,7 +333,9 @@ export function DeliveryPage() {
           <div className="service-columns">
             <div>
               <h3>REST API</h3>
-              <p className="muted">读取当前发布的模型、关系与语义图谱。</p>
+              <p className="muted">
+                指定版本读取模型与语义图谱；获准的调用方可读取文档或数据库实例。
+              </p>
               <code>{serviceRoot}/types</code>
               <a
                 className="button button--text"
@@ -328,7 +349,8 @@ export function DeliveryPage() {
             <div>
               <h3>MCP</h3>
               <p className="muted">
-                MCP 2026-07-28 · 五个只读工具；按请求携带协议元数据，不使用旧
+                MCP 2026-07-28 ·
+                五个本体工具、三个实例工具（按权限开放）；按请求携带协议元数据，不使用旧
                 initialize 握手。
               </p>
               <code>{serviceRoot}/mcp</code>
@@ -345,7 +367,12 @@ export function DeliveryPage() {
                   workspaceRequest<{ id: string; name: string; token: string }>(
                     workspace.id,
                     "/service-tokens",
-                    { name: data.get("name") },
+                    {
+                      name: data.get("name"),
+                      scopes: data.get("instances")
+                        ? ["ontology:read", "instances:read"]
+                        : ["ontology:read"],
+                    },
                   )
                     .then((t) => {
                       setToken(t.token);
@@ -360,6 +387,10 @@ export function DeliveryPage() {
                   placeholder="调用方名称"
                   required
                 />
+                <label>
+                  <input type="checkbox" name="instances" />
+                  允许读取业务实例与证据
+                </label>
                 <button className="button button--secondary">
                   <KeyRound size={14} />
                   创建令牌
@@ -379,7 +410,10 @@ export function DeliveryPage() {
               )}
               {tokens.map((t) => (
                 <div className="token-row" key={t.id}>
-                  {t.name}
+                  {t.name}{" "}
+                  {t.scopes?.includes("instances:read")
+                    ? " · 本体与实例"
+                    : " · 仅本体"}
                   <button
                     className="button button--text"
                     onClick={() =>

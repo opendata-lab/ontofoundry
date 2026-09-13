@@ -24,6 +24,7 @@ from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
+from ontofoundry_api.services.source_rows import validate_source_rows
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["data"])
 
@@ -193,6 +194,7 @@ def tables(
     connection_id: str,
     request: Request,
     table: str | None = None,
+    schema_name: str | None = None,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -201,34 +203,43 @@ def tables(
         get_connection(db, workspace_id, connection_id), request.app.state.settings
     ) as conn:
         inspector = inspect(conn)
-        names = sorted(set(inspector.get_table_names() + inspector.get_view_names()))
+        names = sorted(
+            set(
+                inspector.get_table_names(schema=schema_name)
+                + inspector.get_view_names(schema=schema_name)
+            )
+        )
         if table:
             if table not in names:
                 raise HTTPException(404, "数据表不存在")
-            pks = inspector.get_pk_constraint(table).get("constrained_columns", [])
+            pks = inspector.get_pk_constraint(table, schema=schema_name).get(
+                "constrained_columns", []
+            )
             return {
                 "items": [
                     {
                         "name": table,
-                        "schema": None,
+                        "schema": schema_name,
                         "columns": [
                             {
                                 "name": c["name"],
                                 "type": str(c["type"]),
                                 "primary_key": c["name"] in pks,
+                                "nullable": c.get("nullable"),
+                                "comment": c.get("comment"),
                             }
-                            for c in inspector.get_columns(table)
+                            for c in inspector.get_columns(table, schema=schema_name)
                         ],
                     }
                 ]
             }
-        return {"items": [{"name": n, "schema": None, "columns": []} for n in names]}
+        return {"items": [{"name": n, "schema": schema_name, "columns": []} for n in names]}
 
 
 class PreviewRequest(BaseModel):
     mapping: DataMapping
     q: str = Field(default="", max_length=240)
-    key: str | None = None
+    key: str | None = Field(default=None, max_length=2000)
     offset: int = Field(default=0, ge=0, le=10000)
     limit: int = Field(default=20, ge=1, le=100)
 
@@ -264,6 +275,7 @@ def query_mapping(db, workspace_id, body, settings):
             .limit(body.limit + 1)
         )
         rows = [dict(r) for r in conn.execute(query).mappings()]
+        validate_source_rows(rows)
         return {
             "items": rows[: body.limit],
             "has_more": len(rows) > body.limit,

@@ -16,6 +16,8 @@ import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ModelResults } from "../components/ModelResults";
+import { AgentStream } from "../components/AgentStream";
+import { Markdown } from "../components/Markdown";
 import { useModeling } from "../hooks/useModeling";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
 
@@ -333,9 +335,24 @@ export function BuilderPage() {
             ) : (
               session.messages.map((m, i) => (
                 <div key={i} className={"chat-message chat-message--" + m.role}>
-                  {m.content}
+                  {m.role === "assistant" ? <Markdown>{m.content}</Markdown> : m.content}
+                  {!!m.attachments?.length && (
+                    <div className="agent-attachments">
+                      {m.attachments.map((file) => (
+                        <span key={file.rel_path}><FileText size={13} />{file.name}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
+            )}
+            {session && (
+              <AgentStream
+                session={session}
+                active={pageActive}
+                onSession={setSession}
+                onError={setError}
+              />
             )}
             {session?.task_status !== "idle" && session && (
               <div
