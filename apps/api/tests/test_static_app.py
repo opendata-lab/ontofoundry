@@ -13,6 +13,7 @@ def test_compiled_frontend_and_api_share_an_origin_without_masking_api_errors(tm
         database_url=f"sqlite:///{tmp_path / 'db.sqlite'}",
         data_dir=tmp_path / "files",
         web_dist=dist,
+        auto_create_schema=True,
         seed_demo=False,
     )
     with TestClient(create_app(settings)) as client:

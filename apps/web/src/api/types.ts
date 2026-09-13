@@ -211,10 +211,17 @@ export type ModelingSession = {
   draft: Draft;
   graph: TypeGraph;
   candidates: Candidate[];
-  messages: { role: string; content: string }[];
+  messages: {
+    role: string;
+    content: string;
+    dataagent_task_id?: string;
+    attachments?: { name: string; rel_path: string; size: number; content_type: string }[];
+  }[];
   material_ids: string[];
   task_status: string;
   task_detail: string;
+  dataagent_topic_id?: string | null;
+  dataagent_task_id?: string | null;
   updated_at: string;
   validation?: VersionSummary["validation"];
 };

@@ -2,15 +2,23 @@ import base64
 import binascii
 import json
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from jsonschema import ValidationError, validate
+from pydantic import ValidationError as ModelValidationError
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, ontology_principal
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import OntologyVersionRecord
+from ontofoundry_api.services.access import can_read_instances, require_instances
 from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.instance_query import (
+    ObjectSearch,
+    get_object,
+    object_neighborhood,
+    search_objects,
+)
 from ontofoundry_api.services.ontology_query import (
     current_version,
     get_type,
@@ -35,7 +43,32 @@ TOOLS = [
         },
     ),
     ("export_ontology", "读取官方 Ossie JSON", {}),
+    (
+        "search_objects",
+        "搜索已发布文档实例或按已发布映射查询数据库实例",
+        {
+            "type_id": {"type": "string", "format": "uuid"},
+            "source": {"type": "string", "enum": ["document", "database"]},
+            "q": {"type": "string", "maxLength": 240},
+            "cursor": {"type": "string", "maxLength": 4000},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        },
+    ),
+    (
+        "get_object",
+        "读取实例属性、来源与证据",
+        {"ref": {"type": "string", "maxLength": 4000}},
+    ),
+    (
+        "expand_object_graph",
+        "展开实例关系邻域（最多三跳）",
+        {
+            "ref": {"type": "string", "maxLength": 4000},
+            "depth": {"type": "integer", "minimum": 1, "maximum": 3},
+        },
+    ),
 ]
+INSTANCE_TOOLS = {"search_objects", "get_object", "expand_object_graph"}
 
 
 def rpc_error(rid, code, message, status=400, data=None):
@@ -52,7 +85,11 @@ def tool_schema(name, properties):
     return {
         "type": "object",
         "properties": {**properties, "version_id": {"type": "string"}},
-        "required": ["type_id"] if name == "get_ontology_type" else [],
+        "required": ["type_id"]
+        if name == "get_ontology_type"
+        else ["ref"]
+        if name in ("get_object", "expand_object_graph")
+        else [],
         "additionalProperties": False,
     }
 
@@ -62,7 +99,7 @@ async def rpc(
     workspace_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    _: Principal = Depends(ontology_principal),
+    principal: Principal = Depends(ontology_principal),
 ):
     raw = bytearray()
     async for chunk in request.stream():
@@ -125,7 +162,7 @@ async def rpc(
         result = {
             "supportedVersions": [PROTOCOL_VERSION],
             "capabilities": {"tools": {}},
-            "instructions": "Read published ontology only. Modeling, materials and database instances are not exposed by these tools.",
+            "instructions": "Read published versions. Instance tools require instances:read and workspace membership. Database rows are live; modeling and raw materials are not exposed.",
         }
     elif method == "ping":
         result = {}
@@ -139,6 +176,8 @@ async def rpc(
                     "annotations": {"readOnlyHint": True, "destructiveHint": False},
                 }
                 for n, d, p in TOOLS
+                if n not in INSTANCE_TOOLS
+                or can_read_instances(db, workspace_id, principal)
             ]
         }
     elif method == "tools/call":
@@ -151,13 +190,9 @@ async def rpc(
         except ValidationError as exc:
             return rpc_error(rid, -32602, exc.message)
         try:
-            version = (
-                db.get(OntologyVersionRecord, args["version_id"])
-                if args.get("version_id")
-                else current_version(db, workspace_id)
-            )
-            if not version or version.workspace_id != workspace_id:
-                raise ValueError("Published version not found in this workspace")
+            if name in INSTANCE_TOOLS:
+                require_instances(db, workspace_id, principal)
+            version = current_version(db, workspace_id, args.get("version_id"))
             if name == "get_ontology_version":
                 value = version_summary(version)
             elif name == "search_ontology_types":
@@ -168,19 +203,47 @@ async def rpc(
                 value = type_graph(
                     version, focus_id=args.get("focus_id"), depth=args.get("depth", 1)
                 )
+            elif name == "search_objects":
+                value = search_objects(
+                    db,
+                    version,
+                    ObjectSearch(**{k: v for k, v in args.items() if k != "version_id"}),
+                    request.app.state.settings,
+                )
+            elif name == "get_object":
+                value = get_object(db, version, args["ref"], request.app.state.settings)
+            elif name == "expand_object_graph":
+                value = object_neighborhood(
+                    db,
+                    version,
+                    args["ref"],
+                    args.get("depth", 1),
+                    request.app.state.settings,
+                )
             else:
-                value = version.ossie_json
+                value = {
+                    key: value
+                    for key, value in version.ossie_json.items()
+                    if key != "ontology_mappings"
+                    or can_read_instances(db, workspace_id, principal)
+                }
             result = {
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps(value, ensure_ascii=False, default=str),
+                        "text": json.dumps(jsonable_encoder(value), ensure_ascii=False),
                     }
                 ],
                 "isError": False,
             }
-        except (ServiceError, ValueError) as exc:
-            result = {"content": [{"type": "text", "text": str(exc)}], "isError": True}
+        except (ServiceError, ValueError, HTTPException, ModelValidationError) as exc:
+            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            result = {
+                "content": [
+                    {"type": "text", "text": json.dumps(detail, ensure_ascii=False)}
+                ],
+                "isError": True,
+            }
     else:
         return rpc_error(
             rid, -32601, "Method not found; supported protocol: " + PROTOCOL_VERSION, 404

@@ -1,16 +1,22 @@
 import hashlib
 import secrets
+from typing import Literal
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import ServiceTokenRecord, UserRecord, WorkspaceMemberRecord
+from ontofoundry_api.db_models import (
+    ServiceTokenRecord,
+    ServiceTokenScopeRecord,
+    UserRecord,
+    WorkspaceMemberRecord,
+)
 from ontofoundry_api.services.workspaces import get_workspace, workspace_summary
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["settings"])
@@ -112,6 +118,9 @@ def remove_member(
 
 class TokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+    scopes: list[Literal["ontology:read", "instances:read"]] = Field(
+        default_factory=lambda: ["ontology:read"]
+    )
 
 
 @router.get("/service-tokens")
@@ -123,7 +132,19 @@ def tokens(
     require_member(db, workspace_id, user.id, admin=True)
     return {
         "items": [
-            {"id": t.id, "name": t.name, "created_at": t.created_at}
+            {
+                "id": t.id,
+                "name": t.name,
+                "created_at": t.created_at,
+                "scopes": [
+                    "ontology:read",
+                    *db.scalars(
+                        select(ServiceTokenScopeRecord.scope).where(
+                            ServiceTokenScopeRecord.token_id == t.id
+                        )
+                    ).all(),
+                ],
+            }
             for t in db.scalars(
                 select(ServiceTokenRecord).where(
                     ServiceTokenRecord.workspace_id == workspace_id
@@ -150,8 +171,16 @@ def create_token(
         token_hash=hashlib.sha256(token.encode()).hexdigest(),
     )
     db.add(item)
+    db.flush()
+    if "instances:read" in body.scopes:
+        db.add(ServiceTokenScopeRecord(token_id=item.id, scope="instances:read"))
     db.commit()
-    return {"id": item.id, "name": item.name, "token": token}
+    return {
+        "id": item.id,
+        "name": item.name,
+        "token": token,
+        "scopes": sorted({"ontology:read", *body.scopes}),
+    }
 
 
 @router.delete("/service-tokens/{token_id}")
@@ -165,6 +194,9 @@ def revoke(
     item = db.get(ServiceTokenRecord, token_id)
     if not item or item.workspace_id != workspace_id:
         raise HTTPException(404, "令牌不存在")
+    db.execute(
+        delete(ServiceTokenScopeRecord).where(ServiceTokenScopeRecord.token_id == item.id)
+    )
     db.delete(item)
     db.commit()
     return {"ok": True}

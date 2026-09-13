@@ -124,6 +124,22 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
           {sessionId ? "会话草稿" : "已发布 v" + workspace.current_version}
         </span>
       </header>
+      {workspace.role && mapping && (
+        <div className="source-asset-link">
+          <Link
+            to={`../mappings?${new URLSearchParams({
+              source: mapping.connection_alias,
+              table: mapping.table_name,
+              schema: mapping.schema_name ?? "",
+              ...(sessionId ? { session: sessionId } : {}),
+            })}`}
+          >
+            <Database size={14} /> 查看源资产 · {mapping.connection_alias} /{" "}
+            {mapping.schema_name ? mapping.schema_name + "." : ""}
+            {mapping.table_name}
+          </Link>
+        </div>
+      )}
       <div className="detail-identity">
         <span className="catalog-object-icon">
           {relation ? <GitBranch size={23} /> : <Box size={23} />}

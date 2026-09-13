@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from datetime import UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -11,13 +12,19 @@ from .errors import NotFoundError
 from .workspaces import get_workspace
 
 
-def current_version(session: Session, workspace_id: str) -> OntologyVersionRecord:
+def current_version(
+    session: Session, workspace_id: str, version_id: str | None = None
+) -> OntologyVersionRecord:
     workspace = get_workspace(session, workspace_id)
-    if not workspace.current_version_id:
+    if not version_id and not workspace.current_version_id:
         raise NotFoundError("该工作空间还没有已发布版本")
-    version = session.get(OntologyVersionRecord, workspace.current_version_id)
-    if version is None:
-        raise NotFoundError("工作空间当前版本记录不存在")
+    version = session.get(OntologyVersionRecord, version_id or workspace.current_version_id)
+    if (
+        version is None
+        or version.workspace_id != workspace_id
+        or version.status != "published"
+    ):
+        raise NotFoundError("该空间的已发布版本不存在")
     return version
 
 
@@ -33,7 +40,9 @@ def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
         "version_sha256": version.sha256,
         "status": version.status,
         "message": version.message,
-        "published_at": version.created_at,
+        "published_at": version.created_at
+        if version.created_at.tzinfo
+        else version.created_at.replace(tzinfo=UTC),
         "validation": version.validation_json,
         "counts": {
             "object_types": len(snapshot.get("object_types", [])),

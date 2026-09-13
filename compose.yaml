@@ -15,5 +15,48 @@ services:
     volumes:
       - ontofoundry-postgres:/var/lib/postgresql/data
 
+  dataagent-redis:
+    image: redis:7.2-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  dataagent-backend:
+    build:
+      context: .
+      dockerfile: dataagent/dataagent-backend/Dockerfile
+    environment:
+      DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
+      DATAAGENT_DATABASE_SCHEMA: public
+      REDIS_HOST: dataagent-redis
+      REDIS_PORT: 6379
+      SKILLS_ROOT_DIR: /app/.claude/skills
+      DATAAGENT_HOST_ROOT: /dataagent_runtime
+      DATAAGENT_RUNTIME_ROOT: /dataagent_runtime
+      LLM_PROVIDER: ${DATAAGENT_LLM_PROVIDER:-anthropic_compatible}
+      CLAUDE_MODEL: ${ONTOFOUNDRY_ANTHROPIC_MODEL:-}
+      ANTHROPIC_BASE_URL: ${ONTOFOUNDRY_ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_API_KEY: ${ONTOFOUNDRY_ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dataagent-redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8900:8900"
+    volumes:
+      - ontofoundry-dataagent-runtime:/dataagent_runtime
+      - ./dataagent/.claude/skills:/app/.claude/skills:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/api/v1/nl2sql/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
 volumes:
   ontofoundry-postgres:
+  ontofoundry-dataagent-runtime:

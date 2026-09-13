@@ -13,6 +13,7 @@ from ontofoundry_api.db_models import (
     WorkspaceMemberRecord,
     WorkspaceRecord,
 )
+from ontofoundry_api.domain.instance_validation import include_instance_validation
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
 from ontofoundry_api.ossie.compiler import compile_ossie, sha256_json, validate_ossie
 
@@ -179,7 +180,7 @@ def publish_draft(
         ontology_name=workspace.slug.replace("-", "_"),
         ontology_description=workspace.description or workspace.name,
     )
-    report = validate_ossie(ossie)
+    report = include_instance_validation(validate_ossie(ossie), draft)
     if not report["publishable"]:
         raise PublishValidationError("Ossie 校验未通过，版本未发布", report)
 

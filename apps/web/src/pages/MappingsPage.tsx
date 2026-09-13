@@ -1,3 +1,4 @@
+import { DataAssets } from "../components/DataAssets";
 import { Database, Plus, X, PlugZap, ExternalLink } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -13,11 +14,13 @@ export function MappingsPage() {
   const snapshot = useSnapshot(workspace);
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
+  const [view, setView] = useState<"assets" | "mappings">("assets");
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState("postgresql");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
-  usePageTab({ dirty, busy });
+  const [assetBusy, setAssetBusy] = useState(false);
+  usePageTab({ dirty, busy: busy || assetBusy });
   const [picker, setPicker] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -100,47 +103,77 @@ export function MappingsPage() {
             {status}
           </p>
         )}
-        <h2>本体与数据集</h2>
-        <table className="ref-table">
-          <thead>
-            <tr>
-              <th>业务对象</th>
-              <th>数据集</th>
-              <th>标识字段</th>
-              <th>已映射属性</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {snapshot.draft?.object_types.map((t) => {
-              const m = snapshot.draft?.mappings.find(
-                (m) => m.type_id === t.id,
-              );
-              return (
-                <tr key={t.id}>
-                  <td>
-                    {t.name}
-                    <small>{t.technical_name}</small>
-                  </td>
-                  <td>{m?.table_name ?? "未映射"}</td>
-                  <td>{m?.key_column ?? "—"}</td>
-                  <td>
-                    {Object.keys(m?.fields ?? {}).length}/{t.attributes.length}
-                  </td>
-                  <td>
-                    <Link
-                      className="button button--text"
-                      to={"../objects/" + t.id + snapshot.suffix}
-                    >
-                      查看与编辑
-                      <ExternalLink size={13} />
-                    </Link>
-                  </td>
+        <div className="reading-switch">
+          <button
+            aria-pressed={view === "assets"}
+            disabled={assetBusy}
+            onClick={() => setView("assets")}
+          >
+            数据源与资产
+          </button>
+          <button
+            aria-pressed={view === "mappings"}
+            disabled={assetBusy}
+            onClick={() => setView("mappings")}
+          >
+            本体映射
+          </button>
+        </div>
+        {view === "assets" ? (
+          <DataAssets
+            key={workspace.id + ":" + snapshot.sessionId}
+            onBusyChange={setAssetBusy}
+            workspaceId={workspace.id}
+            connections={connections}
+            draft={snapshot.draft}
+            sessionId={snapshot.sessionId}
+          />
+        ) : (
+          <>
+            <h2>本体与数据集</h2>
+            <table className="ref-table">
+              <thead>
+                <tr>
+                  <th>业务对象</th>
+                  <th>数据集</th>
+                  <th>标识字段</th>
+                  <th>已映射属性</th>
+                  <th />
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {snapshot.draft?.object_types.map((t) => {
+                  const m = snapshot.draft?.mappings.find(
+                    (m) => m.type_id === t.id,
+                  );
+                  return (
+                    <tr key={t.id}>
+                      <td>
+                        {t.name}
+                        <small>{t.technical_name}</small>
+                      </td>
+                      <td>{m?.table_name ?? "未映射"}</td>
+                      <td>{m?.key_column ?? "—"}</td>
+                      <td>
+                        {Object.keys(m?.fields ?? {}).length}/
+                        {t.attributes.length}
+                      </td>
+                      <td>
+                        <Link
+                          className="button button--text"
+                          to={"../objects/" + t.id + snapshot.suffix}
+                        >
+                          查看与编辑
+                          <ExternalLink size={13} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
       <DatasetPicker
         workspaceId={workspace.id}

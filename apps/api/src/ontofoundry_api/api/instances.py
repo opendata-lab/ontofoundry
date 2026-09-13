@@ -22,6 +22,7 @@ from ontofoundry_api.api.modeling import (
 )
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.services.source_rows import source_key, validate_source_rows
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["instances"])
 
@@ -34,7 +35,7 @@ class NeighborhoodRequest(BaseModel):
 
 
 def database_object(type_id, row):
-    key = str(row["__key"])
+    key = source_key(row.get("__key"))
     return {
         "id": f"db:{type_id}:{quote(key, safe='')}",
         "type_id": str(type_id),
@@ -98,7 +99,9 @@ def related_rows(
             .order_by(other.c[other_mapping.key_column])
             .limit(limit + 1)
         )
-        return [dict(row) for row in conn.execute(query).mappings()]
+        rows = [dict(row) for row in conn.execute(query).mappings()]
+        validate_source_rows(rows)
+        return rows
 
 
 @router.post("/instance-neighborhood")
@@ -115,11 +118,19 @@ def neighborhood(
         if body.session_id
         else published_snapshot(workspace_id, db, user)
     )
-    draft = OntologyDraft.model_validate(raw)
+    return database_neighborhood(
+        db,
+        workspace_id,
+        OntologyDraft.model_validate(raw),
+        body,
+        request.app.state.settings,
+    )
+
+
+def database_neighborhood(db, workspace_id, draft, body, settings):
     mappings = {str(m.type_id): m for m in draft.mappings}
     if body.type_id not in mappings:
         raise HTTPException(422, "此对象尚未配置数据映射")
-    settings = request.app.state.settings
     center_rows = query_mapping(
         db,
         workspace_id,

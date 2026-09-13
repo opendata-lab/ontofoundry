@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -11,6 +10,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from ontofoundry_api.api import (
     agent,
+    assets,
     auth,
     connections,
     instances,
@@ -44,20 +44,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if app_settings.auto_create_schema:
             Base.metadata.create_all(engine)
-        from sqlalchemy import update
-
-        from ontofoundry_api.db_models import ModelingSessionRecord
-
-        with session_factory() as session:
-            session.execute(
-                update(ModelingSessionRecord)
-                .where(ModelingSessionRecord.task_status.in_(["queued", "running"]))
-                .values(
-                    task_status="failed",
-                    task_detail="服务已重启，请手动重试。此前生成的候选仍然保留。",
-                )
-            )
-            session.commit()
         app_settings.data_dir.mkdir(parents=True, exist_ok=True)
         if app_settings.auth_mode == "dev" or app_settings.seed_demo:
             with session_factory() as session:
@@ -83,8 +69,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
-        yield
-        engine.dispose()
+        try:
+            yield
+        finally:
+            engine.dispose()
 
     app = FastAPI(
         title="OntoFoundry API",
@@ -95,7 +83,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = app_settings
     app.state.engine = engine
     app.state.session_factory = session_factory
-    app.state.agent_slots = asyncio.Semaphore(10)
+    app.include_router(assets.router)
 
     @app.middleware("http")
     async def check_origin(request: Request, call_next):
@@ -139,7 +127,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         body = {"error": {"code": exc.code, "message": exc.message}}
         if isinstance(exc, PublishValidationError):
             body["error"]["validation"] = exc.report
-        return JSONResponse(status_code=exc.status_code, content=body)
+        return JSONResponse(
+            status_code=exc.status_code, content=body, headers=getattr(exc, "headers", None)
+        )
 
     @app.get("/healthz", tags=["system"])
     def health() -> dict:

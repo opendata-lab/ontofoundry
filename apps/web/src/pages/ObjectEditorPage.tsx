@@ -1,3 +1,4 @@
+import { ExpressionsEditor } from "../components/ExpressionsEditor";
 import {
   ArrowLeft,
   Box,
@@ -7,7 +8,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import { modelingApi } from "../api/client";
 import type { Draft, ObjectDefinition, LinkDefinition } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -27,12 +33,21 @@ function clearBlankReadings<T extends ObjectDefinition | LinkDefinition>(
   if ("attributes" in type)
     return {
       ...type,
+      requires: clean(type.requires),
+      derived_by: clean(type.derived_by),
       attributes: type.attributes.map((item) => ({
         ...item,
+        requires: clean(item.requires),
+        derived_by: clean(item.derived_by),
         verbalizes: clean(item.verbalizes),
       })),
     };
-  return { ...type, verbalizes: clean(type.verbalizes) };
+  return {
+    ...type,
+    requires: clean(type.requires),
+    derived_by: clean(type.derived_by),
+    verbalizes: clean(type.verbalizes),
+  };
 }
 
 export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
@@ -45,7 +60,8 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
   const [type, setType] = useState<ObjectDefinition | LinkDefinition | null>(
     null,
   );
-  const [step, setStep] = useState(0);
+  const [searchParams] = useSearchParams();
+  const [step, setStep] = useState(searchParams.get("step") === "1" ? 1 : 0);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reading, setReading] = useState("");
@@ -160,6 +176,18 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
         <span>/</span>
         <span>编辑本体 {type.name && "【" + type.name + "】"}</span>
         <div className="toolbar-spacer" />
+        {mapping && (
+          <Link
+            to={`../mappings?${new URLSearchParams({
+              source: mapping.connection_alias,
+              table: mapping.table_name,
+              schema: mapping.schema_name ?? "",
+              session: model.session.id,
+            })}`}
+          >
+            查看源资产
+          </Link>
+        )}
         <Link to={"../builder?session=" + model.session.id}>返回建模会话</Link>
       </header>
       <div className="editor-steps">
@@ -242,6 +270,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                   maxLength={4000}
                 />
               </label>
+              <ExpressionsEditor value={type} onChange={change} />
             </>
           )}
           {relation && step === 1 && "source_type_id" in type && (
@@ -359,6 +388,16 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
               type={type}
               mapping={mapping}
               fieldsOnly={step === 3}
+              suggestedSource={
+                searchParams.get("mapping_source") &&
+                searchParams.get("mapping_table")
+                  ? {
+                      connection_alias: searchParams.get("mapping_source")!,
+                      table_name: searchParams.get("mapping_table")!,
+                      schema_name: searchParams.get("mapping_schema") || null,
+                    }
+                  : undefined
+              }
               onChange={(m) => {
                 setDirty(true);
                 setDraft({
@@ -537,6 +576,17 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                     reading === a.id ? (
                       <tr key={a.id + ":reading"} className="attribute-reading">
                         <td colSpan={7}>
+                          <ExpressionsEditor
+                            label={`${a.name || a.technical_name} 规则与约束`}
+                            value={a}
+                            onChange={(next) =>
+                              change({
+                                attributes: type.attributes.map((x) =>
+                                  x.id === a.id ? { ...x, ...next } : x,
+                                ),
+                              })
+                            }
+                          />
                           <VerbalizationEditor
                             label={
                               "「" + (a.name || a.technical_name) + "」读法"

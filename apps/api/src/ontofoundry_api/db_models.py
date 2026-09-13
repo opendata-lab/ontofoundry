@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -140,3 +148,23 @@ class ServiceTokenRecord(Base):
     name: Mapped[str] = mapped_column(String(120))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ServiceTokenScopeRecord(Base):
+    __tablename__ = "service_token_scopes"
+    token_id: Mapped[str] = mapped_column(ForeignKey("service_tokens.id"), primary_key=True)
+    scope: Mapped[str] = mapped_column(String(40), primary_key=True)
+
+
+class MetadataSnapshotRecord(Base):
+    __tablename__ = "metadata_snapshots"
+    connection_id: Mapped[str] = mapped_column(
+        ForeignKey("data_connections.id"), primary_key=True
+    )
+    schema_name: Mapped[str] = mapped_column(String(240), primary_key=True, default="")
+    snapshot_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    changes_json: Mapped[list] = mapped_column(JSON, default=list)
+    observed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
