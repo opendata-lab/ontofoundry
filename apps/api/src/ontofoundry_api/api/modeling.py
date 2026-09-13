@@ -16,11 +16,21 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
     utc_now,
 )
+from ontofoundry_api.domain.instance_validation import (
+    include_instance_validation,
+    instance_issues,
+)
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
+from ontofoundry_api.services.dataagent import task_id_from_messages, topic_id_from_messages
 from ontofoundry_api.services.merge import merge_snapshots
-from ontofoundry_api.services.ontology_query import _all_graph, version_summary
+from ontofoundry_api.services.ontology_query import (
+    _all_graph,
+    current_version,
+    version_summary,
+)
+from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
     get_workspace,
     membership_role,
@@ -45,6 +55,7 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
 
 def session_data(item):
     nodes, edges = _all_graph(item.draft_json)
+    dataagent_task_id = task_id_from_messages(item.messages_json)
     return {
         "id": item.id,
         "title": item.title,
@@ -57,6 +68,12 @@ def session_data(item):
         "material_ids": item.material_ids,
         "task_status": item.task_status,
         "task_detail": item.task_detail,
+        "dataagent_topic_id": topic_id_from_messages(item.messages_json) or None,
+        "dataagent_task_id": (
+            dataagent_task_id
+            if item.task_status in ("queued", "running")
+            else None
+        ),
         "updated_at": item.updated_at,
         "graph": {
             "workspace_id": item.workspace_id,
@@ -93,12 +110,15 @@ def validate_draft(draft, workspace):
         model = OntologyDraft.model_validate(draft)
         if str(model.workspace_id) != workspace.id:
             raise ValueError("草稿空间不匹配")
-        return validate_ossie(
-            compile_ossie(
-                model,
-                ontology_name=workspace.slug.replace("-", "_"),
-                ontology_description=workspace.description or workspace.name,
-            )
+        return include_instance_validation(
+            validate_ossie(
+                compile_ossie(
+                    model,
+                    ontology_name=workspace.slug.replace("-", "_"),
+                    ontology_description=workspace.description or workspace.name,
+                )
+            ),
+            model,
         )
     except (ValidationError, ValueError) as exc:
         return {
@@ -312,9 +332,12 @@ def accept_candidates(
             candidate["status"] = "ignored" if body.action == "ignore" else "pending"
     # An accept-all operation stays atomic: type/ref/name errors never reach the draft.
     try:
-        OntologyDraft.model_validate(draft)
+        model = OntologyDraft.model_validate(draft)
     except ValidationError as exc:
         raise HTTPException(422, str(exc)) from exc
+    issues = instance_issues(model)
+    if body.action == "accept" and issues:
+        raise HTTPException(422, {"code": "INSTANCE_VALIDATION_FAILED", "errors": issues})
     return revise(db, item, body.revision, draft_json=draft, candidates_json=candidates)
 
 
@@ -495,9 +518,78 @@ def capabilities(
     require_member(db, workspace_id, user.id)
     config = request.app.state.settings
     return {
-        "agent_configured": bool(config.anthropic_base_url and config.anthropic_model),
-        "model": config.anthropic_model,
+        "agent_configured": bool(config.dataagent_base_url),
+        "model": "DataAgent · Pi" if config.dataagent_base_url else "",
         "max_file_mb": config.max_file_mb,
         "connections_configured": bool(config.connection_key),
-        "skills": ["md2ossie", "ontology-clarifier"],
+        "skills": ["md2ossie", "ontofoundry-modeling-assistant"],
+    }
+
+
+@router.get("/versions/{version_id}/presentation")
+def presentation(
+    workspace_id: str,
+    version_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    version = current_version(db, workspace_id, version_id)
+    model = deepcopy(version.snapshot_json)
+    from ontofoundry_api.services.workspaces import membership_role
+
+    if not membership_role(db, workspace_id, user.id):
+        model.update(objects=[], links=[], mappings=[])
+        for link in model.get("link_types", []):
+            link.pop("data_join", None)
+    return {"version": version_summary(version), "model": model}
+
+
+@router.post("/sessions/{session_id}/preview")
+def preview_definition(
+    workspace_id: str,
+    session_id: str,
+    body: SessionPublish,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    item = get_modeling_session(db, workspace_id, session_id)
+    if item.revision != body.revision:
+        raise HTTPException(409, "草稿已变化，请刷新后预览")
+    space = get_workspace(db, workspace_id)
+    report = validate_draft(item.draft_json, space)
+    version = current_version(db, workspace_id) if space.current_version_id else None
+    return {
+        "revision": item.revision,
+        "validation": report,
+        "ossie": compile_ossie(
+            OntologyDraft.model_validate(item.draft_json),
+            ontology_name=space.slug.replace("-", "_"),
+            ontology_description=space.description or space.name,
+        )
+        if report["publishable"]
+        else None,
+        **compare_snapshots(version.snapshot_json if version else {}, item.draft_json),
+    }
+
+
+@router.get("/version-comparison")
+def compare_versions(
+    workspace_id: str,
+    right_id: str,
+    left_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    left = current_version(db, workspace_id, left_id) if left_id else None
+    right = current_version(db, workspace_id, right_id)
+    if left and left.id == right.id:
+        raise HTTPException(422, "请选择不同的版本进行比较")
+    if left and left.version_number > right.version_number:
+        left, right = right, left
+    return {
+        "left": version_summary(left) if left else None,
+        "right": version_summary(right),
+        **compare_snapshots(left.snapshot_json if left else {}, right.snapshot_json),
     }

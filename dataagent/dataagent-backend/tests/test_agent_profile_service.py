@@ -1,0 +1,228 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+from config import get_settings, update_settings
+from core import agent_profile_service
+
+
+def test_default_agent_payload_is_general_builtin_agent():
+    payload = agent_profile_service.default_agent_payload()
+
+    assert payload["agent_id"] == "agent_default"
+    assert payload["name"] == "默认助手"
+    assert payload["description"] == "通用对话与分析入口，不预置 OpenDataWorks 专属 Skills。"
+    assert payload["allowed_tools"] == ["Read", "LS", "Glob", "Grep"]
+    assert payload["mcp_server_ids"] == []
+    assert payload["skill_folders"] == []
+    assert payload["is_default"] is True
+    assert payload["is_builtin"] is True
+
+
+def test_opendataworks_agent_payload_is_builtin_with_platform_capabilities():
+    payload = agent_profile_service.opendataworks_agent_payload()
+
+    assert payload["agent_id"] == "agent_opendataworks"
+    assert payload["name"] == "OpenDataWorks平台助手"
+    assert payload["allowed_tools"] == ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
+    assert payload["mcp_server_ids"] == ["portal"]
+    assert payload["skill_folders"] == [
+        "opendataworks-business-knowledge",
+        "opendataworks-platform-tools",
+        "opendataworks-data-dev",
+    ]
+    assert payload["is_default"] is False
+    assert payload["is_builtin"] is True
+
+
+def test_ontology_modeling_agent_payload_is_builtin_with_modeling_skill():
+    payload = agent_profile_service.ontology_modeling_agent_payload()
+
+    assert payload["agent_id"] == "agent_ontology_modeling"
+    assert payload["name"] == "本体建模助手"
+    assert payload["allowed_tools"] == ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
+    assert payload["mcp_server_ids"] == ["portal"]
+    assert payload["skill_folders"] == ["ontology-modeling-assistant"]
+    assert "本体" in payload["description"]
+    assert payload["is_default"] is False
+    assert payload["is_builtin"] is True
+
+
+def test_normalize_agent_profile_payload_accepts_scoped_runtime_config():
+    payload = agent_profile_service.normalize_agent_profile_payload(
+        {
+            "name": "质量巡检助手",
+            "description": "只处理数据质量规则和巡检结果分析。",
+            "system_prompt": "你是数据质量巡检场景的智能体。",
+            "permission_mode": "bypassPermissions",
+            "allowed_tools": ["Read", "Skill", "Read", "Grep"],
+            "mcp_server_ids": ["portal"],
+            "skill_folders": ["opendataworks-business-knowledge"],
+            "max_turns": 12,
+            "env_vars": {"AGENT_SCENE": "quality"},
+            "data_scope": {
+                "allowed_scopes": [
+                    {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
+                    {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
+                    {"cluster_id": None, "source_type": "MYSQL", "database": "opendataworks"},
+                ]
+            },
+        },
+        available_skill_folders={"opendataworks-business-knowledge", "opendataworks-platform-tools"},
+        available_mcp_server_ids={"portal"},
+    )
+
+    assert payload["name"] == "质量巡检助手"
+    assert "permission_mode" not in payload
+    assert payload["allowed_tools"] == ["Read", "Skill", "Grep"]
+    assert payload["mcp_server_ids"] == ["portal"]
+    assert payload["skill_folders"] == ["opendataworks-business-knowledge"]
+    assert payload["max_turns"] == 12
+    assert payload["env_vars"] == {"AGENT_SCENE": "quality"}
+    assert payload["data_scope"] == {
+        "allowed_scopes": [
+            {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
+            {"cluster_id": None, "source_type": "MYSQL", "database": "opendataworks"},
+        ]
+    }
+
+
+def test_normalize_agent_profile_payload_defaults_empty_data_scope_to_deny_all():
+    payload = agent_profile_service.normalize_agent_profile_payload(
+        {"name": "无数据授权智能体"},
+        available_skill_folders=set(),
+        available_mcp_server_ids=set(),
+    )
+
+    assert payload["data_scope"] == {"allowed_scopes": []}
+
+
+def test_normalize_agent_profile_payload_rejects_reserved_environment_keys():
+    with pytest.raises(ValueError, match="reserved environment variable"):
+        agent_profile_service.normalize_agent_profile_payload(
+            {
+                "name": "危险配置",
+                "env_vars": {"DATAAGENT_TOKEN": "bad"},
+            },
+            available_skill_folders=set(),
+            available_mcp_server_ids=set(),
+        )
+
+
+def test_normalize_agent_profile_payload_defaults_visibility_to_all():
+    payload = agent_profile_service.normalize_agent_profile_payload(
+        {"name": "默认可见性智能体"},
+        available_skill_folders=set(),
+        available_mcp_server_ids=set(),
+    )
+
+    assert payload["visibility"] == {"mode": "all", "allowed_users": [], "allowed_groups": []}
+
+
+def test_normalize_agent_profile_payload_accepts_visibility_scope():
+    payload = agent_profile_service.normalize_agent_profile_payload(
+        {
+            "name": "受限智能体",
+            "visibility": {
+                "mode": "selected",
+                "allowed_users": ["SSO:42", "SSO:42", " local:alice "],
+            },
+        },
+        available_skill_folders=set(),
+        available_mcp_server_ids=set(),
+    )
+
+    assert payload["visibility"] == {
+        "mode": "selected",
+        "allowed_users": ["SSO:42", "local:alice"],
+        "allowed_groups": [],
+    }
+
+
+def test_normalize_agent_profile_payload_preserves_existing_visibility_on_partial_update():
+    existing = {
+        "name": "受限智能体",
+        "visibility": {"mode": "authenticated", "allowed_users": [], "allowed_groups": []},
+    }
+    payload = agent_profile_service.normalize_agent_profile_payload(
+        {"description": "只改描述"},
+        existing=existing,
+        available_skill_folders=set(),
+        available_mcp_server_ids=set(),
+    )
+
+    assert payload["visibility"]["mode"] == "authenticated"
+
+
+def test_normalize_agent_profile_payload_rejects_invalid_visibility_mode():
+    with pytest.raises(ValueError, match="invalid visibility mode"):
+        agent_profile_service.normalize_agent_profile_payload(
+            {"name": "非法可见性", "visibility": {"mode": "vip-only"}},
+            available_skill_folders=set(),
+            available_mcp_server_ids=set(),
+        )
+
+
+def test_build_agent_snapshot_excludes_visibility():
+    snapshot = agent_profile_service.build_agent_snapshot(
+        {
+            "agent_id": "agent_scoped",
+            "name": "受限智能体",
+            "visibility": {"mode": "selected", "allowed_users": ["SSO:42"], "allowed_groups": []},
+        }
+    )
+
+    # 快照供运行时消费，可见性只在实时 profile 上强制，避免话题携带过期副本。
+    assert "visibility" not in snapshot
+
+
+def test_build_agent_snapshot_keeps_runtime_fields_without_timestamps():
+    snapshot = agent_profile_service.build_agent_snapshot(
+        {
+            "agent_id": "agent_quality",
+            "name": "质量巡检助手",
+            "description": "只处理数据质量规则和巡检结果分析。",
+            "system_prompt": "你是数据质量巡检场景的智能体。",
+            "permission_mode": "default",
+            "allowed_tools": ["Skill", "Read"],
+            "mcp_server_ids": ["portal"],
+            "skill_folders": ["opendataworks-business-knowledge"],
+            "max_turns": 8,
+            "env_vars": {"AGENT_SCENE": "quality"},
+            "data_scope": {
+                "allowed_scopes": [
+                    {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
+                ]
+            },
+            "is_default": False,
+            "is_builtin": False,
+            "created_at": "2026-05-21T10:00:00",
+            "updated_at": "2026-05-21T11:00:00",
+        }
+    )
+
+    assert snapshot == {
+        "agent_id": "agent_quality",
+        "name": "质量巡检助手",
+        "description": "只处理数据质量规则和巡检结果分析。",
+        "system_prompt": "你是数据质量巡检场景的智能体。",
+        "allowed_tools": ["Skill", "Read"],
+        "mcp_server_ids": ["portal"],
+        "skill_folders": ["opendataworks-business-knowledge"],
+        "max_turns": 8,
+        "env_vars": {"AGENT_SCENE": "quality"},
+        "data_scope": {
+            "allowed_scopes": [
+                {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
+            ]
+        },
+        "is_default": False,
+        "is_builtin": False,
+    }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Database } from "lucide-react";
 import { modelingApi, workspaceRequest } from "../api/client";
 import type {
@@ -15,14 +15,23 @@ export function MappingForm({
   mapping,
   onChange,
   fieldsOnly = false,
+  suggestedSource,
 }: {
   workspaceId: string;
   type: ObjectDefinition;
   mapping: DataMapping | undefined;
   onChange: (m: DataMapping) => void;
   fieldsOnly?: boolean;
+  suggestedSource?: {
+    connection_alias: string;
+    table_name: string;
+    schema_name: string | null;
+  };
 }) {
   const [picker, setPicker] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const previewRequest = useRef(0);
+  const [sourceApplied, setSourceApplied] = useState(false);
   const [columns, setColumns] = useState<DataTable["columns"]>([]);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Record<string, unknown>[] | null>(
@@ -32,15 +41,25 @@ export function MappingForm({
   // workspace configuration, resolved here only to read columns and preview.
   const [connections, setConnections] = useState<DataConnection[]>([]);
   useEffect(() => {
+    let active = true;
+    setConnections([]);
     modelingApi
       .connections(workspaceId)
-      .then((r) => setConnections(r.items))
-      .catch(() => setConnections([]));
+      .then((r) => {
+        if (active) setConnections(r.items);
+      })
+      .catch(() => {
+        if (active) setConnections([]);
+      });
+    return () => {
+      active = false;
+    };
   }, [workspaceId]);
   const alias = mapping?.connection_alias;
   const connectionId = connections.find((c) => c.name === alias)?.id;
   const tableName = mapping?.table_name;
   useEffect(() => {
+    let active = true;
     setColumns([]);
     setPreview(null);
     setError("");
@@ -50,13 +69,71 @@ export function MappingForm({
       "/connections/" +
         connectionId +
         "/tables?table=" +
-        encodeURIComponent(tableName),
+        encodeURIComponent(tableName) +
+        (mapping?.schema_name
+          ? "&schema_name=" + encodeURIComponent(mapping.schema_name)
+          : ""),
     )
-      .then((r) => setColumns(r.items[0]?.columns ?? []))
-      .catch((e: Error) => setError(e.message));
-  }, [connectionId, tableName, workspaceId]);
+      .then((r) => {
+        if (active) setColumns(r.items[0]?.columns ?? []);
+      })
+      .catch((e: Error) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [connectionId, tableName, workspaceId, mapping?.schema_name]);
+  useEffect(() => {
+    const request = previewRequest;
+    request.current++;
+    setPreview(null);
+    setPreviewing(false);
+    return () => {
+      request.current++;
+    };
+  }, [workspaceId, mapping]);
   return (
     <div className="mapping-form">
+      {!fieldsOnly && suggestedSource && !sourceApplied && (
+        <div className="mapping-source-choice">
+          <p>
+            来自数据资产：{suggestedSource.connection_alias} /{" "}
+            {suggestedSource.schema_name
+              ? suggestedSource.schema_name + "."
+              : ""}
+            {suggestedSource.table_name}
+          </p>
+          <p className="muted">
+            {mapping
+              ? "应用后将替换下方映射，请重新选择唯一且非空的标识字段和属性。保存草稿后才会写入。"
+              : "应用后选择唯一且非空的标识字段和属性，再保存草稿。"}
+          </p>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => {
+              onChange({
+                id: mapping?.id ?? crypto.randomUUID(),
+                type_id: type.id,
+                ...suggestedSource,
+                key_column: "",
+                fields: {},
+              });
+              setSourceApplied(true);
+            }}
+          >
+            使用此数据表{mapping ? "替换映射" : "配置映射"}
+          </button>
+          <button
+            type="button"
+            className="button button--text"
+            onClick={() => setSourceApplied(true)}
+          >
+            保留当前配置
+          </button>
+        </div>
+      )}
       {!fieldsOnly && (
         <>
           <h2>数据映射</h2>
@@ -70,7 +147,12 @@ export function MappingForm({
           >
             <Database size={22} />
             <span>
-              <strong>{mapping?.table_name || "选择数据表"}</strong>
+              <strong>
+                {mapping
+                  ? (mapping.schema_name ? mapping.schema_name + "." : "") +
+                    mapping.table_name
+                  : "选择数据表"}
+              </strong>
               <small>
                 {mapping
                   ? "数据源 " + mapping.connection_alias + " · 点击更换数据集"
@@ -113,13 +195,16 @@ export function MappingForm({
               onClick={() =>
                 onChange({
                   ...mapping,
-                  fields: Object.fromEntries(
-                    type.attributes
-                      .filter((a) =>
-                        columns.some((c) => c.name === a.technical_name),
-                      )
-                      .map((a) => [a.technical_name, a.technical_name]),
-                  ),
+                  fields: {
+                    ...mapping.fields,
+                    ...Object.fromEntries(
+                      type.attributes
+                        .filter((a) =>
+                          columns.some((c) => c.name === a.technical_name),
+                        )
+                        .map((a) => [a.technical_name, a.technical_name]),
+                    ),
+                  },
                 })
               }
             >
@@ -165,19 +250,28 @@ export function MappingForm({
           <button
             type="button"
             className="button button--secondary"
-            disabled={!mapping.key_column}
+            disabled={!mapping.key_column || !connectionId || previewing}
             onClick={() => {
+              const current = ++previewRequest.current;
               setError("");
+              setPreviewing(true);
               workspaceRequest<{ items: Record<string, unknown>[] }>(
                 workspaceId,
                 "/mapping-preview",
                 { mapping, limit: 5 },
               )
-                .then((r) => setPreview(r.items))
-                .catch((e: Error) => setError(e.message));
+                .then((r) => {
+                  if (current === previewRequest.current) setPreview(r.items);
+                })
+                .catch((e: Error) => {
+                  if (current === previewRequest.current) setError(e.message);
+                })
+                .finally(() => {
+                  if (current === previewRequest.current) setPreviewing(false);
+                });
             }}
           >
-            预览 5 条数据
+            {previewing ? "正在读取…" : "预览 5 条数据"}
           </button>
           {preview && (
             <div className="preview-scroll">

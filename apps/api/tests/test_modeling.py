@@ -171,7 +171,7 @@ def test_mcp_discover_list_call_and_notification(client):
     assert discover.json()["result"]["supportedVersions"] == ["2026-07-28"]
     assert discover.json()["result"]["resultType"] == "complete"
     tools = mcp_request(client, "tools/list").json()["result"]["tools"]
-    assert len(tools) == 5
+    assert len(tools) == 8
     result = mcp_request(client, "tools/call", {"name": "get_ontology_version"}).json()
     assert result["result"]["isError"] is False
     assert (
@@ -248,70 +248,6 @@ def test_mcp_version_negotiation_and_required_metadata(client):
     assert response.json()["error"]["code"] == -32602
 
 
-def test_agent_contract_returns_candidates_before_accepting(client, monkeypatch):
-    from ontofoundry_api.services import agent
-
-    client.app.state.settings.anthropic_base_url = "https://model.example.invalid"
-    client.app.state.settings.anthropic_model = "contract-test"
-    s = create_session(client)
-    original = deepcopy(s["draft"])
-    proposal = {
-        "id": str(uuid4()),
-        "name": "仓库",
-        "technical_name": "warehouse",
-        "description": "保管物料的设施",
-        "tags": [],
-        "attributes": [],
-    }
-
-    async def fake_model(settings, messages, modeling):
-        assert modeling is True
-        assert "user_request" in messages[-1]["content"]
-        return {
-            "content": [
-                {
-                    "type": "tool_use",
-                    "name": "propose_ontology",
-                    "input": {
-                        "summary": "识别仓库概念",
-                        "candidates": [
-                            {
-                                "kind": "object_type",
-                                "value": proposal,
-                                "reason": "用户明确描述了仓库",
-                            }
-                        ],
-                    },
-                }
-            ]
-        }
-
-    monkeypatch.setattr(agent, "call_model", fake_model)
-    response = client.post(
-        ROOT + "/sessions/" + s["id"] + "/messages",
-        json={
-            "revision": s["revision"],
-            "content": "开始建模：仓库保管物料",
-            "mode": "model",
-        },
-    )
-    assert response.status_code == 202, response.text
-    ready = client.get(ROOT + "/sessions/" + s["id"]).json()
-    assert ready["task_status"] == "completed", ready
-    assert ready["draft"] == original
-    accepted = client.post(
-        ROOT + "/sessions/" + s["id"] + "/candidates",
-        json={
-            "revision": ready["revision"],
-            "ids": [ready["candidates"][0]["id"]],
-            "action": "accept",
-        },
-    )
-    assert accepted.status_code == 200, accepted.text
-    assert len(accepted.json()["draft"]["object_types"]) == 6
-    assert client.get(ONTOLOGY + "/version").json()["version"] == 1
-
-
 def test_candidate_cannot_overwrite_later_manual_edit(client):
     s = create_session(client)
     before = deepcopy(s["draft"]["object_types"][0])
@@ -338,54 +274,3 @@ def test_candidate_cannot_overwrite_later_manual_edit(client):
     assert result.status_code == 200
     assert result.json()["draft"]["object_types"][0]["description"] == "人工修改"
     assert result.json()["candidates"][0]["conflict"]
-
-
-def test_late_cancelled_run_cannot_overwrite_a_new_run(client, monkeypatch):
-    import asyncio
-
-    from ontofoundry_api.services import agent
-
-    s = create_session(client)
-    with client.app.state.session_factory() as db:
-        item = db.get(ModelingSessionRecord, s["id"])
-        item.messages_json = [{"role": "user", "content": "旧请求", "run_id": "old"}]
-        item.task_status = "queued"
-        db.commit()
-
-    async def late_response(*args):
-        with client.app.state.session_factory() as db:
-            item = db.get(ModelingSessionRecord, s["id"])
-            item.messages_json = [
-                *item.messages_json,
-                {"role": "user", "content": "新请求", "run_id": "new"},
-            ]
-            item.task_status, item.task_detail = "running", "新请求处理中"
-            db.commit()
-        return {"content": [{"type": "text", "text": "旧回复"}]}
-
-    monkeypatch.setattr(agent, "call_model", late_response)
-    asyncio.run(agent.run_agent(client.app, s["id"], "旧请求", False, "old"))
-    result = client.get(ROOT + "/sessions/" + s["id"]).json()
-    assert result["task_status"] == "running"
-    assert result["task_detail"] == "新请求处理中"
-    assert not any(m["content"] == "旧回复" for m in result["messages"])
-
-
-def test_candidate_evidence_is_an_exact_source_span():
-    from types import SimpleNamespace
-
-    import pytest
-
-    from ontofoundry_api.services.agent import quote_evidence
-
-    chunk = SimpleNamespace(
-        material_id="m", line_start=12, text="标题\n供应商交付物料。\n下一行"
-    )
-    assert quote_evidence(chunk, "供应商交付物料。")[0] == {
-        "material_id": "m",
-        "line_start": 13,
-        "line_end": 13,
-        "quote": "供应商交付物料。",
-    }
-    with pytest.raises(ValueError, match="不在当前材料"):
-        quote_evidence(chunk, "虚构引用")

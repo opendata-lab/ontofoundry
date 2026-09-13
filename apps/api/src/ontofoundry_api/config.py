@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,10 +14,13 @@ class Settings(BaseSettings):
     )
 
     environment: Literal["development", "test", "production"] = "development"
-    database_url: str = "sqlite+pysqlite:///./ontofoundry.db"
+    database_url: str = (
+        "postgresql+psycopg://ontofoundry:ontofoundry@127.0.0.1:5432/ontofoundry"
+    )
     data_dir: Path = Path("./.data/files")
     web_dist: Path | None = None
-    auto_create_schema: bool = True
+    # Test-only escape hatch. Deployed schemas are owned by the unified Alembic chain.
+    auto_create_schema: bool = False
     seed_demo: bool = True
     auth_mode: Literal["dev", "oauth"] = "dev"
     session_secret: str = "development-only-session-secret-change-me"
@@ -32,12 +35,13 @@ class Settings(BaseSettings):
     oauth_client_id: str = ""
     oauth_client_secret: str = ""
     oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/callback"
-    anthropic_base_url: str = ""
-    anthropic_api_key: str = ""
-    anthropic_model: str = ""
+    # Complete agent execution lives in the vendored DataAgent + Pi service.
+    dataagent_base_url: str = ""
+    dataagent_agent_id: str = "agent_ontofoundry"
+    dataagent_request_timeout_seconds: int = Field(default=30, gt=0)
+    dataagent_execution_mode: Literal["interactive", "background", "auto"] = "auto"
     connection_key: str = ""
     max_file_mb: int = 256
-    model_context_chars: int = 16000
 
     @property
     def cors_origin_list(self) -> list[str]:
