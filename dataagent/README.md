@@ -2,8 +2,12 @@
 
 本目录是 OntoFoundry 的 Agent 控制面和 Pi 执行时实现：
 
-- `dataagent-backend`：Agent master 实现，负责 Topic、Task、Message、文件工作区、调度、取消、恢复、AgentEvent SSE 与 Pi gateway；发布镜像名为 `of-agent-master`。
-- `dataagent-backend/Dockerfile.runner`：Agent sandbox worker 镜像，发布名为 `of-agent-worker`。
+Agent master（Topic、Task、Message、文件工作区、调度、取消、恢复、AgentEvent SSE
+与 Pi gateway）已并入统一 Python 后端，位于 `apps/api/src/dataagent_backend`，与
+`ontofoundry_api` 同进程运行，镜像由 `apps/api/Dockerfile` 构建，发布名仍为
+`of-agent-master`。本目录现在只保留执行引擎与契约：
+
+- `../apps/api/Dockerfile.runner`：Agent sandbox worker 镜像，发布名为 `of-agent-worker`。
 - `dataagent-runtime-pi`：唯一 Agent 执行引擎，Node.js 22.19+，通过 stdio 与后端通信。
 - `contracts`：AgentEvent、任务状态和工作区边界契约。
 - `.claude/skills`：Pi 沿用的 Skill 发现目录；不表示依赖 Claude Agent SDK。

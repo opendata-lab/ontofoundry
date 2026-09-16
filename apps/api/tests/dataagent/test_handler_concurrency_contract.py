@@ -26,11 +26,19 @@ import pytest
 
 import dataagent_backend
 
-BACKEND_ROOT = Path(dataagent_backend.__file__).resolve().parent
+from conftest import PACKAGE_ROOT
 
+# 合并之后这条约束必须覆盖同一进程里的每一个路由模块：一个长任务占住事件
+# 循环，拖慢的不再只是 DataAgent 自己的请求，而是包括本体编辑在内的所有请求。
 ROUTE_MODULES = [
-    "api/admin_routes.py",
-]
+    PACKAGE_ROOT / "api" / "admin_routes.py",
+    PACKAGE_ROOT / "api" / "routes.py",
+    PACKAGE_ROOT / "api" / "auth_routes.py",
+] + sorted(
+    f
+    for f in (PACKAGE_ROOT.parent / "ontofoundry_api" / "api").glob("*.py")
+    if f.name != "__init__.py"  # 包标记文件，不承载路由
+)
 
 
 def _decorator_names(node: ast.AsyncFunctionDef) -> list[str]:
@@ -54,10 +62,9 @@ def _awaits_anything(node: ast.AsyncFunctionDef) -> bool:
     return False
 
 
-@pytest.mark.parametrize("relative_path", ROUTE_MODULES)
+@pytest.mark.parametrize("relative_path", ROUTE_MODULES, ids=lambda p: Path(p).name)
 def test_route_handlers_that_never_await_are_not_declared_async(relative_path: str):
-    module_path = BACKEND_ROOT / relative_path
-    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    tree = ast.parse(Path(relative_path).read_text(encoding="utf-8"))
 
     offenders = [
         f"{node.name} (:{node.lineno})"
@@ -74,15 +81,14 @@ def test_route_handlers_that_never_await_are_not_declared_async(relative_path: s
     )
 
 
-@pytest.mark.parametrize("relative_path", ROUTE_MODULES)
+@pytest.mark.parametrize("relative_path", ROUTE_MODULES, ids=lambda p: Path(p).name)
 def test_the_contract_still_sees_route_handlers(relative_path: str):
     """Fail loudly if the decorator convention changes and the check goes blind.
 
     A check that silently matches nothing always passes, which is worse than
     having no check at all.
     """
-    module_path = BACKEND_ROOT / relative_path
-    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    tree = ast.parse(Path(relative_path).read_text(encoding="utf-8"))
 
     handlers = [
         node
