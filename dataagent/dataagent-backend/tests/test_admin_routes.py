@@ -30,20 +30,10 @@ def test_admin_settings_contract(monkeypatch):
             "anthropic_api_key": "k",
             "anthropic_auth_token": "t",
             "anthropic_base_url": "https://example.com",
-            "mysql_host": "127.0.0.1",
-            "mysql_port": 3306,
-            "mysql_user": "root",
-            "mysql_password": "pwd",
-            "mysql_database": "opendataworks",
-            "doris_host": "127.0.0.1",
-            "doris_port": 9030,
-            "doris_user": "root",
-            "doris_password": "pwd",
-            "doris_database": "ods",
-            "skills_output_dir": "../.claude/skills/opendataworks-business-knowledge",
+            "skills_output_dir": "../.claude/skills/md2ossie",
         },
     )
-    monkeypatch.setattr(admin_routes, "resolve_skills_root_dir", lambda: "/tmp/.claude/skills/opendataworks-business-knowledge")
+    monkeypatch.setattr(admin_routes, "resolve_skills_root_dir", lambda: "/tmp/.claude/skills/md2ossie")
     monkeypatch.setattr(
         admin_routes,
         "_provider_catalog",
@@ -77,14 +67,14 @@ def test_admin_settings_contract(monkeypatch):
 
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql-admin/settings")
+    response = client.get("/api/v1/agent-admin/settings")
     assert response.status_code == 200
     assert response.json()["provider_id"] == "openrouter"
     assert response.json()["providers"][0]["supports_partial_messages"] is False
     assert response.json()["providers"][0]["model_detections"]["anthropic/claude-sonnet-4.5"]["status"] == "verified"
 
     update = client.put(
-        "/api/v1/nl2sql-admin/settings",
+        "/api/v1/agent-admin/settings",
         json={
             "provider_id": "openrouter",
             "model": "anthropic/claude-sonnet-4.5",
@@ -120,7 +110,7 @@ def test_model_detection_route_contract(monkeypatch):
 
     client = TestClient(app)
     response = client.post(
-        "/api/v1/nl2sql-admin/model-detections",
+        "/api/v1/agent-admin/model-detections",
         json={
             "provider_id": "openrouter",
             "model": "anthropic/claude-sonnet-4.5",
@@ -196,9 +186,9 @@ def test_mcp_registry_routes_contract(monkeypatch):
 def test_skill_document_routes_contract(monkeypatch):
     summary = {
         "id": 1,
-        "folder": "opendataworks-platform-tools",
-        "relative_path": "reference/40-runtime-metadata.md",
-        "file_name": "40-runtime-metadata.md",
+        "folder": "md2ossie",
+        "relative_path": "references/methodology-and-pitfalls.md",
+        "file_name": "methodology-and-pitfalls.md",
         "category": "reference",
         "content_type": "markdown",
         "source": "bundled",
@@ -305,8 +295,8 @@ def test_skill_document_routes_contract(monkeypatch):
 
     list_response = client.get("/api/v1/dataagent/skills/documents")
     assert list_response.status_code == 200
-    assert list_response.json()[0]["folder"] == "opendataworks-platform-tools"
-    assert list_response.json()[0]["relative_path"] == "reference/40-runtime-metadata.md"
+    assert list_response.json()[0]["folder"] == "md2ossie"
+    assert list_response.json()[0]["relative_path"] == "references/methodology-and-pitfalls.md"
     assert list_response.json()[0]["source"] == "bundled"
     assert list_response.json()[0]["enabled"] is True
     assert list_response.json()[0]["editable"] is True
@@ -333,12 +323,12 @@ def test_skill_document_routes_contract(monkeypatch):
     assert rollback_response.status_code == 200
     assert rollback_response.json()["id"] == 1
 
-    runtime_response = client.put("/api/v1/dataagent/skills/runtime/opendataworks-business-knowledge", json={"enabled": True})
+    runtime_response = client.put("/api/v1/dataagent/skills/runtime/md2ossie", json={"enabled": True})
     assert runtime_response.status_code == 200
-    assert runtime_response.json()["skill_id"] == "opendataworks-business-knowledge"
+    assert runtime_response.json()["skill_id"] == "md2ossie"
     assert runtime_response.json()["enabled"] is True
 
-    runtime_disable_response = client.put("/api/v1/dataagent/skills/runtime/opendataworks-business-knowledge", json={"enabled": False})
+    runtime_disable_response = client.put("/api/v1/dataagent/skills/runtime/md2ossie", json={"enabled": False})
     assert runtime_disable_response.status_code == 200
     assert runtime_disable_response.json()["enabled"] is False
 
@@ -368,7 +358,7 @@ def test_skill_uninstall_route_rejects_service_errors(monkeypatch):
     monkeypatch.setattr(admin_routes, "uninstall_skill", _reject_uninstall)
 
     client = TestClient(app)
-    response = client.delete("/api/v1/dataagent/skills/opendataworks-business-knowledge")
+    response = client.delete("/api/v1/dataagent/skills/md2ossie")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "内置 Skill 不支持卸载"
@@ -382,7 +372,7 @@ def test_agent_profile_routes_contract(monkeypatch):
         "system_prompt": "只回答营销问题",
         "permission_mode": "inherit",
         "allowed_tools": ["Skill", "Read"],
-        "mcp_server_ids": ["portal"],
+        "mcp_server_ids": ["catalog"],
         "skill_folders": ["marketing-insights"],
         "max_turns": 12,
         "env_vars": {"SAFE_FLAG": "1"},
@@ -414,7 +404,7 @@ def test_agent_profile_routes_contract(monkeypatch):
     )
     monkeypatch.setattr(admin_routes, "agent_capabilities", lambda documents: {
         "tools": ["Skill", "Read"],
-        "mcp_servers": [{"id": "portal", "name": "Portal MCP", "enabled": True, "tool_names": ["portal_query_readonly"]}],
+        "mcp_servers": [{"id": "catalog", "name": "Catalog MCP", "enabled": True, "tool_names": ["search_catalog"]}],
         "skills": [{"folder": "marketing-insights", "source": "managed", "enabled": True}],
         "permission_modes": ["inherit", "default", "bypassPermissions"],
     })
@@ -436,7 +426,7 @@ def test_agent_profile_routes_contract(monkeypatch):
     capabilities = client.get("/api/v1/dataagent/agents/capabilities")
     assert capabilities.status_code == 200
     assert capabilities.json()["skills"][0]["folder"] == "marketing-insights"
-    assert capabilities.json()["mcp_servers"][0]["id"] == "portal"
+    assert capabilities.json()["mcp_servers"][0]["id"] == "catalog"
 
     listed = client.get("/api/v1/dataagent/agents")
     assert listed.status_code == 200
@@ -448,7 +438,7 @@ def test_agent_profile_routes_contract(monkeypatch):
         json={
             "name": "营销分析智能体",
             "allowed_tools": ["Skill", "Read"],
-            "mcp_server_ids": ["portal"],
+            "mcp_server_ids": ["catalog"],
             "skill_folders": ["marketing-insights"],
             "env_vars": {"SAFE_FLAG": "1"},
         },
@@ -503,7 +493,7 @@ class _FakeWidgetStore:
                     "title": "嵌入站会话",
                     "chat_topic_id": "chat_1",
                     "chat_conversation_id": "conv_1",
-                    "agent_id": "agent_default",
+                    "agent_id": "agent_ontofoundry",
                     "current_task_id": None,
                     "current_task_status": None,
                     "message_count": 4,
@@ -543,7 +533,7 @@ def test_admin_widget_topics_routes_contract(monkeypatch):
     client = TestClient(app)
 
     listing = client.get(
-        "/api/v1/nl2sql-admin/widget-topics",
+        "/api/v1/agent-admin/widget-topics",
         params={"website_id": "site_a", "keyword": "嵌入", "page": 1, "page_size": 20},
     )
     assert listing.status_code == 200
@@ -557,13 +547,13 @@ def test_admin_widget_topics_routes_contract(monkeypatch):
     assert store.list_calls[0]["website_id"] == "site_a"
     assert store.list_calls[0]["keyword"] == "嵌入"
 
-    messages = client.get("/api/v1/nl2sql-admin/widget-topics/topic_widget_1/messages")
+    messages = client.get("/api/v1/agent-admin/widget-topics/topic_widget_1/messages")
     assert messages.status_code == 200
     assert messages.json()["topic_id"] == "topic_widget_1"
     # Admin message read bypasses owner isolation via context=None.
     assert store.message_calls[0]["context"] is None
 
-    missing = client.get("/api/v1/nl2sql-admin/widget-topics/unknown/messages")
+    missing = client.get("/api/v1/agent-admin/widget-topics/unknown/messages")
     assert missing.status_code == 404
 
 
@@ -608,15 +598,15 @@ def test_admin_routes_require_admin_when_auth_enabled(monkeypatch, tmp_path):
         client = TestClient(app)
 
         # 未登录 → 401
-        assert client.get("/api/v1/nl2sql-admin/settings").status_code == 401
-        assert client.get("/api/v1/nl2sql-admin/widget-topics").status_code == 401
-        assert client.get("/api/v1/nl2sql-admin/topics").status_code == 401
+        assert client.get("/api/v1/agent-admin/settings").status_code == 401
+        assert client.get("/api/v1/agent-admin/widget-topics").status_code == 401
+        assert client.get("/api/v1/agent-admin/topics").status_code == 401
         assert client.get("/api/v1/dataagent/skills/documents").status_code == 401
         assert client.post("/api/v1/dataagent/agents", json={"name": "x"}).status_code == 401
 
         # 普通用户 → 403
         user_headers = _bearer(auth, role="user")
-        assert client.get("/api/v1/nl2sql-admin/topics", headers=user_headers).status_code == 403
+        assert client.get("/api/v1/agent-admin/topics", headers=user_headers).status_code == 403
         assert client.get("/api/v1/dataagent/skills/documents", headers=user_headers).status_code == 200
         assert client.put(
             "/api/v1/dataagent/skills/runtime/demo",
@@ -626,7 +616,7 @@ def test_admin_routes_require_admin_when_auth_enabled(monkeypatch, tmp_path):
 
         # admin → 放行
         admin_headers = _bearer(auth, role="admin")
-        listing = client.get("/api/v1/nl2sql-admin/topics", headers=admin_headers)
+        listing = client.get("/api/v1/agent-admin/topics", headers=admin_headers)
         assert listing.status_code == 200
         assert store.list_calls[0]["source"] == ""
     finally:
@@ -642,7 +632,7 @@ def test_agent_responses_are_layered_by_authentication(monkeypatch, tmp_path):
             "description": "readable",
             "system_prompt": "internal instructions",
             "allowed_tools": ["Read"],
-            "mcp_server_ids": ["portal"],
+            "mcp_server_ids": ["catalog"],
             "skill_folders": ["demo"],
             "data_scope": {"allowed_scopes": [{"database": "ads"}]},
             "env_vars": {"SECRET_TOKEN": "hidden"},
@@ -668,7 +658,7 @@ def test_agent_responses_are_layered_by_authentication(monkeypatch, tmp_path):
         readable = client.get("/api/v1/dataagent/agents/agent_1/profile", headers=user_headers)
         assert readable.status_code == 200
         assert readable.json()["system_prompt"] == "internal instructions"
-        assert readable.json()["mcp_server_ids"] == ["portal"]
+        assert readable.json()["mcp_server_ids"] == ["catalog"]
         assert readable.json()["data_scope"]["allowed_scopes"][0]["database"] == "ads"
         assert "env_vars" not in readable.json()
 
@@ -716,7 +706,7 @@ def test_admin_all_topics_forwards_filters(monkeypatch, tmp_path):
         client = TestClient(app)
 
         response = client.get(
-            "/api/v1/nl2sql-admin/topics",
+            "/api/v1/agent-admin/topics",
             params={"source": "portal", "auth_user_id": "SSO:42", "keyword": "趋势"},
             headers=_bearer(auth, role="admin"),
         )
@@ -726,7 +716,7 @@ def test_admin_all_topics_forwards_filters(monkeypatch, tmp_path):
         assert store.list_calls[0]["keyword"] == "趋势"
 
         bad_source = client.get(
-            "/api/v1/nl2sql-admin/topics",
+            "/api/v1/agent-admin/topics",
             params={"source": "evil"},
             headers=_bearer(auth, role="admin"),
         )
@@ -763,7 +753,7 @@ def test_agent_visibility_scope_enforced_across_read_tiers(monkeypatch, tmp_path
         monkeypatch.setattr(admin_routes, "get_agent_profile", lambda agent_id: by_id.get(agent_id))
         client = TestClient(app)
 
-        spa = {"X-ODW-Client": "dataagent"}
+        spa = {"X-OF-Client": "dataagent"}
         user_headers = {**_bearer(auth, role="user"), **spa}
         admin_headers = {**_bearer(auth, role="admin"), **spa}
 
@@ -837,13 +827,13 @@ def test_admin_auth_users_route_contract(monkeypatch, tmp_path):
         monkeypatch.setattr(admin_routes, "get_topic_task_store", lambda: _FakeAuthUserStore())
         client = TestClient(app)
 
-        assert client.get("/api/v1/nl2sql-admin/auth-users").status_code == 401
+        assert client.get("/api/v1/agent-admin/auth-users").status_code == 401
         assert (
-            client.get("/api/v1/nl2sql-admin/auth-users", headers=_bearer(auth, role="user")).status_code == 403
+            client.get("/api/v1/agent-admin/auth-users", headers=_bearer(auth, role="user")).status_code == 403
         )
 
         response = client.get(
-            "/api/v1/nl2sql-admin/auth-users",
+            "/api/v1/agent-admin/auth-users",
             params={"keyword": "ali", "limit": 20},
             headers=_bearer(auth, role="admin"),
         )

@@ -522,7 +522,7 @@ def capabilities(
         "model": "DataAgent · Pi" if config.dataagent_base_url else "",
         "max_file_mb": config.max_file_mb,
         "connections_configured": bool(config.connection_key),
-        "skills": ["md2ossie", "ontofoundry-modeling-assistant"],
+        "skills": ["md2ossie"],
     }
 
 

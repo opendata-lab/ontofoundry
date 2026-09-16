@@ -1,6 +1,6 @@
 """认证路由：本地管理员密码登录 + OAuth2 授权码登录。
 
-登录相关接口复用 ``/api/v1/nl2sql/auth`` 前缀；OAuth 回调遵循 FAB/Superset
+登录相关接口复用 ``/api/v1/agent/auth`` 前缀；OAuth 回调遵循 FAB/Superset
 约定，单独暴露为根路径 ``/oauth-authorized/{provider}``。
 auth 关闭（env 未设置或显式 AUTH_ENABLED=False）时各端点安全降级：
 ``/config`` 返回 ``enabled=false``，其余登录端点返回 404。
@@ -34,7 +34,7 @@ from core.auth import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/nl2sql/auth", tags=["auth"])
+router = APIRouter(prefix="/api/v1/agent/auth", tags=["auth"])
 oauth_callback_router = APIRouter(tags=["auth"])
 
 _OAUTH_HTTP_TIMEOUT_SECONDS = 15.0

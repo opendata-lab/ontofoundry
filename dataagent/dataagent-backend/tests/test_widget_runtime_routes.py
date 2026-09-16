@@ -114,7 +114,7 @@ def install_widget_settings(monkeypatch, *, allow_anonymous=False):
         lambda: SimpleNamespace(
             llm_provider="openrouter",
             claude_model="claude-opus-4-6",
-            skills_output_dir="../.claude/skills/opendataworks-business-knowledge",
+            skills_output_dir="../.claude/skills/md2ossie",
             redis_host="127.0.0.1",
             redis_port=6379,
             run_events_stream_poll_interval_seconds=1,
@@ -164,13 +164,13 @@ def install_agent_profile(monkeypatch, agent_id="agent_widget"):
 def widget_headers(user_id="u1", *, origin="https://host.example.com", visitor_id=""):
     headers = {
         "Origin": origin,
-        "X-ODW-Client": "widget",
-        "X-ODW-Website-Id": "demo",
+        "X-OF-Client": "widget",
+        "X-OF-Website-Id": "demo",
     }
     if user_id:
-        headers["X-ODW-User-Id"] = user_id
+        headers["X-OF-User-Id"] = user_id
     if visitor_id:
-        headers["X-ODW-Visitor-Id"] = visitor_id
+        headers["X-OF-Visitor-Id"] = visitor_id
     return headers
 
 
@@ -178,7 +178,7 @@ def test_portal_requests_keep_using_unified_runtime_routes_with_portal_context(m
     store = install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/topics")
+    response = client.get("/api/v1/agent/topics")
 
     assert response.status_code == 200
     context = store.calls[-1][1]
@@ -193,7 +193,7 @@ def test_widget_requests_pass_website_and_user_context_to_unified_routes(monkeyp
     store = install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/topics", headers=widget_headers("user-123"))
+    response = client.get("/api/v1/agent/topics", headers=widget_headers("user-123"))
 
     assert response.status_code == 200
     context = store.calls[-1][1]
@@ -209,7 +209,7 @@ def test_widget_topic_list_passes_agent_filter(monkeypatch):
     client = TestClient(app)
 
     response = client.get(
-        "/api/v1/nl2sql/topics?agent_id=agent_widget",
+        "/api/v1/agent/topics?agent_id=agent_widget",
         headers=widget_headers("user-123"),
     )
 
@@ -225,7 +225,7 @@ def test_widget_topic_create_requires_explicit_agent_id(monkeypatch):
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/topics",
+        "/api/v1/agent/topics",
         headers=widget_headers("user-123"),
         json={"title": "Widget 会话"},
     )
@@ -241,7 +241,7 @@ def test_widget_topic_create_uses_requested_agent_snapshot(monkeypatch):
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/topics",
+        "/api/v1/agent/topics",
         headers=widget_headers("user-123"),
         json={"title": "Widget 会话", "agent_id": "agent_widget"},
     )
@@ -260,7 +260,7 @@ def test_widget_requests_fall_back_to_visitor_context_without_user_id(monkeypatc
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/topics",
+        "/api/v1/agent/topics",
         headers=widget_headers("", visitor_id="visitor-abc"),
         json={"title": "匿名访客", "agent_id": "agent_widget"},
     )
@@ -280,7 +280,7 @@ def test_widget_requests_reject_visitor_when_anonymous_access_is_disabled(monkey
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/topics",
+        "/api/v1/agent/topics",
         headers=widget_headers("", visitor_id="visitor-abc"),
         json={"title": "匿名访客", "agent_id": "agent_widget"},
     )
@@ -298,7 +298,7 @@ def test_widget_requests_without_identity_require_login(monkeypatch):
     store = install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/topics", headers=widget_headers(""))
+    response = client.get("/api/v1/agent/topics", headers=widget_headers(""))
 
     assert response.status_code == 401
     assert response.json()["detail"]["code"] == "WIDGET_LOGIN_REQUIRED"
@@ -311,7 +311,7 @@ def test_widget_origin_must_match_allowed_site(monkeypatch):
     client = TestClient(app)
 
     response = client.get(
-        "/api/v1/nl2sql/topics",
+        "/api/v1/agent/topics",
         headers=widget_headers("user-123", origin="https://evil.example.com"),
     )
 
@@ -323,7 +323,7 @@ def test_widget_cannot_access_task_outside_its_context(monkeypatch):
     install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/tasks/task-forbidden", headers=widget_headers("user-123"))
+    response = client.get("/api/v1/agent/tasks/task-forbidden", headers=widget_headers("user-123"))
 
     assert response.status_code == 404
 
@@ -343,7 +343,7 @@ def test_widget_events_accepted_with_valid_widget_headers(monkeypatch):
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/widget-events",
+        "/api/v1/agent/widget-events",
         headers=widget_headers("u1"),
         json={"events": [{"event_type": "widget_open"}, {"event_type": "message_send", "payload": {"length": 5}}]},
     )
@@ -362,9 +362,9 @@ def test_widget_events_rejected_without_widget_client_header(monkeypatch):
     install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    # No X-ODW-Client: widget header → 400 (missing website_id)
+    # No X-OF-Client: widget header → 400 (missing website_id)
     response = client.post(
-        "/api/v1/nl2sql/widget-events",
+        "/api/v1/agent/widget-events",
         json={"events": [{"event_type": "widget_open"}]},
     )
 
@@ -380,12 +380,12 @@ def test_widget_events_rejected_when_site_not_allowed(monkeypatch):
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/widget-events",
+        "/api/v1/agent/widget-events",
         headers={
             "Origin": "https://evil.example.com",
-            "X-ODW-Client": "widget",
-            "X-ODW-Website-Id": "demo",
-            "X-ODW-User-Id": "u1",
+            "X-OF-Client": "widget",
+            "X-OF-Website-Id": "demo",
+            "X-OF-User-Id": "u1",
         },
         json={"events": [{"event_type": "widget_open"}]},
     )
@@ -399,7 +399,7 @@ def test_widget_events_empty_batch_returns_zero(monkeypatch):
     client = TestClient(app)
 
     response = client.post(
-        "/api/v1/nl2sql/widget-events",
+        "/api/v1/agent/widget-events",
         headers=widget_headers("u1"),
         json={"events": []},
     )
@@ -430,13 +430,11 @@ def test_runtime_config_returns_safe_enabled_provider_subset(monkeypatch):
                     "base_url": "https://openrouter.ai/api",
                 }
             ],
-            "mysql_host": "127.0.0.1",
-            "mysql_database": "opendataworks",
         },
     )
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/runtime-config")
+    response = client.get("/api/v1/agent/runtime-config")
 
     assert response.status_code == 200
     payload = response.json()
@@ -447,7 +445,6 @@ def test_runtime_config_returns_safe_enabled_provider_subset(monkeypatch):
     assert "api_key_set" not in payload["providers"][0]
     assert "auth_token_set" not in payload["providers"][0]
     assert "base_url" not in payload["providers"][0]
-    assert "mysql_host" not in payload
 
 
 # ---------------------------------------------------------------------------
@@ -490,7 +487,7 @@ def test_unmarked_client_with_session_cookie_stays_anonymous_portal(monkeypatch,
         store = install_fake_store(monkeypatch)
         client = TestClient(app)
 
-        response = client.get("/api/v1/nl2sql/topics", cookies=_session_cookie(auth))
+        response = client.get("/api/v1/agent/topics", cookies=_session_cookie(auth))
         assert response.status_code == 200
         context = store.calls[-1][1]
         assert context["source"] == "portal"
@@ -507,7 +504,7 @@ def test_widget_client_with_stray_session_cookie_keeps_widget_context(monkeypatc
         client = TestClient(app)
 
         response = client.get(
-            "/api/v1/nl2sql/topics",
+            "/api/v1/agent/topics",
             headers=widget_headers("user-123"),
             cookies=_session_cookie(auth),
         )
@@ -527,8 +524,8 @@ def test_dataagent_client_resolves_identity_from_cookie(monkeypatch, tmp_path):
         client = TestClient(app)
 
         response = client.get(
-            "/api/v1/nl2sql/topics",
-            headers={"X-ODW-Client": "dataagent"},
+            "/api/v1/agent/topics",
+            headers={"X-OF-Client": "dataagent"},
             cookies=_session_cookie(auth, user_id="SSO:42", display_name="alice"),
         )
         assert response.status_code == 200
@@ -547,7 +544,7 @@ def test_dataagent_client_without_session_gets_401(monkeypatch, tmp_path):
         install_fake_store(monkeypatch)
         client = TestClient(app)
 
-        response = client.get("/api/v1/nl2sql/topics", headers={"X-ODW-Client": "dataagent"})
+        response = client.get("/api/v1/agent/topics", headers={"X-OF-Client": "dataagent"})
         assert response.status_code == 401
     finally:
         auth.reset_auth_for_tests()
@@ -561,7 +558,7 @@ def test_dataagent_client_is_plain_portal_when_auth_disabled(monkeypatch):
     store = install_fake_store(monkeypatch)
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/topics", headers={"X-ODW-Client": "dataagent"})
+    response = client.get("/api/v1/agent/topics", headers={"X-OF-Client": "dataagent"})
     assert response.status_code == 200
     context = store.calls[-1][1]
     assert context == {"source": "portal", "website_id": "", "external_user_id": "", "visitor_id": ""}

@@ -4,14 +4,10 @@ import re
 import uuid
 from typing import Any
 
-from config import get_settings
-from core.data_scope import encode_scope_header
 from core.runtime_registry_store import get_runtime_registry_store
 
 MCP_TRANSPORTS = {"http", "sse", "stdio"}
 MCP_SOURCES = {"configured", "plugin"}
-PORTAL_MCP_SERVER_ID = "portal"
-PORTAL_MCP_TOOL_COUNT = 6
 _SERVER_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 
@@ -154,40 +150,6 @@ def import_mcp_servers(payload: dict[str, Any]) -> int:
     return len(normalized_rows)
 
 
-def bootstrap_portal_mcp_server() -> dict[str, Any] | None:
-    """Persist the legacy environment-backed portal server exactly once.
-
-    Environment variables are an upgrade input only. Runtime resolution below
-    never falls back to them, so a database disable/edit remains authoritative.
-    """
-    cfg = get_settings()
-    store = get_runtime_registry_store()
-    existing = store.get_mcp_server(PORTAL_MCP_SERVER_ID)
-    if existing:
-        return existing
-    enabled = bool(getattr(cfg, "dataagent_portal_mcp_enabled", True))
-    url = str(getattr(cfg, "dataagent_portal_mcp_base_url", "") or "").strip()
-    token = str(getattr(cfg, "dataagent_portal_mcp_token", "") or "").strip()
-    if not enabled or not url or not token:
-        return None
-    header_name = str(getattr(cfg, "dataagent_portal_mcp_token_header_name", "") or "").strip() or "X-Portal-MCP-Token"
-    normalized = normalize_mcp_server(
-        {
-            "server_id": PORTAL_MCP_SERVER_ID,
-            "name": "Portal MCP",
-            "transport": "http",
-            "url": url.rstrip("/") + "/",
-            "headers": {header_name: token},
-            "enabled": True,
-            "oauth_required": False,
-            "tool_count": PORTAL_MCP_TOOL_COUNT,
-            "description": "OpenDataWorks 平台元数据、血缘与只读查询工具。",
-        },
-        source="plugin",
-    )
-    return store.save_mcp_server(normalized, insert_only=True)
-
-
 def available_mcp_servers() -> list[dict[str, Any]]:
     return [
         {
@@ -202,10 +164,8 @@ def available_mcp_servers() -> list[dict[str, Any]]:
 
 def resolve_runtime_mcp_servers(
     mcp_server_ids: list[str] | tuple[str, ...] | None,
-    *,
-    agent_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    raw_selected = [PORTAL_MCP_SERVER_ID] if mcp_server_ids is None else mcp_server_ids
+    raw_selected = [] if mcp_server_ids is None else mcp_server_ids
     selected = [str(item or "").strip() for item in raw_selected]
     selected_set = {item for item in selected if item}
     if not selected_set:
@@ -224,11 +184,9 @@ def resolve_runtime_mcp_servers(
                 "env": dict(row.get("env") or {}),
             }
             continue
-        headers = dict(row.get("headers") or {})
-        if server_id == PORTAL_MCP_SERVER_ID and agent_snapshot is not None:
-            headers["X-Agent-Data-Scope"] = encode_scope_header((agent_snapshot or {}).get("data_scope") or {})
-        url = str(row.get("url") or "")
-        if server_id == PORTAL_MCP_SERVER_ID:
-            url = url.rstrip("/") + "/"
-        resolved[server_id] = {"type": transport, "url": url, "headers": headers}
+        resolved[server_id] = {
+            "type": transport,
+            "url": str(row.get("url") or ""),
+            "headers": dict(row.get("headers") or {}),
+        }
     return resolved

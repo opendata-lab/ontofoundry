@@ -5,7 +5,7 @@
 
 ## 1. 目标
 
-OntoFoundry 不再维护独立的 Agent 循环。对话编排、任务生命周期、模型调用、工具执行、运行隔离和事件持久化统一复用 OpenDataWorks 已跑通的 DataAgent 后端与 Pi TypeScript runtime。
+OntoFoundry 不再维护第二套 Agent 循环。对话编排、任务生命周期、模型调用、工具执行、运行隔离和事件持久化统一由 Agent master 与 Pi TypeScript runtime 承担。
 
 本次收敛的硬约束：
 
@@ -60,8 +60,10 @@ Pi TypeScript Cell
 
 - 保留成熟的 Topic、Task、Message、调度、取消、恢复、文件工作区和 sandbox 能力。
 - 仅调用 Pi runtime；删除 Claude Agent SDK 依赖、执行分支和 runtime kind 配置。
-- 内置 `agent_ontofoundry` profile，默认启用本体建模 Skill 和 `md2ossie`。
-- OntoFoundry profile 不挂载 OpenDataWorks Portal MCP，避免错误依赖另一套业务控制面。
+- 只内置默认的 `agent_ontofoundry` profile，并且只启用 `md2ossie`。
+- 自定义 Agent、Skill 和 MCP server 的管理入口继续暴露；不预装额外业务 Skill 或 Portal MCP。
+- MCP registry 和 Pi MCP client 保持平台无关；只有 Agent profile 显式选择的 MCP server 才会连接。
+- OntoFoundry 原生 MCP 位于 `of-api` 的 `/api/v1/ontology/workspaces/{workspace_id}/mcp`，不再增加独立代理层。
 
 ### 3.3 Pi runtime
 
@@ -150,6 +152,7 @@ DataAgent cancelled/suspended-> OntoFoundry cancelled
 - OntoFoundry 旧的进程内 Agent 主链路。
 - OntoFoundry B0.1 Worker、跨进程 runtime contracts 及其六张运行表；
 - DataAgent eval API、模型、数据集工具和四张 eval 表。
+- Portal MCP 代理、专用配置、自动 registry bootstrap、额外内置 Agent profile 和业务查询 Skill。
 
 保留：
 
@@ -166,6 +169,17 @@ DataAgent cancelled/suspended-> OntoFoundry cancelled
 
 OntoFoundry API 通过 `ONTOFOUNDRY_DATAAGENT_BASE_URL` 访问 DataAgent。生产环境应使用服务发现地址；浏览器不直接访问 DataAgent。
 
+发布镜像名固定为：
+
+| 镜像 | 职责 |
+| --- | --- |
+| `of-web` | React 前端与静态资源 |
+| `of-api` | OntoFoundry API、本体服务和平台原生 MCP |
+| `of-agent-master` | DataAgent 控制面、任务调度、AgentEvent SSE 与 Pi gateway |
+| `of-agent-worker` | sandbox worker 及 Pi 任务执行环境 |
+
+不发布 `ontofoundry-portal-mcp` 或任何 `of-portal-mcp` 镜像。PostgreSQL 和 Redis 使用官方依赖镜像，不改名为平台业务镜像。
+
 ### 8.1 技术栈与数据职责
 
 当前只有一个内部 PostgreSQL 数据库、一个 `public` schema 和一条 Alembic 迁移链：
@@ -181,7 +195,7 @@ OntoFoundry API 通过 `ONTOFOUNDRY_DATAAGENT_BASE_URL` 访问 DataAgent。生�
 
 PostgreSQL 是整个平台唯一内部关系数据库。OntoFoundry 与 DataAgent 表都位于 `public`，只保留 `public.alembic_version`；两者仍只通过 `dataagent_topic_id`、`dataagent_task_id` 做引用和最终状态投影，不做同表双写。`modeling_sessions` 是产品会话，`da_agent_task` 是可重试执行任务，两者职责不同，不是重复表。Redis 只承担队列、租约和并发协调，不保存业务真相。
 
-MySQL 与 Doris 仅作为可选外部业务数据源，由只读查询/元数据连接器按需访问；`pymysql` 依赖因此保留，但 Compose 不再启动内部 MySQL，DataAgent 的 Topic、Task、Event 和管理配置也绝不写入 MySQL。
+Agent master 不保留 MySQL/Doris 直连配置、元数据加载器或只读查询代理，也不依赖 `pymysql`。外部能力通过自定义 MCP server 接入。
 
 DataAgent 历史 MySQL 增量迁移已压平为统一 PostgreSQL baseline。全新部署直接执行 `alembic upgrade head`。既有双 schema 开发库升级时，migration 会把已知 `dataagent.da_*` 表移动到 `public`，删除旧 schema 的版本表，并拒绝覆盖同名 public 表；发现未知表时也会停止，而不是级联删除。eval 表与旧 B0.1 运行表属于明确废弃数据，会被删除，因此升级前必须备份。旧的独立 DataAgent MySQL 若有必须保留的生产历史，应先单独导出、转换和校验后再导入。
 

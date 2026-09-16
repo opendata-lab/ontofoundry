@@ -1,3 +1,4 @@
+// Generic bridge for registry-configured MCP servers.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
@@ -198,7 +199,7 @@ export async function connectMcpServers(
       const transport = createMcpTransport(server);
 
       const client = new Client(
-        { name: "opendataworks-pi-cell", version: "0.1.0" },
+        { name: "ontofoundry-pi-cell", version: "0.1.0" },
         { capabilities: {} }
       );
 

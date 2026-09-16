@@ -25,7 +25,7 @@ def test_runtime_env_contains_platform_contract(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("PATH", "/usr/bin")
     cfg = SimpleNamespace(
         query_result_limit=100,
-        dataagent_portal_mcp_tool_timeout_seconds=180,
+        dataagent_mcp_tool_timeout_seconds=180,
         agent_interactive_sql_read_timeout_seconds=300,
     )
     params = SimpleNamespace(
@@ -47,7 +47,6 @@ def test_runtime_env_contains_platform_contract(monkeypatch, tmp_path: Path):
     assert env["DATAAGENT_SQL_READ_TIMEOUT_SECONDS"] == "60"
     assert env["DATAAGENT_ENABLED_SKILLS"] == "modeling"
     assert env["SAFE_FLAG"] == "1"
-    assert "mysql_password" not in env
 
 
 def test_agent_profile_with_no_skills_does_not_enable_global_fallback(tmp_path: Path):

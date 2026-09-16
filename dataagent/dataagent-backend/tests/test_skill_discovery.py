@@ -38,7 +38,7 @@ def _write_skill(root: Path, folder: str):
 def test_discovery_paths_are_based_on_skills_root_dir(tmp_path: Path):
     project = tmp_path / "project"
     skills_root = project / ".claude" / "skills"
-    _write_skill(skills_root, "opendataworks-business-knowledge")
+    _write_skill(skills_root, "md2ossie")
     update_settings({"skills_root_dir": str(skills_root)})
 
     assert resolve_builtin_skill_root_dir() == skills_root

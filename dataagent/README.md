@@ -1,8 +1,9 @@
 # OntoFoundry DataAgent
 
-本目录从 OpenDataWorks 合并成熟的 Agent 能力，并按 OntoFoundry 边界精简：
+本目录是 OntoFoundry 的 Agent 控制面和 Pi 执行时实现：
 
-- `dataagent-backend`：Topic、Task、Message、文件工作区、调度、取消、恢复、AgentEvent SSE 与 Pi gateway。
+- `dataagent-backend`：Agent master 实现，负责 Topic、Task、Message、文件工作区、调度、取消、恢复、AgentEvent SSE 与 Pi gateway；发布镜像名为 `of-agent-master`。
+- `dataagent-backend/Dockerfile.runner`：Agent sandbox worker 镜像，发布名为 `of-agent-worker`。
 - `dataagent-runtime-pi`：唯一 Agent 执行引擎，Node.js 22.19+，通过 stdio 与后端通信。
 - `contracts`：AgentEvent、任务状态和工作区边界契约。
 - `.claude/skills`：Pi 沿用的 Skill 发现目录；不表示依赖 Claude Agent SDK。
@@ -11,14 +12,11 @@
 
 运行时没有 Claude Agent SDK 兼容分支，也没有 `pi_event` 对外协议。Pi 原始事件在后端边界统一转换成 AgentEvent v1。
 
-内部持久化只使用 PostgreSQL：OntoFoundry 与 DataAgent 共用 `public` schema，由同一张 `alembic_version` 管理。Redis 只做任务协调；MySQL/Doris 仅是可选外部数据源，不承载 Agent 状态。
+内部持久化只使用 PostgreSQL：OntoFoundry 与 DataAgent 共用 `public` schema，由同一张 `alembic_version` 管理。Redis 只做任务协调；Agent master 不包含 MySQL/Doris 直连配置或查询代理。
 
-内置 `agent_ontofoundry` profile 启用：
+系统只内置一个默认的 `agent_ontofoundry` profile，且只启用 `md2ossie` Skill。Agent、Skill 和 MCP server 的自定义管理入口保留，但不再预装其他业务 Skill。
 
-- `ontofoundry-modeling-assistant`
-- `md2ossie`
-
-该 profile 不挂载 OpenDataWorks Portal MCP。本体草稿与材料由 OntoFoundry API 上传到 topic workspace；Agent 的 JSON 交付写入 `output/`，后续仍由 OntoFoundry 校验、预览并人工接受。
+该 profile 不挂载 Portal MCP。Pi 只保留通用 MCP 客户端，OntoFoundry 自身的 MCP 由 `of-api` 内的 `/api/v1/ontology/workspaces/{workspace_id}/mcp` 提供。本体草稿与材料由 OntoFoundry API 上传到 topic workspace；Agent 的 JSON 交付写入 `output/`，后续仍由 OntoFoundry 校验、预览并人工接受。
 
 ## 本地验证
 

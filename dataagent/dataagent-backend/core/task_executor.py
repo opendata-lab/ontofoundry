@@ -15,7 +15,7 @@ from config import get_settings, resolve_workspace_scratch_dirs
 
 from core.agent_profile_service import normalize_agent_snapshot
 from core.context_governance import build_governance_settings
-from core.provider_runtime import build_provider_env, normalize_provider_id
+from core.provider_runtime import build_provider_env, normalize_api_format
 from core.runtime_support import (
     build_mcp_servers,
     build_runtime_env,
@@ -238,7 +238,6 @@ async def _execute_pi(
 
     raw_mcp_servers = build_mcp_servers(
         (agent_snapshot or {}).get("mcp_server_ids") if agent_snapshot else None,
-        agent_snapshot=agent_snapshot,
     )
     mcp_servers = [
         {
@@ -336,7 +335,11 @@ async def _execute_task_stream_local(
     del emit
     cfg = get_settings()
     runtime_target = resolve_runtime_provider_selection(params.provider_id, params.model)
-    provider_id = normalize_provider_id(runtime_target.get("provider_id"), runtime_target.get("base_url"))
+    # provider_id still names the vendor, which is all it is used for below
+    # (default model, telemetry). It no longer decides the wire protocol —
+    # api_format does, and it is stored rather than guessed from the base URL.
+    provider_id = str(runtime_target.get("provider_id") or "").strip()
+    api_format = normalize_api_format(runtime_target.get("api_format"))
     model = str(runtime_target.get("model") or cfg.claude_model or "").strip()
     if not model:
         model = default_model_for_provider(provider_id)
@@ -353,7 +356,7 @@ async def _execute_task_stream_local(
     skill_runtime = resolve_agent_skill_runtime(agent_snapshot, resolve_enabled_skill_runtime())
     system_prompt = build_system_prompt(params.database_hint, skill_runtime, agent_snapshot)
     provider_env = build_provider_env(
-        provider_id,
+        api_format,
         api_key=str(runtime_target.get("api_key") or ""),
         auth_token=str(runtime_target.get("auth_token") or ""),
         base_url=str(runtime_target.get("base_url") or ""),
