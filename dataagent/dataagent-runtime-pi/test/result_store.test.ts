@@ -212,7 +212,7 @@ test("search finds rows without paging or re-running the query", async () => {
   // Paging helps only when the agent knows where to look. When it does not, it
   // has re-run the query instead — one probe turn issued fifteen SQL calls
   // rather than read back what it had already fetched.
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "odw-search-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "of-search-"));
 
   const rows = Array.from({ length: 300 }, (_, i) => ({
     id: i,
@@ -229,7 +229,7 @@ test("search finds rows without paging or re-running the query", async () => {
 });
 
 test("search reports that it capped rather than implying it found exactly the cap", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "odw-search2-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "of-search2-"));
 
   const rows = Array.from({ length: 120 }, (_, i) => ({ id: i, tag: "common" }));
   const saved = await saveToolResult(root, JSON.stringify(rows));
@@ -241,7 +241,7 @@ test("search reports that it capped rather than implying it found exactly the ca
 });
 
 test("an empty query is refused rather than matching everything", async () => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "odw-search3-"));
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "of-search3-"));
   const saved = await saveToolResult(root, JSON.stringify([{ id: 1 }]));
 
   await assert.rejects(() => searchToolResult(root, saved.result_ref, "   "), /must not be empty/);

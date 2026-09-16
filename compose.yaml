@@ -26,6 +26,7 @@ services:
       retries: 20
 
   dataagent-backend:
+    image: ${OF_AGENT_MASTER_IMAGE:-of-agent-master:local}
     build:
       context: .
       dockerfile: dataagent/dataagent-backend/Dockerfile
@@ -37,6 +38,7 @@ services:
       SKILLS_ROOT_DIR: /app/.claude/skills
       DATAAGENT_HOST_ROOT: /dataagent_runtime
       DATAAGENT_RUNTIME_ROOT: /dataagent_runtime
+      DATAAGENT_SANDBOX_IMAGE: ${OF_AGENT_WORKER_IMAGE:-of-agent-worker:local}
       LLM_PROVIDER: ${DATAAGENT_LLM_PROVIDER:-anthropic_compatible}
       CLAUDE_MODEL: ${ONTOFOUNDRY_ANTHROPIC_MODEL:-}
       ANTHROPIC_BASE_URL: ${ONTOFOUNDRY_ANTHROPIC_BASE_URL:-}
@@ -52,7 +54,7 @@ services:
       - ontofoundry-dataagent-runtime:/dataagent_runtime
       - ./dataagent/.claude/skills:/app/.claude/skills:ro
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/api/v1/nl2sql/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/api/v1/agent/health').read()"]
       interval: 10s
       timeout: 5s
       retries: 20

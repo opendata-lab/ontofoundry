@@ -194,7 +194,7 @@ def _wait_task(base_url: str, task_id: str, timeout_seconds: int) -> tuple[dict[
     while time.time() < deadline:
         page = _http_json(
             "GET",
-            f"{base_url}/api/v1/nl2sql/tasks/{task_id}/agent-events?after_id={after_id}",
+            f"{base_url}/api/v1/agent/tasks/{task_id}/agent-events?after_id={after_id}",
             payload=None,
             timeout_seconds=timeout_seconds,
         )
@@ -202,7 +202,7 @@ def _wait_task(base_url: str, task_id: str, timeout_seconds: int) -> tuple[dict[
         if batch:
             agent_records.extend(batch)
             after_id = max(int(item.get("seq_id") or 0) for item in batch)
-        task = _http_json("GET", f"{base_url}/api/v1/nl2sql/tasks/{task_id}", payload=None, timeout_seconds=timeout_seconds)
+        task = _http_json("GET", f"{base_url}/api/v1/agent/tasks/{task_id}", payload=None, timeout_seconds=timeout_seconds)
         if str(task.get("task_status") or "") in {"finished", "error", "suspended"}:
             return task, agent_records
         time.sleep(2)
@@ -212,7 +212,7 @@ def _wait_task(base_url: str, task_id: str, timeout_seconds: int) -> tuple[dict[
 def _run_via_topic_task(base_url: str, scenario: Scenario, provider_id: str, model: str, timeout_seconds: int, mode: str) -> dict[str, Any]:
     topic = _http_json(
         "POST",
-        f"{base_url}/api/v1/nl2sql/topics",
+        f"{base_url}/api/v1/agent/topics",
         payload={"title": f"live-{scenario.scenario_id}-{uuid.uuid4().hex[:8]}"},
         timeout_seconds=timeout_seconds,
     )
@@ -220,7 +220,7 @@ def _run_via_topic_task(base_url: str, scenario: Scenario, provider_id: str, mod
     start = time.perf_counter()
     accepted = _http_json(
         "POST",
-        f"{base_url}/api/v1/nl2sql/tasks/deliver-message",
+        f"{base_url}/api/v1/agent/tasks/deliver-message",
         payload={
             "topic_id": topic_id,
             "content": scenario.question,
@@ -234,7 +234,7 @@ def _run_via_topic_task(base_url: str, scenario: Scenario, provider_id: str, mod
     task, agent_records = _wait_task(base_url, task_id, timeout_seconds)
     topic_messages = _http_json(
         "GET",
-        f"{base_url}/api/v1/nl2sql/topics/{topic_id}/messages?page=1&page_size=500&order=asc",
+        f"{base_url}/api/v1/agent/topics/{topic_id}/messages?page=1&page_size=500&order=asc",
         payload=None,
         timeout_seconds=timeout_seconds,
     )
@@ -317,7 +317,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--scenario", action="append", default=[], help="Only run the specified scenario_id. Repeatable.")
     args = parser.parse_args(argv)
 
-    settings = _http_json("GET", f"{args.base_url}/api/v1/nl2sql-admin/settings", payload=None, timeout_seconds=args.timeout_seconds)
+    settings = _http_json("GET", f"{args.base_url}/api/v1/agent-admin/settings", payload=None, timeout_seconds=args.timeout_seconds)
     provider_id = args.provider_id or str(settings.get("provider_id") or "")
     model = args.model or str(settings.get("model") or "")
     if not provider_id or not model:

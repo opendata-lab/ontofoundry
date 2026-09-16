@@ -336,7 +336,7 @@ def test_admin_list_topics_scopes_to_widget_and_forwards_filters(monkeypatch):
                     "website_id": "site_a",
                     "external_user_id": "",
                     "visitor_id": "visitor_x",
-                    "agent_id": "agent_default",
+                    "agent_id": "agent_ontofoundry",
                     "agent_snapshot_json": None,
                     "created_at": None,
                     "updated_at": None,

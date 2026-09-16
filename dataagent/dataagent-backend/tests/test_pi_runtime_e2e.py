@@ -47,7 +47,7 @@ def _context(tmp_path: Path, provider_id: str, model_id: str) -> PiRunContext:
         topic_id="topic-e2e",
         provider_id=provider_id,
         model=model_id,
-        system_prompt="你是 OpenDataWorks 的数据助手。",
+        system_prompt="你是 OntoFoundry 的数据助手。",
         messages=[{"role": "user", "content": "你好"}],
         project_cwd=tmp_path,
         boundary_policy=build_boundary_policy(tmp_path, {"enabled_roots": {}}, [str(tmp_path)], {}),

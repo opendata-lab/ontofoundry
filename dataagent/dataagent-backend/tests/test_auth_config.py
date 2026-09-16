@@ -532,7 +532,7 @@ def test_oauth_provider_requires_user_info_handler(tmp_path):
 @pytest.mark.parametrize(
     "redirect_uri",
     [
-        "https://app.example.com/api/v1/nl2sql/auth/oauth/callback",
+        "https://app.example.com/api/v1/agent/auth/oauth/callback",
         "https://app.example.com/oauth-authorized/Other",
         "/oauth-authorized/SSO",
         "https://app.example.com/oauth-authorized/SSO?next=/chat",

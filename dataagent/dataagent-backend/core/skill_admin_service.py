@@ -33,19 +33,10 @@ MANAGED_FILE_SUFFIXES = {".json", ".md", ".markdown", ".py"}
 DEFAULT_PROVIDER_ID = "openrouter"
 MODEL_DETECTION_TIMEOUT_SECONDS = 30
 LEGACY_SQL_SKILL_FOLDER = "dataagent-nl2sql"
-DEFAULT_PRIMARY_SKILL_FOLDER = "opendataworks-business-knowledge"
-PLATFORM_TOOLS_SKILL_FOLDER = "opendataworks-platform-tools"
-ONTOLOGY_MODELING_SKILL_FOLDER = "ontology-modeling-assistant"
+DEFAULT_PRIMARY_SKILL_FOLDER = "md2ossie"
 DEFAULT_SKILLS_OUTPUT_DIR = f"../.claude/skills/{DEFAULT_PRIMARY_SKILL_FOLDER}"
-BUILTIN_SKILL_FOLDERS = {
-    DEFAULT_PRIMARY_SKILL_FOLDER,
-    PLATFORM_TOOLS_SKILL_FOLDER,
-    ONTOLOGY_MODELING_SKILL_FOLDER,
-}
-DEFAULT_ENABLED_BUILTIN_SKILL_FOLDERS = (
-    DEFAULT_PRIMARY_SKILL_FOLDER,
-    PLATFORM_TOOLS_SKILL_FOLDER,
-)
+BUILTIN_SKILL_FOLDERS = {DEFAULT_PRIMARY_SKILL_FOLDER}
+DEFAULT_ENABLED_BUILTIN_SKILL_FOLDERS = (DEFAULT_PRIMARY_SKILL_FOLDER,)
 SKILL_FOLDER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 PROVIDER_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
@@ -98,16 +89,6 @@ RUNTIME_SETTING_KEYS = {
     "anthropic_api_key",
     "anthropic_auth_token",
     "anthropic_base_url",
-    "mysql_host",
-    "mysql_port",
-    "mysql_user",
-    "mysql_password",
-    "mysql_database",
-    "doris_host",
-    "doris_port",
-    "doris_user",
-    "doris_password",
-    "doris_database",
     "skills_output_dir",
 }
 
@@ -143,16 +124,6 @@ def _runtime_settings_payload() -> dict[str, Any]:
         "anthropic_api_key": cfg.anthropic_api_key,
         "anthropic_auth_token": cfg.anthropic_auth_token,
         "anthropic_base_url": cfg.anthropic_base_url,
-        "mysql_host": cfg.mysql_host,
-        "mysql_port": cfg.mysql_port,
-        "mysql_user": cfg.mysql_user,
-        "mysql_password": cfg.mysql_password,
-        "mysql_database": cfg.mysql_database,
-        "doris_host": cfg.doris_host,
-        "doris_port": cfg.doris_port,
-        "doris_user": cfg.doris_user,
-        "doris_password": cfg.doris_password,
-        "doris_database": cfg.doris_database,
         "skills_output_dir": cfg.skills_output_dir,
         # Widget allowlist is managed exclusively from the settings page and
         # persisted in da_agent_settings; there is no env-var source.
@@ -548,7 +519,7 @@ def _merge_settings_payload(current: dict[str, Any] | None, patch: dict[str, Any
     for key, value in update.items():
         if key in {"provider_settings", "providers", "skill_runtime"} or value is None:
             continue
-        if key in {"anthropic_api_key", "anthropic_auth_token", "mysql_password", "doris_password"} and not str(value or "").strip():
+        if key in {"anthropic_api_key", "anthropic_auth_token"} and not str(value or "").strip():
             continue
         base[key] = value
 
@@ -596,16 +567,6 @@ def _merge_settings_payload(current: dict[str, Any] | None, patch: dict[str, Any
         "anthropic_api_key": str(runtime_provider.get("api_key") or base.get("anthropic_api_key") or ""),
         "anthropic_auth_token": str(runtime_provider.get("auth_token") or base.get("anthropic_auth_token") or ""),
         "anthropic_base_url": str(runtime_provider.get("base_url") or base.get("anthropic_base_url") or ""),
-        "mysql_host": str(base.get("mysql_host") or ""),
-        "mysql_port": int(base.get("mysql_port") or 3306),
-        "mysql_user": str(base.get("mysql_user") or ""),
-        "mysql_password": str(base.get("mysql_password") or ""),
-        "mysql_database": str(base.get("mysql_database") or ""),
-        "doris_host": str(base.get("doris_host") or ""),
-        "doris_port": int(base.get("doris_port") or 9030),
-        "doris_user": str(base.get("doris_user") or ""),
-        "doris_password": str(base.get("doris_password") or ""),
-        "doris_database": str(base.get("doris_database") or ""),
         "skills_output_dir": normalized_skills_output_dir,
         "provider_settings": provider_settings,
         "skill_runtime": skill_runtime,
@@ -629,16 +590,6 @@ def runtime_patch_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "anthropic_api_key",
         "anthropic_auth_token",
         "anthropic_base_url",
-        "mysql_host",
-        "mysql_port",
-        "mysql_user",
-        "mysql_password",
-        "mysql_database",
-        "doris_host",
-        "doris_port",
-        "doris_user",
-        "doris_password",
-        "doris_database",
         "skills_output_dir",
     }
     for key in passthrough:
@@ -889,12 +840,6 @@ def resolved_chat_settings_payload() -> dict[str, Any]:
         "default_model": default_model,
         "providers": providers,
         "skills_output_dir": str(resolved.get("skills_output_dir") or ""),
-        "mysql_host": str(resolved.get("mysql_host") or ""),
-        "mysql_port": int(resolved.get("mysql_port") or 3306),
-        "mysql_database": str(resolved.get("mysql_database") or ""),
-        "doris_host": str(resolved.get("doris_host") or ""),
-        "doris_port": int(resolved.get("doris_port") or 9030),
-        "doris_database": str(resolved.get("doris_database") or ""),
     }
 
 
@@ -1346,7 +1291,7 @@ def _raw_documents_for_skill(folder: str) -> list[dict[str, Any]]:
 
 
 def import_skill_from_zip(file_name: str, content: bytes) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="odw-skill-import-") as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix="of-skill-import-") as tmp_dir:
         extract_root = Path(tmp_dir) / "extracted"
         extract_root.mkdir(parents=True, exist_ok=True)
         _safe_extract_skill_zip(content, extract_root)

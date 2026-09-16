@@ -183,7 +183,7 @@ export function SettingsPage() {
             </div>
             <div>
               <dt>内置方法</dt>
-              <dd>md2ossie · ontology-clarifier</dd>
+              <dd>md2ossie</dd>
             </div>
             <div>
               <dt>材料格式</dt>

@@ -13,45 +13,16 @@ from config import get_settings, update_settings
 from core import agent_profile_service
 
 
-def test_default_agent_payload_is_general_builtin_agent():
+def test_default_agent_payload_is_the_single_md2ossie_builtin_agent():
     payload = agent_profile_service.default_agent_payload()
 
-    assert payload["agent_id"] == "agent_default"
-    assert payload["name"] == "默认助手"
-    assert payload["description"] == "通用对话与分析入口，不预置 OpenDataWorks 专属 Skills。"
-    assert payload["allowed_tools"] == ["Read", "LS", "Glob", "Grep"]
+    assert payload["agent_id"] == "agent_ontofoundry"
+    assert payload["name"] == "OntoFoundry 建模助手"
+    assert payload["description"] == "基于会话材料和当前草稿进行 Apache Ossie 本体建模与概念澄清。"
+    assert payload["allowed_tools"] == ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
     assert payload["mcp_server_ids"] == []
-    assert payload["skill_folders"] == []
+    assert payload["skill_folders"] == ["md2ossie"]
     assert payload["is_default"] is True
-    assert payload["is_builtin"] is True
-
-
-def test_opendataworks_agent_payload_is_builtin_with_platform_capabilities():
-    payload = agent_profile_service.opendataworks_agent_payload()
-
-    assert payload["agent_id"] == "agent_opendataworks"
-    assert payload["name"] == "OpenDataWorks平台助手"
-    assert payload["allowed_tools"] == ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
-    assert payload["mcp_server_ids"] == ["portal"]
-    assert payload["skill_folders"] == [
-        "opendataworks-business-knowledge",
-        "opendataworks-platform-tools",
-        "opendataworks-data-dev",
-    ]
-    assert payload["is_default"] is False
-    assert payload["is_builtin"] is True
-
-
-def test_ontology_modeling_agent_payload_is_builtin_with_modeling_skill():
-    payload = agent_profile_service.ontology_modeling_agent_payload()
-
-    assert payload["agent_id"] == "agent_ontology_modeling"
-    assert payload["name"] == "本体建模助手"
-    assert payload["allowed_tools"] == ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
-    assert payload["mcp_server_ids"] == ["portal"]
-    assert payload["skill_folders"] == ["ontology-modeling-assistant"]
-    assert "本体" in payload["description"]
-    assert payload["is_default"] is False
     assert payload["is_builtin"] is True
 
 
@@ -63,33 +34,33 @@ def test_normalize_agent_profile_payload_accepts_scoped_runtime_config():
             "system_prompt": "你是数据质量巡检场景的智能体。",
             "permission_mode": "bypassPermissions",
             "allowed_tools": ["Read", "Skill", "Read", "Grep"],
-            "mcp_server_ids": ["portal"],
-            "skill_folders": ["opendataworks-business-knowledge"],
+            "mcp_server_ids": ["catalog"],
+            "skill_folders": ["business-modeling"],
             "max_turns": 12,
             "env_vars": {"AGENT_SCENE": "quality"},
             "data_scope": {
                 "allowed_scopes": [
                     {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
                     {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
-                    {"cluster_id": None, "source_type": "MYSQL", "database": "opendataworks"},
+                    {"cluster_id": None, "source_type": "MYSQL", "database": "crm"},
                 ]
             },
         },
-        available_skill_folders={"opendataworks-business-knowledge", "opendataworks-platform-tools"},
-        available_mcp_server_ids={"portal"},
+        available_skill_folders={"business-modeling"},
+        available_mcp_server_ids={"catalog"},
     )
 
     assert payload["name"] == "质量巡检助手"
     assert "permission_mode" not in payload
     assert payload["allowed_tools"] == ["Read", "Skill", "Grep"]
-    assert payload["mcp_server_ids"] == ["portal"]
-    assert payload["skill_folders"] == ["opendataworks-business-knowledge"]
+    assert payload["mcp_server_ids"] == ["catalog"]
+    assert payload["skill_folders"] == ["business-modeling"]
     assert payload["max_turns"] == 12
     assert payload["env_vars"] == {"AGENT_SCENE": "quality"}
     assert payload["data_scope"] == {
         "allowed_scopes": [
             {"cluster_id": 3, "source_type": "DORIS", "database": "ads_user"},
-            {"cluster_id": None, "source_type": "MYSQL", "database": "opendataworks"},
+            {"cluster_id": None, "source_type": "MYSQL", "database": "crm"},
         ]
     }
 
@@ -192,8 +163,8 @@ def test_build_agent_snapshot_keeps_runtime_fields_without_timestamps():
             "system_prompt": "你是数据质量巡检场景的智能体。",
             "permission_mode": "default",
             "allowed_tools": ["Skill", "Read"],
-            "mcp_server_ids": ["portal"],
-            "skill_folders": ["opendataworks-business-knowledge"],
+            "mcp_server_ids": ["catalog"],
+            "skill_folders": ["business-modeling"],
             "max_turns": 8,
             "env_vars": {"AGENT_SCENE": "quality"},
             "data_scope": {
@@ -214,8 +185,8 @@ def test_build_agent_snapshot_keeps_runtime_fields_without_timestamps():
         "description": "只处理数据质量规则和巡检结果分析。",
         "system_prompt": "你是数据质量巡检场景的智能体。",
         "allowed_tools": ["Skill", "Read"],
-        "mcp_server_ids": ["portal"],
-        "skill_folders": ["opendataworks-business-knowledge"],
+        "mcp_server_ids": ["catalog"],
+        "skill_folders": ["business-modeling"],
         "max_turns": 8,
         "env_vars": {"AGENT_SCENE": "quality"},
         "data_scope": {

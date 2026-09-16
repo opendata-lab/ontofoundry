@@ -32,7 +32,7 @@ ENV DATAAGENT_RUNTIME_PI_DIR=/opt/dataagent-runtime-pi
 正交——分叉点在 `core/task_executor._execute_task_stream_local` 内部，而不是
 和 `_should_use_sandbox_runner` 并列，这样切到 Pi 不会静默丢失容器隔离。
 
-曾经短暂存在过一个独立的 `opendataworks-dataagent-runtime-pi` 镜像。它被移除是
+曾经短暂存在过一个独立的 Pi runtime 镜像。它被移除是
 因为没有任何地方部署它：compose 里没有对应 service，却每次提交都要构建推送。
 若将来真需要「Cell 独立成容器」这种拓扑，应当连同 compose service、离线包
 （`scripts/create-offline-package.sh`、`scripts/load-images.sh`）和发布说明一起

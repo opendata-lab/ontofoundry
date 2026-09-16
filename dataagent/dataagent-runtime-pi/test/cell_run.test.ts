@@ -15,7 +15,7 @@ import { Cell } from "../src/kernel/cell.js";
 import type { CellInitPayload, NeutralAgentEvent } from "../src/protocol/frames.js";
 
 function workspace(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "odw-cell-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "of-cell-"));
   return dir;
 }
 

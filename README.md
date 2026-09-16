@@ -48,6 +48,8 @@ make web-dev
 
 ## 配置与部署边界
 
+正式发布只产出 `of-web`、`of-api`、`of-agent-master` 和 `of-agent-worker` 四个业务镜像。不包含独立的 Portal MCP 代理；平台 MCP 由 `of-api` 原生提供，Pi 保留可连接显式配置 MCP server 的通用客户端。
+
 - Agent 后端：`ONTOFOUNDRY_DATAAGENT_BASE_URL`、`ONTOFOUNDRY_DATAAGENT_AGENT_ID`、`ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE`。
 - 模型供应商：Compose 将 `ONTOFOUNDRY_ANTHROPIC_BASE_URL`、`ONTOFOUNDRY_ANTHROPIC_MODEL`、`ONTOFOUNDRY_ANTHROPIC_API_KEY` 注入 DataAgent。这里的 Anthropic-compatible 是 Pi 使用的模型传输协议，不依赖 Claude Agent SDK。
 - 数据库连接密码：配置固定的 Fernet `ONTOFOUNDRY_CONNECTION_KEY` 后才能新增连接。部署时用源库只读账号，不将密码写入本体版本。
@@ -60,7 +62,7 @@ make build
 make serve
 ```
 
-`make serve` 用 `ONTOFOUNDRY_WEB_DIST=../web/dist` 托管 SPA 与 API。同域 HTTPS 入口由部署环境的反向代理提供。Agent 任务统一进入 DataAgent：平台控制面和 DataAgent 共用同一 PostgreSQL 的 `public` schema 和一张 `alembic_version`，Redis 管理调度协调，Pi Cell 执行模型循环。MySQL/Doris 只作为可选外部业务数据源。正式上线前仍需完成真实模型、OAuth、外部数据源、并发与大文件测试。
+`make serve` 用 `ONTOFOUNDRY_WEB_DIST=../web/dist` 托管 SPA 与 API。同域 HTTPS 入口由部署环境的反向代理提供。Agent 任务统一进入 DataAgent：平台控制面和 DataAgent 共用同一 PostgreSQL 的 `public` schema 和一张 `alembic_version`，Redis 管理调度协调，Pi Cell 执行模型循环。Agent master 不再内置 MySQL/Doris 查询桥；外部能力通过显式配置的 MCP server 扩展。正式上线前仍需完成真实模型、OAuth、外部 MCP、并发与大文件测试。
 
 暂未完成的设计项：规则执行与物化、业务 Skill、探索问数和智能体应用、通用中间表关系映射、跨源查询、文档/数据库事实的同屏混合浏览。表达式可编辑、保存和发布，当前没有执行引擎。
 
@@ -81,4 +83,4 @@ make lint
 make build
 ```
 
-默认单元测试使用临时 SQLite 和受控模型协议响应；部署与迁移验证必须使用 PostgreSQL。设置 `DATAAGENT_TEST_POSTGRES_URL` 后运行 `dataagent/dataagent-backend/tests/test_postgres_store_integration.py`，用例只删除名称以 `dataagent_test_` 开头的隔离 schema。可选 MySQL 用例只验证外部业务数据源连接器，不代表平台内部依赖 MySQL。浏览器验收截图在 `output/playwright/`，实际结果持续记录在设计文档中。
+默认单元测试使用临时 SQLite 和受控模型协议响应；部署与迁移验证必须使用 PostgreSQL。设置 `DATAAGENT_TEST_POSTGRES_URL` 后运行 `dataagent/dataagent-backend/tests/test_postgres_store_integration.py`，用例只删除名称以 `dataagent_test_` 开头的隔离 schema。浏览器验收截图在 `output/playwright/`，实际结果持续记录在设计文档中。

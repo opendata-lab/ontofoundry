@@ -12,18 +12,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { buildShellEnv, runShell, createTools, SHELL_ENV_ALLOWLIST } from "../src/tools/tool-registry.js";
+import { buildShellEnv, runShell, createTools } from "../src/tools/tool-registry.js";
 import { WorkspaceBoundaryEnforcer, type BoundaryPolicy } from "../src/policy/workspace-boundary-enforcer.js";
 
 const SECRET_ENV = {
   PATH: "/usr/bin:/bin",
   HOME: "/home/agent",
   DATAAGENT_PYTHON_BIN: "/usr/bin/python3",
-  DATAAGENT_SKILL_ROOT: "/skills/nl2sql",
+  DATAAGENT_SKILL_ROOT: "/skills/md2ossie",
   DATAAGENT_PLATFORM_SKILL_ROOT: "/skills/platform-tools",
-  ODW_BACKEND_BASE_URL: "http://backend:8080/api/v1/ai",
-  ODW_AGENT_SERVICE_TOKEN: "service-token-123",
+  FOREIGN_BACKEND_BASE_URL: "http://backend:8080/api/v1/ai",
+  FOREIGN_AGENT_SERVICE_TOKEN: "service-token-123",
   ANTHROPIC_API_KEY: "sk-secret-anthropic",
   OPENAI_API_KEY: "sk-secret-openai",
   MYSQL_PASSWORD: "dataagent123",
@@ -37,10 +36,10 @@ test("shell env carries only allowlisted variables", () => {
   assert.equal(env.PATH, "/usr/bin:/bin");
   assert.equal(env.HOME, "/home/agent");
   assert.equal(env.DATAAGENT_PYTHON_BIN, "/usr/bin/python3");
-  assert.equal(env.DATAAGENT_SKILL_ROOT, "/skills/nl2sql");
-  assert.equal(env.DATAAGENT_PLATFORM_SKILL_ROOT, "/skills/platform-tools");
-  assert.equal(env.ODW_BACKEND_BASE_URL, "http://backend:8080/api/v1/ai");
-  assert.equal(env.ODW_AGENT_SERVICE_TOKEN, "service-token-123");
+  assert.equal(env.DATAAGENT_SKILL_ROOT, "/skills/md2ossie");
+  assert.equal(env.DATAAGENT_PLATFORM_SKILL_ROOT, undefined);
+  assert.equal(env.FOREIGN_BACKEND_BASE_URL, undefined);
+  assert.equal(env.FOREIGN_AGENT_SERVICE_TOKEN, undefined);
 });
 
 test("provider and database credentials never reach the shell", () => {
@@ -74,59 +73,8 @@ test("runtime_env cannot smuggle a non-allowlisted variable through", () => {
   assert.equal(env.EVIL_VAR, undefined);
 });
 
-test("static contract: platform-tools scripts declare no variables absent from SHELL_ENV_ALLOWLIST", () => {
-  const testDir = path.dirname(fileURLToPath(import.meta.url));
-  const candidateDirs = [
-    path.resolve(testDir, "../../../.claude/skills/opendataworks-platform-tools"),
-    path.resolve(testDir, "../../.claude/skills/opendataworks-platform-tools"),
-    path.resolve(process.cwd(), "../.claude/skills/opendataworks-platform-tools"),
-  ];
-  const toolsDir = candidateDirs.find((dir) => fs.existsSync(dir));
-  assert.ok(toolsDir, `Could not find opendataworks-platform-tools in: ${candidateDirs.join(", ")}`);
-
-  const filesToScan: string[] = [];
-  const binCli = path.join(toolsDir, "bin", "odw-cli");
-  if (fs.existsSync(binCli)) {
-    filesToScan.push(binCli);
-  }
-
-  const scriptsDir = path.join(toolsDir, "scripts");
-  if (fs.existsSync(scriptsDir)) {
-    for (const f of fs.readdirSync(scriptsDir)) {
-      if (f.endsWith(".py")) {
-        filesToScan.push(path.join(scriptsDir, f));
-      }
-    }
-  }
-
-  assert.ok(filesToScan.length >= 5, `Expected to scan platform scripts, found ${filesToScan.length}`);
-
-  const declaredVars = new Set<string>();
-  const varPattern = /(?:DATAAGENT|ODW)_[A-Z0-9_]+/g;
-
-  for (const file of filesToScan) {
-    const content = fs.readFileSync(file, "utf8");
-    for (const match of content.matchAll(varPattern)) {
-      declaredVars.add(match[0]);
-    }
-  }
-
-  const missingFromAllowlist: string[] = [];
-  for (const declaredVar of declaredVars) {
-    if (!SHELL_ENV_ALLOWLIST.includes(declaredVar)) {
-      missingFromAllowlist.push(declaredVar);
-    }
-  }
-
-  assert.deepEqual(
-    missingFromAllowlist,
-    [],
-    `Platform-tools declared variables missing from SHELL_ENV_ALLOWLIST: ${missingFromAllowlist.join(", ")}`
-  );
-});
-
 test("a command really cannot read a secret from its environment", async () => {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "odw-shell-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "of-shell-"));
   const result = await runShell("echo \"key=${ANTHROPIC_API_KEY:-ABSENT} pw=${MYSQL_PASSWORD:-ABSENT}\"", {
     cwd,
     env: buildShellEnv(SECRET_ENV, {}),
@@ -139,7 +87,7 @@ test("a command really cannot read a secret from its environment", async () => {
 });
 
 test("a shell command exceeding its timeout is killed", async () => {
-  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "odw-shell-"));
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "of-shell-"));
   const result = await runShell("sleep 30", {
     cwd,
     env: buildShellEnv(SECRET_ENV, {}),
@@ -150,8 +98,8 @@ test("a shell command exceeding its timeout is killed", async () => {
 });
 
 test("tools refuse a path outside the workspace before touching the filesystem", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-tools-"));
-  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "odw-outside-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-tools-"));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), "of-outside-"));
   fs.writeFileSync(path.join(outside, "secret.txt"), "top secret", "utf-8");
 
   const policy: BoundaryPolicy = {
@@ -191,7 +139,7 @@ test("tools refuse a path outside the workspace before touching the filesystem",
 });
 
 test("a failing shell command throws so the model and the UI both see an error", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-tools-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-tools-"));
   const policy: BoundaryPolicy = {
     policy_version: 1,
     profile: "pi_agent_core",
@@ -222,7 +170,7 @@ test("a failing shell command throws so the model and the UI both see an error",
 });
 
 test("a failed command inside a pipeline is not masked by a successful final stage", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-tools-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-tools-"));
   const policy: BoundaryPolicy = {
     policy_version: 1,
     profile: "pi_agent_core",

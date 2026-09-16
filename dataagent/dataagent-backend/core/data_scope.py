@@ -74,12 +74,11 @@ def runtime_data_scope_header() -> str:
     """解析当前运行时的 data-scope 请求头值。
 
     与 skill 运行时 `runtime_data_scope_header()` 同一契约：优先使用预计算的
-    `ODW_AGENT_DATA_SCOPE_HEADER` / `DATAAGENT_DATA_SCOPE_HEADER`，否则由
+    `DATAAGENT_DATA_SCOPE_HEADER`，否则由
     `DATAAGENT_DATA_SCOPE_JSON` 归一后 base64url 编码。
     """
     configured = str(
-        os.getenv("ODW_AGENT_DATA_SCOPE_HEADER")
-        or os.getenv("DATAAGENT_DATA_SCOPE_HEADER")
+        os.getenv("DATAAGENT_DATA_SCOPE_HEADER")
         or ""
     ).strip()
     if configured:

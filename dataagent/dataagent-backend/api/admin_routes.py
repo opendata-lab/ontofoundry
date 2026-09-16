@@ -85,7 +85,7 @@ router = APIRouter()
 # 管理面（settings / 会话审计 / agent 与 skill 管理）在 auth 启用时要求 admin 会话；
 # auth 关闭（env 未设置或显式 AUTH_ENABLED=False）时 require_admin no-op 放行，
 # 与无认证时代行为一致。router 级依赖，新增端点自动受保护。
-settings_router = APIRouter(prefix="/api/v1/nl2sql-admin", dependencies=[Depends(require_admin)])
+settings_router = APIRouter(prefix="/api/v1/agent-admin", dependencies=[Depends(require_admin)])
 skills_router = APIRouter(prefix="/api/v1/dataagent", dependencies=[Depends(require_admin)])
 user_router = APIRouter(prefix="/api/v1/dataagent", dependencies=[Depends(require_user)])
 # 聊天页与 widget 依赖的三个只读 agents 端点必须保持公开（匿名嵌入场景）。
@@ -101,7 +101,7 @@ def _catalog_identity(request: Request) -> AuthIdentity | None:
     """
     if not is_auth_enabled():
         return None
-    client = str(request.headers.get("X-ODW-Client") or "").strip().lower()
+    client = str(request.headers.get("X-OF-Client") or "").strip().lower()
     if client != "dataagent":
         return None
     return resolve_identity(request)
@@ -127,16 +127,6 @@ def _build_admin_settings_response(updated_at: str = "") -> AdminSettingsRespons
         anthropic_api_key="",
         anthropic_auth_token="",
         anthropic_base_url=str(payload.get("anthropic_base_url") or ""),
-        mysql_host=str(payload.get("mysql_host") or ""),
-        mysql_port=int(payload.get("mysql_port") or 3306),
-        mysql_user=str(payload.get("mysql_user") or ""),
-        mysql_password="",
-        mysql_database=str(payload.get("mysql_database") or ""),
-        doris_host=str(payload.get("doris_host") or ""),
-        doris_port=int(payload.get("doris_port") or 9030),
-        doris_user=str(payload.get("doris_user") or ""),
-        doris_password="",
-        doris_database=str(payload.get("doris_database") or ""),
         skills_output_dir=str(payload.get("skills_output_dir") or ""),
         settings_file_path="",
         settings_local_file_path="",

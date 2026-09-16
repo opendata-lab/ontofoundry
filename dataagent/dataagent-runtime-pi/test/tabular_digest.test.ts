@@ -27,7 +27,7 @@ test("extractDigest extracts schema, sample rows, and numerical stats from tabul
 
   const digest = extractDigest(rows, {
     resultRef: "res_test_123",
-    toolName: "portal_query_readonly",
+    toolName: "catalog_query_readonly",
   });
 
   assert.equal(digest._type, "dataagent_folded_result");
@@ -35,7 +35,7 @@ test("extractDigest extracts schema, sample rows, and numerical stats from tabul
   if (digest.is_tabular) {
     assert.equal(digest.total_rows, 25);
     assert.equal(digest.result_ref, "res_test_123");
-    assert.equal(digest.tool_name, "portal_query_readonly");
+    assert.equal(digest.tool_name, "catalog_query_readonly");
 
     // Columns schema
     const colNames = digest.columns.map((c) => c.name);

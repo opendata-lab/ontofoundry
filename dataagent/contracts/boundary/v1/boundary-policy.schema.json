@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://opendataworks.io/schemas/dataagent/boundary/v1/boundary-policy.schema.json",
+  "$id": "https://ontofoundry.dev/schemas/agent/boundary/v1/boundary-policy.schema.json",
   "title": "WorkspaceBoundaryPolicy",
   "description": "Serialized workspace boundary policy handed to a data plane that enforces it out of process. Produced by dataagent-backend core/boundary_policy.build_boundary_policy and consumed by the Pi Cell's workspace-boundary-enforcer. The Python side stays the single source of truth for the rules; the two enforcement implementations are kept in agreement by the shared case table in conformance-cases.json.",
   "type": "object",
