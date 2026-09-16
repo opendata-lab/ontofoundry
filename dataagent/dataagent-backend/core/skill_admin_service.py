@@ -19,6 +19,7 @@ import httpx
 from config import get_settings, update_settings
 
 from core.runtime_registry_store import get_runtime_registry_store
+from core.provider_runtime import normalize_api_format
 from core.skill_admin_store import get_skill_admin_store
 from core.skill_discovery import (
     resolve_skill_discovery_root_dir,
@@ -911,6 +912,10 @@ def resolve_runtime_provider_selection(provider_id: str | None, model: str | Non
     return {
         "provider_id": normalized_provider_id,
         "provider_type": str(provider.get("provider_type") or "anthropic_compatible"),
+        # The protocol the provider speaks. provider_type names the vendor family
+        # and does not imply a request shape, so the two cannot be derived from
+        # each other — a self-hosted gateway can serve either.
+        "api_format": normalize_api_format(provider.get("api_format")),
         "model": selected_model,
         "api_key": str(provider.get("api_key") or ""),
         "auth_token": str(provider.get("auth_token") or ""),
