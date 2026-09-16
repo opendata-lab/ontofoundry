@@ -1,0 +1,89 @@
+name: CI
+
+# 验证，不发布。推镜像需要 registry 凭据，这里刻意不碰：先让「能不能构建、能
+# 不能跑过」有个自动答案，发布流程单独再加。
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python (${{ matrix.postgres && 'with PostgreSQL' || 'no database' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 两种都跑：集成测试在缺少 DATAAGENT_TEST_POSTGRES_URL 时会整体 skip，
+        # 只跑带库的那次就看不出「没有库时是否仍然全绿」，只跑不带库的那次则
+        # 等于从不验证真实 SQL 方言与事务边界。
+        postgres: [true, false]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: dataagent_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install the distribution
+        working-directory: apps/api
+        run: uv sync --python 3.13 --all-extras --dev
+      - name: Run tests
+        working-directory: apps/api
+        env:
+          DATAAGENT_TEST_POSTGRES_URL: ${{ matrix.postgres && 'postgresql://test:test@127.0.0.1:5432/dataagent_ci' || '' }}
+        run: uv run --python 3.13 pytest -q
+
+  node:
+    name: Node (runtime + web)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Build the Pi runtime
+        # 后端 spawn 的是编译产物，所以构建失败等同于运行时不可用——
+        # 一次未安装依赖导致的 tsc 失败已经让这套代码停滞过一轮。
+        run: npm run build -w @ontofoundry/agent-runtime-pi
+      - run: npm test -w @ontofoundry/agent-runtime-pi
+      - run: npm test -w ontofoundry-web -- --run
+      - run: npm run build -w ontofoundry-web
+
+  images:
+    name: Image (${{ matrix.image.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - { name: agent-master, dockerfile: apps/api/Dockerfile }
+          - { name: agent-worker, dockerfile: apps/api/Dockerfile.runner }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
