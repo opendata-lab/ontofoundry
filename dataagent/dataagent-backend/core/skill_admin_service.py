@@ -984,7 +984,20 @@ def _is_skill_enabled(folder: str, skill_runtime: dict[str, dict[str, bool]] | N
     return bool((runtime.get(folder_name) or {}).get("enabled"))
 
 
-def _document_api_payload(document: dict[str, Any]) -> dict[str, Any]:
+def _document_api_payload(
+    document: dict[str, Any],
+    *,
+    skill_runtime: dict[str, dict[str, bool]] | None = None,
+    description_cache: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Shape one stored document for the API.
+
+    `skill_runtime` and `description_cache` let a caller resolve the shared
+    per-request state once. Without them this reloads settings from the database
+    and re-parses the folder's SKILL.md for every single document — and neither
+    store pools connections, so a list of N documents opens N fresh ones. See
+    `list_documents`.
+    """
     payload = dict(document or {})
     full_relative_path = str(payload.get("relative_path") or "").replace("\\", "/").strip("/")
     folder = _skill_folder_name(full_relative_path)
@@ -992,27 +1005,39 @@ def _document_api_payload(document: dict[str, Any]) -> dict[str, Any]:
     payload["relative_path"] = _relative_path_within_skill(full_relative_path)
     payload["source"] = _skill_source(folder)
     payload["editable"] = True
-    payload["enabled"] = _is_skill_enabled(folder)
+    payload["enabled"] = _is_skill_enabled(folder, skill_runtime)
     # Every SKILL.md in this repo declares what the skill is for, and none of it
     # reached the UI: the list had no description field, so the client filled
     # that column with last_change_summary — the reindex note, identical on
     # every row ("发现磁盘文件") and looking like content while saying nothing.
-    payload["description"] = _skill_description_from_front_matter(folder)
+    payload["description"] = _skill_description_from_front_matter(folder, description_cache)
     return payload
 
 
-def _skill_description_from_front_matter(folder: str) -> str:
+def _skill_description_from_front_matter(
+    folder: str,
+    description_cache: dict[str, str] | None = None,
+) -> str:
     if not folder:
         return ""
+    if description_cache is not None and folder in description_cache:
+        return description_cache[folder]
+    description = ""
     try:
         skill_md = (resolve_skill_discovery_root_dir() / folder / "SKILL.md").resolve()
     except Exception:
-        return ""
-    try:
-        return _front_matter_value(skill_md, "description")
-    except ValueError:
-        # Unreadable front matter is not worth failing a list request over.
-        return ""
+        skill_md = None
+    if skill_md is not None:
+        try:
+            description = _front_matter_value(skill_md, "description")
+        except ValueError:
+            # Unreadable front matter is not worth failing a list request over.
+            description = ""
+    if description_cache is not None:
+        # Cache the miss too: a folder with no readable SKILL.md would otherwise
+        # be re-stat'ed once per document it owns.
+        description_cache[folder] = description
+    return description
 
 
 def _settings_path_for_skill_folder(folder: str) -> str:
@@ -1057,16 +1082,28 @@ def reindex_documents_from_disk(*, change_source: str = "import", change_summary
     _migrate_document_paths_to_discovery_root(store)
     managed_paths = managed_skill_files()
     managed_path_set = set(managed_paths)
-    for document in store.list_documents():
-        relative_path = str(document.get("relative_path") or "")
+    # One read of the index, reused for both the prune below and the hash
+    # comparison in the loop. The loop used to call get_document_by_path() per
+    # file, and neither store pools connections, so scanning N managed files
+    # opened N connections before a single row changed.
+    stored_by_path = {
+        str(document.get("relative_path") or ""): document
+        for document in store.list_documents()
+    }
+    for relative_path in list(stored_by_path):
         if relative_path and relative_path not in managed_path_set:
             store.delete_document_by_path(relative_path)
 
     changed: list[dict[str, Any]] = []
+    # Shared with the payload shaping below for the same reason list_documents()
+    # does it: a first-run reindex marks every file changed, and shaping each one
+    # would otherwise re-read settings once per file.
+    skill_runtime = _skill_runtime_from_current_settings()
+    description_cache: dict[str, str] = {}
     for relative_path in managed_paths:
         file_path = root / relative_path
         content = file_path.read_text(encoding="utf-8")
-        existing = store.get_document_by_path(relative_path)
+        existing = stored_by_path.get(relative_path)
         current_hash = existing.get("current_hash") if existing else None
         next_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         if existing and current_hash == next_hash:
@@ -1078,13 +1115,23 @@ def reindex_documents_from_disk(*, change_source: str = "import", change_summary
             change_summary=change_summary,
             actor="system",
         )
-        changed.append(_document_api_payload(saved))
+        changed.append(
+            _document_api_payload(saved, skill_runtime=skill_runtime, description_cache=description_cache)
+        )
     return changed
 
 
 def list_documents() -> list[dict[str, Any]]:
     reindex_documents_from_disk()
-    documents = [_document_api_payload(item) for item in get_skill_admin_store().list_documents()]
+    # Resolve the shared state once per request. Passing it down is what keeps a
+    # list of N documents at one settings read and one SKILL.md parse per
+    # folder, instead of N of each.
+    skill_runtime = _skill_runtime_from_current_settings()
+    description_cache: dict[str, str] = {}
+    documents = [
+        _document_api_payload(item, skill_runtime=skill_runtime, description_cache=description_cache)
+        for item in get_skill_admin_store().list_documents()
+    ]
     documents.sort(key=lambda item: (str(item.get("folder") or ""), str(item.get("category") or ""), str(item.get("relative_path") or "")))
     return documents
 

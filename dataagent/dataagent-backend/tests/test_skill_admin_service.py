@@ -1034,3 +1034,80 @@ def test_uninstall_skill_rejects_last_enabled(monkeypatch, tmp_path):
 
     with pytest.raises(ValueError, match="至少需要保留一个启用 Skill"):
         skill_admin_service.uninstall_skill("marketing-insights")
+
+
+def _count_shared_state_reads(tmp_path, *, document_count: int) -> dict[str, int]:
+    """列出一个含 document_count 份文档的 skill，返回各类共享状态的读取次数。
+
+    自带 monkeypatch 上下文：两次调用若共用同一个 monkeypatch，第二次的计数包装器
+    会把第一次的包装器当成原函数，两边的计数互相污染。
+    """
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        return _count_within(monkeypatch, tmp_path, document_count)
+
+
+def _count_within(monkeypatch, tmp_path, document_count: int) -> dict[str, int]:
+    discovery_root, store, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+
+    skill_dir = discovery_root / BUSINESS_SKILL
+    (skill_dir / "reference").mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: md2ossie\ndescription: 本体建模\n---\n正文\n", encoding="utf-8"
+    )
+    for index in range(document_count - 1):
+        (skill_dir / "reference" / f"{index:02d}-note.md").write_text(f"note {index}", encoding="utf-8")
+
+    counts = {"settings": 0, "front_matter": 0, "path_lookups": 0}
+
+    real_runtime = skill_admin_service._skill_runtime_from_current_settings
+    real_front_matter = skill_admin_service._front_matter_value
+    real_get_by_path = store.get_document_by_path
+
+    def counting_runtime():
+        counts["settings"] += 1
+        return real_runtime()
+
+    def counting_front_matter(path, key):
+        counts["front_matter"] += 1
+        return real_front_matter(path, key)
+
+    def counting_get_by_path(relative_path):
+        counts["path_lookups"] += 1
+        return real_get_by_path(relative_path)
+
+    monkeypatch.setattr(skill_admin_service, "_skill_runtime_from_current_settings", counting_runtime)
+    monkeypatch.setattr(skill_admin_service, "_front_matter_value", counting_front_matter)
+    store.get_document_by_path = counting_get_by_path
+
+    documents = skill_admin_service.list_documents()
+    assert len(documents) == document_count
+    assert all(item["description"] == "本体建模" for item in documents)
+    assert all(item["enabled"] is True for item in documents)
+    return counts
+
+
+def test_listing_documents_does_not_scale_shared_state_reads_with_document_count(tmp_path):
+    """共享状态的读取次数必须与文档数无关。
+
+    两个 store 都没有连接池，所以每次 current_settings_payload() 都是一条新连接。
+    修复前 _document_api_payload() 对每个文档各读一次配置、各解析一次 SKILL.md，
+    reindex 又对每个受管文件调一次 get_document_by_path()——上游 84 个文档实测
+    255 条连接、532 ms，而页面只渲染 8 行。
+
+    断言「不随文档数增长」而不是某个具体次数：具体次数会随调用点增减而变，
+    真正要守住的性质是它不是 O(N)。
+    """
+    small = _count_shared_state_reads(tmp_path / "small", document_count=5)
+    large = _count_shared_state_reads(tmp_path / "large", document_count=40)
+
+    assert small == large, (
+        "共享状态读取次数随文档数变化，N+1 又回来了："
+        f"5 个文档 {small}，40 个文档 {large}"
+    )
+    # 并且确实是个小常数，而不是「两边都同样糟糕」。
+    # 上界是 2 而不是 1：reindex 与 list_documents 是两个调用点，各自解析一次
+    # 共享状态。合并成一份要把缓存穿过 reindex 的签名，而它还有别的调用方；
+    # 两次是常数，O(N) 才是问题。
+    assert large["settings"] <= 2, large
+    assert large["front_matter"] <= 2, large
+    assert large["path_lookups"] == 0, large
