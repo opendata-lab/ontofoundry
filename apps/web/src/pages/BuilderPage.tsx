@@ -8,7 +8,6 @@ import {
   Rocket,
   Square,
   Database,
-  ChevronDown,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -143,12 +142,14 @@ export function BuilderPage() {
             : "尚未开始"}
         </small>
         <div className="context-right">
-          <span>
-            LLM:{" "}
-            <Link to="../settings">
-              {capabilities?.model || "未配置"} <ChevronDown size={12} />
-            </Link>
-          </span>
+          {/* 配好之后这里恒等于同一个运行时名，既不是模型名也点不动，下拉箭头
+              还让它看着像个选择器。只在没配的时候提示——那才是用户需要做事的时候，
+              「空间设置」本来就在主导航里。 */}
+          {capabilities && !capabilities.agent_configured && (
+            <span>
+              <Link to="../settings">大模型尚未配置</Link>
+            </span>
+          )}
           <button
             className="button button--primary"
             disabled={!session || running || busy}
