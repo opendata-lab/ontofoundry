@@ -21,6 +21,11 @@ from ontofoundry_api.api import (
     workspaces,
 )
 from ontofoundry_api.api import settings as settings_api
+from dataagent_backend.app import (
+    include_dataagent_routes,
+    start_dataagent,
+    stop_dataagent,
+)
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import WorkspaceRecord
@@ -69,9 +74,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
+        await start_dataagent()
         try:
             yield
         finally:
+            await stop_dataagent()
             engine.dispose()
 
     app = FastAPI(
@@ -145,6 +152,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(instances.router)
     app.include_router(settings_api.router)
     app.include_router(mcp.router)
+    include_dataagent_routes(app)
     if app_settings.web_dist:
         from ontofoundry_api.web import FrontendFiles
 

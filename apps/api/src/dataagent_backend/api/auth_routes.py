@@ -101,7 +101,7 @@ def _clear_session_cookie(response: Response) -> None:
 
 
 @router.get("/config")
-async def auth_config():
+def auth_config():
     cfg = get_auth_settings()
     if not cfg.enabled:
         return {
@@ -121,7 +121,7 @@ async def auth_config():
 
 
 @router.post("/login")
-async def login(payload: LoginRequest):
+def login(payload: LoginRequest):
     _require_enabled()
     cfg = get_auth_settings()
     if not cfg.local_login_enabled:
@@ -135,14 +135,14 @@ async def login(payload: LoginRequest):
 
 
 @router.get("/me")
-async def me(request: Request):
+def me(request: Request):
     _require_enabled()
     identity = require_identity(request)
     return {"code": 200, "data": _identity_payload(identity)}
 
 
 @router.post("/logout")
-async def logout():
+def logout():
     _require_enabled()
     response = JSONResponse({"code": 200, "data": {"ok": True}})
     _clear_session_cookie(response)
@@ -150,7 +150,7 @@ async def logout():
 
 
 @router.get("/oauth/authorize")
-async def oauth_authorize(request: Request):
+def oauth_authorize(request: Request):
     _require_enabled()
     cfg = get_auth_settings()
     if not cfg.oauth_login_enabled:

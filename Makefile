@@ -23,12 +23,11 @@ dataagent-build:
 	cd dataagent/dataagent-runtime-pi && $(NPM) ci && $(NPM) run build
 
 dataagent-images:
-	docker build -t of-agent-master:local -f dataagent/dataagent-backend/Dockerfile .
-	docker build -t of-agent-worker:local -f dataagent/dataagent-backend/Dockerfile.runner .
+	docker build -t of-agent-master:local -f apps/api/Dockerfile .
+	docker build -t of-agent-worker:local -f apps/api/Dockerfile.runner .
 
 dataagent-test:
 	cd dataagent/dataagent-runtime-pi && $(NPM) test
-	cd dataagent/dataagent-backend && $(UV) run --python 3.13 --with-requirements requirements.txt pytest -q
 
 build:
 	$(NPM) run build -w @ontofoundry/agent-runtime-pi
@@ -39,7 +38,6 @@ serve:
 
 test:
 	cd apps/api && $(UV) run --python 3.13 pytest -q
-	cd dataagent/dataagent-backend && $(UV) run --python 3.13 --with-requirements requirements.txt pytest -q
 	$(NPM) test -w @ontofoundry/agent-runtime-pi
 	cd apps/web && $(NPM) test -- --run
 

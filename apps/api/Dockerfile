@@ -17,13 +17,15 @@ ENV PYTHONUNBUFFERED=1
 ENV HOME=/dataagent_runtime
 ENV DATAAGENT_RUNTIME_ROOT=/dataagent_runtime
 
-WORKDIR /opt/dataagent-backend
+WORKDIR /opt/ontofoundry-api
 
-COPY dataagent/dataagent-backend/requirements.txt /tmp/requirements.txt
+# 依赖单一来源：两个包的依赖都声明在 apps/api/pyproject.toml 里
+COPY apps/api/pyproject.toml apps/api/README.md* /opt/ontofoundry-api/
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+COPY apps/api/src /opt/ontofoundry-api/src
+RUN pip install --no-cache-dir /opt/ontofoundry-api
 RUN mkdir -p /dataagent_runtime /app/.claude/skills && chmod 1777 /dataagent_runtime
 
 # Node runtime + built Pi Cell. Both images are debian bookworm, so the node
@@ -35,8 +37,9 @@ COPY --from=pi-cell /build/node_modules /opt/dataagent-runtime-pi/node_modules
 ENV DATAAGENT_NODE_BIN=/usr/local/bin/node
 ENV DATAAGENT_RUNTIME_PI_DIR=/opt/dataagent-runtime-pi
 
-COPY dataagent/dataagent-backend /opt/dataagent-backend
 
 EXPOSE 8900
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8900"]
+# 迁移脚本随 dataagent_backend 包一起安装，alembic 从包内位置读取配置。
+# 单一进程同时提供 OntoFoundry 与 DataAgent 路由。
+CMD ["sh", "-c", "alembic -c /opt/ontofoundry-api/src/dataagent_backend/alembic.ini upgrade head && uvicorn ontofoundry_api.main:app --host 0.0.0.0 --port 8900"]
