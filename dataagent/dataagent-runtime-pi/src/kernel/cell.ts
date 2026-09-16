@@ -14,7 +14,7 @@ import { RunStateMachine } from "./run-state-machine.js";
 import { EventNormalizer, unwrapToolResult } from "./event-normalizer.js";
 import { WorkspaceBoundaryEnforcer, type BoundaryPolicy } from "../policy/workspace-boundary-enforcer.js";
 import { createTools } from "../tools/tool-registry.js";
-import { connectMcpServers, type McpBridgeResult } from "../mcp/portal-mcp-client.js";
+import { connectMcpServers, type McpBridgeResult } from "../mcp/mcp-client.js";
 import { logDiagnostic } from "../protocol/channel.js";
 import { saveToolResult } from "../context/result-store.js";
 import {

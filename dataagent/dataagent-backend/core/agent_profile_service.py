@@ -7,22 +7,13 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-import pymysql
-from config import get_settings
-
 from core.agent_visibility import normalize_agent_visibility
 from core.data_scope import normalize_data_scope
 from core.database import connect_dataagent, dataagent_schema
 from core.mcp_admin_service import available_mcp_servers as list_available_mcp_servers
 
-DEFAULT_AGENT_ID = "agent_default"
-DEFAULT_AGENT_NAME = "默认助手"
-OPENDATAWORKS_AGENT_ID = "agent_opendataworks"
-OPENDATAWORKS_AGENT_NAME = "OpenDataWorks平台助手"
-ONTOLOGY_MODELING_AGENT_ID = "agent_ontology_modeling"
-ONTOLOGY_MODELING_AGENT_NAME = "本体建模助手"
-ONTOFOUNDRY_AGENT_ID = "agent_ontofoundry"
-ONTOFOUNDRY_AGENT_NAME = "OntoFoundry 建模助手"
+DEFAULT_AGENT_ID = "agent_ontofoundry"
+DEFAULT_AGENT_NAME = "OntoFoundry 建模助手"
 
 # Session-level platform permission modes. Legacy values (the removed
 # ``inherit`` or anything unknown) normalize to ``default``.
@@ -30,16 +21,6 @@ PERMISSION_MODES: tuple[str, ...] = ("default", "acceptEdits", "plan", "bypassPe
 DEFAULT_PERMISSION_MODE = "default"
 
 SAFE_AGENT_TOOLS = ["Skill", "Bash", "Read", "LS", "Glob", "Grep"]
-GENERAL_AGENT_TOOLS = ["Read", "LS", "Glob", "Grep"]
-PORTAL_MCP_SERVER_ID = "portal"
-PORTAL_MCP_TOOL_NAMES = [
-    "portal_search_tables",
-    "portal_get_lineage",
-    "portal_resolve_datasource",
-    "portal_export_metadata",
-    "portal_get_table_ddl",
-    "portal_query_readonly",
-]
 
 RESERVED_ENV_KEYS = {"PATH", "HOME", "VIRTUAL_ENV", "TZ"}
 RESERVED_ENV_PREFIXES = (
@@ -48,8 +29,6 @@ RESERVED_ENV_PREFIXES = (
     "MYSQL_",
     "DORIS_",
     "REDIS_",
-    "ODW_",
-    "PORTAL_MCP_",
 )
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -180,11 +159,7 @@ def _validate_preset_questions(value: Any) -> list[str]:
 
 
 def available_mcp_servers() -> list[dict[str, Any]]:
-    servers = list_available_mcp_servers()
-    for server in servers:
-        if server.get("id") == PORTAL_MCP_SERVER_ID:
-            server["tool_names"] = list(PORTAL_MCP_TOOL_NAMES)
-    return servers
+    return list_available_mcp_servers()
 
 
 def available_mcp_server_ids() -> set[str]:
@@ -287,71 +262,6 @@ def default_agent_payload() -> dict[str, Any]:
     return {
         "agent_id": DEFAULT_AGENT_ID,
         "name": DEFAULT_AGENT_NAME,
-        "description": "通用对话与分析入口，不预置 OpenDataWorks 专属 Skills。",
-        "system_prompt": "",
-        "allowed_tools": list(GENERAL_AGENT_TOOLS),
-        "mcp_server_ids": [],
-        "skill_folders": [],
-        "max_turns": 0,
-        "env_vars": {},
-        "data_scope": {"allowed_scopes": []},
-        "is_default": True,
-        "is_builtin": True,
-    }
-
-
-def opendataworks_agent_payload() -> dict[str, Any]:
-    return {
-        "agent_id": OPENDATAWORKS_AGENT_ID,
-        "name": OPENDATAWORKS_AGENT_NAME,
-        "description": "面向 OpenDataWorks 数据门户、元数据、血缘、工作流、智能问数与数据开发场景。",
-        "system_prompt": (
-            "你是 OpenDataWorks 数据门户助手，优先围绕平台元数据、工作流、血缘、数据质量和智能问数场景提供帮助。"
-            "你同时具备数据开发能力：可以生成与润色 SQL、创建数据任务、组装工作流、发布与上线、配置调度。"
-            "数据开发以问数为主、开发为辅；执行开发动作时严格遵循 opendataworks-data-dev 技能的 playbook，"
-            "发布与上线等高危操作必须先预览再经用户确认，绝不跳过。"
-        ),
-        "allowed_tools": list(SAFE_AGENT_TOOLS),
-        "mcp_server_ids": [PORTAL_MCP_SERVER_ID],
-        "skill_folders": [
-            "opendataworks-business-knowledge",
-            "opendataworks-platform-tools",
-            "opendataworks-data-dev",
-        ],
-        "max_turns": 0,
-        "env_vars": {},
-        "data_scope": {"allowed_scopes": []},
-        "is_default": False,
-        "is_builtin": True,
-    }
-
-
-def ontology_modeling_agent_payload() -> dict[str, Any]:
-    return {
-        "agent_id": ONTOLOGY_MODELING_AGENT_ID,
-        "name": ONTOLOGY_MODELING_AGENT_NAME,
-        "description": "根据业务需求、上传文档和数据库表字段创建特定业务域本体语义 Skill。",
-        "system_prompt": "你是 OpenDataWorks 本体建模助手，专注把用户需求、上传文档和数据库表字段整理成可复用的领域本体语义 Skill。",
-        "allowed_tools": list(SAFE_AGENT_TOOLS),
-        "mcp_server_ids": [PORTAL_MCP_SERVER_ID],
-        "skill_folders": ["ontology-modeling-assistant"],
-        "max_turns": 0,
-        "env_vars": {},
-        "data_scope": {"allowed_scopes": []},
-        "preset_questions": [
-            "帮我根据上传文档和候选表创建一个业务域本体 Skill",
-            "把这些业务术语、表字段和指标口径整理成本体 JSON",
-            "检查这个领域本体的对象、关系和 semantic_edges 是否完整",
-        ],
-        "is_default": False,
-        "is_builtin": True,
-    }
-
-
-def ontofoundry_agent_payload() -> dict[str, Any]:
-    return {
-        "agent_id": ONTOFOUNDRY_AGENT_ID,
-        "name": ONTOFOUNDRY_AGENT_NAME,
         "description": "基于会话材料和当前草稿进行 Apache Ossie 本体建模与概念澄清。",
         "system_prompt": (
             "你是 OntoFoundry 本体建模助手。OntoFoundry 会在每轮把当前本体 JSON "
@@ -362,7 +272,7 @@ def ontofoundry_agent_payload() -> dict[str, Any]:
         ),
         "allowed_tools": list(SAFE_AGENT_TOOLS),
         "mcp_server_ids": [],
-        "skill_folders": ["ontofoundry-modeling-assistant", "md2ossie"],
+        "skill_folders": ["md2ossie"],
         "max_turns": 0,
         "env_vars": {},
         "data_scope": {"allowed_scopes": []},
@@ -371,7 +281,7 @@ def ontofoundry_agent_payload() -> dict[str, Any]:
             "帮我澄清一个业务概念",
             "检查当前本体中的对象、属性与关系是否完整",
         ],
-        "is_default": False,
+        "is_default": True,
         "is_builtin": True,
     }
 
@@ -591,6 +501,35 @@ class AgentProfileStore:
         finally:
             conn.close()
 
+    def remove_noncanonical_builtin_profiles(self, default_snapshot: dict[str, Any]) -> None:
+        """Move old built-in bindings to the sole OntoFoundry built-in."""
+        self._ensure_ready()
+        snapshot_json = _json_dump(build_agent_snapshot(default_snapshot))
+        conn = self._connect(database=self._schema_name())
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE da_agent_topic SET agent_id = %s, agent_snapshot_json = %s "
+                    "WHERE agent_id IN ("
+                    "SELECT agent_id FROM da_agent_profile WHERE is_builtin = 1 AND agent_id <> %s"
+                    ")",
+                    (DEFAULT_AGENT_ID, snapshot_json, DEFAULT_AGENT_ID),
+                )
+                cur.execute(
+                    "UPDATE da_agent_task SET agent_id = %s, agent_snapshot_json = %s "
+                    "WHERE agent_id IN ("
+                    "SELECT agent_id FROM da_agent_profile WHERE is_builtin = 1 AND agent_id <> %s"
+                    ")",
+                    (DEFAULT_AGENT_ID, snapshot_json, DEFAULT_AGENT_ID),
+                )
+                cur.execute(
+                    "DELETE FROM da_agent_profile WHERE is_builtin = 1 AND agent_id <> %s",
+                    (DEFAULT_AGENT_ID,),
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
 
 _agent_profile_store = AgentProfileStore()
 
@@ -602,18 +541,10 @@ def get_agent_profile_store() -> AgentProfileStore:
 def bootstrap_default_agent_profile() -> dict[str, Any]:
     store = get_agent_profile_store()
     store.init_schema()
-    default_profile = store.get_profile(DEFAULT_AGENT_ID)
-    if not default_profile:
-        default_profile = store.save_profile(default_agent_payload())
-    opendataworks_profile = store.get_profile(OPENDATAWORKS_AGENT_ID)
-    if not opendataworks_profile:
-        store.save_profile(opendataworks_agent_payload())
-    ontology_modeling_profile = store.get_profile(ONTOLOGY_MODELING_AGENT_ID)
-    if not ontology_modeling_profile:
-        store.save_profile(ontology_modeling_agent_payload())
-    ontofoundry_profile = store.get_profile(ONTOFOUNDRY_AGENT_ID)
-    if not ontofoundry_profile:
-        store.save_profile(ontofoundry_agent_payload())
+    # The bundled profile is a versioned platform contract, not editable user
+    # data. Reconcile it on startup while leaving custom profiles untouched.
+    default_profile = store.save_profile(default_agent_payload())
+    store.remove_noncanonical_builtin_profiles(default_profile)
     store.backfill_default_bindings(default_profile)
     return default_profile
 
@@ -705,71 +636,6 @@ def skill_folders_from_documents(skill_documents: list[dict[str, Any]]) -> set[s
 
 
 def list_data_scope_options() -> list[dict[str, Any]]:
-    cfg = get_settings()
-    metadata_schema = str(cfg.mysql_database or "opendataworks").strip() or "opendataworks"
-    rows: list[dict[str, Any]] = []
-    conn = pymysql.connect(
-        host=cfg.mysql_host,
-        port=cfg.mysql_port,
-        user=cfg.mysql_user,
-        password=cfg.mysql_password,
-        database=metadata_schema,
-        charset="utf8mb4",
-        cursorclass=pymysql.cursors.DictCursor,
-    )
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"""
-                SELECT
-                    dt.cluster_id,
-                    COALESCE(dc.cluster_name, '') AS cluster_name,
-                    COALESCE(NULLIF(dc.source_type, ''), 'DORIS') AS source_type,
-                    dt.db_name AS database_name
-                FROM `{metadata_schema}`.`data_table` dt
-                LEFT JOIN `{metadata_schema}`.`doris_cluster` dc
-                    ON dc.id = dt.cluster_id
-                WHERE dt.deleted = 0
-                  AND (dt.status IS NULL OR dt.status <> 'deprecated')
-                  AND dt.db_name IS NOT NULL
-                  AND dt.db_name <> ''
-                GROUP BY dt.cluster_id, dc.cluster_name, dc.source_type, dt.db_name
-                ORDER BY dc.cluster_name ASC, dt.db_name ASC
-                """
-            )
-            rows.extend(dict(item) for item in (cur.fetchall() or []))
-    finally:
-        conn.close()
-
-    platform_database = str(cfg.mysql_database or "").strip()
-    if platform_database:
-        rows.append(
-            {
-                "cluster_id": None,
-                "cluster_name": "platform-mysql",
-                "source_type": "MYSQL",
-                "database_name": platform_database,
-            }
-        )
-
-    result: list[dict[str, Any]] = []
-    seen: set[tuple[int | None, str]] = set()
-    for row in rows:
-        database = str(row.get("database_name") or row.get("database") or "").strip()
-        if not database:
-            continue
-        cluster_id = row.get("cluster_id")
-        cluster_id = int(cluster_id) if cluster_id not in (None, "") else None
-        key = (cluster_id, database)
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(
-            {
-                "cluster_id": cluster_id,
-                "cluster_name": str(row.get("cluster_name") or ""),
-                "source_type": str(row.get("source_type") or "").upper(),
-                "database": database,
-            }
-        )
-    return result
+    # OntoFoundry does not read another platform's metadata database. Keep the
+    # extension endpoint stable; future data-source plugins can supply options.
+    return []

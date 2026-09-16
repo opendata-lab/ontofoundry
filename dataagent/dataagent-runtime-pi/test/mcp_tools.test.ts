@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { connectMcpServers, createMcpTransport } from "../src/mcp/portal-mcp-client.js";
+import { connectMcpServers, createMcpTransport } from "../src/mcp/mcp-client.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 test("connectMcpServers returns empty tools when servers list is empty or undefined", async () => {
@@ -17,10 +17,10 @@ test("connectMcpServers handles unreachable server gracefully without crashing",
   const result = await connectMcpServers(
     [
       {
-        name: "portal",
+        name: "catalog",
         url: "http://127.0.0.1:59999/mcp/",
         type: "http",
-        headers: { "X-Portal-MCP-Token": "fake" },
+        headers: { Authorization: "Bearer fake" },
       },
     ],
     { connectTimeoutMs: 500 }
@@ -55,7 +55,7 @@ import {
   resolvePropertySchema,
   isObjectProperty,
   formatSchemaHelp,
-} from "../src/mcp/portal-mcp-client.js";
+} from "../src/mcp/mcp-client.js";
 
 const SAMPLE_SCHEMA = {
   $defs: {
@@ -96,10 +96,10 @@ test("resolveRef and resolvePropertySchema resolve local $defs correctly", () =>
 
 test("prepareArguments preserves native object arguments", () => {
   const input = {
-    params: { database: "opendataworks", table: "workflow_publish_record" },
+    params: { database: "crm", table: "workflow_publish_record" },
     extra_flag: true,
   };
-  const prepared = prepareArguments(input, SAMPLE_SCHEMA, "portal_get_table_ddl");
+  const prepared = prepareArguments(input, SAMPLE_SCHEMA, "catalog_get_table_schema");
 
   assert.deepEqual(prepared, input);
   assert.equal(typeof prepared.params, "object");
@@ -107,28 +107,28 @@ test("prepareArguments preserves native object arguments", () => {
 
 test("prepareArguments restores valid JSON string to object for object property", () => {
   const input = {
-    params: JSON.stringify({ database: "opendataworks", table: "workflow_publish_record" }),
+    params: JSON.stringify({ database: "crm", table: "workflow_publish_record" }),
     extra_flag: true,
   };
-  const prepared = prepareArguments(input, SAMPLE_SCHEMA, "portal_get_table_ddl");
+  const prepared = prepareArguments(input, SAMPLE_SCHEMA, "catalog_get_table_schema");
 
   assert.deepEqual(prepared, {
-    params: { database: "opendataworks", table: "workflow_publish_record" },
+    params: { database: "crm", table: "workflow_publish_record" },
     extra_flag: true,
   });
   assert.equal(typeof prepared.params, "object");
-  assert.equal((prepared.params as any).database, "opendataworks");
+  assert.equal((prepared.params as any).database, "crm");
 });
 
 test("prepareArguments rejects invalid JSON string with schema help and example", () => {
   const input = {
-    params: "{database: opendataworks",
+    params: "{database: crm",
   };
 
   assert.throws(
-    () => prepareArguments(input, SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments(input, SAMPLE_SCHEMA, "catalog_get_table_schema"),
     (err: Error) => {
-      assert.match(err.message, /Failed to parse 'portal_get_table_ddl\.params' as JSON string/);
+      assert.match(err.message, /Failed to parse 'catalog_get_table_schema\.params' as JSON string/);
       assert.match(err.message, /database: string \(required\)/);
       assert.match(err.message, /table: string \(required\)/);
       assert.match(err.message, /Correct call format: \{"params":\{/);
@@ -139,25 +139,25 @@ test("prepareArguments rejects invalid JSON string with schema help and example"
 
 test("prepareArguments rejects string that parses to non-object (array, null, number)", () => {
   assert.throws(
-    () => prepareArguments({ params: "[1, 2, 3]" }, SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments({ params: "[1, 2, 3]" }, SAMPLE_SCHEMA, "catalog_get_table_schema"),
     (err: Error) => {
-      assert.match(err.message, /Parsed 'portal_get_table_ddl\.params' must be a non-null object, got array/);
+      assert.match(err.message, /Parsed 'catalog_get_table_schema\.params' must be a non-null object, got array/);
       return true;
     }
   );
 
   assert.throws(
-    () => prepareArguments({ params: "null" }, SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments({ params: "null" }, SAMPLE_SCHEMA, "catalog_get_table_schema"),
     (err: Error) => {
-      assert.match(err.message, /Parsed 'portal_get_table_ddl\.params' must be a non-null object, got null/);
+      assert.match(err.message, /Parsed 'catalog_get_table_schema\.params' must be a non-null object, got null/);
       return true;
     }
   );
 
   assert.throws(
-    () => prepareArguments({ params: "123" }, SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments({ params: "123" }, SAMPLE_SCHEMA, "catalog_get_table_schema"),
     (err: Error) => {
-      assert.match(err.message, /Parsed 'portal_get_table_ddl\.params' must be a non-null object, got number/);
+      assert.match(err.message, /Parsed 'catalog_get_table_schema\.params' must be a non-null object, got number/);
       return true;
     }
   );
@@ -165,22 +165,22 @@ test("prepareArguments rejects string that parses to non-object (array, null, nu
 
 test("prepareArguments rejects non-object raw arguments or non-object values", () => {
   assert.throws(
-    () => prepareArguments("not an object", SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments("not an object", SAMPLE_SCHEMA, "catalog_get_table_schema"),
     /must be a JSON object/
   );
 
   assert.throws(
-    () => prepareArguments(null, SAMPLE_SCHEMA, "portal_get_table_ddl"),
+    () => prepareArguments(null, SAMPLE_SCHEMA, "catalog_get_table_schema"),
     /must be a JSON object/
   );
 
   assert.throws(
-    () => prepareArguments({ params: 42 }, SAMPLE_SCHEMA, "portal_get_table_ddl"),
-    /Field 'portal_get_table_ddl\.params' must be a non-null object, got number/
+    () => prepareArguments({ params: 42 }, SAMPLE_SCHEMA, "catalog_get_table_schema"),
+    /Field 'catalog_get_table_schema\.params' must be a non-null object, got number/
   );
 
   assert.throws(
-    () => prepareArguments({ params: ["list"] }, SAMPLE_SCHEMA, "portal_get_table_ddl"),
-    /Field 'portal_get_table_ddl\.params' must be a non-null object, got array/
+    () => prepareArguments({ params: ["list"] }, SAMPLE_SCHEMA, "catalog_get_table_schema"),
+    /Field 'catalog_get_table_schema\.params' must be a non-null object, got array/
   );
 });

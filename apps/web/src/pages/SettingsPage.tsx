@@ -170,29 +170,24 @@ export function SettingsPage() {
             </form>
           )}
         </section>
+        {/* 这里只留用户用得上的两条：问数能不能用，材料该传成什么样。
+            原本还列了「协议」和「内置方法」：协议是写死的字面量，后端支持两种
+            api_format 之后它可能是错的，而 ontofoundry 本就不知道管理员配了哪种；
+            「内置方法」是 skill 目录名，属内部实现。模型那行的值是固定的运行时名
+            而非模型名，标签却写「内网大模型」——三条都不可操作，也无法自证。 */}
         <section className="detail-section">
-          <h2>大模型与内置方法</h2>
+          <h2>智能问数</h2>
           <dl className="ref-definition">
             <div>
-              <dt>内网大模型</dt>
-              <dd>{cap?.agent_configured ? cap.model : "尚未配置"}</dd>
-            </div>
-            <div>
-              <dt>协议</dt>
-              <dd>Anthropic Messages API</dd>
-            </div>
-            <div>
-              <dt>内置方法</dt>
-              <dd>md2ossie · ontology-clarifier</dd>
+              <dt>状态</dt>
+              <dd>{cap?.agent_configured ? "可用" : "尚未配置"}</dd>
             </div>
             <div>
               <dt>材料格式</dt>
               <dd>Markdown · 最大 {cap?.max_file_mb ?? 256} MB</dd>
             </div>
           </dl>
-          <p className="muted">
-            模型接口与连接加密主密钥由服务器环境配置，密钥不会在页面中显示。
-          </p>
+          <p className="muted">模型接口由服务器环境配置。</p>
         </section>
       </div>
     </div>

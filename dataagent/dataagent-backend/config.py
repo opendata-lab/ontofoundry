@@ -63,42 +63,18 @@ class Settings(BaseSettings):
     )
     dataagent_database_schema: str = "public"
 
-    # ---- 可选外部 MySQL 数据源（不用于 DataAgent 自身存储）----
-    mysql_host: str = "localhost"
-    mysql_port: int = 3306
-    mysql_user: str = "dataagent"
-    mysql_password: str = "dataagent123"
-    mysql_database: str = "opendataworks"
-
     # ---- Redis（task 协调）----
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
     redis_password: str = ""
     redis_db: int = 0
 
-    # ---- Doris（查询工具）----
-    doris_host: str = "localhost"
-    doris_port: int = 9030
-    doris_user: str = "root"
-    doris_password: str = ""
-    doris_database: str = ""
-
     # ---- Skills ----
     skills_root_dir: str = ""
-    skills_output_dir: str = "../.claude/skills/opendataworks-business-knowledge"
+    skills_output_dir: str = "../.claude/skills/md2ossie"
     dataagent_upload_max_bytes: int = 20 * 1024 * 1024
-    # Legacy portal MCP deployment input. Startup imports these values only when
-    # the registry has no portal row; task execution reads da_mcp_server only.
-    dataagent_portal_mcp_enabled: bool = True
-    dataagent_portal_mcp_base_url: str = ""
-    dataagent_portal_mcp_token: str = ""
-    dataagent_portal_mcp_token_header_name: str = "X-Portal-MCP-Token"
-    # Runtime 进程级 MCP_TOOL_TIMEOUT。虽然配置名沿用 portal 前缀，该值也会
-    # 作用于同一进程中的其它 MCP server。180s 覆盖
-    # portal_query_readonly 的 120s 契约上限，且低于交互 run 总预算 360s；若调到
-    # 300s 以上，还必须同步验证 Pi 的工具超时设置。
-    # 见 docs/design/2026-08-17-portal-mcp-streamable-http-design.md
-    dataagent_portal_mcp_tool_timeout_seconds: int = 180
+    # Runtime process-level timeout shared by configured MCP servers.
+    dataagent_mcp_tool_timeout_seconds: int = 180
 
     # ---- Pi runtime（唯一数据面引擎）----
     # Empty values fall back to `node` on PATH and the in-repo build output.

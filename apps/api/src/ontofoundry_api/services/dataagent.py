@@ -1,4 +1,4 @@
-"""Thin integration client for the vendored OpenDataWorks DataAgent service.
+"""Thin integration client for the OntoFoundry Agent master service.
 
 OntoFoundry remains authoritative for workspaces, modeling drafts and candidate
 acceptance.  DataAgent owns the conversation/runtime lifecycle, including its
@@ -114,17 +114,17 @@ class DataAgentClient:
     async def create_topic(self, title: str, agent_id: str) -> dict[str, Any]:
         return await self._json(
             "POST",
-            "/api/v1/nl2sql/topics",
+            "/api/v1/agent/topics",
             json_body={"title": title, "agent_id": agent_id},
         )
 
     async def delete_topic(self, topic_id: str) -> dict[str, Any]:
-        return await self._json("DELETE", f"/api/v1/nl2sql/topics/{topic_id}")
+        return await self._json("DELETE", f"/api/v1/agent/topics/{topic_id}")
 
     async def upload(self, topic_id: str, name: str, content: bytes, media_type: str) -> dict[str, Any]:
         return await self._json(
             "POST",
-            f"/api/v1/nl2sql/topics/{topic_id}/files",
+            f"/api/v1/agent/topics/{topic_id}/files",
             files={"file": (Path(name).name, content, media_type)},
         )
 
@@ -138,7 +138,7 @@ class DataAgentClient:
     ) -> dict[str, Any]:
         return await self._json(
             "POST",
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json_body={
                 "topic_id": topic_id,
                 "content": content,
@@ -149,13 +149,13 @@ class DataAgentClient:
         )
 
     async def task(self, task_id: str) -> dict[str, Any]:
-        return await self._json("GET", f"/api/v1/nl2sql/tasks/{task_id}")
+        return await self._json("GET", f"/api/v1/agent/tasks/{task_id}")
 
     async def task_message(self, task_id: str) -> dict[str, Any]:
-        return await self._json("GET", f"/api/v1/nl2sql/tasks/{task_id}/message")
+        return await self._json("GET", f"/api/v1/agent/tasks/{task_id}/message")
 
     async def cancel(self, task_id: str) -> dict[str, Any]:
-        return await self._json("POST", f"/api/v1/nl2sql/tasks/{task_id}/cancel")
+        return await self._json("POST", f"/api/v1/agent/tasks/{task_id}/cancel")
 
     async def stream(self, task_id: str, after_id: int = 0) -> AsyncIterator[bytes]:
         timeout = httpx.Timeout(
@@ -169,7 +169,7 @@ class DataAgentClient:
                 httpx.AsyncClient(base_url=self.base_url, timeout=timeout) as client,
                 client.stream(
                     "GET",
-                    f"/api/v1/nl2sql/tasks/{task_id}/agent-events/stream",
+                    f"/api/v1/agent/tasks/{task_id}/agent-events/stream",
                     params={"after_id": max(0, after_id)},
                     headers={"Accept": "text/event-stream"},
                 ) as response,

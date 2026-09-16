@@ -21,7 +21,6 @@ from core.skill_discovery import (
     resolve_skill_discovery_root_dir,
 )
 
-PLATFORM_TOOLS_SKILL_FOLDER = "opendataworks-platform-tools"
 SYSTEM_PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "data_agent_system_prompt.md"
 FILE_BOUNDARY_PATH_KEYS = {
     "Read": ("file_path", "path"),
@@ -148,12 +147,6 @@ def build_runtime_env(
     ).resolve()
     enabled_folders = [str(item) for item in ((skill_runtime or {}).get("enabled_folders") or [])]
     enabled_roots = dict((skill_runtime or {}).get("enabled_roots") or {})
-    platform_skill_root = str(enabled_roots.get(PLATFORM_TOOLS_SKILL_FOLDER) or "").strip()
-    if not platform_skill_root:
-        sibling = skills_root.parent / PLATFORM_TOOLS_SKILL_FOLDER
-        if sibling.is_dir():
-            platform_skill_root = str(sibling)
-
     runtime_env = dict(os.environ)
     runtime_env.update(provider_env)
     sql_timeout = int(getattr(params, "sql_read_timeout_seconds", 0) or 0)
@@ -178,12 +171,10 @@ def build_runtime_env(
             "PATH": f"{python_bin.parent}:{os.getenv('PATH', '')}",
             "TZ": str(os.getenv("TZ") or "Asia/Shanghai"),
             "MCP_TOOL_TIMEOUT": str(
-                max(1, int(getattr(cfg, "dataagent_portal_mcp_tool_timeout_seconds", 0) or 180)) * 1000
+                max(1, int(getattr(cfg, "dataagent_mcp_tool_timeout_seconds", 0) or 180)) * 1000
             ),
         }
     )
-    if platform_skill_root:
-        runtime_env["DATAAGENT_PLATFORM_SKILL_ROOT"] = str(Path(platform_skill_root).resolve())
     agent_env = (getattr(params, "agent_snapshot", None) or {}).get("env_vars") or {}
     if isinstance(agent_env, dict):
         runtime_env.update({str(key): str(value) for key, value in agent_env.items()})
@@ -192,10 +183,8 @@ def build_runtime_env(
 
 def build_mcp_servers(
     mcp_server_ids: list[str] | tuple[str, ...] | None = None,
-    *,
-    agent_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    return resolve_runtime_mcp_servers(mcp_server_ids, agent_snapshot=agent_snapshot)
+    return resolve_runtime_mcp_servers(mcp_server_ids)
 
 
 def default_model_for_provider(provider_id: str) -> str:

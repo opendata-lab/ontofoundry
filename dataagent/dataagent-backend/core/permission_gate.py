@@ -67,7 +67,7 @@ POST_PLAN_MODE: str = "acceptEdits"
 
 # Confirmation-card annotation keys the skill attaches to a write tool call so the
 # generic gate can render a meaningful card (title/diff summary). They are gate
-# metadata, not part of any downstream tool schema — the portal MCP write tools
+# metadata, not part of any downstream tool schema — MCP write tools
 # use ``extra="forbid"`` and would reject the call after approval if these leaked
 # through. The gate consumes them for the card and strips them before forwarding.
 CARD_ANNOTATION_KEYS: frozenset[str] = frozenset({"title", "summary"})
@@ -122,7 +122,7 @@ def is_high_risk_tool(tool_name: str) -> bool:
 def plan_denies_tool(tool_name: str) -> bool:
     """Whether ``tool_name`` must be denied under ``plan`` mode.
 
-    Covers portal MCP write tools and the built-in file-mutation tools
+    Covers MCP write tools and the built-in file-mutation tools
     (``PLAN_DENIED_BUILTIN_TOOLS``). Defense in depth: these are not in the
     auto-allow set, but if the model invokes one it must not run before the plan is
     approved; after approval the run switches to acceptEdits where they auto-allow.
@@ -134,7 +134,7 @@ def plan_denies_tool(tool_name: str) -> bool:
     scratch dirs (``dataagent_workspace_scratch_dirs``, ``/tmp`` by default, and in
     sandbox mode a per-container tmpfs). This is an accepted trust
     boundary, not a hard guarantee: the sandbox forwards DB/portal credentials
-    (``MYSQL_`` / ``DATAAGENT_PORTAL_`` / ``ODW_`` env) into the child, so Bash could
+    (provider credentials and internal service tokens) into the child, so Bash could
     in principle reach platform state outside the gated MCP path. Plan mode relies on
     the model honoring read-only research here rather than on Bash being incapable."""
     bare = _bare_tool_name(tool_name)

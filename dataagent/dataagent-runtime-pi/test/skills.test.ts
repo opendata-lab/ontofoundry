@@ -10,7 +10,7 @@ import { WorkspaceBoundaryEnforcer } from "../src/policy/workspace-boundary-enfo
 test("Skill tool is registered when skills are enabled", async () => {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "pi-skills-test-"));
   try {
-    const skillDir = path.join(tmpDir, "opendataworks-platform-tools");
+    const skillDir = path.join(tmpDir, "custom-platform-tools");
     await fs.mkdir(skillDir, { recursive: true });
     await fs.writeFile(path.join(skillDir, "SKILL.md"), "# Test Skill Content\nRun SQL and inspect metadata.");
 
@@ -31,7 +31,7 @@ test("Skill tool is registered when skills are enabled", async () => {
       boundary,
       workspaceRoot: tmpDir,
       runtimeEnv: {},
-      skills: [{ name: "opendataworks-platform-tools", root_path: skillDir }],
+      skills: [{ name: "custom-platform-tools", root_path: skillDir }],
     }) as Array<{ name: string; execute: Function }>;
 
     const skillTool = tools.find((t) => t.name === "Skill");
@@ -39,7 +39,7 @@ test("Skill tool is registered when skills are enabled", async () => {
 
     // Execute Skill tool with enabled skill
     const successResult = await skillTool.execute("call-1", {
-      skill_name: "opendataworks-platform-tools",
+      skill_name: "custom-platform-tools",
     });
     assert.equal(successResult.isError, undefined);
     assert.match(successResult.content[0].text, /Test Skill Content/);

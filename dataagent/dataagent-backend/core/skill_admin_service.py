@@ -19,6 +19,7 @@ import httpx
 from config import get_settings, update_settings
 
 from core.runtime_registry_store import get_runtime_registry_store
+from core.provider_runtime import normalize_api_format
 from core.skill_admin_store import get_skill_admin_store
 from core.skill_discovery import (
     resolve_skill_discovery_root_dir,
@@ -33,19 +34,10 @@ MANAGED_FILE_SUFFIXES = {".json", ".md", ".markdown", ".py"}
 DEFAULT_PROVIDER_ID = "openrouter"
 MODEL_DETECTION_TIMEOUT_SECONDS = 30
 LEGACY_SQL_SKILL_FOLDER = "dataagent-nl2sql"
-DEFAULT_PRIMARY_SKILL_FOLDER = "opendataworks-business-knowledge"
-PLATFORM_TOOLS_SKILL_FOLDER = "opendataworks-platform-tools"
-ONTOLOGY_MODELING_SKILL_FOLDER = "ontology-modeling-assistant"
+DEFAULT_PRIMARY_SKILL_FOLDER = "md2ossie"
 DEFAULT_SKILLS_OUTPUT_DIR = f"../.claude/skills/{DEFAULT_PRIMARY_SKILL_FOLDER}"
-BUILTIN_SKILL_FOLDERS = {
-    DEFAULT_PRIMARY_SKILL_FOLDER,
-    PLATFORM_TOOLS_SKILL_FOLDER,
-    ONTOLOGY_MODELING_SKILL_FOLDER,
-}
-DEFAULT_ENABLED_BUILTIN_SKILL_FOLDERS = (
-    DEFAULT_PRIMARY_SKILL_FOLDER,
-    PLATFORM_TOOLS_SKILL_FOLDER,
-)
+BUILTIN_SKILL_FOLDERS = {DEFAULT_PRIMARY_SKILL_FOLDER}
+DEFAULT_ENABLED_BUILTIN_SKILL_FOLDERS = (DEFAULT_PRIMARY_SKILL_FOLDER,)
 SKILL_FOLDER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 PROVIDER_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
@@ -98,16 +90,6 @@ RUNTIME_SETTING_KEYS = {
     "anthropic_api_key",
     "anthropic_auth_token",
     "anthropic_base_url",
-    "mysql_host",
-    "mysql_port",
-    "mysql_user",
-    "mysql_password",
-    "mysql_database",
-    "doris_host",
-    "doris_port",
-    "doris_user",
-    "doris_password",
-    "doris_database",
     "skills_output_dir",
 }
 
@@ -143,16 +125,6 @@ def _runtime_settings_payload() -> dict[str, Any]:
         "anthropic_api_key": cfg.anthropic_api_key,
         "anthropic_auth_token": cfg.anthropic_auth_token,
         "anthropic_base_url": cfg.anthropic_base_url,
-        "mysql_host": cfg.mysql_host,
-        "mysql_port": cfg.mysql_port,
-        "mysql_user": cfg.mysql_user,
-        "mysql_password": cfg.mysql_password,
-        "mysql_database": cfg.mysql_database,
-        "doris_host": cfg.doris_host,
-        "doris_port": cfg.doris_port,
-        "doris_user": cfg.doris_user,
-        "doris_password": cfg.doris_password,
-        "doris_database": cfg.doris_database,
         "skills_output_dir": cfg.skills_output_dir,
         # Widget allowlist is managed exclusively from the settings page and
         # persisted in da_agent_settings; there is no env-var source.
@@ -548,7 +520,7 @@ def _merge_settings_payload(current: dict[str, Any] | None, patch: dict[str, Any
     for key, value in update.items():
         if key in {"provider_settings", "providers", "skill_runtime"} or value is None:
             continue
-        if key in {"anthropic_api_key", "anthropic_auth_token", "mysql_password", "doris_password"} and not str(value or "").strip():
+        if key in {"anthropic_api_key", "anthropic_auth_token"} and not str(value or "").strip():
             continue
         base[key] = value
 
@@ -596,16 +568,6 @@ def _merge_settings_payload(current: dict[str, Any] | None, patch: dict[str, Any
         "anthropic_api_key": str(runtime_provider.get("api_key") or base.get("anthropic_api_key") or ""),
         "anthropic_auth_token": str(runtime_provider.get("auth_token") or base.get("anthropic_auth_token") or ""),
         "anthropic_base_url": str(runtime_provider.get("base_url") or base.get("anthropic_base_url") or ""),
-        "mysql_host": str(base.get("mysql_host") or ""),
-        "mysql_port": int(base.get("mysql_port") or 3306),
-        "mysql_user": str(base.get("mysql_user") or ""),
-        "mysql_password": str(base.get("mysql_password") or ""),
-        "mysql_database": str(base.get("mysql_database") or ""),
-        "doris_host": str(base.get("doris_host") or ""),
-        "doris_port": int(base.get("doris_port") or 9030),
-        "doris_user": str(base.get("doris_user") or ""),
-        "doris_password": str(base.get("doris_password") or ""),
-        "doris_database": str(base.get("doris_database") or ""),
         "skills_output_dir": normalized_skills_output_dir,
         "provider_settings": provider_settings,
         "skill_runtime": skill_runtime,
@@ -629,16 +591,6 @@ def runtime_patch_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "anthropic_api_key",
         "anthropic_auth_token",
         "anthropic_base_url",
-        "mysql_host",
-        "mysql_port",
-        "mysql_user",
-        "mysql_password",
-        "mysql_database",
-        "doris_host",
-        "doris_port",
-        "doris_user",
-        "doris_password",
-        "doris_database",
         "skills_output_dir",
     }
     for key in passthrough:
@@ -889,12 +841,6 @@ def resolved_chat_settings_payload() -> dict[str, Any]:
         "default_model": default_model,
         "providers": providers,
         "skills_output_dir": str(resolved.get("skills_output_dir") or ""),
-        "mysql_host": str(resolved.get("mysql_host") or ""),
-        "mysql_port": int(resolved.get("mysql_port") or 3306),
-        "mysql_database": str(resolved.get("mysql_database") or ""),
-        "doris_host": str(resolved.get("doris_host") or ""),
-        "doris_port": int(resolved.get("doris_port") or 9030),
-        "doris_database": str(resolved.get("doris_database") or ""),
     }
 
 
@@ -966,6 +912,10 @@ def resolve_runtime_provider_selection(provider_id: str | None, model: str | Non
     return {
         "provider_id": normalized_provider_id,
         "provider_type": str(provider.get("provider_type") or "anthropic_compatible"),
+        # The protocol the provider speaks. provider_type names the vendor family
+        # and does not imply a request shape, so the two cannot be derived from
+        # each other — a self-hosted gateway can serve either.
+        "api_format": normalize_api_format(provider.get("api_format")),
         "model": selected_model,
         "api_key": str(provider.get("api_key") or ""),
         "auth_token": str(provider.get("auth_token") or ""),
@@ -1039,7 +989,20 @@ def _is_skill_enabled(folder: str, skill_runtime: dict[str, dict[str, bool]] | N
     return bool((runtime.get(folder_name) or {}).get("enabled"))
 
 
-def _document_api_payload(document: dict[str, Any]) -> dict[str, Any]:
+def _document_api_payload(
+    document: dict[str, Any],
+    *,
+    skill_runtime: dict[str, dict[str, bool]] | None = None,
+    description_cache: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Shape one stored document for the API.
+
+    `skill_runtime` and `description_cache` let a caller resolve the shared
+    per-request state once. Without them this reloads settings from the database
+    and re-parses the folder's SKILL.md for every single document — and neither
+    store pools connections, so a list of N documents opens N fresh ones. See
+    `list_documents`.
+    """
     payload = dict(document or {})
     full_relative_path = str(payload.get("relative_path") or "").replace("\\", "/").strip("/")
     folder = _skill_folder_name(full_relative_path)
@@ -1047,27 +1010,39 @@ def _document_api_payload(document: dict[str, Any]) -> dict[str, Any]:
     payload["relative_path"] = _relative_path_within_skill(full_relative_path)
     payload["source"] = _skill_source(folder)
     payload["editable"] = True
-    payload["enabled"] = _is_skill_enabled(folder)
+    payload["enabled"] = _is_skill_enabled(folder, skill_runtime)
     # Every SKILL.md in this repo declares what the skill is for, and none of it
     # reached the UI: the list had no description field, so the client filled
     # that column with last_change_summary — the reindex note, identical on
     # every row ("发现磁盘文件") and looking like content while saying nothing.
-    payload["description"] = _skill_description_from_front_matter(folder)
+    payload["description"] = _skill_description_from_front_matter(folder, description_cache)
     return payload
 
 
-def _skill_description_from_front_matter(folder: str) -> str:
+def _skill_description_from_front_matter(
+    folder: str,
+    description_cache: dict[str, str] | None = None,
+) -> str:
     if not folder:
         return ""
+    if description_cache is not None and folder in description_cache:
+        return description_cache[folder]
+    description = ""
     try:
         skill_md = (resolve_skill_discovery_root_dir() / folder / "SKILL.md").resolve()
     except Exception:
-        return ""
-    try:
-        return _front_matter_value(skill_md, "description")
-    except ValueError:
-        # Unreadable front matter is not worth failing a list request over.
-        return ""
+        skill_md = None
+    if skill_md is not None:
+        try:
+            description = _front_matter_value(skill_md, "description")
+        except ValueError:
+            # Unreadable front matter is not worth failing a list request over.
+            description = ""
+    if description_cache is not None:
+        # Cache the miss too: a folder with no readable SKILL.md would otherwise
+        # be re-stat'ed once per document it owns.
+        description_cache[folder] = description
+    return description
 
 
 def _settings_path_for_skill_folder(folder: str) -> str:
@@ -1112,16 +1087,28 @@ def reindex_documents_from_disk(*, change_source: str = "import", change_summary
     _migrate_document_paths_to_discovery_root(store)
     managed_paths = managed_skill_files()
     managed_path_set = set(managed_paths)
-    for document in store.list_documents():
-        relative_path = str(document.get("relative_path") or "")
+    # One read of the index, reused for both the prune below and the hash
+    # comparison in the loop. The loop used to call get_document_by_path() per
+    # file, and neither store pools connections, so scanning N managed files
+    # opened N connections before a single row changed.
+    stored_by_path = {
+        str(document.get("relative_path") or ""): document
+        for document in store.list_documents()
+    }
+    for relative_path in list(stored_by_path):
         if relative_path and relative_path not in managed_path_set:
             store.delete_document_by_path(relative_path)
 
     changed: list[dict[str, Any]] = []
+    # Shared with the payload shaping below for the same reason list_documents()
+    # does it: a first-run reindex marks every file changed, and shaping each one
+    # would otherwise re-read settings once per file.
+    skill_runtime = _skill_runtime_from_current_settings()
+    description_cache: dict[str, str] = {}
     for relative_path in managed_paths:
         file_path = root / relative_path
         content = file_path.read_text(encoding="utf-8")
-        existing = store.get_document_by_path(relative_path)
+        existing = stored_by_path.get(relative_path)
         current_hash = existing.get("current_hash") if existing else None
         next_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
         if existing and current_hash == next_hash:
@@ -1133,13 +1120,23 @@ def reindex_documents_from_disk(*, change_source: str = "import", change_summary
             change_summary=change_summary,
             actor="system",
         )
-        changed.append(_document_api_payload(saved))
+        changed.append(
+            _document_api_payload(saved, skill_runtime=skill_runtime, description_cache=description_cache)
+        )
     return changed
 
 
 def list_documents() -> list[dict[str, Any]]:
     reindex_documents_from_disk()
-    documents = [_document_api_payload(item) for item in get_skill_admin_store().list_documents()]
+    # Resolve the shared state once per request. Passing it down is what keeps a
+    # list of N documents at one settings read and one SKILL.md parse per
+    # folder, instead of N of each.
+    skill_runtime = _skill_runtime_from_current_settings()
+    description_cache: dict[str, str] = {}
+    documents = [
+        _document_api_payload(item, skill_runtime=skill_runtime, description_cache=description_cache)
+        for item in get_skill_admin_store().list_documents()
+    ]
     documents.sort(key=lambda item: (str(item.get("folder") or ""), str(item.get("category") or ""), str(item.get("relative_path") or "")))
     return documents
 
@@ -1346,7 +1343,7 @@ def _raw_documents_for_skill(folder: str) -> list[dict[str, Any]]:
 
 
 def import_skill_from_zip(file_name: str, content: bytes) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="odw-skill-import-") as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix="of-skill-import-") as tmp_dir:
         extract_root = Path(tmp_dir) / "extracted"
         extract_root.mkdir(parents=True, exist_ok=True)
         _safe_extract_skill_zip(content, extract_root)

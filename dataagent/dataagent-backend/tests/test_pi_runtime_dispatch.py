@@ -193,19 +193,15 @@ async def test_missing_pi_runtime_reports_error_instead_of_raising(monkeypatch, 
 @pytest.mark.asyncio
 async def test_mcp_servers_and_history_forwarded(monkeypatch, tmp_path: Path):
     captured: dict[str, Any] = {}
-    cfg = get_settings()
-    monkeypatch.setattr(cfg, "dataagent_portal_mcp_enabled", True)
-    monkeypatch.setattr(cfg, "dataagent_portal_mcp_base_url", "http://portal-mcp:8801/mcp")
-    monkeypatch.setattr(cfg, "dataagent_portal_mcp_token", "test-token")
 
     class FakeRegistry:
         def list_mcp_servers(self):
             return [
                 {
-                    "server_id": "portal",
+                    "server_id": "catalog",
                     "transport": "http",
-                    "url": "http://registry-portal:8801/mcp",
-                    "headers": {"X-Portal-MCP-Token": "registry-token"},
+                    "url": "http://catalog-mcp:8801/mcp",
+                    "headers": {"Authorization": "Bearer registry-token"},
                     "enabled": True,
                 }
             ]
@@ -233,7 +229,7 @@ async def test_mcp_servers_and_history_forwarded(monkeypatch, tmp_path: Path):
     params.question = "what tables exist?"
 
     agent_snapshot = {
-        "mcp_server_ids": ["portal"],
+        "mcp_server_ids": ["catalog"],
         "data_scope": {"allowed_scopes": []},
     }
 
@@ -256,9 +252,9 @@ async def test_mcp_servers_and_history_forwarded(monkeypatch, tmp_path: Path):
     assert len(ctx.history) == 2
     assert ctx.history[0]["content"] == "hello"
     assert len(ctx.mcp_servers) == 1
-    assert ctx.mcp_servers[0]["name"] == "portal"
-    assert ctx.mcp_servers[0]["url"] == "http://registry-portal:8801/mcp/"
-    assert ctx.mcp_servers[0]["headers"]["X-Portal-MCP-Token"] == "registry-token"
+    assert ctx.mcp_servers[0]["name"] == "catalog"
+    assert ctx.mcp_servers[0]["url"] == "http://catalog-mcp:8801/mcp"
+    assert ctx.mcp_servers[0]["headers"]["Authorization"] == "Bearer registry-token"
     assert len(ctx.skills) == 1
     assert ctx.skills[0]["name"] == "test-skill"
 

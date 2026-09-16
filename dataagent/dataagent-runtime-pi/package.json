@@ -1,5 +1,5 @@
 {
-  "name": "@opendataworks/dataagent-runtime-pi",
+  "name": "@ontofoundry/agent-runtime-pi",
   "version": "0.1.0",
   "private": true,
   "type": "module",

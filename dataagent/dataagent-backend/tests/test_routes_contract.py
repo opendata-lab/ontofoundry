@@ -18,7 +18,7 @@ from core.agent_profile_service import normalize_permission_mode
 
 
 DEFAULT_AGENT = {
-    "agent_id": "agent_default",
+    "agent_id": "agent_ontofoundry",
     "name": "默认助手",
     "description": "default",
     "system_prompt": "",
@@ -320,7 +320,7 @@ class _FakeStore:
             "task_id": task_id,
             "topic_id": topic_id,
             "from_task_id": None,
-            "agent_id": self.topics[topic_id].get("agent_id", "agent_default"),
+            "agent_id": self.topics[topic_id].get("agent_id", "agent_ontofoundry"),
             "agent_snapshot": self.topics[topic_id].get("agent_snapshot", DEFAULT_AGENT),
             "agent": self.topics[topic_id].get("agent"),
             "task_status": "waiting",
@@ -686,7 +686,7 @@ def _build_client(monkeypatch):
 
     monkeypatch.setattr(routes, "get_topic_task_store", lambda: store)
     monkeypatch.setattr(routes, "get_task_coordinator", lambda: coordinator)
-    monkeypatch.setattr(routes, "get_agent_profile", lambda agent_id: DEFAULT_AGENT if agent_id == "agent_default" else None)
+    monkeypatch.setattr(routes, "get_agent_profile", lambda agent_id: DEFAULT_AGENT if agent_id == "agent_ontofoundry" else None)
     monkeypatch.setattr(routes, "submit_message_task", _submit_message_task_factory(store, submit_calls))
     monkeypatch.setattr(routes, "compute_next_run_at", lambda cron_expr, timezone: datetime(2026, 3, 23, 4, 0, 0))
 
@@ -703,24 +703,24 @@ def _build_client(monkeypatch):
 def test_topics_tasks_and_v2_routes(monkeypatch):
     client, store, coordinator, submit_calls = _build_client(monkeypatch)
     with client:
-        created = client.post("/api/v1/nl2sql/topics", json={"title": "智能问数测试话题"})
+        created = client.post("/api/v1/agent/topics", json={"title": "智能问数测试话题"})
         assert created.status_code == 200
         topic_id = created.json()["topic_id"]
 
-        listed = client.get("/api/v1/nl2sql/topics")
+        listed = client.get("/api/v1/agent/topics")
         assert listed.status_code == 200
         assert listed.json()[0]["topic_id"] == topic_id
 
-        detail = client.get(f"/api/v1/nl2sql/topics/{topic_id}")
+        detail = client.get(f"/api/v1/agent/topics/{topic_id}")
         assert detail.status_code == 200
         assert "messages" not in detail.json()
 
-        page = client.get(f"/api/v1/nl2sql/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
+        page = client.get(f"/api/v1/agent/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
         assert page.status_code == 200
         assert page.json()["items"] == []
 
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={
                 "topic_id": topic_id,
                 "content": "最近 30 天工作流发布次数趋势",
@@ -737,7 +737,7 @@ def test_topics_tasks_and_v2_routes(monkeypatch):
         assert payload["task_status"] == "waiting"
         assert len(store.topic_messages[topic_id]) == 2
 
-        history = client.get(f"/api/v1/nl2sql/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
+        history = client.get(f"/api/v1/agent/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
         assert history.status_code == 200
         assert history.json()["total"] == 2
         assert history.json()["items"][0]["sender_type"] == "user"
@@ -747,39 +747,39 @@ def test_topics_tasks_and_v2_routes(monkeypatch):
         assistant_message_id = history.json()["items"][1]["message_id"]
 
         feedback = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/feedback",
+            f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/feedback",
             json={"feedback": "like"},
         )
         assert feedback.status_code == 200
         assert feedback.json()["message_id"] == assistant_message_id
         assert feedback.json()["feedback"] == "like"
 
-        hydrated_feedback = client.get(f"/api/v1/nl2sql/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
+        hydrated_feedback = client.get(f"/api/v1/agent/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
         assert hydrated_feedback.status_code == 200
         assert hydrated_feedback.json()["items"][1]["feedback"] == "like"
 
         clear_feedback = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/feedback",
+            f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/feedback",
             json={"feedback": ""},
         )
         assert clear_feedback.status_code == 200
         assert clear_feedback.json()["feedback"] == ""
 
         invalid_feedback = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/feedback",
+            f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/feedback",
             json={"feedback": "star"},
         )
         assert invalid_feedback.status_code == 400
 
         user_message_id = history.json()["items"][0]["message_id"]
         user_feedback = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}/messages/{user_message_id}/feedback",
+            f"/api/v1/agent/topics/{topic_id}/messages/{user_message_id}/feedback",
             json={"feedback": "like"},
         )
         assert user_feedback.status_code == 400
 
         created_task = client.post(
-            "/api/v1/nl2sql/tasks",
+            "/api/v1/agent/tasks",
             json={
                 "topic_id": topic_id,
                 "message_type": "text",
@@ -794,12 +794,12 @@ def test_topics_tasks_and_v2_routes(monkeypatch):
         assert submit_calls[0]["message_content"] == "最近 30 天工作流发布次数趋势"
         assert submit_calls[1]["message_content"] == "第二个问题"
 
-        task = client.get(f"/api/v1/nl2sql/tasks/{task_id}")
+        task = client.get(f"/api/v1/agent/tasks/{task_id}")
         assert task.status_code == 200
         assert task.json()["task_id"] == task_id
         assert task.json()["task_status"] == "waiting"
 
-        task_message = client.get(f"/api/v1/nl2sql/tasks/{task_id}/message")
+        task_message = client.get(f"/api/v1/agent/tasks/{task_id}/message")
         assert task_message.status_code == 200
         assert task_message.json()["message_id"] == assistant_message_id
         assert task_message.json()["attachments"] == []
@@ -814,33 +814,33 @@ def test_topics_tasks_and_v2_routes(monkeypatch):
                 "kind": "output",
             }
         ]
-        task_message_with_files = client.get(f"/api/v1/nl2sql/tasks/{task_id}/message")
+        task_message_with_files = client.get(f"/api/v1/agent/tasks/{task_id}/message")
         assert task_message_with_files.status_code == 200
         assert task_message_with_files.json()["attachments"][0]["rel_path"] == "output/sales.xlsx"
-        history_with_files = client.get(f"/api/v1/nl2sql/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
+        history_with_files = client.get(f"/api/v1/agent/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
         assert history_with_files.json()["items"][1]["attachments"][0]["name"] == "sales.xlsx"
 
-        assert client.get("/api/v1/nl2sql/tasks/task_missing/message").status_code == 404
+        assert client.get("/api/v1/agent/tasks/task_missing/message").status_code == 404
 
-        agent_events = client.get(f"/api/v1/nl2sql/tasks/{task_id}/agent-events", params={"after_id": 0})
+        agent_events = client.get(f"/api/v1/agent/tasks/{task_id}/agent-events", params={"after_id": 0})
         assert agent_events.status_code == 200
         assert agent_events.json()["records"] == []
 
-        assert client.get(f"/api/v1/nl2sql/tasks/{task_id}/events", params={"after_seq": 0}).status_code == 404
-        assert client.get(f"/api/v1/nl2sql/tasks/{task_id}/events/stream", params={"after_seq": 0}).status_code == 404
+        assert client.get(f"/api/v1/agent/tasks/{task_id}/events", params={"after_seq": 0}).status_code == 404
+        assert client.get(f"/api/v1/agent/tasks/{task_id}/events/stream", params={"after_seq": 0}).status_code == 404
 
-        cancelled = client.post(f"/api/v1/nl2sql/tasks/{task_id}/cancel")
+        cancelled = client.post(f"/api/v1/agent/tasks/{task_id}/cancel")
         assert cancelled.status_code == 200
         assert cancelled.json()["task_status"] == "suspended"
         assert coordinator.cancelled == [task_id]
 
-        assert client.get("/api/v1/nl2sql/settings").status_code == 404
+        assert client.get("/api/v1/agent/settings").status_code == 404
         assert client.post(
-            f"/api/v1/nl2sql/topics/{topic_id}/messages",
+            f"/api/v1/agent/topics/{topic_id}/messages",
             json={"content": "旧接口"},
         ).status_code == 405
 
-        deleted = client.delete(f"/api/v1/nl2sql/topics/{topic_id}")
+        deleted = client.delete(f"/api/v1/agent/topics/{topic_id}")
         assert deleted.status_code == 200
         assert store.get_topic(topic_id) is None
 
@@ -849,11 +849,11 @@ def test_topic_permission_mode_lifecycle(monkeypatch):
     client, store, _coordinator, _submit_calls = _build_client(monkeypatch)
     with client:
         # Create defaults to ``default``; explicit mode is honored.
-        default_topic = client.post("/api/v1/nl2sql/topics", json={"title": "默认模式"}).json()
+        default_topic = client.post("/api/v1/agent/topics", json={"title": "默认模式"}).json()
         assert default_topic["permission_mode"] == "default"
 
         created = client.post(
-            "/api/v1/nl2sql/topics",
+            "/api/v1/agent/topics",
             json={"title": "规划模式", "permission_mode": "plan"},
         ).json()
         topic_id = created["topic_id"]
@@ -861,7 +861,7 @@ def test_topic_permission_mode_lifecycle(monkeypatch):
 
         # PUT switches the latest selection mid-session.
         switched = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}",
+            f"/api/v1/agent/topics/{topic_id}",
             json={"permission_mode": "bypassPermissions"},
         )
         assert switched.status_code == 200
@@ -869,30 +869,30 @@ def test_topic_permission_mode_lifecycle(monkeypatch):
 
         # Unknown values normalize to ``default``.
         normalized = client.put(
-            f"/api/v1/nl2sql/topics/{topic_id}",
+            f"/api/v1/agent/topics/{topic_id}",
             json={"permission_mode": "junk"},
         )
         assert normalized.json()["permission_mode"] == "default"
 
         # deliver-message carrying a mode updates the topic's latest selection.
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "你好", "permission_mode": "acceptEdits"},
         )
         assert delivered.status_code == 200
         assert store.get_topic_permission_mode(topic_id) == "acceptEdits"
 
         # PUT with neither field is a 400.
-        empty = client.put(f"/api/v1/nl2sql/topics/{topic_id}", json={})
+        empty = client.put(f"/api/v1/agent/topics/{topic_id}", json={})
         assert empty.status_code == 400
 
 
 def test_agent_events_stream_reads_persisted_records_in_seq_order(monkeypatch):
     client, store, _coordinator, _submit_calls = _build_client(monkeypatch)
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "AgentEvent SSE"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "AgentEvent SSE"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "stream test"},
         ).json()
         task_id = delivered["task_id"]
@@ -924,7 +924,7 @@ def test_agent_events_stream_reads_persisted_records_in_seq_order(monkeypatch):
 
         with client.stream(
             "GET",
-            f"/api/v1/nl2sql/tasks/{task_id}/agent-events/stream",
+            f"/api/v1/agent/tasks/{task_id}/agent-events/stream",
             params={"after_id": 1},
         ) as response:
             assert response.status_code == 200
@@ -942,9 +942,9 @@ def test_agent_events_stream_reads_persisted_records_in_seq_order(monkeypatch):
 def test_running_task_reconnect_replays_content_delta_after_id(monkeypatch):
     client, store, _coordinator, _submit_calls = _build_client(monkeypatch)
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "Delta reconnect"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "Delta reconnect"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "stream delta"},
         ).json()
         task_id = delivered["task_id"]
@@ -973,7 +973,7 @@ def test_running_task_reconnect_replays_content_delta_after_id(monkeypatch):
 
         with client.stream(
             "GET",
-            f"/api/v1/nl2sql/tasks/{task_id}/agent-events/stream",
+            f"/api/v1/agent/tasks/{task_id}/agent-events/stream",
             params={"after_id": 1},
         ) as response:
             events = [
@@ -991,14 +991,14 @@ def test_running_task_reconnect_replays_content_delta_after_id(monkeypatch):
 def test_permission_decision_endpoint(monkeypatch):
     client, store, coordinator, _submit_calls = _build_client(monkeypatch)
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "确认流"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "确认流"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "发布工作流"},
         ).json()
         task_id = delivered["task_id"]
 
-        base = f"/api/v1/nl2sql/tasks/{task_id}/permission-decision"
+        base = f"/api/v1/agent/tasks/{task_id}/permission-decision"
         # Not awaiting a decision yet -> 409.
         assert client.post(base, json={"request_id": "req-1", "decision": "allow"}).status_code == 409
 
@@ -1043,7 +1043,7 @@ def test_permission_decision_endpoint(monkeypatch):
 
         # Unknown task -> 404.
         assert client.post(
-            "/api/v1/nl2sql/tasks/task_missing/permission-decision",
+            "/api/v1/agent/tasks/task_missing/permission-decision",
             json={"request_id": "req-1", "decision": "allow"},
         ).status_code == 404
 
@@ -1051,13 +1051,13 @@ def test_permission_decision_endpoint(monkeypatch):
 def test_question_answer_endpoint(monkeypatch):
     client, store, _coordinator, _submit_calls = _build_client(monkeypatch)
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "追问流"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "追问流"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "需要选择维度"},
         ).json()
         task_id = delivered["task_id"]
-        base = f"/api/v1/nl2sql/tasks/{task_id}/question-answer"
+        base = f"/api/v1/agent/tasks/{task_id}/question-answer"
 
         assert client.post(base, json={"request_id": "q-1", "answers": []}).status_code == 409
 
@@ -1100,9 +1100,9 @@ def test_followup_suggestions_route_generates_without_changing_message_contract(
     monkeypatch.setattr(routes, "generate_followup_suggestions", fake_generate_followup_suggestions, raising=False)
 
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "追问测试"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "追问测试"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={
                 "topic_id": topic_id,
                 "content": "最近 30 天工作流发布次数趋势",
@@ -1117,7 +1117,7 @@ def test_followup_suggestions_route_generates_without_changing_message_contract(
         assistant["status"] = "finished"
         assistant["content"] = "最近 30 天工作流发布次数整体上升，5 月 20 日出现异常峰值。"
 
-        response = client.post(f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions")
+        response = client.post(f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions")
 
         assert response.status_code == 200
         assert response.json() == {
@@ -1137,7 +1137,7 @@ def test_followup_suggestions_route_generates_without_changing_message_contract(
             "visitor_id": "",
         }
 
-        history = client.get(f"/api/v1/nl2sql/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
+        history = client.get(f"/api/v1/agent/topics/{topic_id}/messages", params={"page": 1, "page_size": 50, "order": "asc"})
         assert history.status_code == 200
         assert "followup_suggestions" not in history.json()["items"][1]
 
@@ -1153,34 +1153,34 @@ def test_followup_suggestions_route_rejects_invalid_message_states(monkeypatch):
     monkeypatch.setattr(routes, "generate_followup_suggestions", fake_generate_followup_suggestions, raising=False)
 
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "追问校验"}).json()["topic_id"]
-        other_topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "其他话题"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "追问校验"}).json()["topic_id"]
+        other_topic_id = client.post("/api/v1/agent/topics", json={"title": "其他话题"}).json()["topic_id"]
         delivered = client.post(
-            "/api/v1/nl2sql/tasks/deliver-message",
+            "/api/v1/agent/tasks/deliver-message",
             json={"topic_id": topic_id, "content": "各数据层表数量对比"},
         )
         user_message_id = delivered.json()["user_message_id"]
         assistant_message_id = delivered.json()["assistant_message_id"]
 
-        assert client.post(f"/api/v1/nl2sql/topics/{topic_id}/messages/missing/followup-suggestions").status_code == 404
-        assert client.post(f"/api/v1/nl2sql/topics/{other_topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 404
-        assert client.post(f"/api/v1/nl2sql/topics/{topic_id}/messages/{user_message_id}/followup-suggestions").status_code == 400
-        assert client.post(f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 400
+        assert client.post(f"/api/v1/agent/topics/{topic_id}/messages/missing/followup-suggestions").status_code == 404
+        assert client.post(f"/api/v1/agent/topics/{other_topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 404
+        assert client.post(f"/api/v1/agent/topics/{topic_id}/messages/{user_message_id}/followup-suggestions").status_code == 400
+        assert client.post(f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 400
 
         assistant = store.get_assistant_message(delivered.json()["task_id"])
         assistant["status"] = "finished"
         assistant["content"] = ""
-        assert client.post(f"/api/v1/nl2sql/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 400
+        assert client.post(f"/api/v1/agent/topics/{topic_id}/messages/{assistant_message_id}/followup-suggestions").status_code == 400
         assert calls == []
 
 
 def test_message_queue_and_schedule_routes(monkeypatch):
     client, store, _coordinator, submit_calls = _build_client(monkeypatch)
     with client:
-        topic_id = client.post("/api/v1/nl2sql/topics", json={"title": "队列与调度"}).json()["topic_id"]
+        topic_id = client.post("/api/v1/agent/topics", json={"title": "队列与调度"}).json()["topic_id"]
 
         queue_created = client.post(
-            "/api/v1/nl2sql/message-queue",
+            "/api/v1/agent/message-queue",
             json={
                 "topic_id": topic_id,
                 "message_type": "text",
@@ -1191,13 +1191,13 @@ def test_message_queue_and_schedule_routes(monkeypatch):
         queue_id = queue_created.json()["queue_id"]
         assert queue_created.json()["status"] == "queued"
 
-        queue_query = client.post("/api/v1/nl2sql/message-queue/queries", json={"topic_id": topic_id, "page": 1, "page_size": 20})
+        queue_query = client.post("/api/v1/agent/message-queue/queries", json={"topic_id": topic_id, "page": 1, "page_size": 20})
         assert queue_query.status_code == 200
         assert queue_query.json()["total"] == 1
         assert queue_query.json()["list"][0]["queue_id"] == queue_id
 
         queue_updated = client.put(
-            f"/api/v1/nl2sql/message-queue/{queue_id}",
+            f"/api/v1/agent/message-queue/{queue_id}",
             json={
                 "topic_id": topic_id,
                 "message_type": "text",
@@ -1207,20 +1207,20 @@ def test_message_queue_and_schedule_routes(monkeypatch):
         assert queue_updated.status_code == 200
         assert queue_updated.json()["message_content"] == "更新后的队列消息"
 
-        queue_consumed = client.post(f"/api/v1/nl2sql/message-queue/{queue_id}/consume")
+        queue_consumed = client.post(f"/api/v1/agent/message-queue/{queue_id}/consume")
         assert queue_consumed.status_code == 200
         assert queue_consumed.json()["accepted"] is True
         assert store.get_message_queue(queue_id)["last_task_id"] == queue_consumed.json()["task_id"]
         assert submit_calls[-1]["source_queue_id"] == queue_id
 
         second_queue_id = client.post(
-            "/api/v1/nl2sql/message-queue",
+            "/api/v1/agent/message-queue",
             json={"topic_id": topic_id, "message_type": "text", "message_content": "待删除消息"},
         ).json()["queue_id"]
-        assert client.delete(f"/api/v1/nl2sql/message-queue/{second_queue_id}").status_code == 200
+        assert client.delete(f"/api/v1/agent/message-queue/{second_queue_id}").status_code == 200
 
         schedule_created = client.post(
-            "/api/v1/nl2sql/message-schedule",
+            "/api/v1/agent/message-schedule",
             json={
                 "topic_id": topic_id,
                 "name": "每五分钟同步",
@@ -1236,7 +1236,7 @@ def test_message_queue_and_schedule_routes(monkeypatch):
         assert schedule_created.json()["next_run_at"].startswith("2026-03-23T04:00:00")
 
         schedule_updated = client.put(
-            f"/api/v1/nl2sql/message-schedule/{schedule_id}",
+            f"/api/v1/agent/message-schedule/{schedule_id}",
             json={
                 "topic_id": topic_id,
                 "name": "每十分钟同步",
@@ -1250,17 +1250,17 @@ def test_message_queue_and_schedule_routes(monkeypatch):
         assert schedule_updated.status_code == 200
         assert schedule_updated.json()["name"] == "每十分钟同步"
 
-        schedule_detail = client.get(f"/api/v1/nl2sql/message-schedule/{schedule_id}")
+        schedule_detail = client.get(f"/api/v1/agent/message-schedule/{schedule_id}")
         assert schedule_detail.status_code == 200
         assert schedule_detail.json()["schedule_id"] == schedule_id
 
         store.create_message_schedule_log(schedule_id=schedule_id, status="completed", task_id="task-from-schedule")
-        logs = client.post(f"/api/v1/nl2sql/message-schedule/{schedule_id}/logs", json={"page": 1, "page_size": 20})
+        logs = client.post(f"/api/v1/agent/message-schedule/{schedule_id}/logs", json={"page": 1, "page_size": 20})
         assert logs.status_code == 200
         assert logs.json()["total"] == 1
         assert logs.json()["list"][0]["task_id"] == "task-from-schedule"
 
-        assert client.delete(f"/api/v1/nl2sql/message-schedule/{schedule_id}").status_code == 200
+        assert client.delete(f"/api/v1/agent/message-schedule/{schedule_id}").status_code == 200
 
 
 def test_create_topic_enforces_agent_visibility_for_anonymous(monkeypatch):
@@ -1281,14 +1281,14 @@ def test_create_topic_enforces_agent_visibility_for_anonymous(monkeypatch):
     monkeypatch.setattr(routes, "get_agent_profile", lambda agent_id: by_id.get(agent_id))
 
     with client:
-        allowed = client.post("/api/v1/nl2sql/topics", json={"agent_id": "agent_open"})
+        allowed = client.post("/api/v1/agent/topics", json={"agent_id": "agent_open"})
         assert allowed.status_code == 200
 
-        blocked = client.post("/api/v1/nl2sql/topics", json={"agent_id": "agent_restricted"})
+        blocked = client.post("/api/v1/agent/topics", json={"agent_id": "agent_restricted"})
         assert blocked.status_code == 400
         assert blocked.json()["detail"] == "agent not found"
 
-        missing = client.post("/api/v1/nl2sql/topics", json={"agent_id": "agent_ghost"})
+        missing = client.post("/api/v1/agent/topics", json={"agent_id": "agent_ghost"})
         assert missing.status_code == 400
         assert missing.json()["detail"] == blocked.json()["detail"]
 

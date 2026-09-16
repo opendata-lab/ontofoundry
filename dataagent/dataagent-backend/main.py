@@ -12,7 +12,6 @@ from api.routes import router
 from config import get_settings, update_settings
 from core.agent_profile_service import bootstrap_default_agent_profile
 from core.auth import init_auth
-from core.mcp_admin_service import bootstrap_portal_mcp_server
 from core.runtime_registry_store import get_runtime_registry_store
 from core.skill_admin_service import (
     bootstrap_admin_settings,
@@ -88,11 +87,6 @@ async def startup():
         get_skill_admin_store().init_schema()
         get_runtime_registry_store().init_schema()
         bootstrap_admin_settings()
-        portal_mcp = bootstrap_portal_mcp_server()
-        logger.info(
-            "Portal MCP registry bootstrap server_id=%s",
-            (portal_mcp or {}).get("server_id") or "<unset>",
-        )
         logger.info("Admin settings initialized")
     except Exception as e:
         logger.exception("Admin settings bootstrap failed: %s", e)

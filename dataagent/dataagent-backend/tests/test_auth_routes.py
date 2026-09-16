@@ -83,7 +83,7 @@ ADMIN_USERS = {admin_users}
 
 def test_auth_config_reports_disabled_when_env_unset():
     client = TestClient(app)
-    response = client.get("/api/v1/nl2sql/auth/config")
+    response = client.get("/api/v1/agent/auth/config")
     assert response.status_code == 200
     assert response.json() == {
         "enabled": False,
@@ -96,16 +96,16 @@ def test_auth_config_reports_disabled_when_env_unset():
 
 def test_login_endpoints_are_404_when_disabled():
     client = TestClient(app)
-    assert client.post("/api/v1/nl2sql/auth/login", json={"username": "a", "password": "b"}).status_code == 404
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 404
-    assert client.post("/api/v1/nl2sql/auth/logout").status_code == 404
-    assert client.get("/api/v1/nl2sql/auth/oauth/authorize").status_code == 404
+    assert client.post("/api/v1/agent/auth/login", json={"username": "a", "password": "b"}).status_code == 404
+    assert client.get("/api/v1/agent/auth/me").status_code == 404
+    assert client.post("/api/v1/agent/auth/logout").status_code == 404
+    assert client.get("/api/v1/agent/auth/oauth/authorize").status_code == 404
     assert client.get("/oauth-authorized/SSO").status_code == 404
 
 
 def test_auth_config_exposes_oauth_provider_name_and_icon(monkeypatch, tmp_path):
     enable_auth(monkeypatch, tmp_path, oauth=True)
-    response = TestClient(app).get("/api/v1/nl2sql/auth/config")
+    response = TestClient(app).get("/api/v1/agent/auth/config")
     assert response.status_code == 200
     assert response.json()["provider_name"] == "SSO"
     assert response.json()["provider_icon"] == "fa-github"
@@ -116,7 +116,7 @@ def test_local_login_sets_httponly_cookie_and_me_roundtrip(monkeypatch, tmp_path
     enable_auth(monkeypatch, tmp_path)
     client = TestClient(app)
 
-    response = client.post("/api/v1/nl2sql/auth/login", json={"username": "admin", "password": "admin-pass"})
+    response = client.post("/api/v1/agent/auth/login", json={"username": "admin", "password": "admin-pass"})
     assert response.status_code == 200
     assert response.json()["data"]["role"] == "admin"
 
@@ -126,26 +126,26 @@ def test_local_login_sets_httponly_cookie_and_me_roundtrip(monkeypatch, tmp_path
     assert "SameSite=lax" in set_cookie
     assert "Secure" not in set_cookie
 
-    me = client.get("/api/v1/nl2sql/auth/me")
+    me = client.get("/api/v1/agent/auth/me")
     assert me.status_code == 200
     assert me.json()["data"]["user_id"] == "local:admin"
 
-    logout = client.post("/api/v1/nl2sql/auth/logout")
+    logout = client.post("/api/v1/agent/auth/logout")
     assert logout.status_code == 200
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 def test_cookie_secure_flag_follows_config(monkeypatch, tmp_path):
     enable_auth(monkeypatch, tmp_path, cookie_secure=True)
     client = TestClient(app)
-    response = client.post("/api/v1/nl2sql/auth/login", json={"username": "admin", "password": "admin-pass"})
+    response = client.post("/api/v1/agent/auth/login", json={"username": "admin", "password": "admin-pass"})
     assert "Secure" in response.headers.get("set-cookie", "")
 
 
 def test_local_login_rejects_bad_password(monkeypatch, tmp_path):
     enable_auth(monkeypatch, tmp_path)
     client = TestClient(app)
-    response = client.post("/api/v1/nl2sql/auth/login", json={"username": "admin", "password": "nope"})
+    response = client.post("/api/v1/agent/auth/login", json={"username": "admin", "password": "nope"})
     assert response.status_code == 401
 
 
@@ -154,7 +154,7 @@ def test_oauth_authorize_redirects_with_state(monkeypatch, tmp_path):
     client = TestClient(app)
 
     response = client.get(
-        "/api/v1/nl2sql/auth/oauth/authorize?redirect=/chat",
+        "/api/v1/agent/auth/oauth/authorize?redirect=/chat",
         follow_redirects=False,
     )
     assert response.status_code == 302
@@ -185,7 +185,7 @@ def test_oauth_nonce_cookie_is_lax_even_when_session_samesite_strict(monkeypatch
     enable_auth(monkeypatch, tmp_path, oauth=True, cookie_samesite="strict")
     client = TestClient(app)
 
-    response = client.get("/api/v1/nl2sql/auth/oauth/authorize", follow_redirects=False)
+    response = client.get("/api/v1/agent/auth/oauth/authorize", follow_redirects=False)
     assert response.status_code == 302
 
     nonce_cookie = next(
@@ -312,7 +312,7 @@ def test_oauth_callback_issues_session_and_redirects(monkeypatch, tmp_path):
     assert response.headers["location"] == "/chat"
     assert "HttpOnly" in response.headers.get("set-cookie", "")
 
-    me = client.get("/api/v1/nl2sql/auth/me")
+    me = client.get("/api/v1/agent/auth/me")
     assert me.status_code == 200
     data = me.json()["data"]
     assert data["user_id"] == "SSO:42"
@@ -341,7 +341,7 @@ def test_oauth_callback_uses_oidc_display_name_fallbacks(
 
     response = _oauth_callback(client, monkeypatch, userinfo=userinfo)
     assert response.status_code == 302
-    assert client.get("/api/v1/nl2sql/auth/me").json()["data"]["display_name"] == expected_display_name
+    assert client.get("/api/v1/agent/auth/me").json()["data"]["display_name"] == expected_display_name
 
 
 def test_oauth_callback_requires_normalized_sub(monkeypatch, tmp_path):
@@ -355,7 +355,7 @@ def test_oauth_callback_requires_normalized_sub(monkeypatch, tmp_path):
     )
     assert response.status_code == 302
     assert response.headers["location"] == "/login?error=oauth_missing_user_id"
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -369,7 +369,7 @@ def test_oauth_callback_rejects_invalid_or_oversized_sub(monkeypatch, tmp_path, 
     response = _oauth_callback(client, monkeypatch, userinfo={"sub": sub})
     assert response.status_code == 302
     assert response.headers["location"] == "/login?error=oauth_missing_user_id"
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 @pytest.mark.parametrize(
@@ -388,7 +388,7 @@ def test_oauth_callback_rejects_invalid_display_or_role_claims(monkeypatch, tmp_
     response = _oauth_callback(client, monkeypatch, userinfo=userinfo)
     assert response.status_code == 302
     assert response.headers["location"] == "/login?error=oauth_user_info_failed"
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 def test_oauth_callback_promotes_admin_by_provider_sub_not_display_name(monkeypatch, tmp_path):
@@ -397,13 +397,13 @@ def test_oauth_callback_promotes_admin_by_provider_sub_not_display_name(monkeypa
 
     promoted = _oauth_callback(client, monkeypatch, userinfo={"sub": "1024", "preferred_username": "bob"})
     assert promoted.status_code == 302
-    assert client.get("/api/v1/nl2sql/auth/me").json()["data"]["role"] == "admin"
+    assert client.get("/api/v1/agent/auth/me").json()["data"]["role"] == "admin"
 
     client.cookies.clear()
     # display_name 与提名值相同也不提权（提名只认 provider:sub）。
     not_promoted = _oauth_callback(client, monkeypatch, userinfo={"sub": "7", "preferred_username": "SSO:1024"})
     assert not_promoted.status_code == 302
-    assert client.get("/api/v1/nl2sql/auth/me").json()["data"]["role"] == "user"
+    assert client.get("/api/v1/agent/auth/me").json()["data"]["role"] == "user"
 
 
 def test_oauth_callback_rejects_bad_state(monkeypatch, tmp_path):
@@ -451,7 +451,7 @@ def test_oauth_callback_rejects_unknown_provider(monkeypatch, tmp_path):
 def test_legacy_oauth_callback_route_is_not_exposed(monkeypatch, tmp_path):
     enable_auth(monkeypatch, tmp_path, oauth=True)
     response = TestClient(app).get(
-        "/api/v1/nl2sql/auth/oauth/callback?code=abc&state=unused",
+        "/api/v1/agent/auth/oauth/callback?code=abc&state=unused",
         follow_redirects=False,
     )
     assert response.status_code == 404
@@ -479,7 +479,7 @@ def test_oauth_transport_reads_response_and_grant_types_from_settings(monkeypatc
     settings.oauth.grant_type = "grant-from-settings"
     client = TestClient(app)
 
-    authorize = client.get("/api/v1/nl2sql/auth/oauth/authorize", follow_redirects=False)
+    authorize = client.get("/api/v1/agent/auth/oauth/authorize", follow_redirects=False)
     query = parse_qs(urlparse(authorize.headers["location"]).query)
     assert query["response_type"] == ["code-from-settings"]
 
@@ -590,7 +590,7 @@ def test_oauth_user_info_uses_token_bound_remote_get(monkeypatch, tmp_path):
         "timeout": 15.0,
     }
     assert _FakeRemoteClient.last_get == ("userinfo", {})
-    me = client.get("/api/v1/nl2sql/auth/me").json()["data"]
+    me = client.get("/api/v1/agent/auth/me").json()["data"]
     assert me["user_id"] == "SSO:remote-sub"
     assert me["display_name"] == "remote-user"
 
@@ -605,7 +605,7 @@ def test_sync_oauth_user_info_normalizes_nonstandard_payload(monkeypatch, tmp_pa
         use_config_handler=True,
     )
     assert response.status_code == 302
-    data = client.get("/api/v1/nl2sql/auth/me").json()["data"]
+    data = client.get("/api/v1/agent/auth/me").json()["data"]
     assert data["user_id"] == "SSO:7"
     assert data["display_name"] == "小王"
     assert data["role"] == "user"
@@ -621,7 +621,7 @@ def test_oauth_user_info_role_wins_over_admin_users(monkeypatch, tmp_path):
         use_config_handler=True,
     )
     assert response.status_code == 302
-    assert client.get("/api/v1/nl2sql/auth/me").json()["data"]["role"] == "admin"
+    assert client.get("/api/v1/agent/auth/me").json()["data"]["role"] == "admin"
 
 
 def test_oauth_user_info_without_role_falls_back_to_admin_users(monkeypatch, tmp_path):
@@ -635,7 +635,7 @@ def test_oauth_user_info_without_role_falls_back_to_admin_users(monkeypatch, tmp
     )
     assert response.status_code == 302
     # 钩子未返回 role → 回落 ADMIN_USERS（SSO:1024）提名。
-    assert client.get("/api/v1/nl2sql/auth/me").json()["data"]["role"] == "admin"
+    assert client.get("/api/v1/agent/auth/me").json()["data"]["role"] == "admin"
 
 
 def test_oauth_user_info_failure_is_redacted_and_does_not_stop_service(
@@ -664,7 +664,7 @@ def test_oauth_user_info_failure_is_redacted_and_does_not_stop_service(
     assert "super-secret" not in caplog.text
     assert "error_type=RuntimeError" in caplog.text
     # 服务仍健康。
-    assert client.get("/api/v1/nl2sql/auth/config").status_code == 200
+    assert client.get("/api/v1/agent/auth/config").status_code == 200
 
 
 def test_oauth_user_info_non_dict_fails_the_login(monkeypatch, tmp_path):
@@ -729,7 +729,7 @@ def test_oauth_callback_rejects_state_without_browser_nonce(monkeypatch, tmp_pat
     response = _oauth_callback(client, monkeypatch, userinfo={"sub": "42"}, bind_nonce=False)
     assert response.status_code == 400
     # 未写入任何会话。
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 def test_oauth_callback_rejects_mismatched_browser_nonce(monkeypatch, tmp_path):
@@ -740,7 +740,7 @@ def test_oauth_callback_rejects_mismatched_browser_nonce(monkeypatch, tmp_path):
         client, monkeypatch, userinfo={"sub": "42"}, cookie_nonce="another-browser-nonce"
     )
     assert response.status_code == 400
-    assert client.get("/api/v1/nl2sql/auth/me").status_code == 401
+    assert client.get("/api/v1/agent/auth/me").status_code == 401
 
 
 def test_oauth_callback_clears_nonce_cookie_on_success(monkeypatch, tmp_path):
@@ -761,7 +761,7 @@ def test_login_with_overlong_password_returns_401(monkeypatch, tmp_path):
     enable_auth(monkeypatch, tmp_path)
     client = TestClient(app)
     response = client.post(
-        "/api/v1/nl2sql/auth/login",
+        "/api/v1/agent/auth/login",
         json={"username": "admin", "password": "x" * 200},
     )
     assert response.status_code == 401
