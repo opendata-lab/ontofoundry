@@ -18,11 +18,6 @@ from core.agent_visibility import agent_visible_to
 from core.auth import AuthIdentity, is_auth_enabled, resolve_identity
 from core.followup_suggestions import generate_followup_suggestions
 from core.permission_gate import normalize_permission_decision
-from core.readonly_query_proxy import (
-    QueryProxyConfigError,
-    QueryProxyUpstreamError,
-    execute_readonly_query,
-)
 from core.skill_admin_service import (
     current_settings_payload,
     resolved_chat_settings_payload,
@@ -45,7 +40,6 @@ from models.schemas import (
     CreateTaskRequest,
     CreateTopicRequest,
     DeliverMessageRequest,
-    ExecuteQueryRequest,
     FollowupSuggestionsResponse,
     MessageQueuePageResponse,
     MessageQueueQueryRequest,
@@ -83,12 +77,11 @@ logger = logging.getLogger(__name__)
 # accepts statuses persisted by earlier versions.
 SUCCESS_MESSAGE_STATUSES = {"finished", "success", "completed"}
 
-router = APIRouter(prefix="/api/v1/nl2sql")
+router = APIRouter(prefix="/api/v1/agent")
 topic_router = APIRouter(prefix="/topics")
 task_router = APIRouter(prefix="/tasks")
 queue_router = APIRouter(prefix="/message-queue")
 schedule_router = APIRouter(prefix="/message-schedule")
-query_router = APIRouter(prefix="/query")
 
 
 def _encode_sse(event: dict[str, Any]) -> str:
@@ -175,7 +168,7 @@ def _origin_allowed(origin: str, allowed_origins: list[str]) -> bool:
 
 
 def _request_context(request: Request) -> dict[str, str]:
-    client = _clean_header(request.headers.get("X-ODW-Client"), 32).lower()
+    client = _clean_header(request.headers.get("X-OF-Client"), 32).lower()
     if client != "widget":
         # 三分支客户端语义（docs/design/2026-07-01-dataagent-auth-design.md 3.2）：
         # dataagent 独立 SPA（显式标记）在 auth 启用时消费会话 Cookie/Bearer；
@@ -200,11 +193,11 @@ def _request_context(request: Request) -> dict[str, str]:
             "visitor_id": "",
         }
 
-    website_id = _clean_header(request.headers.get("X-ODW-Website-Id"), 128)
-    external_user_id = _clean_header(request.headers.get("X-ODW-User-Id"), 255)
-    visitor_id = _clean_header(request.headers.get("X-ODW-Visitor-Id"), 128)
+    website_id = _clean_header(request.headers.get("X-OF-Website-Id"), 128)
+    external_user_id = _clean_header(request.headers.get("X-OF-User-Id"), 255)
+    visitor_id = _clean_header(request.headers.get("X-OF-Visitor-Id"), 128)
     if not website_id:
-        raise HTTPException(status_code=400, detail="X-ODW-Website-Id is required")
+        raise HTTPException(status_code=400, detail="X-OF-Website-Id is required")
 
     matched_site = None
     for site in _allowed_widget_sites():
@@ -970,56 +963,10 @@ async def api_list_message_schedule_logs(schedule_id: str, payload: MessageSched
     )
 
 
-@query_router.post("/execute")
-async def api_execute_readonly_query(http_request: Request, request: ExecuteQueryRequest):
-    context = _request_context(http_request)
-
-    sql = str(request.sql or "").strip()
-    database = str(request.database or "").strip()
-    if not sql:
-        raise HTTPException(status_code=400, detail="sql 不能为空")
-    if not database:
-        raise HTTPException(status_code=400, detail="database 不能为空")
-
-    data_scope_header: str | None = None
-    topic_id = str(request.topic_id or "").strip()
-    if topic_id:
-        data_scope_header = _resolve_topic_data_scope_header(topic_id, context=context)
-
-    try:
-        return await execute_readonly_query(
-            sql,
-            database,
-            engine=request.engine,
-            limit=request.limit,
-            timeout_seconds=request.timeout_seconds,
-            data_scope_header=data_scope_header,
-        )
-    except QueryProxyConfigError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except QueryProxyUpstreamError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-
-
-def _resolve_topic_data_scope_header(topic_id: str, *, context: dict[str, str]) -> str:
-    from core.data_scope import encode_scope_header, normalize_data_scope
-
-    store = _get_store()
-    topic = store.get_topic(topic_id, context=context)
-    if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
-    snapshot = topic.get("agent_snapshot") or {}
-    scope = normalize_data_scope(snapshot.get("data_scope") or {})
-    if not scope.get("allowed_scopes"):
-        return ""
-    return encode_scope_header(scope)
-
-
 router.include_router(topic_router)
 router.include_router(task_router)
 router.include_router(queue_router)
 router.include_router(schedule_router)
-router.include_router(query_router)
 
 
 def _get_store():

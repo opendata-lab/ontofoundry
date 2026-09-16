@@ -40,7 +40,7 @@ process.exit(0);
 }
 
 async function runChild(count: number, withFlush: boolean): Promise<string[]> {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "odw-flush-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "of-flush-"));
   const file = path.join(dir, "child.mjs");
   fs.writeFileSync(file, childSource(count, withFlush), "utf-8");
 

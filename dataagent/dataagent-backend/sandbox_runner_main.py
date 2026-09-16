@@ -22,7 +22,6 @@ from fastapi.responses import StreamingResponse
 
 from config import get_settings
 from core.agent_profile_service import normalize_agent_snapshot
-from core.runtime_support import PLATFORM_TOOLS_SKILL_FOLDER
 from core.skill_admin_service import resolve_enabled_skill_runtime
 from core.task_control import CancelReason
 from core.task_executor import TaskExecutionInput, TaskExecutionResult, _execute_task_stream_local
@@ -103,7 +102,6 @@ _FORWARDED_ENV_PREFIXES = (
     "DATAAGENT_PORTAL_",
     "DORIS_",
     "MYSQL_",
-    "ODW_",
     "OPENAI_",
     "OPENROUTER_",
     "SESSION_",
@@ -385,13 +383,6 @@ def _clip_log_text(value: Any, limit: int = 4000) -> str:
     return f"{text[:limit]}... [truncated {len(text) - limit} chars]"
 
 
-SKILLS_REQUIRING_PLATFORM_TOOLS = {
-    "opendataworks-business-knowledge",
-    "opendataworks-data-dev",
-    "opendataworks-methodology-dag",
-}
-
-
 def _build_child_env(enabled_folders: list[str] | None = None) -> dict[str, str]:
     cfg = get_settings()
     child_env = {
@@ -407,8 +398,6 @@ def _build_child_env(enabled_folders: list[str] | None = None) -> dict[str, str]
             "SKILLS_ROOT_DIR": CHILD_SKILLS_ROOT,
         }
     )
-    if enabled_folders and PLATFORM_TOOLS_SKILL_FOLDER in enabled_folders:
-        child_env["DATAAGENT_PLATFORM_SKILL_ROOT"] = f"{CHILD_SKILLS_ROOT}/{PLATFORM_TOOLS_SKILL_FOLDER}"
     return child_env
 
 
@@ -436,10 +425,6 @@ def _enabled_skill_folders_for_task(params: TaskExecutionInput) -> list[str]:
     else:
         runtime = resolve_enabled_skill_runtime()
         folders = _dedupe_skill_folders(runtime.get("enabled_folders"))
-
-    if folders and any(f in SKILLS_REQUIRING_PLATFORM_TOOLS for f in folders):
-        if PLATFORM_TOOLS_SKILL_FOLDER not in folders:
-            folders.append(PLATFORM_TOOLS_SKILL_FOLDER)
 
     return folders
 

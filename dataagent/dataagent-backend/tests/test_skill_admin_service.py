@@ -22,9 +22,8 @@ from core.skill_admin_service import (
 )
 
 
-BUSINESS_SKILL = "opendataworks-business-knowledge"
-PLATFORM_TOOLS_SKILL = "opendataworks-platform-tools"
-ONTOLOGY_MODELING_SKILL = "ontology-modeling-assistant"
+BUSINESS_SKILL = "md2ossie"
+PLATFORM_TOOLS_SKILL = "custom-platform-tools"
 LEGACY_SQL_SKILL = "dataagent-nl2sql"
 
 
@@ -320,7 +319,7 @@ def test_merge_settings_defaults_to_current_bundled_skills_when_runtime_missing(
 
     assert LEGACY_SQL_SKILL not in merged["skill_runtime"]
     assert merged["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
-    assert merged["skill_runtime"][PLATFORM_TOOLS_SKILL]["enabled"] is True
+    assert PLATFORM_TOOLS_SKILL not in merged["skill_runtime"]
 
 
 def test_merge_settings_migrates_legacy_sql_skill_to_current_bundled_skills():
@@ -335,7 +334,7 @@ def test_merge_settings_migrates_legacy_sql_skill_to_current_bundled_skills():
     assert merged["skills_output_dir"] == f"../.claude/skills/{BUSINESS_SKILL}"
     assert LEGACY_SQL_SKILL not in merged["skill_runtime"]
     assert merged["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
-    assert merged["skill_runtime"][PLATFORM_TOOLS_SKILL]["enabled"] is True
+    assert PLATFORM_TOOLS_SKILL not in merged["skill_runtime"]
 
 
 def test_merge_settings_preserves_explicit_bundled_skill_disabled():
@@ -436,16 +435,6 @@ def test_bootstrap_admin_settings_persists_blank_provider_and_model(monkeypatch)
             anthropic_api_key="",
             anthropic_auth_token="",
             anthropic_base_url="",
-            mysql_host="",
-            mysql_port=3306,
-            mysql_user="",
-            mysql_password="",
-            mysql_database="",
-            doris_host="",
-            doris_port=9030,
-            doris_user="",
-            doris_password="",
-            doris_database="",
             skills_output_dir=f"../.claude/skills/{BUSINESS_SKILL}",
         ),
     )
@@ -643,7 +632,7 @@ def test_list_documents_enriches_skill_fields(monkeypatch):
             return [
                 {
                     "id": 1,
-                    "relative_path": "opendataworks-platform-tools/reference/40-runtime-metadata.md",
+                    "relative_path": "custom-platform-tools/reference/40-runtime-metadata.md",
                     "file_name": "40-runtime-metadata.md",
                     "category": "reference",
                     "content_type": "markdown",
@@ -674,9 +663,9 @@ def test_list_documents_enriches_skill_fields(monkeypatch):
 
     documents = skill_admin_service.list_documents()
 
-    assert documents[0]["folder"] == "opendataworks-platform-tools"
+    assert documents[0]["folder"] == "custom-platform-tools"
     assert documents[0]["relative_path"] == "reference/40-runtime-metadata.md"
-    assert documents[0]["source"] == "bundled"
+    assert documents[0]["source"] == "managed"
     assert documents[0]["enabled"] is True
     assert documents[0]["editable"] is True
 
@@ -784,7 +773,7 @@ def test_resolve_enabled_skill_runtime_ignores_deleted_legacy_sql_skill(monkeypa
     runtime = skill_admin_service.resolve_enabled_skill_runtime()
 
     assert runtime["primary_folder"] == BUSINESS_SKILL
-    assert runtime["enabled_folders"] == [BUSINESS_SKILL, PLATFORM_TOOLS_SKILL]
+    assert runtime["enabled_folders"] == [BUSINESS_SKILL]
     assert LEGACY_SQL_SKILL not in runtime["enabled_roots"]
 
 
@@ -1024,12 +1013,6 @@ def test_uninstall_skill_rejects_builtin(monkeypatch, tmp_path):
 
     with pytest.raises(ValueError, match="内置 Skill 不支持卸载"):
         skill_admin_service.uninstall_skill(BUSINESS_SKILL)
-
-    with pytest.raises(ValueError, match="内置 Skill 不支持卸载"):
-        skill_admin_service.uninstall_skill(PLATFORM_TOOLS_SKILL)
-
-    with pytest.raises(ValueError, match="内置 Skill 不支持卸载"):
-        skill_admin_service.uninstall_skill(ONTOLOGY_MODELING_SKILL)
 
 
 def test_uninstall_skill_rejects_last_enabled(monkeypatch, tmp_path):

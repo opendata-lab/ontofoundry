@@ -238,7 +238,6 @@ async def _execute_pi(
 
     raw_mcp_servers = build_mcp_servers(
         (agent_snapshot or {}).get("mcp_server_ids") if agent_snapshot else None,
-        agent_snapshot=agent_snapshot,
     )
     mcp_servers = [
         {

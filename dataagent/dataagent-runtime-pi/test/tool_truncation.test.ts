@@ -33,7 +33,7 @@ function toolsFor(root: string) {
 }
 
 test("Read makes truncation visible and supports byte-offset continuation", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-read-window-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-read-window-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const filePath = "large.txt";
   const tail = "b".repeat(7_000);
@@ -64,7 +64,7 @@ test("Read makes truncation visible and supports byte-offset continuation", asyn
 });
 
 test("Read honors an explicit byte limit and gives the exact next offset", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-read-limit-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-read-limit-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, "alphabet.txt"), "abcdefghijklmnopqrstuvwxyz");
 
@@ -82,7 +82,7 @@ test("Read honors an explicit byte limit and gives the exact next offset", async
 });
 
 test("Bash reports discarded bytes in model-visible successful output", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-bash-truncate-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-bash-truncate-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const command = "printf '%*s' 120000 '' | tr ' ' x";
   const env = { PATH: process.env.PATH ?? "/usr/bin:/bin" };
@@ -102,7 +102,7 @@ test("Bash reports discarded bytes in model-visible successful output", async (t
 });
 
 test("Bash includes the truncation warning in a non-zero exit error", async (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "odw-bash-error-truncate-"));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "of-bash-error-truncate-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const bash = toolsFor(root).find((tool) => tool.name === "Bash")!;
 

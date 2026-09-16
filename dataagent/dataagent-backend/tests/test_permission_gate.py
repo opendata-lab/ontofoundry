@@ -10,7 +10,7 @@ CREATE_TABLE = "mcp__portal__portal_create_table"
 PREVIEW_CREATE_TABLE = "mcp__portal__portal_preview_create_table"
 UPDATE_TABLE_METADATA = "mcp__portal__portal_update_table_metadata"
 ANALYZE = "mcp__portal__portal_analyze_sql"
-READ = "mcp__portal__portal_search_tables"
+READ = "mcp__catalog__search_tables"
 
 
 def test_classification_by_bare_and_qualified_names() -> None:

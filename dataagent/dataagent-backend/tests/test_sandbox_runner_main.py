@@ -160,9 +160,9 @@ def test_sandbox_runner_container_command_mounts_only_topic_workspace(monkeypatc
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(host_root),
-            "dataagent_sandbox_network": "container:opendataworks-dataagent-sandbox-runner",
+            "dataagent_sandbox_network": "container:crm-dataagent-sandbox-runner",
         }
     )
     monkeypatch.setenv("MYSQL_HOST", "mysql")
@@ -204,14 +204,14 @@ def test_sandbox_runner_container_command_mounts_only_topic_workspace(monkeypatc
     workdir_index = command.index("--workdir")
     assert command[workdir_index + 1] == "/mnt/workspace"
     assert "--network" in command
-    assert "container:opendataworks-dataagent-sandbox-runner" in command
+    assert "container:crm-dataagent-sandbox-runner" in command
     assert "--interactive" in command
     assert f"{sandbox_runner_main.SANDBOX_CONTAINER_LABEL}={sandbox_runner_main.SANDBOX_CONTAINER_LABEL_VALUE}" in command
     assert f"{sandbox_runner_main.SANDBOX_TASK_ID_LABEL}=task-1" in command
     assert f"{sandbox_runner_main.SANDBOX_TOPIC_ID_LABEL}=topic-1" in command
     assert "--user" in command
     assert "1000:1000" in command
-    assert "opendataworks-dataagent-runner:test" in command
+    assert "of-agent-worker:test" in command
     assert "python" in command
     assert "/opt/dataagent-backend/sandbox_task_main.py" in command
     assert not any("/var/run/docker.sock" in arg for arg in command)
@@ -251,7 +251,7 @@ def test_sandbox_runner_read_only_rootfs_opt_in(monkeypatch, tmp_path: Path):
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(tmp_path / "topics"),
             "dataagent_sandbox_read_only_rootfs": True,
             "dataagent_sandbox_tmpfs_size": "256m",
@@ -290,7 +290,7 @@ def test_sandbox_runner_startup_cleanup_removes_labeled_stale_containers(monkeyp
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
         }
     )
     calls: list[tuple[str, ...]] = []
@@ -551,7 +551,7 @@ def _warm_settings(tmp_path: Path) -> dict:
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(tmp_path / "topics"),
             "dataagent_sandbox_reuse_enabled": True,
             "dataagent_sandbox_idle_ttl_seconds": 600,
@@ -952,7 +952,7 @@ def test_sandbox_runner_mounts_only_enabled_agent_skills_into_child(monkeypatch,
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(host_root),
         }
     )
@@ -984,7 +984,7 @@ def test_sandbox_runner_requires_auto_discovered_host_skills_dir_when_agent_enab
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(tmp_path / "topics"),
         }
     )
@@ -1014,7 +1014,7 @@ def test_sandbox_runner_requires_enabled_skill_folder_to_exist(monkeypatch, tmp_
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(tmp_path / "topics"),
         }
     )
@@ -1041,7 +1041,7 @@ def test_discover_host_skills_dir_reads_runner_mount_source(monkeypatch):
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
         }
     )
     calls: list[tuple[str, ...]] = []
@@ -1098,7 +1098,7 @@ def test_sandbox_runner_validates_against_runner_mount_when_host_not_visible(mon
     update_settings(
         {
             "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
+            "dataagent_sandbox_image": "of-agent-worker:test",
             "dataagent_host_root": str(tmp_path / "topics"),
         }
     )
@@ -1116,68 +1116,3 @@ def test_sandbox_runner_validates_against_runner_mount_when_host_not_visible(mon
         in command
     )
 
-
-def test_enabled_skill_folders_auto_mounts_platform_tools_dependency():
-    # 1. Business knowledge triggers platform tools auto-dependency
-    params_bk = TaskExecutionInput(**_payload(agent_snapshot=_agent_snapshot(["opendataworks-business-knowledge"])))
-    folders_bk = sandbox_runner_main._enabled_skill_folders_for_task(params_bk)
-    assert folders_bk == ["opendataworks-business-knowledge", "opendataworks-platform-tools"]
-
-    # 2. Custom skill does not trigger platform tools
-    params_custom = TaskExecutionInput(**_payload(agent_snapshot=_agent_snapshot(["custom-standalone-skill"])))
-    folders_custom = sandbox_runner_main._enabled_skill_folders_for_task(params_custom)
-    assert folders_custom == ["custom-standalone-skill"]
-
-    # 3. Already containing platform tools does not duplicate
-    params_both = TaskExecutionInput(
-        **_payload(agent_snapshot=_agent_snapshot(["opendataworks-business-knowledge", "opendataworks-platform-tools"]))
-    )
-    folders_both = sandbox_runner_main._enabled_skill_folders_for_task(params_both)
-    assert folders_both == ["opendataworks-business-knowledge", "opendataworks-platform-tools"]
-
-
-def test_build_container_command_auto_mounts_platform_tools_and_sets_env(tmp_path, monkeypatch):
-    originals = {
-        "dataagent_sandbox_backend": get_settings().dataagent_sandbox_backend,
-        "dataagent_sandbox_image": get_settings().dataagent_sandbox_image,
-        "dataagent_host_root": get_settings().dataagent_host_root,
-    }
-    host_skills = "/host/skills"
-    runner_mount = tmp_path / "runner-skills"
-    bk_dir = runner_mount / "opendataworks-business-knowledge"
-    pt_dir = runner_mount / "opendataworks-platform-tools"
-    bk_dir.mkdir(parents=True)
-    pt_dir.mkdir(parents=True)
-    (bk_dir / "SKILL.md").write_text("# bk\n", encoding="utf-8")
-    (pt_dir / "SKILL.md").write_text("# pt\n", encoding="utf-8")
-
-    monkeypatch.setattr(sandbox_runner_main, "RUNNER_SKILLS_MOUNT_TARGET", str(runner_mount))
-    monkeypatch.setattr(sandbox_runner_main, "_AUTO_HOST_SKILLS_DIR", host_skills)
-    update_settings(
-        {
-            "dataagent_sandbox_backend": "docker",
-            "dataagent_sandbox_image": "opendataworks-dataagent-runner:test",
-            "dataagent_host_root": str(tmp_path / "topics"),
-        }
-    )
-    try:
-        _, _, command = sandbox_runner_main._build_container_command(
-            TaskExecutionInput(**_payload(agent_snapshot=_agent_snapshot(["opendataworks-business-knowledge"])))
-        )
-    finally:
-        update_settings(originals)
-
-    # Verify both skills are mounted
-    assert (
-        f"type=bind,source={host_skills}/opendataworks-business-knowledge,"
-        "target=/mnt/workspace/.claude/skills/opendataworks-business-knowledge,readonly"
-        in command
-    )
-    assert (
-        f"type=bind,source={host_skills}/opendataworks-platform-tools,"
-        "target=/mnt/workspace/.claude/skills/opendataworks-platform-tools,readonly"
-        in command
-    )
-    # Verify DATAAGENT_PLATFORM_SKILL_ROOT is provided in container environment
-    assert "--env" in command
-    assert "DATAAGENT_PLATFORM_SKILL_ROOT=/mnt/workspace/.claude/skills/opendataworks-platform-tools" in command

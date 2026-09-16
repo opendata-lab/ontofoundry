@@ -47,10 +47,10 @@ function loadFixture(): Fixture {
 
 /** Materialize the fixture placeholders, mirroring the Python harness layout. */
 function buildEnvironment() {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), "odw-boundary-"));
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), "of-boundary-"));
   const wsAncestor = path.join(base, "runtime");
   const workspace = path.join(wsAncestor, "topic_1", "workspace");
-  const skillRoot = path.join(base, "skills", "opendataworks-platform-tools");
+  const skillRoot = path.join(base, "skills", "custom-platform-tools");
   const scratch = path.join(base, "scratch");
   const outside = path.join(base, "outside");
   for (const dir of [workspace, skillRoot, scratch, outside]) {

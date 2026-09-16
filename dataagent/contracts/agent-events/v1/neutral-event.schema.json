@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://opendataworks/contracts/agent-events/v1/neutral-event.schema.json",
+  "$id": "https://ontofoundry.dev/contracts/agent-events/v1/neutral-event.schema.json",
   "title": "NeutralAgentEvent",
   "description": "One event from any engine adapter. The type list is closed: an unknown type is a producer bug, not an extension point, because every consumer switches on it and would silently ignore a typo.",
   "type": "object",

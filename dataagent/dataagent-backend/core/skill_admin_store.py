@@ -120,9 +120,7 @@ class SkillAdminStore:
                 cur.execute(
                     """
                     SELECT settings_key, provider_id, model_name, anthropic_api_key, anthropic_auth_token,
-                           anthropic_base_url, mysql_host, mysql_port, mysql_user, mysql_password,
-                           mysql_database, doris_host, doris_port, doris_user, doris_password,
-                           doris_database, skills_output_dir, raw_json, updated_at
+                           anthropic_base_url, skills_output_dir, raw_json, updated_at
                     FROM da_agent_settings
                     WHERE settings_key = 'default'
                     LIMIT 1
@@ -145,11 +143,9 @@ class SkillAdminStore:
                     """
                     INSERT INTO da_agent_settings (
                         settings_key, provider_id, model_name, anthropic_api_key, anthropic_auth_token,
-                        anthropic_base_url, mysql_host, mysql_port, mysql_user, mysql_password,
-                        mysql_database, doris_host, doris_port, doris_user, doris_password,
-                        doris_database, skills_output_dir, raw_json
+                        anthropic_base_url, skills_output_dir, raw_json
                     ) VALUES (
-                        'default', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        'default', %s, %s, %s, %s, %s, %s, %s
                     )
                     ON CONFLICT (settings_key) DO UPDATE SET
                         provider_id = EXCLUDED.provider_id,
@@ -157,16 +153,6 @@ class SkillAdminStore:
                         anthropic_api_key = EXCLUDED.anthropic_api_key,
                         anthropic_auth_token = EXCLUDED.anthropic_auth_token,
                         anthropic_base_url = EXCLUDED.anthropic_base_url,
-                        mysql_host = EXCLUDED.mysql_host,
-                        mysql_port = EXCLUDED.mysql_port,
-                        mysql_user = EXCLUDED.mysql_user,
-                        mysql_password = EXCLUDED.mysql_password,
-                        mysql_database = EXCLUDED.mysql_database,
-                        doris_host = EXCLUDED.doris_host,
-                        doris_port = EXCLUDED.doris_port,
-                        doris_user = EXCLUDED.doris_user,
-                        doris_password = EXCLUDED.doris_password,
-                        doris_database = EXCLUDED.doris_database,
                         skills_output_dir = EXCLUDED.skills_output_dir,
                         raw_json = EXCLUDED.raw_json,
                         updated_at = CURRENT_TIMESTAMP
@@ -177,16 +163,6 @@ class SkillAdminStore:
                         normalized["anthropic_api_key"],
                         normalized["anthropic_auth_token"],
                         normalized["anthropic_base_url"],
-                        normalized["mysql_host"],
-                        normalized["mysql_port"],
-                        normalized["mysql_user"],
-                        normalized["mysql_password"],
-                        normalized["mysql_database"],
-                        normalized["doris_host"],
-                        normalized["doris_port"],
-                        normalized["doris_user"],
-                        normalized["doris_password"],
-                        normalized["doris_database"],
                         normalized["skills_output_dir"],
                         raw_json,
                     ),
@@ -484,16 +460,6 @@ class SkillAdminStore:
             "anthropic_api_key": str(data.get("anthropic_api_key") or ""),
             "anthropic_auth_token": str(data.get("anthropic_auth_token") or ""),
             "anthropic_base_url": str(data.get("anthropic_base_url") or ""),
-            "mysql_host": str(data.get("mysql_host") or ""),
-            "mysql_port": int(data.get("mysql_port") or 3306),
-            "mysql_user": str(data.get("mysql_user") or ""),
-            "mysql_password": str(data.get("mysql_password") or ""),
-            "mysql_database": str(data.get("mysql_database") or ""),
-            "doris_host": str(data.get("doris_host") or ""),
-            "doris_port": int(data.get("doris_port") or 9030),
-            "doris_user": str(data.get("doris_user") or ""),
-            "doris_password": str(data.get("doris_password") or ""),
-            "doris_database": str(data.get("doris_database") or ""),
             "skills_output_dir": str(data.get("skills_output_dir") or ""),
         }
         extra_keys = {
@@ -529,16 +495,6 @@ class SkillAdminStore:
             "anthropic_api_key": str(row.get("anthropic_api_key") or ""),
             "anthropic_auth_token": str(row.get("anthropic_auth_token") or ""),
             "anthropic_base_url": str(row.get("anthropic_base_url") or ""),
-            "mysql_host": str(row.get("mysql_host") or ""),
-            "mysql_port": int(row.get("mysql_port") or 3306),
-            "mysql_user": str(row.get("mysql_user") or ""),
-            "mysql_password": str(row.get("mysql_password") or ""),
-            "mysql_database": str(row.get("mysql_database") or ""),
-            "doris_host": str(row.get("doris_host") or ""),
-            "doris_port": int(row.get("doris_port") or 9030),
-            "doris_user": str(row.get("doris_user") or ""),
-            "doris_password": str(row.get("doris_password") or ""),
-            "doris_database": str(row.get("doris_database") or ""),
             "skills_output_dir": str(row.get("skills_output_dir") or ""),
             "updated_at": _to_iso(row.get("updated_at")),
         }

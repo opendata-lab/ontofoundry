@@ -70,11 +70,11 @@ def test_plugin_mcp_server_is_read_only(monkeypatch):
     registry = FakeRegistry(
         [
             {
-                "server_id": "portal",
-                "name": "Portal MCP",
+                "server_id": "bundled-catalog",
+                "name": "Bundled Catalog MCP",
                 "source": "plugin",
                 "transport": "http",
-                "url": "http://portal-mcp:8801/mcp/",
+                "url": "http://catalog-mcp:8801/mcp/",
                 "headers": {},
                 "command": "",
                 "args": [],
@@ -86,9 +86,9 @@ def test_plugin_mcp_server_is_read_only(monkeypatch):
     monkeypatch.setattr(mcp_admin_service, "get_runtime_registry_store", lambda: registry)
 
     with pytest.raises(ValueError, match="read-only"):
-        mcp_admin_service.update_mcp_server("portal", {"enabled": False})
+        mcp_admin_service.update_mcp_server("bundled-catalog", {"enabled": False})
     with pytest.raises(ValueError, match="read-only"):
-        mcp_admin_service.delete_mcp_server("portal")
+        mcp_admin_service.delete_mcp_server("bundled-catalog")
 
 
 def test_import_validates_entire_payload_before_writing(monkeypatch):
@@ -150,16 +150,16 @@ def test_runtime_resolution_uses_selected_enabled_rows_and_preserves_transport(m
     }
 
 
-def test_runtime_resolution_distinguishes_default_selection_from_explicit_empty(monkeypatch):
+def test_runtime_resolution_requires_explicit_server_selection(monkeypatch):
     registry = FakeRegistry(
         [
             {
-                "server_id": "portal",
-                "name": "Portal MCP",
-                "source": "plugin",
+                "server_id": "catalog",
+                "name": "Catalog MCP",
+                "source": "configured",
                 "transport": "http",
-                "url": "http://portal-mcp:8801/mcp",
-                "headers": {"X-Portal-MCP-Token": "registry-token"},
+                "url": "http://catalog-mcp:8801/mcp",
+                "headers": {"Authorization": "Bearer registry-token"},
                 "command": "",
                 "args": [],
                 "env": {},
@@ -169,5 +169,6 @@ def test_runtime_resolution_distinguishes_default_selection_from_explicit_empty(
     )
     monkeypatch.setattr(mcp_admin_service, "get_runtime_registry_store", lambda: registry)
 
-    assert set(mcp_admin_service.resolve_runtime_mcp_servers(None)) == {"portal"}
+    assert mcp_admin_service.resolve_runtime_mcp_servers(None) == {}
     assert mcp_admin_service.resolve_runtime_mcp_servers([]) == {}
+    assert set(mcp_admin_service.resolve_runtime_mcp_servers(["catalog"])) == {"catalog"}

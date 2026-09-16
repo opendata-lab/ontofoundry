@@ -93,8 +93,8 @@ def test_prepare_topic_workspace_copies_enabled_skills(monkeypatch, tmp_path: Pa
     original_skills_root = getattr(get_settings(), "skills_root_dir", "")
     project = tmp_path / "project"
     skills_root = project / ".claude" / "skills"
-    _write_skill(skills_root, "opendataworks-business-knowledge")
-    _write_skill(skills_root, "opendataworks-platform-tools")
+    _write_skill(skills_root, "md2ossie")
+    _write_skill(skills_root, "custom-platform-tools")
     update_settings(
         {
             "skills_root_dir": str(skills_root),
@@ -103,7 +103,7 @@ def test_prepare_topic_workspace_copies_enabled_skills(monkeypatch, tmp_path: Pa
     try:
         workspace = prepare_topic_workspace(
             "topic_1",
-            ["opendataworks-business-knowledge", "opendataworks-platform-tools"],
+            ["md2ossie", "custom-platform-tools"],
             runtime_root=tmp_path / "topics",
         )
     finally:
@@ -114,14 +114,14 @@ def test_prepare_topic_workspace_copies_enabled_skills(monkeypatch, tmp_path: Pa
             }
         )
 
-    skill_copy = workspace / ".claude" / "skills" / "opendataworks-business-knowledge"
-    platform_copy = workspace / ".claude" / "skills" / "opendataworks-platform-tools"
+    skill_copy = workspace / ".claude" / "skills" / "md2ossie"
+    platform_copy = workspace / ".claude" / "skills" / "custom-platform-tools"
     assert workspace == tmp_path / "topics" / "topic_1" / "workspace"
     # Real directory copies, not symlinks, so Pi skill discovery sees real files.
     assert skill_copy.is_dir() and not skill_copy.is_symlink()
     assert platform_copy.is_dir() and not platform_copy.is_symlink()
-    assert (skill_copy / "SKILL.md").read_text(encoding="utf-8") == "# opendataworks-business-knowledge\n"
-    assert (platform_copy / "SKILL.md").read_text(encoding="utf-8") == "# opendataworks-platform-tools\n"
+    assert (skill_copy / "SKILL.md").read_text(encoding="utf-8") == "# md2ossie\n"
+    assert (platform_copy / "SKILL.md").read_text(encoding="utf-8") == "# custom-platform-tools\n"
 
 
 def test_prepare_topic_workspace_keeps_skills_mounted_inside_workspace(monkeypatch, tmp_path: Path):
@@ -165,7 +165,7 @@ def test_prepare_topic_workspace_can_use_pre_mounted_workspace(monkeypatch, tmp_
     project = tmp_path / "project"
     skills_root = project / ".claude" / "skills"
     mounted_workspace = tmp_path / "mounted-workspace"
-    _write_skill(skills_root, "opendataworks-business-knowledge")
+    _write_skill(skills_root, "md2ossie")
     update_settings(
         {
             "skills_root_dir": str(skills_root),
@@ -174,7 +174,7 @@ def test_prepare_topic_workspace_can_use_pre_mounted_workspace(monkeypatch, tmp_
     try:
         workspace = prepare_topic_workspace(
             "topic_1",
-            ["opendataworks-business-knowledge"],
+            ["md2ossie"],
             workspace_dir=mounted_workspace,
         )
     finally:
@@ -187,9 +187,9 @@ def test_prepare_topic_workspace_can_use_pre_mounted_workspace(monkeypatch, tmp_
 
     assert workspace == mounted_workspace.resolve()
     assert workspace != tmp_path / "topics" / "topic_1"
-    skill_copy = workspace / ".claude" / "skills" / "opendataworks-business-knowledge"
+    skill_copy = workspace / ".claude" / "skills" / "md2ossie"
     assert skill_copy.is_dir() and not skill_copy.is_symlink()
-    assert (skill_copy / "SKILL.md").read_text(encoding="utf-8") == "# opendataworks-business-knowledge\n"
+    assert (skill_copy / "SKILL.md").read_text(encoding="utf-8") == "# md2ossie\n"
 
 
 def test_prepare_topic_workspace_copies_once_and_refreshes_on_source_change(monkeypatch, tmp_path: Path):

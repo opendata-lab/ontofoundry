@@ -109,15 +109,6 @@ class CreateTaskRequest(BaseModel):
     source_schedule_log_id: Optional[str] = None
 
 
-class ExecuteQueryRequest(BaseModel):
-    sql: str
-    database: str
-    engine: Optional[str] = None
-    limit: Optional[int] = None
-    timeout_seconds: Optional[int] = None
-    topic_id: Optional[str] = None
-
-
 class MessageQueueQueryRequest(BaseModel):
     topic_id: Optional[str] = None
     page: int = 1
@@ -167,26 +158,6 @@ class ProviderSettingsUpdate(BaseModel):
     supports_partial_messages: Optional[bool] = None
     model_detections: Optional[Dict[str, "ModelDetectionState"]] = None
     models: Optional[List[Any]] = None
-
-
-class SettingsUpdateRequest(BaseModel):
-    provider_id: Optional[str] = None
-    model: Optional[str] = None
-    anthropic_api_key: Optional[str] = None
-    anthropic_auth_token: Optional[str] = None
-    anthropic_base_url: Optional[str] = None
-    mysql_host: Optional[str] = None
-    mysql_port: Optional[int] = None
-    mysql_user: Optional[str] = None
-    mysql_password: Optional[str] = None
-    mysql_database: Optional[str] = None
-    doris_host: Optional[str] = None
-    doris_port: Optional[int] = None
-    doris_user: Optional[str] = None
-    doris_password: Optional[str] = None
-    doris_database: Optional[str] = None
-    skills_output_dir: Optional[str] = None
-    providers: Optional[List[ProviderSettingsUpdate]] = None
 
 
 class ModelDetectionState(BaseModel):
@@ -309,19 +280,6 @@ class ModelDetectionResponse(BaseModel):
     checked_at: str
 
 
-class SettingsResponse(BaseModel):
-    default_provider_id: str
-    default_model: str
-    providers: List[ProviderConfig] = Field(default_factory=list)
-    skills_output_dir: str = ""
-    mysql_host: str = ""
-    mysql_port: int = 3306
-    mysql_database: str = ""
-    doris_host: str = ""
-    doris_port: int = 9030
-    doris_database: str = ""
-
-
 class RuntimeProviderConfig(BaseModel):
     provider_id: str
     display_name: str
@@ -357,16 +315,6 @@ class AdminSettingsResponse(BaseModel):
     anthropic_api_key: str = ""
     anthropic_auth_token: str = ""
     anthropic_base_url: str = ""
-    mysql_host: str = ""
-    mysql_port: int = 3306
-    mysql_user: str = ""
-    mysql_password: str = ""
-    mysql_database: str = ""
-    doris_host: str = ""
-    doris_port: int = 9030
-    doris_user: str = ""
-    doris_password: str = ""
-    doris_database: str = ""
     skills_output_dir: str = ""
     settings_file_path: str = ""
     settings_local_file_path: str = ""
@@ -380,16 +328,6 @@ class AdminSettingsUpdateRequest(BaseModel):
     anthropic_api_key: Optional[str] = None
     anthropic_auth_token: Optional[str] = None
     anthropic_base_url: Optional[str] = None
-    mysql_host: Optional[str] = None
-    mysql_port: Optional[int] = None
-    mysql_user: Optional[str] = None
-    mysql_password: Optional[str] = None
-    mysql_database: Optional[str] = None
-    doris_host: Optional[str] = None
-    doris_port: Optional[int] = None
-    doris_user: Optional[str] = None
-    doris_password: Optional[str] = None
-    doris_database: Optional[str] = None
     skills_output_dir: Optional[str] = None
     providers: Optional[List[ProviderSettingsUpdate]] = None
     widget_allowed_sites: Optional[List[WidgetAllowedSite]] = None
