@@ -10,7 +10,12 @@ from sqlalchemy import create_engine, pool, text
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers defaults to True, which silences every logger
+    # already configured by the host process. That is harmless for the `alembic`
+    # CLI, which owns its process, but not when migrations run in-process — a
+    # test calling command.upgrade() would take pytest's caplog down with it and
+    # the failure surfaces far away, as an unrelated assertion on empty log text.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = None
 
