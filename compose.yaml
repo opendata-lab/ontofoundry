@@ -25,11 +25,12 @@ services:
       timeout: 3s
       retries: 20
 
-  dataagent-backend:
-    image: ${OF_AGENT_MASTER_IMAGE:-of-agent-master:local}
+  of-backend:
+    image: ${OF_BACKEND_IMAGE:-of-backend:local}
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+      target: backend
     environment:
       DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       DATAAGENT_DATABASE_SCHEMA: public
@@ -38,7 +39,12 @@ services:
       SKILLS_ROOT_DIR: /app/.claude/skills
       DATAAGENT_HOST_ROOT: /dataagent_runtime
       DATAAGENT_RUNTIME_ROOT: /dataagent_runtime
-      DATAAGENT_SANDBOX_IMAGE: ${OF_AGENT_WORKER_IMAGE:-of-agent-worker:local}
+      # 沙箱拓扑：agent 执行不在本进程内 spawn，而是委派给 of-runner，由它
+      # 起子容器。子容器跑的是 `python .../sandbox_task_main.py`，需要完整的
+      # Python 包，所以直接复用 of-backend 镜像，不需要第三个镜像。
+      DATAAGENT_SANDBOX_MODE: "container"
+      DATAAGENT_SANDBOX_RUNNER_URL: http://of-runner:8910
+      DATAAGENT_SANDBOX_IMAGE: ${OF_BACKEND_IMAGE:-of-backend:local}
       LLM_PROVIDER: ${DATAAGENT_LLM_PROVIDER:-anthropic_compatible}
       CLAUDE_MODEL: ${ONTOFOUNDRY_ANTHROPIC_MODEL:-}
       ANTHROPIC_BASE_URL: ${ONTOFOUNDRY_ANTHROPIC_BASE_URL:-}
@@ -58,6 +64,46 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
+
+  of-runner:
+    image: ${OF_RUNNER_IMAGE:-of-runner:local}
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runner
+    environment:
+      DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
+      DATAAGENT_DATABASE_SCHEMA: public
+      REDIS_HOST: dataagent-redis
+      REDIS_PORT: 6379
+      SKILLS_ROOT_DIR: /app/.claude/skills
+      DATAAGENT_HOST_ROOT: /dataagent_runtime
+      DATAAGENT_RUNTIME_ROOT: /dataagent_runtime
+      DATAAGENT_SANDBOX_IMAGE: ${OF_BACKEND_IMAGE:-of-backend:local}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dataagent-redis:
+        condition: service_healthy
+    volumes:
+      - ontofoundry-dataagent-runtime:/dataagent_runtime
+      - ./dataagent/.claude/skills:/app/.claude/skills:ro
+      # runner 通过宿主 docker socket 起子容器。这是本拓扑里权限最大的一处：
+      # 能访问该 socket 等同于宿主 root，所以只有 runner 挂它，of-backend 不挂。
+      - /var/run/docker.sock:/var/run/docker.sock
+    expose:
+      - "8910"
+
+  of-frontend:
+    image: ${OF_FRONTEND_IMAGE:-of-frontend:local}
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      of-backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:80"
 
 volumes:
   ontofoundry-postgres:
