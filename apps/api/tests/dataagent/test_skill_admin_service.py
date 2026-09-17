@@ -1,0 +1,1110 @@
+from __future__ import annotations
+
+import hashlib
+import io
+import sys
+import types
+import zipfile
+from pathlib import Path
+
+import anyio
+import pytest
+
+
+from dataagent_backend.core import skill_admin_service
+from dataagent_backend.core.skill_admin_service import (
+    _merge_provider_settings,
+    _merge_settings_payload,
+    _normalize_widget_allowed_sites,
+)
+
+
+BUSINESS_SKILL = "md2ossie"
+PLATFORM_TOOLS_SKILL = "custom-platform-tools"
+LEGACY_SQL_SKILL = "dataagent-nl2sql"
+
+
+class FakeSkillStore:
+    def __init__(self):
+        self.documents: dict[str, dict] = {}
+        self.next_id = 1
+
+    def list_documents(self):
+        return list(self.documents.values())
+
+    def get_document_by_path(self, relative_path):
+        return self.documents.get(str(relative_path or "").replace("\\", "/").strip("/"))
+
+    def save_document(
+        self,
+        *,
+        relative_path,
+        content,
+        change_source,
+        change_summary=None,
+        actor=None,
+        metadata=None,
+        parent_version_id=None,
+    ):
+        normalized_path = str(relative_path or "").replace("\\", "/").strip("/")
+        existing = self.documents.get(normalized_path)
+        document_id = existing["id"] if existing else self.next_id
+        if not existing:
+            self.next_id += 1
+        version_count = int(existing.get("version_count") or 0) + 1 if existing else 1
+        document = {
+            "id": document_id,
+            "relative_path": normalized_path,
+            "file_name": Path(normalized_path).name,
+            "category": "root" if "/" not in normalized_path else normalized_path.split("/")[1],
+            "content_type": "markdown",
+            "current_content": content,
+            "current_hash": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            "current_version_id": version_count,
+            "version_count": version_count,
+            "last_change_source": change_source,
+            "last_change_summary": change_summary or "",
+            "created_at": "2026-04-17T10:00:00",
+            "updated_at": "2026-04-17T10:00:00",
+        }
+        self.documents[normalized_path] = document
+        return dict(document)
+
+    def delete_document_by_path(self, relative_path):
+        self.documents.pop(str(relative_path or "").replace("\\", "/").strip("/"), None)
+
+    def rename_document_path(self, old_relative_path, new_relative_path):
+        old_path = str(old_relative_path or "").replace("\\", "/").strip("/")
+        new_path = str(new_relative_path or "").replace("\\", "/").strip("/")
+        document = self.documents.pop(old_path, None)
+        if document:
+            document["relative_path"] = new_path
+            document["file_name"] = Path(new_path).name
+            self.documents[new_path] = document
+
+
+def make_zip(entries: dict[str, str]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for path, content in entries.items():
+            archive.writestr(path, content)
+    return buffer.getvalue()
+
+
+def configure_skill_filesystem(monkeypatch, tmp_path, store=None, *, settings=None):
+    discovery_root = tmp_path / ".claude" / "skills"
+    discovery_root.mkdir(parents=True)
+    fake_store = store or FakeSkillStore()
+    persisted = {}
+
+    monkeypatch.setattr(skill_admin_service, "resolve_skill_discovery_root_dir", lambda: discovery_root)
+    monkeypatch.setattr(skill_admin_service, "resolve_skills_root_dir", lambda: discovery_root / BUSINESS_SKILL)
+    monkeypatch.setattr(skill_admin_service, "get_skill_admin_store", lambda: fake_store)
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: settings
+        or {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+                PLATFORM_TOOLS_SKILL: {"enabled": True},
+            },
+        },
+    )
+    monkeypatch.setattr(skill_admin_service, "persist_admin_settings", lambda payload: persisted.update(payload) or payload)
+    return discovery_root, fake_store, persisted
+
+
+def test_merge_provider_settings_can_reenable_provider_with_models():
+    current = {
+        "anyrouter": {
+            "provider_id": "anyrouter",
+            "auth_token": "existing-token",
+            "base_url": "https://a-ocnfniawgw.cn-shanghai.fcapp.run",
+            "provider_enabled": True,
+            "enabled_models": [],
+            "custom_models": [],
+            "model_detections": {},
+            "enabled": False,
+            "validation_status": "unverified",
+            "validation_message": "请启用至少一个模型",
+        }
+    }
+    patch = {
+        "anyrouter": {
+            "provider_id": "anyrouter",
+            "provider_enabled": True,
+            "auth_token": "existing-token",
+            "base_url": "https://a-ocnfniawgw.cn-shanghai.fcapp.run",
+            "enabled_models": ["claude-opus-4-6"],
+            "custom_models": [],
+            "model_detections": {
+                "claude-opus-4-6": {
+                    "status": "verified",
+                    "message": "模型检测通过",
+                    "checked_at": "2026-04-17T10:00:00",
+                }
+            },
+        }
+    }
+
+    merged = _merge_provider_settings(
+        current,
+        patch,
+        legacy_payload={"provider_id": "anyrouter", "model": "claude-opus-4-6"},
+    )
+
+    provider = merged["anyrouter"]
+    assert provider["enabled_models"] == ["claude-opus-4-6"]
+    assert provider["validation_status"] == "verified"
+    assert provider["enabled"] is True
+
+
+def test_merge_provider_settings_preserves_partial_capability_flag():
+    merged = _merge_provider_settings(
+        {
+            "anthropic_compatible": {
+                "provider_id": "anthropic_compatible",
+                "auth_token": "relay-token",
+                "base_url": "https://relay.example.invalid",
+                "provider_enabled": True,
+                "enabled_models": ["claude-sonnet-4.5"],
+                "model_detections": {
+                    "claude-sonnet-4.5": {
+                        "status": "verified",
+                        "message": "模型检测通过",
+                        "checked_at": "2026-04-17T10:00:00",
+                    }
+                },
+                "supports_partial_messages": True,
+            }
+        },
+        {
+            "anthropic_compatible": {
+                "provider_id": "anthropic_compatible",
+                "supports_partial_messages": False,
+            }
+        },
+    )
+
+    provider = merged["anthropic_compatible"]
+    assert provider["supports_partial_messages"] is False
+    assert provider["validation_status"] == "verified"
+    assert provider["enabled"] is True
+
+
+def test_merge_provider_settings_allows_enabled_model_without_detection():
+    merged = _merge_provider_settings(
+        {},
+        {
+            "openrouter": {
+                "provider_id": "openrouter",
+                "provider_enabled": True,
+                "auth_token": "token",
+                "base_url": "https://openrouter.ai/api",
+                "enabled_models": ["anthropic/claude-sonnet-4.5"],
+                "model_detections": {},
+            }
+        },
+    )
+
+    provider = merged["openrouter"]
+    assert provider["enabled_models"] == ["anthropic/claude-sonnet-4.5"]
+    assert provider["validation_status"] == "verified"
+    assert provider["enabled"] is True
+
+
+def test_normalize_widget_allowed_sites_from_json_string():
+    sites = _normalize_widget_allowed_sites(
+        '[{"website_id":"demo","allowed_origins":["https://a.com","https://a.com"],"project_name":"Demo","project_color":"#4A90A4"}]'
+    )
+
+    assert sites == [
+        {
+            "website_id": "demo",
+            "allowed_origins": ["https://a.com"],
+            "project_name": "Demo",
+            "project_color": "#4A90A4",
+            "allow_anonymous": False,
+        }
+    ]
+
+
+def test_normalize_widget_allowed_sites_drops_invalid_and_duplicate_entries():
+    sites = _normalize_widget_allowed_sites(
+        [
+            {"website_id": "  ", "allowed_origins": ["x"]},
+            {"website_id": "dup"},
+            {"website_id": "dup"},
+            "not-a-dict",
+            {"allowed_origins": ["y"]},
+        ]
+    )
+
+    assert [item["website_id"] for item in sites] == ["dup"]
+    assert sites[0]["allowed_origins"] == []
+    assert sites[0]["allow_anonymous"] is False
+
+
+def test_merge_settings_payload_carries_widget_allowed_sites_from_patch():
+    merged = _merge_settings_payload(
+        {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "widget_allowed_sites": [{"website_id": "old", "allowed_origins": []}],
+        },
+        {
+            "widget_allowed_sites": [
+                {
+                    "website_id": "new",
+                    "allowed_origins": ["https://b.com"],
+                    "project_color": "#000",
+                    "allow_anonymous": True,
+                }
+            ]
+        },
+    )
+
+    assert merged["widget_allowed_sites"] == [
+        {
+            "website_id": "new",
+            "allowed_origins": ["https://b.com"],
+            "project_name": "",
+            "project_color": "#000",
+            "allow_anonymous": True,
+        }
+    ]
+
+
+def test_merge_settings_payload_preserves_widget_allowed_sites_without_patch():
+    merged = _merge_settings_payload(
+        {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "widget_allowed_sites": [{"website_id": "keep", "allowed_origins": ["*"]}],
+        },
+        {},
+    )
+
+    assert merged["widget_allowed_sites"] == [
+        {
+            "website_id": "keep",
+            "allowed_origins": ["*"],
+            "project_name": "",
+            "project_color": "",
+            "allow_anonymous": False,
+        }
+    ]
+
+
+def test_merge_settings_payload_allows_clearing_widget_allowed_sites():
+    merged = _merge_settings_payload(
+        {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "widget_allowed_sites": [{"website_id": "keep", "allowed_origins": ["*"]}],
+        },
+        {"widget_allowed_sites": []},
+    )
+
+    assert merged["widget_allowed_sites"] == []
+
+
+def test_merge_settings_defaults_to_current_bundled_skills_when_runtime_missing():
+    merged = _merge_settings_payload(
+        {"skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}"},
+        {},
+    )
+
+    assert LEGACY_SQL_SKILL not in merged["skill_runtime"]
+    assert merged["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
+    assert PLATFORM_TOOLS_SKILL not in merged["skill_runtime"]
+
+
+def test_merge_settings_migrates_legacy_sql_skill_to_current_bundled_skills():
+    merged = _merge_settings_payload(
+        {
+            "skills_output_dir": f"../.claude/skills/{LEGACY_SQL_SKILL}",
+            "skill_runtime": {LEGACY_SQL_SKILL: {"enabled": True}},
+        },
+        {},
+    )
+
+    assert merged["skills_output_dir"] == f"../.claude/skills/{BUSINESS_SKILL}"
+    assert LEGACY_SQL_SKILL not in merged["skill_runtime"]
+    assert merged["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
+    assert PLATFORM_TOOLS_SKILL not in merged["skill_runtime"]
+
+
+def test_merge_settings_preserves_explicit_bundled_skill_disabled():
+    merged = _merge_settings_payload(
+        {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+                PLATFORM_TOOLS_SKILL: {"enabled": False},
+            },
+        },
+        {},
+    )
+
+    assert LEGACY_SQL_SKILL not in merged["skill_runtime"]
+    assert merged["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
+    assert merged["skill_runtime"][PLATFORM_TOOLS_SKILL]["enabled"] is False
+
+
+def test_merge_settings_payload_keeps_provider_and_model_empty_without_enabled_provider():
+    merged = _merge_settings_payload(
+        {
+            "provider_id": "",
+            "model": "",
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+        },
+        {},
+    )
+
+    assert merged["provider_id"] == ""
+    assert merged["model"] == ""
+    assert merged["validated_provider_id"] == ""
+    assert merged["validated_model"] == ""
+
+
+def test_merge_settings_payload_enables_env_selected_provider_on_fresh_install():
+    merged = _merge_settings_payload(
+        {
+            "provider_id": "anyrouter",
+            "model": "claude-opus-4-6",
+            "anthropic_api_key": "",
+            "anthropic_auth_token": "deployment-token",
+            "anthropic_base_url": "https://router.example.invalid",
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+        },
+        {},
+    )
+
+    provider = merged["provider_settings"]["anyrouter"]
+    assert provider["provider_enabled"] is True
+    assert provider["enabled_models"] == ["claude-opus-4-6"]
+    assert provider["validation_status"] == "verified"
+    assert provider["enabled"] is True
+    assert merged["provider_id"] == "anyrouter"
+    assert merged["model"] == "claude-opus-4-6"
+    assert merged["validated_provider_id"] == "anyrouter"
+    assert merged["validated_model"] == "claude-opus-4-6"
+
+
+def test_bootstrap_admin_settings_persists_blank_provider_and_model(monkeypatch):
+    captured = {}
+
+    class FakeStore:
+        def init_schema(self):
+            return None
+
+        def load_settings_record(self):
+            return None
+
+        def save_settings_record(self, payload):
+            captured["saved"] = dict(payload)
+            return dict(payload)
+
+    class FakeRegistry:
+        def __init__(self):
+            self.providers = {}
+
+        def init_schema(self):
+            return None
+
+        def list_providers(self):
+            return list(self.providers.values())
+
+        def save_provider(self, payload):
+            self.providers[payload["provider_id"]] = dict(payload)
+            return dict(payload)
+
+    registry = FakeRegistry()
+
+    monkeypatch.setattr(skill_admin_service, "get_skill_admin_store", lambda: FakeStore())
+    monkeypatch.setattr(skill_admin_service, "get_runtime_registry_store", lambda: registry)
+    monkeypatch.setattr(
+        skill_admin_service,
+        "get_settings",
+        lambda: types.SimpleNamespace(
+            llm_provider="",
+            claude_model="",
+            anthropic_api_key="",
+            anthropic_auth_token="",
+            anthropic_base_url="",
+            skills_output_dir=f"../.claude/skills/{BUSINESS_SKILL}",
+        ),
+    )
+    monkeypatch.setattr(skill_admin_service, "update_settings", lambda patch: patch)
+
+    resolved = skill_admin_service.bootstrap_admin_settings()
+
+    assert captured["saved"]["provider_id"] == ""
+    assert captured["saved"]["model"] == ""
+    assert resolved["provider_id"] == ""
+    assert resolved["model"] == ""
+
+
+def test_current_settings_does_not_fallback_when_provider_registry_is_unavailable(monkeypatch):
+    class FakeSettingsStore:
+        def load_settings_record(self):
+            return {
+                "provider_id": "anthropic_compatible",
+                "provider_settings": {
+                    "anthropic_compatible": {
+                        "provider_enabled": True,
+                        "enabled_models": ["legacy-model"],
+                    }
+                },
+            }
+
+    class BrokenRegistry:
+        def list_providers(self):
+            raise RuntimeError("registry unavailable")
+
+    monkeypatch.setattr(skill_admin_service, "get_skill_admin_store", lambda: FakeSettingsStore())
+    monkeypatch.setattr(skill_admin_service, "get_runtime_registry_store", lambda: BrokenRegistry())
+
+    with pytest.raises(RuntimeError, match="registry unavailable"):
+        skill_admin_service.current_settings_payload()
+
+
+def test_resolve_runtime_provider_selection_returns_partial_capability(monkeypatch):
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "provider_id": "anthropic_compatible",
+            "model": "claude-sonnet-4.5",
+            "provider_settings": {
+                "anthropic_compatible": {
+                    "provider_id": "anthropic_compatible",
+                    "provider_enabled": True,
+                    "auth_token": "relay-token",
+                    "base_url": "https://relay.example.invalid",
+                    "enabled_models": ["claude-sonnet-4.5"],
+                    "model_detections": {},
+                    "supports_partial_messages": False,
+                }
+            },
+        },
+    )
+
+    resolved = skill_admin_service.resolve_runtime_provider_selection("anthropic_compatible", "claude-sonnet-4.5")
+    assert resolved["provider_id"] == "anthropic_compatible"
+    assert resolved["model"] == "claude-sonnet-4.5"
+    assert resolved["supports_partial_messages"] is False
+
+
+def test_delete_current_provider_persists_fallback_selection(monkeypatch):
+    captured = {}
+
+    class FakeRegistry:
+        def get_provider(self, provider_id):
+            return {"provider_id": provider_id} if provider_id == "current" else None
+
+        def delete_provider(self, provider_id):
+            captured["deleted"] = provider_id
+            return True
+
+    payloads = iter(
+        [
+            {"provider_id": "current", "model": "old-model"},
+            {"provider_id": "fallback", "model": "fallback-model"},
+        ]
+    )
+    monkeypatch.setattr(skill_admin_service, "get_runtime_registry_store", lambda: FakeRegistry())
+    monkeypatch.setattr(skill_admin_service, "current_settings_payload", lambda: next(payloads))
+    monkeypatch.setattr(
+        skill_admin_service,
+        "list_provider_configs",
+        lambda **kwargs: [{"provider_id": "fallback", "models": ["fallback-model"]}],
+    )
+    monkeypatch.setattr(
+        skill_admin_service,
+        "persist_admin_settings",
+        lambda payload: captured.setdefault("settings", dict(payload)),
+    )
+
+    skill_admin_service.delete_provider_config("current")
+
+    assert captured == {
+        "deleted": "current",
+        "settings": {"provider_id": "fallback", "model": "fallback-model"},
+    }
+
+
+def test_resolve_runtime_provider_selection_requires_enabled_provider(monkeypatch):
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "provider_id": "",
+            "model": "",
+            "provider_settings": {},
+        },
+    )
+
+    try:
+        skill_admin_service.resolve_runtime_provider_selection(None, None)
+    except ValueError as exc:
+        assert str(exc) == "尚未配置可用大模型供应商"
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_detect_model_availability_returns_verified_detection(monkeypatch):
+    async def fake_detection(**kwargs):
+        assert kwargs["model"] == "anthropic/claude-sonnet-4.5"
+        return "verified", "模型检测通过"
+
+    monkeypatch.setattr(skill_admin_service, "_run_model_detection", fake_detection)
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "provider_id": "openrouter",
+            "model": "",
+            "provider_settings": {
+                "openrouter": {
+                    "provider_id": "openrouter",
+                    "provider_enabled": True,
+                    "auth_token": "saved-token",
+                    "base_url": "https://openrouter.ai/api",
+                    "enabled_models": [],
+                    "custom_models": [],
+                    "model_detections": {},
+                }
+            },
+        },
+    )
+
+    result = anyio.run(
+        skill_admin_service.detect_model_availability,
+        {
+            "provider_id": "openrouter",
+            "model": "anthropic/claude-sonnet-4.5",
+        },
+    )
+
+    assert result["status"] == "verified"
+
+
+def test_detect_model_availability_returns_failed_without_token(monkeypatch):
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "provider_id": "openrouter",
+            "model": "",
+            "provider_settings": {
+                "openrouter": {
+                    "provider_id": "openrouter",
+                    "provider_enabled": True,
+                    "auth_token": "",
+                    "base_url": "https://openrouter.ai/api",
+                    "enabled_models": [],
+                    "custom_models": [],
+                    "model_detections": {},
+                }
+            },
+        },
+    )
+
+    result = anyio.run(
+        skill_admin_service.detect_model_availability,
+        {
+            "provider_id": "openrouter",
+            "model": "anthropic/claude-sonnet-4.5",
+        },
+    )
+
+    assert result["status"] == "failed"
+    assert "Token" in result["message"]
+
+
+def test_list_documents_enriches_skill_fields(monkeypatch):
+    class FakeStore:
+        def list_documents(self):
+            return [
+                {
+                    "id": 1,
+                    "relative_path": "custom-platform-tools/reference/40-runtime-metadata.md",
+                    "file_name": "40-runtime-metadata.md",
+                    "category": "reference",
+                    "content_type": "markdown",
+                    "current_hash": "hash",
+                    "current_version_id": 2,
+                    "version_count": 2,
+                    "last_change_source": "sync",
+                    "last_change_summary": "manual sync",
+                    "created_at": "2026-03-06T10:00:00",
+                    "updated_at": "2026-03-06T12:00:00",
+                }
+            ]
+
+    monkeypatch.setattr(skill_admin_service, "reindex_documents_from_disk", lambda *args, **kwargs: [])
+    monkeypatch.setattr(skill_admin_service, "get_skill_admin_store", lambda: FakeStore())
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+                PLATFORM_TOOLS_SKILL: {"enabled": True},
+                "marketing-insights": {"enabled": True},
+            },
+        },
+    )
+
+    documents = skill_admin_service.list_documents()
+
+    assert documents[0]["folder"] == "custom-platform-tools"
+    assert documents[0]["relative_path"] == "reference/40-runtime-metadata.md"
+    assert documents[0]["source"] == "managed"
+    assert documents[0]["enabled"] is True
+    assert documents[0]["editable"] is True
+
+
+def test_update_skill_runtime_enables_second_skill_without_changing_primary(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(skill_admin_service, "_discovered_skill_folders", lambda: {BUSINESS_SKILL, "marketing-insights"})
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        skill_admin_service,
+        "persist_admin_settings",
+        lambda payload: captured.setdefault("payload", payload) or payload,
+    )
+    result = skill_admin_service.update_skill_runtime("marketing-insights", True)
+
+    assert "skills_output_dir" not in captured["payload"]
+    assert captured["payload"]["skill_runtime"][BUSINESS_SKILL]["enabled"] is True
+    assert captured["payload"]["skill_runtime"]["marketing-insights"]["enabled"] is True
+    assert result["skill_id"] == "marketing-insights"
+    assert result["enabled"] is True
+
+
+def test_update_skill_runtime_rejects_disabling_last_skill(monkeypatch):
+    monkeypatch.setattr(skill_admin_service, "_discovered_skill_folders", lambda: {BUSINESS_SKILL})
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+            },
+        },
+    )
+
+    try:
+        skill_admin_service.update_skill_runtime(BUSINESS_SKILL, False)
+    except ValueError as exc:
+        assert "至少需要保留一个启用 Skill" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_update_skill_runtime_moves_primary_when_disabling_current(monkeypatch):
+    captured = {}
+
+    monkeypatch.setattr(skill_admin_service, "_discovered_skill_folders", lambda: {BUSINESS_SKILL, "marketing-insights"})
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+            "skill_runtime": {
+                BUSINESS_SKILL: {"enabled": True},
+                "marketing-insights": {"enabled": True},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        skill_admin_service,
+        "_settings_path_for_skill_folder",
+        lambda folder: f"../.claude/skills/{folder}",
+    )
+    monkeypatch.setattr(
+        skill_admin_service,
+        "persist_admin_settings",
+        lambda payload: captured.setdefault("payload", payload) or payload,
+    )
+    result = skill_admin_service.update_skill_runtime(BUSINESS_SKILL, False)
+
+    assert captured["payload"]["skills_output_dir"] == "../.claude/skills/marketing-insights"
+    assert captured["payload"]["skill_runtime"][BUSINESS_SKILL]["enabled"] is False
+    assert captured["payload"]["skill_runtime"]["marketing-insights"]["enabled"] is True
+    assert result == {"skill_id": BUSINESS_SKILL, "enabled": False}
+
+
+def test_resolve_enabled_skill_runtime_ignores_deleted_legacy_sql_skill(monkeypatch, tmp_path):
+    discovery_root = tmp_path / ".claude" / "skills"
+    (discovery_root / BUSINESS_SKILL).mkdir(parents=True)
+    (discovery_root / BUSINESS_SKILL / "SKILL.md").write_text("# Business\n", encoding="utf-8")
+    (discovery_root / PLATFORM_TOOLS_SKILL).mkdir(parents=True)
+    (discovery_root / PLATFORM_TOOLS_SKILL / "SKILL.md").write_text("# Tools\n", encoding="utf-8")
+
+    monkeypatch.setattr(skill_admin_service, "resolve_skill_discovery_root_dir", lambda: discovery_root)
+    monkeypatch.setattr(skill_admin_service, "resolve_skills_root_dir", lambda: discovery_root / BUSINESS_SKILL)
+    monkeypatch.setattr(
+        skill_admin_service,
+        "current_settings_payload",
+        lambda: {
+            "skills_output_dir": f"../.claude/skills/{LEGACY_SQL_SKILL}",
+            "skill_runtime": {LEGACY_SQL_SKILL: {"enabled": True}},
+        },
+    )
+
+    runtime = skill_admin_service.resolve_enabled_skill_runtime()
+
+    assert runtime["primary_folder"] == BUSINESS_SKILL
+    assert runtime["enabled_folders"] == [BUSINESS_SKILL]
+    assert LEGACY_SQL_SKILL not in runtime["enabled_roots"]
+
+
+def test_import_skill_from_root_zip_defaults_to_disabled(monkeypatch, tmp_path):
+    discovery_root, store, persisted = configure_skill_filesystem(monkeypatch, tmp_path)
+
+    payload = skill_admin_service.import_skill_from_zip(
+        "marketing-insights.zip",
+        make_zip(
+            {
+                "SKILL.md": "---\nname: marketing-insights\n---\n# Marketing\n",
+                "reference/guide.md": "# Guide\n",
+            }
+        ),
+    )
+
+    assert (discovery_root / "marketing-insights" / "SKILL.md").exists()
+    assert payload["skill_id"] == "marketing-insights"
+    assert payload["source"] == "managed"
+    assert payload["enabled"] is False
+    assert payload["replaced"] is False
+    assert payload["previous_version"] == ""
+    assert persisted["skill_runtime"]["marketing-insights"]["enabled"] is False
+    assert "marketing-insights/SKILL.md" in store.documents
+
+
+def test_import_skill_from_folder_zip(monkeypatch, tmp_path):
+    discovery_root, store, persisted = configure_skill_filesystem(monkeypatch, tmp_path)
+
+    payload = skill_admin_service.import_skill_from_zip(
+        "marketing-insights.zip",
+        make_zip(
+            {
+                "marketing-insights/SKILL.md": "# Marketing\n",
+                "marketing-insights/scripts/run.py": "print('ok')\n",
+            }
+        ),
+    )
+
+    assert (discovery_root / "marketing-insights" / "scripts" / "run.py").exists()
+    assert payload["imported_documents"]
+    assert persisted["skill_runtime"]["marketing-insights"]["enabled"] is False
+    assert "marketing-insights/scripts/run.py" in store.documents
+
+
+def test_import_skill_rejects_folder_zip_when_front_matter_name_differs(monkeypatch, tmp_path):
+    configure_skill_filesystem(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="SKILL.md name must match skill folder"):
+        skill_admin_service.import_skill_from_zip(
+            "marketing-insights.zip",
+            make_zip(
+                {
+                    "marketing-insights/SKILL.md": "---\nname: crm-insights\n---\n# CRM\n",
+                    "marketing-insights/reference/guide.md": "# Guide\n",
+                }
+            ),
+        )
+
+
+def test_import_skill_rejects_unsafe_zip_path(monkeypatch, tmp_path):
+    configure_skill_filesystem(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="unsafe parent path"):
+        skill_admin_service.import_skill_from_zip(
+            "bad.zip",
+            make_zip({"../evil/SKILL.md": "# Evil\n"}),
+        )
+
+
+def test_import_skill_rejects_duplicate_folder_with_same_version(monkeypatch, tmp_path):
+    discovery_root, _, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+    (discovery_root / "marketing-insights").mkdir()
+    (discovery_root / "marketing-insights" / "SKILL.md").write_text(
+        "---\nname: marketing-insights\nversion: 1.0.0\n---\n# Marketing\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="版本相同"):
+        skill_admin_service.import_skill_from_zip(
+            "marketing-insights.zip",
+            make_zip(
+                {"marketing-insights/SKILL.md": "---\nname: marketing-insights\nversion: 1.0.0\n---\n# Marketing\n"}
+            ),
+        )
+
+
+def test_import_skill_rejects_duplicate_folder_without_version(monkeypatch, tmp_path):
+    discovery_root, _, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+    (discovery_root / "marketing-insights").mkdir()
+
+    with pytest.raises(ValueError, match="版本相同"):
+        skill_admin_service.import_skill_from_zip(
+            "marketing-insights.zip",
+            make_zip({"marketing-insights/SKILL.md": "# Marketing\n"}),
+        )
+
+
+def test_import_skill_replaces_existing_when_version_differs(monkeypatch, tmp_path):
+    settings = {
+        "skills_output_dir": f"../.claude/skills/{BUSINESS_SKILL}",
+        "skill_runtime": {
+            BUSINESS_SKILL: {"enabled": True},
+            "marketing-insights": {"enabled": True},
+        },
+    }
+    discovery_root, store, persisted = configure_skill_filesystem(monkeypatch, tmp_path, settings=settings)
+    existing = discovery_root / "marketing-insights"
+    existing.mkdir()
+    (existing / "SKILL.md").write_text(
+        "---\nname: marketing-insights\nversion: 1.0.0\n---\n# Marketing v1\n",
+        encoding="utf-8",
+    )
+    (existing / "reference").mkdir()
+    (existing / "reference" / "legacy.md").write_text("# Legacy\n", encoding="utf-8")
+    store.save_document(
+        relative_path="marketing-insights/SKILL.md",
+        content="---\nname: marketing-insights\nversion: 1.0.0\n---\n# Marketing v1\n",
+        change_source="upload",
+    )
+    store.save_document(
+        relative_path="marketing-insights/reference/legacy.md",
+        content="# Legacy\n",
+        change_source="upload",
+    )
+
+    payload = skill_admin_service.import_skill_from_zip(
+        "marketing-insights.zip",
+        make_zip(
+            {
+                "marketing-insights/SKILL.md": "---\nname: marketing-insights\nversion: 2.0.0\n---\n# Marketing v2\n",
+                "marketing-insights/reference/guide.md": "# Guide\n",
+            }
+        ),
+    )
+
+    assert payload["skill_id"] == "marketing-insights"
+    assert payload["replaced"] is True
+    assert payload["version"] == "2.0.0"
+    assert payload["previous_version"] == "1.0.0"
+    assert payload["enabled"] is True
+    assert persisted["skill_runtime"]["marketing-insights"]["enabled"] is True
+    assert (discovery_root / "marketing-insights" / "reference" / "guide.md").exists()
+    assert not (discovery_root / "marketing-insights" / "reference" / "legacy.md").exists()
+    assert "marketing-insights/reference/legacy.md" not in store.documents
+    assert "marketing-insights/reference/guide.md" in store.documents
+    assert "2.0.0" in store.documents["marketing-insights/SKILL.md"]["current_content"]
+
+
+def test_import_skill_rejects_overwriting_builtin_folder(monkeypatch, tmp_path):
+    discovery_root, _, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+    (discovery_root / BUSINESS_SKILL).mkdir()
+    (discovery_root / BUSINESS_SKILL / "SKILL.md").write_text(
+        f"---\nname: {BUSINESS_SKILL}\nversion: 1.0.0\n---\n# Builtin\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="内置 Skill 不支持覆盖导入"):
+        skill_admin_service.import_skill_from_zip(
+            "builtin.zip",
+            make_zip(
+                {f"{BUSINESS_SKILL}/SKILL.md": f"---\nname: {BUSINESS_SKILL}\nversion: 2.0.0\n---\n# Builtin\n"}
+            ),
+        )
+
+
+def test_import_skill_rejects_missing_skill_md(monkeypatch, tmp_path):
+    configure_skill_filesystem(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="缺少 SKILL.md"):
+        skill_admin_service.import_skill_from_zip(
+            "bad.zip",
+            make_zip({"reference/guide.md": "# Guide\n"}),
+        )
+
+
+def test_uninstall_skill_removes_managed_folder_and_runtime(monkeypatch, tmp_path):
+    settings = {
+        "skills_output_dir": "../.claude/skills/marketing-insights",
+        "skill_runtime": {
+            BUSINESS_SKILL: {"enabled": True},
+            "marketing-insights": {"enabled": True},
+        },
+    }
+    discovery_root, store, persisted = configure_skill_filesystem(monkeypatch, tmp_path, settings=settings)
+    (discovery_root / BUSINESS_SKILL).mkdir()
+    (discovery_root / BUSINESS_SKILL / "SKILL.md").write_text("# Builtin\n", encoding="utf-8")
+    (discovery_root / "marketing-insights").mkdir()
+    (discovery_root / "marketing-insights" / "SKILL.md").write_text("# Marketing\n", encoding="utf-8")
+    store.save_document(
+        relative_path="marketing-insights/SKILL.md",
+        content="# Marketing\n",
+        change_source="upload",
+    )
+    monkeypatch.setattr(skill_admin_service, "reindex_documents_from_disk", lambda *args, **kwargs: [])
+    monkeypatch.setattr(skill_admin_service, "_settings_path_for_skill_folder", lambda folder: f"../.claude/skills/{folder}")
+
+    result = skill_admin_service.uninstall_skill("marketing-insights")
+
+    assert not (discovery_root / "marketing-insights").exists()
+    assert result["skill_id"] == "marketing-insights"
+    assert result["was_enabled"] is True
+    assert result["removed_documents"][0]["folder"] == "marketing-insights"
+    assert "marketing-insights/SKILL.md" not in store.documents
+    assert "marketing-insights" not in persisted["skill_runtime"]
+    assert persisted["skills_output_dir"] == f"../.claude/skills/{BUSINESS_SKILL}"
+
+
+def test_export_skill_as_zip_packs_folder_contents(monkeypatch, tmp_path):
+    discovery_root, _, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+    (discovery_root / "marketing-insights").mkdir()
+    (discovery_root / "marketing-insights" / "SKILL.md").write_text("# Marketing\n", encoding="utf-8")
+    (discovery_root / "marketing-insights" / "scripts").mkdir()
+    (discovery_root / "marketing-insights" / "scripts" / "run.py").write_text("print('ok')\n", encoding="utf-8")
+
+    file_name, content = skill_admin_service.export_skill_as_zip("marketing-insights")
+
+    assert file_name == "marketing-insights.zip"
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        names = set(archive.namelist())
+        assert names == {
+            "marketing-insights/SKILL.md",
+            "marketing-insights/scripts/run.py",
+        }
+        assert archive.read("marketing-insights/scripts/run.py").decode("utf-8") == "print('ok')\n"
+
+
+def test_export_skill_as_zip_rejects_unknown_folder(monkeypatch, tmp_path):
+    configure_skill_filesystem(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="skill folder not found"):
+        skill_admin_service.export_skill_as_zip("does-not-exist")
+
+
+def test_uninstall_skill_rejects_builtin(monkeypatch, tmp_path):
+    configure_skill_filesystem(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError, match="内置 Skill 不支持卸载"):
+        skill_admin_service.uninstall_skill(BUSINESS_SKILL)
+
+
+def test_uninstall_skill_rejects_last_enabled(monkeypatch, tmp_path):
+    settings = {
+        "skills_output_dir": "../.claude/skills/marketing-insights",
+        "skill_runtime": {
+            "marketing-insights": {"enabled": True},
+        },
+    }
+    discovery_root, store, _ = configure_skill_filesystem(monkeypatch, tmp_path, settings=settings)
+    (discovery_root / "marketing-insights").mkdir()
+    (discovery_root / "marketing-insights" / "SKILL.md").write_text("# Marketing\n", encoding="utf-8")
+    store.save_document(
+        relative_path="marketing-insights/SKILL.md",
+        content="# Marketing\n",
+        change_source="upload",
+    )
+    monkeypatch.setattr(skill_admin_service, "reindex_documents_from_disk", lambda *args, **kwargs: [])
+
+    with pytest.raises(ValueError, match="至少需要保留一个启用 Skill"):
+        skill_admin_service.uninstall_skill("marketing-insights")
+
+
+def _count_shared_state_reads(tmp_path, *, document_count: int) -> dict[str, int]:
+    """列出一个含 document_count 份文档的 skill，返回各类共享状态的读取次数。
+
+    自带 monkeypatch 上下文：两次调用若共用同一个 monkeypatch，第二次的计数包装器
+    会把第一次的包装器当成原函数，两边的计数互相污染。
+    """
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        return _count_within(monkeypatch, tmp_path, document_count)
+
+
+def _count_within(monkeypatch, tmp_path, document_count: int) -> dict[str, int]:
+    discovery_root, store, _ = configure_skill_filesystem(monkeypatch, tmp_path)
+
+    skill_dir = discovery_root / BUSINESS_SKILL
+    (skill_dir / "reference").mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: md2ossie\ndescription: 本体建模\n---\n正文\n", encoding="utf-8"
+    )
+    for index in range(document_count - 1):
+        (skill_dir / "reference" / f"{index:02d}-note.md").write_text(f"note {index}", encoding="utf-8")
+
+    counts = {"settings": 0, "front_matter": 0, "path_lookups": 0}
+
+    real_runtime = skill_admin_service._skill_runtime_from_current_settings
+    real_front_matter = skill_admin_service._front_matter_value
+    real_get_by_path = store.get_document_by_path
+
+    def counting_runtime():
+        counts["settings"] += 1
+        return real_runtime()
+
+    def counting_front_matter(path, key):
+        counts["front_matter"] += 1
+        return real_front_matter(path, key)
+
+    def counting_get_by_path(relative_path):
+        counts["path_lookups"] += 1
+        return real_get_by_path(relative_path)
+
+    monkeypatch.setattr(skill_admin_service, "_skill_runtime_from_current_settings", counting_runtime)
+    monkeypatch.setattr(skill_admin_service, "_front_matter_value", counting_front_matter)
+    store.get_document_by_path = counting_get_by_path
+
+    documents = skill_admin_service.list_documents()
+    assert len(documents) == document_count
+    assert all(item["description"] == "本体建模" for item in documents)
+    assert all(item["enabled"] is True for item in documents)
+    return counts
+
+
+def test_listing_documents_does_not_scale_shared_state_reads_with_document_count(tmp_path):
+    """共享状态的读取次数必须与文档数无关。
+
+    两个 store 都没有连接池，所以每次 current_settings_payload() 都是一条新连接。
+    修复前 _document_api_payload() 对每个文档各读一次配置、各解析一次 SKILL.md，
+    reindex 又对每个受管文件调一次 get_document_by_path()——上游 84 个文档实测
+    255 条连接、532 ms，而页面只渲染 8 行。
+
+    断言「不随文档数增长」而不是某个具体次数：具体次数会随调用点增减而变，
+    真正要守住的性质是它不是 O(N)。
+    """
+    small = _count_shared_state_reads(tmp_path / "small", document_count=5)
+    large = _count_shared_state_reads(tmp_path / "large", document_count=40)
+
+    assert small == large, (
+        "共享状态读取次数随文档数变化，N+1 又回来了："
+        f"5 个文档 {small}，40 个文档 {large}"
+    )
+    # 并且确实是个小常数，而不是「两边都同样糟糕」。
+    # 上界是 2 而不是 1：reindex 与 list_documents 是两个调用点，各自解析一次
+    # 共享状态。合并成一份要把缓存穿过 reindex 的签名，而它还有别的调用方；
+    # 两次是常数，O(N) 才是问题。
+    assert large["settings"] <= 2, large
+    assert large["front_matter"] <= 2, large
+    assert large["path_lookups"] == 0, large

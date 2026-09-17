@@ -1,0 +1,562 @@
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
+
+from dataagent_backend.core.auth import AuthIdentity, is_auth_enabled, require_admin, require_user, resolve_identity
+from dataagent_backend.core.agent_visibility import agent_visible_to, filter_visible_agent_profiles
+from dataagent_backend.core.agent_profile_service import (
+    agent_capabilities,
+    create_agent_profile,
+    delete_agent_profile,
+    get_agent_profile,
+    list_data_scope_options,
+    list_agent_profiles,
+    skill_folders_from_documents,
+    update_agent_profile,
+)
+from dataagent_backend.core.skill_admin_service import (
+    compare_document_versions,
+    current_settings_payload,
+    detect_model_availability,
+    export_skill_as_zip,
+    get_document_detail,
+    import_skill_from_zip,
+    list_documents,
+    list_provider_configs,
+    persist_admin_settings,
+    save_provider_config,
+    delete_provider_config,
+    rollback_document,
+    save_document_content,
+    uninstall_skill,
+    update_skill_runtime,
+)
+from dataagent_backend.core.mcp_admin_service import (
+    create_mcp_server,
+    delete_mcp_server,
+    import_mcp_servers,
+    list_mcp_servers,
+    update_mcp_server,
+)
+from dataagent_backend.core.skill_discovery import resolve_skills_root_dir
+from dataagent_backend.core.topic_task_store import get_topic_task_store
+from dataagent_backend.models.schemas import (
+    AdminAuthUser,
+    AdminAuthUserList,
+    AdminSettingsResponse,
+    AdminSettingsUpdateRequest,
+    AdminWidgetTopicPage,
+    AdminWidgetTopicSummary,
+    AdminWidgetUser,
+    AdminWidgetUserList,
+    AgentCapabilitiesResponse,
+    AgentCatalogProfile,
+    AgentDataScopeOption,
+    AgentProfile,
+    AgentProfileCreateRequest,
+    AgentProfileUpdateRequest,
+    AgentReadableProfile,
+    AgentSlashCommandsResponse,
+    ModelDetectionRequest,
+    ModelDetectionResponse,
+    McpServerCreateRequest,
+    McpServerListResponse,
+    McpServerUpdateRequest,
+    ProviderConfig,
+    ProviderCreateRequest,
+    ProviderListResponse,
+    ProviderUpdateRequest,
+    SkillDocumentCompareRequest,
+    SkillDocumentCompareResponse,
+    SkillDocumentDetail,
+    SkillDocumentSummary,
+    SkillDocumentUpdateRequest,
+    SkillImportResponse,
+    SkillRuntimeConfig,
+    SkillRuntimeUpdateRequest,
+    SkillUninstallResponse,
+    TopicMessagePageResponse,
+)
+
+router = APIRouter()
+# 管理面（settings / 会话审计 / agent 与 skill 管理）在 auth 启用时要求 admin 会话；
+# auth 关闭（env 未设置或显式 AUTH_ENABLED=False）时 require_admin no-op 放行，
+# 与无认证时代行为一致。router 级依赖，新增端点自动受保护。
+settings_router = APIRouter(prefix="/api/v1/agent-admin", dependencies=[Depends(require_admin)])
+skills_router = APIRouter(prefix="/api/v1/dataagent", dependencies=[Depends(require_admin)])
+user_router = APIRouter(prefix="/api/v1/dataagent", dependencies=[Depends(require_user)])
+# 聊天页与 widget 依赖的三个只读 agents 端点必须保持公开（匿名嵌入场景）。
+agents_public_router = APIRouter(prefix="/api/v1/dataagent")
+
+
+def _catalog_identity(request: Request) -> AuthIdentity | None:
+    """公开 agents 目录端点的机会性身份解析。
+
+    遵循三分支客户端语义（docs/design/2026-07-01-dataagent-auth-design.md 3.2）：
+    仅 dataagent 独立 SPA 标记消费会话 Cookie/Bearer，widget 与门户嵌入页保持
+    匿名。无效会话降级为匿名而非 401 —— 公开端点保持公开，强制点在可见性过滤。
+    """
+    if not is_auth_enabled():
+        return None
+    client = str(request.headers.get("X-OF-Client") or "").strip().lower()
+    if client != "dataagent":
+        return None
+    return resolve_identity(request)
+
+
+def _readable_agent_payload(profile: dict) -> dict:
+    """登录用户读侧只暴露 visibility 的 mode 摘要，allow-list 名单仅 admin 可见。"""
+    visibility = profile.get("visibility") or {}
+    return {**profile, "visibility_mode": str(visibility.get("mode") or "all")}
+
+
+def _provider_catalog() -> list[ProviderConfig]:
+    return [ProviderConfig.model_validate(item) for item in list_provider_configs(enabled_only=False)]
+
+
+def _build_admin_settings_response(updated_at: str = "") -> AdminSettingsResponse:
+    payload = current_settings_payload()
+    return AdminSettingsResponse(
+        provider_id=str(payload.get("provider_id") or ""),
+        model=str(payload.get("model") or ""),
+        providers=_provider_catalog(),
+        widget_allowed_sites=payload.get("widget_allowed_sites") or [],
+        anthropic_api_key="",
+        anthropic_auth_token="",
+        anthropic_base_url=str(payload.get("anthropic_base_url") or ""),
+        skills_output_dir=str(payload.get("skills_output_dir") or ""),
+        settings_file_path="",
+        settings_local_file_path="",
+        skills_root_dir=str(resolve_skills_root_dir()),
+        updated_at=updated_at,
+    )
+
+
+@settings_router.get("/settings", response_model=AdminSettingsResponse)
+def get_admin_settings():
+    return _build_admin_settings_response()
+
+
+@settings_router.put("/settings", response_model=AdminSettingsResponse)
+def update_admin_settings(request: AdminSettingsUpdateRequest):
+    try:
+        saved = persist_admin_settings(request.model_dump(exclude_none=True, exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _build_admin_settings_response(updated_at=str(saved.get("updated_at") or ""))
+
+
+@settings_router.post("/model-detections", response_model=ModelDetectionResponse)
+async def create_model_detection(request: ModelDetectionRequest):
+    try:
+        result = await detect_model_availability(request.model_dump(exclude_none=True, exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ModelDetectionResponse.model_validate(result)
+
+
+@settings_router.get("/providers", response_model=ProviderListResponse)
+def get_providers():
+    return ProviderListResponse(providers=_provider_catalog())
+
+
+@settings_router.post("/providers")
+def create_provider(request: ProviderCreateRequest):
+    try:
+        saved = save_provider_config(request.model_dump(exclude_none=True, exclude_unset=True), create=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"provider_id": str(saved.get("provider_id") or "")}
+
+
+@settings_router.put("/providers/{provider_id}")
+def update_provider(provider_id: str, request: ProviderUpdateRequest):
+    try:
+        save_provider_config(
+            {"provider_id": provider_id, **request.model_dump(exclude_none=True, exclude_unset=True)},
+            create=False,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@settings_router.delete("/providers/{provider_id}")
+def delete_provider(provider_id: str):
+    try:
+        delete_provider_config(provider_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@skills_router.get("/mcp/servers", response_model=McpServerListResponse)
+def get_mcp_servers():
+    return McpServerListResponse.model_validate(list_mcp_servers())
+
+
+@skills_router.post("/mcp/servers")
+def create_mcp_server_endpoint(request: McpServerCreateRequest):
+    try:
+        server_id = create_mcp_server(request.model_dump(exclude_none=True, exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"server_id": server_id}
+
+
+@skills_router.patch("/mcp/servers/{server_id}")
+def update_mcp_server_endpoint(server_id: str, request: McpServerUpdateRequest):
+    try:
+        update_mcp_server(server_id, request.model_dump(exclude_none=True, exclude_unset=True))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@skills_router.delete("/mcp/servers/{server_id}")
+def delete_mcp_server_endpoint(server_id: str):
+    try:
+        delete_mcp_server(server_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@skills_router.post("/mcp/servers/import")
+def import_mcp_servers_endpoint(payload: dict[str, Any] = Body(...)):
+    try:
+        imported = import_mcp_servers(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"imported": imported}
+
+
+@settings_router.get("/topics", response_model=AdminWidgetTopicPage)
+def admin_list_all_topics(
+    source: str = Query(default="", pattern="^(|portal|widget)$"),
+    website_id: str | None = Query(default=None),
+    external_user_id: str | None = Query(default=None),
+    visitor_id: str | None = Query(default=None),
+    auth_user_id: str | None = Query(default=None),
+    agent_id: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+):
+    """Read-only admin listing across ALL conversation sources (portal
+    anonymous pool, authenticated users, widget). `source=''` means no
+    source filter. Backs the admin "all sessions" view."""
+    payload = get_topic_task_store().admin_list_topics(
+        source=source,
+        website_id=website_id,
+        external_user_id=external_user_id,
+        visitor_id=visitor_id,
+        auth_user_id=auth_user_id,
+        agent_id=agent_id,
+        keyword=keyword,
+        start=start,
+        end=end,
+        page=page,
+        page_size=page_size,
+    )
+    return AdminWidgetTopicPage(
+        items=[AdminWidgetTopicSummary.model_validate(item) for item in payload.get("items") or []],
+        total=int(payload.get("total") or 0),
+        page=int(payload.get("page") or page),
+        page_size=int(payload.get("page_size") or page_size),
+    )
+
+
+@settings_router.get("/widget-topics", response_model=AdminWidgetTopicPage)
+def admin_list_widget_topics(
+    website_id: str | None = Query(default=None),
+    external_user_id: str | None = Query(default=None),
+    visitor_id: str | None = Query(default=None),
+    agent_id: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    start: str | None = Query(default=None),
+    end: str | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+):
+    """Read-only admin listing of widget-sourced conversations across all
+    sites/users. Bypasses per-user isolation by design; portal session
+    listing is unaffected."""
+    payload = get_topic_task_store().admin_list_topics(
+        source="widget",
+        website_id=website_id,
+        external_user_id=external_user_id,
+        visitor_id=visitor_id,
+        agent_id=agent_id,
+        keyword=keyword,
+        start=start,
+        end=end,
+        page=page,
+        page_size=page_size,
+    )
+    return AdminWidgetTopicPage(
+        items=[AdminWidgetTopicSummary.model_validate(item) for item in payload.get("items") or []],
+        total=int(payload.get("total") or 0),
+        page=int(payload.get("page") or page),
+        page_size=int(payload.get("page_size") or page_size),
+    )
+
+
+@settings_router.get("/widget-users", response_model=AdminWidgetUserList)
+def admin_list_widget_users(
+    website_id: str | None = Query(default=None),
+    keyword: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    """Distinct widget users (external users / anonymous visitors) for the
+    admin user filter. Supports server-side keyword search so the dropdown
+    can resolve the full user set rather than only users on the loaded page."""
+    rows = get_topic_task_store().admin_list_widget_users(
+        source="widget",
+        website_id=website_id,
+        keyword=keyword,
+        limit=limit,
+    )
+    return AdminWidgetUserList(items=[AdminWidgetUser.model_validate(row) for row in rows])
+
+
+@settings_router.get("/auth-users", response_model=AdminAuthUserList)
+def admin_list_auth_users(
+    keyword: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    """Distinct authenticated users (derived from topic ownership) powering
+    the agent visibility allow-list picker. Supports server-side keyword
+    search over the stable user id and display name."""
+    rows = get_topic_task_store().admin_list_auth_users(keyword=keyword, limit=limit)
+    return AdminAuthUserList(items=[AdminAuthUser.model_validate(row) for row in rows])
+
+
+@settings_router.get("/widget-topics/{topic_id}/messages", response_model=TopicMessagePageResponse)
+def admin_list_widget_topic_messages(
+    topic_id: str,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=200, ge=1, le=500),
+    order: str = Query(default="asc", pattern="^(asc|desc)$"),
+):
+    """Read-only admin view of a conversation's messages. Resolved by
+    topic_id without owner check, since `context=None` reuses the existing
+    `1 = 1` predicate path in the store."""
+    store = get_topic_task_store()
+    if not store.get_topic(topic_id, context=None):
+        raise HTTPException(status_code=404, detail="Topic not found")
+    payload = store.list_topic_messages_page(
+        topic_id=topic_id, page=page, page_size=page_size, order=order, context=None
+    )
+    return TopicMessagePageResponse.model_validate(payload)
+
+
+@user_router.get("/skills/documents", response_model=list[SkillDocumentSummary])
+def get_skill_documents():
+    return [SkillDocumentSummary.model_validate(item) for item in list_documents()]
+
+
+@skills_router.get("/agents/capabilities", response_model=AgentCapabilitiesResponse)
+def get_agent_capabilities():
+    return AgentCapabilitiesResponse.model_validate(agent_capabilities(list_documents()))
+
+
+@skills_router.get("/data-scope/options", response_model=list[AgentDataScopeOption])
+def get_data_scope_options():
+    return [AgentDataScopeOption.model_validate(item) for item in list_data_scope_options()]
+
+
+@agents_public_router.get("/agents", response_model=list[AgentCatalogProfile])
+def get_agents(request: Request):
+    profiles = filter_visible_agent_profiles(list_agent_profiles(), _catalog_identity(request))
+    return [AgentCatalogProfile.model_validate(item) for item in profiles]
+
+
+@user_router.get("/agents/profiles", response_model=list[AgentReadableProfile])
+def get_readable_agent_profiles(identity: AuthIdentity | None = Depends(require_user)):
+    profiles = filter_visible_agent_profiles(list_agent_profiles(), identity)
+    return [AgentReadableProfile.model_validate(_readable_agent_payload(item)) for item in profiles]
+
+
+@skills_router.post("/agents", response_model=AgentProfile)
+def create_agent(request: AgentProfileCreateRequest):
+    try:
+        profile = create_agent_profile(
+            request.model_dump(exclude_none=True, exclude_unset=True),
+            available_skill_folders=skill_folders_from_documents(list_documents()),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return AgentProfile.model_validate(profile)
+
+
+@agents_public_router.get("/agents/{agent_id}", response_model=AgentCatalogProfile)
+def get_agent(agent_id: str, request: Request):
+    profile = get_agent_profile(agent_id)
+    # 不可见与不存在返回完全一致的 404，防助手存在性探测。
+    if not profile or not agent_visible_to(profile, _catalog_identity(request)):
+        raise HTTPException(status_code=404, detail="agent not found")
+    return AgentCatalogProfile.model_validate(profile)
+
+
+@user_router.get("/agents/{agent_id}/profile", response_model=AgentReadableProfile)
+def get_readable_agent_profile(agent_id: str, identity: AuthIdentity | None = Depends(require_user)):
+    profile = get_agent_profile(agent_id)
+    if not profile or not agent_visible_to(profile, identity):
+        raise HTTPException(status_code=404, detail="agent not found")
+    return AgentReadableProfile.model_validate(_readable_agent_payload(profile))
+
+
+@skills_router.get("/agents/{agent_id}/configuration", response_model=AgentProfile)
+def get_agent_configuration(agent_id: str):
+    profile = get_agent_profile(agent_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="agent not found")
+    return AgentProfile.model_validate(profile)
+
+
+@agents_public_router.get("/agents/{agent_id}/slash-commands", response_model=AgentSlashCommandsResponse)
+def get_agent_slash_commands_endpoint(agent_id: str, request: Request):
+    profile = get_agent_profile(agent_id)
+    if not profile or not agent_visible_to(profile, _catalog_identity(request)):
+        raise HTTPException(status_code=404, detail="agent not found")
+    raw = profile.get("skill_folders")
+    folders = [str(item).strip() for item in raw if str(item or "").strip()] if isinstance(raw, list) else []
+    return AgentSlashCommandsResponse(slash_commands=folders, source="profile")
+
+
+@skills_router.put("/agents/{agent_id}", response_model=AgentProfile)
+def update_agent(agent_id: str, request: AgentProfileUpdateRequest):
+    try:
+        profile = update_agent_profile(
+            agent_id,
+            request.model_dump(exclude_none=True, exclude_unset=True),
+            available_skill_folders=skill_folders_from_documents(list_documents()),
+        )
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return AgentProfile.model_validate(profile)
+
+
+@skills_router.delete("/agents/{agent_id}")
+def delete_agent(agent_id: str):
+    try:
+        deleted = delete_agent_profile(agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not deleted:
+        raise HTTPException(status_code=404, detail="agent not found")
+    return {"status": "ok"}
+
+
+@user_router.get("/skills/documents/{document_id}", response_model=SkillDocumentDetail)
+def get_skill_document(document_id: int):
+    document = get_document_detail(document_id)
+    if not document:
+        raise HTTPException(status_code=404, detail="document not found")
+    return SkillDocumentDetail.model_validate(document)
+
+
+@skills_router.put("/skills/documents/{document_id}", response_model=SkillDocumentDetail)
+def update_skill_document(document_id: int, request: SkillDocumentUpdateRequest):
+    try:
+        document = save_document_content(document_id, request.content, request.change_summary)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return SkillDocumentDetail.model_validate(document)
+
+
+@skills_router.put("/skills/runtime/{folder}", response_model=SkillRuntimeConfig)
+def update_skill_runtime_config(folder: str, request: SkillRuntimeUpdateRequest):
+    try:
+        result = update_skill_runtime(folder, request.enabled)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SkillRuntimeConfig.model_validate(result)
+
+
+@skills_router.post("/skills/imports", response_model=SkillImportResponse)
+async def import_skill(file: UploadFile = File(...)):
+    try:
+        content = await file.read()
+        result = import_skill_from_zip(file.filename or "", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SkillImportResponse.model_validate(result)
+
+
+@skills_router.get("/skills/{folder}/export")
+def export_skill(folder: str):
+    try:
+        file_name, content = export_skill_as_zip(folder)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
+@skills_router.delete("/skills/{folder}", response_model=SkillUninstallResponse)
+def delete_skill(folder: str):
+    try:
+        result = uninstall_skill(folder)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return SkillUninstallResponse.model_validate(result)
+
+
+@user_router.post("/skills/documents/{document_id}/compare", response_model=SkillDocumentCompareResponse)
+def compare_skill_document(document_id: int, request: SkillDocumentCompareRequest):
+    try:
+        result = compare_document_versions(
+            document_id,
+            left_version_id=request.left_version_id,
+            right_version_id=request.right_version_id,
+        )
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return SkillDocumentCompareResponse.model_validate(result)
+
+
+@skills_router.post("/skills/documents/{document_id}/versions/{version_id}/rollback", response_model=SkillDocumentDetail)
+def rollback_skill_document(document_id: int, version_id: int):
+    try:
+        document = rollback_document(document_id, version_id)
+    except ValueError as exc:
+        message = str(exc)
+        status_code = 404 if "not found" in message else 400
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return SkillDocumentDetail.model_validate(document)
+
+
+# include 顺序即路由匹配顺序：admin 的静态路径 /agents/capabilities 必须先于
+# 公开的动态路径 /agents/{agent_id} 注册，否则 capabilities 会被当作 agent_id。
+router.include_router(settings_router)
+router.include_router(skills_router)
+router.include_router(user_router)
+router.include_router(agents_public_router)

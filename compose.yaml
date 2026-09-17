@@ -29,7 +29,7 @@ services:
     image: ${OF_AGENT_MASTER_IMAGE:-of-agent-master:local}
     build:
       context: .
-      dockerfile: dataagent/dataagent-backend/Dockerfile
+      dockerfile: apps/api/Dockerfile
     environment:
       DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       DATAAGENT_DATABASE_SCHEMA: public

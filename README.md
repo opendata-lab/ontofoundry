@@ -69,8 +69,9 @@ make serve
 所有平台表和 DataAgent 表由同一套 Alembic migration 管理，部署配置不使用 API 启动时 `create_all`。升级既有的双 schema 开发库时，migration 会把已知的 `dataagent.da_*` 表移动到 `public`，删除 eval 表和已被 DataAgent/Pi 替代的旧 B0.1 运行表，最后只保留 `public.alembic_version`。这一步会删除废弃运行历史，执行前必须备份并验证恢复能力。
 
 ```sh
-cd dataagent/dataagent-backend
-DATAAGENT_DATABASE_URL=postgresql://... DATAAGENT_DATABASE_SCHEMA=public alembic upgrade head
+cd apps/api
+DATAAGENT_DATABASE_URL=postgresql://... DATAAGENT_DATABASE_SCHEMA=public \
+  uv run alembic -c src/dataagent_backend/alembic.ini upgrade head
 ```
 
 MCP 当前实现 2026-07-28 的 `server/discover`、`tools/list`、`tools/call`，使用本平台签发的只读 Bearer 令牌；尚未实现 MCP OAuth 动态发现或兼容旧版 `initialize` 客户端。上线前需与实际消费端核对版本。
