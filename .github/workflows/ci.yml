@@ -1,11 +1,16 @@
 name: CI
 
-# 验证，不发布。推镜像需要 registry 凭据，这里刻意不碰：先让「能不能构建、能
-# 不能跑过」有个自动答案，发布流程单独再加。
+# 验证与发布在同一个文件里，因为它们构建的是同一批镜像。拆成两个文件时，镜像
+# 矩阵被抄了两份——加第四个镜像要改两处，漏一处就静默不一致。这正是把两个
+# Dockerfile 合成多阶段文件时消除的那类漂移，不该在这里重新造一个。
+#
+# 发布相关的 job 靠 if 条件跳过：PR 上不跑，也就不需要 secrets。
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -91,13 +96,94 @@ jobs:
           - { name: of-frontend, dockerfile: apps/web/Dockerfile, target: "" }
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - name: Build
+
+      # 只有推到 main 或打 tag 时才发布。PR（含 fork 来的）走到这里会跳过，
+      # 因为它们拿不到 secrets，跑了也只会红一片。
+      - name: Should publish
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] \
+             && [ "${{ github.repository }}" = "opendata-lab/ontofoundry" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tags and labels
+        if: steps.gate.outputs.publish == 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/${{ matrix.image.name }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+
+      - uses: docker/login-action@v3
+        if: steps.gate.outputs.publish == 'true'
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build${{ steps.gate.outputs.publish == 'true' && ' and push' || '' }}
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
           target: ${{ matrix.image.target }}
-          push: false
+          # 只在发布时做多架构：PR 上跑 arm64 要靠 qemu 模拟，慢一倍而验证不出
+          # 更多东西。
+          platforms: ${{ steps.gate.outputs.publish == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          push: ${{ steps.gate.outputs.publish }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}
+
+  offline-package:
+    name: Offline package
+    runs-on: ubuntu-latest
+    # 依赖镜像 job：包里装的就是它们，镜像构建不过就没有打包的意义。
+    needs: images
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      # 真的执行打包脚本。此前它只是仓库里的一个文件——没有任何地方运行它，
+      # 不产出 artifact，也不附到 release，所以"离线包"实际上并不存在。
+      - name: Build the package
+        run: ./scripts/create-offline-package.sh "$RUNNER_TEMP/offline"
+
+      - name: Sanity check the contents
+        run: |
+          cd "$RUNNER_TEMP/offline"
+          test -f images/ontofoundry.tar
+          test -f images/infra.tar
+          test -f compose.yaml
+          test -f install.sh
+          test -d dataagent/.claude/skills
+          # 镜像 tar 应当是有内容的：save 失败也可能留下一个空文件。
+          for tar in images/*.tar; do
+            size=$(stat -c%s "$tar")
+            [ "$size" -gt 10000000 ] || { echo "$tar 只有 $size 字节，导出多半失败了"; exit 1; }
+          done
+          tar -tf images/ontofoundry.tar >/dev/null
+
+      - name: Compress
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/ontofoundry-offline.tar.gz" offline
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ontofoundry-offline
+          path: ${{ runner.temp }}/ontofoundry-offline.tar.gz
+          retention-days: 14
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" "$RUNNER_TEMP/ontofoundry-offline.tar.gz" --clobber
