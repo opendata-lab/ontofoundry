@@ -7,7 +7,10 @@ Agent master（Topic、Task、Message、文件工作区、调度、取消、恢�
 `ontofoundry_api` 同进程运行，镜像由 `apps/api/Dockerfile` 构建，发布名仍为
 `of-agent-master`。本目录现在只保留执行引擎与契约：
 
-- `../apps/api/Dockerfile.runner`：Agent sandbox worker 镜像，发布名为 `of-agent-worker`。
+- `../apps/api/Dockerfile` 是一个多阶段文件，三个角色共用同一份镜像内容，只有 CMD
+  不同：`of-backend`（API）、`of-runner`（sandbox runner，多一个 docker CLI）。
+  沙箱子容器直接复用 `of-backend`——它执行 `python .../sandbox_task_main.py`，
+  需要完整 Python 包，因此不存在"纯 Pi runtime 镜像"这一说。
 - `dataagent-runtime-pi`：唯一 Agent 执行引擎，Node.js 22.19+，通过 stdio 与后端通信。
 - `contracts`：AgentEvent、任务状态和工作区边界契约。
 - `.claude/skills`：Pi 沿用的 Skill 发现目录；不表示依赖 Claude Agent SDK。
@@ -32,7 +35,7 @@ make dataagent-test
 ## 本地启动
 
 ```sh
-docker compose --env-file apps/api/.env up -d --build dataagent-backend
+docker compose --env-file apps/api/.env up -d --build of-backend of-runner of-frontend
 ```
 
 镜像启动时自动执行 `alembic upgrade head`，服务监听 `127.0.0.1:8900`。模型供应商配置通过 Compose 环境变量注入；Anthropic-compatible 是模型传输协议，不是 Claude Agent SDK。
