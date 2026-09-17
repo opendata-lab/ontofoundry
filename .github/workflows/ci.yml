@@ -23,6 +23,18 @@ jobs:
         # 等于从不验证真实 SQL 方言与事务边界。
         postgres: [true, false]
     services:
+      # 合并之后 create_app() 会启动 DataAgent 的任务协调器，它需要 Redis。
+      # 这是真实的运行依赖，不是测试脚手架：没有 Redis，提交的任务永远不会被
+      # 取走执行。CI 第一次运行就是靠这一点暴露出来的——本地机器上恰好有一个
+      # Redis 在跑，20 个 OntoFoundry 测试因此从未失败过。
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       postgres:
         image: postgres:16-alpine
         env:
