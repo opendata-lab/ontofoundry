@@ -14,17 +14,18 @@ web-dev:
 	cd apps/web && $(NPM) run dev
 
 dataagent-up:
-	docker compose --env-file apps/api/.env up -d --build dataagent-backend
+	docker compose --env-file apps/api/.env up -d --build of-backend of-runner of-frontend
 
 dataagent-down:
-	docker compose stop dataagent-backend dataagent-redis
+	docker compose stop of-frontend of-runner of-backend dataagent-redis
 
 dataagent-build:
 	cd dataagent/dataagent-runtime-pi && $(NPM) ci && $(NPM) run build
 
 dataagent-images:
-	docker build -t of-agent-master:local -f apps/api/Dockerfile .
-	docker build -t of-agent-worker:local -f apps/api/Dockerfile.runner .
+	docker build -t of-backend:local --target backend -f apps/api/Dockerfile .
+	docker build -t of-runner:local --target runner -f apps/api/Dockerfile .
+	docker build -t of-frontend:local -f apps/web/Dockerfile .
 
 dataagent-test:
 	cd dataagent/dataagent-runtime-pi && $(NPM) test
