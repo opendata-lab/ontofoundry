@@ -28,10 +28,22 @@ command -v "$DOCKER" >/dev/null 2>&1 || {
   exit 1
 }
 
-echo "==> 构建三个自有镜像"
-"$DOCKER" build -t "$BACKEND_IMAGE"  --target backend -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
-"$DOCKER" build -t "$RUNNER_IMAGE"   --target runner  -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
-"$DOCKER" build -t "$FRONTEND_IMAGE" -f "$REPO_ROOT/apps/web/Dockerfile" "$REPO_ROOT"
+# SKIP_BUILD=1 时复用已存在的镜像。CI 里镜像已经由上游 job 构建过，重复构建
+# 只是浪费几分钟；本地直接跑脚本时仍然需要构建这一步。
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  echo "==> 跳过构建，复用已有镜像"
+  for img in "$BACKEND_IMAGE" "$RUNNER_IMAGE" "$FRONTEND_IMAGE"; do
+    "$DOCKER" image inspect "$img" >/dev/null 2>&1 || {
+      echo "SKIP_BUILD=1 但本地没有 $img" >&2
+      exit 1
+    }
+  done
+else
+  echo "==> 构建三个自有镜像"
+  "$DOCKER" build -t "$BACKEND_IMAGE"  --target backend -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
+  "$DOCKER" build -t "$RUNNER_IMAGE"   --target runner  -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
+  "$DOCKER" build -t "$FRONTEND_IMAGE" -f "$REPO_ROOT/apps/web/Dockerfile" "$REPO_ROOT"
+fi
 
 echo "==> 拉取第三方镜像"
 "$DOCKER" pull "$POSTGRES_IMAGE"
