@@ -11,6 +11,8 @@ dependency; the Node implementation is held to the same frames by its own tests.
 
 from __future__ import annotations
 
+import types
+
 import asyncio
 import json
 import sys
@@ -395,3 +397,25 @@ async def test_idle_timeout_does_not_mislabel_a_pending_cancel(tmp_path: Path):
 
     assert outcome.terminal_status == "cancelled"
     assert outcome.error_code != "PI_RUN_IDLE_TIMEOUT"
+
+
+def test_cell_entrypoint_matches_what_the_build_actually_emits(tmp_path):
+    """解析出的入口必须和 tsc 的产物同名。
+
+    这条是补漏：包重整时批量改写 import 的脚本把这个**字符串常量**也当成模块
+    名加了前缀，`main.js` 变成 `dataagent_backend.main.js`。561 个测试无一失败，
+    因为凡是跑到这条路径的测试都把 resolve_cell_command 换掉了——真实入口解析
+    从来没有被执行过，直到用真模型跑一个回合才炸出来。
+    """
+    from dataagent_backend.core import pi_runtime
+
+    root = tmp_path / "runtime-pi"
+    (root / "dist" / "src").mkdir(parents=True)
+    # 与 tsconfig 的 outDir 布局一致：src/main.ts -> dist/src/main.js
+    (root / "dist" / "src" / "main.js").write_text("", encoding="utf-8")
+
+    command = pi_runtime.resolve_cell_command(
+        types.SimpleNamespace(dataagent_runtime_pi_dir=str(root), dataagent_node_bin="node")
+    )
+
+    assert str(command[-1]).endswith("dist/src/main.js"), command

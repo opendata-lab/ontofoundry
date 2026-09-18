@@ -132,7 +132,7 @@ def resolve_cell_command(cfg: Any = None) -> list[str]:
         # dataagent-backend/core/pi_runtime.py -> dataagent/dataagent-runtime-pi
         root = Path(__file__).resolve().parents[2] / "dataagent-runtime-pi"
 
-    entrypoint = root / "dist" / "src" / "dataagent_backend.main.js"
+    entrypoint = root / "dist" / "src" / "main.js"
     if not entrypoint.exists():
         raise PiRuntimeUnavailable(
             f"Pi Cell 入口不存在：{entrypoint}（请先在 {root} 执行 npm ci && npm run build）"
