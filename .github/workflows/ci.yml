@@ -147,6 +147,10 @@ jobs:
   offline-package:
     name: Offline package
     runs-on: ubuntu-latest
+    # 默认的 GITHUB_TOKEN 是只读的，创建 release 会 403。只有这个 job 需要写，
+    # 所以在 job 级别声明而不是放到 workflow 顶层。
+    permissions:
+      contents: write
     # 依赖镜像 job：包里装的就是它们，镜像构建不过就没有打包的意义。
     needs: images
     steps:
@@ -182,8 +186,16 @@ jobs:
           path: ${{ runner.temp }}/ontofoundry-offline.tar.gz
           retention-days: 14
 
-      - name: Attach to the release
+      - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" "$RUNNER_TEMP/ontofoundry-offline.tar.gz" --clobber
+        run: |
+          # 先确保 release 存在再上传。此前这里只有 upload——而 `gh release
+          # upload` 对不存在的 release 直接失败，所以即便打了 tag 也传不上去。
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" \
+                 --title "$GITHUB_REF_NAME" \
+                 --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/ontofoundry-offline.tar.gz" --clobber
