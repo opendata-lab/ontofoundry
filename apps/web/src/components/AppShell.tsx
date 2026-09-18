@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Globe,
+  Plug,
 } from "lucide-react";
 import {
   NavLink,
@@ -33,6 +34,8 @@ const navigation = [
   { to: "view", label: "本体视图", icon: Network },
   { to: "objects", label: "业务对象", icon: Box },
   { to: "relations", label: "本体关系", icon: GitBranch },
+  // 先接数据源，再做映射——菜单顺序跟着实际操作顺序走。
+  { to: "connections", label: "数据连接", icon: Plug },
   { to: "mappings", label: "数据映射", icon: Database },
   { to: "builder", label: "本体自动构建", icon: Sparkles },
   { to: "settings", label: "空间设置", icon: Settings },
