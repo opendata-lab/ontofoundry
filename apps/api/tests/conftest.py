@@ -8,16 +8,7 @@ from ontofoundry_api.main import create_app
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
-    async def no_op_dataagent_lifecycle() -> None:
-        return None
-
-    monkeypatch.setattr(
-        "ontofoundry_api.main.start_dataagent", no_op_dataagent_lifecycle
-    )
-    monkeypatch.setattr(
-        "ontofoundry_api.main.stop_dataagent", no_op_dataagent_lifecycle
-    )
+def client(tmp_path) -> Iterator[TestClient]:
     settings = Settings(
         environment="test",
         database_url=f"sqlite+pysqlite:///{tmp_path / 'test.db'}",

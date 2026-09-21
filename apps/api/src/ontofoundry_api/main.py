@@ -8,11 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
-from dataagent_backend.app import (
-    include_dataagent_routes,
-    start_dataagent,
-    stop_dataagent,
-)
 from ontofoundry_api.api import (
     agent_conversation,
     assets,
@@ -75,11 +70,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
-        await start_dataagent()
         try:
             yield
         finally:
-            await stop_dataagent()
             engine.dispose()
 
     app = FastAPI(
@@ -160,7 +153,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(instances.router)
     app.include_router(settings_api.router)
     app.include_router(mcp.router)
-    include_dataagent_routes(app)
     if app_settings.web_dist:
         from ontofoundry_api.web import FrontendFiles
 
