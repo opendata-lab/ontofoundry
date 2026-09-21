@@ -31,6 +31,7 @@ from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import WorkspaceRecord
 from ontofoundry_api.domain.models import WorkspaceCreate
+from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 from ontofoundry_api.services.errors import PublishValidationError, ServiceError
 from ontofoundry_api.services.workspaces import (
@@ -137,6 +138,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             body["error"]["validation"] = exc.report
         return JSONResponse(
             status_code=exc.status_code, content=body, headers=getattr(exc, "headers", None)
+        )
+
+    @app.exception_handler(DataAgentError)
+    async def dataagent_error_handler(_: Request, exc: DataAgentError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"message": str(exc), "hint": exc.hint},
         )
 
     @app.get("/healthz", tags=["system"])

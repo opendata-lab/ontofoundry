@@ -465,6 +465,7 @@ def test_events_retry_retriable_result_before_done_and_return_model_metadata(
     client, monkeypatch
 ):
     client.app.state.settings.dataagent_base_url = "https://dataagent.example"
+    client.app.state.settings.dataagent_access_key = "server-secret"
     session = _create_model_session(client, task_status="running")
     calls: list[object] = []
 
@@ -502,6 +503,7 @@ def test_events_retry_retriable_result_before_done_and_return_model_metadata(
 
 def test_events_exhaust_three_retries_before_permanent_done(client, monkeypatch):
     client.app.state.settings.dataagent_base_url = "https://dataagent.example"
+    client.app.state.settings.dataagent_access_key = "server-secret"
     session = _create_model_session(client, task_status="running")
     calls: list[object] = []
 

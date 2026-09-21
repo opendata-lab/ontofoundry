@@ -15,6 +15,8 @@ import type {
 } from "./types";
 
 type ErrorBody = {
+  message?: string;
+  hint?: string;
   error?: {
     code?: string;
     message?: string;
@@ -52,14 +54,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ErrorBody;
-    throw new ApiError(
+    const message =
       body.error?.message ??
-        (typeof body.detail === "string"
-          ? body.detail
-          : body.detail
-            ? JSON.stringify(body.detail)
-            : null) ??
-        "请求失败（HTTP " + response.status + "）",
+      body.message ??
+      (typeof body.detail === "string"
+        ? body.detail
+        : body.detail
+          ? JSON.stringify(body.detail)
+          : null) ??
+      "请求失败（HTTP " + response.status + "）";
+    throw new ApiError(
+      body.hint ? message + "\n" + body.hint : message,
       response.status,
       body.error?.code,
       body.detail,

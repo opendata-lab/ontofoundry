@@ -24,6 +24,7 @@ from ontofoundry_api.services.dataagent import (
     DataAgentError,
     build_turn_prompt,
     public_answer,
+    require_dataagent_configuration,
     task_id_from_messages,
     topic_id_from_messages,
     uploaded_material_ids,
@@ -171,8 +172,9 @@ async def chat(
         raise HTTPException(422, "所选材料总量超过 2 GB，请分批建模")
 
     config = request.app.state.settings
-    if not config.dataagent_base_url:
-        raise HTTPException(503, "DataAgent 未配置，无法启动 Agent 任务")
+    require_dataagent_configuration(
+        config.dataagent_base_url, config.dataagent_access_key
+    )
     if item.revision != body.revision or item.task_status in ("queued", "running"):
         raise HTTPException(409, "会话正在处理或已更新，请刷新后重试")
     dataagent = _client(request, workspace_id, session_id)
@@ -236,7 +238,7 @@ async def chat(
         if created_topic and topic_id:
             with suppress(DataAgentError):
                 await dataagent.delete_topic(topic_id)
-        raise HTTPException(exc.status_code, str(exc)) from exc
+        raise exc
     changed = db.execute(
         update(ModelingSessionRecord)
         .where(
@@ -284,12 +286,14 @@ async def sync(
 ):
     require_member(db, workspace_id, user.id)
     get_modeling_session(db, workspace_id, session_id)
-    if not request.app.state.settings.dataagent_base_url:
-        raise HTTPException(409, "当前未启用 DataAgent")
+    settings = request.app.state.settings
+    require_dataagent_configuration(
+        settings.dataagent_base_url, settings.dataagent_access_key
+    )
     try:
         return await _sync_dataagent(request.app, workspace_id, session_id)
     except DataAgentError as exc:
-        raise HTTPException(exc.status_code, str(exc)) from exc
+        raise exc
 
 
 @router.get("/events")
@@ -303,8 +307,10 @@ async def events(
 ):
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
-    if not request.app.state.settings.dataagent_base_url:
-        raise HTTPException(409, "当前未启用 DataAgent")
+    settings = request.app.state.settings
+    require_dataagent_configuration(
+        settings.dataagent_base_url, settings.dataagent_access_key
+    )
     task_id = task_id_from_messages(item.messages_json)
     if not task_id:
         raise HTTPException(404, "当前会话没有 DataAgent 任务")
@@ -312,7 +318,7 @@ async def events(
     try:
         await dataagent.task(task_id)
     except DataAgentError as exc:
-        raise HTTPException(exc.status_code, str(exc)) from exc
+        raise exc
 
     async def proxy():
         completed = False
@@ -350,8 +356,9 @@ async def cancel(
     item = get_modeling_session(db, workspace_id, session_id)
     settings = request.app.state.settings
     dataagent_task_id = task_id_from_messages(item.messages_json)
-    if not settings.dataagent_base_url:
-        raise HTTPException(409, "当前未启用 DataAgent")
+    require_dataagent_configuration(
+        settings.dataagent_base_url, settings.dataagent_access_key
+    )
     if item.task_status not in ("running", "queued"):
         return session_data(item)
     if not dataagent_task_id:
@@ -359,7 +366,7 @@ async def cancel(
     try:
         result = await _client(request, workspace_id, session_id).cancel(dataagent_task_id)
     except DataAgentError as exc:
-        raise HTTPException(exc.status_code, str(exc)) from exc
+        raise exc
     item.task_status = "cancelled"
     item.task_detail = _dataagent_detail(
         str(result.get("task_status") or "cancelled").lower()
