@@ -207,6 +207,18 @@ def _top_level_changed(
     return before != imported
 
 
+# Transient by status code. 429 matters most: a rate-limited file service is the
+# one case where the result exists and is correct, and calling that permanent
+# throws away a model the agent already produced. 408 and 425 are the same
+# shape. Everything else — 404, a malformed body, a contract violation — is a
+# statement about the result itself and will not improve by asking again.
+_RETRIABLE_DOWNLOAD_STATUSES = frozenset({408, 425, 429})
+
+
+def _is_retriable_download(status_code: int) -> bool:
+    return status_code >= 500 or status_code in _RETRIABLE_DOWNLOAD_STATUSES
+
+
 async def reconcile_run(
     app: Any,
     workspace_id: str,
@@ -267,7 +279,7 @@ async def reconcile_run(
             app, workspace_id, session_id
         ).download(topic_id, result_path)
     except DataAgentError as exc:
-        if exc.status_code >= 500:
+        if _is_retriable_download(exc.status_code):
             return _finish_failure(
                 app,
                 session_id,

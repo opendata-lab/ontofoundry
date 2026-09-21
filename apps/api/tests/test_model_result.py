@@ -556,3 +556,24 @@ def test_model_prompt_contains_complete_versioned_result_contract():
     assert f"output/ontofoundry-result-{RUN_TOKEN}.json" in prompt
     assert "Apache Ossie 0.2.0.dev0" in prompt
     assert "完整" in prompt
+
+
+@pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
+def test_transient_download_failures_stay_retriable(status_code):
+    """A rate-limited or timed-out fetch must not discard a produced model.
+
+    429 is the case that matters: the result file exists and is correct, and
+    the only thing wrong is that we asked too fast. Marking that permanent
+    throws away work the agent already did, with no path back to it.
+    """
+    from ontofoundry_api.services.model_result import _is_retriable_download
+
+    assert _is_retriable_download(status_code) is True
+
+
+@pytest.mark.parametrize("status_code", [400, 403, 404, 422])
+def test_definitive_download_failures_are_permanent(status_code):
+    """These describe the result, not the request, and will not change on retry."""
+    from ontofoundry_api.services.model_result import _is_retriable_download
+
+    assert _is_retriable_download(status_code) is False

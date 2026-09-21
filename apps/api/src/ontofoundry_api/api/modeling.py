@@ -29,6 +29,7 @@ from ontofoundry_api.services.ontology_query import (
     current_version,
     version_summary,
 )
+from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
     get_workspace,
@@ -400,7 +401,10 @@ def publish_session(
     )
     if not item:
         raise HTTPException(404, "建模会话不存在")
-    if item.revision != body.revision or item.task_status in ("queued", "running"):
+    # All five active states, not just the two obvious ones: a run parked on
+    # waiting_input or waiting_permission is still live, and publishing a draft
+    # the agent is mid-way through rewriting would capture a half-applied model.
+    if item.revision != body.revision or item.task_status in ACTIVE_RUN_STATUSES:
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
     empty = OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
 
