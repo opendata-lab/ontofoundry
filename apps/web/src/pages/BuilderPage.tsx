@@ -1,12 +1,10 @@
 import {
   FileText,
   Upload,
-  Send,
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
   Rocket,
-  Square,
   Database,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -22,7 +20,7 @@ import type {
 } from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
 import { useModeling } from "../hooks/useModeling";
-import { usePageActive, usePageTab } from "../hooks/usePageTab";
+import { usePageTab } from "../hooks/usePageTab";
 
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
@@ -38,7 +36,6 @@ export function BuilderPage() {
   const input = useRef<HTMLInputElement>(null);
   const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
-  const pageActive = usePageActive();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
     dirty: !!scenario.trim(),

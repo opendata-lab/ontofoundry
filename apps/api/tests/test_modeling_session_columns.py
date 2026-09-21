@@ -242,3 +242,20 @@ def test_migration_backfills_existing_rows_and_can_downgrade(tmp_path):
         assert {column["name"] for column in inspect(connection).get_columns("modeling_sessions")} == {
             "id"
         }
+
+
+@pytest.mark.parametrize(
+    "status",
+    ["submitting", "queued", "running", "waiting_input", "waiting_permission"],
+)
+def test_publish_is_blocked_for_every_active_status(status):
+    """Publishing mid-run would capture a half-rewritten draft.
+
+    The guard used to list queued and running only, so a run parked on
+    waiting_input read as idle — and the publish page, which has no live run
+    state of its own, would happily publish a draft the agent was still
+    working on.
+    """
+    from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
+
+    assert status in ACTIVE_RUN_STATUSES
