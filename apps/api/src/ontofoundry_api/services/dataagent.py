@@ -114,7 +114,9 @@ class DataAgentClient:
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         try:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=self.timeout
+            ) as client:
                 response = await client.request(
                     method,
                     path,
@@ -165,7 +167,9 @@ class DataAgentClient:
                 params={"page": page, "page_size": page_size, "order": "asc"},
             )
             items = payload.get("items")
-            if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            if not isinstance(items, list) or any(
+                not isinstance(item, dict) for item in items
+            ):
                 raise DataAgentError("DataAgent 历史消息返回格式错误")
             result.extend(items)
             total = int(payload.get("total") or 0)
@@ -173,7 +177,9 @@ class DataAgentClient:
                 return result
             page += 1
 
-    async def upload(self, topic_id: str, name: str, content: bytes, media_type: str) -> dict[str, Any]:
+    async def upload(
+        self, topic_id: str, name: str, content: bytes, media_type: str
+    ) -> dict[str, Any]:
         return await self._json(
             "POST",
             f"{self.prefix}/topics/{topic_id}/files",
@@ -183,7 +189,9 @@ class DataAgentClient:
     async def download(self, topic_id: str, rel_path: str) -> tuple[bytes, str]:
         path = f"{self.prefix}/topics/{topic_id}/files/{rel_path.lstrip('/')}"
         try:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=self.timeout
+            ) as client:
                 response = await client.get(path, headers=self.headers)
         except httpx.HTTPError as exc:
             raise DataAgentError(f"DataAgent 连接失败: {exc}", status_code=503) from exc
@@ -223,7 +231,9 @@ class DataAgentClient:
         return await self._json("GET", f"{self.prefix}/tasks/{task_id}/message")
 
     async def cancel(self, task_id: str) -> dict[str, Any]:
-        return await self._json("POST", f"{self.prefix}/tasks/{task_id}/cancel")
+        return await self._json(
+            "POST", f"{self.prefix}/tasks/{task_id}/cancel", json_body={}
+        )
 
     async def permission_decision(
         self, task_id: str, request_id: str, payload: dict[str, Any]
@@ -298,10 +308,12 @@ def build_turn_prompt(
     session_id: str,
     context_file: str,
     material_files: list[str],
+    run_token: str = "",
 ) -> str:
     action = (
         "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议；"
-        "需要机器可读交付时，把完整 Ossie JSON 写到 output/ 目录，同时在回答中概括变更。"
+        f"把完整 Ossie JSON 写到 output/ontofoundry-result-{run_token}.json，"
+        "同时在回答中概括变更。"
         if mode == "model"
         else "这是普通对话或概念澄清。除非用户明确要求修改，否则不要生成或覆盖本体文件。"
     )
@@ -310,6 +322,7 @@ def build_turn_prompt(
         "[OntoFoundry 会话上下文]\n"
         f"workspace_id: {workspace_id}\n"
         f"session_id: {session_id}\n"
+        f"run_token: {run_token}\n"
         f"当前本体快照: {context_file}\n"
         f"本轮新增材料:\n{files}\n\n"
         f"{action}\n"
