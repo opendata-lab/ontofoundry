@@ -62,6 +62,8 @@ T1 必须最先（迁移链在即将删除的目录里）。**T11 必须最后**
 
 **验收：** 两种库上均成功；`alembic history` 的 revision ID 与迁移前逐行一致；应用正常启动。
 
+**T1 已完成**（commit `17f07ca`）。实施说明：`script_location = %(here)s/alembic` 原本就是相对写法，移动 ini 后自然解析到新目录，无需改值。compose 保留 `DATAAGENT_DATABASE_URL` 并新增 `ONTOFOUNDRY_DATABASE_URL`——内置 DataAgent 要到 T11 才删，全删会让 T11 之前的应用起不来。
+
 ---
 
 ## T2 — Modeling Session 新增显式字段
@@ -111,6 +113,8 @@ T1 必须最先（迁移链在即将删除的目录里）。**T11 必须最后**
 - [ ] 提交。
 
 **验收：** 新测试通过（含存量行回填断言）；现有测试全绿；迁移可升可降。
+
+**T2 已完成**（commit `48c8c6f`）：9 个新测试通过，全量 567 passed / 10 skipped。实施说明：`api/agent.py` 的旧链路也同步写新列，否则 T2→T10 过渡期内两份表示会漂移；`tests/conftest.py` 的 client 夹具 stub 掉 `start_dataagent`/`stop_dataagent`，单测不该拉起 Redis 与 Pi 运行时。
 
 ---
 
