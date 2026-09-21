@@ -239,6 +239,10 @@ async def chat(
         .values(
             task_status="queued",
             task_detail="等待 DataAgent 调度",
+            dataagent_topic_id=topic_id,
+            dataagent_task_id=task_id,
+            dataagent_task_mode=body.mode,
+            uploaded_material_ids=sorted(already_uploaded | set(newly_uploaded)),
             revision=body.revision + 1,
             messages_json=[
                 *item.messages_json,

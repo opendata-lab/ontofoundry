@@ -9,7 +9,9 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Iterator
+from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 import psycopg
 import pytest
@@ -18,6 +20,7 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 
 import dataagent_backend
+import ontofoundry_api
 from dataagent_backend.config import get_settings, update_settings
 from dataagent_backend.core import pi_runtime, task_coordinator
 from dataagent_backend.core.pi_runtime import PiRunOutcome
@@ -25,6 +28,9 @@ from ontofoundry_api.config import Settings
 from ontofoundry_api.main import create_app
 
 PACKAGE_ROOT = __import__("pathlib").Path(dataagent_backend.__file__).resolve().parent
+ONTOFOUNDRY_PACKAGE_ROOT = (
+    __import__("pathlib").Path(ontofoundry_api.__file__).resolve().parent
+)
 
 POSTGRES_URL = os.environ.get("DATAAGENT_TEST_POSTGRES_URL", "")
 E2E_SCHEMA = os.environ.get("DATAAGENT_TEST_E2E_SCHEMA", "dataagent_test_e2e")
@@ -58,8 +64,17 @@ def dataagent_schema() -> Iterator[None]:
             "skills_root_dir": str(repo_skills),
         }
     )
-    config = Config(str(PACKAGE_ROOT / "alembic.ini"))
-    command.upgrade(config, "head")
+    migration_url = POSTGRES_URL.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+    separator = "&" if "?" in migration_url else "?"
+    migration_url += f"{separator}options=-csearch_path%3D{E2E_SCHEMA}%2Cpublic"
+    config = Config(str(ONTOFOUNDRY_PACKAGE_ROOT / "alembic.ini"))
+    with patch(
+        "ontofoundry_api.config.get_settings",
+        return_value=SimpleNamespace(database_url=migration_url),
+    ):
+        command.upgrade(config, "head")
 
     # 任务提交会校验"存在一个已启用且带已启用模型的 provider"，没有就 400。
     # 这一行不是为了调模型——cell 是替身——而是因为那道校验本身属于被测链路。
