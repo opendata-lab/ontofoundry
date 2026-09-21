@@ -1,4 +1,4 @@
-import { Box, GitBranch, Braces, Check, X, FileText } from "lucide-react";
+import { Box, GitBranch, Braces, Check, X, FileText, Database } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
@@ -65,6 +65,11 @@ export function ModelResults({
           ...d.link_types.filter((t) => t.id !== c.value.id),
           c.value,
         ];
+      if (c.kind === "mapping")
+        d.mappings = [
+          ...d.mappings.filter((m) => m.id !== c.value.id),
+          c.value,
+        ];
     }
     return d;
   }, [session]);
@@ -73,6 +78,16 @@ export function ModelResults({
       ? (model?.object_types ?? [])
       : kind === "link_type"
         ? (model?.link_types ?? [])
+        : kind === "mapping"
+          ? (model?.mappings ?? []).map((m) => ({
+              ...m,
+              // DataMapping carries no name: the published model deliberately
+              // holds a connection alias rather than a connection, so the
+              // alias plus the table is the only stable label available.
+              name: `${m.connection_alias} · ${m.schema_name ? m.schema_name + "." : ""}${m.table_name}`,
+              description: `主键 ${m.key_column}`,
+              technical_name: m.table_name,
+            }))
         : (model?.object_types.flatMap((t) =>
             t.attributes.map((a) => ({
               ...a,
@@ -95,6 +110,13 @@ export function ModelResults({
       cls: "relation",
     },
     {
+      key: "mapping",
+      text: "映射",
+      icon: Database,
+      count: model?.mappings.length ?? 0,
+      cls: "mapping",
+    },
+    {
       key: "attribute",
       text: "属性",
       icon: Braces,
@@ -105,8 +127,16 @@ export function ModelResults({
   ];
   const candidateFor = (id: string): Candidate | undefined =>
     pending.find((c) => "id" in c.value && c.value.id === id);
+  const warnings = session?.result_warnings ?? [];
   return (
     <aside className="ref-results">
+      {warnings.length > 0 && (
+        <div className="result-warnings" role="status">
+          {warnings.map((text) => (
+            <p key={text}>{text}</p>
+          ))}
+        </div>
+      )}
       <div className="ref-tabs" role="tablist" aria-label="构建结果">
         <button
           role="tab"
