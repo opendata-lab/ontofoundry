@@ -34,6 +34,21 @@ class DataAgentError(RuntimeError):
         self.hint = hint
 
 
+def require_dataagent_configuration(base_url: str, access_key: str) -> None:
+    if not base_url.strip():
+        raise DataAgentError(
+            "DataAgent 未配置",
+            status_code=503,
+            hint="设置 ONTOFOUNDRY_DATAAGENT_BASE_URL 后重启",
+        )
+    if not access_key.strip():
+        raise DataAgentError(
+            "未配置服务端接入密钥",
+            status_code=503,
+            hint="设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY",
+        )
+
+
 def topic_id_from_messages(messages: list[dict[str, Any]]) -> str:
     for message in reversed(messages):
         topic_id = str(message.get("dataagent_topic_id") or "").strip()
@@ -113,6 +128,7 @@ class DataAgentClient:
         files: dict[str, tuple[str, bytes, str]] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        require_dataagent_configuration(self.base_url, self.access_key)
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url, timeout=self.timeout
@@ -126,7 +142,11 @@ class DataAgentClient:
                     headers=self.headers,
                 )
         except httpx.HTTPError as exc:
-            raise DataAgentError(f"DataAgent 连接失败: {exc}", status_code=503) from exc
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
         if response.is_error:
             try:
                 payload = response.json()
@@ -135,6 +155,25 @@ class DataAgentClient:
                     detail = detail.get("message") or json.dumps(detail, ensure_ascii=False)
             except (ValueError, AttributeError):
                 detail = response.text
+            normalized_detail = str(detail or "").lower()
+            if response.status_code == 403 and "site is not allowed" in normalized_detail:
+                raise DataAgentError(
+                    "DataAgent 拒绝了本站点",
+                    status_code=502,
+                    hint=(
+                        "在管理端 → Widget 接入设置中放行 "
+                        f"website_id={self.website_id}"
+                    ),
+                )
+            if response.status_code == 403 and "access key" in normalized_detail:
+                raise DataAgentError(
+                    "DataAgent 拒绝了服务端接入密钥",
+                    status_code=502,
+                    hint=(
+                        "在管理端重新生成密钥并更新 "
+                        "ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
+                    ),
+                )
             raise DataAgentError(
                 f"DataAgent 请求失败 ({response.status_code}): {detail or response.reason_phrase}",
                 status_code=503 if response.status_code >= 500 else response.status_code,
@@ -187,6 +226,7 @@ class DataAgentClient:
         )
 
     async def download(self, topic_id: str, rel_path: str) -> tuple[bytes, str]:
+        require_dataagent_configuration(self.base_url, self.access_key)
         path = f"{self.prefix}/topics/{topic_id}/files/{rel_path.lstrip('/')}"
         try:
             async with httpx.AsyncClient(
@@ -194,7 +234,11 @@ class DataAgentClient:
             ) as client:
                 response = await client.get(path, headers=self.headers)
         except httpx.HTTPError as exc:
-            raise DataAgentError(f"DataAgent 连接失败: {exc}", status_code=503) from exc
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
         if response.is_error:
             raise DataAgentError(
                 f"DataAgent 文件下载失败 ({response.status_code}): {response.text}",
@@ -260,8 +304,8 @@ class DataAgentClient:
             if exc.status_code != 404:
                 raise
             raise DataAgentError(
-                str(exc),
-                status_code=404,
+                "DataAgent 上找不到该 Agent",
+                status_code=502,
                 hint=(
                     f"创建 agent_id={agent_id}、安装 md2ossie Skill，"
                     "并确认其可见性允许 Widget 访问"
@@ -269,6 +313,7 @@ class DataAgentClient:
             ) from exc
 
     async def stream(self, task_id: str, after_id: int = 0) -> AsyncIterator[bytes]:
+        require_dataagent_configuration(self.base_url, self.access_key)
         timeout = httpx.Timeout(
             connect=self.timeout.connect,
             read=None,
@@ -297,7 +342,11 @@ class DataAgentClient:
         except DataAgentError:
             raise
         except httpx.HTTPError as exc:
-            raise DataAgentError(f"DataAgent 事件流中断: {exc}", status_code=503) from exc
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
 
 
 def build_turn_prompt(

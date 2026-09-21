@@ -1847,6 +1847,14 @@ small,
 .settings-content .section-field {
   max-width: 600px;
 }
+.dataagent-health-table td:last-child {
+  line-height: 1.65;
+}
+.dataagent-health-status--failed {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
 .ontology-node {
   min-width: 132px;
   max-width: 208px;

@@ -468,6 +468,7 @@ def versions(
     }
 
 
+@router.get("/ontology")
 @router.get("/published-snapshot")
 def published_snapshot(
     workspace_id: str,

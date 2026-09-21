@@ -28,6 +28,7 @@ def test_public_answer_prefers_projected_main_text():
 
 def test_modeling_turn_is_submitted_and_reconciled_through_dataagent(client, monkeypatch):
     client.app.state.settings.dataagent_base_url = "http://dataagent.invalid"
+    client.app.state.settings.dataagent_access_key = "server-secret"
     session = create_session(client)
     uploads = []
 
@@ -84,6 +85,7 @@ def test_modeling_turn_is_submitted_and_reconciled_through_dataagent(client, mon
 
 def test_failed_first_submission_removes_unreferenced_dataagent_topic(client, monkeypatch):
     client.app.state.settings.dataagent_base_url = "http://dataagent.invalid"
+    client.app.state.settings.dataagent_access_key = "server-secret"
     session = create_session(client)
     deleted = []
 
@@ -116,6 +118,7 @@ def test_failed_first_submission_removes_unreferenced_dataagent_topic(client, mo
 
 def test_dataagent_cancel_uses_remote_task(client, monkeypatch):
     client.app.state.settings.dataagent_base_url = "http://dataagent.invalid"
+    client.app.state.settings.dataagent_access_key = "server-secret"
     session = create_session(client)
 
     async def create_topic(self, title, agent_id):

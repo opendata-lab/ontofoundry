@@ -257,6 +257,15 @@ export type Capabilities = {
   connections_configured: boolean;
   skills: string[];
 };
+export type DataAgentHealth = {
+  ok: boolean;
+  checks: {
+    name: string;
+    ok: boolean;
+    message: string;
+    hint: string;
+  }[];
+};
 export type DataConnection = {
   id: string;
   name: string;

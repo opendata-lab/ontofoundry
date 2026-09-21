@@ -94,14 +94,18 @@ async def test_runtime_paths_and_auth_headers(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_access_key_header_is_omitted_when_empty(monkeypatch):
-    def handler(request: httpx.Request) -> httpx.Response:
-        _assert_auth_headers(request, access_key=False)
-        return httpx.Response(200, json={"topic_id": "topic-1"})
+async def test_empty_access_key_fails_before_request(monkeypatch):
+    def handler(_: httpx.Request) -> httpx.Response:
+        raise AssertionError("missing access key must fail before the request")
 
     client = _client(monkeypatch, handler, access_key="")
 
-    await client.create_topic("Topic", "agent-1")
+    with pytest.raises(DataAgentError) as caught:
+        await client.create_topic("Topic", "agent-1")
+
+    assert caught.value.status_code == 503
+    assert str(caught.value) == "未配置服务端接入密钥"
+    assert caught.value.hint == "设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
 
 
 @pytest.mark.asyncio
@@ -187,6 +191,7 @@ async def test_agent_profile_404_has_actionable_hint(monkeypatch):
     with pytest.raises(DataAgentError) as caught:
         await client.agent_profile("missing-agent")
 
-    assert caught.value.status_code == 404
+    assert caught.value.status_code == 502
+    assert str(caught.value) == "DataAgent 上找不到该 Agent"
     assert "missing-agent" in caught.value.hint
     assert "可见性" in caught.value.hint

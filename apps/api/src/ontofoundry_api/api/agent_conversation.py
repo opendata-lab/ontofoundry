@@ -22,6 +22,7 @@ from ontofoundry_api.services.dataagent import (
     DataAgentClient,
     DataAgentError,
     build_turn_prompt,
+    require_dataagent_configuration,
 )
 from ontofoundry_api.services.model_result import (
     exhaust_retriable_result,
@@ -68,8 +69,10 @@ def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentCl
 
 
 def _require_configured(request: Request) -> None:
-    if not request.app.state.settings.dataagent_base_url:
-        raise HTTPException(503, "DataAgent 未配置，无法使用 Agent Conversation")
+    settings = request.app.state.settings
+    require_dataagent_configuration(
+        settings.dataagent_base_url, settings.dataagent_access_key
+    )
 
 
 def _mode(value: object) -> str:
@@ -113,7 +116,7 @@ def _run_ref(
 
 
 def _raise_dataagent(exc: DataAgentError) -> None:
-    raise HTTPException(exc.status_code, str(exc)) from exc
+    raise exc
 
 
 def _is_stale(updated_at: datetime) -> bool:
