@@ -101,7 +101,6 @@ class ModelingSessionRecord(Base):
     revision: Mapped[int] = mapped_column(Integer, default=0)
     draft_json: Mapped[dict] = mapped_column(JSON)
     candidates_json: Mapped[list] = mapped_column(JSON, default=list)
-    messages_json: Mapped[list] = mapped_column(JSON, default=list)
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
     task_status: Mapped[str] = mapped_column(String(24), default="idle")
     task_detail: Mapped[str] = mapped_column(Text, default="")

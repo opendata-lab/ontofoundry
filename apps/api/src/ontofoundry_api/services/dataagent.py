@@ -49,45 +49,12 @@ def require_dataagent_configuration(base_url: str, access_key: str) -> None:
         )
 
 
-def topic_id_from_messages(messages: list[dict[str, Any]]) -> str:
-    for message in reversed(messages):
-        topic_id = str(message.get("dataagent_topic_id") or "").strip()
-        if topic_id:
-            return topic_id
-    return ""
 
 
-def task_id_from_messages(messages: list[dict[str, Any]]) -> str:
-    for message in reversed(messages):
-        task_id = str(message.get("dataagent_task_id") or "").strip()
-        if task_id:
-            return task_id
-    return ""
 
 
-def uploaded_material_ids(messages: list[dict[str, Any]]) -> set[str]:
-    result: set[str] = set()
-    for message in messages:
-        values = message.get("dataagent_material_ids")
-        if isinstance(values, list):
-            result.update(str(value) for value in values if value)
-    return result
 
 
-def public_answer(message: dict[str, Any]) -> str:
-    """Prefer the public main-text projection and retain old-row fallback."""
-    blocks = message.get("blocks")
-    if isinstance(blocks, list):
-        text = [
-            str(block.get("text") or "").strip()
-            for block in blocks
-            if isinstance(block, dict)
-            and str(block.get("kind") or block.get("type") or "") in {"main_text", "text"}
-            and str(block.get("text") or "").strip()
-        ]
-        if text:
-            return "\n\n".join(text)
-    return str(message.get("content") or "").strip()
 
 
 class DataAgentClient:

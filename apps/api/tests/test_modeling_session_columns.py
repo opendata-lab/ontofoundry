@@ -51,7 +51,6 @@ def _new_record(*, status: str = "idle") -> ModelingSessionRecord:
         title="显式字段测试",
         draft_json=OntologyDraft(workspace_id=workspace_id).model_dump(mode="json"),
         candidates_json=[],
-        messages_json=[],
         material_ids=[],
         task_status=status,
         task_detail="",

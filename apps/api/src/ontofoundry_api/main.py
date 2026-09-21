@@ -14,7 +14,6 @@ from dataagent_backend.app import (
     stop_dataagent,
 )
 from ontofoundry_api.api import (
-    agent,
     agent_conversation,
     assets,
     auth,
@@ -156,7 +155,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ontology.router)
     app.include_router(modeling.router)
     app.include_router(materials.router)
-    app.include_router(agent.router)
     app.include_router(agent_conversation.router)
     app.include_router(connections.router)
     app.include_router(instances.router)

@@ -114,10 +114,7 @@ async def test_six_failures_have_stable_http_status_message_and_hint(
     assert caught.value.hint == expected_hint
 
 
-@pytest.mark.parametrize("conversation_api", ["legacy", "sdk"])
-def test_bff_returns_message_and_hint_for_dataagent_failure(
-    client, monkeypatch, conversation_api
-):
+def test_bff_returns_message_and_hint_for_dataagent_failure(client, monkeypatch):
     settings = client.app.state.settings
     settings.dataagent_base_url = "https://dataagent.example"
     settings.dataagent_access_key = "server-secret"
@@ -132,16 +129,10 @@ def test_bff_returns_message_and_hint_for_dataagent_failure(
     ).json()
 
     base = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}/sessions/{session['id']}"
-    if conversation_api == "legacy":
-        response = client.post(
-            base + "/messages",
-            json={"content": "hello", "mode": "chat", "revision": session["revision"]},
-        )
-    else:
-        response = client.post(
-            base + "/agent-conversation/messages",
-            json={"content": "hello", "metadata": {}},
-        )
+    response = client.post(
+        base + "/agent-conversation/messages",
+        json={"content": "hello", "metadata": {}},
+    )
 
     assert response.status_code == 502
     assert response.json() == {
