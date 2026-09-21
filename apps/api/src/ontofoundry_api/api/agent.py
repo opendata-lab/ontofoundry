@@ -40,10 +40,14 @@ class ChatRequest(BaseModel):
     revision: int
 
 
-def _client(request: Request) -> DataAgentClient:
+def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
     settings = request.app.state.settings
     return DataAgentClient(
         settings.dataagent_base_url,
+        prefix=settings.dataagent_api_prefix,
+        website_id=settings.dataagent_website_id,
+        access_key=settings.dataagent_access_key,
+        session_ref=f"ontofoundry:{workspace_id}:{session_id}",
         timeout_seconds=settings.dataagent_request_timeout_seconds,
     )
 
@@ -68,6 +72,10 @@ async def _sync_dataagent(app, workspace_id: str, session_id: str) -> dict:
     settings = app.state.settings
     client = DataAgentClient(
         settings.dataagent_base_url,
+        prefix=settings.dataagent_api_prefix,
+        website_id=settings.dataagent_website_id,
+        access_key=settings.dataagent_access_key,
+        session_ref=f"ontofoundry:{workspace_id}:{session_id}",
         timeout_seconds=settings.dataagent_request_timeout_seconds,
     )
     with app.state.session_factory() as db:
@@ -167,7 +175,7 @@ async def chat(
         raise HTTPException(503, "DataAgent 未配置，无法启动 Agent 任务")
     if item.revision != body.revision or item.task_status in ("queued", "running"):
         raise HTTPException(409, "会话正在处理或已更新，请刷新后重试")
-    dataagent = _client(request)
+    dataagent = _client(request, workspace_id, session_id)
     topic_id = topic_id_from_messages(item.messages_json)
     created_topic = False
     try:
@@ -300,7 +308,7 @@ async def events(
     task_id = task_id_from_messages(item.messages_json)
     if not task_id:
         raise HTTPException(404, "当前会话没有 DataAgent 任务")
-    dataagent = _client(request)
+    dataagent = _client(request, workspace_id, session_id)
     try:
         await dataagent.task(task_id)
     except DataAgentError as exc:
@@ -349,7 +357,7 @@ async def cancel(
     if not dataagent_task_id:
         raise HTTPException(409, "当前运行中的会话缺少 DataAgent task_id")
     try:
-        result = await _client(request).cancel(dataagent_task_id)
+        result = await _client(request, workspace_id, session_id).cancel(dataagent_task_id)
     except DataAgentError as exc:
         raise HTTPException(exc.status_code, str(exc)) from exc
     item.task_status = "cancelled"
