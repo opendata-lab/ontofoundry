@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
 from contextlib import suppress
@@ -21,6 +22,10 @@ from ontofoundry_api.services.dataagent import (
     DataAgentClient,
     DataAgentError,
     build_turn_prompt,
+)
+from ontofoundry_api.services.model_result import (
+    exhaust_retriable_result,
+    reconcile_run,
 )
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
@@ -48,10 +53,6 @@ class InteractionRequest(BaseModel):
     kind: Literal["permission", "question"]
     request_id: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
-
-
-async def reconcile_run(*_args: object) -> None:
-    """T5 extension point for consuming a completed modeling result."""
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
@@ -233,7 +234,18 @@ async def snapshot(
             )
             local_detail = _detail(upstream_status, task.get("error"))
             if local_status in TERMINAL_RUN_STATUSES:
-                await reconcile_run(request.app, workspace_id, session_id, task_id)
+                result_state = await reconcile_run(
+                    request.app, workspace_id, session_id, task_id
+                )
+                with request.app.state.session_factory() as current_db:
+                    current = current_db.get(ModelingSessionRecord, item.id)
+                    if current is not None:
+                        local_status = current.task_status
+                        local_detail = current.task_detail
+                if result_state in {"failed_retriable", "processing"}:
+                    # Keep the SDK run reconnectable; only /events owns the
+                    # bounded automatic retry and eventual terminal event.
+                    local_status = "running"
 
         run = None
         if task_id or local_status in ACTIVE_RUN_STATUSES | TERMINAL_RUN_STATUSES:
@@ -434,11 +446,11 @@ async def events(
         raise HTTPException(404, "当前会话没有 DataAgent 任务")
 
     task_id = item.dataagent_task_id
-    mode = _mode(item.dataagent_task_mode)
     dataagent = _client(request, workspace_id, session_id)
 
     async def stream_events():
         cursor = after_id
+        mode = _mode(item.dataagent_task_mode)
         while True:
             buffer = ""
             async for chunk in dataagent.stream(task_id, cursor):
@@ -473,12 +485,40 @@ async def events(
             if upstream_status in ACTIVE_TASK_STATUSES:
                 continue
 
-            await reconcile_run(request.app, workspace_id, session_id, task_id)
+            result_state = await reconcile_run(
+                request.app, workspace_id, session_id, task_id
+            )
+            if result_state in {"failed_retriable", "processing"}:
+                for delay in (2, 4, 8):
+                    await asyncio.sleep(delay)
+                    result_state = await reconcile_run(
+                        request.app, workspace_id, session_id, task_id
+                    )
+                    if result_state not in {"failed_retriable", "processing"}:
+                        break
+                if result_state == "failed_retriable":
+                    result_state = exhaust_retriable_result(
+                        request.app, session_id, task_id
+                    )
+                elif result_state == "processing":
+                    # Another request still owns a valid lease. It must be the
+                    # one to commit or fail the result before any terminal SDK
+                    # event is emitted.
+                    continue
+
+            with request.app.state.session_factory() as current_db:
+                current = current_db.get(ModelingSessionRecord, session_id)
+                if current is not None:
+                    status = current.task_status
+                    detail = current.task_detail
+                    mode = _mode(current.dataagent_task_mode)
+                else:  # pragma: no cover - a live request owns this session
+                    detail = _detail(upstream_status, task.get("error"))
             run = _run_ref(
                 task_id,
                 status,
                 mode=mode,
-                detail=_detail(upstream_status, task.get("error")),
+                detail=detail,
             )
             yield (
                 "event: done\ndata: "

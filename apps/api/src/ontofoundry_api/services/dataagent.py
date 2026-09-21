@@ -311,8 +311,17 @@ def build_turn_prompt(
     run_token: str = "",
 ) -> str:
     action = (
-        "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议；"
-        f"把完整 Ossie JSON 写到 output/ontofoundry-result-{run_token}.json，"
+        "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议。\n"
+        "你必须把完整的 Apache Ossie 0.2.0.dev0 文档（不是 diff）放入以下信封：\n"
+        "{\n"
+        '  "schema_version": "ontofoundry.model-result/v1",\n'
+        f'  "run_token": "{run_token}",\n'
+        '  "ontology": {"...": "完整 Ossie 文档"},\n'
+        '  "annotations": [{"target": {"kind": "object_type | link_type | mapping", '
+        '"key": "Ossie concept 名"}, "reason": "...", "evidence": []}]\n'
+        "}\n"
+        f"只将该 JSON 信封写到 output/ontofoundry-result-{run_token}.json。"
+        "不要覆盖其他轮次的结果文件，也不要尝试直接修改或发布 OntoFoundry 草稿。"
         "同时在回答中概括变更。"
         if mode == "model"
         else "这是普通对话或概念澄清。除非用户明确要求修改，否则不要生成或覆盖本体文件。"
