@@ -20,22 +20,22 @@ from __future__ import annotations
 
 import os
 import re
-import sys
 from pathlib import Path
-
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import psycopg
 import pytest
 from alembic import command
 from alembic.config import Config
+
+import ontofoundry_api
 from dataagent_backend.config import get_settings, update_settings
 from dataagent_backend.core.runtime_registry_store import RuntimeRegistryStore
 from dataagent_backend.core.topic_task_store import TopicTaskStore
 
-import dataagent_backend
-
-# 包安装后的真实位置，不再依赖测试文件与源码的相对层级
-BACKEND_ROOT = Path(dataagent_backend.__file__).resolve().parent
+# 包安装后的真实位置，不再依赖测试文件与源码的相对层级。
+ONTOFOUNDRY_ROOT = Path(ontofoundry_api.__file__).resolve().parent
 
 
 POSTGRES_URL = os.environ.get("DATAAGENT_TEST_POSTGRES_URL", "")
@@ -63,9 +63,17 @@ def migrated_postgres():
             "dataagent_database_schema": TEST_SCHEMA,
         }
     )
-    alembic_config = Config(str(BACKEND_ROOT / "alembic.ini"))
-    alembic_config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    command.upgrade(alembic_config, "head")
+    migration_url = POSTGRES_URL.replace(
+        "postgresql://", "postgresql+psycopg://", 1
+    )
+    separator = "&" if "?" in migration_url else "?"
+    migration_url += f"{separator}options=-csearch_path%3D{TEST_SCHEMA}%2Cpublic"
+    alembic_config = Config(str(ONTOFOUNDRY_ROOT / "alembic.ini"))
+    with patch(
+        "ontofoundry_api.config.get_settings",
+        return_value=SimpleNamespace(database_url=migration_url),
+    ):
+        command.upgrade(alembic_config, "head")
 
     try:
         yield
@@ -283,7 +291,10 @@ def test_agent_profile_store_round_trip(migrated_postgres):
     UPDATE。这类语句最容易在换连接层时因为事务或自动提交行为变化而静默失效，
     内存替身完全测不到。
     """
-    from dataagent_backend.core.agent_profile_service import AgentProfileStore, default_agent_payload
+    from dataagent_backend.core.agent_profile_service import (
+        AgentProfileStore,
+        default_agent_payload,
+    )
 
     store = AgentProfileStore()
     store.init_schema()
