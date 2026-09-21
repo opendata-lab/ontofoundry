@@ -2,10 +2,9 @@
   "name": "ontofoundry",
   "private": true,
   "version": "0.1.0",
-  "description": "OntoFoundry web frontend and DataAgent Pi runtime",
+  "description": "OntoFoundry web frontend",
   "workspaces": [
-    "apps/web",
-    "dataagent/dataagent-runtime-pi"
+    "apps/web"
   ],
   "engines": {
     "node": ">=22.19.0"

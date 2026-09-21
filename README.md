@@ -6,7 +6,9 @@ OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markd
 
 - [平台完整设计](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md)
 - [原型参考与分阶段产品补充](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md#prototype-supplement)：七张参考图、与现有实现的对应关系，以及基线补齐 → 业务 Skill → 探索与智能体的需求。阶段 A 的实施与验收记录见同一文档第 17.12 节，阶段 B/C/D 仍为后续设计。
-- [DataAgent + Pi 集成设计](./docs/design/2026-09-12-dataagent-pi-integration.md)：单运行时边界、AgentEvent 协议、SSE、状态投影、部署与验收。
+- [接入 DataAgent Conversation SDK](./docs/design/2026-09-21-dataagent-conversation-sdk-integration-design.md)：三方边界、BFF 会话协议、建模结果回写、迁移与发布顺序。
+- [DataAgent 集成包](./integrations/dataagent/README.md)：在外部 DataAgent 上安装 Skill、创建 Agent、配置站点密钥的步骤。
+- [DataAgent + Pi 集成设计](./docs/design/2026-09-12-dataagent-pi-integration.md)（历史）：内置运行时形态的设计，已被上面的 SDK 接入取代。
 
 已迁入的内置建模资产：
 
@@ -18,7 +20,7 @@ OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markd
 
 需要 Node.js 22.19+、Python 3.13 和 uv。默认仅监听本机，开发身份是 `admin`，不可直接用于生产。
 
-前端与 Pi runtime 由根目录的 npm workspaces 统一安装，`make install` 在仓库根执行 `npm ci`，不再单独进入 `apps/web`。Node 版本下限由 Pi 数据面决定。
+前端由根目录的 npm workspaces 统一安装，`make install` 在仓库根执行 `npm ci`，不再单独进入 `apps/web`。
 
 ```sh
 make install
@@ -29,7 +31,7 @@ make web-dev
 
 前端 http://127.0.0.1:5174，API http://127.0.0.1:8000/docs。首次启动创建明确标注的制造供应链示例。平台内部统一使用 PostgreSQL；SQLite 只保留给隔离单元测试，不属于部署技术栈。
 
-先将根目录 `.env.example` 复制到 `apps/api/.env` 再配置。从本版本起需要一个可达的外部 OpenDataWorks DataAgent，并配置六个 `ONTOFOUNDRY_DATAAGENT_*` 接入变量；`make dataagent-up` 启动的仓库内置服务仍使用旧运行时路由，已经不兼容（T11 会将其删除）。PostgreSQL 数据保存在 Compose volume，材料文件位于 `apps/api/.data/files`，均不纳入 Git。
+先将根目录 `.env.example` 复制到 `apps/api/.env` 再配置。从本版本起需要一个可达的外部 OpenDataWorks DataAgent，并配置六个 `ONTOFOUNDRY_DATAAGENT_*` 接入变量；Agent 运行时不再内置于本仓库——会话、任务、Skill 与沙箱全部由外部 DataAgent 提供，接入步骤见 [集成包说明](./integrations/dataagent/README.md)。未配置 `ONTOFOUNDRY_DATAAGENT_BASE_URL` 时应用照常启动，本体的查看、编辑、发布与 MCP 都不依赖它。PostgreSQL 数据保存在 Compose volume，材料文件位于 `apps/api/.data/files`，均不纳入 Git。
 
 ## 已接通的流程
 
