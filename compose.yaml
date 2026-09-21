@@ -32,6 +32,8 @@ services:
       dockerfile: apps/api/Dockerfile
       target: backend
     environment:
+      ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
+      # T11 删除内置 DataAgent 前，它仍需自己的兼容配置指向同一数据库。
       DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       DATAAGENT_DATABASE_SCHEMA: public
       REDIS_HOST: dataagent-redis
@@ -72,6 +74,7 @@ services:
       dockerfile: apps/api/Dockerfile
       target: runner
     environment:
+      # Runner 不执行 OntoFoundry 迁移，但内置 DataAgent 仍通过此变量持久化。
       DATAAGENT_DATABASE_URL: postgresql://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       DATAAGENT_DATABASE_SCHEMA: public
       REDIS_HOST: dataagent-redis

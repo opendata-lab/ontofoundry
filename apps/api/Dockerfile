@@ -53,9 +53,9 @@ FROM base AS backend
 
 EXPOSE 8900
 
-# 迁移脚本随 dataagent_backend 包一起安装，alembic 从包内位置读取配置。
+# 迁移脚本由 ontofoundry_api 拥有，alembic 从包内位置读取配置。
 # 单一进程同时提供 OntoFoundry 与 DataAgent 路由。
-CMD ["sh", "-c", "alembic -c /opt/ontofoundry-api/src/dataagent_backend/alembic.ini upgrade head && uvicorn ontofoundry_api.main:app --host 0.0.0.0 --port 8900"]
+CMD ["sh", "-c", "alembic -c /opt/ontofoundry-api/src/ontofoundry_api/alembic.ini upgrade head && uvicorn ontofoundry_api.main:app --host 0.0.0.0 --port 8900"]
 
 # ---- of-runner ---------------------------------------------------------
 FROM base AS runner

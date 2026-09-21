@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from conftest import PACKAGE_ROOT, REPO_ROOT, REPO_DATAAGENT_DIR  # noqa: E402
-
+from conftest import REPO_ROOT  # noqa: E402
 
 DOCKERFILE = REPO_ROOT / "apps" / "api" / "Dockerfile"
 
@@ -66,6 +63,9 @@ def test_backend_stage_runs_migrations_then_the_merged_app():
     assert "RUN pip install --no-cache-dir /opt/ontofoundry-api" in content
     assert "COPY dataagent/.claude" not in content
     # 包安装之后 alembic.ini 不在 cwd 里，必须显式指路；仍要在起服务前跑迁移
-    assert "alembic -c /opt/ontofoundry-api/src/dataagent_backend/alembic.ini upgrade head" in content
+    assert (
+        "alembic -c /opt/ontofoundry-api/src/ontofoundry_api/alembic.ini upgrade head"
+        in content
+    )
     assert "uvicorn ontofoundry_api.main:app" in content
     assert 'EXPOSE 8900' in content

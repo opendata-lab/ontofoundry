@@ -70,8 +70,8 @@ make serve
 
 ```sh
 cd apps/api
-DATAAGENT_DATABASE_URL=postgresql://... DATAAGENT_DATABASE_SCHEMA=public \
-  uv run alembic -c src/dataagent_backend/alembic.ini upgrade head
+ONTOFOUNDRY_DATABASE_URL=postgresql+psycopg://... \
+  uv run alembic -c src/ontofoundry_api/alembic.ini upgrade head
 ```
 
 MCP 当前实现 2026-07-28 的 `server/discover`、`tools/list`、`tools/call`，使用本平台签发的只读 Bearer 令牌；尚未实现 MCP OAuth 动态发现或兼容旧版 `initialize` 客户端。上线前需与实际消费端核对版本。
