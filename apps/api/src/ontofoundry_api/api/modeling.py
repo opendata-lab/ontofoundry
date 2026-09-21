@@ -23,7 +23,6 @@ from ontofoundry_api.domain.instance_validation import (
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
-from ontofoundry_api.services.dataagent import task_id_from_messages, topic_id_from_messages
 from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
@@ -55,7 +54,6 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
 
 def session_data(item):
     nodes, edges = _all_graph(item.draft_json)
-    dataagent_task_id = task_id_from_messages(item.messages_json)
     return {
         "id": item.id,
         "title": item.title,
@@ -68,12 +66,26 @@ def session_data(item):
         "material_ids": item.material_ids,
         "task_status": item.task_status,
         "task_detail": item.task_detail,
-        "dataagent_topic_id": topic_id_from_messages(item.messages_json) or None,
+        "dataagent_topic_id": item.dataagent_topic_id,
         "dataagent_task_id": (
-            dataagent_task_id
-            if item.task_status in ("queued", "running")
+            item.dataagent_task_id
+            if item.task_status
+            in (
+                "submitting",
+                "queued",
+                "running",
+                "waiting_input",
+                "waiting_permission",
+            )
             else None
         ),
+        "dataagent_task_mode": item.dataagent_task_mode,
+        "dataagent_run_token": item.dataagent_run_token,
+        "uploaded_material_ids": item.uploaded_material_ids,
+        "last_result_task_id": item.last_result_task_id,
+        "result_state": item.result_state,
+        "result_warnings": item.result_warnings,
+        "result_claimed_at": item.result_claimed_at,
         "updated_at": item.updated_at,
         "graph": {
             "workspace_id": item.workspace_id,
@@ -86,14 +98,28 @@ def session_data(item):
 
 
 def revise(db, item, revision, **values):
-    if item.task_status in ("queued", "running"):
+    if item.task_status in (
+        "submitting",
+        "queued",
+        "running",
+        "waiting_input",
+        "waiting_permission",
+    ):
         raise HTTPException(409, "当前会话正在生成，请等待完成或取消后编辑")
     result = db.execute(
         update(ModelingSessionRecord)
         .where(
             ModelingSessionRecord.id == item.id,
             ModelingSessionRecord.revision == revision,
-            ModelingSessionRecord.task_status.not_in(["queued", "running"]),
+            ModelingSessionRecord.task_status.not_in(
+                [
+                    "submitting",
+                    "queued",
+                    "running",
+                    "waiting_input",
+                    "waiting_permission",
+                ]
+            ),
         )
         .values(**values, revision=revision + 1, updated_at=utc_now())
     )

@@ -105,6 +105,25 @@ class ModelingSessionRecord(Base):
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
     task_status: Mapped[str] = mapped_column(String(24), default="idle")
     task_detail: Mapped[str] = mapped_column(Text, default="")
+    dataagent_topic_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dataagent_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dataagent_task_mode: Mapped[str] = mapped_column(
+        String(8), nullable=False, server_default=""
+    )
+    dataagent_run_token: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    uploaded_material_ids: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default="[]"
+    )
+    last_result_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    result_state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=""
+    )
+    result_warnings: Mapped[list] = mapped_column(
+        JSON, nullable=False, server_default="[]"
+    )
+    result_claimed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
