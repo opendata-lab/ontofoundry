@@ -11,6 +11,7 @@
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
+    "@opendataworks/agent-conversation": "file:vendor-agent-conversation-0.1.0.tgz",
     "@xyflow/react": "^12.10.0",
     "dompurify": "^3.4.15",
     "lucide-react": "^0.468.0",

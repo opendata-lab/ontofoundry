@@ -110,6 +110,11 @@ export function useModeling(
   };
   return {
     session,
+    // The id from the URL, which changes the moment the user switches — unlike
+    // `session`, which is null until its request comes back. Anything deriving
+    // a conversation address must use this: an address that briefly goes empty
+    // reads as a switch and resets the embedded conversation.
+    sessionId,
     setSession,
     sessions,
     error,
