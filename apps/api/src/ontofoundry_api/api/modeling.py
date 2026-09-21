@@ -62,7 +62,6 @@ def session_data(item):
         "revision": item.revision,
         "draft": item.draft_json,
         "candidates": item.candidates_json,
-        "messages": item.messages_json,
         "material_ids": item.material_ids,
         "task_status": item.task_status,
         "task_detail": item.task_detail,
