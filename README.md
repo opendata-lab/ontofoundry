@@ -10,7 +10,7 @@ OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markd
 
 已迁入的内置建模资产：
 
-- [md2ossie Skill](./.claude/skills/md2ossie/SKILL.md)：将 Markdown 转换为 Apache Ossie 0.2.0.dev0 Ontology JSON，并执行离线官方 Schema 校验和 semantic lint。
+- [md2ossie Skill](./integrations/dataagent/skills/md2ossie/SKILL.md)：将 Markdown 转换为 Apache Ossie 0.2.0.dev0 Ontology JSON，并执行离线官方 Schema 校验和 semantic lint。
 
 所有范围变化直接修订该文档，不另建精益版或平行方案。
 
