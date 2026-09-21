@@ -165,24 +165,6 @@ export const modelingApi = {
       "/sessions/" + s.id + "/candidates",
       { revision: s.revision, ids, action },
     ),
-  chat: (s: ModelingSession, content: string, mode: string) =>
-    workspaceRequest<ModelingSession>(
-      s.workspace_id,
-      "/sessions/" + s.id + "/messages",
-      { revision: s.revision, content, mode },
-    ),
-  cancel: (s: ModelingSession) =>
-    workspaceRequest<ModelingSession>(
-      s.workspace_id,
-      "/sessions/" + s.id + "/cancel",
-      {},
-    ),
-  sync: (workspaceId: string, sessionId: string) =>
-    workspaceRequest<ModelingSession>(
-      workspaceId,
-      "/sessions/" + sessionId + "/sync",
-      {},
-    ),
   validate: (s: ModelingSession) =>
     workspaceRequest<VersionSummary["validation"]>(
       s.workspace_id,

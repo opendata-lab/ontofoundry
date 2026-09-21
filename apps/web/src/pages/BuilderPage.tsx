@@ -14,36 +14,40 @@ import { Link, useNavigate } from "react-router-dom";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import type {
+  AgentConversationElement,
+  CompleteDetail,
+  ErrorDetail,
+  RunChangeDetail,
+} from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
-import { AgentStream } from "../components/AgentStream";
-import { Markdown } from "../components/Markdown";
 import { useModeling } from "../hooks/useModeling";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
 
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
-  const { session, setSession, error, setError } = model;
+  const { session, sessionId, setSession, error, setError } = model;
   const [materials, setMaterials] = useState<Material[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
-  const [prompt, setPrompt] = useState("");
   const [scenario, setScenario] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
   const input = useRef<HTMLInputElement>(null);
-  const chatEnd = useRef<HTMLDivElement>(null);
-  const lastChatUpdate = useRef("");
+  const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
   const pageActive = usePageActive();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
-    dirty: !!prompt.trim() || !!scenario.trim(),
+    dirty: !!scenario.trim(),
     busy: busy || uploading,
   });
-  const running =
-    !!session && ["queued", "running"].includes(session.task_status);
+  // Run state comes from the element, not from a status column the page
+  // polls. It knows first, and it covers the parked states — waiting_input is
+  // still a live run, and treating it as idle would unlock editing mid-run.
+  const [running, setRunning] = useState(false);
   useEffect(() => {
     Promise.all([
       modelingApi.materials(workspace.id),
@@ -55,13 +59,6 @@ export function BuilderPage() {
       })
       .catch((e: Error) => setError(e.message));
   }, [workspace.id, setError]);
-  useEffect(() => {
-    if (!session) return;
-    const stamp = `${session.id}/${session.messages.length}/${session.task_detail}`;
-    if (pageActive && lastChatUpdate.current !== stamp)
-      chatEnd.current?.scrollIntoView({ block: "nearest" });
-    lastChatUpdate.current = stamp;
-  }, [session, pageActive]);
   const act = async (fn: () => Promise<void>) => {
     setError("");
     setBusy(true);
@@ -93,18 +90,74 @@ export function BuilderPage() {
     setUploading(false);
     if (input.current) input.current.value = "";
   };
-  const send = (mode: string) =>
-    act(async () => {
-      const content =
-        (mode === "model" && scenario.trim() && prompt.trim()
-          ? `业务场景：${scenario.trim()}\n本次需求：${prompt.trim()}`
-          : prompt.trim()) ||
-        (mode === "model" ? scenario.trim() || "基于已选材料开始建模" : "");
-      if (!content) return;
-      const current = await model.ensure();
-      setSession(await modelingApi.chat(current, content, mode));
-      setPrompt("");
-    });
+  const startModeling = () => {
+    const el = conversation.current;
+    if (!el) return;
+    const text = el.value.trim();
+    const content =
+      (scenario.trim() && text
+        ? `业务场景：${scenario.trim()}\n本次需求：${text}`
+        : text) ||
+      scenario.trim() ||
+      "基于已选材料开始建模";
+    // metadata is opaque to the SDK and comes back on completion; it is how we
+    // tell a modeling run apart from ordinary chat when deciding what to refresh.
+    void el.sendMessage(content, { metadata: { mode: "model" } });
+  };
+
+  // The element owns the network; the page only reacts to what it reports.
+  useEffect(() => {
+    const el = conversation.current;
+    if (!el) return;
+
+    const onRun = (event: Event) => {
+      const { status } = (event as CustomEvent<RunChangeDetail>).detail;
+      const active = [
+        "queued",
+        "running",
+        "waiting_input",
+        "waiting_permission",
+      ].includes(status);
+      setRunning(active);
+      // The BFF bumps the session revision when it accepts a run. Without
+      // resyncing, every later save, accept and publish would carry a stale
+      // revision and be rejected.
+      if (active) model.reload();
+    };
+
+    const onComplete = (event: Event) => {
+      setRunning(false);
+      // Reload on any terminal state: the revision moved regardless of how the
+      // run ended. Only whether to draw attention to the candidates depends on
+      // the mode.
+      model.reload();
+      const { metadata } = (event as CustomEvent<CompleteDetail>).detail;
+      if (metadata?.mode === "model") setError("");
+    };
+
+    const onError = (event: Event) => {
+      const { message, hint } = (event as CustomEvent<ErrorDetail>).detail;
+      setError(hint ? `${message}（${hint}）` : message);
+    };
+
+    el.addEventListener("dataagent-run-change", onRun);
+    el.addEventListener("dataagent-complete", onComplete);
+    el.addEventListener("dataagent-error", onError);
+    return () => {
+      el.removeEventListener("dataagent-run-change", onRun);
+      el.removeEventListener("dataagent-complete", onComplete);
+      el.removeEventListener("dataagent-error", onError);
+    };
+  }, [model, setError]);
+
+  // A session that does not exist yet is created on first send, so opening the
+  // page never mints an empty conversation.
+  useEffect(() => {
+    const el = conversation.current;
+    if (el) el.endpointResolver = async () =>
+      `/api/v1/workspaces/${workspace.id}/sessions/${(await model.ensure()).id}/agent-conversation`;
+  }, [model, workspace.id]);
+
   return (
     <div className="ref-builder">
       <header className="context-bar">
@@ -308,157 +361,29 @@ export function BuilderPage() {
           )}
         </aside>
         <section className="ref-chat">
-          <div className="chat-scroll">
-            {!session?.messages.length ? (
-              <div className="agent-welcome">
-                <h2>
-                  你好，
-                  <br />
-                  我是本体自动构建助手，
-                  <br />
-                  很高兴为你服务！
-                </h2>
-                <p>
-                  你可以直接用自然语言描述业务场景，或在左侧上传材料，补充业务知识后开始构建。
-                </p>
-                <div className="prompt-suggestions">
-                  {[
-                    "结合已上传文档生成本体模型",
-                    "帮我澄清一个业务概念",
-                    "解释实体、属性与关系的区别",
-                  ].map((p) => (
-                    <button key={p} onClick={() => setPrompt(p)}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              session.messages.map((m, i) => (
-                <div key={i} className={"chat-message chat-message--" + m.role}>
-                  {m.role === "assistant" ? <Markdown>{m.content}</Markdown> : m.content}
-                  {!!m.attachments?.length && (
-                    <div className="agent-attachments">
-                      {m.attachments.map((file) => (
-                        <span key={file.rel_path}><FileText size={13} />{file.name}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-            {session && (
-              <AgentStream
-                session={session}
-                active={pageActive}
-                onSession={setSession}
-                onError={setError}
-              />
-            )}
-            {session?.task_status !== "idle" && session && (
-              <div
-                className={
-                  "task-progress task-progress--" + session.task_status
-                }
-              >
-                <span
-                  className={running ? "progress-spinner" : "progress-check"}
-                />
-                <strong>
-                  {
-                    (
-                      {
-                        queued: "排队中",
-                        running: "构建进行中",
-                        completed: "处理完成",
-                        failed: "处理失败",
-                        cancelled: "已取消",
-                      } as Record<string, string>
-                    )[session.task_status]
-                  }
-                </strong>
-                <p>{session.task_detail}</p>
-              </div>
-            )}
-            {session && !running && session.candidates.length > 0 && (
-              <div className="build-summary">
-                <h3>构建产出</h3>
-                <p>
-                  {
-                    session.candidates.filter((c) => c.status === "pending")
-                      .length
-                  }{" "}
-                  项待确认候选 · {session.draft.object_types.length} 个草稿实体
-                  · {session.draft.link_types.length} 条草稿关系
-                </p>
-                <span>
-                  在右侧展开模型查看属性与来源，接受后可继续人工编辑。
-                </span>
-              </div>
-            )}
-            <div ref={chatEnd} />
-          </div>
-          <form
-            className="ref-composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void send("chat");
-            }}
+          {/* The endpoint is derived from sessionId, never from `session`.
+              That object is null while a session loads, and an endpoint that
+              momentarily goes empty reads as a conversation switch — the
+              element would clear itself and reload for no reason. */}
+          <dataagent-conversation
+            ref={conversation}
+            endpoint={
+              sessionId
+                ? `/api/v1/workspaces/${workspace.id}/sessions/${sessionId}/agent-conversation`
+                : ""
+            }
+            placeholder="向智能体提问以辅助本体构建…"
           >
-            <textarea
-              aria-label="Agent 对话"
-              rows={3}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="向智能体提问以辅助本体构建…"
-              disabled={running}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  void send("chat");
-                }
-              }}
-            />
-            <footer>
-              {session && <span>会话草稿 · 独立保存</span>}
-              <div>
-                {running ? (
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    onClick={() =>
-                      act(async () => {
-                        if (session)
-                          setSession(await modelingApi.cancel(session));
-                      })
-                    }
-                  >
-                    <Square size={12} />
-                    停止
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="button button--secondary"
-                      disabled={busy}
-                      onClick={() => void send("model")}
-                    >
-                      开始建模
-                    </button>
-                    <button
-                      type="submit"
-                      className="button button--primary send-button"
-                      aria-label="发送对话"
-                      disabled={busy || !prompt.trim()}
-                    >
-                      <Send size={16} />
-                    </button>
-                  </>
-                )}
-              </div>
-            </footer>
-          </form>
+            <button
+              slot="composer-actions"
+              type="button"
+              className="button button--secondary"
+              disabled={busy}
+              onClick={startModeling}
+            >
+              开始建模
+            </button>
+          </dataagent-conversation>
         </section>
         <ModelResults
           session={session}
