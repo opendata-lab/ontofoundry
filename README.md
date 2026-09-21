@@ -22,7 +22,6 @@ OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markd
 
 ```sh
 make install
-make dataagent-up
 make api-dev
 # 另一个终端
 make web-dev
@@ -30,7 +29,7 @@ make web-dev
 
 前端 http://127.0.0.1:5174，API http://127.0.0.1:8000/docs。首次启动创建明确标注的制造供应链示例。平台内部统一使用 PostgreSQL；SQLite 只保留给隔离单元测试，不属于部署技术栈。
 
-先将根目录 `.env.example` 复制到 `apps/api/.env` 再配置；`make dataagent-up` 也会用该文件为 Compose 注入模型供应商变量。PostgreSQL 数据保存在 Compose volume，材料文件位于 `apps/api/.data/files`，均不纳入 Git。
+先将根目录 `.env.example` 复制到 `apps/api/.env` 再配置。从本版本起需要一个可达的外部 OpenDataWorks DataAgent，并配置六个 `ONTOFOUNDRY_DATAAGENT_*` 接入变量；`make dataagent-up` 启动的仓库内置服务仍使用旧运行时路由，已经不兼容（T11 会将其删除）。PostgreSQL 数据保存在 Compose volume，材料文件位于 `apps/api/.data/files`，均不纳入 Git。
 
 ## 已接通的流程
 
@@ -50,7 +49,7 @@ make web-dev
 
 正式发布只产出 `of-web`、`of-api`、`of-agent-master` 和 `of-agent-worker` 四个业务镜像。不包含独立的 Portal MCP 代理；平台 MCP 由 `of-api` 原生提供，Pi 保留可连接显式配置 MCP server 的通用客户端。
 
-- Agent 后端：`ONTOFOUNDRY_DATAAGENT_BASE_URL`、`ONTOFOUNDRY_DATAAGENT_AGENT_ID`、`ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE`。
+- Agent 后端：`ONTOFOUNDRY_DATAAGENT_BASE_URL`、`ONTOFOUNDRY_DATAAGENT_API_PREFIX`、`ONTOFOUNDRY_DATAAGENT_WEBSITE_ID`、`ONTOFOUNDRY_DATAAGENT_ACCESS_KEY`、`ONTOFOUNDRY_DATAAGENT_AGENT_ID`、`ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS`；任务执行模式沿用 `ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE`。
 - 模型供应商：Compose 将 `ONTOFOUNDRY_ANTHROPIC_BASE_URL`、`ONTOFOUNDRY_ANTHROPIC_MODEL`、`ONTOFOUNDRY_ANTHROPIC_API_KEY` 注入 DataAgent。这里的 Anthropic-compatible 是 Pi 使用的模型传输协议，不依赖 Claude Agent SDK。
 - 数据库连接密码：配置固定的 Fernet `ONTOFOUNDRY_CONNECTION_KEY` 后才能新增连接。部署时用源库只读账号，不将密码写入本体版本。
 - OAuth：配置服务端地址、client ID/secret、回调 URI；启用 `AUTH_MODE=oauth`。生产启用 HTTPS 安全 Cookie、随机 session secret，关闭 demo seed。
