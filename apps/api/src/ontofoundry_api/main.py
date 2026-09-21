@@ -8,8 +8,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from dataagent_backend.app import (
+    include_dataagent_routes,
+    start_dataagent,
+    stop_dataagent,
+)
 from ontofoundry_api.api import (
     agent,
+    agent_conversation,
     assets,
     auth,
     connections,
@@ -21,11 +27,6 @@ from ontofoundry_api.api import (
     workspaces,
 )
 from ontofoundry_api.api import settings as settings_api
-from dataagent_backend.app import (
-    include_dataagent_routes,
-    start_dataagent,
-    stop_dataagent,
-)
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import WorkspaceRecord
@@ -148,6 +149,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(modeling.router)
     app.include_router(materials.router)
     app.include_router(agent.router)
+    app.include_router(agent_conversation.router)
     app.include_router(connections.router)
     app.include_router(instances.router)
     app.include_router(settings_api.router)
