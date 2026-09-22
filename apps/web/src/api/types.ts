@@ -195,11 +195,19 @@ export type Candidate = {
   reason: string;
   conflict?: string;
   evidence?: Evidence[];
+  /**
+   * The draft value this proposal was computed against. accept_candidates
+   * compares against it to detect hand edits — without it every acceptance
+   * would read as a conflict.
+   */
+  before?: unknown;
+  source_task_id?: string;
 } & (
   | { kind: "object_type"; value: ObjectDefinition }
   | { kind: "link_type"; value: LinkDefinition }
   | { kind: "object"; value: DocumentObject }
   | { kind: "link"; value: DocumentLink }
+  | { kind: "mapping"; value: DataMapping }
   | { kind: "clarification"; value: { name: string } }
 );
 export type ModelingSession = {
@@ -211,15 +219,15 @@ export type ModelingSession = {
   draft: Draft;
   graph: TypeGraph;
   candidates: Candidate[];
-  messages: {
-    role: string;
-    content: string;
-    dataagent_task_id?: string;
-    attachments?: { name: string; rel_path: string; size: number; content_type: string }[];
-  }[];
   material_ids: string[];
   task_status: string;
   task_detail: string;
+  /**
+   * Non-blocking notes from the last modeling run — e.g. top-level ontology
+   * constraints that the agent proposed but v1 does not turn into candidates.
+   * Surfaced so those changes are not lost silently.
+   */
+  result_warnings?: string[];
   dataagent_topic_id?: string | null;
   dataagent_task_id?: string | null;
   updated_at: string;
@@ -256,6 +264,15 @@ export type Capabilities = {
   max_file_mb: number;
   connections_configured: boolean;
   skills: string[];
+};
+export type DataAgentHealth = {
+  ok: boolean;
+  checks: {
+    name: string;
+    ok: boolean;
+    message: string;
+    hint: string;
+  }[];
 };
 export type DataConnection = {
   id: string;

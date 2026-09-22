@@ -76,11 +76,6 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - name: Build the Pi runtime
-        # 后端 spawn 的是编译产物，所以构建失败等同于运行时不可用——
-        # 一次未安装依赖导致的 tsc 失败已经让这套代码停滞过一轮。
-        run: npm run build -w @ontofoundry/agent-runtime-pi
-      - run: npm test -w @ontofoundry/agent-runtime-pi
       - run: npm test -w ontofoundry-web -- --run
       - run: npm run build -w ontofoundry-web
 
@@ -92,7 +87,6 @@ jobs:
       matrix:
         image:
           - { name: of-backend,  dockerfile: apps/api/Dockerfile, target: backend }
-          - { name: of-runner,   dockerfile: apps/api/Dockerfile, target: runner }
           - { name: of-frontend, dockerfile: apps/web/Dockerfile, target: "" }
     steps:
       - uses: actions/checkout@v4
@@ -169,7 +163,11 @@ jobs:
           test -f images/infra.tar
           test -f compose.yaml
           test -f install.sh
-          test -d dataagent/.claude/skills
+          test ! -e integrations
+          if grep -i dataagent compose.yaml .env.example README.md install.sh; then
+            echo "离线包元数据不应包含 DataAgent 配置或说明"
+            exit 1
+          fi
           # 镜像 tar 应当是有内容的：save 失败也可能留下一个空文件。
           for tar in images/*.tar; do
             size=$(stat -c%s "$tar")

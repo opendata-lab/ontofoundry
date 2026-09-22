@@ -44,7 +44,6 @@ const session: ModelingSession = {
     edges: [],
   },
   candidates: [],
-  messages: [],
   material_ids: [],
   task_status: "idle",
   task_detail: "",

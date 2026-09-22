@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from ontofoundry_api.api import (
-    agent,
+    agent_conversation,
     assets,
     auth,
     connections,
@@ -21,15 +21,11 @@ from ontofoundry_api.api import (
     workspaces,
 )
 from ontofoundry_api.api import settings as settings_api
-from dataagent_backend.app import (
-    include_dataagent_routes,
-    start_dataagent,
-    stop_dataagent,
-)
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import WorkspaceRecord
 from ontofoundry_api.domain.models import WorkspaceCreate
+from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 from ontofoundry_api.services.errors import PublishValidationError, ServiceError
 from ontofoundry_api.services.workspaces import (
@@ -74,11 +70,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
-        await start_dataagent()
         try:
             yield
         finally:
-            await stop_dataagent()
             engine.dispose()
 
     app = FastAPI(
@@ -138,6 +132,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             status_code=exc.status_code, content=body, headers=getattr(exc, "headers", None)
         )
 
+    @app.exception_handler(DataAgentError)
+    async def dataagent_error_handler(_: Request, exc: DataAgentError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"message": str(exc), "hint": exc.hint},
+        )
+
     @app.get("/healthz", tags=["system"])
     def health() -> dict:
         return {"status": "ok", "service": "ontofoundry-api"}
@@ -147,12 +148,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ontology.router)
     app.include_router(modeling.router)
     app.include_router(materials.router)
-    app.include_router(agent.router)
+    app.include_router(agent_conversation.router)
     app.include_router(connections.router)
     app.include_router(instances.router)
     app.include_router(settings_api.router)
     app.include_router(mcp.router)
-    include_dataagent_routes(app)
     if app_settings.web_dist:
         from ontofoundry_api.web import FrontendFiles
 

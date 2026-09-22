@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # 打一个可在无外网机器上部署的离线包。
 #
-# 目标机器拉不到任何镜像，所以第三方基础镜像也要一并导出。我们自己的三个镜像已经
-# 把 nginx / node / python 烘进各自的层里，不需要单独导出；postgres 与 redis 是
-# 独立服务，必须单独 save。
+# 目标机器拉不到任何镜像，所以第三方基础镜像也要一并导出。两个业务镜像已经把
+# nginx / node / python 烘进各自的层里，不需要单独导出；PostgreSQL 是独立服务，
+# 必须单独 save。
 #
 #   ./scripts/create-offline-package.sh [输出目录]
 
@@ -14,13 +14,11 @@ OUT_DIR="${1:-$REPO_ROOT/dist/offline}"
 STAMP="$(date +%Y%m%d%H%M%S)"
 
 BACKEND_IMAGE="${OF_BACKEND_IMAGE:-of-backend:local}"
-RUNNER_IMAGE="${OF_RUNNER_IMAGE:-of-runner:local}"
 FRONTEND_IMAGE="${OF_FRONTEND_IMAGE:-of-frontend:local}"
 
 # 与 compose.yaml 保持一致。写死而不是解析 yaml：解析要引入依赖，而版本漂移会
 # 立刻在 `docker compose up` 时暴露，不会静默。
 POSTGRES_IMAGE="postgres:17-alpine"
-REDIS_IMAGE="redis:7.2-alpine"
 
 DOCKER="${DOCKER:-docker}"
 command -v "$DOCKER" >/dev/null 2>&1 || {
@@ -32,51 +30,42 @@ command -v "$DOCKER" >/dev/null 2>&1 || {
 # 只是浪费几分钟；本地直接跑脚本时仍然需要构建这一步。
 if [ "${SKIP_BUILD:-0}" = "1" ]; then
   echo "==> 跳过构建，复用已有镜像"
-  for img in "$BACKEND_IMAGE" "$RUNNER_IMAGE" "$FRONTEND_IMAGE"; do
+  for img in "$BACKEND_IMAGE" "$FRONTEND_IMAGE"; do
     "$DOCKER" image inspect "$img" >/dev/null 2>&1 || {
       echo "SKIP_BUILD=1 但本地没有 $img" >&2
       exit 1
     }
   done
 else
-  echo "==> 构建三个自有镜像"
+  echo "==> 构建两个自有镜像"
   "$DOCKER" build -t "$BACKEND_IMAGE"  --target backend -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
-  "$DOCKER" build -t "$RUNNER_IMAGE"   --target runner  -f "$REPO_ROOT/apps/api/Dockerfile" "$REPO_ROOT"
   "$DOCKER" build -t "$FRONTEND_IMAGE" -f "$REPO_ROOT/apps/web/Dockerfile" "$REPO_ROOT"
 fi
 
 echo "==> 拉取第三方镜像"
 "$DOCKER" pull "$POSTGRES_IMAGE"
-"$DOCKER" pull "$REDIS_IMAGE"
 
 mkdir -p "$OUT_DIR/images"
 
 echo "==> 导出镜像"
-# 一次 save 多个镜像可以共享公共层，比逐个 save 小得多——三个自有镜像共用同一个
-# base stage，分开导出会把那层复制三份。
+# 一次 save 两个业务镜像，方便目标机器一次加载。
 "$DOCKER" save -o "$OUT_DIR/images/ontofoundry.tar" \
-  "$BACKEND_IMAGE" "$RUNNER_IMAGE" "$FRONTEND_IMAGE"
+  "$BACKEND_IMAGE" "$FRONTEND_IMAGE"
 "$DOCKER" save -o "$OUT_DIR/images/infra.tar" \
-  "$POSTGRES_IMAGE" "$REDIS_IMAGE"
+  "$POSTGRES_IMAGE"
 
 echo "==> 复制部署文件"
-cp "$REPO_ROOT/compose.yaml" "$OUT_DIR/"
-# skills 目录是 bind mount 进容器的，不在镜像里，所以必须随包带走。
-mkdir -p "$OUT_DIR/dataagent"
-cp -R "$REPO_ROOT/dataagent/.claude" "$OUT_DIR/dataagent/"
+cp "$REPO_ROOT/scripts/offline-compose.yaml" "$OUT_DIR/compose.yaml"
 
 cat > "$OUT_DIR/.env.example" <<'ENV'
-# 离线包内的镜像标签。load 之后名字就是这三个，不要改成带 registry 前缀的形式，
+# 离线包内的镜像标签。load 之后名字就是这两个，不要改成带 registry 前缀的形式，
 # 否则 compose 会试图去拉取而不是用本地已加载的。
 OF_BACKEND_IMAGE=of-backend:local
-OF_RUNNER_IMAGE=of-runner:local
 OF_FRONTEND_IMAGE=of-frontend:local
 
-# 模型接入。离线环境通常指向内网网关。
-DATAAGENT_LLM_PROVIDER=anthropic_compatible
-ONTOFOUNDRY_ANTHROPIC_BASE_URL=
-ONTOFOUNDRY_ANTHROPIC_API_KEY=
-ONTOFOUNDRY_ANTHROPIC_MODEL=
+# 创建数据连接时必填。生成 Fernet key：
+# python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
+ONTOFOUNDRY_CONNECTION_KEY=
 ENV
 
 cat > "$OUT_DIR/install.sh" <<'INSTALL'
@@ -108,10 +97,9 @@ cat > "$OUT_DIR/README.md" <<'DOC'
 
 | 文件 | 内容 |
 | --- | --- |
-| `images/ontofoundry.tar` | of-backend、of-runner、of-frontend |
-| `images/infra.tar` | postgres:17-alpine、redis:7.2-alpine |
+| `images/ontofoundry.tar` | of-backend、of-frontend |
+| `images/infra.tar` | postgres:17-alpine |
 | `compose.yaml` | 部署编排 |
-| `dataagent/.claude/skills` | Skill 目录，bind mount 进容器，不在镜像里 |
 
 nginx、node、python 已经烘在自有镜像的层里，不需要单独提供。
 
@@ -122,11 +110,6 @@ cp .env.example .env    # 填写模型接入信息
 ./install.sh
 ```
 
-## 需要宿主机提供
-
-`of-runner` 会挂载宿主的 `/var/run/docker.sock` 来启动 agent 子容器。能访问该
-socket 等同于宿主 root 权限，这是本拓扑里权限最大的一处；只有 runner 挂它。
-如果目标环境不允许，就不能用容器沙箱模式。
 DOC
 
 echo

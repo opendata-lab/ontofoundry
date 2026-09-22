@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ontofoundry
+      POSTGRES_USER: ontofoundry
+      POSTGRES_PASSWORD: ontofoundry
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ontofoundry -d ontofoundry"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - ontofoundry-postgres:/var/lib/postgresql/data
+
+  of-backend:
+    image: ${OF_BACKEND_IMAGE:-of-backend:local}
+    environment:
+      ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
+      ONTOFOUNDRY_CONNECTION_KEY: ${ONTOFOUNDRY_CONNECTION_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8900:8900"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/api/v1/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  of-frontend:
+    image: ${OF_FRONTEND_IMAGE:-of-frontend:local}
+    depends_on:
+      of-backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:80"
+
+volumes:
+  ontofoundry-postgres:

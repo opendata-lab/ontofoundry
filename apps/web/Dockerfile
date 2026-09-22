@@ -6,11 +6,9 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /build
 
-# 先只拷清单，让依赖层能被缓存复用。runtime-pi 的 package.json 也要带上：
-# 它是同一个 workspace 的成员，缺了它 npm ci 会拒绝按 lockfile 安装。
+# 先只拷清单和本地依赖包，让依赖层能被缓存复用。
 COPY package.json package-lock.json ./
-COPY apps/web/package.json ./apps/web/
-COPY dataagent/dataagent-runtime-pi/package.json ./dataagent/dataagent-runtime-pi/
+COPY apps/web/package.json apps/web/vendor-agent-conversation-*.tgz ./apps/web/
 RUN npm ci --ignore-scripts
 
 COPY apps/web ./apps/web

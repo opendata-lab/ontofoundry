@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { workspaceRequest, modelingApi } from "../api/client";
-import type { Capabilities } from "../api/types";
+import type { Capabilities, DataAgentHealth } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { usePageTab } from "../hooks/usePageTab";
 
@@ -16,6 +16,8 @@ export function SettingsPage() {
     }[]
   >([]);
   const [cap, setCap] = useState<Capabilities | null>(null);
+  const [dataagentHealth, setDataagentHealth] =
+    useState<DataAgentHealth | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [infoDirty, setInfoDirty] = useState(false);
@@ -35,6 +37,12 @@ export function SettingsPage() {
     modelingApi
       .capabilities(workspace.id)
       .then(setCap)
+      .catch((e: Error) => setError(e.message));
+    workspaceRequest<DataAgentHealth>(
+      workspace.id,
+      "/settings/dataagent-health",
+    )
+      .then(setDataagentHealth)
       .catch((e: Error) => setError(e.message));
   }, [workspace.id, load]);
   return (
@@ -188,6 +196,48 @@ export function SettingsPage() {
             </div>
           </dl>
           <p className="muted">模型接口由服务器环境配置。</p>
+        </section>
+        <section className="detail-section">
+          <h2>DataAgent 连通性</h2>
+          <p className="muted">
+            只读检查。地址、站点与凭据均由部署环境和 DataAgent 管理端配置。
+          </p>
+          {dataagentHealth ? (
+            <table className="ref-table dataagent-health-table">
+              <thead>
+                <tr>
+                  <th>检查项</th>
+                  <th>状态</th>
+                  <th>结果与修复指引</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataagentHealth.checks.map((check) => (
+                  <tr key={check.name}>
+                    <td>{check.name}</td>
+                    <td>
+                      <span
+                        className={
+                          "status-chip " +
+                          (check.ok
+                            ? "status-chip--published"
+                            : "dataagent-health-status--failed")
+                        }
+                      >
+                        {check.ok ? "通过" : "需处理"}
+                      </span>
+                    </td>
+                    <td>
+                      <div>{check.message}</div>
+                      {check.hint && <div className="muted">{check.hint}</div>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="muted">正在检查…</p>
+          )}
         </section>
       </div>
     </div>
