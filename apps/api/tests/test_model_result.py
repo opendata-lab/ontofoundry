@@ -640,3 +640,109 @@ def test_result_warnings_say_what_the_import_could_not_carry_over(client, monkey
     warnings = _row(client, session["id"]).result_warnings
     assert "文件带有 OntoFoundry 扩展信息" in warnings
     assert any("order_item 没有数据映射" in item for item in warnings)
+
+
+def _install_deliver(monkeypatch, task_id: str = "task-repair-1") -> list[str]:
+    """Capture the follow-up turns the platform sends back to the agent."""
+    sent: list[str] = []
+
+    async def deliver(self, *, topic_id, content, agent_id, execution_mode):
+        assert topic_id == "topic-1"
+        sent.append(content)
+        return {"task_id": task_id, "task_status": "waiting"}
+
+    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
+    return sent
+
+
+def test_an_unusable_result_is_handed_back_to_the_agent_to_fix(client, monkeypatch):
+    """Validate, report the errors, let the author correct them.
+
+    The agent is the only thing that can produce a different model, so failing
+    the run outright throws away the work and tells the user nothing they can
+    act on. Handing back the specific complaints is what a reviewer would do.
+    """
+    session = _create_model_session(client)
+    before = _row(client, session["id"])
+    broken = _payload()
+    broken["ontology"]["ontology"] = [{"concept": "customer", "type": "NotAType"}]
+    _install_download(monkeypatch, [broken])
+    sent = _install_deliver(monkeypatch)
+
+    assert _reconcile(client, session["id"]) == ""
+
+    after = _row(client, session["id"])
+    assert after.task_status == "running"
+    assert after.dataagent_task_id == "task-repair-1"
+    # A new nonce, so the corrected result cannot be confused with this one.
+    assert after.dataagent_run_token != before.dataagent_run_token
+    assert after.draft_json == before.draft_json
+
+    assert len(sent) == 1
+    assert "结果校验未通过" in sent[0]
+    assert after.dataagent_run_token in sent[0]
+
+
+def test_the_repair_request_names_what_to_fix(client, monkeypatch):
+    """A usable draft that ignores the naming and display-name instructions.
+
+    Observed for real: an agent returned `Customer`, `Order` and `Product`
+    alongside `order_item`, with no Chinese display names at all.
+    """
+    session = _create_model_session(client)
+    payload = _payload()
+    payload["ontology"]["ontology"][0]["concept"] = "Customer"
+    payload["ontology"]["ai_context"]["ontofoundry"]["display_names"] = {}
+    _install_download(monkeypatch, [payload])
+    sent = _install_deliver(monkeypatch)
+
+    assert _reconcile(client, session["id"]) == ""
+
+    assert len(sent) == 1
+    assert "Customer" in sent[0]
+    assert "snake_case" in sent[0]
+    assert "display_names" in sent[0]
+    assert "完整" in sent[0]
+
+
+def test_a_convention_complaint_never_costs_a_working_model(client, monkeypatch):
+    """If the agent cannot be reached, the usable draft is still written.
+
+    Naming is worth one request for a correction. It is not worth discarding a
+    model that imports cleanly.
+    """
+    session = _create_model_session(client)
+    payload = _payload()
+    payload["ontology"]["ai_context"]["ontofoundry"]["display_names"] = {}
+    _install_download(monkeypatch, [payload])
+
+    async def refuse(self, **kwargs):
+        raise DataAgentError("DataAgent 拒绝了本次投递", status_code=503)
+
+    monkeypatch.setattr(DataAgentClient, "deliver", refuse)
+
+    assert _reconcile(client, session["id"]) == "done"
+
+    after = _row(client, session["id"])
+    assert len(after.draft_json["object_types"]) == 2
+    assert any("display_names" in item for item in after.result_warnings)
+
+
+def test_an_unusable_result_still_fails_when_the_agent_cannot_be_reached(
+    client, monkeypatch
+):
+    session = _create_model_session(client)
+    before = _row(client, session["id"])
+    broken = _payload()
+    broken["ontology"]["ontology"] = [{"concept": "customer", "type": "NotAType"}]
+    _install_download(monkeypatch, [broken])
+
+    async def refuse(self, **kwargs):
+        raise DataAgentError("DataAgent 拒绝了本次投递", status_code=503)
+
+    monkeypatch.setattr(DataAgentClient, "deliver", refuse)
+
+    assert _reconcile(client, session["id"]) == "failed_permanent"
+    after = _row(client, session["id"])
+    assert after.task_status == "failed"
+    assert after.draft_json == before.draft_json
