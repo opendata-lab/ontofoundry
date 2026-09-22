@@ -135,6 +135,10 @@ export function BuilderPage() {
     const onError = (event: Event) => {
       const { message, hint } = (event as CustomEvent<ErrorDetail>).detail;
       setError(hint ? `${message}（${hint}）` : message);
+      // POST /messages claims the run and advances the revision before any
+      // remote call. Even a reported transport/configuration failure can
+      // therefore leave this page's session snapshot one revision behind.
+      model.reload();
     };
 
     el.addEventListener("dataagent-run-change", onRun);

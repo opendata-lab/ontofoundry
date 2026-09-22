@@ -7,7 +7,8 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import event, update
+from sqlalchemy.sql.dml import Update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.domain.models import OntologyDraft
@@ -459,6 +460,113 @@ def test_worker_that_lost_its_claim_cannot_write_candidates(client, monkeypatch)
     assert row.result_state == "processing"
     assert row.candidates_json == []
     assert row.draft_json == _empty_draft()
+
+
+def test_result_claim_cannot_attach_task_a_lease_after_task_b_starts(
+    client, monkeypatch
+):
+    session = _create_model_session(client)
+    engine = client.app.state.session_factory.kw["bind"]
+    switched = False
+
+    def switch_task_before_claim(
+        conn, clauseelement, multiparams, params, execution_options
+    ):
+        nonlocal switched
+        if (
+            switched
+            or not isinstance(clauseelement, Update)
+            or clauseelement.table.name != ModelingSessionRecord.__tablename__
+        ):
+            return
+        switched = True
+        with client.app.state.session_factory() as db:
+            db.execute(
+                update(ModelingSessionRecord)
+                .where(ModelingSessionRecord.id == session["id"])
+                .values(
+                    dataagent_task_id="task-model-2",
+                    dataagent_run_token="run-token-2",
+                    task_status="running",
+                )
+            )
+            db.commit()
+
+    async def forbidden_download(*args, **kwargs):
+        raise AssertionError("task A must lose the claim before downloading")
+
+    event.listen(engine, "before_execute", switch_task_before_claim)
+    monkeypatch.setattr(DataAgentClient, "download", forbidden_download)
+    try:
+        assert _reconcile(client, session["id"]) == ""
+    finally:
+        event.remove(engine, "before_execute", switch_task_before_claim)
+
+    row = _row(client, session["id"])
+    assert row.dataagent_task_id == "task-model-2"
+    assert row.task_status == "running"
+    assert row.last_result_task_id is None
+    assert row.result_state == ""
+
+
+def test_task_a_download_404_cannot_mark_task_b_failed(client, monkeypatch):
+    session = _create_model_session(client)
+
+    async def task_b_starts_then_a_is_missing(self, topic_id: str, rel_path: str):
+        with client.app.state.session_factory() as db:
+            db.execute(
+                update(ModelingSessionRecord)
+                .where(ModelingSessionRecord.id == session["id"])
+                .values(
+                    dataagent_task_id="task-model-2",
+                    dataagent_run_token="run-token-2",
+                    task_status="running",
+                    revision=ModelingSessionRecord.revision + 1,
+                )
+            )
+            db.commit()
+        raise DataAgentError("missing", status_code=404)
+
+    monkeypatch.setattr(DataAgentClient, "download", task_b_starts_then_a_is_missing)
+    assert _reconcile(client, session["id"]) == "processing"
+    row = _row(client, session["id"])
+    assert row.dataagent_task_id == "task-model-2"
+    assert row.dataagent_run_token == "run-token-2"
+    assert row.task_status == "running"
+    assert row.result_state == "processing"
+
+
+def test_task_a_success_cannot_write_candidates_after_task_b_starts(
+    client, monkeypatch
+):
+    session = _create_model_session(client)
+
+    async def task_b_starts_before_a_download_returns(
+        self, topic_id: str, rel_path: str
+    ):
+        with client.app.state.session_factory() as db:
+            db.execute(
+                update(ModelingSessionRecord)
+                .where(ModelingSessionRecord.id == session["id"])
+                .values(
+                    dataagent_task_id="task-model-2",
+                    dataagent_run_token="run-token-2",
+                    task_status="running",
+                )
+            )
+            db.commit()
+        return json.dumps(_payload()).encode(), "application/json"
+
+    monkeypatch.setattr(
+        DataAgentClient, "download", task_b_starts_before_a_download_returns
+    )
+    assert _reconcile(client, session["id"]) == "processing"
+    row = _row(client, session["id"])
+    assert row.dataagent_task_id == "task-model-2"
+    assert row.dataagent_run_token == "run-token-2"
+    assert row.task_status == "running"
+    assert row.result_state == "processing"
+    assert row.candidates_json == []
 
 
 def test_events_retry_retriable_result_before_done_and_return_model_metadata(

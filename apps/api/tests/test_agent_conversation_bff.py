@@ -383,6 +383,174 @@ def test_remote_failure_releases_claim_and_deletes_new_topic(client, monkeypatch
     assert deleted == ["topic-new"]
 
 
+@pytest.mark.parametrize("failure_kind", ["timeout", "disconnect", "server-5xx"])
+def test_unknown_deliver_outcome_stays_submitting_then_reconciles_without_redelivery(
+    client, monkeypatch, failure_kind
+):
+    """A task created before a broken response must block a duplicate submit."""
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="finished",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-previous",
+    )
+    delivered_content = ""
+    deliver_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal deliver_count, delivered_content
+        path = request.url.path
+        if path.endswith("/files"):
+            return httpx.Response(200, json={"rel_path": "uploads/context.json"})
+        if path.endswith("/deliver-message"):
+            deliver_count += 1
+            delivered_content = _json_request(request)["content"]
+            if failure_kind == "timeout":
+                raise httpx.ReadTimeout("response timed out", request=request)
+            if failure_kind == "server-5xx":
+                return httpx.Response(503, json={"detail": "unavailable"})
+            raise httpx.ReadError("response disconnected", request=request)
+        if path.endswith("/messages"):
+            return _messages_response(
+                [
+                    {
+                        "message_id": "message-lost-response",
+                        "topic_id": "topic-1",
+                        "task_id": "task-lost-response",
+                        "sender_type": "user",
+                        "type": "text",
+                        "content": delivered_content,
+                        "seq_id": 1,
+                    }
+                ]
+            )
+        if path.endswith("/tasks/task-lost-response"):
+            return httpx.Response(
+                200,
+                json={
+                    "task_id": "task-lost-response",
+                    "task_status": "waiting",
+                },
+            )
+        raise AssertionError(path)
+
+    _install_transport(monkeypatch, handler)
+    base = _endpoint(session["id"])
+    lost = client.post(base + "/messages", json={"content": "one", "metadata": {}})
+    assert lost.status_code == 503
+    claimed = _session_row(client, session["id"])
+    assert claimed.task_status == "submitting"
+    assert claimed.dataagent_task_id is None
+
+    duplicate = client.post(
+        base + "/messages", json={"content": "duplicate", "metadata": {}}
+    )
+    assert duplicate.status_code == 409
+    assert deliver_count == 1
+
+    _set_session(
+        client,
+        session["id"],
+        updated_at=utc_now() - timedelta(seconds=121),
+    )
+    reconciled = client.get(base)
+    assert reconciled.status_code == 200, reconciled.text
+    assert reconciled.json()["run"]["task_id"] == "task-lost-response"
+    row = _session_row(client, session["id"])
+    assert row.dataagent_task_id == "task-lost-response"
+    assert row.task_status == "queued"
+    assert deliver_count == 1
+
+
+def test_new_topic_is_persisted_before_unknown_deliver_and_can_be_reconciled(
+    client, monkeypatch
+):
+    """The first turn can reconcile a lost deliver response via its saved topic."""
+    _configure(client)
+    session = _create_session(client)
+    delivered_content = ""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal delivered_content
+        path = request.url.path
+        if path.endswith("/topics"):
+            return httpx.Response(200, json={"topic_id": "topic-new"})
+        if path.endswith("/files"):
+            return httpx.Response(200, json={"rel_path": "uploads/context.json"})
+        if path.endswith("/deliver-message"):
+            delivered_content = _json_request(request)["content"]
+            raise httpx.ReadTimeout("response timed out", request=request)
+        if path.endswith("/messages"):
+            return _messages_response(
+                [
+                    {
+                        "message_id": "message-first-turn",
+                        "topic_id": "topic-new",
+                        "task_id": "task-first-turn",
+                        "sender_type": "user",
+                        "type": "text",
+                        "content": delivered_content,
+                        "seq_id": 1,
+                    }
+                ]
+            )
+        if path.endswith("/tasks/task-first-turn"):
+            return httpx.Response(
+                200,
+                json={"task_id": "task-first-turn", "task_status": "waiting"},
+            )
+        raise AssertionError(path)
+
+    _install_transport(monkeypatch, handler)
+    base = _endpoint(session["id"])
+    lost = client.post(base + "/messages", json={"content": "one", "metadata": {}})
+    assert lost.status_code == 503
+    claimed = _session_row(client, session["id"])
+    assert claimed.task_status == "submitting"
+    assert claimed.dataagent_topic_id == "topic-new"
+
+    _set_session(
+        client,
+        session["id"],
+        updated_at=utc_now() - timedelta(seconds=121),
+    )
+    reconciled = client.get(base)
+    assert reconciled.status_code == 200, reconciled.text
+    assert reconciled.json()["run"]["task_id"] == "task-first-turn"
+    row = _session_row(client, session["id"])
+    assert row.dataagent_topic_id == "topic-new"
+    assert row.dataagent_task_id == "task-first-turn"
+
+
+@pytest.mark.parametrize("failure_kind", ["connection-refused", "bad-request"])
+def test_definite_deliver_failure_releases_claim(client, monkeypatch, failure_kind):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(client, session["id"], dataagent_topic_id="topic-1")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/files"):
+            return httpx.Response(200, json={"rel_path": "uploads/context.json"})
+        if request.url.path.endswith("/deliver-message"):
+            if failure_kind == "bad-request":
+                return httpx.Response(422, json={"detail": "invalid prompt"})
+            raise httpx.ConnectError("connection refused", request=request)
+        raise AssertionError(request.url.path)
+
+    _install_transport(monkeypatch, handler)
+    response = client.post(
+        _endpoint(session["id"]) + "/messages",
+        json={"content": "hello", "metadata": {}},
+    )
+    assert response.status_code == (422 if failure_kind == "bad-request" else 503)
+    row = _session_row(client, session["id"])
+    assert row.task_status == "failed"
+    assert row.dataagent_task_id is None
+
+
 @pytest.mark.parametrize(
     "status",
     ["submitting", "queued", "running", "waiting_input", "waiting_permission"],
@@ -442,10 +610,14 @@ def test_events_transform_frames_ping_resubscribe_and_done_after_reconcile(
     async def reconcile(*args):
         order.append("reconcile")
 
+    async def no_sleep(_delay):
+        return None
+
     _install_transport(monkeypatch, handler)
     monkeypatch.setattr(
         "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
     )
+    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.asyncio.sleep", no_sleep)
     response = client.get(_endpoint(session["id"]) + "/events")
     assert response.status_code == 200, response.text
     body = response.text
@@ -456,6 +628,45 @@ def test_events_transform_frames_ping_resubscribe_and_done_after_reconcile(
     assert body.index("event: agent-event") < body.index("event: done")
     assert order == ["reconcile"]
     assert stream_count == 2
+
+
+def test_events_back_off_when_active_stream_repeatedly_ends_empty(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="running",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-1",
+        dataagent_task_mode="chat",
+    )
+    task_count = 0
+    delays: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal task_count
+        if request.url.path.endswith("/sdk-events/stream"):
+            return httpx.Response(200, content=b"")
+        if request.url.path.endswith("/tasks/task-1"):
+            task_count += 1
+            status = "running" if task_count <= 3 else "finished"
+            return httpx.Response(
+                200, json={"task_id": "task-1", "task_status": status}
+            )
+        raise AssertionError(request.url.path)
+
+    async def record_sleep(delay):
+        delays.append(delay)
+
+    _install_transport(monkeypatch, handler)
+    monkeypatch.setattr(
+        "ontofoundry_api.api.agent_conversation.asyncio.sleep", record_sleep
+    )
+    response = client.get(_endpoint(session["id"]) + "/events")
+    assert response.status_code == 200, response.text
+    assert "event: done" in response.text
+    assert delays == [0.25, 0.5, 1.0]
 
 
 @pytest.mark.parametrize(
@@ -496,6 +707,94 @@ def test_get_rebuilds_run_metadata_from_persisted_mode(client, monkeypatch):
     response = client.get(_endpoint(session["id"]))
     assert response.status_code == 200, response.text
     assert response.json()["run"]["metadata"] == {"mode": "model"}
+
+
+def test_slow_old_snapshot_cannot_project_over_a_new_task(client, monkeypatch):
+    """Browser A's late task-A response must not replace browser B's task B."""
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="running",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-old",
+        dataagent_run_token="old-token",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/messages"):
+            return _messages_response([])
+        if request.url.path.endswith("/tasks/task-old"):
+            _set_session(
+                client,
+                session["id"],
+                task_status="running",
+                dataagent_task_id="task-new",
+                dataagent_run_token="new-token",
+            )
+            return httpx.Response(
+                200, json={"task_id": "task-old", "task_status": "finished"}
+            )
+        raise AssertionError(request.url.path)
+
+    _install_transport(monkeypatch, handler)
+    response = client.get(_endpoint(session["id"]))
+    assert response.status_code == 200, response.text
+    assert response.json()["run"]["task_id"] == "task-new"
+    assert response.json()["run"]["status"] == "running"
+    row = _session_row(client, session["id"])
+    assert row.dataagent_task_id == "task-new"
+    assert row.dataagent_run_token == "new-token"
+    assert row.task_status == "running"
+
+
+def test_snapshot_result_reconcile_returns_the_new_task_owner(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="finished",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-old",
+        dataagent_task_mode="model",
+        dataagent_run_token="old-token",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/messages"):
+            return _messages_response([])
+        if request.url.path.endswith("/tasks/task-old"):
+            return httpx.Response(
+                200, json={"task_id": "task-old", "task_status": "finished"}
+            )
+        raise AssertionError(request.url.path)
+
+    async def reconcile(*args):
+        _set_session(
+            client,
+            session["id"],
+            task_status="running",
+            task_detail="new task running",
+            dataagent_task_id="task-new",
+            dataagent_task_mode="chat",
+            dataagent_run_token="new-token",
+        )
+        return ""
+
+    _install_transport(monkeypatch, handler)
+    monkeypatch.setattr(
+        "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
+    )
+    response = client.get(_endpoint(session["id"]))
+    assert response.status_code == 200, response.text
+    assert response.json()["run"] == {
+        "task_id": "task-new",
+        "status": "running",
+        "detail": "new task running",
+        "metadata": {"mode": "chat"},
+    }
 
 
 def test_request_schema_has_no_revision_and_sanitizes_metadata(client, monkeypatch):
@@ -632,6 +931,171 @@ def test_stale_submitting_without_matching_task_becomes_failed(client, monkeypat
     row = _session_row(client, session["id"])
     assert row.task_status == "failed"
     assert "重试" in row.task_detail
+
+
+def test_stale_reconciler_cannot_fail_a_newer_run(client, monkeypatch):
+    """A stale browser's empty history cannot release a newer run's claim."""
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="submitting",
+        dataagent_topic_id="topic-1",
+        dataagent_run_token="old-token",
+        updated_at=utc_now() - timedelta(seconds=121),
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/messages")
+        _set_session(
+            client,
+            session["id"],
+            task_status="running",
+            dataagent_task_id="task-new",
+            dataagent_run_token="new-token",
+        )
+        return _messages_response([])
+
+    _install_transport(monkeypatch, handler)
+    response = client.get(_endpoint(session["id"]))
+    assert response.status_code == 200, response.text
+    assert response.json()["run"]["task_id"] == "task-new"
+    assert response.json()["run"]["status"] == "running"
+    row = _session_row(client, session["id"])
+    assert row.dataagent_task_id == "task-new"
+    assert row.dataagent_run_token == "new-token"
+    assert row.task_status == "running"
+
+
+def test_stale_first_submit_without_topic_is_released_and_can_retry(
+    client, monkeypatch
+):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="submitting",
+        dataagent_topic_id=None,
+        dataagent_task_id=None,
+        dataagent_run_token="crashed-first-run",
+        updated_at=utc_now() - timedelta(seconds=121),
+    )
+
+    stale = client.get(_endpoint(session["id"]))
+    assert stale.status_code == 200, stale.text
+    assert stale.json()["run"]["status"] == "failed"
+    assert _session_row(client, session["id"]).task_status == "failed"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/topics"):
+            return httpx.Response(200, json={"topic_id": "topic-retry"})
+        if request.url.path.endswith("/files"):
+            return httpx.Response(200, json={"rel_path": "uploads/context.json"})
+        if request.url.path.endswith("/deliver-message"):
+            return httpx.Response(
+                200, json={"task_id": "task-retry", "task_status": "waiting"}
+            )
+        raise AssertionError(request.url.path)
+
+    _install_transport(monkeypatch, handler)
+    retried = client.post(
+        _endpoint(session["id"]) + "/messages",
+        json={"content": "retry", "metadata": {}},
+    )
+    assert retried.status_code == 202, retried.text
+    assert retried.json()["task_id"] == "task-retry"
+
+
+def test_old_event_stream_closes_without_completing_a_new_task(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="running",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-old",
+        dataagent_run_token="old-token",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/sdk-events/stream"):
+            return httpx.Response(200, content=b"")
+        if request.url.path.endswith("/tasks/task-old"):
+            _set_session(
+                client,
+                session["id"],
+                task_status="running",
+                dataagent_task_id="task-new",
+                dataagent_run_token="new-token",
+            )
+            return httpx.Response(
+                200, json={"task_id": "task-old", "task_status": "finished"}
+            )
+        raise AssertionError(request.url.path)
+
+    _install_transport(monkeypatch, handler)
+    response = client.get(_endpoint(session["id"]) + "/events")
+    assert response.status_code == 200, response.text
+    assert ": ping\n\n" in response.text
+    assert "event: done" not in response.text
+    row = _session_row(client, session["id"])
+    assert row.dataagent_task_id == "task-new"
+    assert row.task_status == "running"
+
+
+def test_events_waits_when_exhaustion_loses_to_a_new_result_lease(
+    client, monkeypatch
+):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(
+        client,
+        session["id"],
+        task_status="finished",
+        dataagent_topic_id="topic-1",
+        dataagent_task_id="task-1",
+        dataagent_task_mode="model",
+    )
+    stream_count = 0
+    reconcile_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal stream_count
+        if request.url.path.endswith("/sdk-events/stream"):
+            stream_count += 1
+            return httpx.Response(200, content=b"")
+        if request.url.path.endswith("/tasks/task-1"):
+            return httpx.Response(
+                200, json={"task_id": "task-1", "task_status": "finished"}
+            )
+        raise AssertionError(request.url.path)
+
+    async def reconcile(*args):
+        nonlocal reconcile_count
+        reconcile_count += 1
+        return "failed_retriable" if reconcile_count <= 4 else "done"
+
+    async def no_sleep(_delay):
+        return None
+
+    _install_transport(monkeypatch, handler)
+    monkeypatch.setattr(
+        "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
+    )
+    monkeypatch.setattr(
+        "ontofoundry_api.api.agent_conversation.exhaust_retriable_result",
+        lambda *args: "processing",
+    )
+    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.asyncio.sleep", no_sleep)
+
+    response = client.get(_endpoint(session["id"]) + "/events")
+    assert response.status_code == 200, response.text
+    assert "event: done" in response.text
+    assert reconcile_count == 5
+    assert stream_count == 2
 
 
 def test_cancel_and_interactions_dispatch_by_kind(client, monkeypatch):
