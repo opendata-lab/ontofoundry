@@ -232,12 +232,132 @@ small,
   font-weight: 650;
   white-space: nowrap;
 }
-.context-bar select {
-  border: 0;
-  font-weight: 500;
+.session-picker {
+  position: relative;
+  min-width: 0;
+}
+.session-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 230px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: var(--color-surface);
-  max-width: 200px;
-  padding-left: 4px;
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+.session-picker-trigger:hover,
+.session-picker-trigger[aria-expanded="true"] {
+  border-color: var(--color-rule);
+  background: var(--color-surface-soft);
+}
+.session-picker-trigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-picker-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(560px, calc(100vw - 280px));
+  padding: 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 14px 38px rgb(15 23 42 / 14%);
+}
+.session-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-left: 10px;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  color: var(--color-muted);
+}
+.session-picker-search:focus-within {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+.session-picker-search input {
+  width: 100%;
+  border: 0 !important;
+  outline: 0 !important;
+  padding-left: 0 !important;
+}
+.session-picker-table-wrap {
+  max-height: 330px;
+  overflow: auto;
+  border: 1px solid var(--color-rule-soft);
+  border-radius: 6px;
+}
+.session-picker-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.session-picker-table th,
+.session-picker-table td {
+  padding: 9px 10px;
+  font-size: 12px;
+}
+.session-picker-table th:first-child,
+.session-picker-table td:first-child {
+  width: 52%;
+}
+.session-picker-table td:first-child {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink);
+  font-weight: 500;
+}
+.session-picker-table tbody tr {
+  cursor: pointer;
+}
+.session-picker-table tbody tr:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.session-status--submitting,
+.session-status--queued,
+.session-status--running {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.session-status--waiting_input,
+.session-status--waiting_permission {
+  background: #fff7ed;
+  color: #c2410c;
+}
+.session-status--failed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.session-picker-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--color-muted);
+  font-size: 12px;
 }
 .context-bar .saved-at {
   font-size: 10px;
@@ -448,8 +568,17 @@ small,
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--color-rule);
   background: var(--color-surface);
+}
+.ref-chat > dataagent-conversation {
+  display: block;
+  flex: 1 1 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 .chat-scroll {
   padding: 24px;

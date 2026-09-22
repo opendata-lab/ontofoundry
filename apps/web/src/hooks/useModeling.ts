@@ -10,7 +10,7 @@ const ACTIVE_TASK_STATUSES = [
   "waiting_input",
   "waiting_permission",
 ];
-import type { ModelingSession } from "../api/types";
+import type { ModelingSession, ModelingSessionSummary } from "../api/types";
 import { usePageActive } from "./usePageTab";
 
 export function useModeling(
@@ -22,10 +22,9 @@ export function useModeling(
   const wasActive = useRef(pageActive);
   const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
+  console.log("[DEBUG useModeling]", { sessionId, pageActive, params: params.toString(), location: window.location.href, stack: new Error().stack?.split("\n").slice(1, 4).join(" | ") });
   const [session, setSession] = useState<ModelingSession | null>(null);
-  const [sessions, setSessions] = useState<
-    Pick<ModelingSession, "id" | "title" | "task_status">[]
-  >([]);
+  const [sessions, setSessions] = useState<ModelingSessionSummary[]>([]);
   const [error, setError] = useState("");
   const pending = useRef<Promise<ModelingSession> | null>(null);
   const [refresh, setRefresh] = useState(0);
@@ -68,7 +67,8 @@ export function useModeling(
     modelingApi
       .sessions(workspaceId)
       .then((r) => {
-        if (active) setSessions(r.items);
+        if (!active) return;
+        setSessions(r.items);
       })
       .catch((e: Error) => {
         if (active) setError(e.message);
@@ -77,6 +77,13 @@ export function useModeling(
       active = false;
     };
   }, [workspaceId, sessionId, enabled, refresh]);
+  useEffect(() => {
+    if (!enabled || sessionId) return;
+    const activeSession = sessions.find((item) =>
+      ACTIVE_TASK_STATUSES.includes(item.task_status),
+    );
+    if (activeSession) select(activeSession.id);
+  }, [enabled, sessionId, sessions, select]);
   useEffect(() => {
     if (
       !pageActive ||

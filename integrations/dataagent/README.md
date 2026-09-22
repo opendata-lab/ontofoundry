@@ -38,28 +38,47 @@ DataAgent 管理端 → Widget 接入设置 → 新建站点：
 > 失败现象：站点没建 → OntoFoundry 报 "DataAgent 拒绝了本站点"；密钥没配或不匹配
 > → "DataAgent 拒绝了服务端接入密钥"。
 
-### 2. 导入 md2ossie Skill
+### 2. 安装 md2ossie Skill
+
+Skill 由 DataAgent 在**启动时从 `SKILLS_ROOT_DIR` 扫描索引**，没有 ZIP 上传接口。
+把源码目录放进去，然后重启 DataAgent：
 
 ```sh
-make -C integrations/dataagent zip
+cp -r integrations/dataagent/skills/md2ossie "$SKILLS_ROOT_DIR"/
+# 重启 DataAgent 让它重新索引
 ```
 
-把产出的 `dist/md2ossie.zip` 上传到管理端的 Skill 导入。管理端**只接受 ZIP**，
-不接受目录；归档根目录是 `md2ossie/`，`Makefile` 已经保证了这个结构。
+确认已识别：
 
-ZIP 不提交进 Git：源码目录是唯一真相，提交二进制会让 diff 不可读并产生第二份真相。
+```sh
+curl -s http://<dataagent>/api/v1/dataagent/agents/capabilities \
+  | python3 -c "import sys,json;print([s['folder'] for s in json.load(sys.stdin)['skills']])"
+```
+
+**顺序不能反。** 先启动后放目录的话，下一步创建 Agent 会报
+`unknown skill folder: md2ossie`——我就是这么踩的。
+
+`make -C integrations/dataagent zip` 仍然可用，但那是给需要分发归档的场景，
+本地安装用不上。
 
 ### 3. 创建 Agent
 
 按 [`agents/agent_ontofoundry.md`](./agents/agent_ontofoundry.md) 创建，`agent_id`
-必须是 `agent_ontofoundry`。
+由服务端生成，**不是调用方指定的**——创建接口会返回形如
+`agent_7895f271d13c40f9bc2fabf7` 的 ID。把返回的那个值填进
+`ONTOFOUNDRY_DATAAGENT_AGENT_ID`，不要照抄本文档里的示例名。
 
-**两件最容易漏的事**，那份文档里都写明了原因：
+**三件最容易漏的事**，前两件那份文档里写明了原因，第三件是实测踩出来的：
 
 - **可见性必须设为"全部可见"。** Widget 身份不是 DataAgent 的登录用户，受限可见的
   Agent 对它等同于不存在。
+- **`max_turns` 至少给到 100。** `md2ossie` 要先读完 Ossie 规范文档、再分析表结构、
+  最后生成完整 Ossie JSON。默认值或几十轮不够用——Agent 会在读规范的阶段耗尽轮次，
+  任务以 `finished` 结束却没写结果文件。现象和下面那条一模一样：**任务显示成功，
+  新版本草稿没有变化，也没有任何报错**。我第一次配 30 轮就是这么失败的。
+
 - **系统提示词必须包含结果文件约定。** 缺了它，Agent 只会用自然语言回答，不写结果
-  文件，右侧候选区永远是空的——而任务看起来是成功的。
+  文件，右侧新版本草稿不会更新——而任务看起来是成功的。
 
 ### 4. 配置 OntoFoundry
 

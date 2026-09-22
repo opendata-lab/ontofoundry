@@ -3,6 +3,10 @@
 **设计文档:** `docs/design/2026-09-21-dataagent-conversation-sdk-integration-design.md`
 **上游计划:** OpenDataWorks 仓库 `docs/plans/2026-09-21-agent-conversation-sdk-plan.md`
 
+> **2026-09-22 修订：** T5/T8/T9 的逐项候选流程已被完整版本草稿流程取代。
+> 自动建模结果使用 `mode="replace"` 原子写入会话草稿，用户在交付页预览差异后发布；
+> 本文中标为“原候选计划（已停用）”的内容仅保留实施历史。
+
 ## 跨仓库前置依赖
 
 | 本计划的任务 | 依赖上游 | 说明 |
@@ -20,11 +24,11 @@
 - **Agent 存在性查询在不同前缀**：`GET /api/v1/dataagent/agents/{agent_id}`，不套用 `ONTOFOUNDRY_DATAAGENT_API_PREFIX`。`GET {prefix}/topics?agent_id=` 只过滤 Topic，**不能**用作存在性检查。
 - BFF 基址 `/api/v1/workspaces/{workspace_id}/sessions/{session_id}/agent-conversation`。
 - 状态转换表（写死，依据 `opendataworks/.../core/task_status.py:17,23`）：`waiting→queued`、`running→running`、`waiting_input→waiting_input`、`waiting_permission→waiting_permission`、`finished→finished`、`error→failed`、`suspended→cancelled`、任务不存在`→failed`。**活动态是 `submitting` + 前四个**，所有互斥条件必须覆盖全部五个。
-- BFF 的 `/events` **不得字节透传**，必须输出 `event: agent-event` / `event: done`；`done` 在候选回写完成之后才发。
+- BFF 的 `/events` **不得字节透传**，必须输出 `event: agent-event` / `event: done`；`done` 在完整版本草稿写入之后才发。
 - **CAS 抢占必须发生在任何远端副作用之前。**
 - 结果文件 `output/ontofoundry-result-{run_token}.json`，`schema_version` 固定 `ontofoundry.model-result/v1`，文件内 `run_token` 必须与请求一致。
-- 候选 `id` 确定性构造 `f"{task_id}:{kind}:{value_id}"`，不得用 `uuid4`；必须带 `before` 字段。
-- **任何情况下 Agent 产出都不得直接写入 `draft_json` 或触发发布。** 只写 `candidates_json`。
+- 成功建模必须用 `import_ossie(..., mode="replace")` 生成完整草稿，并在 generation guard 与 revision 条件保护下原子写入 `draft_json`、清空 `candidates_json`。
+- **Agent 结果可以替换会话草稿，但任何情况下都不得触发发布。** 发布必须由用户在交付页明确执行。
 - 迁移链三个 revision：`20260921_000001`（加列）→ `20260921_000002`（删 `messages_json`）→ `20260921_000003`（删 `da_*`），与设计 §8.1 表格逐字一致。
 - SDK 依赖写精确版本 `"@opendataworks/agent-conversation": "0.1.0"`，不用 `^`；**不 import 任何 CSS**。
 - Python 3.13 + uv；测试 `cd apps/api && uv run --python 3.13 pytest -q`，lint `uv run --python 3.13 ruff check src tests`。前端 `npm test -w apps/web`。
@@ -217,7 +221,7 @@ db.execute(update(ModelingSessionRecord)
   **请求体模型只有 `content` 与 `metadata` 两个字段，不得出现 `revision`。**
 - [ ] `build_turn_prompt` 在 `mode == "model"` 时写入 `run_token` 与结果文件路径（T5 完善提示词正文，此处先把参数打通）。
 - [ ] 实现 `GET /events`：**转换而非透传**。读 `client.stream(task_id, after_id)` 的裸 `data:` 帧 → 逐条输出 `event: agent-event`；上游流结束后**先查任务状态**，仍是活动态则继续订阅（不得发 `done`）；确认终态后调 `reconcile_run()`，**再**输出 `event: done` + 终态 `RunRef`。响应头 `Cache-Control: no-cache`、`X-Accel-Buffering: no`；空闲时输出 `: ping`。
-  本任务的 `reconcile_run()` 是空实现钩子，因此 **T4 只验收 `mode=chat` 路径**：`done` 的时序正确、内容正确。"done 在候选回写之后"这条语义连同建模路径的验收归 T5。
+  本任务的 `reconcile_run()` 是空实现钩子，因此 **T4 只验收 `mode=chat` 路径**：`done` 的时序正确、内容正确。"done 在完整版本草稿写入之后"这条语义连同建模路径的验收归 T5。
 - [ ] 实现 `POST /cancel`、`POST /interactions`（按 `kind` 分派）、`GET /files/{rel_path:path}`（透传字节与 content-type）。
 - [ ] `main.py` 注册新 router。
 - [ ] 跑测试与 lint。
@@ -229,7 +233,20 @@ db.execute(update(ModelingSessionRecord)
 
 ## T5 — 自动建模结果回写
 
-**产出：** 建模任务完成后自动产出候选项，右侧"构建产出"第一次真正接通。
+**产出：** 建模任务完成后直接形成完整的新版本草稿，右侧展示结果，交付页负责差异预览与发布。
+
+### 2026-09-22 当前修订（取代下方原计划）
+
+- `reconcile_run` 下载并校验带 `run_token` 的完整 Ossie 结果。
+- 调用 `import_ossie(ontology, workspace_id=..., mode="replace")`，不传旧草稿作为 merge base。
+- 成功时一次事务写 `draft_json=version_draft`、`candidates_json=[]`、
+  `result_state='done'`、`task_status='finished'`、`revision+1`。
+- 普通聊天、下载/契约/Schema/导入失败、丢失 lease、旧 task 或 revision 竞争失败均不得修改草稿。
+- 构建页删除候选叠加与接受/忽略操作；交付页删除候选计数，保留版本差异、校验和显式发布。
+- 回归门禁：完整结果替换旧草稿；文件外旧项不保留；同 task 幂等；重试成功只写一次；
+  task A 不覆盖 task B；失败保持旧草稿；发布前 `current_version_id` 不变。
+
+### 原候选计划（已停用，仅保留实施历史）
 
 **涉及文件**
 - 新增 `apps/api/src/ontofoundry_api/services/model_result.py`
@@ -318,7 +335,7 @@ UPDATE modeling_sessions
 
 ## T7 — DataAgent 集成包
 
-**为什么排在前端接入之前：** T8 的验收要连真实 DataAgent 跑通"开始建模 → 出现候选"，而可用的 Agent、`md2ossie` ZIP 和安装说明都由本任务产出。放在后面会让 T8 无法验收。它同时也必须早于 T11——那一步会清理 `.claude/skills/`。
+**为什么排在前端接入之前：** T8 的验收要连真实 DataAgent 跑通"开始建模 → 形成完整新版本草稿"，而可用的 Agent、`md2ossie` ZIP 和安装说明都由本任务产出。放在后面会让 T8 无法验收。它同时也必须早于 T11——那一步会清理 `.claude/skills/`。
 
 **前置：** 验收需要上游 T8 的 access key 能力。
 
@@ -376,29 +393,32 @@ const endpoint = sessionId ? conversationUrl(workspace.id, sessionId) : ""
 - [ ] 补测试：连续快速切换两次会话，`endpoint` 不经过空字符串；首次 `ensure()` 后立即重渲染，`endpoint` 保持为新地址。
 - [ ] `composer-actions` slot 放"开始建模"，实现设计 §9.2 的 `startModeling`。
 - [ ] 监听 `dataagent-run-change`：首次进入活动态 → `model.reload()`；并用它驱动宿主的 busy/禁用态。
-- [ ] 监听 `dataagent-complete`：**任意终态都 `model.reload()`**；仅 `metadata.mode === "model"` 时额外聚焦候选区。
+- [ ] 监听 `dataagent-complete`：**任意终态都 `model.reload()`**；仅 `metadata.mode === "model"` 时额外聚焦建模结果区。
 - [ ] 删除 `modelingApi.chat` / `cancel` / `sync` 与 `ModelingSession.messages` 类型；增加 `result_warnings: string[]`。
 - [ ] 跑 `npm test -w apps/web`，`ModelResults` 与材料区既有测试必须全绿。
 - [ ] 提交。
 
-**验收：** 前端测试全绿；连真实 DataAgent 手工走通"上传材料 → 普通问答 → 开始建模 → 右侧出现候选"，且发送后保存草稿不报 409（验证 revision 已同步）。
+**验收：** 前端测试全绿；连真实 DataAgent 手工走通“上传材料 → 普通问答 →
+开始建模 → 右侧出现完整新版本草稿 → 交付页预览差异”，且发送后保存/发布不报 409
+（验证 revision 已同步）。
 
 ---
 
-## T9 — mapping 候选与结果提示
+## T9 — 完整草稿展示与结果提示
 
 **涉及文件**
-- 修改 `apps/web/src/api/types.ts`、`components/ModelResults.tsx`、`components/ModelResults.test.tsx`
+- 修改 `components/ModelResults.tsx`、`components/ModelResults.test.tsx`、`pages/DeliveryPage.tsx`
 
 **步骤**
-- [ ] `Candidate` 联合类型增加 `| { kind: "mapping"; value: DataMapping }`（**类型名是 `DataMapping`，已存在于 `types.ts:171`；不存在 `MappingDefinition`**），公共部分增加 `before?: unknown`、`source_task_id?: string`。
-- [ ] 先写失败测试：给 `ModelResults` 一个 mapping 候选，断言渲染出 `connection_alias`、表名、`key_column`，点击接受时 `onCandidate([id], "accept")` 被调用；再断言 `result_warnings` 非空时候选区上方出现提示。
-- [ ] `ModelResults` kind 切换栏增加"映射"页签。**`DataMapping` 没有 `name` 字段**，卡片展示 `connection_alias`、`schema_name`/`table_name`、`key_column`，以及 `type_id` 对应的对象类型名；reason 与 evidence 复用现有渲染。
-- [ ] 候选区上方渲染 `result_warnings` 每条一行。
+- [ ] `ModelResults` 直接展示 `session.draft`，不得把 `candidates` 叠加到草稿上。
+- [ ] 删除接受/忽略按钮和对应回调；结果区注明这是完整的新版本草稿，需到交付页发布。
+- [ ] 保留对象类型、关系类型和 mapping 页签。**`DataMapping` 没有 `name` 字段**，卡片展示 `connection_alias`、`schema_name`/`table_name`、`key_column`，以及 `type_id` 对应的对象类型名。
+- [ ] 结果区上方渲染 `result_warnings`，每条一行。
+- [ ] 交付页删除"待确认候选"计数，保留草稿统计、校验、版本差异与发布入口。
 - [ ] 跑测试。
 - [ ] 提交。
 
-**验收：** 新测试通过；现有 `ModelResults.test.tsx` 全绿；object_type / link_type 页签展示无变化。
+**验收：** 新测试通过；`ModelResults.test.tsx` 全绿；完整草稿的 object_type、link_type、mapping 均可查看；页面不存在候选接受/忽略入口，交付页仍可预览差异并发布。
 
 ---
 
@@ -472,6 +492,57 @@ for table in (
 - [ ] `docker compose config` + 完整镜像构建 + `docker compose up` 三服务健康
 - [ ] `grep -rn "api/v1/agent\b\|agent-events/stream" apps/ --exclude-dir=node_modules` 无结果
 - [ ] 端到端手工冒烟（设计 §12"端到端"流程）全部通过
+
+### 2026-09-22 本轮回归记录
+
+| 检查 | 命令 | 结果 |
+| --- | --- | --- |
+| API 全量测试 | `cd apps/api && ONTOFOUNDRY_DATAAGENT_BASE_URL='' ONTOFOUNDRY_DATAAGENT_ACCESS_KEY='' .venv/bin/pytest -q` | 193 passed，1 skipped，0 failed；显式清空本机 `.env` 中的 DataAgent 配置，以验证默认配置用例 |
+| API 静态检查 | `cd apps/api && .venv/bin/ruff check src tests` | 通过 |
+| Web 全量测试 | `npm test -w apps/web` | 14 files、48 tests 全部通过 |
+| Web 生产构建 | `npm run build -w apps/web` | 通过；仅有既存的 chunk size warning |
+| Diff 格式 | `git diff --check` | 通过 |
+| Web lint | `npm run lint -w apps/web` | 被本次范围外的 `DataConnections.tsx:1` 未使用 `Plus` import 阻断；本次修改文件无新增 lint 错误 |
+
+#### 真实 DataAgent 复跑（2026-09-22 晚，已完成）
+
+在有 docker 与 DataAgent（DeepSeek provider）的机器上复跑，**当场暴露两个只有真跑才会出现的缺陷**：
+
+1. **一个无效结果让整个会话页 500，运行永远无法收敛。**
+   Agent 产出的本体里，`order_item` 没有对象映射，却有两条关系映射。`import_ossie` 只捕获了
+   `OssieImportError`，而 `OntologyDraft` 抛的是 pydantic `ValidationError`——异常从
+   `reconcile_run` 直接穿出，成为会话 GET 的 500；租约仍被持有、`result_state` 卡在
+   `processing`。写回是加载会话的副作用，**一个坏结果因此让会话读都读不了**。
+
+2. **根因在导入顺序。** `parse_joins` 在 `parse_mappings` 之前执行，不知道哪些对象最终有映射，
+   于是给关系装上了 `data_join`——而 `OntologyDraft` 恰恰禁止"两端未映射的关系带数据连接"。
+   导入器自己造出了校验器必然拒绝的草稿。
+
+修法：
+- `parse_joins` 移到 `parse_mappings` 之后并接收已映射的 type id 集合；端点未映射时**跳过该
+  join 并记一条 skip**，保住模型其余部分，而不是让一整轮建模因一个概念没映射而全废。
+- `reconcile_run` 增加 `ValidationError` 分支 → `failed_permanent`（同一份文件重跑不会有不同
+  结果），并只取第一条可读信息，不把整份被拒文档灌进 `task_detail`。
+- `result_warnings` 此前只收 `notes`，**丢掉了 `skipped` 这最可操作的一半**；改为两者合并。
+
+复跑结果（工作空间 `10375c4d…d23001`，真实 MySQL `demo_analytics` 四表）：
+
+| 核对项 | 结果 |
+| --- | --- |
+| 结果整体替换草稿 | ✓ 9 对象 → 4 对象 / 3 关系 / 3 映射 |
+| 旧候选清空 | ✓ `candidates_json = []` |
+| `current_version_id` 不变 | ✓ 自动建模不发布 |
+| `revision` 递增 | ✓ 2 → 3 |
+| 会话 GET | ✓ 200（修复前 500） |
+| 跳过原因透出 | ✓ "order_item 没有数据映射，该关系的数据连接未设置" |
+
+回归测试：`test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping`
+使用**当场把线上打挂的那份真实 Agent 产出**作为 fixture
+（`tests/fixtures/agent_result_partial_mappings.json`）。
+
+仍未核对：中文显示名是否只经 `ai_context.ontofoundry.display_names` 表达。本轮 Agent 产出的
+`technical_name` 是 `Customer`/`Product`/`Order`（首字母大写），**未遵守提示词里的 snake_case
+约束**——提示词约束是软的，模型可以不听，这一点需要在发布前决定是强校验还是接受。
 
 ## 发布与回滚
 

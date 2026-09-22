@@ -74,3 +74,35 @@ it.each(["resolve", "reject"])(
     expect(result.current.error).toBe("");
   },
 );
+
+it("automatically resumes the latest active session when the URL has none", async () => {
+  vi.mocked(modelingApi.sessions).mockResolvedValue({
+    items: [
+      {
+        id: "active",
+        title: "电商核心业务本体构建",
+        task_status: "running",
+        updated_at: "2026-09-22T07:00:00Z",
+      },
+      {
+        id: "idle",
+        title: "空白会话",
+        task_status: "idle",
+        updated_at: "2026-09-22T08:00:00Z",
+      },
+    ],
+  });
+  vi.mocked(modelingApi.get).mockImplementation((_workspace, id) =>
+    Promise.resolve(session(id)),
+  );
+
+  const { result } = renderHook(() => useModeling("w"), {
+    wrapper: ({ children }) => (
+      <MemoryRouter initialEntries={["/"]}>{children}</MemoryRouter>
+    ),
+  });
+
+  await waitFor(() => expect(result.current.sessionId).toBe("active"));
+  await waitFor(() => expect(result.current.session?.id).toBe("active"));
+  expect(modelingApi.get).toHaveBeenCalledWith("w", "active");
+});

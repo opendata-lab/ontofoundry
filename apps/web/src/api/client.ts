@@ -7,6 +7,7 @@ import type {
   Workspace,
   Draft,
   ModelingSession,
+  ModelingSessionSummary,
   Material,
   OssieImportResult,
   Capabilities,
@@ -146,7 +147,7 @@ export function workspaceRequest<T>(
 export const modelingApi = {
   sessions: (id: string) =>
     workspaceRequest<{
-      items: Pick<ModelingSession, "id" | "title" | "task_status">[];
+      items: ModelingSessionSummary[];
     }>(id, "/sessions"),
   create: (id: string, title = "新的建模会话") =>
     workspaceRequest<ModelingSession>(id, "/sessions", { title }),
