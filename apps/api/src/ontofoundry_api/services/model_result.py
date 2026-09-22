@@ -155,6 +155,7 @@ def _guarded_result_values(
             update(ModelingSessionRecord)
             .where(
                 ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
                 ModelingSessionRecord.last_result_task_id == task_id,
                 ModelingSessionRecord.result_state == "processing",
                 ModelingSessionRecord.result_claimed_at == claimed_at,
@@ -244,6 +245,7 @@ async def reconcile_run(
             update(ModelingSessionRecord)
             .where(
                 ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
                 or_(
                     ModelingSessionRecord.last_result_task_id.is_distinct_from(task_id),
                     ModelingSessionRecord.result_state == "failed_retriable",
@@ -381,6 +383,7 @@ async def reconcile_run(
             update(ModelingSessionRecord)
             .where(
                 ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
                 ModelingSessionRecord.last_result_task_id == task_id,
                 ModelingSessionRecord.result_state == "processing",
                 ModelingSessionRecord.result_claimed_at == claimed_at,
@@ -425,6 +428,7 @@ def exhaust_retriable_result(app: Any, session_id: str, task_id: str) -> str:
             update(ModelingSessionRecord)
             .where(
                 ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
                 ModelingSessionRecord.last_result_task_id == task_id,
                 ModelingSessionRecord.result_state == "failed_retriable",
             )
