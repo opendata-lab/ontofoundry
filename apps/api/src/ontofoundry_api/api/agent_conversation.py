@@ -80,6 +80,25 @@ def _mode(value: object) -> str:
     return value if value in {"chat", "model"} else "chat"
 
 
+def _session_title(content: str, materials: list[MaterialRecord]) -> str:
+    """Name a first turn without another model call or remote dependency."""
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    candidates: list[str] = []
+    for prefix in ("业务场景：", "业务场景:", "本次需求：", "本次需求:"):
+        candidates.extend(
+            line.removeprefix(prefix).strip() for line in lines if line.startswith(prefix)
+        )
+    candidates.extend(lines)
+    title = next((value for value in candidates if value), "")
+    if title == "基于已选材料开始建模" and materials:
+        material_name = materials[0].name.rsplit("/", 1)[-1]
+        title = material_name.rsplit(".", 1)[0] + "建模"
+    title = " ".join(title.split()).strip("#*- ")
+    if not title:
+        return "未命名建模会话"
+    return title if len(title) <= 36 else title[:35].rstrip() + "…"
+
+
 def _detail(status: str, error: object = None) -> str:
     if status in {"waiting", "queued", "submitting"}:
         return "等待 DataAgent 调度"
@@ -402,7 +421,11 @@ async def send_message(
     expected_revision = item.revision
     run_token = secrets.token_hex(16)
     topic_id = item.dataagent_topic_id
-    title = item.title
+    title = (
+        _session_title(body.content, materials)
+        if item.title in {"新的建模会话", "未命名建模会话"}
+        else item.title
+    )
     draft = item.draft_json
     uploaded_ids = set(item.uploaded_material_ids or [])
 
@@ -414,6 +437,7 @@ async def send_message(
             ModelingSessionRecord.task_status.not_in(ACTIVE_RUN_STATUSES),
         )
         .values(
+            title=title,
             task_status="submitting",
             task_detail="正在提交到 DataAgent",
             dataagent_task_id=None,

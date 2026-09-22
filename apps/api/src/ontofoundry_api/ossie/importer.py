@@ -401,9 +401,17 @@ def parse_ossie(
             ),
         )
         link_types.append(candidate)
-    # Mappings need the finished types, so they are read last.
-    parse_joins(document, object_types, link_types)
+    # Mappings need the finished types, so they are read last — and joins need
+    # the mappings, because a relation can only be joined when both of its
+    # endpoints are backed by a table.
     mappings = parse_mappings(document, object_types, workspace_id, report.skip)
+    parse_joins(
+        document,
+        object_types,
+        link_types,
+        {mapping.type_id for mapping in mappings},
+        report.skip,
+    )
     return object_types, link_types, mappings, ontology_requires, report
 
 

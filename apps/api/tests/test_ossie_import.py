@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -660,3 +661,34 @@ def test_import_endpoint_rejects_invalid_files(client):
     )
     assert response.status_code == 422
     assert "导入失败" in response.json()["detail"]
+
+
+def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
+    """A real agent result where one concept ended up without a dataset.
+
+    Joins used to be attached before mappings were read, so a relation whose
+    endpoint had no table still got one — producing a draft that `OntologyDraft`
+    itself rejects. Because the only producer of these documents is an agent,
+    that rejection discarded a whole modeling run over one unmapped concept.
+    The rest of the model is worth keeping; the missing join is worth saying.
+    """
+    document = json.loads(
+        (Path(__file__).parent / "fixtures" / "agent_result_partial_mappings.json")
+        .read_text(encoding="utf-8")
+    )["ontology"]
+
+    draft, report = import_ossie(
+        document, workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+
+    # The draft is valid — which is the whole point, since this document used to
+    # raise out of the model layer.
+    OntologyDraft.model_validate(draft)
+
+    assert len(draft["object_types"]) == 4
+    assert len(draft["mappings"]) == 3
+    joined = [link for link in draft["link_types"] if link.get("data_join")]
+    assert len(joined) == 1
+
+    reasons = [item["reason"] for item in report["skipped"]]
+    assert sum("order_item 没有数据映射" in reason for reason in reasons) == 2

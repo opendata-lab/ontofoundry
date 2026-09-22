@@ -1,0 +1,804 @@
+{
+  "schema_version": "ontofoundry.model-result/v1",
+  "run_token": "a7d385295aa88d471d06e826f93afce4",
+  "ontology": {
+    "version": "0.2.0.dev0",
+    "name": "ecommerce_ontology",
+    "description": "电商订单域本体：客户、商品、订单、订单明细，以及客户下单与明细归属/指向关系；映射到 demo_mysql.demo_analytics 的 customers、products、orders、order_items 四张表。",
+    "ai_context": {
+      "instructions": "按本体中的概念、标识与关系解释电商订单域术语；订单金额以 Order.total_amount 为准，订单明细行不含已确认的金额字段，相关统计须先确认口径。",
+      "synonyms": [
+        "电商交易域本体",
+        "订单域语义模型"
+      ],
+      "ontofoundry": {
+        "version": "1",
+        "display_names": {
+          "Customer": "客户",
+          "Product": "商品",
+          "Order": "订单",
+          "order_item": "订单明细",
+          "places_order": "客户下单",
+          "belongs_to_order": "明细归属订单",
+          "includes_product": "明细指向商品"
+        }
+      }
+    },
+    "ontology": [
+      {
+        "concept": "Customer",
+        "type": "EntityType",
+        "description": "电商平台注册客户。",
+        "identify_by": [
+          "customer_id"
+        ],
+        "relationships": [
+          {
+            "name": "customer_id",
+            "description": "客户唯一编号",
+            "roles": [
+              {
+                "concept": "Integer"
+              }
+            ],
+            "multiplicity": "OneToOne",
+            "verbalizes": [
+              "{Customer} 的客户编号是 {Integer}",
+              "{Integer} 唯一标识 {Customer}"
+            ]
+          },
+          {
+            "name": "customer_name",
+            "description": "客户姓名",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Customer} 的客户姓名是 {String}"
+            ]
+          },
+          {
+            "name": "city",
+            "description": "客户所在城市",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Customer} 所在城市是 {String}"
+            ]
+          },
+          {
+            "name": "signup_date",
+            "description": "客户注册日期",
+            "roles": [
+              {
+                "concept": "Date"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Customer} 的注册日期是 {Date}"
+            ]
+          }
+        ]
+      },
+      {
+        "concept": "Product",
+        "type": "EntityType",
+        "description": "在售商品。",
+        "identify_by": [
+          "product_id"
+        ],
+        "relationships": [
+          {
+            "name": "product_id",
+            "description": "商品唯一编号",
+            "roles": [
+              {
+                "concept": "Integer"
+              }
+            ],
+            "multiplicity": "OneToOne",
+            "verbalizes": [
+              "{Product} 的商品编号是 {Integer}",
+              "{Integer} 唯一标识 {Product}"
+            ]
+          },
+          {
+            "name": "product_name",
+            "description": "商品名称",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Product} 的商品名称是 {String}"
+            ]
+          },
+          {
+            "name": "category",
+            "description": "商品品类",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Product} 所属品类是 {String}"
+            ]
+          },
+          {
+            "name": "unit_price",
+            "description": "商品单价",
+            "roles": [
+              {
+                "concept": "Decimal"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Product} 的单价是 {Decimal}"
+            ]
+          }
+        ]
+      },
+      {
+        "concept": "Order",
+        "type": "EntityType",
+        "description": "交易订单主体。",
+        "identify_by": [
+          "order_id"
+        ],
+        "relationships": [
+          {
+            "name": "order_id",
+            "description": "订单唯一编号",
+            "roles": [
+              {
+                "concept": "Integer"
+              }
+            ],
+            "multiplicity": "OneToOne",
+            "verbalizes": [
+              "{Order} 的订单编号是 {Integer}",
+              "{Integer} 唯一标识 {Order}"
+            ]
+          },
+          {
+            "name": "order_date",
+            "description": "下单时间",
+            "roles": [
+              {
+                "concept": "DateTime"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Order} 的下单时间是 {DateTime}"
+            ]
+          },
+          {
+            "name": "order_status",
+            "description": "订单状态",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Order} 的订单状态是 {String}"
+            ]
+          },
+          {
+            "name": "total_amount",
+            "description": "订单总金额",
+            "roles": [
+              {
+                "concept": "Decimal"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Order} 的订单总金额是 {Decimal}"
+            ]
+          },
+          {
+            "name": "places_order",
+            "description": "订单由客户提交；每位订单属于一位客户，一位客户可提交多个订单。",
+            "roles": [
+              {
+                "concept": "Customer"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{Order} 由 {Customer} 提交",
+              "{Customer} 提交 {Order}"
+            ]
+          }
+        ]
+      },
+      {
+        "concept": "order_item",
+        "type": "EntityType",
+        "description": "订单明细行：一条订单中出现的商品行，用于连接订单与商品。材料未给出 order_items 表的完整结构，本概念仅建模由关联关系可确证的部分，唯一标识与明细数量/金额字段待人工确认。",
+        "relationships": [
+          {
+            "name": "belongs_to_order",
+            "description": "明细行所属订单",
+            "roles": [
+              {
+                "concept": "Order"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{order_item} 属于 {Order}",
+              "{Order} 包含 {order_item}"
+            ]
+          },
+          {
+            "name": "includes_product",
+            "description": "明细行指向的商品",
+            "roles": [
+              {
+                "concept": "Product"
+              }
+            ],
+            "multiplicity": "ManyToOne",
+            "verbalizes": [
+              "{order_item} 指向 {Product}",
+              "{Product} 出现于 {order_item}"
+            ]
+          }
+        ]
+      }
+    ],
+    "ontology_mappings": [
+      {
+        "name": "demo_mysql",
+        "description": "demo_mysql 连接下 demo_analytics 库到电商订单域本体的映射（ANSI_SQL 表达式）。",
+        "semantic_model": {
+          "name": "demo_mysql",
+          "datasets": [
+            {
+              "name": "Customer",
+              "source": "demo_analytics.customers",
+              "description": "客户表 customers",
+              "primary_key": [
+                "customer_id"
+              ],
+              "fields": [
+                {
+                  "name": "customer_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "customer_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                },
+                {
+                  "name": "customer_name",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "customer_name"
+                      }
+                    ]
+                  },
+                  "datatype": "String"
+                },
+                {
+                  "name": "city",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "city"
+                      }
+                    ]
+                  },
+                  "datatype": "String"
+                },
+                {
+                  "name": "signup_date",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "signup_date"
+                      }
+                    ]
+                  },
+                  "datatype": "Date"
+                }
+              ]
+            },
+            {
+              "name": "Product",
+              "source": "demo_analytics.products",
+              "description": "商品表 products",
+              "primary_key": [
+                "product_id"
+              ],
+              "fields": [
+                {
+                  "name": "product_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "product_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                },
+                {
+                  "name": "product_name",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "product_name"
+                      }
+                    ]
+                  },
+                  "datatype": "String"
+                },
+                {
+                  "name": "category",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "category"
+                      }
+                    ]
+                  },
+                  "datatype": "String"
+                },
+                {
+                  "name": "unit_price",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "unit_price"
+                      }
+                    ]
+                  },
+                  "datatype": "Decimal"
+                }
+              ]
+            },
+            {
+              "name": "Order",
+              "source": "demo_analytics.orders",
+              "description": "订单表 orders",
+              "primary_key": [
+                "order_id"
+              ],
+              "fields": [
+                {
+                  "name": "order_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                },
+                {
+                  "name": "order_date",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_date"
+                      }
+                    ]
+                  },
+                  "datatype": "DateTime"
+                },
+                {
+                  "name": "order_status",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_status"
+                      }
+                    ]
+                  },
+                  "datatype": "String"
+                },
+                {
+                  "name": "total_amount",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "total_amount"
+                      }
+                    ]
+                  },
+                  "datatype": "Decimal"
+                },
+                {
+                  "name": "customer_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "customer_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                }
+              ]
+            },
+            {
+              "name": "order_item",
+              "source": "demo_analytics.order_items",
+              "description": "订单明细表 order_items；材料未给出完整列清单，暂只映射关联列，主键待确认。",
+              "fields": [
+                {
+                  "name": "order_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                },
+                {
+                  "name": "product_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "product_id"
+                      }
+                    ]
+                  },
+                  "datatype": "Integer"
+                }
+              ]
+            }
+          ],
+          "relationships": [
+            {
+              "name": "places_order",
+              "from": "Order",
+              "to": "Customer",
+              "from_columns": [
+                "customer_id"
+              ],
+              "to_columns": [
+                "customer_id"
+              ]
+            },
+            {
+              "name": "belongs_to_order",
+              "from": "order_item",
+              "to": "Order",
+              "from_columns": [
+                "order_id"
+              ],
+              "to_columns": [
+                "order_id"
+              ]
+            },
+            {
+              "name": "includes_product",
+              "from": "order_item",
+              "to": "Product",
+              "from_columns": [
+                "product_id"
+              ],
+              "to_columns": [
+                "product_id"
+              ]
+            }
+          ]
+        },
+        "concept_mappings": [
+          {
+            "concept": "Customer",
+            "object_mappings": [
+              {
+                "expression": "Customer.customer_id"
+              }
+            ],
+            "link_mappings": [
+              {
+                "relationship": "customer_id",
+                "object_mapping": {
+                  "expression": "Customer.customer_id"
+                }
+              },
+              {
+                "relationship": "customer_name",
+                "object_mapping": {
+                  "expression": "Customer.customer_name"
+                }
+              },
+              {
+                "relationship": "city",
+                "object_mapping": {
+                  "expression": "Customer.city"
+                }
+              },
+              {
+                "relationship": "signup_date",
+                "object_mapping": {
+                  "expression": "Customer.signup_date"
+                }
+              }
+            ]
+          },
+          {
+            "concept": "Product",
+            "object_mappings": [
+              {
+                "expression": "Product.product_id"
+              }
+            ],
+            "link_mappings": [
+              {
+                "relationship": "product_id",
+                "object_mapping": {
+                  "expression": "Product.product_id"
+                }
+              },
+              {
+                "relationship": "product_name",
+                "object_mapping": {
+                  "expression": "Product.product_name"
+                }
+              },
+              {
+                "relationship": "category",
+                "object_mapping": {
+                  "expression": "Product.category"
+                }
+              },
+              {
+                "relationship": "unit_price",
+                "object_mapping": {
+                  "expression": "Product.unit_price"
+                }
+              }
+            ]
+          },
+          {
+            "concept": "Order",
+            "object_mappings": [
+              {
+                "expression": "Order.order_id"
+              }
+            ],
+            "link_mappings": [
+              {
+                "relationship": "order_id",
+                "object_mapping": {
+                  "expression": "Order.order_id"
+                }
+              },
+              {
+                "relationship": "order_date",
+                "object_mapping": {
+                  "expression": "Order.order_date"
+                }
+              },
+              {
+                "relationship": "order_status",
+                "object_mapping": {
+                  "expression": "Order.order_status"
+                }
+              },
+              {
+                "relationship": "total_amount",
+                "object_mapping": {
+                  "expression": "Order.total_amount"
+                }
+              },
+              {
+                "relationship": "places_order",
+                "object_mapping": {
+                  "concept": "Customer",
+                  "expression": "Order.customer_id"
+                }
+              }
+            ]
+          },
+          {
+            "concept": "order_item",
+            "link_mappings": [
+              {
+                "relationship": "belongs_to_order",
+                "object_mapping": {
+                  "concept": "Order",
+                  "expression": "order_item.order_id"
+                }
+              },
+              {
+                "relationship": "includes_product",
+                "object_mapping": {
+                  "concept": "Product",
+                  "expression": "order_item.product_id"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "annotations": [
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "Customer"
+      },
+      "reason": "材料 1.1 客户：customers 表推断客户实体，沿用已有 technical_name Customer 与属性名。",
+      "evidence": [
+        "demo_analytics_schema.md#1-客户"
+      ]
+    },
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "Product"
+      },
+      "reason": "材料 1.2 商品：products 表推断商品实体，沿用已有 technical_name Product。",
+      "evidence": [
+        "demo_analytics_schema.md#2-商品"
+      ]
+    },
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "Order"
+      },
+      "reason": "材料 1.3 订单：orders 表推断订单实体，沿用已有 technical_name Order。",
+      "evidence": [
+        "demo_analytics_schema.md#3-订单"
+      ]
+    },
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "order_item"
+      },
+      "reason": "用户要求覆盖 order_items 表；材料未给出该表列清单，仅按关联需要建模订单明细实体，主键与明细数量/金额字段待人工确认。",
+      "evidence": [
+        "用户请求：四张表"
+      ]
+    },
+    {
+      "target": {
+        "kind": "link_type",
+        "key": "places_order"
+      },
+      "reason": "材料明确了 orders.customer_id -> customers.id，沿用已有关系 technical_name places_order（Order -> Customer，many_to_one）。",
+      "evidence": [
+        "demo_analytics_schema.md#1-客户下单关联"
+      ]
+    },
+    {
+      "target": {
+        "kind": "link_type",
+        "key": "belongs_to_order"
+      },
+      "reason": "由 order_items 连接 orders 的外键推断，方向按子表指向父表 ManyToOne 建模。",
+      "evidence": [
+        "材料未显式给出，属推断，待确认"
+      ]
+    },
+    {
+      "target": {
+        "kind": "link_type",
+        "key": "includes_product"
+      },
+      "reason": "由 order_items 连接 products 的外键推断，方向按子表指向父表 ManyToOne 建模。",
+      "evidence": [
+        "材料未显式给出，属推断，待确认"
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "Customer"
+      },
+      "reason": "映射到 demo_mysql.demo_analytics.customers，主键列 id 对应属性 customer_id。",
+      "evidence": [
+        "demo_analytics_schema.md#1-客户"
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "Product"
+      },
+      "reason": "映射到 demo_mysql.demo_analytics.products，主键列 id 对应属性 product_id。",
+      "evidence": [
+        "demo_analytics_schema.md#2-商品"
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "Order"
+      },
+      "reason": "映射到 demo_mysql.demo_analytics.orders，并为 places_order 关系补充 customer_id 外键列。",
+      "evidence": [
+        "demo_analytics_schema.md#3-订单"
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "order_item"
+      },
+      "reason": "映射到 demo_mysql.demo_analytics.order_items，仅含关联列 order_id、product_id；无主键声明。",
+      "evidence": [
+        "用户请求：四张表"
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "semantic_model:demo_mysql"
+      },
+      "reason": "语义模型名采用材料给出的数据连接别名 demo_mysql；上一版本上下文中的连接别名为 demo_mysql_to_ecommerce_ontology，如平台按别名解析请人工确认。",
+      "evidence": [
+        "demo_analytics_schema.md#数据连接别名",
+        "ontofoundry-context-r1.json"
+      ]
+    },
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "supplier/material/product_batch/equipment/person"
+      },
+      "reason": "旧草稿中的供应链与生产概念未被本轮材料要求，按“替换草稿、不保留材料未要求概念”的要求移除。",
+      "evidence": [
+        "用户指令：不要仅为保留旧模型而复制材料未要求的概念"
+      ]
+    },
+    {
+      "target": {
+        "kind": "concept",
+        "key": "order_item.quantity/unit_price/amount"
+      },
+      "reason": "未建模：材料未提供 order_items 字段证据，金额与数量口径待确认后再补。",
+      "evidence": [
+        "材料缺失"
+      ]
+    }
+  ]
+}

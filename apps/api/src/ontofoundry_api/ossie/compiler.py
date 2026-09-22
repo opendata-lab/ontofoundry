@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -76,18 +77,74 @@ def attribute_verbalizations(
     return [f"{{{object_key}}}的{attribute.name}是{{{value_concept}}}"]
 
 
+PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_:]+)\}")
+
+
+def _resolve_readings(
+    readings: list[str] | None,
+    expected_placeholders: set[str],
+    fallback: list[str],
+    *,
+    aliases: dict[str, str] | None = None,
+) -> list[str]:
+    """Sanitize and validate readings against expected role placeholders.
+
+    Resolves case differences and common type aliases (e.g. {Integer} for an
+    identifier value concept), and falls back to deterministic standard readings
+    if any reading refers to unknown roles.
+    """
+    if not readings:
+        return fallback
+    alias_map = {p.casefold(): p for p in expected_placeholders}
+    for p in expected_placeholders:
+        if ":" in p:
+            alias_map[p.split(":")[0].casefold()] = p
+    if aliases:
+        for k, v in aliases.items():
+            alias_map[k.casefold()] = v
+
+    cleaned: list[str] = []
+    for reading in readings:
+        if not isinstance(reading, str) or not reading.strip():
+            continue
+
+        def repl(match: re.Match) -> str:
+            token = match.group(1)
+            if token in expected_placeholders:
+                return f"{{{token}}}"
+            token_lower = token.casefold()
+            if token_lower in alias_map:
+                return f"{{{alias_map[token_lower]}}}"
+            return match.group(0)
+
+        rewritten = PLACEHOLDER_RE.sub(repl, reading)
+        found = set(PLACEHOLDER_RE.findall(rewritten))
+        if found and found <= expected_placeholders:
+            cleaned.append(rewritten)
+
+    return cleaned if cleaned else fallback
+
+
 def _compile_link_relationship(
     link: LinkTypeDefinition,
     source_key: str,
     target_key: str,
 ) -> dict[str, Any]:
     role_name = link.target_role_name or ("related" if source_key == target_key else None)
+    target_ref = target_key + (":" + role_name if role_name else "")
+    expected = {source_key, target_ref}
+    fallback = link_verbalizations(link, source_key, target_key)
+    verbalizes = _resolve_readings(
+        link.verbalizes,
+        expected,
+        fallback,
+        aliases={target_key: target_ref},
+    )
     relationship: dict[str, Any] = {
         "name": link.technical_name,
         "description": link.description or f"{link.name}：{source_key} 到 {target_key}",
         "roles": [{"concept": target_key}],
-        # Hand-written readings win; otherwise the standard one is generated.
-        "verbalizes": link.verbalizes or link_verbalizations(link, source_key, target_key),
+        "verbalizes": verbalizes,
     }
     if role_name:
         relationship["roles"][0]["name"] = role_name
@@ -156,14 +213,26 @@ def compile_ossie(
                         "extends": [VALUE_BASES[attribute.value_kind]],
                     }
                 )
+            expected = {object_type.technical_name, value_concept}
+            fallback = attribute_verbalizations(
+                attribute, object_type.technical_name, value_concept
+            )
+            aliases = {}
+            if attribute.identifier:
+                base_name = VALUE_BASES.get(attribute.value_kind)
+                if base_name:
+                    aliases[base_name] = value_concept
+            verbalizes = _resolve_readings(
+                attribute.verbalizes,
+                expected,
+                fallback,
+                aliases=aliases,
+            )
             relationship: dict[str, Any] = {
                 "name": attribute.technical_name,
                 "description": attribute.description or attribute.name,
                 "roles": [{"concept": value_concept}],
-                "verbalizes": attribute.verbalizes
-                or attribute_verbalizations(
-                    attribute, object_type.technical_name, value_concept
-                ),
+                "verbalizes": verbalizes,
             }
             if attribute.identifier:
                 relationship["multiplicity"] = (

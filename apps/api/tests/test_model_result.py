@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from copy import deepcopy
 from datetime import timedelta
 from pathlib import Path
 
@@ -10,27 +9,20 @@ import pytest
 from sqlalchemy import event, update
 from sqlalchemy.sql.dml import Update
 
-from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
+from ontofoundry_api.db_models import ModelingSessionRecord, WorkspaceRecord, utc_now
 from ontofoundry_api.domain.models import OntologyDraft
-from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.dataagent import (
     DataAgentClient,
     DataAgentError,
     build_turn_prompt,
 )
-from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
-from ontofoundry_api.services.model_result import build_candidates, reconcile_run
+from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
+from ontofoundry_api.services.model_result import reconcile_run
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
 RESULT_PATH = Path(__file__).parent / "fixtures" / "ontofoundry_result_v1.json"
 RUN_TOKEN = "0123456789abcdef0123456789abcdef"
 TASK_ID = "task-model-1"
-TOP_LEVEL_WARNING = (
-    "本轮结果包含顶层本体约束变更，v1 不生成候选，"
-    "如需应用请手工编辑或导入 Ossie 文件"
-)
-
-
 def _payload() -> dict:
     return json.loads(RESULT_PATH.read_text(encoding="utf-8"))
 
@@ -98,79 +90,40 @@ def _reconcile(client, session_id: str, task_id: str = TASK_ID) -> str:
     )
 
 
-def test_build_candidates_has_deterministic_ids_before_and_annotations():
-    before = _empty_draft()
-    imported, _ = import_ossie(
-        _payload()["ontology"],
-        workspace_id=str(DEMO_WORKSPACE_ID),
-        base=before,
-        mode="merge",
+def test_valid_result_replaces_draft_and_clears_candidates(client, monkeypatch):
+    old_draft = build_demo_draft().model_dump(mode="json")
+    session = _create_model_session(
+        client,
+        draft_json=old_draft,
+        candidates_json=[{"id": "old", "status": "pending"}],
     )
-    first = build_candidates(before, imported, _payload()["annotations"], TASK_ID)
-    second = build_candidates(before, imported, _payload()["annotations"], TASK_ID)
-
-    assert first == second
-    assert {candidate["kind"] for candidate in first} == {
-        "object_type",
-        "link_type",
-        "mapping",
-    }
-    assert all(
-        candidate["id"]
-        == f"{TASK_ID}:{candidate['kind']}:{candidate['value']['id']}"
-        for candidate in first
-    )
-    assert all("before" in candidate for candidate in first)
-    assert all(candidate["before"] is None for candidate in first)
-    customer = next(
-        candidate
-        for candidate in first
-        if candidate["kind"] == "object_type"
-        and candidate["value"]["technical_name"] == "customer"
-    )
-    assert customer["reason"] == "Customer is the central sales entity"
-    assert customer["evidence"][0]["material_id"] == "material-1"
-
-
-def test_unmatched_annotation_is_ignored():
-    payload = _payload()
-    payload["annotations"].append(
-        {
-            "target": {"kind": "object_type", "key": "not_present"},
-            "reason": "must not leak",
-            "evidence": [{"material_id": "x", "line_start": 1, "line_end": 1}],
-        }
-    )
-    imported, _ = import_ossie(
-        payload["ontology"], workspace_id=str(DEMO_WORKSPACE_ID), base=_empty_draft()
-    )
-    candidates = build_candidates(
-        _empty_draft(), imported, payload["annotations"], TASK_ID
-    )
-    assert "must not leak" not in {candidate["reason"] for candidate in candidates}
-
-
-def test_valid_result_writes_candidates_only_and_warns_for_top_level_change(
-    client, monkeypatch
-):
-    session = _create_model_session(client)
     before = _row(client, session["id"])
+    with client.app.state.session_factory() as db:
+        current_version_id = db.get(
+            WorkspaceRecord, str(DEMO_WORKSPACE_ID)
+        ).current_version_id
     _install_download(monkeypatch, [_payload()])
 
     assert _reconcile(client, session["id"]) == "done"
 
     after = _row(client, session["id"])
-    assert after.draft_json == before.draft_json
+    assert after.draft_json != before.draft_json
     assert after.revision == before.revision + 1
     assert after.result_state == "done"
     assert after.task_status == "finished"
-    assert [item["kind"] for item in after.candidates_json].count("object_type") == 2
-    assert [item["kind"] for item in after.candidates_json].count("link_type") == 1
-    assert [item["kind"] for item in after.candidates_json].count("mapping") == 1
-    assert TOP_LEVEL_WARNING in after.result_warnings
-    assert not {"object", "link", "constraint"} & {
-        item["kind"] for item in after.candidates_json
+    assert after.candidates_json == []
+    assert len(after.draft_json["object_types"]) == 2
+    assert len(after.draft_json["link_types"]) == 1
+    assert len(after.draft_json["mappings"]) == 1
+    assert "supplier" not in {
+        item["technical_name"] for item in after.draft_json["object_types"]
     }
+    with client.app.state.session_factory() as db:
+        assert (
+            db.get(WorkspaceRecord, str(DEMO_WORKSPACE_ID)).current_version_id
+            == current_version_id
+        )
+    assert "预览差异后发布新版本" in after.task_detail
 
 
 def test_chat_completion_never_downloads_or_changes_draft_and_candidates(
@@ -191,48 +144,6 @@ def test_chat_completion_never_downloads_or_changes_draft_and_candidates(
     assert after.draft_json == before.draft_json
     assert after.candidates_json == old
     assert after.revision == before.revision
-
-
-def test_merge_never_proposes_deleting_existing_types():
-    before, _ = import_ossie(
-        _payload()["ontology"],
-        workspace_id=str(DEMO_WORKSPACE_ID),
-        base=_empty_draft(),
-        mode="merge",
-    )
-    partial = deepcopy(_payload()["ontology"])
-    partial["ontology"] = [
-        item for item in partial["ontology"] if item["concept"] == "customer"
-    ]
-    partial.pop("ontology_mappings")
-    partial["requires"] = []
-    imported, _ = import_ossie(
-        partial, workspace_id=str(DEMO_WORKSPACE_ID), base=before, mode="merge"
-    )
-    candidates = build_candidates(before, imported, [], TASK_ID)
-    assert candidates == []
-    assert len(imported["object_types"]) == 2
-
-
-def test_existing_mapping_never_becomes_an_update_candidate():
-    before, _ = import_ossie(
-        _payload()["ontology"],
-        workspace_id=str(DEMO_WORKSPACE_ID),
-        base=_empty_draft(),
-        mode="merge",
-    )
-    changed = deepcopy(_payload()["ontology"])
-    changed["ontology_mappings"][0]["semantic_model"]["datasets"][0][
-        "source"
-    ] = "other.customers"
-    imported, _ = import_ossie(
-        changed, workspace_id=str(DEMO_WORKSPACE_ID), base=before, mode="merge"
-    )
-    assert not [
-        item
-        for item in build_candidates(before, imported, [], TASK_ID)
-        if item["kind"] == "mapping"
-    ]
 
 
 def test_run_token_path_isolation_does_not_consume_previous_round_file(
@@ -300,23 +211,9 @@ def test_download_timeout_is_retriable_then_next_reconcile_succeeds(
     assert _reconcile(client, session["id"]) == "done"
     recovered = _row(client, session["id"])
     assert recovered.result_state == "done"
-    assert recovered.candidates_json
+    assert recovered.candidates_json == []
+    assert len(recovered.draft_json["object_types"]) == 2
     assert len(paths) == 2
-
-
-def test_success_supersedes_only_old_pending_candidates(client, monkeypatch):
-    old = [
-        {"id": "pending", "status": "pending"},
-        {"id": "accepted", "status": "accepted"},
-        {"id": "ignored", "status": "ignored"},
-    ]
-    session = _create_model_session(client, candidates_json=old)
-    _install_download(monkeypatch, [_payload()])
-    assert _reconcile(client, session["id"]) == "done"
-    by_id = {item["id"]: item for item in _row(client, session["id"]).candidates_json}
-    assert by_id["pending"]["status"] == "superseded"
-    assert by_id["accepted"]["status"] == "accepted"
-    assert by_id["ignored"]["status"] == "ignored"
 
 
 @pytest.mark.parametrize(
@@ -365,57 +262,6 @@ def test_permanent_failures_are_specific_and_never_mutate_model(
     assert after.revision == before.revision
 
 
-def test_accepted_candidates_update_draft_and_manual_edit_conflicts(
-    client, monkeypatch
-):
-    session = _create_model_session(client)
-    _install_download(monkeypatch, [_payload()])
-    assert _reconcile(client, session["id"]) == "done"
-    row = _row(client, session["id"])
-    ids = [item["id"] for item in row.candidates_json]
-
-    accepted = client.post(
-        ROOT + f"/sessions/{session['id']}/candidates",
-        json={"revision": row.revision, "ids": ids, "action": "accept"},
-    )
-    assert accepted.status_code == 200, accepted.text
-    assert len(accepted.json()["draft"]["object_types"]) == 2
-    assert len(accepted.json()["draft"]["link_types"]) == 1
-    assert len(accepted.json()["draft"]["mappings"]) == 1
-
-    conflict_session = _create_model_session(client)
-    _install_download(monkeypatch, [_payload()])
-    assert _reconcile(client, conflict_session["id"]) == "done"
-    row = _row(client, conflict_session["id"])
-    target = next(item for item in row.candidates_json if item["kind"] == "object_type")
-    manually_changed = deepcopy(row.draft_json)
-    manual = deepcopy(target["value"])
-    manual["description"] = "manual edit wins"
-    manually_changed["object_types"].append(manual)
-    with client.app.state.session_factory() as db:
-        db.execute(
-            update(ModelingSessionRecord)
-            .where(ModelingSessionRecord.id == conflict_session["id"])
-            .values(draft_json=manually_changed)
-        )
-        db.commit()
-    response = client.post(
-        ROOT + f"/sessions/{conflict_session['id']}/candidates",
-        json={"revision": row.revision, "ids": [target["id"]], "action": "accept"},
-    )
-    assert response.status_code == 200, response.text
-    candidate = next(
-        item for item in response.json()["candidates"] if item["id"] == target["id"]
-    )
-    assert "手工修改" in candidate["conflict"]
-    current = next(
-        item
-        for item in response.json()["draft"]["object_types"]
-        if item["id"] == target["value"]["id"]
-    )
-    assert current["description"] == "manual edit wins"
-
-
 def test_expired_processing_lease_can_be_reclaimed_after_process_crash(
     client, monkeypatch
 ):
@@ -441,7 +287,7 @@ def test_expired_processing_lease_can_be_reclaimed_after_process_crash(
     assert _row(client, session["id"]).result_state == "done"
 
 
-def test_worker_that_lost_its_claim_cannot_write_candidates(client, monkeypatch):
+def test_worker_that_lost_its_claim_cannot_write_version_draft(client, monkeypatch):
     session = _create_model_session(client)
 
     async def stolen_claim(self, topic_id: str, rel_path: str):
@@ -460,6 +306,32 @@ def test_worker_that_lost_its_claim_cannot_write_candidates(client, monkeypatch)
     assert row.result_state == "processing"
     assert row.candidates_json == []
     assert row.draft_json == _empty_draft()
+
+
+def test_manual_revision_change_during_run_is_never_overwritten(client, monkeypatch):
+    session = _create_model_session(client)
+    manual_draft = _empty_draft()
+    manual_draft["requires"] = ["manual change"]
+
+    async def edit_before_download_returns(self, topic_id: str, rel_path: str):
+        with client.app.state.session_factory() as db:
+            db.execute(
+                update(ModelingSessionRecord)
+                .where(ModelingSessionRecord.id == session["id"])
+                .values(
+                    draft_json=manual_draft,
+                    revision=ModelingSessionRecord.revision + 1,
+                )
+            )
+            db.commit()
+        return json.dumps(_payload()).encode(), "application/json"
+
+    monkeypatch.setattr(DataAgentClient, "download", edit_before_download_returns)
+    assert _reconcile(client, session["id"]) == "failed_permanent"
+    row = _row(client, session["id"])
+    assert row.draft_json == manual_draft
+    assert row.task_status == "failed"
+    assert "会话已更新" in row.task_detail
 
 
 def test_result_claim_cannot_attach_task_a_lease_after_task_b_starts(
@@ -536,7 +408,7 @@ def test_task_a_download_404_cannot_mark_task_b_failed(client, monkeypatch):
     assert row.result_state == "processing"
 
 
-def test_task_a_success_cannot_write_candidates_after_task_b_starts(
+def test_task_a_success_cannot_write_version_draft_after_task_b_starts(
     client, monkeypatch
 ):
     session = _create_model_session(client)
@@ -606,7 +478,9 @@ def test_events_retry_retriable_result_before_done_and_return_model_metadata(
     assert response.text.count("event: done") == 1
     assert '"status":"finished"' in response.text
     assert '"metadata":{"mode":"model"}' in response.text
-    assert _row(client, session["id"]).candidates_json
+    row = _row(client, session["id"])
+    assert row.candidates_json == []
+    assert len(row.draft_json["object_types"]) == 2
 
 
 def test_events_exhaust_three_retries_before_permanent_done(client, monkeypatch):
@@ -664,6 +538,12 @@ def test_model_prompt_contains_complete_versioned_result_contract():
     assert f"output/ontofoundry-result-{RUN_TOKEN}.json" in prompt
     assert "Apache Ossie 0.2.0.dev0" in prompt
     assert "完整" in prompt
+    assert "替换当前草稿的完整快照" in prompt
+    assert "原样复用其 technical_name" in prompt
+    assert "snake_case" in prompt
+    assert "ai_context.ontofoundry.display_names" in prompt
+    assert '"customer":"客户"' in prompt
+    assert "预览差异后发布" in prompt
 
 
 @pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
@@ -685,3 +565,78 @@ def test_definitive_download_failures_are_permanent(status_code):
     from ontofoundry_api.services.model_result import _is_retriable_download
 
     assert _is_retriable_download(status_code) is False
+
+
+def test_a_model_that_breaks_a_draft_invariant_fails_instead_of_crashing(
+    client, monkeypatch
+):
+    """The backstop for anything `import_ossie` cannot turn into a valid draft.
+
+    Only OssieImportError was caught, so a pydantic ValidationError escaped out
+    of whichever request happened to be reconciling — the conversation endpoint
+    answered 500 and the lease stayed held with result_state parked on
+    "processing", leaving the run unresolvable and the conversation unreadable.
+    """
+    old_draft = build_demo_draft().model_dump(mode="json")
+    session = _create_model_session(
+        client,
+        draft_json=old_draft,
+        candidates_json=[{"id": "old", "status": "pending"}],
+    )
+    before = _row(client, session["id"])
+    _install_download(monkeypatch, [_payload()])
+
+    def _reject(*args, **kwargs):
+        OntologyDraft.model_validate(
+            {"workspace_id": str(DEMO_WORKSPACE_ID), "mappings": [{"bad": True}]}
+        )
+
+    monkeypatch.setattr(
+        "ontofoundry_api.services.model_result.import_ossie", _reject
+    )
+
+    assert _reconcile(client, session["id"]) == "failed_permanent"
+
+    after = _row(client, session["id"])
+    assert after.task_status == "failed"
+    assert "不满足草稿约束" in after.task_detail
+    # The rejected model never touches what the user already has.
+    assert after.draft_json == before.draft_json
+    assert after.candidates_json == before.candidates_json
+    assert after.revision == before.revision
+
+
+def test_result_warnings_say_what_the_import_could_not_carry_over(client, monkeypatch):
+    """`skipped` is the actionable half and used to be dropped.
+
+    Keeping only `notes` meant a draft could come back smaller than the answer
+    described — a relation quietly missing its data join — with nothing on screen
+    explaining which concept was missing a mapping.
+    """
+    session = _create_model_session(client)
+    payload = _payload()
+    _install_download(monkeypatch, [payload])
+
+    def _import(*args, **kwargs):
+        return (
+            OntologyDraft(workspace_id=DEMO_WORKSPACE_ID).model_dump(mode="json"),
+            {
+                "notes": ["文件带有 OntoFoundry 扩展信息"],
+                "skipped": [
+                    {
+                        "path": "semantic_model.relationships[belongs_to_order]",
+                        "reason": "order_item 没有数据映射，该关系的数据连接未设置",
+                    }
+                ],
+            },
+        )
+
+    monkeypatch.setattr(
+        "ontofoundry_api.services.model_result.import_ossie", _import
+    )
+
+    assert _reconcile(client, session["id"]) == "done"
+
+    warnings = _row(client, session["id"]).result_warnings
+    assert "文件带有 OntoFoundry 扩展信息" in warnings
+    assert any("order_item 没有数据映射" in item for item in warnings)
