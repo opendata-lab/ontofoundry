@@ -35,8 +35,11 @@ class Settings(BaseSettings):
     oauth_client_id: str = ""
     oauth_client_secret: str = ""
     oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/callback"
-    # Complete agent execution lives in the vendored DataAgent + Pi service.
+    # Complete agent execution lives in an external OpenDataWorks DataAgent.
     dataagent_base_url: str = ""
+    dataagent_api_prefix: str = "/api/v1/nl2sql"
+    dataagent_website_id: str = "ontofoundry"
+    dataagent_access_key: str = ""
     dataagent_agent_id: str = "agent_ontofoundry"
     dataagent_request_timeout_seconds: int = Field(default=30, gt=0)
     dataagent_execution_mode: Literal["interactive", "background", "auto"] = "auto"

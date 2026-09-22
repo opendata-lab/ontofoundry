@@ -3,7 +3,7 @@ import secrets
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -17,9 +17,21 @@ from ontofoundry_api.db_models import (
     UserRecord,
     WorkspaceMemberRecord,
 )
+from ontofoundry_api.services.dataagent_health import dataagent_health
 from ontofoundry_api.services.workspaces import get_workspace, workspace_summary
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["settings"])
+
+
+@router.get("/settings/dataagent-health")
+async def get_dataagent_health(
+    workspace_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    return await dataagent_health(request.app.state.settings, workspace_id)
 
 
 class SpaceUpdate(BaseModel):

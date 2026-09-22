@@ -15,25 +15,10 @@ services:
     volumes:
       - ontofoundry-postgres:/var/lib/postgresql/data
 
-
   of-backend:
     image: ${OF_BACKEND_IMAGE:-of-backend:local}
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-      target: backend
     environment:
       ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
-      # Agent capability now lives in an external OpenDataWorks DataAgent.
-      # Leave the base URL unset and the application still runs — ontology
-      # browsing, editing, publishing and MCP do not depend on it.
-      ONTOFOUNDRY_DATAAGENT_BASE_URL: ${ONTOFOUNDRY_DATAAGENT_BASE_URL:-}
-      ONTOFOUNDRY_DATAAGENT_API_PREFIX: ${ONTOFOUNDRY_DATAAGENT_API_PREFIX:-/api/v1/nl2sql}
-      ONTOFOUNDRY_DATAAGENT_WEBSITE_ID: ${ONTOFOUNDRY_DATAAGENT_WEBSITE_ID:-ontofoundry}
-      ONTOFOUNDRY_DATAAGENT_ACCESS_KEY: ${ONTOFOUNDRY_DATAAGENT_ACCESS_KEY:-}
-      ONTOFOUNDRY_DATAAGENT_AGENT_ID: ${ONTOFOUNDRY_DATAAGENT_AGENT_ID:-agent_ontofoundry}
-      ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS: ${ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS:-30}
-      ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE: ${ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE:-auto}
       ONTOFOUNDRY_CONNECTION_KEY: ${ONTOFOUNDRY_CONNECTION_KEY:-}
     depends_on:
       postgres:
@@ -46,12 +31,8 @@ services:
       timeout: 5s
       retries: 20
 
-
   of-frontend:
     image: ${OF_FRONTEND_IMAGE:-of-frontend:local}
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
     depends_on:
       of-backend:
         condition: service_healthy

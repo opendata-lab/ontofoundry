@@ -28,56 +28,63 @@ CANCELLED_TASK_STATUSES = {"cancelled", "canceled", "suspended"}
 
 
 class DataAgentError(RuntimeError):
-    def __init__(self, message: str, *, status_code: int = 502) -> None:
+    def __init__(self, message: str, *, status_code: int = 502, hint: str = "") -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.hint = hint
 
 
-def topic_id_from_messages(messages: list[dict[str, Any]]) -> str:
-    for message in reversed(messages):
-        topic_id = str(message.get("dataagent_topic_id") or "").strip()
-        if topic_id:
-            return topic_id
-    return ""
+def require_dataagent_configuration(base_url: str, access_key: str) -> None:
+    if not base_url.strip():
+        raise DataAgentError(
+            "DataAgent 未配置",
+            status_code=503,
+            hint="设置 ONTOFOUNDRY_DATAAGENT_BASE_URL 后重启",
+        )
+    if not access_key.strip():
+        raise DataAgentError(
+            "未配置服务端接入密钥",
+            status_code=503,
+            hint="设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY",
+        )
 
 
-def task_id_from_messages(messages: list[dict[str, Any]]) -> str:
-    for message in reversed(messages):
-        task_id = str(message.get("dataagent_task_id") or "").strip()
-        if task_id:
-            return task_id
-    return ""
 
 
-def uploaded_material_ids(messages: list[dict[str, Any]]) -> set[str]:
-    result: set[str] = set()
-    for message in messages:
-        values = message.get("dataagent_material_ids")
-        if isinstance(values, list):
-            result.update(str(value) for value in values if value)
-    return result
 
 
-def public_answer(message: dict[str, Any]) -> str:
-    """Prefer the public main-text projection and retain old-row fallback."""
-    blocks = message.get("blocks")
-    if isinstance(blocks, list):
-        text = [
-            str(block.get("text") or "").strip()
-            for block in blocks
-            if isinstance(block, dict)
-            and str(block.get("kind") or block.get("type") or "") in {"main_text", "text"}
-            and str(block.get("text") or "").strip()
-        ]
-        if text:
-            return "\n\n".join(text)
-    return str(message.get("content") or "").strip()
+
+
 
 
 class DataAgentClient:
-    def __init__(self, base_url: str, *, timeout_seconds: int = 30) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        *,
+        prefix: str,
+        website_id: str,
+        access_key: str,
+        session_ref: str,
+        timeout_seconds: int = 30,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.prefix = "/" + prefix.strip("/")
+        self.website_id = website_id
+        self.access_key = access_key
+        self.session_ref = session_ref
         self.timeout = httpx.Timeout(timeout_seconds)
+
+    @property
+    def headers(self) -> dict[str, str]:
+        headers = {
+            "X-ODW-Client": "widget",
+            "X-ODW-Website-Id": self.website_id,
+            "X-ODW-User-Id": self.session_ref,
+        }
+        if self.access_key:
+            headers["X-ODW-Access-Key"] = self.access_key
+        return headers
 
     async def _json(
         self,
@@ -86,12 +93,27 @@ class DataAgentClient:
         *,
         json_body: dict[str, Any] | None = None,
         files: dict[str, tuple[str, bytes, str]] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        require_dataagent_configuration(self.base_url, self.access_key)
         try:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=self.timeout) as client:
-                response = await client.request(method, path, json=json_body, files=files)
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=self.timeout
+            ) as client:
+                response = await client.request(
+                    method,
+                    path,
+                    json=json_body,
+                    files=files,
+                    params=params,
+                    headers=self.headers,
+                )
         except httpx.HTTPError as exc:
-            raise DataAgentError(f"DataAgent 连接失败: {exc}", status_code=503) from exc
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
         if response.is_error:
             try:
                 payload = response.json()
@@ -100,6 +122,25 @@ class DataAgentClient:
                     detail = detail.get("message") or json.dumps(detail, ensure_ascii=False)
             except (ValueError, AttributeError):
                 detail = response.text
+            normalized_detail = str(detail or "").lower()
+            if response.status_code == 403 and "site is not allowed" in normalized_detail:
+                raise DataAgentError(
+                    "DataAgent 拒绝了本站点",
+                    status_code=502,
+                    hint=(
+                        "在管理端 → Widget 接入设置中放行 "
+                        f"website_id={self.website_id}"
+                    ),
+                )
+            if response.status_code == 403 and "access key" in normalized_detail:
+                raise DataAgentError(
+                    "DataAgent 拒绝了服务端接入密钥",
+                    status_code=502,
+                    hint=(
+                        "在管理端重新生成密钥并更新 "
+                        "ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
+                    ),
+                )
             raise DataAgentError(
                 f"DataAgent 请求失败 ({response.status_code}): {detail or response.reason_phrase}",
                 status_code=503 if response.status_code >= 500 else response.status_code,
@@ -114,18 +155,64 @@ class DataAgentClient:
     async def create_topic(self, title: str, agent_id: str) -> dict[str, Any]:
         return await self._json(
             "POST",
-            "/api/v1/agent/topics",
+            f"{self.prefix}/topics",
             json_body={"title": title, "agent_id": agent_id},
         )
 
     async def delete_topic(self, topic_id: str) -> dict[str, Any]:
-        return await self._json("DELETE", f"/api/v1/agent/topics/{topic_id}")
+        return await self._json("DELETE", f"{self.prefix}/topics/{topic_id}")
 
-    async def upload(self, topic_id: str, name: str, content: bytes, media_type: str) -> dict[str, Any]:
+    async def messages(self, topic_id: str) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        page = 1
+        page_size = 500
+        while True:
+            payload = await self._json(
+                "GET",
+                f"{self.prefix}/topics/{topic_id}/messages",
+                params={"page": page, "page_size": page_size, "order": "asc"},
+            )
+            items = payload.get("items")
+            if not isinstance(items, list) or any(
+                not isinstance(item, dict) for item in items
+            ):
+                raise DataAgentError("DataAgent 历史消息返回格式错误")
+            result.extend(items)
+            total = int(payload.get("total") or 0)
+            if not items or (total and len(result) >= total) or len(items) < page_size:
+                return result
+            page += 1
+
+    async def upload(
+        self, topic_id: str, name: str, content: bytes, media_type: str
+    ) -> dict[str, Any]:
         return await self._json(
             "POST",
-            f"/api/v1/agent/topics/{topic_id}/files",
+            f"{self.prefix}/topics/{topic_id}/files",
             files={"file": (Path(name).name, content, media_type)},
+        )
+
+    async def download(self, topic_id: str, rel_path: str) -> tuple[bytes, str]:
+        require_dataagent_configuration(self.base_url, self.access_key)
+        path = f"{self.prefix}/topics/{topic_id}/files/{rel_path.lstrip('/')}"
+        try:
+            async with httpx.AsyncClient(
+                base_url=self.base_url, timeout=self.timeout
+            ) as client:
+                response = await client.get(path, headers=self.headers)
+        except httpx.HTTPError as exc:
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
+        if response.is_error:
+            raise DataAgentError(
+                f"DataAgent 文件下载失败 ({response.status_code}): {response.text}",
+                status_code=503 if response.status_code >= 500 else response.status_code,
+            )
+        return response.content, response.headers.get(
+            "content-type", "application/octet-stream"
         )
 
     async def deliver(
@@ -138,7 +225,7 @@ class DataAgentClient:
     ) -> dict[str, Any]:
         return await self._json(
             "POST",
-            "/api/v1/agent/tasks/deliver-message",
+            f"{self.prefix}/tasks/deliver-message",
             json_body={
                 "topic_id": topic_id,
                 "content": content,
@@ -149,15 +236,51 @@ class DataAgentClient:
         )
 
     async def task(self, task_id: str) -> dict[str, Any]:
-        return await self._json("GET", f"/api/v1/agent/tasks/{task_id}")
+        return await self._json("GET", f"{self.prefix}/tasks/{task_id}")
 
     async def task_message(self, task_id: str) -> dict[str, Any]:
-        return await self._json("GET", f"/api/v1/agent/tasks/{task_id}/message")
+        return await self._json("GET", f"{self.prefix}/tasks/{task_id}/message")
 
     async def cancel(self, task_id: str) -> dict[str, Any]:
-        return await self._json("POST", f"/api/v1/agent/tasks/{task_id}/cancel")
+        return await self._json(
+            "POST", f"{self.prefix}/tasks/{task_id}/cancel", json_body={}
+        )
+
+    async def permission_decision(
+        self, task_id: str, request_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self._json(
+            "POST",
+            f"{self.prefix}/tasks/{task_id}/permission-decision",
+            json_body={**payload, "request_id": request_id},
+        )
+
+    async def question_answer(
+        self, task_id: str, request_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        return await self._json(
+            "POST",
+            f"{self.prefix}/tasks/{task_id}/question-answer",
+            json_body={**payload, "request_id": request_id},
+        )
+
+    async def agent_profile(self, agent_id: str) -> dict[str, Any]:
+        try:
+            return await self._json("GET", f"/api/v1/dataagent/agents/{agent_id}")
+        except DataAgentError as exc:
+            if exc.status_code != 404:
+                raise
+            raise DataAgentError(
+                "DataAgent 上找不到该 Agent",
+                status_code=502,
+                hint=(
+                    f"创建 agent_id={agent_id}、安装 md2ossie Skill，"
+                    "并确认其可见性允许 Widget 访问"
+                ),
+            ) from exc
 
     async def stream(self, task_id: str, after_id: int = 0) -> AsyncIterator[bytes]:
+        require_dataagent_configuration(self.base_url, self.access_key)
         timeout = httpx.Timeout(
             connect=self.timeout.connect,
             read=None,
@@ -169,9 +292,9 @@ class DataAgentClient:
                 httpx.AsyncClient(base_url=self.base_url, timeout=timeout) as client,
                 client.stream(
                     "GET",
-                    f"/api/v1/agent/tasks/{task_id}/agent-events/stream",
+                    f"{self.prefix}/tasks/{task_id}/sdk-events/stream",
                     params={"after_id": max(0, after_id)},
-                    headers={"Accept": "text/event-stream"},
+                    headers={**self.headers, "Accept": "text/event-stream"},
                 ) as response,
             ):
                 if response.is_error:
@@ -186,7 +309,11 @@ class DataAgentClient:
         except DataAgentError:
             raise
         except httpx.HTTPError as exc:
-            raise DataAgentError(f"DataAgent 事件流中断: {exc}", status_code=503) from exc
+            raise DataAgentError(
+                "无法连接 DataAgent",
+                status_code=503,
+                hint=f"检查地址与网络连通性；当前地址 {self.base_url}",
+            ) from exc
 
 
 def build_turn_prompt(
@@ -197,10 +324,21 @@ def build_turn_prompt(
     session_id: str,
     context_file: str,
     material_files: list[str],
+    run_token: str = "",
 ) -> str:
     action = (
-        "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议；"
-        "需要机器可读交付时，把完整 Ossie JSON 写到 output/ 目录，同时在回答中概括变更。"
+        "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议。\n"
+        "你必须把完整的 Apache Ossie 0.2.0.dev0 文档（不是 diff）放入以下信封：\n"
+        "{\n"
+        '  "schema_version": "ontofoundry.model-result/v1",\n'
+        f'  "run_token": "{run_token}",\n'
+        '  "ontology": {"...": "完整 Ossie 文档"},\n'
+        '  "annotations": [{"target": {"kind": "object_type | link_type | mapping", '
+        '"key": "Ossie concept 名"}, "reason": "...", "evidence": []}]\n'
+        "}\n"
+        f"只将该 JSON 信封写到 output/ontofoundry-result-{run_token}.json。"
+        "不要覆盖其他轮次的结果文件，也不要尝试直接修改或发布 OntoFoundry 草稿。"
+        "同时在回答中概括变更。"
         if mode == "model"
         else "这是普通对话或概念澄清。除非用户明确要求修改，否则不要生成或覆盖本体文件。"
     )
@@ -209,6 +347,7 @@ def build_turn_prompt(
         "[OntoFoundry 会话上下文]\n"
         f"workspace_id: {workspace_id}\n"
         f"session_id: {session_id}\n"
+        f"run_token: {run_token}\n"
         f"当前本体快照: {context_file}\n"
         f"本轮新增材料:\n{files}\n\n"
         f"{action}\n"

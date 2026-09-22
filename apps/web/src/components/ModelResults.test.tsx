@@ -52,7 +52,6 @@ function session(): ModelingSession {
       edges: [],
     },
     candidates: [],
-    messages: [],
     material_ids: [],
     task_status: "idle",
     task_detail: "",
@@ -116,5 +115,82 @@ describe("建模结果", () => {
     );
     expect(screen.getByText("暂无构建结果")).toBeInTheDocument();
     expect(screen.queryByText("接受全部无冲突项")).not.toBeInTheDocument();
+  });
+});
+
+describe("mapping candidates", () => {
+  const mapping = {
+    id: "map-1",
+    type_id: "material",
+    connection_alias: "warehouse",
+    table_name: "dim_material",
+    schema_name: "ods",
+    key_column: "material_id",
+    fields: {},
+  };
+
+  const withMappingCandidate = (): ModelingSession => ({
+    ...session(),
+    candidates: [
+      {
+        id: "t-1:mapping:map-1",
+        kind: "mapping",
+        status: "pending",
+        reason: "材料中提到物料主数据来自数仓",
+        value: mapping,
+      },
+    ],
+  });
+
+  it("labels a mapping by its connection alias and table", () => {
+    // DataMapping has no name field on purpose: a published model carries an
+    // alias rather than a connection, so this pair is the only stable label.
+    render(
+      <MemoryRouter>
+        <ModelResults session={withMappingCandidate()} busy={false} onCandidate={() => {}} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /映射/ }));
+
+    expect(screen.getByText(/warehouse · ods\.dim_material/)).toBeInTheDocument();
+    expect(screen.getByText(/主键 material_id/)).toBeInTheDocument();
+  });
+
+  it("accepts a mapping candidate by id", () => {
+    const onCandidate = vi.fn();
+    render(
+      <MemoryRouter>
+        <ModelResults
+          session={withMappingCandidate()}
+          busy={false}
+          onCandidate={onCandidate}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /映射/ }));
+    fireEvent.click(screen.getAllByRole("button", { name: /接受/ })[0]);
+
+    expect(onCandidate).toHaveBeenCalledWith(["t-1:mapping:map-1"], "accept");
+  });
+});
+
+describe("result warnings", () => {
+  it("surfaces notes from the last run so they are not lost silently", () => {
+    // Top-level ontology constraints are not turned into candidates in v1.
+    // Without this the agent's proposal would vanish with no trace at all.
+    const warned: ModelingSession = {
+      ...session(),
+      result_warnings: ["本轮结果包含顶层本体约束变更，v1 不生成候选"],
+    };
+
+    render(
+      <MemoryRouter>
+        <ModelResults session={warned} busy={false} onCandidate={() => {}} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("顶层本体约束变更");
   });
 });

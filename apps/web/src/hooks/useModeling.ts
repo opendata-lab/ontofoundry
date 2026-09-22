@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { modelingApi } from "../api/client";
+
+/** Mirrors the backend's ACTIVE_RUN_STATUSES; a parked run is still a run. */
+const ACTIVE_TASK_STATUSES = [
+  "submitting",
+  "queued",
+  "running",
+  "waiting_input",
+  "waiting_permission",
+];
 import type { ModelingSession } from "../api/types";
 import { usePageActive } from "./usePageTab";
 
@@ -73,7 +82,10 @@ export function useModeling(
       !pageActive ||
       !sessionId ||
       !taskStatus ||
-      !["queued", "running"].includes(taskStatus)
+      // Every active state, matching the backend. A run waiting on input is
+      // not finished, and stopping the poll there leaves the page showing a
+      // stale revision that later saves and publishes will 409 against.
+      !ACTIVE_TASK_STATUSES.includes(taskStatus)
     )
       return;
     let active = true;
@@ -110,6 +122,11 @@ export function useModeling(
   };
   return {
     session,
+    // The id from the URL, which changes the moment the user switches — unlike
+    // `session`, which is null until its request comes back. Anything deriving
+    // a conversation address must use this: an address that briefly goes empty
+    // reads as a switch and resets the embedded conversation.
+    sessionId,
     setSession,
     sessions,
     error,

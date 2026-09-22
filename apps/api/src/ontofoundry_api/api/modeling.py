@@ -24,13 +24,13 @@ from ontofoundry_api.domain.instance_validation import (
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
-from ontofoundry_api.services.dataagent import task_id_from_messages, topic_id_from_messages
 from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
     current_version,
     version_summary,
 )
+from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
     get_workspace,
@@ -56,7 +56,6 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
 
 def session_data(item):
     nodes, edges = _all_graph(item.draft_json)
-    dataagent_task_id = task_id_from_messages(item.messages_json)
     return {
         "id": item.id,
         "title": item.title,
@@ -65,16 +64,29 @@ def session_data(item):
         "revision": item.revision,
         "draft": item.draft_json,
         "candidates": item.candidates_json,
-        "messages": item.messages_json,
         "material_ids": item.material_ids,
         "task_status": item.task_status,
         "task_detail": item.task_detail,
-        "dataagent_topic_id": topic_id_from_messages(item.messages_json) or None,
+        "dataagent_topic_id": item.dataagent_topic_id,
         "dataagent_task_id": (
-            dataagent_task_id
-            if item.task_status in ("queued", "running")
+            item.dataagent_task_id
+            if item.task_status
+            in (
+                "submitting",
+                "queued",
+                "running",
+                "waiting_input",
+                "waiting_permission",
+            )
             else None
         ),
+        "dataagent_task_mode": item.dataagent_task_mode,
+        "dataagent_run_token": item.dataagent_run_token,
+        "uploaded_material_ids": item.uploaded_material_ids,
+        "last_result_task_id": item.last_result_task_id,
+        "result_state": item.result_state,
+        "result_warnings": item.result_warnings,
+        "result_claimed_at": item.result_claimed_at,
         "updated_at": item.updated_at,
         "graph": {
             "workspace_id": item.workspace_id,
@@ -87,14 +99,28 @@ def session_data(item):
 
 
 def revise(db, item, revision, **values):
-    if item.task_status in ("queued", "running"):
+    if item.task_status in (
+        "submitting",
+        "queued",
+        "running",
+        "waiting_input",
+        "waiting_permission",
+    ):
         raise HTTPException(409, "当前会话正在生成，请等待完成或取消后编辑")
     result = db.execute(
         update(ModelingSessionRecord)
         .where(
             ModelingSessionRecord.id == item.id,
             ModelingSessionRecord.revision == revision,
-            ModelingSessionRecord.task_status.not_in(["queued", "running"]),
+            ModelingSessionRecord.task_status.not_in(
+                [
+                    "submitting",
+                    "queued",
+                    "running",
+                    "waiting_input",
+                    "waiting_permission",
+                ]
+            ),
         )
         .values(**values, revision=revision + 1, updated_at=utc_now())
     )
@@ -376,7 +402,10 @@ def publish_session(
     )
     if not item:
         raise HTTPException(404, "建模会话不存在")
-    if item.revision != body.revision or item.task_status in ("queued", "running"):
+    # All five active states, not just the two obvious ones: a run parked on
+    # waiting_input or waiting_permission is still live, and publishing a draft
+    # the agent is mid-way through rewriting would capture a half-applied model.
+    if item.revision != body.revision or item.task_status in ACTIVE_RUN_STATUSES:
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
     empty = OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
 
@@ -443,6 +472,7 @@ def versions(
     }
 
 
+@router.get("/ontology")
 @router.get("/published-snapshot")
 def published_snapshot(
     workspace_id: str,
@@ -510,25 +540,6 @@ def import_ossie_document(
 
 
 @router.get("/capabilities")
-
-def _agent_capability() -> dict[str, Any]:
-    """问数是否可用，以及当前选中的模型。
-
-    直接问 DataAgent 的 provider 选择逻辑，而不是看某个 URL 配没配。解析失败
-    （没有 provider、模型没启用）时返回未配置，这正是前端要提示用户去设置的
-    情形。
-    """
-    try:
-        from dataagent_backend.core.skill_admin_service import (
-            resolve_runtime_provider_selection,
-        )
-
-        target = resolve_runtime_provider_selection(None, None)
-    except Exception:
-        return {"agent_configured": False, "model": ""}
-    return {"agent_configured": True, "model": str(target.get("model") or "")}
-
-
 def capabilities(
     workspace_id: str,
     request: Request,
@@ -537,11 +548,10 @@ def capabilities(
 ):
     require_member(db, workspace_id, user.id)
     config = request.app.state.settings
+    configured = bool(config.dataagent_base_url and config.dataagent_access_key)
     return {
-        # DataAgent 现在同进程运行，dataagent_base_url 是跨服务时代的遗留，
-        # 永远为空——照它判断的话，模型配好了 UI 也永远显示"尚未配置"。
-        # 真正决定能不能问数的是有没有可用的 provider。
-        **_agent_capability(),
+        "agent_configured": configured,
+        "model": f"DataAgent · {config.dataagent_agent_id}" if configured else "",
         "max_file_mb": config.max_file_mb,
         "connections_configured": bool(config.connection_key),
         "skills": ["md2ossie"],

@@ -1,0 +1,152 @@
+{
+  "schema_version": "ontofoundry.model-result/v1",
+  "run_token": "0123456789abcdef0123456789abcdef",
+  "ontology": {
+    "version": "0.2.0.dev0",
+    "name": "sales_model",
+    "description": "A customer and order ontology",
+    "requires": [
+      "EXISTS (customer)"
+    ],
+    "ontology": [
+      {
+        "concept": "customer",
+        "type": "EntityType",
+        "description": "A customer that places orders",
+        "identify_by": [
+          "customer_id"
+        ],
+        "relationships": [
+          {
+            "name": "customer_id",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{customer} has id {String}"
+            ],
+            "multiplicity": "OneToOne"
+          },
+          {
+            "name": "places",
+            "roles": [
+              {
+                "concept": "sales_order"
+              }
+            ],
+            "verbalizes": [
+              "{customer} places {sales_order}"
+            ],
+            "multiplicity": "ManyToOne"
+          }
+        ]
+      },
+      {
+        "concept": "sales_order",
+        "type": "EntityType",
+        "description": "An order placed by a customer",
+        "identify_by": [
+          "order_id"
+        ],
+        "relationships": [
+          {
+            "name": "order_id",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{sales_order} has id {String}"
+            ],
+            "multiplicity": "OneToOne"
+          }
+        ]
+      }
+    ],
+    "ontology_mappings": [
+      {
+        "name": "warehouse",
+        "semantic_model": {
+          "name": "warehouse_model",
+          "datasets": [
+            {
+              "name": "customer",
+              "source": "public.customers",
+              "primary_key": [
+                "id"
+              ]
+            }
+          ]
+        },
+        "concept_mappings": [
+          {
+            "concept": "customer",
+            "object_mappings": [
+              {
+                "expression": "customer.id"
+              }
+            ],
+            "link_mappings": [
+              {
+                "relationship": "customer_id",
+                "object_mapping": {
+                  "expression": "customer.id"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "annotations": [
+    {
+      "target": {
+        "kind": "object_type",
+        "key": "customer"
+      },
+      "reason": "Customer is the central sales entity",
+      "evidence": [
+        {
+          "material_id": "material-1",
+          "line_start": 12,
+          "line_end": 18,
+          "quote": "Customers place sales orders."
+        }
+      ]
+    },
+    {
+      "target": {
+        "kind": "link_type",
+        "key": "places"
+      },
+      "reason": "The source explicitly connects customers and orders",
+      "evidence": [
+        {
+          "material_id": "material-1",
+          "line_start": 20,
+          "line_end": 20,
+          "quote": "Each customer places orders."
+        }
+      ]
+    },
+    {
+      "target": {
+        "kind": "mapping",
+        "key": "customer"
+      },
+      "reason": "Customer rows are stored in the customers table",
+      "evidence": [
+        {
+          "material_id": "material-2",
+          "line_start": 3,
+          "line_end": 5,
+          "quote": "public.customers is keyed by id."
+        }
+      ]
+    }
+  ]
+}

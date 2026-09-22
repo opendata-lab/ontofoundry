@@ -1860,6 +1860,14 @@ small,
 .settings-content .section-field {
   max-width: 600px;
 }
+.dataagent-health-table td:last-child {
+  line-height: 1.65;
+}
+.dataagent-health-status--failed {
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
 .ontology-node {
   min-width: 132px;
   max-width: 208px;
@@ -2111,4 +2119,21 @@ small,
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Notes from the last modeling run. Top-level ontology constraints are not
+   turned into candidates in v1, so this is the only place a user learns the
+   agent proposed one. */
+.result-warnings {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  border-radius: 0 6px 6px 0;
+}
+.result-warnings p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #92400e;
 }
