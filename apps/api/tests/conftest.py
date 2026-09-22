@@ -6,6 +6,12 @@ from fastapi.testclient import TestClient
 from ontofoundry_api.config import Settings
 from ontofoundry_api.main import create_app
 
+# Several tests assert on declared defaults, which means they must not inherit a
+# developer's local `.env`. Without this the suite passes in CI and fails on any
+# machine configured to run the DataAgent end-to-end flow — the local file
+# supplies a base URL and access key the tests expect to be empty.
+Settings.model_config["env_file"] = None
+
 
 @pytest.fixture
 def client(tmp_path) -> Iterator[TestClient]:

@@ -1,7 +1,7 @@
 """Thin integration client for the OntoFoundry Agent master service.
 
-OntoFoundry remains authoritative for workspaces, modeling drafts and candidate
-acceptance.  DataAgent owns the conversation/runtime lifecycle, including its
+OntoFoundry remains authoritative for workspaces, version drafts and publishing.
+DataAgent owns the conversation/runtime lifecycle, including its
 PostgreSQL task store, Redis coordinator, Pi cell and replayable AgentEvent stream.
 This module intentionally translates only at that product boundary instead of
 re-implementing an agent loop in the platform API.
@@ -327,18 +327,22 @@ def build_turn_prompt(
     run_token: str = "",
 ) -> str:
     action = (
-        "这是明确的建模请求。请分析材料和当前本体，给出可审查的建模建议。\n"
-        "你必须把完整的 Apache Ossie 0.2.0.dev0 文档（不是 diff）放入以下信封：\n"
+        "这是明确的建模请求。请基于本轮材料生成一份完整的新版本本体。\n"
+        "输出是替换当前草稿的完整快照，不是 diff，也不要把新旧模型并列或合并。\n"
+        "当前本体仅用于理解已有命名：保留某个已有概念时必须原样复用其 technical_name；"
+        "不要仅为保留旧模型而复制材料未要求的概念。新增技术名统一使用 snake_case，"
+        "中文业务空间使用中文显示名并写入 ai_context.ontofoundry.display_names，"
+        "格式如 {\"version\":\"1\",\"display_names\":{\"customer\":\"客户\"}}。\n"
+        "你必须把完整的 Apache Ossie 0.2.0.dev0 文档放入以下信封：\n"
         "{\n"
         '  "schema_version": "ontofoundry.model-result/v1",\n'
         f'  "run_token": "{run_token}",\n'
-        '  "ontology": {"...": "完整 Ossie 文档"},\n'
-        '  "annotations": [{"target": {"kind": "object_type | link_type | mapping", '
-        '"key": "Ossie concept 名"}, "reason": "...", "evidence": []}]\n'
+        '  "ontology": {"...": "完整 Ossie 文档"}\n'
         "}\n"
         f"只将该 JSON 信封写到 output/ontofoundry-result-{run_token}.json。"
-        "不要覆盖其他轮次的结果文件，也不要尝试直接修改或发布 OntoFoundry 草稿。"
-        "同时在回答中概括变更。"
+        "不要覆盖其他轮次的结果文件，也不要尝试直接发布 OntoFoundry。"
+        "平台会把该完整结果保存为新版本草稿，由用户预览差异后发布。"
+        "同时在回答中概括完整模型。"
         if mode == "model"
         else "这是普通对话或概念澄清。除非用户明确要求修改，否则不要生成或覆盖本体文件。"
     )

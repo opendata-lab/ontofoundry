@@ -131,17 +131,19 @@ def test_topic_is_lazy_created_then_reused_across_refresh_and_second_send(
     client, monkeypatch
 ):
     _configure(client)
-    session = _create_session(client)
+    session = _create_session(client, title="新的建模会话")
     base = _endpoint(session["id"])
     created = 0
     delivered = 0
     messages = []
+    topic_titles: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         nonlocal created, delivered
         path = request.url.path
         if request.method == "POST" and path.endswith("/topics"):
             created += 1
+            topic_titles.append(_json_request(request)["title"])
             return httpx.Response(200, json={"topic_id": "topic-1"})
         if request.method == "POST" and path.endswith("/files"):
             return httpx.Response(200, json={"rel_path": "uploads/context.json"})
@@ -179,10 +181,18 @@ def test_topic_is_lazy_created_then_reused_across_refresh_and_second_send(
     assert empty.json() == {"messages": [], "run": None}
     assert created == 0
 
-    first = client.post(base + "/messages", json={"content": "第一轮", "metadata": {}})
+    first = client.post(
+        base + "/messages",
+        json={
+            "content": "业务场景：电商核心业务本体构建\n本次需求：第一轮",
+            "metadata": {},
+        },
+    )
     assert first.status_code == 202, first.text
     assert first.json()["task_id"] == "task-1"
     assert created == 1
+    assert topic_titles == ["电商核心业务本体构建"]
+    assert _session_row(client, session["id"]).title == "电商核心业务本体构建"
 
     refreshed = client.get(base)
     assert refreshed.status_code == 200, refreshed.text

@@ -13,6 +13,7 @@ silently produce a wrong mapping.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid5
 
@@ -245,9 +246,20 @@ def parse_joins(
     document: dict[str, Any],
     objects: list[ObjectTypeDefinition],
     links: list[LinkTypeDefinition],
+    mapped_type_ids: set[str],
+    skip: Callable[[str, str], None],
 ) -> None:
-    """Fill in relation join columns from the semantic model, in place."""
+    """Fill in relation join columns from the semantic model, in place.
+
+    A join is only attachable when both endpoints are backed by a table, which
+    is also what `OntologyDraft` enforces. Attaching one regardless produced a
+    draft the model layer then rejected — and since the only producer of these
+    documents is an agent, that rejection threw away an entire modeling run
+    because one concept happened to have no dataset. Skipping the join keeps the
+    rest of the model and leaves a note explaining what is missing.
+    """
     datasets_by_concept = {item.technical_name: item.id for item in objects}
+    names_by_id = {item.id: item.technical_name for item in objects}
     for entry in document.get("ontology_mappings") or []:
         if not isinstance(entry, dict):
             continue
@@ -265,6 +277,16 @@ def parse_joins(
                 if link.technical_name != str(relationship.get("name") or ""):
                     continue
                 if {link.source_type_id, link.target_type_id} != {source, target}:
+                    continue
+                unmapped = {link.source_type_id, link.target_type_id} - mapped_type_ids
+                if unmapped:
+                    missing = "、".join(
+                        sorted(names_by_id.get(type_id, type_id) for type_id in unmapped)
+                    )
+                    skip(
+                        f"semantic_model.relationships[{link.technical_name}]",
+                        f"{missing} 没有数据映射，该关系的数据连接未设置",
+                    )
                     continue
                 forward = link.source_type_id == source
                 link.data_join = DataJoin(

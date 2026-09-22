@@ -1,5 +1,4 @@
 from copy import deepcopy
-from typing import Any
 from uuid import uuid4
 
 import jsonschema

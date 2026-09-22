@@ -1,16 +1,16 @@
-"""Consume completed DataAgent modeling results as reviewable candidates.
+"""Consume a completed DataAgent result as a complete version draft.
 
-The agent output is deliberately kept on the proposal side of the boundary:
-this module never writes ``draft_json`` and never publishes an ontology.
+The generated ontology replaces the modeling session's draft as one atomic
+snapshot.  Publishing remains a separate, explicit user action.
 """
 
 from __future__ import annotations
 
 import json
-from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
+from pydantic import ValidationError
 from sqlalchemy import and_, or_, update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
@@ -20,114 +20,6 @@ from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 
 RESULT_SCHEMA_VERSION = "ontofoundry.model-result/v1"
 RESULT_LEASE = timedelta(minutes=5)
-TOP_LEVEL_WARNING = (
-    "本轮结果包含顶层本体约束变更，v1 不生成候选，"
-    "如需应用请手工编辑或导入 Ossie 文件"
-)
-_CANDIDATE_COLLECTIONS = {
-    "object_type": "object_types",
-    "link_type": "link_types",
-    "mapping": "mappings",
-}
-AnnotationIndex = dict[tuple[str, str], tuple[str, list[dict[str, Any]]]]
-
-
-def _annotation_index(
-    annotations: object, imported_draft: dict[str, Any]
-) -> AnnotationIndex:
-    result: AnnotationIndex = {}
-    if not isinstance(annotations, list):
-        return result
-    object_keys = {
-        str(item.get("id")): {
-            str(item.get("technical_name") or ""),
-            str(item.get("name") or ""),
-        }
-        for item in imported_draft.get("object_types", [])
-        if isinstance(item, dict)
-    }
-    for annotation in annotations:
-        if not isinstance(annotation, dict):
-            continue
-        target = annotation.get("target")
-        if not isinstance(target, dict):
-            continue
-        kind = str(target.get("kind") or "")
-        key = str(target.get("key") or "")
-        if kind not in _CANDIDATE_COLLECTIONS or not key:
-            continue
-        evidence = annotation.get("evidence")
-        if not isinstance(evidence, list) or any(
-            not isinstance(item, dict) for item in evidence
-        ):
-            evidence = []
-        result[(kind, key)] = (
-            str(annotation.get("reason") or ""),
-            deepcopy(evidence),
-        )
-        # Mappings are addressed by their owning Ossie concept, not an
-        # implementation UUID. Keep the regular key above for forward
-        # compatibility, and resolve the current mapping keys below.
-        if kind == "mapping":
-            for mapping in imported_draft.get("mappings", []):
-                if not isinstance(mapping, dict):
-                    continue
-                if key in object_keys.get(str(mapping.get("type_id")), set()):
-                    result[(kind, str(mapping.get("id") or ""))] = result[(kind, key)]
-    return result
-
-
-def build_candidates(
-    before_draft: dict[str, Any],
-    imported_draft: dict[str, Any],
-    annotations: object,
-    task_id: str,
-) -> list[dict[str, Any]]:
-    """Build deterministic type-level proposals from an imported merge result."""
-    annotation_by_target = _annotation_index(annotations, imported_draft)
-    candidates: list[dict[str, Any]] = []
-    for kind, collection in _CANDIDATE_COLLECTIONS.items():
-        before_by_id = {
-            str(item.get("id")): item
-            for item in before_draft.get(collection, [])
-            if isinstance(item, dict) and item.get("id")
-        }
-        for value in imported_draft.get(collection, []):
-            if not isinstance(value, dict) or not value.get("id"):
-                continue
-            value_id = str(value["id"])
-            before = before_by_id.get(value_id)
-            if before is not None and (kind == "mapping" or before == value):
-                continue
-            annotation_keys = (
-                [value_id]
-                if kind == "mapping"
-                else [
-                    str(value.get("technical_name") or ""),
-                    str(value.get("name") or ""),
-                ]
-            )
-            reason, evidence = next(
-                (
-                    annotation_by_target[(kind, key)]
-                    for key in annotation_keys
-                    if (kind, key) in annotation_by_target
-                ),
-                ("", []),
-            )
-            candidates.append(
-                {
-                    "id": f"{task_id}:{kind}:{value_id}",
-                    "kind": kind,
-                    "status": "pending",
-                    "value": deepcopy(value),
-                    "before": deepcopy(before),
-                    "reason": reason,
-                    "evidence": evidence,
-                    "source_task_id": task_id,
-                }
-            )
-    return candidates
 
 
 def _client(app: Any, workspace_id: str, session_id: str) -> DataAgentClient:
@@ -166,6 +58,37 @@ def _guarded_result_values(
         return changed.rowcount == 1
 
 
+def _result_warnings(import_report: dict[str, Any]) -> list[str]:
+    """Everything the import could not carry over, in one list for the user.
+
+    Only `notes` used to be kept, which dropped exactly the actionable half:
+    `skipped` is where "this relation has no data join because that concept has
+    no mapping" lives. Without it the draft silently came back smaller than the
+    agent described and nothing said why.
+    """
+    warnings = [str(note) for note in import_report.get("notes") or []]
+    for item in import_report.get("skipped") or []:
+        reason = str(item.get("reason") or "").strip()
+        path = str(item.get("path") or "").strip()
+        text = f"{path}：{reason}" if path and reason else reason or path
+        if text and text not in warnings:
+            warnings.append(text)
+    return warnings
+
+
+def _first_validation_message(exc: ValidationError) -> str:
+    """The one line worth showing a user out of a pydantic error report.
+
+    The raw report repeats the whole rejected document, which for an ontology is
+    thousands of characters of noise around a one-sentence reason.
+    """
+    for error in exc.errors():
+        message = str(error.get("msg") or "").removeprefix("Value error, ").strip()
+        if message:
+            return message
+    return "草稿校验未通过"
+
+
 def _current_result_state(app: Any, session_id: str) -> str:
     with app.state.session_factory() as db:
         item = db.get(ModelingSessionRecord, session_id)
@@ -195,17 +118,6 @@ def _permanent_detail(exc: DataAgentError, result_path: str) -> str:
     if exc.status_code == 404:
         return f"建模任务没有产出 `{result_path}`"
     return f"建模结果下载失败：{exc}"
-
-
-def _top_level_changed(
-    before_draft: dict[str, Any], imported_draft: dict[str, Any]
-) -> bool:
-    collections = set(_CANDIDATE_COLLECTIONS.values())
-    before = {key: value for key, value in before_draft.items() if key not in collections}
-    imported = {
-        key: value for key, value in imported_draft.items() if key not in collections
-    }
-    return before != imported
 
 
 # Transient by status code. 429 matters most: a rate-limited file service is the
@@ -270,9 +182,6 @@ async def reconcile_run(
 
         topic_id = str(item.dataagent_topic_id or "")
         run_token = str(item.dataagent_run_token or "")
-        before_draft = deepcopy(item.draft_json)
-        old_candidates = deepcopy(item.candidates_json or [])
-        old_warnings = deepcopy(item.result_warnings or [])
         revision = item.revision
 
     result_path = f"output/ontofoundry-result-{run_token}.json"
@@ -346,11 +255,10 @@ async def reconcile_run(
         )
 
     try:
-        imported_draft, _report = import_ossie(
+        version_draft, import_report = import_ossie(
             payload["ontology"],
             workspace_id=workspace_id,
-            base=before_draft,
-            mode="merge",
+            mode="replace",
         )
     except OssieImportError as exc:
         return _finish_failure(
@@ -361,22 +269,24 @@ async def reconcile_run(
             state="failed_permanent",
             detail=f"建模结果无法导入：{exc}",
         )
-
-    candidates = build_candidates(
-        before_draft,
-        imported_draft,
-        payload.get("annotations", []),
-        task_id,
-    )
-    retained = []
-    for candidate in old_candidates:
-        candidate = deepcopy(candidate)
-        if candidate.get("status") == "pending":
-            candidate["status"] = "superseded"
-        retained.append(candidate)
-    warnings = old_warnings
-    if _top_level_changed(before_draft, imported_draft):
-        warnings = [*warnings, TOP_LEVEL_WARNING]
+    except ValidationError as exc:
+        # The document passed the Ossie schema but breaks a draft invariant of
+        # ours — an agent may, for instance, map a link whose endpoint objects
+        # have no data mapping. Only OssieImportError was caught here, so this
+        # escaped as a 500 out of whichever request happened to be reconciling,
+        # and the lease stayed held with result_state parked on "processing":
+        # the conversation became unreadable and the run never resolved.
+        #
+        # Re-running the same file cannot change the outcome, so it is
+        # permanent: the agent has to produce a different model.
+        return _finish_failure(
+            app,
+            session_id,
+            task_id,
+            claimed_at,
+            state="failed_permanent",
+            detail=f"建模结果不满足草稿约束：{_first_validation_message(exc)}",
+        )
 
     with app.state.session_factory() as db:
         changed = db.execute(
@@ -390,11 +300,12 @@ async def reconcile_run(
                 ModelingSessionRecord.revision == revision,
             )
             .values(
-                candidates_json=[*retained, *candidates],
-                result_warnings=warnings,
+                draft_json=version_draft,
+                candidates_json=[],
+                result_warnings=_result_warnings(import_report),
                 result_state="done",
                 task_status="finished",
-                task_detail="DataAgent 处理完成",
+                task_detail="完整建模结果已生成，请预览差异后发布新版本",
                 revision=revision + 1,
                 updated_at=utc_now(),
             )
@@ -408,8 +319,8 @@ async def reconcile_run(
                     session_id,
                     task_id,
                     claimed_at,
-                    state="failed_retriable",
-                    detail="候选写入前草稿已更新，正在基于最新草稿重试",
+                    state="failed_permanent",
+                    detail="新版本草稿写入前会话已更新，请重新运行建模",
                 )
             return state
     return "done"

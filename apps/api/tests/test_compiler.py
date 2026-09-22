@@ -85,3 +85,23 @@ def test_all_cardinalities_and_self_relationship_are_official_schema_valid(multi
     relation.target_type_id = relation.source_type_id
     result = compile_ossie(draft, ontology_name="test", ontology_description="")
     assert validate_ossie(result)["publishable"], validate_ossie(result)
+
+
+def test_compiler_sanitizes_readings_with_case_and_type_aliases():
+    draft = build_demo_draft()
+    # Provide TitleCase readings on a lowercase technical name link
+    draft.link_types[0].verbalizes = [
+        "{Supplier} 向企业提供 {Material}",
+        "{Material} 由 {Supplier} 提供",
+    ]
+    # Provide {String} on an identifier attribute that gets a ValueType wrapper
+    draft.object_types[0].attributes[0].verbalizes = [
+        "{Supplier} 的供应商编码是 {String}",
+    ]
+    # Provide an invalid reading that should fall back gracefully
+    draft.link_types[1].verbalizes = ["{NonExistent} relates to {Ghost}"]
+
+    result = compile_ossie(draft, ontology_name="test", ontology_description="")
+    report = validate_ossie(result)
+    assert report["publishable"] is True
+    assert report["errors"] == []
