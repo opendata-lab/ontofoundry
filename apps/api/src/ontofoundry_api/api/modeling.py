@@ -547,9 +547,10 @@ def capabilities(
 ):
     require_member(db, workspace_id, user.id)
     config = request.app.state.settings
+    configured = bool(config.dataagent_base_url and config.dataagent_access_key)
     return {
-        "agent_configured": bool(config.dataagent_base_url),
-        "model": "DataAgent · Pi" if config.dataagent_base_url else "",
+        "agent_configured": configured,
+        "model": f"DataAgent · {config.dataagent_agent_id}" if configured else "",
         "max_file_mb": config.max_file_mb,
         "connections_configured": bool(config.connection_key),
         "skills": ["md2ossie"],
