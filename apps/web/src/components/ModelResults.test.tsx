@@ -63,7 +63,7 @@ describe("建模结果", () => {
   it("only has the two agreed tabs, with real model counts and searchable attributes", () => {
     render(
       <MemoryRouter>
-        <ModelResults session={session()} busy={false} onCandidate={vi.fn()} />
+        <ModelResults session={session()} />
       </MemoryRouter>,
     );
     expect(screen.getAllByRole("tab")).toHaveLength(2);
@@ -77,40 +77,22 @@ describe("建模结果", () => {
     fireEvent.click(screen.getByRole("tab", { name: "语义图谱概览" }));
     expect(screen.getByTestId("semantic-graph")).toBeInTheDocument();
   });
-  it("preview does not mutate the draft and bulk acceptance omits conflicts", () => {
-    const s = session(),
-      accept = vi.fn();
-    s.candidates = [
-      {
-        id: "candidate1",
-        kind: "object_type",
-        status: "pending",
-        reason: "原文",
-        value: { ...draft.object_types[0], name: "候选物料" },
-      },
-      {
-        id: "candidate2",
-        kind: "object_type",
-        status: "pending",
-        reason: "原文",
-        conflict: "已有人工修改",
-        value: { ...draft.object_types[0], id: "other", name: "冲突项" },
-      },
-    ];
+  it("shows the complete result as a version draft without candidate actions", () => {
+    const s = session();
+    s.draft.object_types[0].name = "新版本物料";
     render(
       <MemoryRouter>
-        <ModelResults session={s} busy={false} onCandidate={accept} />
+        <ModelResults session={s} />
       </MemoryRouter>,
     );
-    expect(screen.getByText("候选物料")).toBeInTheDocument();
-    expect(s.draft.object_types[0].name).toBe("物料");
-    fireEvent.click(screen.getByRole("button", { name: "接受全部无冲突项" }));
-    expect(accept).toHaveBeenCalledWith(["candidate1"], "accept");
+    expect(screen.getByText("新版本物料")).toBeInTheDocument();
+    expect(screen.getByText(/完整的新版本草稿/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /接受/ })).not.toBeInTheDocument();
   });
   it("has an honest empty state before generation", () => {
     render(
       <MemoryRouter>
-        <ModelResults session={null} busy={false} onCandidate={vi.fn()} />
+        <ModelResults session={null} />
       </MemoryRouter>,
     );
     expect(screen.getByText("暂无构建结果")).toBeInTheDocument();
@@ -118,7 +100,7 @@ describe("建模结果", () => {
   });
 });
 
-describe("mapping candidates", () => {
+describe("version draft mappings", () => {
   const mapping = {
     id: "map-1",
     type_id: "material",
@@ -129,25 +111,18 @@ describe("mapping candidates", () => {
     fields: {},
   };
 
-  const withMappingCandidate = (): ModelingSession => ({
-    ...session(),
-    candidates: [
-      {
-        id: "t-1:mapping:map-1",
-        kind: "mapping",
-        status: "pending",
-        reason: "材料中提到物料主数据来自数仓",
-        value: mapping,
-      },
-    ],
-  });
+  const withMapping = (): ModelingSession => {
+    const value = session();
+    value.draft.mappings = [mapping];
+    return value;
+  };
 
   it("labels a mapping by its connection alias and table", () => {
     // DataMapping has no name field on purpose: a published model carries an
     // alias rather than a connection, so this pair is the only stable label.
     render(
       <MemoryRouter>
-        <ModelResults session={withMappingCandidate()} busy={false} onCandidate={() => {}} />
+        <ModelResults session={withMapping()} />
       </MemoryRouter>,
     );
 
@@ -157,23 +132,6 @@ describe("mapping candidates", () => {
     expect(screen.getByText(/主键 material_id/)).toBeInTheDocument();
   });
 
-  it("accepts a mapping candidate by id", () => {
-    const onCandidate = vi.fn();
-    render(
-      <MemoryRouter>
-        <ModelResults
-          session={withMappingCandidate()}
-          busy={false}
-          onCandidate={onCandidate}
-        />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /映射/ }));
-    fireEvent.click(screen.getAllByRole("button", { name: /接受/ })[0]);
-
-    expect(onCandidate).toHaveBeenCalledWith(["t-1:mapping:map-1"], "accept");
-  });
 });
 
 describe("result warnings", () => {
@@ -187,7 +145,7 @@ describe("result warnings", () => {
 
     render(
       <MemoryRouter>
-        <ModelResults session={warned} busy={false} onCandidate={() => {}} />
+        <ModelResults session={warned} />
       </MemoryRouter>,
     );
 

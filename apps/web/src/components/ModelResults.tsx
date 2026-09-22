@@ -1,12 +1,7 @@
-import { Box, GitBranch, Braces, Check, X, FileText, Database } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Box, Braces, Database, GitBranch } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import type {
-  Candidate,
-  Draft,
-  ModelingSession,
-  TypeGraph,
-} from "../api/types";
+import type { Draft, ModelingSession, TypeGraph } from "../api/types";
 import { EmptyModel } from "./EmptyModel";
 import { OntologyGraph } from "./OntologyGraph";
 
@@ -37,42 +32,11 @@ function draftGraph(draft: Draft): TypeGraph {
   };
 }
 
-export function ModelResults({
-  session,
-  busy,
-  onCandidate,
-}: {
-  session: ModelingSession | null;
-  busy: boolean;
-  onCandidate: (ids: string[], action: string) => void;
-}) {
+export function ModelResults({ session }: { session: ModelingSession | null }) {
   const [tab, setTab] = useState("models");
   const [kind, setKind] = useState("object_type");
   const [query, setQuery] = useState("");
-  const pending =
-    session?.candidates.filter((c) => c.status === "pending") ?? [];
-  const model = useMemo(() => {
-    if (!session) return null;
-    const d = structuredClone(session.draft);
-    for (const c of session.candidates.filter((c) => c.status === "pending")) {
-      if (c.kind === "object_type")
-        d.object_types = [
-          ...d.object_types.filter((t) => t.id !== c.value.id),
-          c.value,
-        ];
-      if (c.kind === "link_type")
-        d.link_types = [
-          ...d.link_types.filter((t) => t.id !== c.value.id),
-          c.value,
-        ];
-      if (c.kind === "mapping")
-        d.mappings = [
-          ...d.mappings.filter((m) => m.id !== c.value.id),
-          c.value,
-        ];
-    }
-    return d;
-  }, [session]);
+  const model = session?.draft ?? null;
   const rows =
     kind === "object_type"
       ? (model?.object_types ?? [])
@@ -81,19 +45,16 @@ export function ModelResults({
         : kind === "mapping"
           ? (model?.mappings ?? []).map((m) => ({
               ...m,
-              // DataMapping carries no name: the published model deliberately
-              // holds a connection alias rather than a connection, so the
-              // alias plus the table is the only stable label available.
               name: `${m.connection_alias} · ${m.schema_name ? m.schema_name + "." : ""}${m.table_name}`,
               description: `主键 ${m.key_column}`,
               technical_name: m.table_name,
             }))
-        : (model?.object_types.flatMap((t) =>
-            t.attributes.map((a) => ({
-              ...a,
-              description: t.name + " · " + a.value_kind,
-            })),
-          ) ?? []);
+          : (model?.object_types.flatMap((t) =>
+              t.attributes.map((a) => ({
+                ...a,
+                description: t.name + " · " + a.value_kind,
+              })),
+            ) ?? []);
   const categories = [
     {
       key: "object_type",
@@ -125,9 +86,13 @@ export function ModelResults({
       cls: "attribute",
     },
   ];
-  const candidateFor = (id: string): Candidate | undefined =>
-    pending.find((c) => "id" in c.value && c.value.id === id);
   const warnings = session?.result_warnings ?? [];
+  const visibleRows = rows.filter((r) =>
+    (r.name + r.technical_name + r.description)
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+
   return (
     <aside className="ref-results">
       {warnings.length > 0 && (
@@ -177,155 +142,66 @@ export function ModelResults({
               onChange={(e) => setQuery(e.target.value)}
             />
           </label>
-          {pending.some((c) => c.kind !== "clarification") && (
-            <div className="candidate-actions">
-              <span>{pending.length} 项候选</span>
-              <button
-                className="button button--text"
-                disabled={busy}
-                onClick={() =>
-                  onCandidate(
-                    pending
-                      .filter((c) => !c.conflict && c.kind !== "clarification")
-                      .map((c) => c.id),
-                    "accept",
-                  )
-                }
-              >
-                接受全部无冲突项
-              </button>
-            </div>
-          )}
           <div className="result-list">
-            {rows
-              .filter((r) =>
-                (r.name + r.technical_name + r.description)
-                  .toLowerCase()
-                  .includes(query.toLowerCase()),
-              )
-              .map((r) => {
-                const candidate = candidateFor(r.id);
-                return (
-                  <details className="result-row" key={r.id}>
-                    <summary>
-                      <span
-                        className={
-                          "model-icon model-icon--" +
-                          (kind === "object_type"
-                            ? "object"
-                            : kind === "link_type"
-                              ? "relation"
-                              : "attribute")
-                        }
-                      >
-                        {kind === "object_type" ? (
-                          <Box size={13} />
-                        ) : kind === "link_type" ? (
-                          <GitBranch size={13} />
-                        ) : (
-                          <Braces size={13} />
-                        )}
-                      </span>
-                      <span className="result-row-title">
-                        <strong>{r.name}</strong>
-                        <small>{r.technical_name}</small>
-                        <p>{r.description || "尚未填写定义"}</p>
-                      </span>
-                      <span
-                        className={
-                          candidate ? "candidate-badge" : "result-count"
-                        }
-                      >
-                        {candidate
-                          ? "候选"
-                          : "attributes" in r
-                            ? r.attributes.length + " 属性"
-                            : "草稿"}
-                      </span>
-                    </summary>
-                    <div className="result-expanded">
-                      {"attributes" in r && (
-                        <table>
-                          <tbody>
-                            {r.attributes.map((a) => (
-                              <tr key={a.id}>
-                                <td>
-                                  <Braces size={12} />
-                                  {a.name}
-                                </td>
-                                <td>{a.technical_name}</td>
-                                <td>{a.value_kind}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                      {candidate && (
-                        <>
-                          <p>{candidate.reason}</p>
-                          {candidate.evidence?.map((ev, i) => (
-                            <a
-                              key={i}
-                              className="evidence-link"
-                              target="_blank"
-                              rel="noreferrer"
-                              href={
-                                "/api/v1/workspaces/" +
-                                session?.workspace_id +
-                                "/materials/" +
-                                ev.material_id
-                              }
-                            >
-                              <FileText size={13} />
-                              原文 {ev.line_start}–{ev.line_end} 行
-                            </a>
-                          ))}
-                          {candidate.conflict && (
-                            <p className="inline-error">{candidate.conflict}</p>
-                          )}
-                          <div className="result-actions">
-                            <button
-                              className="button button--primary"
-                              disabled={busy}
-                              onClick={() =>
-                                onCandidate([candidate.id], "accept")
-                              }
-                            >
-                              <Check size={13} />
-                              接受
-                            </button>
-                            <button
-                              className="button button--text"
-                              disabled={busy}
-                              onClick={() =>
-                                onCandidate([candidate.id], "ignore")
-                              }
-                            >
-                              <X size={13} />
-                              忽略
-                            </button>
-                          </div>
-                        </>
-                      )}
-                      {!candidate && session && kind === "object_type" && (
-                        <Link
-                          className="button button--text"
-                          to={
-                            "../objects/" + r.id + "/edit?session=" + session.id
-                          }
-                        >
-                          编辑本体
-                        </Link>
-                      )}
-                    </div>
-                  </details>
-                );
-              })}
-            {!rows.some((r) =>
-              (r.name + r.technical_name + r.description)
-                .toLowerCase()
-                .includes(query.toLowerCase()),
-            ) && (
+            {visibleRows.map((r) => (
+              <details className="result-row" key={r.id}>
+                <summary>
+                  <span
+                    className={
+                      "model-icon model-icon--" +
+                      (kind === "object_type"
+                        ? "object"
+                        : kind === "link_type"
+                          ? "relation"
+                          : "attribute")
+                    }
+                  >
+                    {kind === "object_type" ? (
+                      <Box size={13} />
+                    ) : kind === "link_type" ? (
+                      <GitBranch size={13} />
+                    ) : (
+                      <Braces size={13} />
+                    )}
+                  </span>
+                  <span className="result-row-title">
+                    <strong>{r.name}</strong>
+                    <small>{r.technical_name}</small>
+                    <p>{r.description || "尚未填写定义"}</p>
+                  </span>
+                  <span className="result-count">
+                    {"attributes" in r ? r.attributes.length + " 属性" : "新版本草稿"}
+                  </span>
+                </summary>
+                <div className="result-expanded">
+                  {"attributes" in r && (
+                    <table>
+                      <tbody>
+                        {r.attributes.map((a) => (
+                          <tr key={a.id}>
+                            <td>
+                              <Braces size={12} />
+                              {a.name}
+                            </td>
+                            <td>{a.technical_name}</td>
+                            <td>{a.value_kind}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {session && kind === "object_type" && (
+                    <Link
+                      className="button button--text"
+                      to={"../objects/" + r.id + "/edit?session=" + session.id}
+                    >
+                      编辑本体
+                    </Link>
+                  )}
+                </div>
+              </details>
+            ))}
+            {!visibleRows.length && (
               <EmptyModel
                 text={
                   query
@@ -337,81 +213,9 @@ export function ModelResults({
               />
             )}
           </div>
-          {pending.some((c) => c.kind === "object" || c.kind === "link") && (
-            <details className="result-row">
-              <summary>
-                文档实例与实例关系 ·{" "}
-                {
-                  pending.filter(
-                    (c) => c.kind === "object" || c.kind === "link",
-                  ).length
-                }{" "}
-                项待确认
-              </summary>
-              <div className="result-expanded">
-                {pending
-                  .filter((c) => c.kind === "object" || c.kind === "link")
-                  .map((c) => (
-                    <section key={c.id}>
-                      <strong>
-                        {c.kind === "object" ? c.value.name : "实例关系"}
-                      </strong>
-                      <p>{c.reason}</p>
-                      {c.kind === "object" && (
-                        <dl className="ref-definition">
-                          {Object.entries(c.value.values).map(([k, v]) => (
-                            <div key={k}>
-                              <dt>{k}</dt>
-                              <dd>{String(v ?? "—")}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                      )}
-                      {c.kind === "link" && (
-                        <p>
-                          {c.value.source_id} → {c.value.target_id}
-                        </p>
-                      )}
-                      {c.evidence?.map((ev, i) => (
-                        <p className="evidence" key={i}>
-                          {ev.quote}（{ev.line_start}–{ev.line_end} 行）
-                        </p>
-                      ))}
-                      {c.conflict && (
-                        <p className="inline-error">{c.conflict}</p>
-                      )}
-                      <div className="result-actions">
-                        <button
-                          className="button button--primary"
-                          disabled={busy}
-                          onClick={() => onCandidate([c.id], "accept")}
-                        >
-                          接受
-                        </button>
-                        <button
-                          className="button button--text"
-                          disabled={busy}
-                          onClick={() => onCandidate([c.id], "ignore")}
-                        >
-                          忽略
-                        </button>
-                      </div>
-                    </section>
-                  ))}
-              </div>
-            </details>
-          )}
-          {pending
-            .filter((c) => c.kind === "clarification")
-            .map((c) => (
-              <div className="clarification" key={c.id}>
-                <strong>待澄清</strong>
-                <p>{c.reason}</p>
-              </div>
-            ))}
           {session && (
             <footer className="result-footnote">
-              草稿 + 待确认候选 · 接受后才写入草稿
+              完整的新版本草稿 · 请前往交付页预览差异并发布
             </footer>
           )}
         </>

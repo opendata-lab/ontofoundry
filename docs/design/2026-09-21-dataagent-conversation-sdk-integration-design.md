@@ -6,12 +6,17 @@
 **上游依赖:** OpenDataWorks 仓库 `docs/design/2026-09-21-agent-conversation-sdk-design.md`
 **取代:** `docs/design/2026-09-16-merge-dataagent-into-ontofoundry.md` 所确立的"同进程合并"形态（该文档保留为历史记录）
 
+> **2026-09-22 MVP 决策修订：** 自动建模不再生成逐项候选或与旧草稿合并。
+> DataAgent 产出的完整 Ossie 文档经校验后，原子替换当前建模会话的版本草稿；
+> 用户仍须在交付页预览差异并显式发布。本文 §7、§12 和配套实施计划已按此
+> 修订；候选接受与三方合并保留为未来能力，不属于当前自动建模主流程。
+
 ## 1. 背景与定位
 
 | 平台 | 拥有 | 不拥有 |
 | --- | --- | --- |
 | OpenDataWorks | 数据源、元数据、存储、加工、查询、任务、数据权限、数据 MCP | 本体版本真相 |
-| OntoFoundry | 业务概念、本体草稿、候选项、版本、发布、语义映射、本体 API/MCP | 通用会话运行时、模型 Provider、Skill 市场、沙箱 |
+| OntoFoundry | 业务概念、版本草稿、版本、发布、语义映射、本体 API/MCP | 通用会话运行时、模型 Provider、Skill 市场、沙箱 |
 | DataAgent | 会话、Topic、Task、AgentEvent、Agent、Skill、MCP registry、模型、运行隔离 | 数据权限真相、本体版本真相 |
 
 **OpenDataWorks 管数据，OntoFoundry 管数据的业务含义，DataAgent 用智能体把两者组织起来。**
@@ -36,11 +41,11 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
 
 ### 2.1 必须先说清的现状缺口
 
-**当前没有任何代码把 Agent 的产出写回候选项。** `candidates_json` 在全仓库只有两处触碰：`session_data()` 读出来给前端（`api/modeling.py:67`），`accept_candidates()` 改状态并合并进草稿（:299-342）。**没有任何生产者。**
+改造前没有任何代码把 Agent 的产出写回版本草稿。自动建模实际停在：Agent 回答一段文本，
+附件挂在聊天区，人再手工操作；已有的候选确认 UI 也没有生产者。
 
-今天的"自动建模"实际停在：Agent 回答一段文本，附件挂在聊天区，人再手工操作。右侧候选确认逻辑是完整的，但上游没接上。
-
-因此本次不只是换 UI——要让工作台真正闭环，必须补上"建模任务 → OSSIE 结果 → 候选项"这一段。
+因此本次不只是换 UI——要让工作台真正闭环，必须补上
+"建模任务 → 完整 Ossie 结果 → 新版本草稿 → 差异预览与发布"这一段。
 
 ## 3. 问题
 
@@ -57,7 +62,7 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
 - 删除本仓库内的 DataAgent 后端与 Pi 运行时，改为通过同源 BFF 访问**外部**的 OpenDataWorks DataAgent。
 - 中间会话区替换为 `@opendataworks/agent-conversation` 的 `<dataagent-conversation>`，删除自制 `AgentStream` 与 `dataagentStream` reducer。
 - **自动建模页左侧（材料 / 业务场景 / 数据源）与右侧（`ModelResults`）的布局与交互保持不变。**
-- 补上"建模任务 → 候选项"的回写闭环。
+- 补上"建模任务 → 完整版本草稿"的回写闭环。
 - DataAgent 成为聊天与运行记录的唯一权威来源。
 
 ### 非目标
@@ -65,7 +70,7 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
 - 不改本体领域模型、Ossie 编译器/校验器/导入器的语义。
 - 不引入 launch token 或独立 integration 身份协议。
 - 不把数据连接与凭据下沉到 OpenDataWorks。
-- 不新增"顶层本体约束"候选类型（理由见 §7.5）。
+- 不实现逐项候选接受或自动合并；兼容字段与接口暂时保留，后续单独设计。
 
 ## 5. 目标架构
 
@@ -75,7 +80,7 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
         │ 同源
         ▼
 OntoFoundry API（FastAPI，单进程）
-  ├─ 本体领域：草稿、候选、版本、发布、Ossie、MCP
+  ├─ 本体领域：版本草稿、版本、发布、Ossie、MCP
   └─ Agent Conversation BFF ──── 服务端调用，带 access key ────▶ OpenDataWorks DataAgent
 ```
 
@@ -153,7 +158,8 @@ event: done
 data: {"task_id":"t-1","status":"finished","detail":"...","metadata":{"mode":"model"}}
 ```
 
-**`done` 必须在 BFF 完成候选回写之后才发出。** 这样前端收到 `dataagent-complete` 时刷新右侧一定能看到新候选，不需要额外的轮询或延迟重试。
+**`done` 必须在 BFF 完成新版本草稿写入之后才发出。** 这样前端收到
+`dataagent-complete` 时刷新右侧一定能看到完整结果，不需要额外轮询或延迟重试。
 
 ### 6.4 身份与隔离
 
@@ -263,11 +269,82 @@ X-ODW-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 
 同一组诊断在空间设置页以只读连通性检查呈现（`GET /api/v1/workspaces/{id}/settings/dataagent-health`），Agent 一项用 §6.2 的 `/api/v1/dataagent/agents/{agent_id}` 探测。**设置页不提供密钥写入**——凭据由部署环境注入，不进数据库、不经浏览器。
 
-## 7. 自动建模结果回写
+## 7. 自动建模结果回写（当前 MVP）
 
-本次唯一的新增业务能力，风险最高。原则：**DataAgent 只负责提出方案，OntoFoundry 始终掌握校验、冲突检测和人工接受。Agent 在任何情况下都不能直接改写草稿或发布版本。**
+原则：**DataAgent 生成完整模型，OntoFoundry 负责结构校验、版本差异预览和发布；
+Agent 永远不能直接发布版本。** 建模结果可以原子替换建模会话中的版本草稿，但只有用户
+在交付页明确点击发布后，才会创建 `vN+1` 并切换当前生效版本。
 
-### 7.1 结果契约
+### 7.1 当前结果契约
+
+```json
+{
+  "schema_version": "ontofoundry.model-result/v1",
+  "run_token": "9f2a…",
+  "ontology": { "...": "完整的 Apache Ossie 0.2.0.dev0 文档" }
+}
+```
+
+- `ontology` 是完整的新版本快照，不是 diff 或候选集合。
+- 当前本体快照只用于理解命名；保留已有概念时必须原样复用 `technical_name`。
+- 新增技术名统一使用 `snake_case`；中文显示名写入 OntoFoundry
+  `ai_context.ontofoundry.display_names` 扩展。
+- 不要求 `annotations`；当前 MVP 不消费逐项理由和证据。
+
+### 7.2 当前消费流水线
+
+```text
+claim 当前 task + result lease
+  ↓
+下载并校验 output/ontofoundry-result-{run_token}.json
+  ↓
+validate_schema(ontology)
+  ↓
+import_ossie(ontology, workspace_id=…, mode="replace")
+  ↓
+一次条件事务写入：
+  draft_json = 完整导入结果
+  candidates_json = []
+  result_state = 'done'
+  task_status = 'finished'
+  revision = revision + 1
+  ↓
+前端刷新“新版本草稿” → 交付页预览差异 → 用户显式发布
+```
+
+这里故意不用 `mode="merge"`：文件之外的旧对象、关系、实例和映射不会隐式保留。
+每轮成功建模都产生一个自洽的完整草稿，历史已发布版本保持不可变并可比较、回滚。
+
+### 7.3 并发、幂等与失败门禁
+
+- `run_token` 文件隔离、`result_state`、五分钟 claim 租约和 task generation guard 保持不变。
+- 同一 task 重复消费不重复推进 revision，也不重复写草稿。
+- 下载超时、429、5xx 保持可重试；404、契约错误、非法 JSON、Schema/导入错误为永久失败。
+- **任意失败都不得修改 `draft_json` 或清空旧结果。**
+- 写入前 session revision 或当前 task 已变化时，旧 worker 不得覆盖新一轮草稿。
+- `event: done` 只能在完整草稿写入成功或明确终止后发送。
+
+### 7.4 前端与发布边界
+
+- 构建页右侧直接展示 `session.draft`，不再叠加候选预览，不显示接受/忽略按钮。
+- 交付页不显示“待确认候选”，仍展示实体、关系、实例、映射统计及版本差异。
+- 自动建模完成不创建 `OntologyVersionRecord`，也不改变 `current_version_id`。
+- 只有现有发布接口在校验通过且用户明确操作后创建 `vN+1`。
+
+### 7.5 暂缓能力
+
+逐项候选、人工接受/忽略、基于 `before` 的冲突检测、增量 mapping 更新和三方模型合并
+暂缓到后续版本。数据库中的 `candidates_json` 与兼容 API 暂时保留，但自动建模不再生产
+候选，前端主流程也不调用候选接受接口。
+
+## 7A. 历史候选方案（已停用，仅保留决策背景）
+
+以下内容描述 2026-09-21 最初实现，不再是当前产品合同。若与 §7 冲突，以 §7 为准。
+
+原原则是：DataAgent 只负责提出方案，OntoFoundry 掌握校验、冲突检测和人工接受，
+Agent 不直接改写草稿或发布版本。
+
+### 7A.1 结果契约
 
 ```json
 {
@@ -292,7 +369,7 @@ X-ODW-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 - `annotations` 是可选解释层，`target.key` 用 Ossie 文档中的概念名，匹配不上的条目忽略（只丢失理由展示）。
 - `evidence[]` 结构与前端 `Evidence` 类型一致（`types.ts:151`）。
 
-### 7.2 消费时机
+### 7A.2 消费时机
 
 只有 `mode == "model"` 的任务到达成功终态时才消费。普通聊天任务**永不触碰草稿或候选**。
 
@@ -301,13 +378,13 @@ X-ODW-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 1. `/events` 的 SSE 流读到 DataAgent 终态后、发出 `event: done` 之前（主路径）。
 2. `GET ""` 发现活动任务已终态时（刷新页面 / 流中断后的兜底）。
 
-### 7.3 为什么需要 run_token
+### 7A.3 为什么需要 run_token
 
 同一 Topic 的多轮任务**共享工作区与文件名空间**。若结果文件用固定名 `output/ontofoundry-result.json`，那么"新任务成功结束但没写文件"时，上一轮的旧文件仍在，会被当作本轮结果消费，静默产出错误候选。
 
 `run_token` 由 BFF 在 deliver 前生成并写进提示词，消费时只读 `output/ontofoundry-result-{run_token}.json`，并校验文件内 `run_token` 字段与之一致。两处不匹配即判定本轮没有产出结果。
 
-### 7.4 处理流水线与幂等
+### 7A.4 处理流水线与幂等
 
 ```text
 claim：UPDATE modeling_sessions SET result_state='processing', last_result_task_id=:tid
@@ -343,7 +420,7 @@ WHERE id = :sid
 
 **关键点三：`failed_retriable` 时不得发 `done`。** 否则 SDK 收到终态就停止重连，"可重试"没有任何自动重试路径，只能靠用户手动刷新。规则：`/events` 在 reconcile 得到 `failed_retriable` 时，**按 2s/4s/8s 退避重试 reconcile**，最多三次；三次仍失败则降级为 `failed_permanent` 并发 `done`（携带失败原因），让用户看到明确结果而不是无限转圈。
 
-### 7.5 候选项生成规则
+### 7A.5 候选项生成规则
 
 比较 `item.draft_json` 与 `import_ossie` 输出：
 
@@ -377,13 +454,13 @@ WHERE id = :sid
 
 **顶层差异的处理：本次完全忽略，并产生一条 warning。** `import_ossie` 会把 `requires` 等顶层构造合入 imported draft（`importer.py:594`），而 diff 只看三个集合——不写清楚就会静默丢失。因此回写结果中附带 `result_warnings: string[]`，当检测到顶层差异时写入一条"本轮结果包含顶层本体约束变更，v1 不生成候选，如需应用请手工编辑或导入 Ossie 文件"。该字段随 `session_data()` 返回，前端在右侧候选区上方以一行提示展示。这是一条**有数据通道的**承诺，不是空头说明。
 
-### 7.6 替代与冲突
+### 7A.6 替代与冲突
 
 - 新一轮建模成功后，该会话内所有 `status == "pending"` 的旧候选置为 `superseded`。已 `accepted` / `ignored` 的保留不动。
 - `ModelResults` 只渲染 `status == "pending"` 的候选（`ModelResults.tsx:53`），因此 `superseded` 自动从界面消失。
 - 冲突检测完全沿用 `accept_candidates` 既有逻辑。
 
-### 7.7 失败语义
+### 7A.7 失败语义
 
 | 情况 | 分类 | 行为 |
 | --- | --- | --- |
@@ -409,7 +486,7 @@ WHERE id = :sid
 | 新增 | `last_result_task_id` | `String(64)` nullable | 已消费/在消费的建模结果任务 |
 | 新增 | `result_state` | `String(20)` NOT NULL，server_default `''` | `processing` / `done` / `failed_retriable` / `failed_permanent` |
 | 新增 | `result_claimed_at` | `DateTime(timezone=True)` nullable | 回写租约时间戳，用于回收崩溃留下的 `processing` |
-| 新增 | `result_warnings` | `JSON` NOT NULL，server_default `'[]'` | §7.5 的顶层差异提示 |
+| 新增 | `result_warnings` | `JSON` NOT NULL，server_default `'[]'` | 完整 Ossie 导入时的非阻塞说明 |
 | 删除 | `messages_json` | — | 聊天不再双写 |
 | 保留 | `task_status`、`task_detail` | — | 运行状态投影；`task_status` 新增 `submitting` 取值 |
 
@@ -443,7 +520,7 @@ Alembic 所有权必须先转移：仓库内唯一的迁移链在 `dataagent_bac
 
 ### 9.1 保持不变
 
-左侧材料上传/材料库/业务场景/数据源选择，右侧 `ModelResults`（语义图谱、候选列表、接受/忽略），顶部会话切换与发布入口，全部保持现有布局与交互。
+左侧材料上传/材料库/业务场景/数据源选择，右侧 `ModelResults`（完整版本草稿的列表与语义图谱），顶部会话切换与发布入口，全部保持现有布局。
 
 ### 9.2 会话区替换
 
@@ -490,20 +567,20 @@ const startModeling = () => {
 
 ### 9.3 宿主状态同步
 
-这是容易漏掉的一处。`POST /messages` 只返回 `RunRef`，宿主的 `ModelingSession` 仍持有旧 `revision` 和 `idle` 状态；而 BFF 在 CAS 抢占时已经把 `revision` 加了 1。若不同步，后续保存草稿、接受候选、发布都会带着过期 revision 被 409 拒绝。
+这是容易漏掉的一处。`POST /messages` 只返回 `RunRef`，宿主的 `ModelingSession` 仍持有旧 `revision` 和 `idle` 状态；而 BFF 在 CAS 抢占时已经把 `revision` 加了 1。若不同步，后续保存草稿或发布都会带着过期 revision 被 409 拒绝。
 
 规则：
 
 - 监听 `dataagent-run-change`，**首次进入活动态时立即 `model.reload()`**，把新的 revision 与 `task_status` 同步回宿主。
 - 监听 `dataagent-complete`，**所有终态都 `model.reload()`**（不只是建模轮次）——因为任何一轮都可能改变 revision 与运行状态。
-- 只有"是否需要特别关注右侧候选区"才按 `detail.metadata?.mode === "model"` 区分（例如滚动到候选区、展示 `result_warnings`）。
+- 只有"是否需要特别关注右侧建模结果"才按 `detail.metadata?.mode === "model"` 区分（例如滚动到结果区、展示 `result_warnings`）。
 - 宿主的 busy/禁用态由 `dataagent-run-change` 驱动，不再自己维护 `running` 推断。
 
 ```ts
 conversation.current.addEventListener("dataagent-run-change", onRunChange)
 conversation.current.addEventListener("dataagent-complete", (e) => {
   model.reload()
-  if (e.detail.metadata?.mode === "model") focusCandidates()
+  if (e.detail.metadata?.mode === "model") focusModelResults()
 })
 ```
 
@@ -519,9 +596,10 @@ conversation.current.addEventListener("dataagent-complete", (e) => {
 
 ### 9.5 新增
 
-- `Candidate` 联合类型增加 `{ kind: "mapping"; value: DataMapping }` 分支（**类型名是 `DataMapping`**，`types.ts:171`），并在公共部分增加可选字段 `before?: unknown`、`source_task_id?: string`。
-- `ModelResults` 增加 mapping 候选的最小展示。`DataMapping` **没有 `name` 字段**，展示项为 `connection_alias`、`schema_name`/`table_name`、`key_column`，以及所属 `type_id` 对应的对象类型名。接受/忽略入口复用现有候选卡片。
-- `ModelingSession` 类型增加 `result_warnings: string[]`，在候选区上方以一行提示展示。
+- `ModelResults` 直接读取 `ModelingSession.draft`，展示完整草稿中的对象类型、关系类型和 mapping。
+- `DataMapping` **没有 `name` 字段**，展示项为 `connection_alias`、`schema_name`/`table_name`、`key_column`，以及所属 `type_id` 对应的对象类型名。
+- `ModelingSession` 类型保留 `result_warnings: string[]`，在结果区上方逐条提示导入说明。
+- 结果区不提供接受/忽略操作；发布入口仍跳转交付页，先做版本差异预览和校验。
 
 ### 9.6 依赖
 
@@ -577,7 +655,7 @@ integrations/dataagent/
 - **并发控制**：两个并发 `POST /messages`，其中一个 409，且**远端只收到一次 deliver**（关键——验证 CAS 在远端副作用之前）。
 - CAS 抢占后远端失败 → `task_status` 释放为 `failed`，本轮新建的 topic 被删除。
 - 已有活动任务（含 `submitting` / `waiting_input` / `waiting_permission`）时再次发送 → 409。
-- `/events` 输出 `event: agent-event` 与 `event: done`，**不是**原始字节；`done` 在候选回写之后发出。
+- `/events` 输出 `event: agent-event` 与 `event: done`，**不是**原始字节；`done` 在完整版本草稿写入之后发出。
 - 状态转换表七种输入各自映射正确。
 - `GET ""` 的 `run.metadata` 从 `dataagent_task_mode` 重建为 `{mode}`。
 - `metadata` 未知键被忽略；`mode` 非法值按 `chat`。
@@ -589,19 +667,16 @@ integrations/dataagent/
 - `base_url` 为空时应用正常启动，本体查看/编辑/发布/MCP 全部可用。
 
 **结果回写**
-- 有效结果 → 生成 object_type / link_type / mapping 候选，`before` 正确。
-- `annotations` 的 reason 与 evidence 正确附加；匹配不上的 annotation 被忽略且不报错。
+- 有效结果 → `mode="replace"` 导入完整模型，原子替换 `draft_json`，并清空旧候选。
+- 结果中的对象、关系、mapping 与顶层 `requires` 全部进入新版本草稿；文件外旧项不保留。
 - 普通聊天任务完成 → 草稿与候选零变化。
-- merge 语义：Agent 结果中缺失的既有 object_type **不产生删除**。
-- **mapping 只产出新增候选**：已有 mapping 的 type_id 不产生更新候选。
 - **run_token 隔离**：上一轮留下 `ontofoundry-result-{old}.json`，本轮 Agent 未写文件 → 判定无结果，不消费旧文件。
 - **文件内 run_token 与请求不符 → 永久失败，草稿与候选不变。**
-- 幂等：对同一 task 连续消费两次，候选数量不变。
+- 幂等：对同一 task 连续消费两次，草稿和 revision 只更新一次。
 - **可重试失败不锁死**：下载超时 → `result_state='failed_retriable'`；再次触发能成功消费。
-- 旧 pending 候选被置 `superseded`；已 accepted / ignored 的不变。
 - 四种永久失败输入各自：任务失败、`task_detail` 含具体原因、草稿与候选不变。
-- 顶层约束差异 → `result_warnings` 有一条，候选不含该 kind。
-- 生成的候选喂给现有 `accept_candidates`，接受后草稿正确更新；人工先改过同一项时命中冲突提示。
+- worker 丢失租约、revision 已变化或新 task 已启动时，不得覆盖当前草稿。
+- 成功结果的 `task_detail` 明确提示“预览差异后发布新版本”。
 
 **迁移**
 - 含数据的库上 `alembic upgrade head`：领域表行数不变；九个新列存在且非空列已回填默认值；`dataagent_topic_id` 全 NULL；`messages_json` 消失；`da_*` 表全不存在。
@@ -614,14 +689,20 @@ integrations/dataagent/
 - `session` 已存在时挂载：`endpoint` 直接有值。
 - 切换会话：只改 `endpoint`，不调 `reload()`；消息区重置。
 - "开始建模"提交的 content 与 `metadata.mode === "model"` 正确；业务场景为空/非空两种拼接。
-- `dataagent-run-change` 首次进入活动态 → `model.reload()`；`dataagent-complete` 任意终态 → `model.reload()`；仅 `mode === "model"` 时额外聚焦候选区。
+- `dataagent-run-change` 首次进入活动态 → `model.reload()`；`dataagent-complete` 任意终态 → `model.reload()`。
 - 左侧材料区与右侧 `ModelResults` 现有测试全部通过（回归门禁）。
-- mapping 候选展示 `connection_alias` / 表 / `key_column`，接受/忽略调用参数正确。
-- `result_warnings` 非空时在候选区上方展示。
+- `ModelResults` 直接展示新版本草稿，不出现候选接受/忽略入口。
+- mapping 草稿展示 `connection_alias` / 表 / `key_column`。
+- `result_warnings` 非空时在结果区上方展示。
+- 交付页不再显示“待确认候选”，仍可预览差异、校验并发布。
 
 ### 端到端（手工，上线前必做一次）
 
-在真实外部 DataAgent 上：管理端建站点 `ontofoundry` → 生成 access key → 上传 `md2ossie.zip` → 创建 `agent_ontofoundry` 并设 `visibility.mode=all` → 配置 OntoFoundry 环境变量 → 设置页连通性全绿 → 上传材料 → 普通问答一轮 → "开始建模" → 右侧出现候选 → 接受 → 校验 → 发布 → 刷新页面确认聊天历史来自 DataAgent 且恢复后的终态仍能刷新候选。
+在真实外部 DataAgent 上：管理端建站点 `ontofoundry` → 生成 access key → 安装
+`md2ossie` → 创建建模 Agent 并设 `visibility.mode=all` → 配置 OntoFoundry → 设置页
+连通性全绿 → 上传材料 → 普通问答一轮 → “开始建模” → 右侧直接出现完整新版本草稿
+→ 交付页确认版本差异 → 校验 → 发布 → 确认历史版本未改、`vN+1` 成为当前版本，刷新后
+聊天历史和新草稿均能恢复。
 
 ## 13. 发布顺序与回滚
 
@@ -648,12 +729,11 @@ integrations/dataagent/
 | 决策 | 理由 | 风险与缓解 |
 | --- | --- | --- |
 | 删除本地 DataAgent 而非逐步解耦 | 保留分叉会持续与上游分叉，且部署代价已经在付 | 变更面大。用迁移测试 + 端到端冒烟 + 数据库备份 + 维护窗口四道防线 |
-| 结果契约用完整 Ossie 而非差异指令 | `md2ossie` 天然产出完整文档；复用已被测试锁定的 `import_ossie` | Agent 漏写被 `mode="merge"` 兜住，不会删除既有模型 |
+| 结果契约用完整 Ossie 并整体替换草稿 | MVP 不承担增量合并与语义去重；每轮模型边界清晰 | Agent 漏写会导致新草稿缺项；通过交付页差异预览和显式发布阻止静默上线 |
 | 引入 `run_token` | 同 Topic 多轮共享工作区，固定文件名会误消费上一轮 | 增加一次提示词约定；Agent 未遵守时表现为"无结果"而非"错结果"，失败方向安全 |
 | CAS 抢占先于远端副作用 | 否则并发会在 DataAgent 上留下孤儿任务 | 多一个 `submitting` 状态，所有互斥条件都要覆盖 |
 | `result_state` 区分可重试与永久失败 | 否则一次下载超时让建模结果永久丢失 | 状态机变复杂；用测试锁定四种取值的转换 |
-| mapping 仅新增候选 | merge 语义决定，不是偷懒 | 已有 mapping 的变更无法通过建模流入；需要时另行修改 importer |
-| 顶层约束忽略 + warning | `accept_candidates` 无对应集合键，硬加会被静默丢弃 | 用户需手工处理；有 `result_warnings` 通道确保不静默 |
+| 暂停候选与合并主流程 | 先验证完整建模与版本发布闭环 | 暂不支持逐项接受；数据库兼容字段保留，后续另行设计 |
 | 不迁移旧聊天记录 | 旧 topic 在即将删除的本地表里 | 升级后用户看到空会话，发布说明中告知 |
 | v1 不做 launch token | 浏览器不直连 DataAgent，BFF 已是可信边界 | DataAgent 必须只暴露在可信内网 |
 | `X-ODW-User-Id` 用会话 ID | DataAgent 按 `external_user_id` 过滤可见性，用真实用户 ID 会破坏多人协作 | 管理端呈现为"每会话一个伪用户"，已接受 |

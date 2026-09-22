@@ -223,9 +223,7 @@ export type ModelingSession = {
   task_status: string;
   task_detail: string;
   /**
-   * Non-blocking notes from the last modeling run — e.g. top-level ontology
-   * constraints that the agent proposed but v1 does not turn into candidates.
-   * Surfaced so those changes are not lost silently.
+   * Non-blocking import notes from the complete model produced by the last run.
    */
   result_warnings?: string[];
   dataagent_topic_id?: string | null;
@@ -233,6 +231,10 @@ export type ModelingSession = {
   updated_at: string;
   validation?: VersionSummary["validation"];
 };
+export type ModelingSessionSummary = Pick<
+  ModelingSession,
+  "id" | "title" | "task_status" | "updated_at"
+>;
 export type OssieImportReport = {
   name: string;
   description: string;

@@ -95,8 +95,10 @@ export function WorkspaceTabs({
   });
   const [seen, setSeen] = useState(location.key + href);
   if (seen !== location.key + href) {
+    const nextState = openTab(state, href, navigationType === "REPLACE");
+    console.log("[DEBUG WorkspaceTabs openTab]", { currentHref: state.tabs[0]?.href, nextHref: nextState.tabs[0]?.href, passedHref: href, replace: navigationType === "REPLACE" });
     setSeen(location.key + href);
-    setState((current) => openTab(current, href, navigationType === "REPLACE"));
+    setState(nextState);
   }
   const strip = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);

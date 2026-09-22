@@ -19,6 +19,7 @@ import type {
   RunChangeDetail,
 } from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
+import { SessionPicker } from "../components/SessionPicker";
 import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
 
@@ -26,6 +27,7 @@ export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
+  console.log("[DEBUG BuilderPage render]", { sessionId, sessionTitle: session?.title, modelSessionsCount: model.sessions.length });
   const [materials, setMaterials] = useState<Material[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [scenario, setScenario] = useState("");
@@ -117,16 +119,15 @@ export function BuilderPage() {
       ].includes(status);
       setRunning(active);
       // The BFF bumps the session revision when it accepts a run. Without
-      // resyncing, every later save, accept and publish would carry a stale
+      // resyncing, every later save and publish would carry a stale
       // revision and be rejected.
       if (active) model.reload();
     };
 
     const onComplete = (event: Event) => {
       setRunning(false);
-      // Reload on any terminal state: the revision moved regardless of how the
-      // run ended. Only whether to draw attention to the candidates depends on
-      // the mode.
+      // Reload on any terminal state: a modeling result atomically replaces the
+      // version draft before completion is reported.
       model.reload();
       const { metadata } = (event as CustomEvent<CompleteDetail>).detail;
       if (metadata?.mode === "model") setError("");
@@ -163,18 +164,12 @@ export function BuilderPage() {
     <div className="ref-builder">
       <header className="context-bar">
         <h1>本体自动构建</h1>
-        <select
-          aria-label="选择建模会话"
-          value={session?.id ?? ""}
-          onChange={(e) => e.target.value && model.select(e.target.value)}
-        >
-          <option value="">新的建模会话</option>
-          {model.sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title}
-            </option>
-          ))}
-        </select>
+        <SessionPicker
+          session={session}
+          sessionId={sessionId}
+          sessions={model.sessions}
+          onSelect={model.select}
+        />
         <button
           className="icon-button"
           aria-label="新建会话"
@@ -386,16 +381,7 @@ export function BuilderPage() {
             </button>
           </dataagent-conversation>
         </section>
-        <ModelResults
-          session={session}
-          busy={busy || running}
-          onCandidate={(ids, action) =>
-            act(async () => {
-              if (session)
-                setSession(await modelingApi.candidates(session, ids, action));
-            })
-          }
-        />
+        <ModelResults session={session} />
       </div>
     </div>
   );

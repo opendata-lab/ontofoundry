@@ -147,16 +147,6 @@ export function DeliveryPage() {
                   <span>
                     映射 <b>{model.session.draft.mappings.length}</b>
                   </span>
-                  <span>
-                    待确认候选{" "}
-                    <b>
-                      {
-                        model.session.candidates.filter(
-                          (c) => c.status === "pending",
-                        ).length
-                      }
-                    </b>
-                  </span>
                 </div>
                 <label className="section-field">
                   <span>版本说明</span>
