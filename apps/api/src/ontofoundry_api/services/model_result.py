@@ -7,6 +7,7 @@ snapshot.  Publishing remains a separate, explicit user action.
 from __future__ import annotations
 
 import json
+import secrets
 from datetime import timedelta
 from typing import Any
 
@@ -17,6 +18,7 @@ from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.ossie.validator import validate_schema
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+from ontofoundry_api.services.model_review import build_repair_request, review_conventions
 
 RESULT_SCHEMA_VERSION = "ontofoundry.model-result/v1"
 RESULT_LEASE = timedelta(minutes=5)
@@ -112,6 +114,64 @@ def _finish_failure(
     ):
         return state
     return _current_result_state(app, session_id)
+
+
+async def _request_repair(
+    app: Any,
+    workspace_id: str,
+    session_id: str,
+    task_id: str,
+    claimed_at,
+    *,
+    topic_id: str,
+    problems: list[str],
+) -> str | None:
+    """Hand the complaints back to the agent and let it produce a fix.
+
+    Returns the new result-state on success, or None when the caller should fall
+    through to its own ending — no topic, or DataAgent refused the turn. Failing
+    to ask must never be worse than not trying: the original outcome still
+    applies.
+
+    The claim is released only after DataAgent accepts the follow-up, so a
+    refusal leaves the lease exactly as it was.
+    """
+    if not topic_id or not problems:
+        return None
+
+    next_token = secrets.token_hex(16)
+    result_path = f"output/ontofoundry-result-{next_token}.json"
+    try:
+        submitted = await _client(app, workspace_id, session_id).deliver(
+            topic_id=topic_id,
+            content=build_repair_request(problems, next_token, result_path),
+            agent_id=app.state.settings.dataagent_agent_id,
+            execution_mode=app.state.settings.dataagent_execution_mode,
+        )
+    except DataAgentError:
+        return None
+
+    next_task_id = str(submitted.get("task_id") or "")
+    if not next_task_id:
+        return None
+
+    # The new task becomes the session's run. `last_result_task_id` stays on the
+    # task being abandoned so this result is never consumed again, and
+    # result_state clears so the next reconcile can claim the new one.
+    if not _guarded_result_values(
+        app,
+        session_id,
+        task_id,
+        claimed_at,
+        dataagent_task_id=next_task_id,
+        dataagent_run_token=next_token,
+        result_state="",
+        result_claimed_at=None,
+        task_status="running",
+        task_detail="结果未通过校验，已把问题交回 DataAgent 修正",
+    ):
+        return _current_result_state(app, session_id)
+    return ""
 
 
 def _permanent_detail(exc: DataAgentError, result_path: str) -> str:
@@ -239,54 +299,77 @@ async def reconcile_run(
             detail=detail,
         )
 
+    # A blocking problem is one the platform cannot work around. The agent wrote
+    # the document, so it is also the only thing that can fix it — ask, within
+    # budget, before giving up on the run.
+    blocking: list[str] = []
+    version_draft: dict[str, Any] | None = None
+    import_report: dict[str, Any] = {}
+
     schema_issues = validate_schema(payload["ontology"])
     if schema_issues:
-        first = schema_issues[0]
+        blocking = [
+            "结果不符合 Apache Ossie 0.2.0.dev0 schema："
+            + str(issue.get("message") or issue)
+            for issue in schema_issues[:10]
+        ]
+
+    if not blocking:
+        try:
+            version_draft, import_report = import_ossie(
+                payload["ontology"],
+                workspace_id=workspace_id,
+                mode="replace",
+            )
+        except OssieImportError as exc:
+            blocking = [f"结果无法导入为本体草稿：{exc}"]
+        except ValidationError as exc:
+            blocking = [f"结果不满足草稿约束：{_first_validation_message(exc)}"]
+
+    if blocking:
+        repaired = await _request_repair(
+            app,
+            workspace_id,
+            session_id,
+            task_id,
+            claimed_at,
+            topic_id=topic_id,
+            problems=blocking,
+        )
+        if repaired is not None:
+            return repaired
         return _finish_failure(
             app,
             session_id,
             task_id,
             claimed_at,
             state="failed_permanent",
-            detail=(
-                "建模结果不符合 Apache Ossie 0.2.0.dev0 schema："
-                + str(first.get("message") or first)
-            ),
+            detail=f"建模结果校验未通过：{blocking[0]}",
         )
 
-    try:
-        version_draft, import_report = import_ossie(
-            payload["ontology"],
-            workspace_id=workspace_id,
-            mode="replace",
-        )
-    except OssieImportError as exc:
-        return _finish_failure(
+    assert version_draft is not None
+
+    # Advisory problems: the draft is usable, it just ignores something the
+    # prompt asked for. Worth one correction round, never worth discarding a
+    # working model — so if the budget is gone this falls through to success
+    # with the complaints recorded as warnings.
+    advisory = review_conventions(payload["ontology"])
+    if advisory:
+        repaired = await _request_repair(
             app,
+            workspace_id,
             session_id,
             task_id,
             claimed_at,
-            state="failed_permanent",
-            detail=f"建模结果无法导入：{exc}",
+            topic_id=topic_id,
+            problems=advisory,
         )
-    except ValidationError as exc:
-        # The document passed the Ossie schema but breaks a draft invariant of
-        # ours — an agent may, for instance, map a link whose endpoint objects
-        # have no data mapping. Only OssieImportError was caught here, so this
-        # escaped as a 500 out of whichever request happened to be reconciling,
-        # and the lease stayed held with result_state parked on "processing":
-        # the conversation became unreadable and the run never resolved.
-        #
-        # Re-running the same file cannot change the outcome, so it is
-        # permanent: the agent has to produce a different model.
-        return _finish_failure(
-            app,
-            session_id,
-            task_id,
-            claimed_at,
-            state="failed_permanent",
-            detail=f"建模结果不满足草稿约束：{_first_validation_message(exc)}",
-        )
+        if repaired is not None:
+            return repaired
+        import_report = {
+            **import_report,
+            "notes": [*(import_report.get("notes") or []), *advisory],
+        }
 
     with app.state.session_factory() as db:
         changed = db.execute(

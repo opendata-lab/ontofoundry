@@ -100,7 +100,16 @@
           }
         ]
       }
-    ]
+    ],
+    "ai_context": {
+      "ontofoundry": {
+        "version": "1",
+        "display_names": {
+          "customer": "客户",
+          "sales_order": "销售订单"
+        }
+      }
+    }
   },
   "annotations": [
     {

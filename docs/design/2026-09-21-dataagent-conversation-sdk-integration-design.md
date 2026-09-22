@@ -298,9 +298,15 @@ claim 当前 task + result lease
   ↓
 下载并校验 output/ontofoundry-result-{run_token}.json
   ↓
-validate_schema(ontology)
-  ↓
-import_ossie(ontology, workspace_id=…, mode="replace")
+validate_schema(ontology) ─── 不通过 ──┐
+  ↓                                    │
+import_ossie(…, mode="replace") ── 失败 ┤
+  ↓                                    │
+review_conventions(ontology) ── 不合规 ─┤
+  ↓                                    ↓
+  │                         把具体问题交回同一个 Topic，
+  │                         带新的 run_token 与结果路径，
+  │                         Agent 重新输出完整结果
   ↓
 一次条件事务写入：
   draft_json = 完整导入结果
@@ -315,11 +321,36 @@ import_ossie(ontology, workspace_id=…, mode="replace")
 这里故意不用 `mode="merge"`：文件之外的旧对象、关系、实例和映射不会隐式保留。
 每轮成功建模都产生一个自洽的完整草稿，历史已发布版本保持不可变并可比较、回滚。
 
+#### 校验不通过时把问题交回 Agent
+
+写这份文档的只有 Agent，因此**唯一能修它的也只有 Agent**。直接判失败等于丢掉整轮工作，
+并且给用户一条他无法处理的报错。所以校验失败时不结束运行，而是像评审那样把**具体的问题
+清单**投回同一个 Topic，让 Agent 重新输出完整结果——经典的工具契约：校验、给错误、重来。
+
+两类问题的收尾不同：
+
+| 类别 | 例子 | 交回失败时怎么办 |
+| --- | --- | --- |
+| **阻塞** | Ossie schema 不合法；`import_ossie` 抛错；草稿约束不满足 | `failed_permanent`，草稿不动 |
+| **建议** | 技术名不是 snake_case；`display_names` 缺失 | **仍然写入草稿**，问题记进 `result_warnings` |
+
+建议类问题值得请 Agent 改一次，但**不值得为命名丢掉一个能用的模型**。
+
+交回时必须换一个 `run_token`，修正结果写到新路径。复用上一轮的文件名会让平台读到旧文件，
+以为问题已经解决。
+
+投递失败（DataAgent 拒绝、无 topic）时不改变原有结论：阻塞类仍判永久失败，建议类仍按成功
+写入。**"没能请求修正"绝不能比"没尝试请求"更糟。**
+
+未做轮次上限：先保持逻辑简单。如果实测出现 Agent 反复不满足同一条约束而持续重试，再补
+上限——那时才有真实数据决定次数。
+
 ### 7.3 并发、幂等与失败门禁
 
 - `run_token` 文件隔离、`result_state`、五分钟 claim 租约和 task generation guard 保持不变。
 - 同一 task 重复消费不重复推进 revision，也不重复写草稿。
-- 下载超时、429、5xx 保持可重试；404、契约错误、非法 JSON、Schema/导入错误为永久失败。
+- 下载超时、429、5xx 保持可重试；404、契约错误、非法 JSON 为永久失败。
+- Schema / 导入 / 草稿约束错误先交回 Agent 修正（见上），交回失败才落永久失败。
 - **任意失败都不得修改 `draft_json` 或清空旧结果。**
 - 写入前 session revision 或当前 task 已变化时，旧 worker 不得覆盖新一轮草稿。
 - `event: done` 只能在完整草稿写入成功或明确终止后发送。
