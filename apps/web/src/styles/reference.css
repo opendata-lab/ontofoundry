@@ -1025,6 +1025,18 @@ small,
 .empty-model-art i:nth-child(3):before {
   background: var(--color-relation);
 }
+/* 路由面板：未激活的必须彻底不可见。
+   此前只靠 [hidden] 的默认 display:none 兜底，而页面内部自己的 tabpanel
+   （本体视图的「全局/语义视图」）带着 hidden=false 渲染在里面，照样显示——
+   于是切换菜单时旧页面浮在新页面上，来回切一次才「好」。 */
+.route-panel[hidden] {
+  display: none !important;
+}
+.route-panel {
+  height: 100%;
+  min-height: 0;
+}
+
 .ref-catalog {
   height: 100%;
   overflow: auto;
@@ -1618,7 +1630,8 @@ small,
   margin-left: auto;
 }
 .management-content {
-  padding: 12px 28px 32px;
+  /* 与 .catalog-toolbar 的左右内边距对齐，否则标题和内容不在同一条纵线上 */
+  padding: 12px 20px 32px;
 }
 .management-content > h2 {
   font-size: 15px;

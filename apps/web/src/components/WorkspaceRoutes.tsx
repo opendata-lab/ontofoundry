@@ -25,6 +25,11 @@ const ObjectEditorPage = lazy(() =>
     default: module.ObjectEditorPage,
   })),
 );
+const ConnectionsPage = lazy(() =>
+  import("../pages/ConnectionsPage").then((module) => ({
+    default: module.ConnectionsPage,
+  })),
+);
 const MappingsPage = lazy(() =>
   import("../pages/MappingsPage").then((module) => ({
     default: module.MappingsPage,
@@ -67,6 +72,7 @@ export function WorkspaceRoutes({ href }: { href: string }) {
         element={<ObjectEditorPage relation />}
       />
       <Route path="builder" element={<BuilderPage />} />
+      <Route path="connections" element={<ConnectionsPage />} />
       <Route path="mappings" element={<MappingsPage />} />
       <Route path="delivery" element={<DeliveryPage />} />
       <Route path="settings" element={<SettingsPage />} />
