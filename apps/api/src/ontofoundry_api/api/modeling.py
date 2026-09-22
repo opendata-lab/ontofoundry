@@ -1,4 +1,5 @@
 from copy import deepcopy
+from typing import Any
 from uuid import uuid4
 
 import jsonschema
@@ -509,6 +510,25 @@ def import_ossie_document(
 
 
 @router.get("/capabilities")
+
+def _agent_capability() -> dict[str, Any]:
+    """问数是否可用，以及当前选中的模型。
+
+    直接问 DataAgent 的 provider 选择逻辑，而不是看某个 URL 配没配。解析失败
+    （没有 provider、模型没启用）时返回未配置，这正是前端要提示用户去设置的
+    情形。
+    """
+    try:
+        from dataagent_backend.core.skill_admin_service import (
+            resolve_runtime_provider_selection,
+        )
+
+        target = resolve_runtime_provider_selection(None, None)
+    except Exception:
+        return {"agent_configured": False, "model": ""}
+    return {"agent_configured": True, "model": str(target.get("model") or "")}
+
+
 def capabilities(
     workspace_id: str,
     request: Request,
@@ -518,8 +538,10 @@ def capabilities(
     require_member(db, workspace_id, user.id)
     config = request.app.state.settings
     return {
-        "agent_configured": bool(config.dataagent_base_url),
-        "model": "DataAgent · Pi" if config.dataagent_base_url else "",
+        # DataAgent 现在同进程运行，dataagent_base_url 是跨服务时代的遗留，
+        # 永远为空——照它判断的话，模型配好了 UI 也永远显示"尚未配置"。
+        # 真正决定能不能问数的是有没有可用的 provider。
+        **_agent_capability(),
         "max_file_mb": config.max_file_mb,
         "connections_configured": bool(config.connection_key),
         "skills": ["md2ossie"],
