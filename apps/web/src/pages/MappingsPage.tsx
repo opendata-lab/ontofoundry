@@ -1,5 +1,5 @@
 import { DataAssets } from "../components/DataAssets";
-import { Database } from "lucide-react";
+import { Database, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { modelingApi } from "../api/client";
@@ -15,6 +15,8 @@ export function MappingsPage() {
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
   const [view, setView] = useState<"assets" | "mappings">("assets");
+  // DatasetPicker 选中表之后在这里提示，和连接测试无关，所以没随连接管理搬走。
+  const [status, setStatus] = useState("");
   const [assetBusy, setAssetBusy] = useState(false);
   usePageTab({ busy: assetBusy });
   const [picker, setPicker] = useState(false);
@@ -42,6 +44,11 @@ export function MappingsPage() {
       <div className="management-content">
         {(error || snapshot.error) && (
           <div className="inline-error">{error || snapshot.error}</div>
+        )}
+        {status && (
+          <p className="muted" role="status">
+            {status}
+          </p>
         )}
         <div className="reading-switch">
           <button
