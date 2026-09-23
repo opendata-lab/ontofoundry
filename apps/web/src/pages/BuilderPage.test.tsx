@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ModelingSession, Workspace } from "../api/types";
+import type { AgentConversationElement } from "../types/agent-conversation";
 import { BuilderPage } from "./BuilderPage";
 
 const context = vi.hoisted(() => ({
@@ -105,6 +106,14 @@ it("reloads the session after an agent error advances the backend revision", asy
   );
   const conversation = container.querySelector("dataagent-conversation");
   expect(conversation).not.toBeNull();
+  const conversationElement = conversation as AgentConversationElement;
+  expect(conversationElement.endpoint).toBe(
+    "/api/v1/workspaces/w1/sessions/s1/agent-conversation",
+  );
+  expect(conversationElement.endpointResolver).toBeTypeOf("function");
+  expect(conversationElement.transportFactory).toBeTypeOf("function");
+  expect(conversation?.hasAttribute("transportFactory")).toBe(false);
+  expect(conversation?.hasAttribute("endpointResolver")).toBe(false);
 
   await act(async () => {
     conversation?.dispatchEvent(

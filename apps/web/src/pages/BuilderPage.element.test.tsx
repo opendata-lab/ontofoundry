@@ -23,7 +23,7 @@ describe("the conversation element is usable", () => {
 
     // An unregistered tag is an HTMLElement with none of these.
     expect(el.shadowRoot, "the element must attach a shadow root").toBeTruthy();
-    for (const method of ["sendMessage", "cancel", "reload", "focus"]) {
+    for (const method of ["sendMessage", "cancel", "reload", "focus", "focusMessage"]) {
       expect(
         typeof (el as unknown as Record<string, unknown>)[method],
         `${method}() must exist for BuilderPage to drive the conversation`,

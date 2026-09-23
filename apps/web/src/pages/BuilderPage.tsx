@@ -7,7 +7,7 @@ import {
   Rocket,
   Database,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
@@ -22,6 +22,7 @@ import { ModelResults } from "../components/ModelResults";
 import { SessionPicker } from "../components/SessionPicker";
 import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
+import { createOntoFoundryConversationTransport } from "../lib/agentConversation";
 
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
@@ -154,11 +155,21 @@ export function BuilderPage() {
 
   // A session that does not exist yet is created on first send, so opening the
   // page never mints an empty conversation.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = conversation.current;
-    if (el) el.endpointResolver = async () =>
+    if (!el) return;
+
+    // Functions are custom-element DOM properties, never JSX attributes.
+    // Install the factory before the conversation key: useEndpoint builds a
+    // transport when endpoint changes and intentionally does not rebuild one
+    // merely because a late factory assignment arrived.
+    el.transportFactory = createOntoFoundryConversationTransport;
+    el.endpointResolver = async () =>
       `/api/v1/workspaces/${workspace.id}/sessions/${(await model.ensure()).id}/agent-conversation`;
-  }, [model, workspace.id]);
+    el.endpoint = sessionId
+      ? `/api/v1/workspaces/${workspace.id}/sessions/${sessionId}/agent-conversation`
+      : "";
+  }, [model, sessionId, workspace.id]);
 
   return (
     <div className="ref-builder">
@@ -363,11 +374,6 @@ export function BuilderPage() {
               element would clear itself and reload for no reason. */}
           <dataagent-conversation
             ref={conversation}
-            endpoint={
-              sessionId
-                ? `/api/v1/workspaces/${workspace.id}/sessions/${sessionId}/agent-conversation`
-                : ""
-            }
             placeholder="向智能体提问以辅助本体构建…"
           >
             <button
