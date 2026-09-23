@@ -573,6 +573,10 @@ small,
   background: var(--color-surface);
 }
 .ref-chat > dataagent-conversation {
+  --dac-content-max-width: 760px;
+  --dac-content-padding-inline: clamp(16px, 2vw, 24px);
+  --dac-content-padding-block: 24px;
+  --dac-message-gap: 20px;
   display: block;
   flex: 1 1 0;
   width: 100%;
