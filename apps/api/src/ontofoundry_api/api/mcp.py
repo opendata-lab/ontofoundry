@@ -11,7 +11,11 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, ontology_principal
 from ontofoundry_api.database import get_db
-from ontofoundry_api.services.access import can_read_instances, require_instances
+from ontofoundry_api.services.access import (
+    can_read_instances,
+    can_read_mappings,
+    require_instances,
+)
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.instance_query import (
     ObjectSearch,
@@ -29,7 +33,17 @@ from ontofoundry_api.services.ontology_query import (
 
 router = APIRouter(prefix="/api/v1/ontology/workspaces/{workspace_id}/mcp", tags=["mcp"])
 PROTOCOL_VERSION = "2026-07-28"
+LEGACY_PROTOCOL_VERSIONS = (
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26",
+)
 META = "io.modelcontextprotocol/"
+INSTRUCTIONS = (
+    "Read published ontology versions. Mapping metadata requires mappings:read or "
+    "instances:read; instance tools require instances:read. Both require workspace "
+    "membership. Database rows are live; modeling and raw materials are not exposed."
+)
 TOOLS = [
     ("get_ontology_version", "读取当前已发布本体版本", {}),
     ("search_ontology_types", "搜索已发布业务对象和关系", {"query": {"type": "string"}}),
@@ -94,6 +108,31 @@ def tool_schema(name, properties):
     }
 
 
+def legacy_initialize(rid, params):
+    requested = params.get("protocolVersion")
+    if (
+        not isinstance(requested, str)
+        or not isinstance(params.get("capabilities"), dict)
+        or not isinstance(params.get("clientInfo"), dict)
+    ):
+        return rpc_error(rid, -32602, "Invalid initialize params")
+    negotiated = (
+        requested
+        if requested in LEGACY_PROTOCOL_VERSIONS
+        else LEGACY_PROTOCOL_VERSIONS[0]
+    )
+    return {
+        "jsonrpc": "2.0",
+        "id": rid,
+        "result": {
+            "protocolVersion": negotiated,
+            "capabilities": {"tools": {"listChanged": False}},
+            "serverInfo": {"name": "ontofoundry", "version": "0.1.0"},
+            "instructions": INSTRUCTIONS,
+        },
+    }
+
+
 @router.post("")
 async def rpc(
     workspace_id: str,
@@ -123,26 +162,48 @@ async def rpc(
         return rpc_error(None, -32600, "Request ID must be a string or integer")
     if not isinstance(params, dict):
         return rpc_error(rid, -32602, "Invalid params")
-    metadata = params.get("_meta", {})
-    if not isinstance(metadata, dict):
-        return rpc_error(rid, -32602, "Invalid request metadata")
     header_version = request.headers.get("mcp-protocol-version")
-    if not header_version or request.headers.get("mcp-method") != method:
-        return rpc_error(rid, -32020, "Missing or mismatched protocol/method headers")
-    if header_version != metadata.get(META + "protocolVersion"):
-        return rpc_error(
-            rid, -32020, "Protocol version header does not match request metadata"
-        )
-    if header_version != PROTOCOL_VERSION:
-        return rpc_error(
-            rid,
-            -32022,
-            "Unsupported protocol version",
-            data={"supported": [PROTOCOL_VERSION], "requested": header_version},
-        )
-    if not isinstance(metadata.get(META + "clientCapabilities"), dict):
-        return rpc_error(rid, -32602, "Required clientCapabilities metadata is missing")
     accept = request.headers.get("accept", "")
+    legacy = header_version in LEGACY_PROTOCOL_VERSIONS
+    if (
+        method == "initialize"
+        and header_version != PROTOCOL_VERSION
+        and request.headers.get("mcp-method") is None
+    ):
+        if "application/json" not in accept or "text/event-stream" not in accept:
+            return rpc_error(
+                rid,
+                -32600,
+                "Accept must include application/json and text/event-stream",
+                406,
+            )
+        return legacy_initialize(rid, params)
+    if legacy:
+        if request.headers.get("mcp-method") not in (None, method):
+            return rpc_error(rid, -32020, "Mcp-Method does not match request method")
+    else:
+        metadata = params.get("_meta", {})
+        if not isinstance(metadata, dict):
+            return rpc_error(rid, -32602, "Invalid request metadata")
+        if not header_version or request.headers.get("mcp-method") != method:
+            return rpc_error(
+                rid, -32020, "Missing or mismatched protocol/method headers"
+            )
+        if header_version != metadata.get(META + "protocolVersion"):
+            return rpc_error(
+                rid, -32020, "Protocol version header does not match request metadata"
+            )
+        if header_version != PROTOCOL_VERSION:
+            return rpc_error(
+                rid,
+                -32022,
+                "Unsupported protocol version",
+                data={"supported": [PROTOCOL_VERSION], "requested": header_version},
+            )
+        if not isinstance(metadata.get(META + "clientCapabilities"), dict):
+            return rpc_error(
+                rid, -32602, "Required clientCapabilities metadata is missing"
+            )
     if "application/json" not in accept or "text/event-stream" not in accept:
         return rpc_error(
             rid, -32600, "Accept must include application/json and text/event-stream", 406
@@ -156,13 +217,15 @@ async def rpc(
                 )
             except (ValueError, UnicodeError, binascii.Error):
                 return rpc_error(rid, -32020, "Malformed Mcp-Name header")
-        if not header_name or header_name != params.get("name"):
+        if (not legacy and not header_name) or (
+            header_name and header_name != params.get("name")
+        ):
             return rpc_error(rid, -32020, "Mcp-Name does not match tool name")
     if method == "server/discover":
         result = {
             "supportedVersions": [PROTOCOL_VERSION],
             "capabilities": {"tools": {}},
-            "instructions": "Read published versions. Instance tools require instances:read and workspace membership. Database rows are live; modeling and raw materials are not exposed.",
+            "instructions": INSTRUCTIONS,
         }
     elif method == "ping":
         result = {}
@@ -221,19 +284,24 @@ async def rpc(
                     request.app.state.settings,
                 )
             else:
+                mappings_allowed = can_read_mappings(db, workspace_id, principal)
                 value = {
                     key: value
                     for key, value in version.ossie_json.items()
                     if key != "ontology_mappings"
-                    or can_read_instances(db, workspace_id, principal)
+                    or mappings_allowed
                 }
+                if not mappings_allowed and "ontology_mappings" in version.ossie_json:
+                    value["redacted_fields"] = ["ontology_mappings"]
+            structured = jsonable_encoder(value)
             result = {
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps(jsonable_encoder(value), ensure_ascii=False),
+                        "text": json.dumps(structured, ensure_ascii=False),
                     }
                 ],
+                "structuredContent": structured,
                 "isError": False,
             }
         except (ServiceError, ValueError, HTTPException, ModelValidationError) as exc:
@@ -248,14 +316,15 @@ async def rpc(
         return rpc_error(
             rid, -32601, "Method not found; supported protocol: " + PROTOCOL_VERSION, 404
         )
+    response_result = result if legacy else {
+        **result,
+        "resultType": "complete",
+        "_meta": {META + "serverInfo": {"name": "ontofoundry", "version": "0.1.0"}},
+    }
     return {
         "jsonrpc": "2.0",
         "id": rid,
-        "result": {
-            **result,
-            "resultType": "complete",
-            "_meta": {META + "serverInfo": {"name": "ontofoundry", "version": "0.1.0"}},
-        },
+        "result": response_result,
     }
 
 

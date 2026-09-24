@@ -2,11 +2,14 @@ from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from ontofoundry_api.api.auth import Principal
+from ontofoundry_api.api.auth import Principal, ontology_directory_principal
 from ontofoundry_api.api.auth import ontology_principal as current_principal
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import OntologyVersionRecord
-from ontofoundry_api.services.access import can_read_instances, require_instances
+from ontofoundry_api.services.access import (
+    can_read_mappings,
+    require_instances,
+)
 from ontofoundry_api.services.errors import NotFoundError
 from ontofoundry_api.services.instance_query import (
     ObjectSearch,
@@ -21,8 +24,30 @@ from ontofoundry_api.services.ontology_query import (
     type_graph,
     version_summary,
 )
+from ontofoundry_api.services.workspaces import list_accessible_workspaces
 
 router = APIRouter(prefix="/api/v1/ontology/workspaces", tags=["ontology"])
+
+
+@router.get("")
+def accessible_workspaces(
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(ontology_directory_principal),
+) -> dict:
+    items = list_accessible_workspaces(
+        session,
+        principal.id,
+        workspace_id=principal.service_workspace_id,
+    )
+    return {
+        "items": [
+            {
+                **item,
+                "mcp_endpoint": f"/api/v1/ontology/workspaces/{item['id']}/mcp",
+            }
+            for item in items
+        ]
+    }
 
 
 @router.get("/{workspace_id}/objects")
@@ -145,7 +170,7 @@ def export_version(
             key: value
             for key, value in version.ossie_json.items()
             if key != "ontology_mappings"
-            or can_read_instances(session, workspace_id, principal)
+            or can_read_mappings(session, workspace_id, principal)
         },
         headers={
             "Content-Disposition": (

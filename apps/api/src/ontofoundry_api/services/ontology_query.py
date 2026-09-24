@@ -48,6 +48,7 @@ def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
             "object_types": len(snapshot.get("object_types", [])),
             "link_types": len(snapshot.get("link_types", [])),
             "attributes": attributes,
+            "mappings": len(snapshot.get("mappings", [])),
         },
     }
 
@@ -130,15 +131,26 @@ def _type_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "attribute_count": len(item.get("attributes", [])) + len(inherited),
             }
         )
-    links = [
-        {
-            **{key: value for key, value in item.items() if key != "data_join"},
-            "kind": "link_type",
-            "attribute_count": 0,
-        }
-        for item in snapshot.get("link_types", [])
-    ]
+    links = []
+    for item in snapshot.get("link_types", []):
+        source = by_id.get(str(item["source_type_id"]))
+        target = by_id.get(str(item["target_type_id"]))
+        links.append(
+            {
+                **{key: value for key, value in item.items() if key != "data_join"},
+                "kind": "link_type",
+                "source_type": _type_summary(source),
+                "target_type": _type_summary(target),
+                "attribute_count": 0,
+            }
+        )
     return objects + links
+
+
+def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
+    if item is None:
+        return None
+    return {key: item[key] for key in ("id", "name", "technical_name")}
 
 
 def search_types(

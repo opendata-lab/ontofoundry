@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from uuid import uuid4
 
@@ -129,6 +130,7 @@ def test_non_member_cannot_read_materials_drafts_connections_or_instances(client
 
 def test_service_token_is_workspace_scoped_revocable_and_read_only(client):
     token = client.post(ROOT + "/service-tokens", json={"name": "测试调用方"}).json()
+    assert token["scopes"] == ["instances:read", "mappings:read", "ontology:read"]
     headers = {"Authorization": "Bearer " + token["token"]}
     assert client.get(ONTOLOGY + "/types", headers=headers).status_code == 200
     assert client.post(ROOT + "/sessions", json={}, headers=headers).status_code == 401
@@ -139,8 +141,36 @@ def test_service_token_is_workspace_scoped_revocable_and_read_only(client):
     assert "token" not in client.get(ROOT + "/service-tokens").text.replace(
         "service-tokens", ""
     )
+    assert client.get(ROOT + "/service-tokens").json()["items"][0]["scopes"] == [
+        "ontology:read",
+        "instances:read",
+        "mappings:read",
+    ]
     client.delete(ROOT + "/service-tokens/" + token["id"])
     assert client.get(ONTOLOGY + "/types", headers=headers).status_code == 401
+
+
+def test_ontology_workspace_directory_is_filtered_for_service_tokens(client):
+    other = client.post(
+        "/api/v1/workspaces",
+        json={"name": "第二空间", "slug": "second-space", "description": ""},
+    ).json()
+    user_items = client.get("/api/v1/ontology/workspaces").json()["items"]
+    assert {item["id"] for item in user_items} == {
+        str(DEMO_WORKSPACE_ID),
+        other["id"],
+    }
+    assert all(item["mcp_endpoint"].endswith("/mcp") for item in user_items)
+
+    token = client.post(
+        ROOT + "/service-tokens",
+        json={"name": "目录调用方", "scopes": ["ontology:read"]},
+    ).json()
+    token_items = client.get(
+        "/api/v1/ontology/workspaces",
+        headers={"Authorization": "Bearer " + token["token"]},
+    ).json()["items"]
+    assert [item["id"] for item in token_items] == [str(DEMO_WORKSPACE_ID)]
 
 
 def mcp_request(client, method, params=None, headers=None):
@@ -174,6 +204,9 @@ def test_mcp_discover_list_call_and_notification(client):
     assert len(tools) == 8
     result = mcp_request(client, "tools/call", {"name": "get_ontology_version"}).json()
     assert result["result"]["isError"] is False
+    assert result["result"]["structuredContent"] == json.loads(
+        result["result"]["content"][0]["text"]
+    )
     assert (
         client.post(
             ONTOLOGY + "/mcp", json={"jsonrpc": "2.0", "method": "notifications/example"}
@@ -205,7 +238,65 @@ def test_mcp_rejects_mismatched_headers_and_invalid_arguments(client):
         == 400
     )
     assert mcp_request(client, "unknown").status_code == 404
-    assert mcp_request(client, "initialize").status_code == 404
+
+
+def test_mcp_legacy_initialize_negotiates_without_weakening_modern_requests(client):
+    initialized = client.post(
+        ONTOLOGY + "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "legacy-test", "version": "1.0"},
+            },
+        },
+        headers={"Accept": "application/json, text/event-stream"},
+    )
+    assert initialized.status_code == 200
+    assert initialized.json()["result"]["protocolVersion"] == "2025-06-18"
+    assert initialized.json()["result"]["capabilities"] == {
+        "tools": {"listChanged": False}
+    }
+
+    legacy_tools = client.post(
+        ONTOLOGY + "/mcp",
+        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        headers={
+            "MCP-Protocol-Version": "2025-06-18",
+            "Accept": "application/json, text/event-stream",
+        },
+    )
+    assert legacy_tools.status_code == 200
+    assert len(legacy_tools.json()["result"]["tools"]) == 8
+    assert "resultType" not in legacy_tools.json()["result"]
+
+    modern_without_modern_headers = client.post(
+        ONTOLOGY + "/mcp",
+        json={"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
+        headers={"Accept": "application/json, text/event-stream"},
+    )
+    assert modern_without_modern_headers.json()["error"]["code"] == -32020
+
+
+def test_mcp_legacy_initialize_counteroffers_latest_handshake_version(client):
+    response = client.post(
+        ONTOLOGY + "/mcp",
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "old-client", "version": "1.0"},
+            },
+        },
+        headers={"Accept": "application/json, text/event-stream"},
+    )
+    assert response.json()["result"]["protocolVersion"] == "2025-11-25"
 
 
 def test_mcp_invalid_ids_do_not_emit_a_null_response_id(client):

@@ -145,6 +145,23 @@ def list_workspaces(session: Session, user_id: str) -> list[dict]:
     return [workspace_summary(session, item, user_id) for item in workspaces]
 
 
+def list_accessible_workspaces(
+    session: Session, user_id: str, *, workspace_id: str | None = None
+) -> list[dict]:
+    query = (
+        select(WorkspaceRecord)
+        .join(
+            WorkspaceMemberRecord,
+            WorkspaceMemberRecord.workspace_id == WorkspaceRecord.id,
+        )
+        .where(WorkspaceMemberRecord.user_id == user_id)
+        .order_by(WorkspaceRecord.updated_at.desc())
+    )
+    if workspace_id is not None:
+        query = query.where(WorkspaceRecord.id == workspace_id)
+    return [workspace_summary(session, item, user_id) for item in session.scalars(query)]
+
+
 def publish_draft(
     session: Session,
     *,

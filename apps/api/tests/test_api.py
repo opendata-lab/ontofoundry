@@ -50,6 +50,22 @@ def test_published_ontology_query_and_export_share_version(client):
     }
     assert export.status_code == 200
     assert export.json()["version"] == "0.2.0.dev0"
+    assert "mappings" in version["counts"]
+
+
+def test_relation_type_includes_endpoint_name_summaries(client):
+    workspace_id = str(DEMO_WORKSPACE_ID)
+    relation = client.get(
+        f"/api/v1/ontology/workspaces/{workspace_id}/types",
+        params={"kind": "link_type"},
+    ).json()["items"][0]
+    detail = client.get(
+        f"/api/v1/ontology/workspaces/{workspace_id}/types/{relation['id']}"
+    ).json()["item"]
+
+    for endpoint in ("source_type", "target_type"):
+        assert set(detail[endpoint]) == {"id", "name", "technical_name"}
+        assert detail[endpoint]["name"]
 
 
 def test_type_neighborhood_limits_result(client):

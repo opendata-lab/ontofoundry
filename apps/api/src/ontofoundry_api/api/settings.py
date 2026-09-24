@@ -130,8 +130,12 @@ def remove_member(
 
 class TokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    scopes: list[Literal["ontology:read", "instances:read"]] = Field(
-        default_factory=lambda: ["ontology:read"]
+    scopes: list[Literal["ontology:read", "mappings:read", "instances:read"]] = Field(
+        default_factory=lambda: [
+            "ontology:read",
+            "mappings:read",
+            "instances:read",
+        ]
     )
 
 
@@ -150,11 +154,13 @@ def tokens(
                 "created_at": t.created_at,
                 "scopes": [
                     "ontology:read",
-                    *db.scalars(
-                        select(ServiceTokenScopeRecord.scope).where(
-                            ServiceTokenScopeRecord.token_id == t.id
-                        )
-                    ).all(),
+                    *sorted(
+                        db.scalars(
+                            select(ServiceTokenScopeRecord.scope).where(
+                                ServiceTokenScopeRecord.token_id == t.id
+                            )
+                        ).all()
+                    ),
                 ],
             }
             for t in db.scalars(
@@ -184,8 +190,8 @@ def create_token(
     )
     db.add(item)
     db.flush()
-    if "instances:read" in body.scopes:
-        db.add(ServiceTokenScopeRecord(token_id=item.id, scope="instances:read"))
+    for scope in sorted(set(body.scopes) - {"ontology:read"}):
+        db.add(ServiceTokenScopeRecord(token_id=item.id, scope=scope))
     db.commit()
     return {
         "id": item.id,
