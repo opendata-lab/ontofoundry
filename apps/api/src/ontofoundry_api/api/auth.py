@@ -36,6 +36,7 @@ class Principal:
     display_name: str
     email: str | None
     service_token_id: str | None = None
+    service_workspace_id: str | None = None
     scopes: frozenset[str] = frozenset()
 
 
@@ -124,7 +125,12 @@ def safe_return_to(value: str) -> str:
     )
 
 
-def ontology_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
+def _ontology_principal(
+    request: Request,
+    session: Session,
+    *,
+    workspace_id: str | None,
+) -> Principal:
     authorization = request.headers.get("authorization", "")
     if authorization:
         scheme, _, token = authorization.partition(" ")
@@ -136,7 +142,7 @@ def ontology_principal(request: Request, session: Session = Depends(get_db)) -> 
         if (
             scheme.lower() != "bearer"
             or not record
-            or record.workspace_id != request.path_params.get("workspace_id")
+            or (workspace_id is not None and record.workspace_id != workspace_id)
         ):
             raise HTTPException(401, "本体服务令牌无效或不属于当前空间")
         user = session.get(UserRecord, record.created_by)
@@ -150,9 +156,24 @@ def ontology_principal(request: Request, session: Session = Depends(get_db)) -> 
         return replace(
             _principal(user),
             service_token_id=record.id,
+            service_workspace_id=record.workspace_id,
             scopes=frozenset(["ontology:read", *scopes]),
         )
     return current_principal(request, session)
+
+
+def ontology_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
+    return _ontology_principal(
+        request,
+        session,
+        workspace_id=request.path_params.get("workspace_id"),
+    )
+
+
+def ontology_directory_principal(
+    request: Request, session: Session = Depends(get_db)
+) -> Principal:
+    return _ontology_principal(request, session, workspace_id=None)
 
 
 @router.get("/me")

@@ -900,7 +900,7 @@ JSON 合法只是技术底线。选择代表性 Markdown 和实例查询，预�
 
 数据库实例邻域上限为 100 个节点、300 条边和 50 次查询；单次查询超时 10 秒，整体 15 秒预算在查询之间检查，因此不是严格 15 秒墙钟 SLA。缺少映射、字段不存在、跨连接等情况返回局部结果和原因，不自动补数据或拼接跨库 SQL。
 
-MCP 实现锁定 2026-07-28：单 POST 请求、`server/discover`、协议/方法头校验、`tools/list`、`tools/call` 和只读查询。采用本平台 Bearer 服务令牌，不宣称已经实现 OAuth 动态发现或旧版 `initialize` 兼容。需要在消费端确认相同版本后联调。[协议版本](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/versioning.mdx)、[HTTP 传输](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/transports/streamable-http.mdx)。
+MCP 主路径锁定 2026-07-28：单 POST 请求、`server/discover`、协议/方法头校验、`tools/list`、`tools/call` 和只读查询；同时兼容 2025-03-26、2025-06-18、2025-11-25 的 `initialize` 握手与 Streamable HTTP 请求。新版路径继续逐请求严格校验协议头和 `_meta`，旧版路径按握手时代的版本头规则独立校验。采用本平台 Bearer 服务令牌，尚未实现 OAuth 动态发现。[协议版本](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/versioning.mdx)、[HTTP 传输](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/docs/specification/2026-07-28/basic/transports/streamable-http.mdx)。
 
 ### 17.2 实际测试证据
 

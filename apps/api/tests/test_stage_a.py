@@ -162,7 +162,10 @@ def test_tokens_do_not_gain_instances_implicitly_and_can_be_revoked(
     client, document_session
 ):
     publish(client, document_session[0])
-    legacy = client.post(ROOT + "/service-tokens", json={"name": "本体调用方"}).json()
+    legacy = client.post(
+        ROOT + "/service-tokens",
+        json={"name": "本体调用方", "scopes": ["ontology:read"]},
+    ).json()
     legacy_headers = {"Authorization": "Bearer " + legacy["token"]}
     assert client.get(SERVICE + "/types", headers=legacy_headers).status_code == 200
     assert client.get(SERVICE + "/objects", headers=legacy_headers).status_code == 403
@@ -214,6 +217,7 @@ def test_database_services_share_actual_rows_and_protect_mapping_export(
 ):
     session, supplier, _ = mapped_session
     vid = publish(client, session)["version"]["version_id"]
+    assert client.get(SERVICE + "/version").json()["counts"]["mappings"] > 0
     page = client.get(
         SERVICE + "/objects",
         params={"source": "database", "type_id": supplier["id"], "version_id": vid},
@@ -228,12 +232,40 @@ def test_database_services_share_actual_rows_and_protect_mapping_export(
         client, "tools/call", {"name": "expand_object_graph", "arguments": {"ref": ref}}
     ).json()["result"]
     assert json.loads(mcp["content"][0]["text"])["objects"] == graph["objects"]
-    legacy = client.post(ROOT + "/service-tokens", json={"name": "语义"}).json()
+    legacy = client.post(
+        ROOT + "/service-tokens",
+        json={"name": "语义", "scopes": ["ontology:read"]},
+    ).json()
     definition = client.get(
         SERVICE + f"/versions/{vid}/export",
         headers={"Authorization": "Bearer " + legacy["token"]},
     ).json()
     assert "ontology_mappings" not in definition
+    redacted = mcp_request(
+        client,
+        "tools/call",
+        {"name": "export_ontology", "arguments": {"version_id": vid}},
+        headers={"Authorization": "Bearer " + legacy["token"]},
+    ).json()["result"]
+    assert redacted["structuredContent"]["redacted_fields"] == [
+        "ontology_mappings"
+    ]
+    assert "ontology_mappings" not in redacted["structuredContent"]
+
+    mapping_token = client.post(
+        ROOT + "/service-tokens",
+        json={"name": "映射", "scopes": ["mappings:read"]},
+    ).json()
+    mapping_headers = {"Authorization": "Bearer " + mapping_token["token"]}
+    complete = mcp_request(
+        client,
+        "tools/call",
+        {"name": "export_ontology", "arguments": {"version_id": vid}},
+        headers=mapping_headers,
+    ).json()["result"]["structuredContent"]
+    assert complete["ontology_mappings"]
+    assert "redacted_fields" not in complete
+    assert client.get(SERVICE + "/objects", headers=mapping_headers).status_code == 403
 
 
 def test_assets_detect_schema_drift_and_keep_last_success(
