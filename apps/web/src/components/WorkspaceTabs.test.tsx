@@ -174,15 +174,21 @@ describe("页签交互", () => {
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
   });
-  it("请求进行中不可关闭或跳转，不丢弃在途操作", async () => {
+  it("后台页签忙碌时仍可切换和发布，但不可关闭该页签或离开空间", async () => {
     const router = show();
     fireEvent.click(screen.getByRole("button", { name: "切换忙碌" }));
-    await act(() => router.navigate("/workspaces/w/objects"));
-    expect(screen.getByRole("dialog")).toHaveTextContent("操作正在进行");
+    await act(() => router.navigate("/workspaces/w/delivery"));
+    expect(router.state.location.pathname).toBe("/workspaces/w/delivery");
+    expect(document.querySelector(".route-panel[hidden]")).toHaveTextContent("列表");
+    fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
+    expect(screen.getByRole("status")).toHaveTextContent("本体视图」的操作正在进行");
+    fireEvent.click(screen.getByRole("button", { name: "关闭提示" }));
+    fireEvent.click(tabs().getByRole("button", { name: "关闭 发布与服务" }));
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
+    fireEvent.click(screen.getByRole("link", { name: "离开空间" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("操作正在进行");
     expect(screen.queryByRole("button", { name: "放弃并离开" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "返回页面" }));
-    fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
-    expect(screen.getByRole("status")).toHaveTextContent("操作正在进行");
+    expect(router.state.location.pathname).toBe("/workspaces/w/view");
   });
 });
