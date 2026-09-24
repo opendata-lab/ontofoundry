@@ -27,7 +27,6 @@ import {
 import { PageTabContext, type PageTabMeta } from "../hooks/usePageTab";
 import {
   closeTab,
-  isTabPromotion,
   openTab,
   restoreTabs,
   type PageTab,
@@ -106,20 +105,15 @@ export function WorkspaceTabs({
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    if (
-      nextLocation.pathname === currentLocation.pathname &&
-      nextLocation.state?.tabOperation === "session-created"
-    )
-      return false;
-    if (
-      busy &&
-      !isTabPromotion(createPath(currentLocation), createPath(nextLocation))
-    )
-      return true;
-    return dirty && !nextLocation.pathname.startsWith(base + "/");
-  });
+  // Pages stay mounted in their tabs, so switching within the workspace does
+  // not interrupt a request running in another tab. Protect only navigation
+  // that would unmount the entire workspace.
+  const blocker = useBlocker(
+    ({ nextLocation }) =>
+      (busy || dirty) && !nextLocation.pathname.startsWith(base + "/"),
+  );
   const blocked = blocker.state === "blocked";
+  const blockingBusy = blocked && busy && !closing;
   useEffect(() => {
     if (closing || blocked) dialog.current?.showModal();
     else dialog.current?.close();
@@ -183,8 +177,8 @@ export function WorkspaceTabs({
       ?.focus();
   };
   const requestClose = (tab: PageTab) => {
-    if (tab.busy || busy) {
-      setNotice("操作正在进行，请完成后再关闭页面。");
+    if (tab.busy) {
+      setNotice(`「${tab.title}」的操作正在进行，请完成后再关闭页面。`);
       return;
     }
     if (tab.dirty) setClosing(tab.id);
@@ -307,12 +301,12 @@ export function WorkspaceTabs({
       >
         <header>
           <h2 id="tab-confirm-title">
-            {busy ? "操作正在进行" : "有尚未保存的内容"}
+            {blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
           </h2>
         </header>
         <p>
-          {busy
-            ? "请等待当前操作完成后再切换或关闭页面。"
+          {blockingBusy
+            ? "请等待当前操作完成后再离开空间。"
             : target
               ? `关闭「${target.title}」将丢失未保存的修改。`
               : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
@@ -325,7 +319,7 @@ export function WorkspaceTabs({
           >
             返回页面
           </button>
-          {!busy && (
+          {!blockingBusy && (
             <button
               className="button button--primary"
               onClick={() => {
