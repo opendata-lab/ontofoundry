@@ -90,20 +90,6 @@ export function BuilderPage() {
     setUploading(false);
     if (input.current) input.current.value = "";
   };
-  const startModeling = () => {
-    const el = conversation.current;
-    if (!el) return;
-    const text = el.value.trim();
-    const content =
-      (scenario.trim() && text
-        ? `业务场景：${scenario.trim()}\n本次需求：${text}`
-        : text) ||
-      scenario.trim() ||
-      "基于已选材料开始建模";
-    // metadata is opaque to the SDK and comes back on completion; it is how we
-    // tell a modeling run apart from ordinary chat when deciding what to refresh.
-    void el.sendMessage(content, { metadata: { mode: "model" } });
-  };
 
   // The element owns the network; the page only reacts to what it reports.
   useEffect(() => {
@@ -164,6 +150,10 @@ export function BuilderPage() {
     // transport when endpoint changes and intentionally does not rebuild one
     // merely because a late factory assignment arrived.
     el.transportFactory = createOntoFoundryConversationTransport;
+    // A modeling run's deliverable is the draft, which the results panel to the
+    // right already renders. The raw JSON behind it is not something to hand
+    // the user as a file.
+    el.showAttachments = false;
     el.endpointResolver = async () =>
       `/api/v1/workspaces/${workspace.id}/sessions/${(await model.ensure()).id}/agent-conversation`;
     el.endpoint = sessionId
@@ -375,17 +365,7 @@ export function BuilderPage() {
           <dataagent-conversation
             ref={conversation}
             placeholder="向智能体提问以辅助本体构建…"
-          >
-            <button
-              slot="composer-actions"
-              type="button"
-              className="button button--secondary"
-              disabled={busy}
-              onClick={startModeling}
-            >
-              开始建模
-            </button>
-          </dataagent-conversation>
+          />
         </section>
         <ModelResults session={session} />
       </div>

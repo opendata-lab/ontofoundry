@@ -577,12 +577,22 @@ small,
   --dac-content-padding-inline: clamp(16px, 2vw, 24px);
   --dac-content-padding-block: 24px;
   --dac-message-gap: 20px;
+  /* The SDK defaults to emerald. Unset, the conversation would be the one
+     green thing on a blue page. */
+  --dac-primary: var(--color-accent);
+  --dac-primary-dark: var(--color-accent-hover);
+  --dac-primary-color: var(--color-accent);
+  --dac-accent: var(--color-accent);
+  --dac-user-bubble-bg: var(--color-accent-soft);
   display: block;
   flex: 1 1 0;
   width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
+}
+.ref-chat > dataagent-conversation::part(run-detail) {
+  display: none;
 }
 .chat-scroll {
   padding: 24px;
