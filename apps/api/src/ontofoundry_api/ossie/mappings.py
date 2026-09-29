@@ -66,7 +66,11 @@ def compile_mappings(
                     "name": dataset,
                     "source": _source(mapping),
                     "primary_key": [mapping.key_column],
-                    "description": object_type.description or object_type.name,
+                    **(
+                        {"description": object_type.description}
+                        if object_type.description
+                        else {}
+                    ),
                     # Inside a semantic model an expression is dialect-tagged;
                     # on the ontology side it is a plain string.
                     "fields": [
@@ -86,10 +90,17 @@ def compile_mappings(
                     "object_mappings": [{"expression": f"{dataset}.{mapping.key_column}"}],
                     "link_mappings": [
                         {
-                            "relationship": name,
-                            "object_mapping": {"expression": f"{dataset}.{column}"},
+                            "object_mapping": {
+                                "expression": f"{dataset}.{mapping.key_column}"
+                            },
+                            "children": [
+                                {
+                                    "relationship": name,
+                                    "object_mapping": {"expression": f"{dataset}.{column}"},
+                                }
+                                for name, column in sorted(mapping.fields.items())
+                            ],
                         }
-                        for name, column in sorted(mapping.fields.items())
                     ],
                 }
             )
@@ -115,7 +126,7 @@ def compile_mappings(
                 (item for item in concept_mappings if item["concept"] == owner), None
             )
             if entry is not None:
-                entry["link_mappings"].append(
+                entry["link_mappings"][0]["children"].append(
                     {
                         "relationship": link.technical_name,
                         "object_mapping": {
@@ -124,6 +135,10 @@ def compile_mappings(
                         },
                     }
                 )
+
+        for entry in concept_mappings:
+            if not entry["link_mappings"][0]["children"]:
+                del entry["link_mappings"]
 
         semantic_model: dict[str, Any] = {"name": alias, "datasets": datasets}
         if relationships:
@@ -139,13 +154,70 @@ def compile_mappings(
     return documents
 
 
-def _column(expression: Any, dataset: str) -> str | None:
+def validate_mapping_tree(document: dict[str, Any]) -> str | None:
+    """Reject the old flat layout before it can be silently misread as a tree."""
+    for index, entry in enumerate(document.get("ontology_mappings") or []):
+        for concept_mapping in entry.get("concept_mappings") or []:
+            concept = str(concept_mapping.get("concept") or "(未命名)")
+            roots = concept_mapping.get("link_mappings") or []
+            if len(roots) > 1:
+                return (
+                    f"ontology_mappings[{index}].{concept}.link_mappings "
+                    "最多支持一个对象映射根节点"
+                )
+            for root_index, root in enumerate(roots):
+                path = f"ontology_mappings[{index}].{concept}.link_mappings[{root_index}]"
+                if "relationship" in root:
+                    return (
+                        f"{path} 不能在根节点指定 relationship；"
+                        "旧版平铺映射和一元关系映射均不受支持"
+                    )
+                seen_relationships: set[str] = set()
+                for child_index, child in enumerate(root.get("children") or []):
+                    relationship = child.get("relationship")
+                    if not relationship:
+                        return f"{path}.children[{child_index}] 缺少 relationship"
+                    if relationship in seen_relationships:
+                        return f"{path}.children[{child_index}] 重复映射 {relationship}"
+                    seen_relationships.add(relationship)
+    return None
+
+
+def _dataset_fields(dataset: dict[str, Any], dataset_name: str) -> dict[str, str | None]:
+    """Resolve declared logical fields only when their ANSI SQL is one column."""
+    resolved: dict[str, str | None] = {}
+    for field in dataset.get("fields") or []:
+        name = str(field.get("name") or "")
+        if not name:
+            continue
+        dialects = (field.get("expression") or {}).get("dialects") or []
+        expression = next(
+            (
+                str(item.get("expression") or "")
+                for item in dialects
+                if item.get("dialect") == "ANSI_SQL"
+            ),
+            "",
+        )
+        match = COLUMN_RE.fullmatch(expression.strip())
+        resolved[name] = (
+            match.group("column")
+            if match and match.group("dataset") in (None, dataset_name)
+            else None
+        )
+    return resolved
+
+
+def _column(
+    expression: Any, dataset: str, fields: dict[str, str | None] | None = None
+) -> str | None:
     match = COLUMN_RE.match(str(expression or ""))
     if not match:
         return None
     if match.group("dataset") and match.group("dataset") != dataset:
         return None
-    return match.group("column")
+    name = match.group("column")
+    return fields[name] if fields is not None and name in fields else name
 
 
 def parse_mappings(
@@ -191,15 +263,32 @@ def parse_mappings(
                 for item in object_mappings
             ):
                 skip(path, "referent_mappings（按引用关系定位对象）暂不支持")
+            roots = concept_mapping.get("link_mappings") or []
+            root_expression = next(
+                (
+                    root["object_mapping"].get("expression")
+                    for root in roots
+                    if root["object_mapping"].get("expression")
+                ),
+                None,
+            )
             dataset_name = next(
-                (name for name in datasets if str(expression or "").startswith(f"{name}.")),
+                (
+                    name
+                    for name in datasets
+                    for text in (expression, root_expression)
+                    if str(text or "").startswith(f"{name}.")
+                ),
                 concept if concept in datasets else None,
             )
             dataset = datasets.get(dataset_name or "")
             if dataset is None:
                 skip(path, "找不到这个概念对应的 dataset")
                 continue
-            key_column = _column(expression, dataset_name or "")
+            fields_by_name = _dataset_fields(dataset, dataset_name or "")
+            key_column = _column(expression, dataset_name or "", fields_by_name) or _column(
+                root_expression, dataset_name or "", fields_by_name
+            )
             if not key_column:
                 keys = dataset.get("primary_key") or []
                 key_column = str(keys[0]) if keys else None
@@ -209,22 +298,23 @@ def parse_mappings(
 
             attributes = {item.technical_name for item in object_type.attributes}
             fields: dict[str, str] = {}
-            for link_mapping in concept_mapping.get("link_mappings") or []:
-                if not isinstance(link_mapping, dict):
-                    continue
-                name = str(link_mapping.get("relationship") or "")
-                if link_mapping.get("children"):
-                    skip(f"{path}.{name}", "多层 link_mappings 暂不支持")
-                if name not in attributes:
-                    continue  # relations are mapped through data_join, not fields
-                column = _column(
-                    (link_mapping.get("object_mapping") or {}).get("expression"),
-                    dataset_name or "",
-                )
-                if not column:
-                    skip(f"{path}.{name}", "字段映射不是单列表达式，未导入这一列")
-                    continue
-                fields[name] = column
+            for root in roots:
+                for link_mapping in root.get("children") or []:
+                    name = str(link_mapping.get("relationship") or "")
+                    if link_mapping.get("children"):
+                        skip(f"{path}.{name}", "三元及以上关系的映射暂不支持")
+                        continue
+                    if name not in attributes:
+                        continue  # relations are mapped through data_join
+                    column = _column(
+                        link_mapping["object_mapping"].get("expression"),
+                        dataset_name or "",
+                        fields_by_name,
+                    )
+                    if not column:
+                        skip(f"{path}.{name}", "字段映射不是单列表达式，未导入这一列")
+                        continue
+                    fields[name] = column
 
             source = str(dataset.get("source") or "")
             schema_name, _, table_name = source.rpartition(".")

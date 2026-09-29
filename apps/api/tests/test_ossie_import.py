@@ -492,6 +492,17 @@ def test_data_mappings_travel_as_ontology_mappings_without_connections():
     assert datasets["supplier"]["source"] == "public.suppliers"
     assert datasets["supplier"]["primary_key"] == ["code"]
     assert maps[0]["semantic_model"]["relationships"][0]["from_columns"] == ["code"]
+    supplier_mapping = next(
+        item for item in maps[0]["concept_mappings"] if item["concept"] == "supplier"
+    )
+    root = supplier_mapping["link_mappings"][0]
+    assert "relationship" not in root
+    assert root["object_mapping"]["expression"] == "supplier.code"
+    assert {item["relationship"] for item in root["children"]} == {
+        "supplier_code",
+        "supplier_name",
+        "supplies",
+    }
     # No credentials, host or connection id anywhere in the published document.
     assert "connection" not in json.dumps(document).lower()
 
@@ -537,12 +548,13 @@ def test_computed_mapping_expressions_are_reported_not_guessed():
     draft = mapped_draft()
     document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
     mapping = document["ontology_mappings"][0]["concept_mappings"][0]
-    mapping["link_mappings"][0]["object_mapping"]["expression"] = "UPPER(code)"
+    child = mapping["link_mappings"][0]["children"][0]
+    child["object_mapping"]["expression"] = "UPPER(code)"
     payload, report = import_ossie(
         document, workspace_id=str(draft.workspace_id), mode="replace"
     )
     imported = OntologyDraft.model_validate(payload)
-    dropped = mapping["link_mappings"][0]["relationship"]
+    dropped = child["relationship"]
 
     assert any("单列表达式" in item["reason"] for item in report["skipped"])
     assert all(
@@ -555,6 +567,85 @@ def test_computed_mapping_expressions_are_reported_not_guessed():
             if entry.technical_name == mapping["concept"]
         )
     )
+
+
+def test_declared_computed_field_is_not_guessed_as_a_physical_column():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    group = document["ontology_mappings"][0]
+    mapping = group["concept_mappings"][0]
+    dataset = next(
+        item
+        for item in group["semantic_model"]["datasets"]
+        if item["name"] == mapping["concept"]
+    )
+    dataset["fields"].append(
+        {
+            "name": "calculated",
+            "expression": {
+                "dialects": [{"dialect": "ANSI_SQL", "expression": "UPPER(code)"}]
+            },
+        }
+    )
+    child = mapping["link_mappings"][0]["children"][0]
+    child["object_mapping"]["expression"] = f"{mapping['concept']}.calculated"
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    object_type = next(
+        item for item in imported.object_types if item.technical_name == mapping["concept"]
+    )
+    data_mapping = next(
+        item for item in imported.mappings if item.type_id == object_type.id
+    )
+    assert child["relationship"] not in data_mapping.fields
+    assert any(
+        item["path"].endswith(child["relationship"]) and "单列表达式" in item["reason"]
+        for item in report["skipped"]
+    )
+
+
+def test_plain_logical_field_resolves_to_its_physical_column():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    group = document["ontology_mappings"][0]
+    mapping = group["concept_mappings"][0]
+    dataset = next(
+        item
+        for item in group["semantic_model"]["datasets"]
+        if item["name"] == mapping["concept"]
+    )
+    child = mapping["link_mappings"][0]["children"][0]
+    physical = child["object_mapping"]["expression"].split(".", 1)[1]
+    dataset["fields"].append(
+        {
+            "name": "logical_field",
+            "expression": {
+                "dialects": [
+                    {
+                        "dialect": "ANSI_SQL",
+                        "expression": f"{mapping['concept']}.{physical}",
+                    }
+                ]
+            },
+        }
+    )
+    child["object_mapping"]["expression"] = f"{mapping['concept']}.logical_field"
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    imported = OntologyDraft.model_validate(payload)
+    object_type = next(
+        item for item in imported.object_types if item.technical_name == mapping["concept"]
+    )
+    data_mapping = next(
+        item for item in imported.mappings if item.type_id == object_type.id
+    )
+    assert data_mapping.fields[child["relationship"]] == physical
+    assert report["skipped"] == []
 
 
 def test_merge_keeps_existing_model_instances_and_mappings():
@@ -612,7 +703,7 @@ def test_merge_updates_matching_types_without_renaming_them():
 
 
 def test_import_refuses_documents_that_are_not_valid_ossie():
-    with pytest.raises(OssieImportError, match="Apache Ossie"):
+    with pytest.raises(OssieImportError, match="OSSIE_VERSION_UNSUPPORTED"):
         import_ossie({"version": "9", "ontology": []}, workspace_id=DEMO_WORKSPACE_ID)
     with pytest.raises(OssieImportError):
         import_ossie(
@@ -630,6 +721,56 @@ def test_import_refuses_documents_that_are_not_valid_ossie():
             },
             workspace_id=DEMO_WORKSPACE_ID,
         )
+
+
+def test_import_rejects_old_flat_mappings_even_with_current_extension():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    mapping = document["ontology_mappings"][0]["concept_mappings"][0]
+    mapping["link_mappings"] = mapping["link_mappings"][0]["children"]
+
+    with pytest.raises(OssieImportError, match="MAPPING_FORMAT_UNSUPPORTED"):
+        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+
+def test_import_rejects_ambiguous_mapping_trees():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    mapping = document["ontology_mappings"][0]["concept_mappings"][0]
+    root = mapping["link_mappings"][0]
+    mapping["link_mappings"].append(json.loads(json.dumps(root)))
+    with pytest.raises(OssieImportError, match="最多支持一个对象映射根节点"):
+        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+    mapping["link_mappings"].pop()
+    root["children"].append(json.loads(json.dumps(root["children"][0])))
+    with pytest.raises(OssieImportError, match="重复映射"):
+        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+
+def test_import_rejects_old_extension_version():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    document["ai_context"]["ontofoundry"]["version"] = "1"
+
+    with pytest.raises(OssieImportError, match="ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED"):
+        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+    del document["ontology_mappings"]
+    with pytest.raises(OssieImportError, match="ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED"):
+        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+
+def test_standard_tree_without_ontofoundry_extension_can_be_imported():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    del document["ai_context"]["ontofoundry"]
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+    assert len(payload["mappings"]) == len(draft.mappings)
+    assert report["skipped"] == []
 
 
 def test_import_endpoint_creates_a_reviewable_session_without_publishing(client):
@@ -663,6 +804,30 @@ def test_import_endpoint_rejects_invalid_files(client):
     assert "导入失败" in response.json()["detail"]
 
 
+def test_import_endpoint_reports_unsupported_versions_and_flat_mappings(client):
+    document = compile_ossie(
+        mapped_draft(), ontology_name="mfg", ontology_description="制造"
+    )
+    old_extension = json.loads(json.dumps(document))
+    old_extension["ai_context"]["ontofoundry"]["version"] = "1"
+    response = client.post(
+        ROOT + "/imports/ossie",
+        json={"document": old_extension, "mode": "replace"},
+    )
+    assert response.status_code == 422
+    assert "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED" in response.json()["detail"]
+
+    old_flat = json.loads(json.dumps(document))
+    mapping = old_flat["ontology_mappings"][0]["concept_mappings"][0]
+    mapping["link_mappings"] = mapping["link_mappings"][0]["children"]
+    response = client.post(
+        ROOT + "/imports/ossie",
+        json={"document": old_flat, "mode": "replace"},
+    )
+    assert response.status_code == 422
+    assert "MAPPING_FORMAT_UNSUPPORTED" in response.json()["detail"]
+
+
 def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
     """A real agent result where one concept ended up without a dataset.
 
@@ -673,13 +838,12 @@ def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
     The rest of the model is worth keeping; the missing join is worth saying.
     """
     document = json.loads(
-        (Path(__file__).parent / "fixtures" / "agent_result_partial_mappings.json")
-        .read_text(encoding="utf-8")
+        (
+            Path(__file__).parent / "fixtures" / "agent_result_partial_mappings.json"
+        ).read_text(encoding="utf-8")
     )["ontology"]
 
-    draft, report = import_ossie(
-        document, workspace_id=DEMO_WORKSPACE_ID, mode="replace"
-    )
+    draft, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
 
     # The draft is valid — which is the whole point, since this document used to
     # raise out of the model layer.
@@ -692,3 +856,162 @@ def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
 
     reasons = [item["reason"] for item in report["skipped"]]
     assert sum("order_item 没有数据映射" in reason for reason in reasons) == 2
+
+
+def named_value_roles_document():
+    return {
+        "version": "0.2.0.dev0",
+        "name": "governance",
+        "description": "治理",
+        "ontology": [
+            {
+                "concept": "arch_issue",
+                "type": "EntityType",
+                "identify_by": ["issue_key"],
+                "relationships": [
+                    {
+                        "name": "issue_key",
+                        "roles": [{"concept": "String", "name": "key_role"}],
+                        "multiplicity": "ManyToOne",
+                        "verbalizes": ["{arch_issue} 的编号是 {String:key_role}"],
+                    },
+                    {
+                        "name": "issue_args",
+                        "roles": [{"concept": "String", "name": "args_role"}],
+                        "multiplicity": "ManyToOne",
+                        "verbalizes": ["{arch_issue} 的参数是 {String:args_role}"],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def test_named_value_roles_and_stated_multiplicity_survive_round_trip():
+    document = named_value_roles_document()
+    payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    model = OntologyDraft.model_validate(payload)
+    by_name = {item.technical_name: item for item in model.object_types[0].attributes}
+
+    assert report["skipped"] == []
+    assert by_name["issue_key"].value_concept == "String"
+    assert by_name["issue_key"].multiplicity == Multiplicity.MANY_TO_ONE
+    assert by_name["issue_key"].target_role_name == "key_role"
+    assert by_name["issue_args"].target_role_name == "args_role"
+    assert all(item.description == "" for item in by_name.values())
+
+    rewritten = compile_ossie(
+        model, ontology_name="governance", ontology_description="治理"
+    )
+    assert validate_ossie(rewritten)["publishable"] is True
+    relationships = {
+        item["name"]: item for item in rewritten["ontology"][0]["relationships"]
+    }
+    assert relationships == {
+        item["name"]: item for item in document["ontology"][0]["relationships"]
+    }
+    assert "description" not in rewritten["ontology"][0]
+
+    # Removing an imported reading regenerates one with the named placeholder.
+    by_name["issue_args"].verbalizes = []
+    generated = compile_ossie(
+        model, ontology_name="governance", ontology_description="治理"
+    )
+    assert validate_ossie(generated)["publishable"] is True
+    args = next(
+        item
+        for item in generated["ontology"][0]["relationships"]
+        if item["name"] == "issue_args"
+    )
+    assert "{String:args_role}" in args["verbalizes"][0]
+
+
+def test_imported_role_and_multiplicity_survive_publish_and_export(client):
+    response = client.post(
+        ROOT + "/imports/ossie",
+        json={"document": named_value_roles_document(), "mode": "replace"},
+    )
+    assert response.status_code == 201, response.text
+    session = response.json()
+    published = client.post(
+        ROOT + "/sessions/" + session["id"] + "/publish",
+        json={"revision": session["revision"], "message": "值角色往返"},
+    )
+    assert published.status_code == 200, published.text
+    version_id = published.json()["version"]["version_id"]
+
+    snapshot = client.get(ROOT + "/published-snapshot").json()
+    issue = next(
+        item for item in snapshot["object_types"] if item["technical_name"] == "arch_issue"
+    )
+    key = next(
+        item for item in issue["attributes"] if item["technical_name"] == "issue_key"
+    )
+    assert key["target_role_name"] == "key_role"
+    assert key["multiplicity"] == "many_to_one"
+
+    exported = client.get(
+        f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}/versions/{version_id}/export"
+    )
+    assert exported.status_code == 200
+    component = next(
+        item for item in exported.json()["ontology"] if item["concept"] == "arch_issue"
+    )
+    key_relationship = next(
+        item for item in component["relationships"] if item["name"] == "issue_key"
+    )
+    assert key_relationship["roles"] == [{"concept": "String", "name": "key_role"}]
+    assert key_relationship["multiplicity"] == "ManyToOne"
+
+
+def test_description_is_not_invented_or_removed_when_it_equals_a_name():
+    document = named_value_roles_document()
+    document["ontology"][0]["description"] = "arch_issue"
+    document["ontology"][0]["relationships"][1]["description"] = "issue_args"
+    payload, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
+    rewritten = compile_ossie(
+        OntologyDraft.model_validate(payload),
+        ontology_name="governance",
+        ontology_description="治理",
+    )
+
+    component = rewritten["ontology"][0]
+    assert component["description"] == "arch_issue"
+    args = next(item for item in component["relationships"] if item["name"] == "issue_args")
+    assert args["description"] == "issue_args"
+    assert "description" not in next(
+        item for item in component["relationships"] if item["name"] == "issue_key"
+    )
+
+
+def test_editor_created_attribute_still_infers_identifier_multiplicity():
+    payload, _ = import_ossie(
+        named_value_roles_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    model = OntologyDraft.model_validate(payload)
+    model.object_types[0].attributes[0].multiplicity = None
+    rewritten = compile_ossie(
+        model, ontology_name="governance", ontology_description="治理"
+    )
+    key = next(
+        item
+        for item in rewritten["ontology"][0]["relationships"]
+        if item["name"] == "issue_key"
+    )
+    assert key["multiplicity"] == "OneToOne"
+
+
+def test_attribute_rejects_cardinality_that_ossie_cannot_export():
+    payload, _ = import_ossie(
+        named_value_roles_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
+    )
+    payload["object_types"][0]["attributes"][0]["multiplicity"] = "many_to_many"
+    with pytest.raises(ValidationError, match="属性的基数"):
+        OntologyDraft.model_validate(payload)
+
+
+def test_internal_draft_rejects_unknown_schema_version():
+    payload = build_demo_draft().model_dump(mode="json")
+    payload["schema_version"] = "2"
+    with pytest.raises(ValidationError, match="schema_version"):
+        OntologyDraft.model_validate(payload)

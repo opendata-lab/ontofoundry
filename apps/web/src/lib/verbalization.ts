@@ -19,13 +19,21 @@ export function valueConcept(
   objectKey: string,
   attribute: Pick<
     AttributeDefinition,
-    "technical_name" | "value_kind" | "identifier" | "value_concept"
+    | "technical_name"
+    | "value_kind"
+    | "identifier"
+    | "value_concept"
+    | "target_role_name"
   >,
 ): string {
-  if (attribute.value_concept) return attribute.value_concept;
-  if (attribute.identifier)
-    return `${objectKey}_${attribute.technical_name}_value`;
-  return VALUE_BASES[attribute.value_kind] ?? "String";
+  const concept = attribute.value_concept
+    ? attribute.value_concept
+    : attribute.identifier
+      ? `${objectKey}_${attribute.technical_name}_value`
+      : (VALUE_BASES[attribute.value_kind] ?? "String");
+  return attribute.target_role_name
+    ? `${concept}:${attribute.target_role_name}`
+    : concept;
 }
 
 /** The placeholders a reading of this relationship may use. */

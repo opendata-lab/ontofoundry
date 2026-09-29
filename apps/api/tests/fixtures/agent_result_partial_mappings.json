@@ -12,7 +12,7 @@
         "订单域语义模型"
       ],
       "ontofoundry": {
-        "version": "1",
+        "version": "2",
         "display_names": {
           "Customer": "客户",
           "Product": "商品",
@@ -535,28 +535,15 @@
             ],
             "link_mappings": [
               {
-                "relationship": "customer_id",
                 "object_mapping": {
                   "expression": "Customer.customer_id"
-                }
-              },
-              {
-                "relationship": "customer_name",
-                "object_mapping": {
-                  "expression": "Customer.customer_name"
-                }
-              },
-              {
-                "relationship": "city",
-                "object_mapping": {
-                  "expression": "Customer.city"
-                }
-              },
-              {
-                "relationship": "signup_date",
-                "object_mapping": {
-                  "expression": "Customer.signup_date"
-                }
+                },
+                "children": [
+                  {"relationship": "customer_id", "object_mapping": {"expression": "Customer.customer_id"}},
+                  {"relationship": "customer_name", "object_mapping": {"expression": "Customer.customer_name"}},
+                  {"relationship": "city", "object_mapping": {"expression": "Customer.city"}},
+                  {"relationship": "signup_date", "object_mapping": {"expression": "Customer.signup_date"}}
+                ]
               }
             ]
           },
@@ -569,28 +556,15 @@
             ],
             "link_mappings": [
               {
-                "relationship": "product_id",
                 "object_mapping": {
                   "expression": "Product.product_id"
-                }
-              },
-              {
-                "relationship": "product_name",
-                "object_mapping": {
-                  "expression": "Product.product_name"
-                }
-              },
-              {
-                "relationship": "category",
-                "object_mapping": {
-                  "expression": "Product.category"
-                }
-              },
-              {
-                "relationship": "unit_price",
-                "object_mapping": {
-                  "expression": "Product.unit_price"
-                }
+                },
+                "children": [
+                  {"relationship": "product_id", "object_mapping": {"expression": "Product.product_id"}},
+                  {"relationship": "product_name", "object_mapping": {"expression": "Product.product_name"}},
+                  {"relationship": "category", "object_mapping": {"expression": "Product.category"}},
+                  {"relationship": "unit_price", "object_mapping": {"expression": "Product.unit_price"}}
+                ]
               }
             ]
           },
@@ -603,54 +577,16 @@
             ],
             "link_mappings": [
               {
-                "relationship": "order_id",
                 "object_mapping": {
                   "expression": "Order.order_id"
-                }
-              },
-              {
-                "relationship": "order_date",
-                "object_mapping": {
-                  "expression": "Order.order_date"
-                }
-              },
-              {
-                "relationship": "order_status",
-                "object_mapping": {
-                  "expression": "Order.order_status"
-                }
-              },
-              {
-                "relationship": "total_amount",
-                "object_mapping": {
-                  "expression": "Order.total_amount"
-                }
-              },
-              {
-                "relationship": "places_order",
-                "object_mapping": {
-                  "concept": "Customer",
-                  "expression": "Order.customer_id"
-                }
-              }
-            ]
-          },
-          {
-            "concept": "order_item",
-            "link_mappings": [
-              {
-                "relationship": "belongs_to_order",
-                "object_mapping": {
-                  "concept": "Order",
-                  "expression": "order_item.order_id"
-                }
-              },
-              {
-                "relationship": "includes_product",
-                "object_mapping": {
-                  "concept": "Product",
-                  "expression": "order_item.product_id"
-                }
+                },
+                "children": [
+                  {"relationship": "order_id", "object_mapping": {"expression": "Order.order_id"}},
+                  {"relationship": "order_date", "object_mapping": {"expression": "Order.order_date"}},
+                  {"relationship": "order_status", "object_mapping": {"expression": "Order.order_status"}},
+                  {"relationship": "total_amount", "object_mapping": {"expression": "Order.total_amount"}},
+                  {"relationship": "places_order", "object_mapping": {"concept": "Customer", "expression": "Order.customer_id"}}
+                ]
               }
             ]
           }

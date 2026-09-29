@@ -28,11 +28,13 @@ from ontofoundry_api.domain.models import (
 
 from .compiler import (
     EXTENSION_KEY,
+    EXTENSION_VERSION,
+    OSSIE_VERSION,
     VALUE_BASES,
     attribute_verbalizations,
     link_verbalizations,
 )
-from .mappings import parse_joins, parse_mappings
+from .mappings import parse_joins, parse_mappings, validate_mapping_tree
 from .validator import validate_schema
 
 MAX_COMPONENTS = 2000
@@ -282,7 +284,16 @@ def parse_ossie(
                     identifier=identifier,
                     # Keep the file's own value concept so it is written back
                     # under the same name and readings stay valid untouched.
-                    value_concept=target if target in values else None,
+                    value_concept=(
+                        target
+                        if target in values
+                        or (identifier and target in VALUE_KIND_BY_CONCEPT)
+                        else None
+                    ),
+                    target_role_name=str(role.get("name")) if role.get("name") else None,
+                    multiplicity=MULTIPLICITY_BY_OSSIE.get(
+                        str(relationship.get("multiplicity") or "")
+                    ),
                     requires=_expressions(relationship, "requires"),
                     derived_by=_expressions(relationship, "derived_by"),
                 )
@@ -464,6 +475,8 @@ def _merge(
                 continue
             found.value_kind = attribute.value_kind
             found.value_concept = attribute.value_concept
+            found.target_role_name = attribute.target_role_name
+            found.multiplicity = attribute.multiplicity
             found.identifier = attribute.identifier
             found.required = attribute.required
             found.requires = attribute.requires
@@ -554,11 +567,29 @@ def import_ossie(
     mode: str = "merge",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Return the resulting draft and a report of everything the import changed."""
+    version = document.get("version") if isinstance(document, dict) else None
+    if version != OSSIE_VERSION:
+        raise OssieImportError(
+            f"OSSIE_VERSION_UNSUPPORTED: 仅支持 Apache Ossie {OSSIE_VERSION}，"
+            f"文件版本为 {version!r}"
+        )
     schema_issues = validate_schema(document)
     if schema_issues:
         raise OssieImportError(
-            "文件不符合 Apache Ossie 0.2.0.dev0 结构：" + schema_issues[0]["message"]
+            f"文件不符合 Apache Ossie {OSSIE_VERSION} 结构：" + schema_issues[0]["message"]
         )
+    extension = _extension(document)
+    context = document.get("ai_context")
+    extension_present = isinstance(context, dict) and EXTENSION_KEY in context
+    if extension_present and extension.get("version") != EXTENSION_VERSION:
+        raise OssieImportError(
+            "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED: "
+            f"仅支持 OntoFoundry 扩展版本 {EXTENSION_VERSION}，"
+            f"文件版本为 {extension.get('version')!r}"
+        )
+    mapping_error = validate_mapping_tree(document)
+    if mapping_error:
+        raise OssieImportError("MAPPING_FORMAT_UNSUPPORTED: " + mapping_error)
     objects, links, mappings, requires, report = parse_ossie(
         document, workspace_id=workspace_id
     )
