@@ -34,10 +34,15 @@ from .compiler import (
     attribute_verbalizations,
     link_verbalizations,
 )
-from .mappings import parse_joins, parse_mappings, validate_mapping_tree
+from .mappings import parse_joins, parse_mappings
 from .validator import validate_schema
 
 MAX_COMPONENTS = 2000
+# Every extension version this platform has exported. v1 differs from v2 only in
+# laying attribute mappings out flat, which parse_mappings reads as well, so
+# files exported before the bump — and published versions exported from them —
+# still import.
+READABLE_EXTENSION_VERSIONS = ("1", EXTENSION_VERSION)
 VALUE_KIND_BY_CONCEPT = {name: kind for kind, name in VALUE_BASES.items()}
 MULTIPLICITY_BY_OSSIE = {
     "OneToOne": Multiplicity.ONE_TO_ONE,
@@ -272,6 +277,15 @@ def parse_ossie(
                     loss = _value_concept_loss(target, values, kind)
                     if loss:
                         report.note(loss)
+                    # Export writes the attribute's description onto its value
+                    # concept, so a concept that says something of its own is
+                    # overwritten on the way back out.
+                    own = str(values.get(target, {}).get("description") or "")
+                    if own and own != str(relationship.get("description") or ""):
+                        report.note(
+                            f"值概念 {target} 的描述与属性 {concept}.{name} 不同："
+                            "内置模型只保留属性描述，导出时值概念改用属性描述"
+                        )
                 attribute_key = _unique(_sanitize(name), taken_attribute_keys)
                 identifier = name in identifiers
                 attribute = AttributeDefinition(
@@ -581,15 +595,12 @@ def import_ossie(
     extension = _extension(document)
     context = document.get("ai_context")
     extension_present = isinstance(context, dict) and EXTENSION_KEY in context
-    if extension_present and extension.get("version") != EXTENSION_VERSION:
+    if extension_present and extension.get("version") not in READABLE_EXTENSION_VERSIONS:
         raise OssieImportError(
             "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED: "
-            f"仅支持 OntoFoundry 扩展版本 {EXTENSION_VERSION}，"
+            f"仅支持 OntoFoundry 扩展版本 {'、'.join(READABLE_EXTENSION_VERSIONS)}，"
             f"文件版本为 {extension.get('version')!r}"
         )
-    mapping_error = validate_mapping_tree(document)
-    if mapping_error:
-        raise OssieImportError("MAPPING_FORMAT_UNSUPPORTED: " + mapping_error)
     objects, links, mappings, requires, report = parse_ossie(
         document, workspace_id=workspace_id
     )

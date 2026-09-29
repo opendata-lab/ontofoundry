@@ -151,7 +151,7 @@ Rule 升级为一等对象：
 }
 ```
 
-首期拒绝 `owner_kind=workspace`。编译 Ossie 时，将 Rule 投影回所属元素的 `requires` 或 `derived_by`；导入 Ossie 时创建 Rule。Rule 的稳定 ID 不进入官方 Ossie 字段，保存在 `ai_context.ontofoundry` 扩展与 OntoFoundry 完整快照中。当前扩展 v2 不得静默增加这些字段；Proposal-first 输出使用扩展 v3，导入器同时兼容 v2 和 v3。
+首期拒绝 `owner_kind=workspace`。编译 Ossie 时，将 Rule 投影回所属元素的 `requires` 或 `derived_by`；导入 Ossie 时创建 Rule。Rule 的稳定 ID 不进入官方 Ossie 字段，保存在 `ai_context.ontofoundry` 扩展与 OntoFoundry 完整快照中。当前扩展 v2 不得静默增加这些字段；Proposal-first 输出使用扩展 v3，导入器兼容读取 v1、v2 和 v3（v1 与 v2 仅映射布局不同，已由 `parse_mappings` 同时支持）。
 
 ### 4.4 Action
 
@@ -164,14 +164,47 @@ Action 是一等定义元素，不是执行记录：
   "technical_name": "approve_supplier",
   "description": "",
   "input_type_id": "uuid",
-  "parameters": [],
+  "parameters": [
+    {
+      "id": "uuid",
+      "name": "审批意见",
+      "technical_name": "comment",
+      "value_kind": "string",
+      "required": false
+    }
+  ],
   "precondition_rule_ids": [],
-  "effects": [],
+  "effects": [
+    {
+      "id": "uuid",
+      "kind": "set_property | create_link | delete_link",
+      "property_id": "uuid | null",
+      "link_type_id": "uuid | null",
+      "expression": "..."
+    }
+  ],
   "evidence": []
 }
 ```
 
+`parameters[].value_kind` 取 Property 相同的枚举；`effects[]` 只描述定义，`set_property` 必须给 `property_id`，`create_link/delete_link` 必须给 `link_type_id`，引用对象都必须属于同一草稿。
+
 首期只做 CRUD、Proposal、Diff、合并、校验和版本保存。不存在 Action 执行 API。Action 进入 OntoFoundry 完整快照；标准 Ossie 没有对应构造时，只进入 v3 `ai_context.ontofoundry` 扩展，不生成非法标准字段。
+
+### 4.5 哈希定义
+
+所有哈希都是对规范化 JSON（UTF-8、键按字典序、无多余空白、数组保持语义顺序；按 ID 标识的元素集合先按 `id` 排序）求 SHA-256 的小写十六进制串。不同用途的哈希互不比较：
+
+| 名称 | 输入 | 用途 |
+|---|---|---|
+| `version_content_sha256` | 现有 `ontology_versions.sha256`：`{snapshot, ossie, validation}` | 版本完整性，保持现有语义，不改写历史 |
+| `normalized_snapshot_sha256` | 读取层规范化为 v2 后的快照 | Session 基线、预览、发布比较；v1 历史版本按需计算并缓存，不回写 |
+| `draft_sha256` | Session 当前 v2 草稿 | Batch 来源和草稿乐观校验 |
+| `element_sha256` | 单个元素（含 `id`，不含证据以外的派生字段） | Proposal `expected_target_hash` |
+| `merged_snapshot_sha256` | 预览时 B/L/D 合并后的 v2 快照 | 预览与发布一致性 |
+| `proposal_result_sha256` | DataAgent 原始结果 JSON | 结果去重 |
+
+空快照是 `{"schema_version":"2","workspace_id":"<wid>"}` 加所有元素集合为空数组后的规范化结果。文档中出现的 `base_version_sha256`、`current_version_sha256` 均指 `normalized_snapshot_sha256`。
 
 ## 5. Material 与 Mapped 实例
 
@@ -184,10 +217,11 @@ Action 是一等定义元素，不是执行记录：
 - 发布后进入不可变版本；
 - 至少携带一个 Evidence，人工创建可以使用 `manual` provenance 而不是伪造材料引用。
 
-Evidence 最小合同：
+Evidence 是判别联合。材料证据：
 
 ```json
 {
+  "kind": "material",
   "id": "uuid",
   "material_id": "uuid",
   "material_sha256": "64 hex",
@@ -200,7 +234,21 @@ Evidence 最小合同：
 }
 ```
 
-保存或接受时校验 `material_id` 属于同一 Workspace、SHA-256 与不可变材料记录一致、行号范围和 quote 可在规范化文本中核验。
+人工来源：
+
+```json
+{
+  "kind": "manual",
+  "id": "uuid",
+  "note": "业务专家确认",
+  "created_by": "user-id",
+  "created_at": "ISO-8601"
+}
+```
+
+Material Object/Link 至少携带一条任意类型的 Evidence。
+
+保存或接受时，对 `kind=material` 校验 `material_id` 属于同一 Workspace、SHA-256 与不可变材料记录一致、行号范围和 quote 可在规范化文本中核验。
 
 ### 5.2 Mapped Object / Link
 
@@ -216,7 +264,7 @@ Material 与 Mapped 实例可以在统一查询响应中返回，但必须有 `s
 
 - 原文件按内容 SHA-256 不可变保存，同一 Workspace 内去重。
 - Material 元数据不得原地指向另一份内容。
-- 被 Proposal、会话草稿或任何已发布版本引用时禁止物理删除，只允许归档。
+- 被 Proposal、会话草稿或任何已发布版本引用时禁止物理删除，只允许归档。`materials` 增加 `archived_at`、`archived_by`（T2 迁移）；归档材料不出现在新建模的材料选择中，但已有证据仍可打开；删除接口先检查 `proposal_items.evidence_json`、所有 Session 草稿和版本快照中的引用，存在引用返回 409 `MATERIAL_IN_USE`。
 - 本体版本保存材料引用清单及哈希，不重复保存二进制。
 - 备份与恢复必须同时覆盖 PostgreSQL 和材料存储；只恢复数据库不算成功。
 
@@ -249,7 +297,7 @@ Material 与 Mapped 实例可以在统一查询响应中返回，但必须有 `s
 - DataAgent topic/task/run token；
 - Agent、Skill、模型和结果 schema 版本。
 
-开始运行后 session revision 变化不会取消远端任务，但其结果只能落为 `stale` Batch，不得自动进入可接受状态。
+开始运行后 session revision 变化不会取消远端任务，但其结果只能落为 `stale` Batch，不得自动进入可接受状态。为此，当前 `revise()` 中“运行期间禁止编辑”的限制在 proposal 合同启用后改为：草稿保存和 Proposal 决策只受 revision CAS 约束；旧完整结果合同的运行仍保留原限制和 generation guard。
 
 ### 6.3 MCP
 
@@ -303,7 +351,8 @@ get_ontology_elements(workspace_id, version_id, element_ids)
 
 - `create` 使用 batch 内唯一 `client_ref`；DataAgent 不自行决定最终 UUID。
 - 服务端先以 `UUIDv5(session_id, run_token)` 计算稳定 `proposal_batch_id`，再以 `UUIDv5(proposal_batch_id, client_ref)` 确定性分配 create 的 `target_id`，重试得到同一 Batch 和同一元素 ID。
-- 同一 Batch 内引用新元素时使用 `client_ref`，入库前统一解析为最终 UUID。
+- 同一 Batch 内引用新元素时，任何本应填元素 ID 的字段（如 `owner_type_id`、`source_type_id`、`owner_id`、`precondition_rule_ids[]` 中的一项）改写为对象 `{"client_ref": "new-supplier-type"}`；入库前统一解析为最终 UUID，并自动把被引用 Item 加入 `depends_on`。
+- `after` 的结构按 `target_kind` 取 v2 领域模型中对应元素的完整定义（JSON Schema 随 `ontofoundry.proposals/v1` 一起发布，按 `target_kind` 做 `oneOf` 判别）：create 时省略 `id`，其余必填字段必须给出，服务端除 `id` 外不补任何默认值；update 时必须是修改后的完整元素，`id` 必须等于 `target_id`。
 - `update/delete` 必须携带现有 `target_id`、完整 `before` 和 `expected_target_hash`；target 必须存在于该 run 固定的草稿中。
 - `create` 的 `before` 必须为 null；`delete` 的 `after` 必须为 null；`update` 两者都非 null。
 - `field_changes` 是展示和索引数据，`before/after` 才是应用与冲突检测的权威。
@@ -363,21 +412,30 @@ proposal_item_dependencies
   depends_on_item_id
   PRIMARY KEY (item_id, depends_on_item_id)
 
-proposal_decisions
+proposal_decision_requests
   id
   workspace_id
   session_id
-  item_id
   idempotency_key
-  decision                   # accept|reject|restore
+  request_sha256             # 规范化请求体哈希，用于判断同键异体
   expected_session_revision
-  result_session_revision nullable
+  result_session_revision
+  response_json              # 首次成功响应，重放时原样返回
   actor_id
   created_at
   UNIQUE (workspace_id, session_id, idempotency_key)
+  FOREIGN KEY (workspace_id, session_id) → modeling_sessions(workspace_id, id)
+
+proposal_decision_items
+  request_id                 FK proposal_decision_requests
+  item_id                    FK proposal_items
+  decision                   # accept|reject|restore
+  PRIMARY KEY (request_id, item_id)
 ```
 
-所有跨表查询同时带 Workspace 和 Session 条件；不要仅凭全局 UUID 假定空间归属。PostgreSQL 外键和唯一约束是生产合同，SQLite 测试不能代替真实并发验收。
+只有成功的决策请求才写入这两张表。
+
+所有跨表查询同时带 Workspace 和 Session 条件；不要仅凭全局 UUID 假定空间归属。`proposal_batches`、`proposal_items` 对 `(workspace_id, session_id)` 使用复合外键指向 `modeling_sessions`（需先给后者加 `UNIQUE (workspace_id, id)`），`proposal_items` 对 `(workspace_id, session_id, batch_id)` 复合外键指向 `proposal_batches`。PostgreSQL 外键和唯一约束是生产合同，SQLite 测试不能代替真实并发验收。
 
 ### 7.3 状态与不可变性
 
@@ -418,7 +476,7 @@ POST /api/v1/workspaces/{wid}/sessions/{sid}/proposal-decisions
 
 1. 锁定 Session 行并比较 `expected_session_revision`。
 2. 读取全部 Item、依赖和幂等决策记录。
-3. 比较 `source_draft_sha256` 与 Item `expected_target_hash`。
+3. 对每个 update/delete Item，比较当前草稿中目标元素的 `element_sha256` 与 Item `expected_target_hash`；create Item 检查 `target_id` 未被占用。Batch `source_draft_sha256` 与当前 `draft_sha256` 不同本身不阻止接受，只要逐项目标哈希仍一致。
 4. 按依赖拓扑应用 create/update/delete；禁止按数组位置更新。
 5. 校验 Workspace、稳定 ID、kind、名称、引用、实例类型、Evidence 和 Mapping。
 6. 规范化 draft 并计算新 SHA-256。
@@ -426,7 +484,9 @@ POST /api/v1/workspaces/{wid}/sessions/{sid}/proposal-decisions
 8. 写 decision，更新 Item 状态和 `accepted_revision`。
 9. 同一事务提交。
 
-同一 idempotency key、同一请求体重复调用返回第一次结果；同键不同请求体返回 409。revision 或目标内容变化返回 409，并把 Item 标记 conflict/stale，不覆盖人工修改。
+同一 idempotency key、同一请求体（`request_sha256` 相同）重复调用返回保存的 `response_json`；同键不同请求体返回 409 `IDEMPOTENCY_MISMATCH`。
+
+失败请求整体回滚，不写任何状态。revision 或目标内容变化返回 409，响应中逐项说明哪些 Item 已过期或冲突；Item 的 `stale/conflict` 不在失败事务中落库，而是在读取时按 §4.5 的哈希动态计算（Batch `source_draft_sha256 ≠` 当前 `draft_sha256` 且该 Item `expected_target_hash ≠` 当前 `element_sha256` → stale；目标已被删除或 kind 改变 → conflict），并在该 Session 下一次成功写事务中顺带持久化。
 
 ### 8.3 人工编辑
 
@@ -475,6 +535,8 @@ POST /api/v1/workspaces/{wid}/sessions/{sid}/preview
   "session_revision": 12,
   "base_version_id": "...",
   "current_version_id": "...",
+  "current_version_number": 14,
+  "next_version_number": 15,
   "current_version_sha256": "...",
   "merged_snapshot_sha256": "...",
   "validation": {},
@@ -540,7 +602,7 @@ name = owner_kind + owner_id + rule_kind + normalized_expression
 
 迁移必须线性追加，不修改已发布 revision：
 
-1. 新增 identity、proposal 四组表及索引；
+1. `modeling_sessions` 增加 `UNIQUE (workspace_id, id)`；新增 identity、`proposal_batches`、`proposal_items`、`proposal_item_dependencies`、`proposal_decision_requests`、`proposal_decision_items` 及索引；`materials` 增加 `archived_at`、`archived_by`；
 2. Modeling Session 增加 `base_version_sha256`、`draft_sha256`，先 nullable；
 3. 扫描全部历史版本和现有 Session 中已有稳定 ID，回填 identity registry；同一 Workspace 内同一 ID 出现不同 kind 时立即中止迁移并输出冲突清单，不自动改 ID；
 4. 回填当前 Session 哈希和基线哈希；
@@ -573,7 +635,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - 所有 Proposal API先 `require_member`，并同时验证 Batch、Item、Session、Material、Version 属于路由 Workspace。
 - DataAgent 只获得固定版本的只读本体 MCP 和本次 Session/Material 上下文，不获得发布权限。
 - Agent 不分配发布版本号、不改变 Workspace current pointer、不接受 Proposal。
-- Material quote 和结构化数据样例属于敏感内容；非成员与只读本体服务令牌不得读取。
+- Material quote 和结构化数据样例属于敏感内容；非成员与只读本体服务令牌不得读取。Ossie 导出分两种投影：公开投影不含 `ontology_mappings`，且 `ai_context.ontofoundry` 中去掉 Material Object/Link 与所有 Evidence；完整投影只返回给 `can_read_mappings` 为真的主体（成员且会话登录，或服务令牌带 `mappings:read`/`instances:read`）。REST 导出、MCP、presentation 和任何缓存都调用同一个按主体裁剪的函数，不在各处各自过滤。T3 前必须有越权读取的回归测试。
 - Action Definition 不意味着执行授权；本阶段无执行端点。
 - JSON 中的 Workspace/Version 声明不能代替数据库归属校验。
 
@@ -592,11 +654,12 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - 编译、导入、导出和 Diff 支持 v2；不改历史快照。
 - 测试 Rule ID 稳定、Action 扩展往返、legacy Ossie 往返。
 
-### T2 — 数据库迁移与哈希
+### T2 — 数据库迁移、哈希与固定上下文
 
-- 新增 identity/proposal/decision/dependency 表。
-- 回填 Session base/draft hash。
-- 在 PostgreSQL 验证唯一约束、外键、upgrade/downgrade。
+- 新增 identity/proposal/decision/dependency 表、`materials.archived_at/archived_by`。
+- 按 §4.5 实现规范化哈希函数，回填 Session base/draft hash。
+- 在 PostgreSQL 验证唯一约束、复合外键、upgrade/downgrade。
+- 固定上下文：run manifest（base version/hash、source revision/draft hash、材料 ID/hash）；MCP 版本化读取响应带 Workspace/Version/SHA；BFF 按 Session 注入并拒绝其他 Workspace/Version；Ossie 公开/完整投影与越权测试。以上是 T3 的准入条件。
 
 ### T3 — Proposal 结果契约与消费
 
@@ -621,11 +684,10 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - 发布请求增加 expected current version 与 merged hash。
 - 冲突解决按元素/字段呈现，解决后强制重新预览。
 
-### T7 — MCP 与固定上下文
+### T7 — MCP 扩展与验收
 
-- 核对固定 version 工具响应包含 Workspace/Version/SHA。
-- BFF 强制会话绑定；运行固定 draft/material manifest。
-- 测试 Agent 请求其他 Workspace/Version 被拒绝。
+- 固定上下文的安全部分已在 T2 完成；此处补 `list_ontology_elements` 分页、按 kind 查询等性能与易用性改进。
+- 端到端验收：真实 DataAgent 运行只能读到本 Session 固定的 Workspace/Version/Draft/材料。
 
 ### T8 — 切换与清理准备
 
@@ -643,7 +705,9 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - Update/delete 的 before/hash 不匹配变 stale/conflict。
 - Rule owner 不存在、owner=workspace、Action 引用不存在 Rule 均拒绝。
 - Proposal 依赖缺失、跨 Batch、成环、部分接受均拒绝。
-- 同幂等键同请求返回相同结果；同键不同请求 409。
+- 同幂等键同请求返回保存的首次响应；同键不同请求 409 `IDEMPOTENCY_MISMATCH`；一次请求含多个 Item 时逐项写入 `proposal_decision_items`。
+- 失败请求不写任何 Item 状态；stale/conflict 由读取时的哈希比较得出。
+- 只读本体令牌读取 Ossie、MCP、presentation 时看不到 Material Object/Link、Evidence 和 mapping。
 - 接受失败不改变 draft、revision、Item 状态。
 
 ### 14.2 材料与实例
@@ -697,6 +761,12 @@ apps/api/src/ontofoundry_api/services/version_diff.py
 apps/api/src/ontofoundry_api/ossie/compiler.py
 apps/api/src/ontofoundry_api/ossie/importer.py
 apps/api/src/ontofoundry_api/api/mcp.py
+apps/api/src/ontofoundry_api/api/ontology.py
+apps/api/src/ontofoundry_api/api/assets.py
+apps/api/src/ontofoundry_api/services/ontology_query.py
+apps/api/src/ontofoundry_api/services/instance_query.py
+apps/api/src/ontofoundry_api/services/access.py
+apps/api/src/ontofoundry_api/services/workspaces.py
 integrations/dataagent/skills/md2ossie/
 apps/web/src/api/types.ts
 apps/web/src/api/client.ts
@@ -706,6 +776,8 @@ apps/web/src/components/ReleaseReview.tsx
 apps/web/src/pages/BuilderPage.tsx
 apps/web/src/pages/DeliveryPage.tsx
 ```
+
+后端新增唯一的快照读取边界 `read_snapshot(record) -> OntologyDraftV2`（v1→v2 规范化在此完成），查询、统计、Diff、实例、presentation、MCP 和合并全部经由它读取；禁止各服务自行判断 v1/v2 或直接读 `snapshot_json` 的嵌套字段。前端影响面见前端合同 §7。
 
 实施前先检查这些文件的未提交改动；当前工作区已有与 Ossie、verbalization 相关的用户修改，不得覆盖或回退。
 

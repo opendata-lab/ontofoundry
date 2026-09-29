@@ -151,7 +151,7 @@ V0.1 不做：
 | 中文业务名 | UI、搜索、图谱和 Agent 对话 | 通过描述保留业务含义，不作为标识 |
 | ASCII 技术名 | concept、relationship 和表达式引用 | 是 |
 
-Object Type、Link Type、Property、Rule、Action、Material Object / Link 和 Mapping 都使用稳定内部 UUID。Object Type 和 Link Type 的中文业务名、ASCII 技术名在工作空间内分别全局唯一。比较前进行 Unicode 规范化、去首尾空白，并对 ASCII 技术名做不区分大小写的冲突检查。
+Object Type、Link Type、Property、Rule、Action、Material Object / Link 和 Mapping 都使用稳定内部 UUID。Object Type 的中文业务名、ASCII 技术名在工作空间内全局唯一；Link Type 与 Property 的名称是所属 Object Type 内的局部名，在所属概念内唯一（属性与关系共用一个命名空间，并对子类型生效），与 Ossie 关系名的局部语义一致。比较前进行 Unicode 规范化、去首尾空白，并对 ASCII 技术名做不区分大小写的冲突检查。
 
 模型项首次发布后仍允许修改技术名。内部 UUID 不变，平台同步更新可确定引用，Diff 标记重命名及影响范围，发布前重新校验。
 
@@ -373,11 +373,11 @@ V0.1 直接连接：
 
 中栏默认是通用对话，保留明确的“开始建模”操作；运行时显示任务状态。不常驻展示内部 Skill 名、方法论名或“对话澄清，明确后开始建模”等重复说明，内部实现只在设置或技术文档中说明。用户明确要求开始或修改本体后，Agent 先复述目标和所选材料；只有高影响歧义才一次追问一个问题，其余不确定项生成待澄清事项。任务卡显示排队、运行、等待回答、完成、失败或取消；关闭页面后重开可继续。
 
-右侧是主工作区，默认打开最近一次会话的“本体模型”，已有结果时直接展示，不要求用户重新执行建模。固定页签只保留“本体模型”和“语义图谱概览”：前者用同一列表承载 Proposal、已接受草稿、待澄清和冲突状态，并在条目内展开结构化差异、Material Object/Link、来源证据与 Mapping 建议；后者只预览本次 Object Type、Value Type 与 Link Type 的语义影响，不显示实例或物理表。
+右侧是主工作区，默认打开最近一次会话的“本体模型”，已有结果时直接展示，不要求用户重新执行建模。固定页签为“提案”“本体草稿”“语义图谱”三个：“提案”承载 Proposal Batch 的待审、冲突/过期和历史条目，在条目内展开结构化差异、Material Object/Link、来源证据与 Mapping 建议，接受后的内容才进入“本体草稿”；“本体草稿”展示会话草稿并标记相对基线的新增、修改、待删除；“语义图谱”只预览草稿中 Object Type、Value Type 与 Link Type 的语义结构，不显示实例或物理表。有待审提案时默认打开“提案”，否则打开“本体草稿”。交互细节见 [Proposal 工作台前端交互与前后端合同补充](./2026-09-29-proposal-workbench-frontend-contract.md)。
 
-JSON 预览、Schema 校验和语义 lint 是发布门槛，集中放在“发布与服务”（工作台顶部“发布本体”进入）的发布准备区；它们不再作为建模工作台的并列页签。版本历史同样放在“发布与服务”。这样右栏只回答两个问题：“模型具体变了什么”和“放进整张语义图后是什么结构”。
+JSON 预览、Schema 校验和语义 lint 是发布门槛，集中放在“发布与服务”（工作台顶部“发布本体”进入）的发布准备区；它们不再作为建模工作台的并列页签。版本历史同样放在“发布与服务”。这样右栏回答三个问题：“Agent 建议改什么”“接受后的草稿是什么”和“放进整张语义图后是什么结构”。
 
-Proposal 顶部保留业务对象（蓝）、本体关系（青）、Property（绿）三个目录计数，下面直接进入可展开明细。Material Object/Link 放在同一列表下的 Proposal 组，提供值、引用及接受/拒绝操作，不另加页签。Rule 缺少可靠表达式时内联待澄清，Mapping 从对象编辑进入。颜色始终伴随名称和数字。新增、修改、删除、待澄清和冲突用文字表达，不重复成另一组统计卡。
+Proposal 顶部保留业务对象（蓝）、本体关系（青）、Property（绿）三个目录计数，下面直接进入可展开明细。Material Object/Link 放在“提案”页签的同一列表中，提供值、引用及接受/拒绝操作，不另加页签。Rule 缺少可靠表达式时内联待澄清，Mapping 从对象编辑进入。颜色始终伴随名称和数字。新增、修改、删除、待澄清和冲突用文字表达，不重复成另一组统计卡。
 
 一次建模的主路径不是技术向导，而是三个可逆状态：
 
@@ -545,7 +545,7 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 
 UUID、Evidence、Material Object/Link 和 Action 定义不写入 Ossie 标准字段。编译器确定性输出，确保相同快照得到相同 SHA-256；需要往返的 OntoFoundry 扩展放在带版本号的 `ai_context.ontofoundry` 中。
 
-中文显示名、标签和 Property 必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此当前导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。当前扩展版本为 `2`；导入时拒绝其他扩展版本。Proposal-first 新增的 Rule ID、Action、Material Object/Link 和 Evidence 投影使用扩展 `3`，并提供 v2 兼容读取，不能在 v2 下静默加入字段。
+中文显示名、标签和 Property 必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此当前导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。当前导出扩展版本为 `2`；导入兼容读取 `1` 和 `2`（两者只在映射布局上不同），拒绝未知版本。Proposal-first 新增的 Rule ID、Action、Material Object/Link 和 Evidence 投影使用扩展 `3`，导入继续兼容 v1/v2，不能在 v2 下静默加入字段；v3 中的 Material 与 Evidence 只出现在完整投影中，公开投影不含。
 
 ### 9.1 Ossie 构造到内置模型的对照
 
@@ -555,7 +555,7 @@ UUID、Evidence、Material Object/Link 和 Action 定义不写入 Ossie 标准�
 |---|---|---|
 | `EntityType` component | 业务对象（Object Type） | 双向无损。concept 作技术名，中文名来自扩展，缺失时用 concept |
 | `extends`（实体继承） | Object Type 的 `extends`（多父） | 双向无损。子对象只存自己新增的属性与关系，继承链上的内容按需解析；校验拒绝环与重名 |
-| `ValueType` component | 属性的 `value_kind` + `value_concept`（概念名） | 名称与共用关系双向无损：属性记住它指向的值概念名，导出时按同一个名字写回一个 component，多个属性共用则仍是一个概念。有损的只有值概念自带的 `requires`/`derived_by` 和 `extends` 链上的中间概念（导出统一写成直接继承内置类型），这两种情况才提示 |
+| `ValueType` component | 属性的 `value_kind` + `value_concept`（概念名） | 名称与共用关系双向无损：属性记住它指向的值概念名，导出时按同一个名字写回一个 component，多个属性共用则仍是一个概念。有损的是值概念自带的 `requires`/`derived_by`、`extends` 链上的中间概念（导出统一写成直接继承内置类型），以及与属性描述不同的值概念自身描述（导出改用属性描述），这三种情况才提示 |
 | 内置值概念 String/Integer/Decimal/Float/Boolean/Date/DateTime | 七种 value_kind | 双向无损 |
 | 内置实体 `Any` | 无 | 不支持：指向 `Any` 的关系跳过并报告，它没有对应的业务对象 |
 | relationship（role 指向值概念） | 属性 | 双向无损 |
@@ -568,7 +568,7 @@ UUID、Evidence、Material Object/Link 和 Action 定义不写入 Ossie 标准�
 | `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
 | `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损，原样存取，不解析也不改写占位符。与标准模板一致的读法不存储（避免改名后留下陈述旧名的死文本）。这条成立的前提是导入不给概念改名：值概念按原名写回，读法里的 `{值概念}` 才仍是这条关系的合法 role |
 | `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
-| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损限于单列表达式。`link_mappings` 仅使用树形结构：根节点映射对象键，二元属性与关系放在 `children`；旧版顶层直接带 `relationship` 的平铺结构不再导入。dataset 名用概念的技术名，`source` 是 `schema.table`。计算字段和三元以上映射报告后跳过，不从任意 SQL 里猜列名 |
+| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损限于单列表达式。`link_mappings` 仅使用树形结构：根节点映射对象键，二元属性与关系放在 `children`；扩展 v1 时期导出的平铺结构（顶层条目直接带 `relationship`）仍可导入，读作根节点的 children；多个根节点只导入第一个，缺少 `relationship` 或重复映射的条目报告后跳过，不整份拒绝。dataset 名用概念的技术名，`source` 是 `schema.table`。计算字段和三元以上映射报告后跳过，不从任意 SQL 里猜列名 |
 | 无对应标准字段 | 稳定 UUID、Action、Material Object/Link、Evidence | 存在于 OntoFoundry 完整快照；需要标准文件往返的标识和定义放入版本化 `ai_context.ontofoundry` 扩展，支持范围内的关系 Join 列随 Mapping 往返 |
 
 同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
@@ -708,7 +708,7 @@ MCP Clients  ──Bearer── Streamable HTTP /mcp
 | workspaces、workspace_members | 空间与角色 |
 | materials、material_chunks | 文件哈希与磁盘位置、文本和证据分块 |
 | modeling_sessions | 基线版本与摘要、草稿与摘要、材料选择、修订号与后台任务状态 |
-| proposal_batches、proposal_items、proposal_decisions | Agent 提案批次、不可变条目、依赖、接受/拒绝决策和幂等记录 |
+| proposal_batches、proposal_items、proposal_item_dependencies、proposal_decision_requests、proposal_decision_items | Agent 提案批次、不可变条目、依赖、接受/拒绝决策和幂等记录 |
 | ontology_versions | TBox、文档 ABox、映射、Ossie JSON 和校验报告 |
 | data_connections | 加密连接配置 |
 | service_tokens | 令牌哈希、所属空间、名称、撤销状态；只读 TBox |

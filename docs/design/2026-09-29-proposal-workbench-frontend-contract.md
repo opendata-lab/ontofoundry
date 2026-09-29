@@ -66,7 +66,7 @@ UI 草图：`docs/assets/proposal-workbench-2026-09-29/`
 ### 2.3 本体草稿 Tab
 
 - 保留现有分类（实体、关系、映射、属性），新增“规则”“Action”“材料实例”三个分类。
-- 每行显示相对 `base_version_id` 的变更标记：`新增`、`已修改`、`待删除`（删除项保留在列表中，删除线显示，直到发布）。
+- 每行显示相对 `base_version_id` 的变更标记：`新增`、`已修改`、`待删除`。待删除项不在草稿里，由 `session.base_diff` 中 `change=deleted` 的条目按 `label` 以删除线插入列表，直到发布。
 - 底部说明改为“会话草稿 · 基于 v{n} · r{revision} · 发布前需预览合并结果”。
 
 ### 2.4 空状态、加载与错误
@@ -113,7 +113,11 @@ export type TargetKind =
 export type ProposalStatus =
   | "pending" | "accepted" | "rejected" | "stale" | "conflict" | "superseded";
 
-export type Evidence = {
+// 现有 types.ts 的 `Evidence`（v1 文档实例证据）在 T1 切换 v2 时删除，
+// 调用点（DocumentObject、DocumentLink、Candidate、InstancesPage、ObjectDetailPage）
+// 一并改用下面的判别联合。
+export type MaterialEvidence = {
+  kind: "material";
   id: string;
   material_id: string;
   material_sha256: string;
@@ -121,6 +125,14 @@ export type Evidence = {
   locator: { heading?: string; line_start: number; line_end: number };
   quote: string;
 };
+export type ManualEvidence = {
+  kind: "manual";
+  id: string;
+  note: string;
+  created_by: string;
+  created_at: string;
+};
+export type Evidence = MaterialEvidence | ManualEvidence;
 
 export type FieldChange = {
   path: string;                   // 如 "description"、"values.credit_level"
@@ -180,17 +192,33 @@ export type MergeConflict = {
   allowed: ("latest" | "draft" | "custom" | "both")[];
 };
 
+// 按元素聚合的变更，发布预览和会话 base_diff 共用。
+export type ElementChange = {
+  element_kind: TargetKind;
+  element_id: string;
+  label: string;                  // 删除时取 before 的名称，前端无需再查
+  owner_label?: string;           // 属性、规则的归属元素显示名
+  change: "created" | "updated" | "deleted";
+  field_changes: FieldChange[];   // created/deleted 时为空
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+};
+
+export type Impact = { element_kind: TargetKind; element_id: string; label: string; reason: string };
+
 export type PublishPreview = {
   session_revision: number;
   base_version_id: string | null;
   current_version_id: string | null;
+  current_version_number: number | null;   // 空空间为 null
+  next_version_number: number;             // 由服务端给出，前端不自行推断
   current_version_sha256: string;
   merged_snapshot_sha256: string;
   validation: VersionSummary["validation"];
-  changes: unknown[];               // 沿用现有 ReleaseReview Changes 结构
-  impacts: unknown[];
-  ossie: unknown;
-  auto_merged: { element_kind: TargetKind; element_id: string; element_label: string; path: string; side: "latest" | "draft" | "both" }[];
+  changes: ElementChange[];                // 相对 current version，按元素聚合
+  impacts: Impact[];
+  ossie: Record<string, unknown>;          // 完整 Ossie 文档，仅在抽屉中展示
+  auto_merged: (ElementChange & { side: "latest" | "both" })[];  // 来自其他会话、由合并带入的变更
 };
 ```
 
@@ -201,7 +229,7 @@ draft_sha256: string;
 base_version_sha256: string;
 pending_proposal_count: number;
 latest_batch_id: string | null;
-base_diff: Record<string, "created" | "updated" | "deleted">; // element_id → 相对基线的变更
+base_diff: ElementChange[];   // 相对 base_version 的变更；已删除元素靠 label/before 渲染删除线，草稿本身不保留墓碑
 ```
 
 旧 `candidates` 字段在迁移期保留为可选，仅用于只读展示遗留候选。
@@ -226,30 +254,32 @@ base_diff: Record<string, "created" | "updated" | "deleted">; // element_id → 
 - `accept` 请求必须包含完整 `dependency_group`；前端从 Item 上直接取，不自行计算依赖图。
 - 成功：200 `DecisionResult`。
 
-错误响应统一为：
+错误响应沿用后端现有 `ServiceError` 信封（`main.py` 中的 `service_error_handler`），新增字段放在 `error` 内：
 
 ```json
-{ "detail": { "code": "...", "message": "...", "items": [{ "proposal_id": "...", "reason": "..." }] } }
+{ "error": { "code": "...", "message": "...", "items": [{ "proposal_id": "...", "reason": "..." }], "conflicts": [], "current_version_id": null } }
 ```
+
+新接口一律抛 `ServiceError` 子类，不使用 `HTTPException(detail=...)`。前端 `ApiError` 增加 `items`、`conflicts`、`currentVersionId` 三个可选字段，从 `body.error` 解析；每个错误码都有客户端单测。
 
 | HTTP | code | 前端处理 |
 |---|---|---|
-| 409 | `session_revision_changed` | 重拉会话和批次，提示“草稿已更新，请重新确认” |
-| 409 | `proposal_stale` | 重拉批次，相关卡片显示已过期 |
-| 409 | `idempotency_mismatch` | 视为程序错误，换新键不自动重试，展示错误 |
-| 422 | `dependency_incomplete` | 就地提示缺失依赖，展开依赖组 |
-| 422 | `validation_failed` | 在卡片上显示 `items[].reason` |
+| 409 | `SESSION_REVISION_CHANGED` | 重拉会话和批次，提示“草稿已更新，请重新确认” |
+| 409 | `PROPOSAL_STALE` | 重拉批次，相关卡片显示已过期 |
+| 409 | `IDEMPOTENCY_MISMATCH` | 视为程序错误，换新键不自动重试，展示错误 |
+| 422 | `DEPENDENCY_INCOMPLETE` | 就地提示缺失依赖，展开依赖组 |
+| 422 | `VALIDATION_FAILED` | 在卡片上显示 `items[].reason` |
 
 ### 5.3 会话
 
-`GET/PUT …/sessions/{sid}` 响应增加 §4 列出的字段。`PUT` 保存草稿后，后端负责把受影响的 pending 提案标成 stale（实施设计 §8.3），前端保存成功后重拉当前批次。
+`GET/PUT …/sessions/{sid}` 响应增加 §4 列出的字段。`PUT` 保存草稿后，受影响的 pending 提案在读取批次时按哈希动态呈现为 stale（实施设计 §8.2–8.3），前端保存成功后重拉当前批次。运行期间保存草稿和提交决策不再被禁止，只受 revision 乐观锁约束。
 
 ### 5.4 预览、冲突解决、发布
 
 - `POST …/preview`，请求 `{ expected_session_revision }`。
   - 200：`PublishPreview`。
-  - 409 `merge_conflicts`：`detail.conflicts: MergeConflict[]`，外加 `current_version_id`，供解决时回传。
-  - 409 `session_revision_changed`：重拉会话后重新预览。
+  - 409 `MERGE_CONFLICTS`：`error.conflicts: MergeConflict[]`，外加 `error.current_version_id`，供解决时回传。
+  - 409 `SESSION_REVISION_CHANGED`：重拉会话后重新预览。
 - `POST …/resolve-merge`（现有接口改形）：请求
 
   ```json
@@ -263,7 +293,7 @@ base_diff: Record<string, "created" | "updated" | "deleted">; // element_id → 
   ```
 
   `custom` 时 `value` 必填且按字段类型校验。成功返回新的 `ModelingSession`（base 已推进到 current，revision+1）。前端随后**自动**重新调用 preview，不允许复用旧预览。
-- `POST …/publish`：请求见实施设计 §9.3。409 `preview_outdated`（三个 expected 值任一不符）时，前端丢弃当前预览，显示警示条“当前最新版本在你预览后已变化，已重新合并”，并自动重新预览。
+- `POST …/publish`：请求见实施设计 §9.3。409 `PREVIEW_OUTDATED`（三个 expected 值任一不符）时，前端丢弃当前预览，显示警示条“当前最新版本在你预览后已变化，已重新合并”，并自动重新预览。
 
 现有 `resolutions: dict[str, str]` 与 `publish {revision, message}` 在切换后不再被前端使用；后端在迁移期同时接受旧形状，按实施设计 T8 的节奏移除。
 
@@ -296,7 +326,7 @@ pages/DeliveryPage.tsx
 
 策略：
 
-1. API 所有草稿与快照响应统一输出 v2（历史 v1 版本在读取层规范化后输出），前端只处理 v2，不做双格式分支。
+1. API 所有草稿与快照响应统一输出 v2（后端经实施设计 §15 的唯一 `read_snapshot` 边界规范化历史 v1 版本），前端只处理 v2，不做双格式分支。
 2. 新增 `lib/draftView.ts`，提供 `propertiesOf(draft, typeId)`、`rulesOf(draft, ownerId)`、`typeById`、`materialObjectsOf(draft, typeId)` 等选择器。上面各文件改为调用选择器，不在组件内直接拼接数组。
 3. `ObjectEditorPage` 保存时按 v2 写回：修改属性即修改顶层 `properties[]` 中对应 ID 的元素，不重排数组。
 4. 这一步归入实施设计 T1，前端和后端在同一个 PR 中切换，避免中间状态。
@@ -322,7 +352,7 @@ pages/DeliveryPage.tsx
 - 顶部一行：会话选择、`基线 v{base} → 最新 v{current} → 草稿 r{revision}` 芯片、“返回建模”。
 - 三步进度条：① 合并预览 ② 解决冲突（无冲突时显示“无需处理”）③ 确认发布。进度只由服务端预览结果决定，不由前端自行推进。
 - 左栏“变更摘要”：计数“新增 / 修改 / 删除 / 来自其他会话”，按元素类型分组列出，修改项可展开字段差异（复用 `FieldDiff`）；`auto_merged` 放在默认折叠的“自动合并了其他会话的 n 项变更”。
-- 右栏固定“确认发布”卡片：`将发布为 v{n+1}`、校验状态、`预览于 {时间} · 基于最新 v{current}`、版本说明、主按钮“发布 v{n+1}”，以及“查看 Ossie JSON”（抽屉）和“重新预览”。
+- 右栏固定“确认发布”卡片：`将发布为 v{next_version_number}`、`当前最新 v{current_version_number}`、校验状态、`预览于 {时间} · 基于最新 v{current}`、版本说明、主按钮“发布 v{next_version_number}”，以及“查看 Ossie JSON”（抽屉）和“重新预览”。
 - 校验有错误时发布按钮禁用，错误列表显示在确认卡片内，每条可点击定位到变更摘要中的元素。
 
 ### 8.3 发布 Tab：解决冲突（草图 03）
@@ -331,7 +361,7 @@ pages/DeliveryPage.tsx
 - 左栏只列冲突项，按“元素 / 字段”显示，状态“待处理 / 已选择”，底部小字“另有 n 项已自动合并”。
 - 右栏一次只处理一个冲突：三列只读对比“基线 / 最新 / 我的草稿”，下方单选“采用最新 / 采用我的草稿 / 自定义”（`allowed` 含 `both` 时另有“都保留”），“上一个 / 下一个”切换。
 - 底部固定栏：“已解决 a / b” 与“保存并重新预览”；此状态不出现发布按钮和“确认发布”卡片。
-- 保存成功后自动重新预览，回到 8.2；`preview_outdated` 时同样自动重新预览并显示提示条。
+- 保存成功后自动重新预览，回到 8.2；`PREVIEW_OUTDATED` 时同样自动重新预览并显示提示条。
 
 ## 9. 前端测试清单
 
@@ -342,7 +372,7 @@ pages/DeliveryPage.tsx
 - 决策 409 / 422 各 code 的就地展示；重试复用同一幂等键。
 - stale 批次和 stale 卡片只读，“重新建模”填入输入框但不发送。
 - Action 卡片显示“仅定义 · 不可执行”，不存在执行按钮。
-- 发布页：三个页面 Tab 与 URL 保持；进度条状态由预览结果决定；冲突列表、三方对比、custom 校验、保存后自动重新预览、`preview_outdated` 自动重新预览、发布按钮启用条件；版本历史与服务接入迁移后原有测试通过。
+- 发布页：三个页面 Tab 与 URL 保持；进度条状态由预览结果决定；冲突列表、三方对比、custom 校验、保存后自动重新预览、`PREVIEW_OUTDATED` 自动重新预览、发布按钮启用条件；版本历史与服务接入迁移后原有测试通过。
 - `draftView` 选择器单测，以及改用选择器后各页面的现有测试全部通过。
 
 ## 10. 与实施顺序的对应

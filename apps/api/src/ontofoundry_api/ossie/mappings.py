@@ -154,33 +154,41 @@ def compile_mappings(
     return documents
 
 
-def validate_mapping_tree(document: dict[str, Any]) -> str | None:
-    """Reject the old flat layout before it can be silently misread as a tree."""
-    for index, entry in enumerate(document.get("ontology_mappings") or []):
-        for concept_mapping in entry.get("concept_mappings") or []:
-            concept = str(concept_mapping.get("concept") or "(未命名)")
-            roots = concept_mapping.get("link_mappings") or []
-            if len(roots) > 1:
-                return (
-                    f"ontology_mappings[{index}].{concept}.link_mappings "
-                    "最多支持一个对象映射根节点"
-                )
-            for root_index, root in enumerate(roots):
-                path = f"ontology_mappings[{index}].{concept}.link_mappings[{root_index}]"
-                if "relationship" in root:
-                    return (
-                        f"{path} 不能在根节点指定 relationship；"
-                        "旧版平铺映射和一元关系映射均不受支持"
-                    )
-                seen_relationships: set[str] = set()
-                for child_index, child in enumerate(root.get("children") or []):
-                    relationship = child.get("relationship")
-                    if not relationship:
-                        return f"{path}.children[{child_index}] 缺少 relationship"
-                    if relationship in seen_relationships:
-                        return f"{path}.children[{child_index}] 重复映射 {relationship}"
-                    seen_relationships.add(relationship)
-    return None
+def _link_tree(
+    concept_mapping: dict[str, Any], path: str, skip: Callable[[str, str], None]
+) -> tuple[Any, list[dict[str, Any]]]:
+    """Return the object root's key expression and its field children.
+
+    This writes one root whose children are the attribute columns. Files from
+    extension v1 list those children flat, with `relationship` on each top-level
+    entry; the official schema also allows several roots. Both are read rather
+    than rejected: flat entries become children of the single root, and anything
+    ambiguous is reported and skipped, never guessed.
+    """
+    entries = [
+        item for item in concept_mapping.get("link_mappings") or [] if isinstance(item, dict)
+    ]
+    roots = [item for item in entries if not item.get("relationship")]
+    flat = [item for item in entries if item.get("relationship")]
+    if len(roots) > 1:
+        skip(f"{path}.link_mappings", "有多个对象映射根节点，只导入第一个")
+    root = roots[0] if roots else {}
+    root_expression = (root.get("object_mapping") or {}).get("expression")
+    children: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for child in [*(root.get("children") or []), *flat]:
+        if not isinstance(child, dict):
+            continue
+        name = str(child.get("relationship") or "")
+        if not name:
+            skip(f"{path}.link_mappings", "有字段映射缺少 relationship，已跳过")
+            continue
+        if name in seen:
+            skip(f"{path}.{name}", "重复映射同一字段，只保留第一个")
+            continue
+        seen.add(name)
+        children.append(child)
+    return root_expression, children
 
 
 def _dataset_fields(dataset: dict[str, Any], dataset_name: str) -> dict[str, str | None]:
@@ -263,15 +271,7 @@ def parse_mappings(
                 for item in object_mappings
             ):
                 skip(path, "referent_mappings（按引用关系定位对象）暂不支持")
-            roots = concept_mapping.get("link_mappings") or []
-            root_expression = next(
-                (
-                    root["object_mapping"].get("expression")
-                    for root in roots
-                    if root["object_mapping"].get("expression")
-                ),
-                None,
-            )
+            root_expression, children = _link_tree(concept_mapping, path, skip)
             dataset_name = next(
                 (
                     name
@@ -298,23 +298,22 @@ def parse_mappings(
 
             attributes = {item.technical_name for item in object_type.attributes}
             fields: dict[str, str] = {}
-            for root in roots:
-                for link_mapping in root.get("children") or []:
-                    name = str(link_mapping.get("relationship") or "")
-                    if link_mapping.get("children"):
-                        skip(f"{path}.{name}", "三元及以上关系的映射暂不支持")
-                        continue
-                    if name not in attributes:
-                        continue  # relations are mapped through data_join
-                    column = _column(
-                        link_mapping["object_mapping"].get("expression"),
-                        dataset_name or "",
-                        fields_by_name,
-                    )
-                    if not column:
-                        skip(f"{path}.{name}", "字段映射不是单列表达式，未导入这一列")
-                        continue
-                    fields[name] = column
+            for link_mapping in children:
+                name = str(link_mapping["relationship"])
+                if link_mapping.get("children"):
+                    skip(f"{path}.{name}", "三元及以上关系的映射暂不支持")
+                    continue
+                if name not in attributes:
+                    continue  # relations are mapped through data_join
+                column = _column(
+                    (link_mapping.get("object_mapping") or {}).get("expression"),
+                    dataset_name or "",
+                    fields_by_name,
+                )
+                if not column:
+                    skip(f"{path}.{name}", "字段映射不是单列表达式，未导入这一列")
+                    continue
+                fields[name] = column
 
             source = str(dataset.get("source") or "")
             schema_name, _, table_name = source.rpartition(".")
