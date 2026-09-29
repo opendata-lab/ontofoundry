@@ -699,6 +699,12 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - 为完整结果替换、候选接受、会话 revision、三方发布、预览差异补 characterization tests。
 - 在 PostgreSQL 增加两个并发发布用例，不只跑 SQLite。
 
+**状态：已完成（2026-09-29）。**
+
+- `apps/api/tests/test_t0_characterization.py`：候选接受与原子回滚、revision 过期、运行中禁止编辑、预览、发布后基线推进、冲突发布不留版本、`resolve-merge` 过期拒绝。标注 `KNOWN GAP` 的两条（运行中禁止编辑 → T3/T4；预览对比未合并草稿 → T6）是目标设计有意改变的行为，对应阶段必须显式修改这些测试，其余测试在 T1–T8 中必须保持通过。
+- `apps/api/tests/test_t0_postgres_publish.py`：真实 PostgreSQL 上两会话并发发布——独立修改都成功且版本号 1/2/3 连续、指针指向最新；同字段修改恰好一个成功、失败方不留孤立版本。每条测试使用独立临时数据库。已做变异验证：去掉发布时 Workspace 行锁后测试失败。
+- 运行：`make test-pg`（默认连接 `127.0.0.1:55432` 的一次性容器，见测试文件头部说明）。
+
 ### T1 — v2 领域模型与兼容读取
 
 - **先交付并评审**：`ontofoundry.proposals/v1` 与 v2 元素的 Draft 2020-12 JSON Schema（按 `target_kind` 的 `oneOf`），每个 target kind 至少一组 create/update/delete 正例和反例；Action `effects[].expression` 的语言与求值上下文在此一并定稿（首期建议只允许引用输入参数与 `input_type` 属性的受限表达式，不可执行）。评审通过前不写 T1 代码。评审时必须同时定稿：
