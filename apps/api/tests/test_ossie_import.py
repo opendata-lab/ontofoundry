@@ -1055,7 +1055,7 @@ def test_value_concept_description_that_differs_is_reported():
 
 
 V1_EXPORT = json.loads(
-    (Path(__file__).parent / "fixtures" / "ossie_extension_v1_export.json").read_text()
+    (Path(__file__).parent / "fixtures" / "ossie_extension_v1_export.json").read_text(encoding="utf-8")
 )
 
 
@@ -1114,3 +1114,11 @@ def test_second_mapping_root_is_skipped_not_merged():
     columns = {c for m in payload["mappings"] for c in [m["key_column"], *m["fields"].values()]}
     assert "other_key" not in columns and "other_column" not in columns
     assert any("只导入第一个" in item["reason"] for item in report["skipped"])
+
+
+def test_current_extension_version_is_always_readable():
+    from ontofoundry_api.ossie.compiler import EXTENSION_VERSION
+    from ontofoundry_api.ossie.importer import READABLE_EXTENSION_VERSIONS
+
+    assert EXTENSION_VERSION in READABLE_EXTENSION_VERSIONS
+    assert "1" in READABLE_EXTENSION_VERSIONS

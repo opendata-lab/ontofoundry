@@ -151,7 +151,7 @@ Rule 升级为一等对象：
 }
 ```
 
-首期拒绝 `owner_kind=workspace`。编译 Ossie 时，将 Rule 投影回所属元素的 `requires` 或 `derived_by`；导入 Ossie 时创建 Rule。Rule 的稳定 ID 不进入官方 Ossie 字段，保存在 `ai_context.ontofoundry` 扩展与 OntoFoundry 完整快照中。当前扩展 v2 不得静默增加这些字段；Proposal-first 输出使用扩展 v3，导入器兼容读取 v1、v2 和 v3（v1 与 v2 仅映射布局不同，已由 `parse_mappings` 同时支持）。
+首期拒绝 `owner_kind=workspace`。编译 Ossie 时，将 Rule 投影回所属元素的 `requires` 或 `derived_by`；导入 Ossie 时创建 Rule。Rule 的稳定 ID 不进入官方 Ossie 字段，保存在 `ai_context.ontofoundry` 扩展与 OntoFoundry 完整快照中。当前扩展 v2 不得静默增加这些字段；Proposal-first 输出使用扩展 v3，导入器兼容读取 v1、v2 和 v3（v1 与 v2 仅映射布局不同，已由 `parse_mappings` 同时支持）。当前代码的可读白名单是显式的 `("1", "2")`；T1 引入 v3 时改为 `("1", "2", "3")`，并为三个版本各保留一份冻结的导出样本。
 
 ### 4.4 Action
 
@@ -193,7 +193,13 @@ Action 是一等定义元素，不是执行记录：
 
 ### 4.5 哈希定义
 
-所有哈希都是对规范化 JSON 求 SHA-256 的小写十六进制串。规范化分两步：
+所有哈希都是 SHA-256 的小写十六进制串，但按输入域分为三种算法，**互不通用**：
+
+- **A. 版本信封算法**：只用于 `version_content_sha256`。继续使用现有 `ossie/compiler.py` 的 `sha256_json`（`canonical_json` 编码）对 `{snapshot, ossie, validation}` 求值，历史版本和新版本语义一致，不引入下面的语义规范化。
+- **B. 领域快照算法**：用于 `normalized_snapshot_sha256`、`draft_sha256`、`element_sha256`、`merged_snapshot_sha256`，输入只能是 v2 领域快照或其中的单个元素，按下述两步规范化。
+- **C. 原始结果算法**：只用于 `proposal_result_sha256`，对 DataAgent 结果文件的原始字节求 SHA-256，不解析、不规范化；结果语义去重另由 Item `fingerprint`（对单个 Item 按算法 B 规范化其 `operation/target_kind/target_id/after`）负责。
+
+算法 B 的规范化分两步：
 
 1. **语义规范化**（按字段固定，不按数据形状猜）：
 
@@ -202,11 +208,12 @@ Action 是一等定义元素，不是执行记录：
    | 顶层元素集合（`object_types`、`properties`、`link_types`、`rules`、`actions`、`material_objects`、`material_links`、`mappings`）| 按 `id` 升序 |
    | `evidence[]` | 按 `id` 升序 |
    | `tags[]`、`extends[]`、`precondition_rule_ids[]`、`requires[]`、`derived_by[]` | 视为集合，去重后按字符串升序 |
-   | `verbalizes[]`、Action `parameters[]`、Action `effects[]`、Mapping 字段顺序 | 有序，保持原顺序 |
+   | `verbalizes[]`、Action `parameters[]`、Action `effects[]` | 有序，保持原顺序 |
+| Mapping `fields` 等 JSON 对象 | 对象无顺序，由 JCS 按键排序 |
    | 可选字段值为 `null` | 省略该键 |
    | 字符串 | Unicode NFC |
 
-   新增数组字段时必须先在本表登记归类，否则规范化函数拒绝该字段（测试会失败）。
+   v2 领域模型新增数组字段时必须先在本表登记归类，否则算法 B 的规范化函数拒绝该字段（测试会失败）。本表只约束算法 B，不适用于 Ossie 文档或 Proposal 结果。
 2. **字节规范化**：采用 RFC 8785 JSON Canonicalization Scheme（JCS），它规定了键排序、数字（含 `-0`、禁止 NaN/Infinity）和字符串转义的唯一编码。
 
 T2 必须附带一组固定输入与期望哈希的测试向量，后续任何版本改动都不得改变这些向量的结果。不同用途的哈希互不比较：
@@ -262,7 +269,7 @@ Evidence 是判别联合。材料证据：
 }
 ```
 
-Material Object/Link 至少携带一条任意类型的 Evidence。
+Material Object/Link 至少携带一条任意类型的 Evidence。`manual` Evidence 的 `created_by` 一律由服务端取当前认证主体、`created_at` 取数据库时间，请求中的值被忽略；DataAgent 结果中出现 `kind=manual` 视为结果合同错误，整个结果拒收；update 不得修改或删除他人创建的 `manual` Evidence，只能追加自己的。
 
 保存或接受时，对 `kind=material` 校验 `material_id` 属于同一 Workspace、SHA-256 与不可变材料记录一致、行号范围和 quote 可在规范化文本中核验。
 
@@ -479,7 +486,9 @@ proposal_decision_items
 - Create Proposal 的预分配 `target_id` 在 accepted 前不写入 `ontology_element_identities`；拒绝提案不会污染正式身份登记。Update/delete 的 target 必须已经登记或可从 legacy 快照回填验证。
 - Item 的**有效状态**由存储状态和当前草稿共同决定，且 `stale`、`conflict` 只在读取时计算、**永不落库**：
   - 存储状态为 `accepted`、`rejected`、`superseded` 时，有效状态即存储状态；
-  - 存储状态为 `pending` 时：update/delete 的目标元素已不存在或 kind 改变 → `conflict`；目标 `element_sha256 ≠ expected_target_hash` → `stale`；create 的 `target_id` 已被占用、或其 `depends_on`/`client_ref` 指向的元素已不存在 → `conflict`；否则为 `pending`。
+  - 存储状态为 `pending` 时：update/delete 的目标元素已不存在或 kind 改变 → `conflict`；目标 `element_sha256 ≠ expected_target_hash` → `stale`；create 的 `target_id` 已被占用 → `conflict`；否则再按依赖判断（见下）。
+  - **依赖传播**：对 `depends_on` 中的每个依赖 Item——依赖为 `pending` 且可与本 Item 同组接受，或已 `accepted` 且其目标仍在草稿中：不影响；依赖为 `rejected`/`superseded`，或已 `accepted` 但目标已被删除：本 Item 为 `conflict`；依赖的有效状态为 `stale`/`conflict`：本 Item 继承该状态，`status_reason` 注明“依赖 X 已过期/冲突”。依赖尚未接受时其目标本就不在草稿中，**不**据此判 conflict。
+  - 引用已存在元素（非 `client_ref`）的字段，只在该元素原本存在、随后被删除时判 `conflict`。
   - 因为不落库，目标内容若被改回原值，Item 自动恢复为 `pending`。
 - Batch 不存在整批 stale。Batch 的 `source_session_revision/source_draft_sha256` 只用于展示“基于草稿 r{n}”和审计。
 - 新 Batch 可以将同一目标上的旧 pending Item 标记 superseded；不得删除历史。
@@ -707,7 +716,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T3 — Proposal 结果契约与消费
 
-- 增加 `ontofoundry.proposals/v1` JSON Schema、解析、引用解析、确定性 create ID、指纹和原子落库。
+- 按 T1 已冻结的 `ontofoundry.proposals/v1` Schema 实现解析、版本协商、引用解析、确定性 create ID、指纹和原子落库；T3 不重新设计 Schema。
 - generation guard、run token 校验；结果只入库为 Batch，绝不写 draft；运行期间草稿变化只影响各 Item 的有效状态。
 - 新运行通过 feature flag 选择 proposal contract；旧活动 run 继续兼容。
 
@@ -749,6 +758,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - Update/delete 的目标哈希不匹配呈现 stale、目标缺失呈现 conflict，且不落库。
 - Rule owner 不存在、owner=workspace、Action 引用不存在 Rule 均拒绝。
 - Proposal 依赖缺失、跨 Batch、成环、部分接受均拒绝。
+- “新增 Object Type → 新增 Property → 新增 Link Type”三级 create 依赖组：接受前全部为 pending，整组原子接受成功；拒绝根 Item 后其余呈现 conflict；API 与 PostgreSQL 事务测试都覆盖。
 - 同幂等键同请求返回保存的首次响应；同键不同请求 409 `IDEMPOTENCY_MISMATCH`；一次请求含多个 Item 时逐项写入 `proposal_decision_items`。
 - 失败请求不写任何 Item 状态；stale/conflict 由读取时的哈希比较得出。
 - 只读本体令牌读取 Ossie、MCP、presentation 时看不到 Material Object/Link、Evidence 和 mapping。
