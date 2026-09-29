@@ -16,7 +16,7 @@
 ```text
 Workspace current version Vn
        │
-       ├─ create session → pin Vn + version_sha256
+       ├─ create session → pin Vn + normalized_snapshot_sha256
        │                      │
        │                      ├─ run pins session revision + draft hash + materials
        │                      │
@@ -193,18 +193,34 @@ Action 是一等定义元素，不是执行记录：
 
 ### 4.5 哈希定义
 
-所有哈希都是对规范化 JSON（UTF-8、键按字典序、无多余空白、数组保持语义顺序；按 ID 标识的元素集合先按 `id` 排序）求 SHA-256 的小写十六进制串。不同用途的哈希互不比较：
+所有哈希都是对规范化 JSON 求 SHA-256 的小写十六进制串。规范化分两步：
+
+1. **语义规范化**（按字段固定，不按数据形状猜）：
+
+   | 字段 | 规则 |
+   |---|---|
+   | 顶层元素集合（`object_types`、`properties`、`link_types`、`rules`、`actions`、`material_objects`、`material_links`、`mappings`）| 按 `id` 升序 |
+   | `evidence[]` | 按 `id` 升序 |
+   | `tags[]`、`extends[]`、`precondition_rule_ids[]`、`requires[]`、`derived_by[]` | 视为集合，去重后按字符串升序 |
+   | `verbalizes[]`、Action `parameters[]`、Action `effects[]`、Mapping 字段顺序 | 有序，保持原顺序 |
+   | 可选字段值为 `null` | 省略该键 |
+   | 字符串 | Unicode NFC |
+
+   新增数组字段时必须先在本表登记归类，否则规范化函数拒绝该字段（测试会失败）。
+2. **字节规范化**：采用 RFC 8785 JSON Canonicalization Scheme（JCS），它规定了键排序、数字（含 `-0`、禁止 NaN/Infinity）和字符串转义的唯一编码。
+
+T2 必须附带一组固定输入与期望哈希的测试向量，后续任何版本改动都不得改变这些向量的结果。不同用途的哈希互不比较：
 
 | 名称 | 输入 | 用途 |
 |---|---|---|
 | `version_content_sha256` | 现有 `ontology_versions.sha256`：`{snapshot, ossie, validation}` | 版本完整性，保持现有语义，不改写历史 |
 | `normalized_snapshot_sha256` | 读取层规范化为 v2 后的快照 | Session 基线、预览、发布比较；v1 历史版本按需计算并缓存，不回写 |
 | `draft_sha256` | Session 当前 v2 草稿 | Batch 来源和草稿乐观校验 |
-| `element_sha256` | 单个元素（含 `id`，不含证据以外的派生字段） | Proposal `expected_target_hash` |
+| `element_sha256` | 单个元素在草稿中存储的全部字段（含 `id` 与 `evidence`），不含服务端展示用的联表字段（如 `material_name`、`display_name`） | Proposal `expected_target_hash` |
 | `merged_snapshot_sha256` | 预览时 B/L/D 合并后的 v2 快照 | 预览与发布一致性 |
 | `proposal_result_sha256` | DataAgent 原始结果 JSON | 结果去重 |
 
-空快照是 `{"schema_version":"2","workspace_id":"<wid>"}` 加所有元素集合为空数组后的规范化结果。文档中出现的 `base_version_sha256`、`current_version_sha256` 均指 `normalized_snapshot_sha256`。
+空快照是 `{"schema_version":"2","workspace_id":"<wid>"}` 加所有元素集合为空数组后的规范化结果。文档中出现的 `base_version_sha256`、`current_version_sha256` 均指 `normalized_snapshot_sha256`。对外接口不再使用含义模糊的 `version_sha256`：REST、MCP 版本响应同时返回 `version_content_sha256` 与 `normalized_snapshot_sha256`，run manifest、BFF 固定校验和发布预览只使用 `normalized_snapshot_sha256`；现有 `version_sha256` 字段在迁移期保留为 `version_content_sha256` 的别名。
 
 ## 5. Material 与 Mapped 实例
 
@@ -297,7 +313,7 @@ Material 与 Mapped 实例可以在统一查询响应中返回，但必须有 `s
 - DataAgent topic/task/run token；
 - Agent、Skill、模型和结果 schema 版本。
 
-开始运行后 session revision 变化不会取消远端任务，但其结果只能落为 `stale` Batch，不得自动进入可接受状态。为此，当前 `revise()` 中“运行期间禁止编辑”的限制在 proposal 合同启用后改为：草稿保存和 Proposal 决策只受 revision CAS 约束；旧完整结果合同的运行仍保留原限制和 generation guard。
+开始运行后 session revision 变化不会取消远端任务。结果仍入库为 `available` Batch，但其中每个 Item 按 §7.3 的规则逐项判断：目标在运行期间被改动的 Item 呈现为 stale，不受影响的 Item 仍可接受。为此，当前 `revise()` 中“运行期间禁止编辑”的限制在 proposal 合同启用后改为：草稿保存和 Proposal 决策只受 revision CAS 约束；旧完整结果合同的运行仍保留原限制和 generation guard。
 
 ### 6.3 MCP
 
@@ -309,7 +325,7 @@ list_ontology_elements(workspace_id, version_id, kind, cursor)
 get_ontology_elements(workspace_id, version_id, element_ids)
 ```
 
-响应必须包含 `workspace_id`、`version_id`、`version_sha256`。BFF 根据 Session 注入或校验这三个值，不让模型读取其他 Workspace/Version。当前 Session Draft 通过本次运行固定的只读上下文文件或内部受限接口提供，不能冒充已发布 MCP 版本。
+响应必须包含 `workspace_id`、`version_id`、`version_content_sha256`、`normalized_snapshot_sha256`。BFF 根据 Session 注入 `workspace_id`、`version_id`，并以 Session `base_version_sha256` 校验响应的 `normalized_snapshot_sha256`，不让模型读取其他 Workspace/Version。当前 Session Draft 通过本次运行固定的只读上下文文件或内部受限接口提供，不能冒充已发布 MCP 版本。
 
 ## 7. Proposal 合同
 
@@ -378,11 +394,13 @@ proposal_batches
   material_manifest_json
   producer_json              # agent/skill/model versions
   result_sha256
-  status                     # validating|available|stale|failed
+  status                     # validating|available|failed
   error_json
   created_at
   UNIQUE (workspace_id, session_id, run_token)
   UNIQUE (workspace_id, session_id, result_sha256)
+  UNIQUE (workspace_id, session_id, id)                 # 供复合外键引用
+  FOREIGN KEY (workspace_id, session_id) → modeling_sessions(workspace_id, id)
 
 proposal_items
   id                         # server proposal UUID
@@ -399,18 +417,28 @@ proposal_items
   after_json
   field_changes_json
   evidence_json
-  status                     # pending|accepted|rejected|stale|conflict|superseded
+  status                     # 仅存决策状态：pending|accepted|rejected|superseded
   decided_by nullable
   decided_at nullable
   accepted_revision nullable
   created_at
   UNIQUE (batch_id, ordinal)
   UNIQUE (batch_id, fingerprint)
+  UNIQUE (workspace_id, session_id, batch_id, id)       # 供依赖与决策项复合外键引用
+  FOREIGN KEY (workspace_id, session_id, batch_id) → proposal_batches(workspace_id, session_id, id)
 
 proposal_item_dependencies
+  workspace_id
+  session_id
+  batch_id
   item_id
   depends_on_item_id
   PRIMARY KEY (item_id, depends_on_item_id)
+  FOREIGN KEY (workspace_id, session_id, batch_id, item_id)
+    → proposal_items(workspace_id, session_id, batch_id, id)
+  FOREIGN KEY (workspace_id, session_id, batch_id, depends_on_item_id)
+    → proposal_items(workspace_id, session_id, batch_id, id)   # 两端同 Batch 由数据库保证
+  CHECK (item_id <> depends_on_item_id)
 
 proposal_decision_requests
   id
@@ -424,27 +452,39 @@ proposal_decision_requests
   actor_id
   created_at
   UNIQUE (workspace_id, session_id, idempotency_key)
+  UNIQUE (workspace_id, session_id, id)
   FOREIGN KEY (workspace_id, session_id) → modeling_sessions(workspace_id, id)
 
 proposal_decision_items
-  request_id                 FK proposal_decision_requests
-  item_id                    FK proposal_items
+  workspace_id
+  session_id
+  request_id
+  batch_id
+  item_id
   decision                   # accept|reject|restore
   PRIMARY KEY (request_id, item_id)
+  FOREIGN KEY (workspace_id, session_id, request_id)
+    → proposal_decision_requests(workspace_id, session_id, id)
+  FOREIGN KEY (workspace_id, session_id, batch_id, item_id)
+    → proposal_items(workspace_id, session_id, batch_id, id)   # 请求与 Item 同 Session 由数据库保证
 ```
 
 只有成功的决策请求才写入这两张表。
 
-所有跨表查询同时带 Workspace 和 Session 条件；不要仅凭全局 UUID 假定空间归属。`proposal_batches`、`proposal_items` 对 `(workspace_id, session_id)` 使用复合外键指向 `modeling_sessions`（需先给后者加 `UNIQUE (workspace_id, id)`），`proposal_items` 对 `(workspace_id, session_id, batch_id)` 复合外键指向 `proposal_batches`。PostgreSQL 外键和唯一约束是生产合同，SQLite 测试不能代替真实并发验收。
+所有跨表查询同时带 Workspace 和 Session 条件；不要仅凭全局 UUID 假定空间归属。`proposal_batches`、`proposal_items` 对 `(workspace_id, session_id)` 使用复合外键指向 `modeling_sessions`（需先给后者加 `UNIQUE (workspace_id, id)`），`proposal_items` 对 `(workspace_id, session_id, batch_id)` 复合外键指向 `proposal_batches`；依赖与决策项通过上面的复合外键保证不跨 Workspace、Session、Batch。跨 Batch 依赖由此在数据库层即被拒绝。PostgreSQL 外键和唯一约束是生产合同，SQLite 测试不能代替真实并发验收。
 
 ### 7.3 状态与不可变性
 
 - Batch 和 Item 的生成内容入库后不可修改；只更新状态与决策字段。
 - Create Proposal 的预分配 `target_id` 在 accepted 前不写入 `ontology_element_identities`；拒绝提案不会污染正式身份登记。Update/delete 的 target 必须已经登记或可从 legacy 快照回填验证。
-- source revision/hash 不等于当前 Session 时，Batch 为 stale，Items 不可接受，但仍可查看。
+- Item 的**有效状态**由存储状态和当前草稿共同决定，且 `stale`、`conflict` 只在读取时计算、**永不落库**：
+  - 存储状态为 `accepted`、`rejected`、`superseded` 时，有效状态即存储状态；
+  - 存储状态为 `pending` 时：update/delete 的目标元素已不存在或 kind 改变 → `conflict`；目标 `element_sha256 ≠ expected_target_hash` → `stale`；create 的 `target_id` 已被占用、或其 `depends_on`/`client_ref` 指向的元素已不存在 → `conflict`；否则为 `pending`。
+  - 因为不落库，目标内容若被改回原值，Item 自动恢复为 `pending`。
+- Batch 不存在整批 stale。Batch 的 `source_session_revision/source_draft_sha256` 只用于展示“基于草稿 r{n}”和审计。
 - 新 Batch 可以将同一目标上的旧 pending Item 标记 superseded；不得删除历史。
 - accepted Item 不允许改为 rejected；撤销通过新的反向 Proposal 或人工草稿编辑完成。
-- reject 不改草稿；restore 只把 rejected 且仍未过期的 Item恢复为 pending。
+- reject 不改草稿，只能作用于有效状态为 `pending`、`stale` 或 `conflict` 的 Item；restore 只作用于存储状态为 `rejected` 的 Item，把它改回 `pending`（有效状态随后照常计算）。
 
 ## 8. 接受、拒绝与人工编辑
 
@@ -474,8 +514,10 @@ POST /api/v1/workspaces/{wid}/sessions/{sid}/proposal-decisions
 
 顺序固定：
 
-1. 锁定 Session 行并比较 `expected_session_revision`。
-2. 读取全部 Item、依赖和幂等决策记录。
+1. 锁定 Session 行（`SELECT … FOR UPDATE`）。
+2. 按 `(workspace_id, session_id, idempotency_key)` 查 `proposal_decision_requests`：已存在且 `request_sha256` 相同 → 直接返回保存的 `response_json`，结束；已存在但哈希不同 → 409 `IDEMPOTENCY_MISMATCH`，结束。
+2a. 记录不存在时，比较 `expected_session_revision`，不等 → 409 `SESSION_REVISION_CHANGED`。
+2b. 读取全部 Item 与依赖，计算每个 Item 的有效状态。
 3. 对每个 update/delete Item，比较当前草稿中目标元素的 `element_sha256` 与 Item `expected_target_hash`；create Item 检查 `target_id` 未被占用。Batch `source_draft_sha256` 与当前 `draft_sha256` 不同本身不阻止接受，只要逐项目标哈希仍一致。
 4. 按依赖拓扑应用 create/update/delete；禁止按数组位置更新。
 5. 校验 Workspace、稳定 ID、kind、名称、引用、实例类型、Evidence 和 Mapping。
@@ -486,11 +528,11 @@ POST /api/v1/workspaces/{wid}/sessions/{sid}/proposal-decisions
 
 同一 idempotency key、同一请求体（`request_sha256` 相同）重复调用返回保存的 `response_json`；同键不同请求体返回 409 `IDEMPOTENCY_MISMATCH`。
 
-失败请求整体回滚，不写任何状态。revision 或目标内容变化返回 409，响应中逐项说明哪些 Item 已过期或冲突；Item 的 `stale/conflict` 不在失败事务中落库，而是在读取时按 §4.5 的哈希动态计算（Batch `source_draft_sha256 ≠` 当前 `draft_sha256` 且该 Item `expected_target_hash ≠` 当前 `element_sha256` → stale；目标已被删除或 kind 改变 → conflict），并在该 Session 下一次成功写事务中顺带持久化。
+失败请求整体回滚，不写任何状态。请求中任一 Item 的有效状态不是 `pending`（accept）时返回 409 `PROPOSAL_STALE` 或 `PROPOSAL_CONFLICT`，`error.items` 逐项说明原因。`stale/conflict` 按 §7.3 在读取时计算，从不持久化。PostgreSQL 并发测试必须覆盖：成功后 revision 已推进，再以同键串行重放和并发重放，均返回首次响应。
 
 ### 8.3 人工编辑
 
-现有保存草稿 API继续使用 revision 乐观锁，并同步更新 `draft_sha256`。人工编辑某 target 后，读取时动态或后台把以旧 target hash 为前提的 pending Proposal 标记 stale；不要求保存请求扫描所有历史 Batch 才能提交。
+现有保存草稿 API继续使用 revision 乐观锁，并同步更新 `draft_sha256`。人工编辑某 target 后，以旧 target hash 为前提的 pending Proposal 在读取时自然呈现为 stale（§7.3）；保存请求不扫描、也不改写任何 Batch。
 
 ## 9. 三方合并与发布
 
@@ -650,6 +692,8 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T1 — v2 领域模型与兼容读取
 
+- **先交付并评审**：`ontofoundry.proposals/v1` 与 v2 元素的 Draft 2020-12 JSON Schema（按 `target_kind` 的 `oneOf`），每个 target kind 至少一组 create/update/delete 正例和反例；Action `effects[].expression` 的语言与求值上下文在此一并定稿（首期建议只允许引用输入参数与 `input_type` 属性的受限表达式，不可执行）。评审通过前不写 T1 代码。
+
 - 新增 RuleDefinition、ActionDefinition、Evidence/来源字段和 v1→v2 规范化适配器。
 - 编译、导入、导出和 Diff 支持 v2；不改历史快照。
 - 测试 Rule ID 稳定、Action 扩展往返、legacy Ossie 往返。
@@ -664,7 +708,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 ### T3 — Proposal 结果契约与消费
 
 - 增加 `ontofoundry.proposals/v1` JSON Schema、解析、引用解析、确定性 create ID、指纹和原子落库。
-- generation guard、run token、revision/hash 不匹配落 stale，不能写 draft。
+- generation guard、run token 校验；结果只入库为 Batch，绝不写 draft；运行期间草稿变化只影响各 Item 的有效状态。
 - 新运行通过 feature flag 选择 proposal contract；旧活动 run 继续兼容。
 
 ### T4 — Proposal API 与接受事务
@@ -702,7 +746,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 - 每个 target kind 的 create/update/delete。
 - Create client_ref 重试分配同一 UUID。
-- Update/delete 的 before/hash 不匹配变 stale/conflict。
+- Update/delete 的目标哈希不匹配呈现 stale、目标缺失呈现 conflict，且不落库。
 - Rule owner 不存在、owner=workspace、Action 引用不存在 Rule 均拒绝。
 - Proposal 依赖缺失、跨 Batch、成环、部分接受均拒绝。
 - 同幂等键同请求返回保存的首次响应；同键不同请求 409 `IDEMPOTENCY_MISMATCH`；一次请求含多个 Item 时逐项写入 `proposal_decision_items`。
@@ -721,7 +765,7 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 - Session 固定 base version/hash；Workspace 后续发布不改变它。
 - Run 固定 revision/draft/material manifest。
-- 运行期间人工编辑后，结果落 stale Batch，不覆盖草稿。
+- 运行期间人工编辑某元素后，结果 Batch 中以该元素为目标的 Item 呈现 stale，其余 Item 仍可接受；改回原值后恢复 pending；草稿不被覆盖。
 - 重复消费同一结果不重复创建 Batch、Item 或推进 revision。
 
 ### 14.4 合并与发布
@@ -761,6 +805,8 @@ apps/api/src/ontofoundry_api/services/version_diff.py
 apps/api/src/ontofoundry_api/ossie/compiler.py
 apps/api/src/ontofoundry_api/ossie/importer.py
 apps/api/src/ontofoundry_api/api/mcp.py
+apps/api/src/ontofoundry_api/main.py
+apps/api/src/ontofoundry_api/services/errors.py
 apps/api/src/ontofoundry_api/api/ontology.py
 apps/api/src/ontofoundry_api/api/assets.py
 apps/api/src/ontofoundry_api/services/ontology_query.py

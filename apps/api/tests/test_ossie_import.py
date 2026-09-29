@@ -1052,3 +1052,65 @@ def test_value_concept_description_that_differs_is_reported():
     _, report = import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
 
     assert any(value["concept"] in note and "描述" in note for note in report["notes"])
+
+
+V1_EXPORT = json.loads(
+    (Path(__file__).parent / "fixtures" / "ossie_extension_v1_export.json").read_text()
+)
+
+
+def test_frozen_extension_v1_export_imports_and_reexports_as_v2():
+    """A file exported by the extension-v1 compiler (commit e3dc4a9), frozen."""
+    expected = V1_EXPORT["draft"]
+    payload, report = import_ossie(
+        V1_EXPORT["ossie"], workspace_id=V1_EXPORT["workspace_id"], mode="replace"
+    )
+
+    assert mapping_view(payload["mappings"]) == mapping_view(expected["mappings"])
+    assert {t["technical_name"] for t in payload["object_types"]} == {
+        t["technical_name"] for t in expected["object_types"]
+    }
+    joins = {
+        link["technical_name"]: link.get("data_join")
+        for link in payload["link_types"]
+        if link.get("data_join")
+    }
+    assert joins == {
+        link["technical_name"]: link["data_join"]
+        for link in expected["link_types"]
+        if link.get("data_join")
+    }
+    assert report["skipped"] == []
+
+    again = compile_ossie(
+        OntologyDraft.model_validate(payload), ontology_name="mfg", ontology_description="制造"
+    )
+    assert again["ai_context"]["ontofoundry"]["version"] == "2"
+    assert validate_ossie(again)["publishable"] is True
+
+
+def test_second_mapping_root_is_skipped_not_merged():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    mapping = document["ontology_mappings"][0]["concept_mappings"][0]
+    first = mapping["link_mappings"][0]
+    dataset = first["object_mapping"]["expression"].split(".")[0]
+    mapping["link_mappings"].append(
+        {
+            "object_mapping": {"expression": f"{dataset}.other_key"},
+            "children": [
+                {
+                    "relationship": first["children"][0]["relationship"],
+                    "object_mapping": {"expression": f"{dataset}.other_column"},
+                }
+            ],
+        }
+    )
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+
+    columns = {c for m in payload["mappings"] for c in [m["key_column"], *m["fields"].values()]}
+    assert "other_key" not in columns and "other_column" not in columns
+    assert any("只导入第一个" in item["reason"] for item in report["skipped"])

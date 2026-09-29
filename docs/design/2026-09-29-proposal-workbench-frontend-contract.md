@@ -77,7 +77,7 @@ UI 草图：`docs/assets/proposal-workbench-2026-09-29/`
 | 运行中 | 提案 Tab 顶部显示“正在生成提案…”；已有批次仍可操作 |
 | Batch `validating` | 批次头部显示“正在校验提案”，卡片不可操作 |
 | Batch `failed` | 错误块显示 `error_json.message`，提供“重新建模” |
-| Batch `stale` | 整批只读，头部说明“生成期间草稿已变化（r{a} → r{b}）” |
+| 生成期间草稿已变化 | 批次头部提示“生成期间草稿已变化（r{a} → r{b}），受影响的提案已标为已过期”；其余提案照常可操作 |
 | 决策 409 | 不弹通用 toast；重新拉取会话和批次，对失败 Item 就地显示原因 |
 
 ## 3. 前端组件拆分
@@ -116,12 +116,12 @@ export type ProposalStatus =
 // 现有 types.ts 的 `Evidence`（v1 文档实例证据）在 T1 切换 v2 时删除，
 // 调用点（DocumentObject、DocumentLink、Candidate、InstancesPage、ObjectDetailPage）
 // 一并改用下面的判别联合。
+// 存储形态：与草稿、版本快照中的 JSON 完全一致。
 export type MaterialEvidence = {
   kind: "material";
   id: string;
   material_id: string;
   material_sha256: string;
-  material_name: string;          // 服务端联表返回，只用于展示
   locator: { heading?: string; line_start: number; line_end: number };
   quote: string;
 };
@@ -133,6 +133,11 @@ export type ManualEvidence = {
   created_at: string;
 };
 export type Evidence = MaterialEvidence | ManualEvidence;
+
+// 展示形态：仅出现在 Proposal、预览等详情 DTO 中，服务端联表补充材料名。
+export type EvidenceView =
+  | (MaterialEvidence & { material_name: string; material_archived: boolean })
+  | ManualEvidence;
 
 export type FieldChange = {
   path: string;                   // 如 "description"、"values.credit_level"
@@ -152,10 +157,11 @@ export type ProposalItem = {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   field_changes: FieldChange[];
-  evidence: Evidence[];
+  evidence: EvidenceView[];
   depends_on: string[];           // item id
   dependency_group: string[];     // 接受时必须一起提交的闭包，含自身
-  status: ProposalStatus;
+  status: ProposalStatus;         // 有效状态：stale/conflict 由服务端读取时计算，从不落库
+  stored_status: "pending" | "accepted" | "rejected" | "superseded";
   status_reason?: string;         // stale/conflict 的人类可读原因
   accepted_revision?: number;
   decided_at?: string;
@@ -163,7 +169,7 @@ export type ProposalItem = {
 
 export type ProposalBatch = {
   id: string;
-  status: "validating" | "available" | "stale" | "failed";
+  status: "validating" | "available" | "failed";
   created_at: string;
   source_session_revision: number;
   base_version_id: string | null;
@@ -260,7 +266,7 @@ base_diff: ElementChange[];   // 相对 base_version 的变更；已删除元素
 { "error": { "code": "...", "message": "...", "items": [{ "proposal_id": "...", "reason": "..." }], "conflicts": [], "current_version_id": null } }
 ```
 
-新接口一律抛 `ServiceError` 子类，不使用 `HTTPException(detail=...)`。前端 `ApiError` 增加 `items`、`conflicts`、`currentVersionId` 三个可选字段，从 `body.error` 解析；每个错误码都有客户端单测。
+新接口一律抛 `ServiceError` 子类，不使用 `HTTPException(detail=...)`。`ServiceError` 增加可选 `details: dict`，`service_error_handler` 把它合并进 `error` 对象（与现有 `PublishValidationError` 的 `validation` 同一机制，改为通用实现）。前端 `ApiError` 增加 `items`、`conflicts`、`currentVersionId` 三个可选字段，从 `body.error` 解析；每个错误码都有客户端单测。
 
 | HTTP | code | 前端处理 |
 |---|---|---|
@@ -269,6 +275,11 @@ base_diff: ElementChange[];   // 相对 base_version 的变更；已删除元素
 | 409 | `IDEMPOTENCY_MISMATCH` | 视为程序错误，换新键不自动重试，展示错误 |
 | 422 | `DEPENDENCY_INCOMPLETE` | 就地提示缺失依赖，展开依赖组 |
 | 422 | `VALIDATION_FAILED` | 在卡片上显示 `items[].reason` |
+| 409 | `PROPOSAL_CONFLICT` | 重拉批次，相关卡片显示冲突 |
+| 409 | `PROPOSAL_NOT_RESTORABLE` | restore 目标不是已拒绝状态；重拉批次 |
+| 422 | `DEPENDENCY_CYCLE` / `DEPENDENCY_CROSS_BATCH` | 视为结果合同错误，展示错误，不重试 |
+| 422 | `EVIDENCE_INVALID` | 证据材料跨空间、哈希或原文不符；在卡片证据区显示原因 |
+| 409 | `MATERIAL_IN_USE` | 材料被引用，删除改为提示归档 |
 
 ### 5.3 会话
 
@@ -370,7 +381,7 @@ pages/DeliveryPage.tsx
 - 单条接受、依赖组接受、接受全部无冲突项、拒绝、恢复。
 - 接受成功后“本体草稿”出现新元素且带“新增”标记；拒绝后草稿不变。
 - 决策 409 / 422 各 code 的就地展示；重试复用同一幂等键。
-- stale 批次和 stale 卡片只读，“重新建模”填入输入框但不发送。
+- stale / conflict 卡片只读，“重新建模”填入输入框但不发送；目标改回原值后卡片恢复为待审。
 - Action 卡片显示“仅定义 · 不可执行”，不存在执行按钮。
 - 发布页：三个页面 Tab 与 URL 保持；进度条状态由预览结果决定；冲突列表、三方对比、custom 校验、保存后自动重新预览、`PREVIEW_OUTDATED` 自动重新预览、发布按钮启用条件；版本历史与服务接入迁移后原有测试通过。
 - `draftView` 选择器单测，以及改用选择器后各页面的现有测试全部通过。

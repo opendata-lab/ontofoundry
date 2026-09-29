@@ -70,7 +70,7 @@ V0.1 不保留“项目”“业务域”“子图”等长期实体。一个工
 | Link Type | 定义 Object Type 之间有方向的二元关系 | 一等元素，可新增、修改、删除 |
 | Rule | 定义约束或派生表达式 | 一等元素，但必须通过 `owner_kind`、`owner_id` 归属具体 Object Type、Property、Link Type 或 Action；首期不设计 Workspace Rule 或通用 scope 体系 |
 | Action | 定义可对业务对象执行的动作合同 | 一等定义元素；Action 执行记录不进入本体版本，执行引擎仍属后续能力 |
-| Material Object / Link | 从已保存材料抽取并经用户确认的事实 | 可作为提案，接受后进入草稿并随空间版本保存 |
+| Material Object / Link | 从已保存材料抽取、或由用户人工录入并经确认的事实 | 可作为提案，接受后进入草稿并随空间版本保存 |
 | Mapping | Object Type、Property、Link Type 与结构化数据集、字段、键、Join 的映射 | 可作为提案并随空间版本保存；不包含连接凭据 |
 
 Apache Ossie 主要承载 Object Type、Link Type、Property、Rule 和 ontology mappings。OntoFoundry 补充中文显示名、稳定 UUID、标签、Action 定义、Material Object / Link、来源证据和版本信息。上述元素的 `kind` 创建后不可原地改变；把一种元素改成另一种元素必须表现为删除旧 ID、创建新 ID。
@@ -196,9 +196,9 @@ Markdown 是待分析数据，不是 Agent 指令。文档中即使出现“忽�
 
 Agent 的模型修改始终先形成不可变 Proposal Item，不直接改变会话草稿，更不能自动发布。一次建模运行产生一个 Proposal Batch，其中可以包含多条相互依赖的新增、修改或删除提案。
 
-创建建模会话时固定 `workspace_id`、`base_version_id` 和发布快照 SHA-256，并以该版本初始化会话草稿。Agent 获取本体上下文时必须通过本体 MCP 显式读取这个 Workspace 的指定 `version_id`，不能在运行过程中使用动态 `latest`。MCP 响应同时返回 `workspace_id`、`version_id` 和 `version_sha256`，服务端拒绝模型越过会话绑定自行选择其他空间或版本。
+创建建模会话时固定 `workspace_id`、`base_version_id` 和发布快照 SHA-256，并以该版本初始化会话草稿。Agent 获取本体上下文时必须通过本体 MCP 显式读取这个 Workspace 的指定 `version_id`，不能在运行过程中使用动态 `latest`。MCP 响应同时返回 `workspace_id`、`version_id`、`version_content_sha256` 和 `normalized_snapshot_sha256`（后者用于与会话基线比较），服务端拒绝模型越过会话绑定自行选择其他空间或版本。
 
-每一次建模运行还固定开始时的 `session_revision`、`draft_sha256`、材料 ID 与材料 SHA-256、Agent/Skill/模型版本。Agent 实际看到的是固定发布基线与该次运行开始时的会话草稿；若运行结束前会话 revision 已变化，旧结果只能标记为 stale，不能写入当前提案或草稿。固定版本保证读取稳定，网络重试还必须使用 Idempotency-Key、run ID 和 Proposal 内容指纹去重。
+每一次建模运行还固定开始时的 `session_revision`、`draft_sha256`、材料 ID 与材料 SHA-256、Agent/Skill/模型版本。Agent 实际看到的是固定发布基线与该次运行开始时的会话草稿；运行结果只生成提案批次，绝不直接写草稿；若运行期间会话草稿已变化，批次仍入库，但目标元素已被改动的提案逐条呈现为“已过期”，其余提案仍可接受。固定版本保证读取稳定，网络重试还必须使用 Idempotency-Key、run ID 和 Proposal 内容指纹去重。
 
 V0.1 内置：
 
@@ -573,7 +573,7 @@ UUID、Evidence、Material Object/Link 和 Action 定义不写入 Ossie 标准�
 
 同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
 
-导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须声明 Apache Ossie `0.2.0.dev0` 并通过官方 JSON Schema；存在 OntoFoundry 扩展时还必须声明版本 `2`，映射必须是树形结构，否则整份拒绝。没有 OntoFoundry 扩展的标准 Ossie 树形映射仍可导入。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
+导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须声明 Apache Ossie `0.2.0.dev0` 并通过官方 JSON Schema；存在 OntoFoundry 扩展时，版本必须是 `1` 或 `2`，未知版本整份拒绝。映射按树形读取，扩展 v1 的平铺条目读作根节点的 children；多个根节点只导入第一个，缺少 `relationship` 或重复的字段映射报告后跳过。没有 OntoFoundry 扩展的标准 Ossie 映射同样按此规则导入。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
 
 ### 9.2 内置模型为支持双向翻译新增的字段
 
@@ -604,7 +604,7 @@ V0.1 的本体服务只读：
 - 有 instances:read 权限时，可在详情中查看已发布证据片段；
 - 不可创建 Proposal、修改会话草稿、接受 Proposal 或发布。
 
-模型消费方需要可复现时必须传入 version_id；省略时读取当前版本。所有响应都返回 workspace_id、version_id 和 version_sha256。
+模型消费方需要可复现时必须传入 version_id；省略时读取当前版本。所有响应都返回 workspace_id、version_id、version_content_sha256 和 normalized_snapshot_sha256（迁移期 version_sha256 保留为 version_content_sha256 的别名）。
 
 ### 10.2 REST 服务 API
 
@@ -859,7 +859,7 @@ V0.1 不自动重试模型请求；网络、429、5xx、认证和输入问题都
 - 语义 lint 0 error，warning 清晰展示；
 - 相同快照重复编译得到相同 SHA-256；
 - 工作空间概念中文名和技术名无重复；
-- 每个已发布 Material Object 和 Material Link 都有有效类型和可恢复的来源；
+- 每个已发布 Material Object 和 Material Link 都有有效类型和至少一条来源：材料证据可恢复到不可变材料，人工证据记录录入人和时间；
 - OAuth state/nonce、Cookie、回跳和权限测试通过；
 - Markdown 注入文本不能触发工具或覆盖系统指令；
 - 256 MB Markdown 可流式上传和分块，服务进程不会按文件大小一次性占用等量内存；
