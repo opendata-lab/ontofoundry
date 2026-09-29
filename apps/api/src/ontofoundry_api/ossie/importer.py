@@ -28,7 +28,6 @@ from ontofoundry_api.domain.models import (
 
 from .compiler import (
     EXTENSION_KEY,
-    EXTENSION_VERSION,
     OSSIE_VERSION,
     VALUE_BASES,
     attribute_verbalizations,
@@ -41,8 +40,9 @@ MAX_COMPONENTS = 2000
 # Every extension version this platform has exported. v1 differs from v2 only in
 # laying attribute mappings out flat, which parse_mappings reads as well, so
 # files exported before the bump — and published versions exported from them —
-# still import.
-READABLE_EXTENSION_VERSIONS = ("1", EXTENSION_VERSION)
+# still import. Listed explicitly: bumping EXTENSION_VERSION must not drop
+# the version it replaces.
+READABLE_EXTENSION_VERSIONS = ("1", "2")
 VALUE_KIND_BY_CONCEPT = {name: kind for kind, name in VALUE_BASES.items()}
 MULTIPLICITY_BY_OSSIE = {
     "OneToOne": Multiplicity.ONE_TO_ONE,
