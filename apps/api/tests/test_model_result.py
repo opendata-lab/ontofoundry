@@ -542,6 +542,8 @@ def test_model_prompt_contains_complete_versioned_result_contract():
     assert "原样复用其 technical_name" in prompt
     assert "snake_case" in prompt
     assert "ai_context.ontofoundry.display_names" in prompt
+    assert '"version":"2"' in prompt
+    assert "link_mappings 必须使用树形结构" in prompt
     assert '"customer":"客户"' in prompt
     assert "预览差异后发布" in prompt
 

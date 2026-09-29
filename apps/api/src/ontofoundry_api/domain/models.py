@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -67,6 +67,11 @@ class AttributeDefinition(BaseModel):
     # shared by several attributes — is written back under its own name, so
     # verbalizations that mention it stay valid without being rewritten.
     value_concept: str | None = None
+    # Ossie readings address a named value role as {concept:role}.
+    target_role_name: str | None = Field(default=None, max_length=240)
+    # Keep a file's stated cardinality; None lets the compiler infer it for
+    # attributes created in the editor or in older drafts.
+    multiplicity: Multiplicity | None = None
     # Compiles to a relationship, so it carries the same Ossie fields a
     # relationship does. Empty verbalizes means "generate the standard reading".
     requires: Expressions
@@ -86,6 +91,13 @@ class AttributeDefinition(BaseModel):
             return None
         if len(value) > 240:
             raise ValueError("值概念名称过长")
+        return value
+
+    @field_validator("multiplicity")
+    @classmethod
+    def check_value_multiplicity(cls, value: Multiplicity | None) -> Multiplicity | None:
+        if value not in (None, Multiplicity.ONE_TO_ONE, Multiplicity.MANY_TO_ONE):
+            raise ValueError("属性的基数只能是一对一或多对一")
         return value
 
 
@@ -170,7 +182,7 @@ class LinkTypeDefinition(BaseModel):
 
 
 class OntologyDraft(BaseModel):
-    schema_version: str = "1"
+    schema_version: Literal["1"] = "1"
     workspace_id: UUID
     # Ossie ontology-level `requires`: constraints over the whole population.
     requires: Expressions

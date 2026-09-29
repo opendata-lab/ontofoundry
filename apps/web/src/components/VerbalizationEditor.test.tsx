@@ -82,5 +82,19 @@ describe("自然语言读法", () => {
         value_concept: "sku",
       }),
     ).toBe("sku");
+    expect(
+      valueConcept("material", {
+        ...base,
+        target_role_name: "code_role",
+      }),
+    ).toBe("String:code_role");
+    expect(
+      valueConcept("material", {
+        ...base,
+        identifier: true,
+        value_concept: "sku",
+        target_role_name: "code_role",
+      }),
+    ).toBe("sku:code_role");
   });
 });

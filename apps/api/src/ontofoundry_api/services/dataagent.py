@@ -332,7 +332,10 @@ def build_turn_prompt(
         "当前本体仅用于理解已有命名：保留某个已有概念时必须原样复用其 technical_name；"
         "不要仅为保留旧模型而复制材料未要求的概念。新增技术名统一使用 snake_case，"
         "中文业务空间使用中文显示名并写入 ai_context.ontofoundry.display_names，"
-        "格式如 {\"version\":\"1\",\"display_names\":{\"customer\":\"客户\"}}。\n"
+        '格式如 {"version":"2","display_names":{"customer":"客户"}}。\n'
+        "如需 ontology_mappings，link_mappings 必须使用树形结构：根节点仅含 "
+        "object_mapping 和 children，二元关系或属性映射放在 children 中；"
+        "不要输出旧版顶层直接带 relationship 的平铺节点。\n"
         "你必须把完整的 Apache Ossie 0.2.0.dev0 文档放入以下信封：\n"
         "{\n"
         '  "schema_version": "ontofoundry.model-result/v1",\n'

@@ -24,7 +24,7 @@ OSSIE_VERSION = "0.2.0.dev0"
 # so they ride there under our own key; every other consumer can ignore it, and
 # import works without it.
 EXTENSION_KEY = "ontofoundry"
-EXTENSION_VERSION = "1"
+EXTENSION_VERSION = "2"
 
 VALUE_BASES = {
     ValueKind.STRING: "String",
@@ -74,7 +74,10 @@ def link_verbalizations(
 def attribute_verbalizations(
     attribute: AttributeDefinition, object_key: str, value_concept: str
 ) -> list[str]:
-    return [f"{{{object_key}}}的{attribute.name}是{{{value_concept}}}"]
+    value_role = value_concept + (
+        f":{attribute.target_role_name}" if attribute.target_role_name else ""
+    )
+    return [f"{{{object_key}}}的{attribute.name}是{{{value_role}}}"]
 
 
 PLACEHOLDER_RE = re.compile(r"\{([A-Za-z0-9_:]+)\}")
@@ -142,7 +145,7 @@ def _compile_link_relationship(
     )
     relationship: dict[str, Any] = {
         "name": link.technical_name,
-        "description": link.description or f"{link.name}：{source_key} 到 {target_key}",
+        **({"description": link.description} if link.description else {}),
         "roles": [{"concept": target_key}],
         "verbalizes": verbalizes,
     }
@@ -208,12 +211,18 @@ def compile_ossie(
                     {
                         "concept": value_concept,
                         "type": "ValueType",
-                        "description": attribute.description
-                        or f"{object_type.name}的{attribute.name}",
+                        **(
+                            {"description": attribute.description}
+                            if attribute.description
+                            else {}
+                        ),
                         "extends": [VALUE_BASES[attribute.value_kind]],
                     }
                 )
-            expected = {object_type.technical_name, value_concept}
+            value_role = value_concept + (
+                f":{attribute.target_role_name}" if attribute.target_role_name else ""
+            )
+            expected = {object_type.technical_name, value_role}
             fallback = attribute_verbalizations(
                 attribute, object_type.technical_name, value_concept
             )
@@ -221,7 +230,7 @@ def compile_ossie(
             if attribute.identifier:
                 base_name = VALUE_BASES.get(attribute.value_kind)
                 if base_name:
-                    aliases[base_name] = value_concept
+                    aliases[base_name] = value_role
             verbalizes = _resolve_readings(
                 attribute.verbalizes,
                 expected,
@@ -230,17 +239,28 @@ def compile_ossie(
             )
             relationship: dict[str, Any] = {
                 "name": attribute.technical_name,
-                "description": attribute.description or attribute.name,
-                "roles": [{"concept": value_concept}],
+                **({"description": attribute.description} if attribute.description else {}),
+                "roles": [
+                    {
+                        "concept": value_concept,
+                        **(
+                            {"name": attribute.target_role_name}
+                            if attribute.target_role_name
+                            else {}
+                        ),
+                    }
+                ],
                 "verbalizes": verbalizes,
             }
+            relationship["multiplicity"] = (
+                OSSIE_MULTIPLICITY[attribute.multiplicity]
+                if attribute.multiplicity is not None
+                else "OneToOne"
+                if attribute.identifier and identifier_count == 1
+                else "ManyToOne"
+            )
             if attribute.identifier:
-                relationship["multiplicity"] = (
-                    "OneToOne" if identifier_count == 1 else "ManyToOne"
-                )
                 identifiers.append(attribute.technical_name)
-            else:
-                relationship["multiplicity"] = "ManyToOne"
             if attribute.requires:
                 relationship["requires"] = list(attribute.requires)
             if attribute.derived_by:
@@ -277,7 +297,7 @@ def compile_ossie(
         component: dict[str, Any] = {
             "concept": object_type.technical_name,
             "type": "EntityType",
-            "description": object_type.description or object_type.name,
+            **({"description": object_type.description} if object_type.description else {}),
         }
         if object_type.extends:
             component["extends"] = sorted(

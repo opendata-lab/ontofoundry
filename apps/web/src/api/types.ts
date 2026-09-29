@@ -29,6 +29,8 @@ export type AttributeDefinition = {
   required: boolean;
   identifier: boolean;
   value_concept?: string | null;
+  target_role_name?: string | null;
+  multiplicity?: "one_to_one" | "many_to_one" | null;
   // Ossie relationship fields: constraints, derivations and readings.
   requires?: string[];
   derived_by?: string[];

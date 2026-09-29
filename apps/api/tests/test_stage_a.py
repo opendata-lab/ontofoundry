@@ -264,6 +264,12 @@ def test_database_services_share_actual_rows_and_protect_mapping_export(
         headers=mapping_headers,
     ).json()["result"]["structuredContent"]
     assert complete["ontology_mappings"]
+    assert complete["ai_context"]["ontofoundry"]["version"] == "2"
+    concept_mappings = complete["ontology_mappings"][0]["concept_mappings"]
+    mapped = next(item for item in concept_mappings if item.get("link_mappings"))
+    root = mapped["link_mappings"][0]
+    assert "relationship" not in root
+    assert root["children"]
     assert "redacted_fields" not in complete
     assert client.get(SERVICE + "/objects", headers=mapping_headers).status_code == 403
 

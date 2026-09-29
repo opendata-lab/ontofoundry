@@ -91,10 +91,12 @@
             ],
             "link_mappings": [
               {
-                "relationship": "customer_id",
                 "object_mapping": {
                   "expression": "customer.id"
-                }
+                },
+                "children": [
+                  {"relationship": "customer_id", "object_mapping": {"expression": "customer.id"}}
+                ]
               }
             ]
           }
@@ -103,7 +105,7 @@
     ],
     "ai_context": {
       "ontofoundry": {
-        "version": "1",
+        "version": "2",
         "display_names": {
           "customer": "客户",
           "sales_order": "销售订单"
