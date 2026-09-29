@@ -723,40 +723,72 @@ def test_import_refuses_documents_that_are_not_valid_ossie():
         )
 
 
-def test_import_rejects_old_flat_mappings_even_with_current_extension():
-    draft = mapped_draft()
+def v1_export(draft):
+    """The layout extension v1 exported: attribute columns flat, no object root."""
     document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
-    mapping = document["ontology_mappings"][0]["concept_mappings"][0]
-    mapping["link_mappings"] = mapping["link_mappings"][0]["children"]
+    document["ai_context"]["ontofoundry"]["version"] = "1"
+    for entry in document["ontology_mappings"]:
+        for mapping in entry["concept_mappings"]:
+            if mapping.get("link_mappings"):
+                mapping["link_mappings"] = mapping["link_mappings"][0]["children"]
+    return document
 
-    with pytest.raises(OssieImportError, match="MAPPING_FORMAT_UNSUPPORTED"):
-        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+def mapping_view(mappings):
+    return sorted(
+        (m["table_name"], m["key_column"], sorted(m["fields"].items()))
+        for m in mappings
+    )
 
 
-def test_import_rejects_ambiguous_mapping_trees():
+def test_extension_v1_files_with_flat_mappings_still_import():
+    draft = mapped_draft()
+    payload, report = import_ossie(
+        v1_export(draft), workspace_id=str(draft.workspace_id), mode="replace"
+    )
+
+    expected = draft.model_dump(mode="json")["mappings"]
+    assert mapping_view(payload["mappings"]) == mapping_view(expected)
+    assert report["skipped"] == []
+    # Re-exporting the imported model writes the current tree layout.
+    again = compile_ossie(
+        OntologyDraft.model_validate(payload), ontology_name="mfg", ontology_description="制造"
+    )
+    assert again["ai_context"]["ontofoundry"]["version"] == "2"
+    assert all(
+        "relationship" not in root
+        for entry in again["ontology_mappings"]
+        for mapping in entry["concept_mappings"]
+        for root in mapping.get("link_mappings") or []
+    )
+
+
+def test_ambiguous_mapping_trees_are_reported_not_rejected():
     draft = mapped_draft()
     document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
     mapping = document["ontology_mappings"][0]["concept_mappings"][0]
     root = mapping["link_mappings"][0]
     mapping["link_mappings"].append(json.loads(json.dumps(root)))
-    with pytest.raises(OssieImportError, match="最多支持一个对象映射根节点"):
-        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
-
-    mapping["link_mappings"].pop()
     root["children"].append(json.loads(json.dumps(root["children"][0])))
-    with pytest.raises(OssieImportError, match="重复映射"):
-        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+    root["children"].append({"object_mapping": {"expression": "x.y"}})
+
+    payload, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), mode="replace"
+    )
+
+    expected = draft.model_dump(mode="json")["mappings"]
+    assert mapping_view(payload["mappings"]) == mapping_view(expected)
+    reasons = " ".join(item["reason"] for item in report["skipped"])
+    assert "只导入第一个" in reasons
+    assert "只保留第一个" in reasons
+    assert "缺少 relationship" in reasons
 
 
-def test_import_rejects_old_extension_version():
+def test_import_rejects_unknown_extension_versions():
     draft = mapped_draft()
     document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
-    document["ai_context"]["ontofoundry"]["version"] = "1"
+    document["ai_context"]["ontofoundry"]["version"] = "9"
 
-    with pytest.raises(OssieImportError, match="ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED"):
-        import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
-
-    del document["ontology_mappings"]
     with pytest.raises(OssieImportError, match="ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED"):
         import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
 
@@ -804,28 +836,22 @@ def test_import_endpoint_rejects_invalid_files(client):
     assert "导入失败" in response.json()["detail"]
 
 
-def test_import_endpoint_reports_unsupported_versions_and_flat_mappings(client):
-    document = compile_ossie(
-        mapped_draft(), ontology_name="mfg", ontology_description="制造"
-    )
-    old_extension = json.loads(json.dumps(document))
-    old_extension["ai_context"]["ontofoundry"]["version"] = "1"
+def test_import_endpoint_accepts_v1_and_reports_unknown_extension_versions(client):
+    draft = mapped_draft()
     response = client.post(
         ROOT + "/imports/ossie",
-        json={"document": old_extension, "mode": "replace"},
+        json={"document": v1_export(draft), "mode": "replace"},
+    )
+    assert response.status_code == 201, response.text
+
+    unknown = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    unknown["ai_context"]["ontofoundry"]["version"] = "9"
+    response = client.post(
+        ROOT + "/imports/ossie",
+        json={"document": unknown, "mode": "replace"},
     )
     assert response.status_code == 422
     assert "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED" in response.json()["detail"]
-
-    old_flat = json.loads(json.dumps(document))
-    mapping = old_flat["ontology_mappings"][0]["concept_mappings"][0]
-    mapping["link_mappings"] = mapping["link_mappings"][0]["children"]
-    response = client.post(
-        ROOT + "/imports/ossie",
-        json={"document": old_flat, "mode": "replace"},
-    )
-    assert response.status_code == 422
-    assert "MAPPING_FORMAT_UNSUPPORTED" in response.json()["detail"]
 
 
 def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
@@ -1015,3 +1041,14 @@ def test_internal_draft_rejects_unknown_schema_version():
     payload["schema_version"] = "2"
     with pytest.raises(ValidationError, match="schema_version"):
         OntologyDraft.model_validate(payload)
+
+
+def test_value_concept_description_that_differs_is_reported():
+    draft = mapped_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    value = next(c for c in document["ontology"] if c.get("type") == "ValueType")
+    value["description"] = "值概念自己的说明"
+
+    _, report = import_ossie(document, workspace_id=str(draft.workspace_id), mode="replace")
+
+    assert any(value["concept"] in note and "描述" in note for note in report["notes"])
