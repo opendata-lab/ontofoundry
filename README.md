@@ -5,6 +5,7 @@ OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markd
 当前已进入正式代码实现：React + TypeScript 前端、FastAPI 后端，保留 HTML 原型作为历史参考。只维护一份权威设计：
 
 - [平台完整设计](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md)
+- [Proposal-first 本体生命周期实施设计](./docs/design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md)：供实施智能体执行的稳定元素 ID、提案状态机、Rule/Action、材料与映射实例、版本固定、三方合并、迁移和验收合同。
 - [原型参考与分阶段产品补充](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md#prototype-supplement)：七张参考图、与现有实现的对应关系，以及基线补齐 → 业务 Skill → 探索与智能体的需求。阶段 A 的实施与验收记录见同一文档第 17.12 节，阶段 B/C/D 仍为后续设计。
 - [接入 DataAgent Conversation SDK](./docs/design/2026-09-21-dataagent-conversation-sdk-integration-design.md)：三方边界、BFF 会话协议、建模结果回写、迁移与发布顺序。
 - [DataAgent 集成包](./integrations/dataagent/README.md)：在外部 DataAgent 上安装 Skill、创建 Agent、配置站点密钥的步骤。
@@ -37,7 +38,7 @@ make web-dev
 
 - 本体视图、对象/关系目录、详情和人工编辑；对象五步编辑，关系字段映射。语义图谱只画业务对象和它们之间的关系与继承，属性是对象的字段，由卡片计数和详情面板呈现，不画成节点。
 - 建模工作台三栏布局：Markdown 材料、DataAgent 通用对话、新版本草稿/语义图谱。明确点击“开始建模”后才抽取；回答通过 AgentEvent SSE 增量展示并安全渲染 Markdown。
-- 每次自动建模产出完整 Ossie 快照并整体写入新版本草稿，不与旧草稿逐项合并；用户在交付页预览版本差异后显式发布，历史版本保持可追溯。
+- 当前自动建模仍以完整 Ossie 快照整体写入会话草稿，这是待替换的过渡实现；目标流程改为 Proposal-first，用户逐项接受/拒绝后才进入草稿，再经三方合并和显式发布形成新版本。实施合同见上方独立设计文档。
 - Apache Ossie JSON 导入导出：内置模型已按 Ossie 扩展（继承、标识关系、requires/derived_by、verbalizes），本平台导出的文件重新导入得到同一个模型，外部文件导入后仍可编译回合法 Ossie。导入先过官方 Schema，可合并或替换，生成建模草稿并逐条报告仍装不下的构造（一元/n 元关系、指向 Any 的关系、计算列映射），发布仍是单独操作。完整对照见设计文档第 9.1、9.2 节。
 - 文档实例详情与 1–3 跳关系；数据库只读预览、实例详情及同连接等值 Join 邻域。数据库行不全量同步。
 - 本体视图增加业务/技术阅读与同版本 Ossie JSON；对象、属性、关系和空间约束可编辑，发布前可查看标准定义与结构化 Diff，历史版本按 UUID 对齐比较。

@@ -7,6 +7,8 @@
 > 自动建模结果使用 `mode="replace"` 原子写入会话草稿，用户在交付页预览差异后发布；
 > 本文中标为“原候选计划（已停用）”的内容仅保留实施历史。
 
+> **2026-09-26 后续实施边界：** 本计划记录已经完成的 Conversation SDK 与完整快照过渡实现，不得继续用它实施新的本体生命周期。Proposal-first、稳定元素 ID、Rule/Action 一等化、材料/映射实例区分以及发布双重乐观锁，统一按 [Proposal-first 本体生命周期实施设计](../design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) 执行。新实现完成前保留本计划描述的读取兼容路径，切换后停止生成 `ontofoundry.model-result/v1` 完整替换结果。
+
 ## 跨仓库前置依赖
 
 | 本计划的任务 | 依赖上游 | 说明 |
