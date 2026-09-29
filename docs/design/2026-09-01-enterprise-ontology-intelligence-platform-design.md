@@ -2,7 +2,7 @@
 
 <!-- Hallmark · pre-emit critique: P5 H5 E4 S5 R5 V5 · genre: modern-minimal · macrostructure: Workbench · tone: technical/restrained/trustworthy · slop: pass for design specification; rendered implementation gates remain acceptance work -->
 
-> 修订日期：2026-09-09
+> 修订日期：2026-09-26
 >
 > 状态：唯一需求、产品、交互与架构基线  
 > 本仓库不再维护精益版或平行设计；范围变化直接修订本文。
@@ -10,7 +10,7 @@
 > 第 1–16 节描述 V0.1 基线，第 17 节记录实现证据，第 18 节收录七张原型参考及分阶段需求，第 19 节定义 Python 控制面与开源 Pi 数据面的目标架构和实施合同。
 > 阶段 A 已实施，生产联调仍有独立门槛；B0、B、C、D 均为待实现设计。第 19 节是后续架构的准则，不表示 Pi 已接入。
 
-阅读入口：[现有实现与验证](#implementation-status) · [七张原型与产品需求](#prototype-supplement) · [Python / Pi 完整架构](#pi-control-data-plane) · [分阶段实施与回滚](#pi-delivery-plan)。
+阅读入口：[Proposal-first 生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) · [现有实现与验证](#implementation-status) · [七张原型与产品需求](#prototype-supplement) · [Python / Pi 完整架构](#pi-control-data-plane) · [分阶段实施与回滚](#pi-delivery-plan)。
 
 ## 1. 结论先行
 
@@ -23,9 +23,9 @@ Markdown / 数据库结构
         ↓
 通用 Agent 对话与概念澄清
         ↓
-Object、Link、Object Type、Link Type、属性、规则、约束和映射候选
+Object、Link、Object Type、Link Type、Property、Rule、Action 和 Mapping Proposal
         ↓
-候选确认 + 人工编辑 + 来源证据
+Proposal 接受/拒绝 + 人工编辑 + 来源证据
         ↓
 本体图 / 实例图 / Diff / 严格校验
         ↓
@@ -40,7 +40,7 @@ Object、Link、Object Type、Link Type、属性、规则、约束和映射候�
 
 技术发布门槛是：生成的 Apache Ossie JSON 语法正确、通过固定版本的官方 JSON Schema，且语义 lint 没有 error。warning 必须展示但不阻塞发布。通过校验只说明结构与可确定引用正确，不代表业务语义必然正确。
 
-首期验收把“能发布合法 JSON”作为硬退出条件，把“产品经理是否能独立完成”作为产品成功条件：用户无需理解 Ossie 术语，即可从 Markdown 形成有来源的候选，修正草稿，发布版本，并让应用通过 REST 或 MCP 读取同一份结果。
+首期验收把“能发布合法 JSON”作为硬退出条件，把“产品经理是否能独立完成”作为产品成功条件：用户无需理解 Ossie 术语，即可从 Markdown 形成有来源的 Proposal，接受或拒绝后修正草稿，发布版本，并让应用通过 REST 或 MCP 读取同一份结果。
 
 ## 2. 产品边界
 
@@ -51,7 +51,7 @@ V0.1 不保留“项目”“业务域”“子图”等长期实体。一个工
 ~~~text
 工作空间（隔离与名称唯一性边界）
 ├── 一张本体模型图
-├── 文档原生实例与事实
+├── 材料实例、结构化数据映射与来源证据
 ├── 数据库连接与本体映射
 ├── Markdown 材料库
 ├── 多个独立的 Agent 建模会话
@@ -59,27 +59,34 @@ V0.1 不保留“项目”“业务域”“子图”等长期实体。一个工
 └── REST API / MCP 服务配置
 ~~~
 
-每个建模会话从一个已发布版本出发，拥有独立对话、候选区和会话草稿。不同会话互不覆盖；发布时与工作空间最新版本执行三方结构化合并。发布成功后，会话基线自动推进到新版本，用户可继续在原对话中增量建模。
+每个建模会话从一个已发布版本出发，拥有独立对话、Proposal 区和会话草稿。不同会话互不覆盖；发布时与工作空间最新版本执行三方结构化合并。发布成功后，会话基线自动推进到新版本，用户可继续在原对话中增量建模。
 
-### 2.2 四层对象模型
+### 2.2 本体元素清单
 
-| 模型层 | 实例层 | OntoFoundry 责任 |
+| 元素 | 责任 | 版本与提案边界 |
 |---|---|---|
-| Object Type | Object | 定义实体类型，并保存或查询其具体对象 |
-| Link Type | Link | 定义关系类型，并保存或查询对象之间的具体关系 |
+| Object Type | 定义业务对象类型 | 一等元素，可新增、修改、删除 |
+| Property | 定义 Object Type 的属性 | 一等元素，有独立稳定 UUID，不以数组位置识别 |
+| Link Type | 定义 Object Type 之间有方向的二元关系 | 一等元素，可新增、修改、删除 |
+| Rule | 定义约束或派生表达式 | 一等元素，但必须通过 `owner_kind`、`owner_id` 归属具体 Object Type、Property、Link Type 或 Action；首期不设计 Workspace Rule 或通用 scope 体系 |
+| Action | 定义可对业务对象执行的动作合同 | 一等定义元素；Action 执行记录不进入本体版本，执行引擎仍属后续能力 |
+| Material Object / Link | 从已保存材料抽取并经用户确认的事实 | 可作为提案，接受后进入草稿并随空间版本保存 |
+| Mapping | Object Type、Property、Link Type 与结构化数据集、字段、键、Join 的映射 | 可作为提案并随空间版本保存；不包含连接凭据 |
 
-Apache Ossie 主要承载 Object Type、Link Type、属性、规则、约束和 ontology mappings。OntoFoundry 补充中文显示名、稳定 UUID、标签、Object、Link、来源证据和版本信息。
+Apache Ossie 主要承载 Object Type、Link Type、Property、Rule 和 ontology mappings。OntoFoundry 补充中文显示名、稳定 UUID、标签、Action 定义、Material Object / Link、来源证据和版本信息。上述元素的 `kind` 创建后不可原地改变；把一种元素改成另一种元素必须表现为删除旧 ID、创建新 ID。
 
 V0.1 的 Link Type 是有方向的二元关系，产品层只要求“起点 Object Type、关系名称、终点 Object Type 和基数”。同一类型自关联时可在高级区命名两端角色。需要三个及以上参与方的事实先建模为一个 Object Type，再用多个二元 Link Type 连接；V0.1 不提供独立的 n 元关系编辑器。
 
-### 2.3 两类彼此独立的实例
+### 2.3 材料实例与映射实例
 
 | 实例来源 | 形成方式 | 存储与版本 | 用途 |
 |---|---|---|---|
-| 文档原生实例 | 从 Markdown 抽取 Object 和 Link，经用户确认 | 保存于 OntoFoundry，随空间版本发布 | 从实例归纳本体；没有数据映射时仍可浏览实例 |
-| 数据映射实例 | 按 Object Type、属性、Link Type 到数据源、表、字段、主键、Join 的映射查询 | 不复制业务行，只版本化映射；映射不含连接凭据 | 实时查看数据库中已有实例及关系 |
+| Material Object / Link | 从已上传并保存的非结构化材料抽取，经用户确认 | 保存于 OntoFoundry，携带 Material Evidence，随空间版本发布 | 从事实归纳本体；没有数据映射时仍可浏览和追溯 |
+| Mapped Object / Link | 按 Object Type、Property、Link Type 到数据源、表、字段、主键、Join 的 Mapping 动态查询 | 不复制业务行，不逐条形成提案；只版本化 Mapping 和必要的稳定行引用 | 实时查看结构化数据中的实例及关系 |
 
-两类实例可以在同一实例画布中展示，但通过来源样式区分，不自动做实体融合，也不把文档事实写回业务数据库。
+两类实例共享 Object / Link 的查询与展示协议，但在存储、版本和界面上必须明确区分 Material 与 Mapped 来源。两类实例可以在同一实例画布中展示，不自动做实体融合，也不把材料事实写回业务数据库。同一现实对象同时出现在材料和数据库中时，在明确建立身份绑定前保持为两个实例；首期不通过名称或模型相似度自动判同一实体。
+
+Material Evidence 是来源绑定，不是与 Object Type、Rule 平级的本体元素。它至少保存 `material_id`、材料内容 SHA-256、标题或页段定位、行号和短原文。被提案、草稿或已发布版本引用的原始材料必须不可变保留；版本保存材料引用清单而不是重复复制大文件。未被引用的材料才可按保留策略物理清理。
 
 ### 2.4 明确不做
 
@@ -91,14 +98,14 @@ V0.1 不做：
 - 跨数据库连接 Join 或联邦查询；
 - 审核流、发布审批、领域负责人或细粒度对象权限；
 - Skill 市场、用户自定义 Skill 和第三方脚本沙箱；
-- Action、Event、Automation、App 和工作流执行；
+- Action 执行、Event、Automation、App 和工作流执行；Action 定义可以建模和版本化，但不会因发布而自动获得执行能力；
 - 多模型路由、外部模型回退、向量数据库和 GraphRAG；
 - Git 仓库式版本存储、Redis、Celery、Kafka 和微服务；
 - 局部发布、项目级发布或子图独立版本；
 - API/MCP 反馈箱、使用分析系统或自动反向建模；
 - 手机端或窄屏完整建模；
 - 自助回滚已发布版本；
-- 通过 API 或 MCP 直接修改草稿、绕过候选确认或自动发布。
+- 通过 API 或 MCP 直接修改草稿、绕过 Proposal 决策或自动发布。
 
 ### 2.5 后续产品扩展的衔接
 
@@ -115,12 +122,12 @@ V0.1 不做：
 | 身份 | 能力 |
 |---|---|
 | 已登录非成员 | 查看工作空间目录和其他空间已发布的本体模型 |
-| 空间成员 | 查看本空间材料、文档实例、映射与实例图；创建会话、建模、编辑和发布 |
+| 空间成员 | 查看本空间材料、Material/Mapped 实例、映射与实例图；创建会话、建模、编辑和发布 |
 | 空间管理员 | 拥有成员全部能力，并可管理成员、数据连接和空间设置 |
 
 一个用户可加入和切换多个工作空间。任何通过内网 OAuth 登录的用户都可以创建空间并自动成为管理员。V0.1 不设置平台管理员。
 
-为防止实例数据泄露，非成员不能查看材料、会话、草稿、文档实例、数据映射、数据库连接或实例图谱。
+为防止实例数据泄露，非成员不能查看材料、会话、草稿、Material/Mapped 实例、数据映射、数据库连接或实例图谱。
 
 ### 3.2 OAuth
 
@@ -144,26 +151,28 @@ V0.1 不做：
 | 中文业务名 | UI、搜索、图谱和 Agent 对话 | 通过描述保留业务含义，不作为标识 |
 | ASCII 技术名 | concept、relationship 和表达式引用 | 是 |
 
-Object Type 和 Link Type 的中文业务名、ASCII 技术名在工作空间内分别全局唯一。比较前进行 Unicode 规范化、去首尾空白，并对 ASCII 技术名做不区分大小写的冲突检查。
+Object Type、Link Type、Property、Rule、Action、Material Object / Link 和 Mapping 都使用稳定内部 UUID。Object Type 和 Link Type 的中文业务名、ASCII 技术名在工作空间内分别全局唯一。比较前进行 Unicode 规范化、去首尾空白，并对 ASCII 技术名做不区分大小写的冲突检查。
 
 模型项首次发布后仍允许修改技术名。内部 UUID 不变，平台同步更新可确定引用，Diff 标记重命名及影响范围，发布前重新校验。
+
+稳定身份是 `(workspace_id, element_id)`；历史版本中的一个确定状态由 `(workspace_id, version_id, element_id)` 唯一定位。`version_id` 变化只表示快照变化，不表示产生了另一个逻辑对象。三方合并先用稳定 `element_id` 判断是否为同一对象，再比较基线、最新版本和会话草稿的内容；不能用名称、数组位置或版本 ID 代替对象身份。不同 ID 但技术名相同属于唯一性或语义重复冲突，不等于双方修改了同一个对象。
 
 ### 4.2 唯一性范围
 
 - Object Type、Link Type 的中文名和技术名：工作空间当前状态分别全局唯一；不同空间可同名；
-- 属性名：只需在所属 Object Type 内唯一，以 ObjectType.property 形成限定名；
+- Property 名：只需在所属 Object Type 内唯一，以 ObjectType.property 形成限定名；
 - Link Type 的端点角色名：只需在该 Link Type 内唯一；
 - 历史版本不参与当前名称冲突判断；
-- 精确同名候选识别为已有概念，只产生补充或修改候选；
-- 语义相似但名称不同的候选提示合并，不自动合并；
+- 精确同名 Proposal 识别为已有概念，只产生 update Proposal；
+- 语义相似但名称不同的 Proposal 提示可能重复，不自动合并；
 - 草稿可暂存冲突，但必须标红且不能发布；
 - 发布事务再次检查唯一性，不能只依赖前端。
 
 ### 4.3 实例身份
 
-每个已发布 Object 必须绑定一个 Object Type，每个 Link 必须绑定一个 Link Type。若只从材料抽到实例，Agent 必须进一步提出 Object Type、Link Type 或属性候选，并保留实例到类型的绑定。
+每个已发布 Object 必须绑定一个 Object Type，每个 Link 必须绑定一个 Link Type。若只从材料抽到实例，Agent 必须进一步提出 Object Type、Link Type 或 Property Proposal，并保留实例到类型的绑定。
 
-文档 Object 使用内部 UUID 和业务标识；数据库 Object 使用数据连接、数据集和标识字段值组成稳定引用。V0.1 不自动判断文档 Object 与数据库 Object 是否为同一现实对象。
+Material Object 使用内部 UUID 和业务标识；Mapped Object 使用 Mapping、数据集和标识字段值组成稳定引用。V0.1 不自动判断 Material Object 与 Mapped Object 是否为同一现实对象。
 
 ## 5. 输入、证据与 Agent
 
@@ -183,13 +192,17 @@ Markdown 是待分析数据，不是 Agent 指令。文档中即使出现“忽�
 
 ### 5.2 通用 Agent 对话
 
-中间区域是通用工作空间 Agent，不是固定向导。默认只读解释：说明概念、回答材料问题、查找已发布本体、解释校验错误。只有用户明确表达“开始建模”“把这些内容加入本体”“修改某概念”等意图时，才启动候选生成。
+中间区域是通用工作空间 Agent，不是固定向导。默认只读解释：说明概念、回答材料问题、查找已发布本体、解释校验错误。只有用户明确表达“开始建模”“把这些内容加入本体”“修改某概念”等意图时，才启动 Proposal 生成。
 
-Agent 的模型修改始终先进入候选区，不直接改变会话草稿，更不能自动发布。
+Agent 的模型修改始终先形成不可变 Proposal Item，不直接改变会话草稿，更不能自动发布。一次建模运行产生一个 Proposal Batch，其中可以包含多条相互依赖的新增、修改或删除提案。
+
+创建建模会话时固定 `workspace_id`、`base_version_id` 和发布快照 SHA-256，并以该版本初始化会话草稿。Agent 获取本体上下文时必须通过本体 MCP 显式读取这个 Workspace 的指定 `version_id`，不能在运行过程中使用动态 `latest`。MCP 响应同时返回 `workspace_id`、`version_id` 和 `version_sha256`，服务端拒绝模型越过会话绑定自行选择其他空间或版本。
+
+每一次建模运行还固定开始时的 `session_revision`、`draft_sha256`、材料 ID 与材料 SHA-256、Agent/Skill/模型版本。Agent 实际看到的是固定发布基线与该次运行开始时的会话草稿；若运行结束前会话 revision 已变化，旧结果只能标记为 stale，不能写入当前提案或草稿。固定版本保证读取稳定，网络重试还必须使用 Idempotency-Key、run ID 和 Proposal 内容指纹去重。
 
 V0.1 内置：
 
-- md2ossie：从材料生成保守的 Apache Ossie 候选，并执行官方 Schema 与语义 lint；
+- md2ossie：从材料生成保守的结构化 Proposal，并执行官方 Schema 与语义 lint；
 - ontology-clarifier：借鉴 grill-me 的逐步澄清方式，每次只追问一个高价值问题，将不确定信息转为待澄清项。
 
 Skill 随应用版本只读发布。每次任务记录 Skill 版本、模型和输入来源。V0.1 不提供安装、编辑或执行用户 Skill 的入口。
@@ -201,9 +214,9 @@ Skill 随应用版本只读发布。每次任务记录 Skill 版本、模型和�
 ~~~text
 Markdown
   ↓
-抽取 Object / Link 候选及证据
+抽取 Material Object / Link Proposal 及证据
   ↓
-聚类、比较与归纳 Object Type / Link Type / 属性候选
+聚类、比较与归纳 Object Type / Link Type / Property Proposal
   ↓
 复用已有类型，或提出新类型
   ↓
@@ -214,21 +227,25 @@ Markdown
 
 例如材料陈述“供应商 A 提供产品 B”：平台提出“供应商 A”和“产品 B”两个 Object、“供应商”和“产品”两个 Object Type、“提供”Link 及对应 Link Type，并保留类型绑定和原文证据；已有类型直接复用。
 
-### 5.4 候选与人工编辑
+### 5.4 Proposal 与人工编辑
 
-候选单位包括：
+Proposal Item 的目标种类限定为：
 
-- Object Type、Link Type、属性、规则、约束；
-- 文档 Object、Link 及类型绑定；
-- 数据映射；
-- 重命名、删除和近义概念合并建议；
-- 待澄清事项。
+- Object Type、Property、Link Type、Rule、Action；
+- Material Object、Material Link 及类型绑定；
+- Mapping；
+- 以上元素的新增、修改、删除；
+- 不写入草稿的待澄清事项。
 
-每项显示业务解释、结构化 Diff、影响对象以及文件、标题、行号和原文片段。首次生成可“一键接受全部无冲突项”；后续增量默认逐项接受，也支持按类型或来源批量接受。被忽略项保留，可恢复。
+每个 Proposal Item 至少保存 `proposal_id`、来源 run、生成时的 session revision 与草稿 SHA-256、operation、target kind、稳定 target ID、before、after、字段级变化、目标内容哈希、证据和依赖关系。Proposal 生成后不可原地改写；新的 Agent 结果产生新 Proposal，并可把旧 Proposal 标记为 superseded。状态包括 pending、accepted、rejected、stale、conflict 和 superseded。
+
+每项显示业务解释、结构化 Diff、影响对象以及文件、标题、行号和原文片段。首次生成可“一键接受全部无冲突项”；后续增量默认逐项接受，也支持按类型或来源批量接受。被拒绝项保留，可恢复或由新提案取代。依赖新 Object Type 的 Link Type、依赖新 Property 的 Rule 等组合必须按依赖组原子接受，不能产生悬空引用。
+
+接受 Proposal 时在一个事务中比较 session revision 与目标内容哈希，应用新增、修改或删除，检查引用和唯一性，写入会话草稿，将 revision 加一并记录 accepted 决策。同一个幂等键重复接受返回已完成结果；提案生成后目标已被人工或其他提案修改时返回 stale/conflict，不得覆盖。拒绝 Proposal 不修改草稿。
 
 用户可绕过 Agent，直接在表单或图谱检查器中新增、修改和删除。人工编辑直接进入会话草稿并触发增量校验。
 
-信息不足的规则留在“待澄清事项”，不写入 Ossie JSON，也不阻塞发布；发布页只显示未决候选和 warning 数量，不计算“材料陈述覆盖率”。确定性的 JSON 语法、Schema、引用、类型、名称和映射错误必须阻塞。
+Rule 是一等对象并拥有稳定 ID，但首期只允许通过 `owner_kind`、`owner_id` 归属具体 Object Type、Property、Link Type 或 Action；不引入 Workspace Rule、独立 ontology constraint 或通用 scope 抽象。信息不足的规则留在“待澄清事项”，不写入 Ossie JSON，也不阻塞发布；发布页只显示未决 Proposal 和 warning 数量，不计算“材料陈述覆盖率”。确定性的 JSON 语法、Schema、引用、类型、名称和映射错误必须阻塞。
 
 ### 5.5 后台任务
 
@@ -257,9 +274,9 @@ V0.1 直接连接：
 实例图谱是独立页面。用户可以：
 
 1. 选择 Object Type；
-2. 按数据库映射或文档实例搜索中心 Object；
+2. 按结构化数据 Mapping 或 Material Object 搜索中心 Object；
 3. 按已发布 Link Type 展开一到三跳已有 Link；
-4. 在同一画布查看文档原生实例和数据库映射实例；
+4. 在同一画布查看 Material 与 Mapped Object/Link；
 5. 打开节点或边，查看类型、属性、数据集/字段或文档证据。
 
 数据库事实使用实线，文档事实使用点线；颜色之外同时显示来源图标和文字。V0.1 不自动融合两种来源，也不执行 derived_by 生成新 Link。
@@ -276,7 +293,7 @@ V0.1 直接连接：
 2. 业务对象：Object Type 目录，以及对象详情、编辑、实例列表和实例详情的钻取入口；
 3. 本体关系：Link Type 目录，以及关系详情、方向、基数和映射编辑；
 4. 数据映射：Markdown 材料、数据库连接、数据集选择、对象映射和关系映射；
-5. 本体自动构建：三栏工作台、建模会话和候选确认；
+5. 本体自动构建：三栏工作台、建模会话和 Proposal 决策；
 6. 空间设置：成员和空间配置。
 
 “本体详情”“实例列表”“实例详情”是从业务对象进入的二级页面，不额外占用一级导航；用户始终可通过面包屑返回对象目录。数据映射既有独立入口，也会在对象或关系详情中以页签展示当前对象的局部映射，两处编辑同一份草稿数据。
@@ -306,7 +323,7 @@ V0.1 直接连接：
 
 本体视图只显示当前已发布版本，避免把草稿误认为企业标准。页面内部提供“全局”和“语义视图”两个页签，默认进入全局。两者使用同一份已发布模型，不形成两套本体，但必须使用不同的呈现方式，不能只改标题或叠一张统计卡。
 
-全局沿用参考图“左侧层级索引 + 右侧透视层板”的布局，按本平台已确定的能力展示四层：服务层（REST API / MCP）、语义模型层（业务对象 / 本体关系 / 属性）、实例与证据层（文档实例 / 实例关系 / 来源材料）、数据映射层（已发布对象映射）。这是同一模型的阅读视角，不新增业务层存储、审批或执行引擎。服务名称表示提供的接口方式，不表示连接已启用或有调用流量；数据库实例按需查询，不编造全库实例数量。语义视图则是独立的二维 TBox 关系图。
+全局沿用参考图“左侧层级索引 + 右侧透视层板”的布局，按本平台已确定的能力展示四层：服务层（REST API / MCP）、语义模型层（业务对象 / 本体关系 / Property）、实例与证据层（Material Object / Link / 来源材料）、数据映射层（已发布 Mapping）。这是同一模型的阅读视角，不新增业务层存储、审批或执行引擎。服务名称表示提供的接口方式，不表示连接已启用或有调用流量；Mapped 实例按需查询，不编造全库实例数量。语义视图则是独立的二维 TBox 关系图。
 
 全局左侧显示同一已发布快照的真实总数，右侧显示有限节点预览及已有的关系和映射连线。无实例或映射时保留空层并明确提示，不填充演示节点；非成员的实例和映射层显示“仅空间成员可见”，不能用 0 冒充无数据。选层可聚焦并进入相应业务入口，选本体节点打开详情检查器；支持缩放和适配。概览不受语义视图的标签和搜索影响。
 
@@ -325,7 +342,7 @@ V0.1 直接连接：
 
 左侧不是第二套导航，而是当前查询的图例、数量和匹配结果；没有搜索和筛选时默认折叠。右侧检查器由节点或边选择触发，未选择时不保留空白面板，让画布获得空间。标签只改变筛选和着色，不制造“子图”概念。
 
-“语义视图”只呈现 TBox，不混入任何 Object、Link、数据库表或文档实例。画布上的节点只有 Object Type，边只有 Link Type 与继承；Value Type 是 Object Type 的字段，和规则、约束、映射一样属于检查器内容，不画成节点。属性画成节点会让画布的节点数翻三到四倍，把业务结构埋掉，而读者真正要看的是对象之间的关系。卡片右上角的计数和检查器里的属性列表负责回答“这个对象有多少属性、分别是什么”。全局中的实例、映射节点仅作成员可见的已发布预览；完整内容仍进入实例详情、独立实例图谱或对象映射页查看。
+“语义视图”只呈现 TBox，不混入任何 Object、Link、数据库表或 Material/Mapped 实例。画布上的节点只有 Object Type，边只有 Link Type 与继承；Value Type 是 Object Type 的字段，和 Rule、Action、Mapping 一样属于检查器内容，不画成节点。Property 画成节点会让画布的节点数翻三到四倍，把业务结构埋掉，而读者真正要看的是对象之间的关系。卡片右上角的计数和检查器里的 Property 列表负责回答“这个对象有多少属性、分别是什么”。全局中的实例、Mapping 节点仅作成员可见的已发布预览；完整内容仍进入实例详情、独立实例图谱或对象映射页查看。
 
 核心操作：
 
@@ -354,25 +371,25 @@ V0.1 直接连接：
 
 左栏上半区是会话列表，下半区是本会话材料。新建会话必须选择基线版本，默认最新已发布版本；没有版本时显示“空白基线”。材料通过上传、搜索和复选加入本次上下文，文件名旁显示处理状态、大小和是否已选。点击材料在右侧临时打开只读证据预览，不挤占对话区。
 
-中栏默认是通用对话，保留明确的“开始建模”操作；运行时显示任务状态。不常驻展示内部 Skill 名、方法论名或“对话澄清，明确后开始建模”等重复说明，内部实现只在设置或技术文档中说明。用户明确要求开始或修改本体后，Agent 先复述目标和所选材料；只有高影响歧义才一次追问一个问题，其余不确定项生成待澄清候选。任务卡显示排队、运行、等待回答、完成、失败或取消；关闭页面后重开可继续。
+中栏默认是通用对话，保留明确的“开始建模”操作；运行时显示任务状态。不常驻展示内部 Skill 名、方法论名或“对话澄清，明确后开始建模”等重复说明，内部实现只在设置或技术文档中说明。用户明确要求开始或修改本体后，Agent 先复述目标和所选材料；只有高影响歧义才一次追问一个问题，其余不确定项生成待澄清事项。任务卡显示排队、运行、等待回答、完成、失败或取消；关闭页面后重开可继续。
 
-右侧是主工作区，默认打开最近一次会话的“本体模型”，已有结果时直接展示，不要求用户重新执行建模。固定页签只保留“本体模型”和“语义图谱概览”：前者用同一列表承载候选、已接受草稿、待澄清和冲突状态，并在条目内展开结构化差异、文档实例、来源证据与数据库映射建议；后者只预览本次 Object Type、Value Type 与 Link Type 的语义影响，不显示实例或物理表。
+右侧是主工作区，默认打开最近一次会话的“本体模型”，已有结果时直接展示，不要求用户重新执行建模。固定页签只保留“本体模型”和“语义图谱概览”：前者用同一列表承载 Proposal、已接受草稿、待澄清和冲突状态，并在条目内展开结构化差异、Material Object/Link、来源证据与 Mapping 建议；后者只预览本次 Object Type、Value Type 与 Link Type 的语义影响，不显示实例或物理表。
 
 JSON 预览、Schema 校验和语义 lint 是发布门槛，集中放在“发布与服务”（工作台顶部“发布本体”进入）的发布准备区；它们不再作为建模工作台的并列页签。版本历史同样放在“发布与服务”。这样右栏只回答两个问题：“模型具体变了什么”和“放进整张语义图后是什么结构”。
 
-候选顶部保留业务对象（蓝）、本体关系（青）、属性（绿）三个目录计数，下面直接进入可展开明细。文档实例与实例关系放在同一列表下的候选组，提供值、引用及接受/忽略操作，不另加页签。规则缺少可靠表达式时内联待澄清，数据映射从对象编辑进入。颜色始终伴随名称和数字。新增、修改、待澄清和冲突用文字表达，不重复成另一组统计卡。
+Proposal 顶部保留业务对象（蓝）、本体关系（青）、Property（绿）三个目录计数，下面直接进入可展开明细。Material Object/Link 放在同一列表下的 Proposal 组，提供值、引用及接受/拒绝操作，不另加页签。Rule 缺少可靠表达式时内联待澄清，Mapping 从对象编辑进入。颜色始终伴随名称和数字。新增、修改、删除、待澄清和冲突用文字表达，不重复成另一组统计卡。
 
 一次建模的主路径不是技术向导，而是三个可逆状态：
 
 ~~~text
-Agent 形成候选 → 用户接受或忽略 → 草稿保存并持续校验 → 用户去发布页整体发布
+Agent 形成 Proposal → 用户接受或拒绝 → 草稿保存并持续校验 → 用户去发布页整体发布
 ~~~
 
-不会用进度条暗示线性完成度，也不要求用户按固定步骤依次打开页面。顶部只显示事实：候选数量、草稿相对基线的修改数量、error/warning 数量和自动保存状态。
+不会用进度条暗示线性完成度，也不要求用户按固定步骤依次打开页面。顶部只显示事实：Proposal 数量、草稿相对基线的修改数量、error/warning 数量和自动保存状态。
 
-候选列表按“冲突 > 待澄清 > 修改 > 新增 > 实例”排序，可按类型和来源筛选。每项至少包含：业务名称、候选类型、一句话解释、结构化 Diff、来源定位、影响范围、置信提示和接受/忽略操作。置信提示用“证据充分 / 需确认 / 信息不足”，不展示伪精确百分比。
+Proposal 列表按“冲突/过期 > 待澄清 > 修改/删除 > 新增 > 实例”排序，可按类型和来源筛选。每项至少包含：业务名称、operation、target kind、一句话解释、结构化 Diff、来源定位、影响范围、置信提示和接受/拒绝操作。置信提示用“证据充分 / 需确认 / 信息不足”，不展示伪精确百分比。
 
-首次生成显示“一键接受全部无冲突项”，并明确列出不会被接受的冲突和待澄清项；后续增量默认逐项确认。接受后候选移入草稿并可撤销，忽略后进入可恢复列表。批量操作失败必须返回到具体条目，不出现只写“操作失败”的悬空 toast。
+首次生成显示“一键接受全部无冲突项”，并明确列出不会被接受的冲突、过期和待澄清项；后续增量默认逐项确认。接受后 Proposal 进入决策历史并修改草稿，拒绝后保留且可在未过期时恢复。撤销已接受变更通过新的反向 Proposal 或人工编辑完成，不改写历史决策。批量操作失败必须返回到具体条目，不出现只写“操作失败”的悬空 toast。
 
 V0.1 使用 1280px 桌面工作台作为最小设计画布，不为窄屏重排导航或建模三栏。独立打开且容器宽度不小于 1280px 时按原尺寸显示；用于飞书文档等较窄容器预览时，整张工作台按容器宽度等比缩放，导航、内容和交互位置保持不变。等比缩放只解决原型嵌入与设计对齐，不代表 V0.1 支持手机端建模。
 
@@ -416,7 +433,7 @@ V0.1 使用 1280px 桌面工作台作为最小设计画布，不为窄屏重排�
 | 无实例结果 | 显示查询条件和可查来源 | 修改标识或切换来源 |
 | 无权限 | 隐藏敏感内容并说明需要的空间角色或 scope | 返回目录或联系空间管理员 |
 
-正常保存、接受候选和切换筛选不弹确认框；成功用就地状态表达，不连续堆 toast。可逆操作优先提供短时撤销；不可逆或高影响操作使用含对象名称和影响范围的确认框。
+正常保存、接受 Proposal 和切换筛选不弹确认框；成功用就地状态表达，不连续堆 toast。可逆操作优先提供短时撤销；不可逆或高影响操作使用含对象名称和影响范围的确认框。
 
 ### 7.7 视觉系统
 
@@ -442,7 +459,7 @@ V0.1 使用 1280px 桌面工作台作为最小设计画布，不为窄屏重排�
 - 正文和控件满足 WCAG AA 对比度，键盘焦点为 2px cobalt 外环，Tab 顺序遵循左栏—对话—主工作区；
 - 加载使用骨架或局部进度，避免整页旋转器；尊重 prefers-reduced-motion。
 
-动效只解释状态变化：悬停和选中 120–160ms，检查器进入 180–220ms；图谱聚焦可以平移，但不使用弹簧、视差、发光、持续脉冲或庆祝动画。按钮文案使用“接受候选”“保存草稿”“发布版本”等动词，不使用“好的”“下一步”“魔法生成”等模糊或拟人化措辞。
+动效只解释状态变化：悬停和选中 120–160ms，检查器进入 180–220ms；图谱聚焦可以平移，但不使用弹簧、视差、发光、持续脉冲或庆祝动画。按钮文案使用“接受提案”“拒绝提案”“保存草稿”“发布版本”等动词，不使用“好的”“下一步”“魔法生成”等模糊或拟人化措辞。
 
 界面只复用通用的信息架构规律，不复制第三方产品的商标、Logo、截图、文案、图标或特有视觉资产。最终设计使用 OntoFoundry 自有名称、设计令牌和组件。
 
@@ -452,38 +469,45 @@ V0.1 使用 1280px 桌面工作台作为最小设计画布，不为窄屏重排�
 
 每次发布整个工作空间，生成：
 
-1. 不可变 OntoFoundry 快照：TBox、文档 ABox、数据映射、标签和平台元数据；
+1. 不可变 OntoFoundry 快照：Object Type、Property、Link Type、Rule、Action 定义、Material Object / Link、Mapping、标签、来源引用和平台元数据；
 2. 确定性排序和格式化的标准 Apache Ossie JSON；
 3. 校验报告、发布人、时间、基线和变更摘要；
 4. 同一版本对应的 REST API 与 MCP 可查询快照。
 
-数据库实时 Object 和 Link 不进入快照。
+Mapped Object / Link 的实时业务行不进入快照；版本只固定 Mapping。固定本体版本不等于冻结源数据库数据。
 
 ### 8.2 三方结构化合并
 
 不引入 Git。发布使用基准版本 B、当前版本 L 和会话草稿 D：
 
-- 以内部 UUID 对齐 Object Type、Link Type、文档 Object、Link 和映射；
+- 以稳定内部 UUID 对齐 Object Type、Property、Link Type、Rule、Action、Material Object / Link 和 Mapping；
 - 只修改一侧的字段自动合并；
 - 双方做相同修改直接合并；
 - 双方对同一字段做不同修改形成冲突；
 - 删除与修改同一对象形成冲突；
 - 名称冲突、类型不兼容和引用断裂属于语义冲突。
 
-冲突界面并排显示基准、最新版和本会话。解决后重新合并与校验。
+同一元素 ID 的双方变化先细化到字段和带稳定 ID 的子元素；双方修改同一元素的不同字段应自动合并，不因版本 ID 不同而形成冲突。冲突界面先按元素分组，再并排显示基准、最新版、本会话和合并结果；同一标量字段冲突允许选最新版、选草稿或输入自定义值，可按 ID 合并的集合才提供“都保留”。解决后重新合并与校验。
 
-### 8.3 原子发布
+### 8.3 发布预览与乐观校验
+
+发布预览必须执行与最终发布相同的 B/L/D 三方合并，而不是直接比较最新版与原始会话草稿。预览返回 `session_revision`、`current_version_id`、合并结果 SHA-256、完整 Diff、校验报告和确定性 Ossie JSON；有冲突时返回按元素、字段组织的冲突集合。
+
+发布请求必须回传预览得到的 `expected_session_revision`、`expected_current_version_id` 和合并结果 SHA-256。任一值变化均返回 409，要求刷新、重新合并并再次确认；发布不得静默纳入用户预览后由其他会话产生的变化。这里有两个独立的乐观锁：session revision 防止草稿被覆盖，Workspace current version ID 防止用户确认的发布基线过期。
+
+### 8.4 原子发布
 
 发布事务：
 
 1. 锁定工作空间发布指针；
-2. 读取 B、L、D 并三方合并；
-3. 检查名称、引用、类型绑定和映射；
-4. 编译 Ossie JSON；
-5. 执行官方 Schema 和语义 lint；
-6. 写入不可变版本并更新当前版本；
-7. 将会话基线推进到新版本；
-8. 提交事务并广播版本变更。
+2. 重新核对预览携带的会话 revision、Workspace 当前版本 ID 和合并结果摘要；
+3. 读取 B、L、D 并三方合并；
+4. 检查名称、引用、类型绑定和映射；
+5. 编译 Ossie JSON；
+6. 执行官方 Schema 和语义 lint；
+7. 写入不可变版本并更新当前版本；
+8. 将会话基线推进到新版本；
+9. 提交事务并广播版本变更。
 
 任何一步失败都不改变当前发布版本。历史版本可查看、比较和下载。V0.1 不提供自助回滚；极少发生的误发布由运维从不可变快照人工恢复，并产生一个新版本，不删除历史。
 
@@ -519,9 +543,9 @@ V0.1 固定 Apache Ossie ontology specification 0.2.0.dev0。官方 `ontology/on
 - requires、derived_by 除可确定引用外，不宣称完成业务语义验证；
 - JSON 语法和官方 Schema 通过且语义 lint 0 error 才可发布；warning 展示但不阻塞。
 
-UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性输出，确保相同快照得到相同 SHA-256。
+UUID、Evidence、Material Object/Link 和 Action 定义不写入 Ossie 标准字段。编译器确定性输出，确保相同快照得到相同 SHA-256；需要往返的 OntoFoundry 扩展放在带版本号的 `ai_context.ontofoundry` 中。
 
-中文显示名、标签和属性必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。UUID、文档实例和证据仍然只在 OntoFoundry 快照里。
+中文显示名、标签和 Property 必填标记在标准里没有字段，但它们是界面的主要读物。官方 schema 在除 `ai_context` 之外的每一层都禁止额外属性，而 `ai_context` 明确是开放对象，因此当前导出把这三项放进 `ai_context.ontofoundry`（`display_names`、`tags`、`required_attributes`）。这是带命名空间的扩展：其他消费方可以完全忽略，导入没有它也能工作，只是业务名称退回 concept 名称。当前扩展版本为 `2`；导入时拒绝其他扩展版本。Proposal-first 新增的 Rule ID、Action、Material Object/Link 和 Evidence 投影使用扩展 `3`，并提供 v2 兼容读取，不能在 v2 下静默加入字段。
 
 ### 9.1 Ossie 构造到内置模型的对照
 
@@ -544,12 +568,12 @@ UUID、证据和文档 Object/Link 不写入 Ossie schema。编译器确定性�
 | `derived_by` | 对象、属性、关系上的 `derived_by` | 双向无损，同上，不执行 |
 | `verbalizes` | 属性与关系上的 `verbalizes` | 双向无损，原样存取，不解析也不改写占位符。与标准模板一致的读法不存储（避免改名后留下陈述旧名的死文本）。这条成立的前提是导入不给概念改名：值概念按原名写回，读法里的 `{值概念}` 才仍是这条关系的合法 role |
 | `ai_context` | 空间名称与描述 + `ontofoundry` 扩展 | 单向：导出生成 instructions/synonyms，导入只读取扩展 |
-| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损，限于单列表达式。dataset 名用概念的技术名，`source` 是 `schema.table`，键列取 `primary_key` 或对象映射表达式，属性列取 `link_mappings` 的对象映射表达式。计算列、`referent_mappings`、多层 `link_mappings` 报告后跳过，不从任意 SQL 里猜列名 |
-| 无对应 | UUID、文档实例、实例关系、证据 | 标准里没有这些构造，只存在于 OntoFoundry 快照；支持范围内的关系 Join 列随上一行映射往返 |
+| `ontology_mappings` + `semantic_model` | 数据映射（数据源名称、表、键列、字段字典）与关系的 Join 列 | 双向无损限于单列表达式。`link_mappings` 仅使用树形结构：根节点映射对象键，二元属性与关系放在 `children`；旧版顶层直接带 `relationship` 的平铺结构不再导入。dataset 名用概念的技术名，`source` 是 `schema.table`。计算字段和三元以上映射报告后跳过，不从任意 SQL 里猜列名 |
+| 无对应标准字段 | 稳定 UUID、Action、Material Object/Link、Evidence | 存在于 OntoFoundry 完整快照；需要标准文件往返的标识和定义放入版本化 `ai_context.ontofoundry` 扩展，支持范围内的关系 Join 列随 Mapping 往返 |
 
 同一个名字在两侧的含义不同，值得单独点明：Ossie 的 `description` 是一句解释（“采购、生产与库存环节管理的物料。”），内置模型的“中文名”是一个短标签（“物料”），用于图上节点、目录行和搜索，并且要求唯一。把标签写进 `description` 会让往返后的节点标签变成一整句话，所以标签放在 `ai_context.ontofoundry.display_names`，`description` 保持原义。
 
-导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须先通过官方 JSON Schema，否则整份拒绝。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
+导入生成建模会话草稿，不直接改动已发布模型；发布仍是单独的显式操作。两种方式：合并按技术名新增或更新，保留文件之外的对象、文档实例和数据映射，并保留本地中文名；替换只保留文件内容，文档实例与数据映射不会带入，发布后文件之外的对象会消失。文件必须声明 Apache Ossie `0.2.0.dev0` 并通过官方 JSON Schema；存在 OntoFoundry 扩展时还必须声明版本 `2`，映射必须是树形结构，否则整份拒绝。没有 OntoFoundry 扩展的标准 Ossie 树形映射仍可导入。对象与属性的 UUID 由工作空间 ID 和 concept 名派生，同一个文件重复导入得到同一批标识。
 
 ### 9.2 内置模型为支持双向翻译新增的字段
 
@@ -576,9 +600,9 @@ V0.1 的本体服务只读：
 - 可查询当前版本或指定历史版本的 Object Type、Link Type、属性、规则和约束；
 - 可按中文名、技术名、别名和标签搜索；
 - 可查询类型图邻域；
-- 有 instances:read 权限时，可查询文档 Object/Link 和数据库映射 Object/Link；
+- 有 instances:read 权限时，可查询 Material Object/Link 和 Mapped Object/Link；
 - 有 instances:read 权限时，可在详情中查看已发布证据片段；
-- 不可创建候选、修改会话草稿、接受候选或发布。
+- 不可创建 Proposal、修改会话草稿、接受 Proposal 或发布。
 
 模型消费方需要可复现时必须传入 version_id；省略时读取当前版本。所有响应都返回 workspace_id、version_id 和 version_sha256。
 
@@ -626,7 +650,7 @@ REST 与 MCP 均使用 Authorization Bearer，不在 URL 中传 token。MCP 端�
 - ontology:read：查询已发布 TBox；
 - instances:read：查询文档和数据库 ABox，并查看关联证据片段。
 
-instances:read 只授予空间成员或明确绑定该空间的服务主体。数据库凭据、草稿、对话和未发布候选永不通过本体服务暴露。
+instances:read 只授予空间成员或明确绑定该空间的服务主体。数据库凭据、草稿、对话和未发布 Proposal 永不通过本体服务暴露。
 
 服务只保留排障与安全审计所需的标准访问日志：请求 ID、主体、工作空间、版本、操作、耗时和错误码，不记录数据库密码或完整敏感结果。
 
@@ -683,7 +707,8 @@ MCP Clients  ──Bearer── Streamable HTTP /mcp
 | users | OAuth 身份 |
 | workspaces、workspace_members | 空间与角色 |
 | materials、material_chunks | 文件哈希与磁盘位置、文本和证据分块 |
-| modeling_sessions | 基线版本、草稿、候选、消息、材料选择、修订号与后台任务状态 |
+| modeling_sessions | 基线版本与摘要、草稿与摘要、材料选择、修订号与后台任务状态 |
+| proposal_batches、proposal_items、proposal_decisions | Agent 提案批次、不可变条目、依赖、接受/拒绝决策和幂等记录 |
 | ontology_versions | TBox、文档 ABox、映射、Ossie JSON 和校验报告 |
 | data_connections | 加密连接配置 |
 | service_tokens | 令牌哈希、所属空间、名称、撤销状态；只读 TBox |
@@ -695,7 +720,7 @@ MCP Clients  ──Bearer── Streamable HTTP /mcp
 - /api/v1/workspaces/{id}/materials：材料上传、目录与原文；
 - /api/v1/workspaces/{id}/sessions：会话与草稿；
 - /api/v1/workspaces/{id}/sessions/{sessionId}/messages、cancel：对话、建模与取消；
-- /api/v1/workspaces/{id}/sessions/{sessionId}/candidates：接受、忽略和恢复；
+- /api/v1/workspaces/{id}/sessions/{sessionId}/proposal-batches、proposal-decisions：查看 Proposal，接受、拒绝和恢复；
 - /api/v1/workspaces/{id}/sessions/{sessionId}/validate、resolve-merge、publish：校验、冲突选择与整体发布；
 - /api/v1/workspaces/{id}/versions：查看、比较和下载；
 - /api/v1/workspaces/{id}/connections：连接、Schema 浏览和映射；
@@ -834,7 +859,7 @@ V0.1 不自动重试模型请求；网络、429、5xx、认证和输入问题都
 - 语义 lint 0 error，warning 清晰展示；
 - 相同快照重复编译得到相同 SHA-256；
 - 工作空间概念中文名和技术名无重复；
-- 每个已发布文档 Object 和 Link 都有有效类型；
+- 每个已发布 Material Object 和 Material Link 都有有效类型和可恢复的来源；
 - OAuth state/nonce、Cookie、回跳和权限测试通过；
 - Markdown 注入文本不能触发工具或覆盖系统指令；
 - 256 MB Markdown 可流式上传和分块，服务进程不会按文件大小一次性占用等量内存；
@@ -1151,6 +1176,12 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 **发现的既有隐患**。`db_models.py` 使用裸外键列、几乎不定义 ORM `relationship()`，SQLAlchemy 工作单元因此没有依赖可排序，同一次 flush 内新增父子行的插入顺序是任意的。用本节之前的模型可复现，不是 B0.1 引入。它长期未暴露，是因为 SQLite 默认不强制外键，只有真实 PostgreSQL 会报外键违反。后续在同一事务内新增有外键关系的多行时，父行必须先单独 flush。
 
 **未验证与不可声称的事项**。全程 `kind=controlled_noop`，没有任何模型调用，因此**不能据此声称现有建模路径已可切换到 Pi**——那是 B0.2 的范围。MySQL 集成、第 19.16 节的容量与时延目标、真实内网模型联调、备份恢复演练均未进行。设计文档第 19.7 节的 `ExecutionGrant` 在无模型任务下退化为常量许可，其校验路径存在但未经真实模型或查询执行器检验。
+
+### 17.14 Proposal-first 生命周期设计修订（2026-09-26）
+
+第 2、4、5、8 节已经按本轮确认的目标生命周期修订：一个 Workspace 只有一批权威本体；建模会话固定已发布基线；DataAgent 只产生逐项 Proposal；接受 Proposal 才修改会话草稿；发布使用稳定元素 ID 做 B/L/D 三方合并，并同时校验会话 revision 与 Workspace 当前版本 ID。
+
+这是目标合同，不是当前代码完成声明。当前实现仍有以下差距：DataAgent 建模结果使用完整 Ossie 快照替换 `draft_json`；`candidates_json` 只支持有限 kind 且没有完整 create/update/delete、依赖组和幂等决策；Rule 仍是字符串数组，Action 尚无领域模型；发布预览没有返回或锁定 `current_version_id` 与合并结果摘要。实施以 [Proposal-first 本体生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) 为唯一执行入口，完成迁移、兼容和验收前不得把本节描述成已交付能力。
 
 <a id="prototype-supplement"></a>
 

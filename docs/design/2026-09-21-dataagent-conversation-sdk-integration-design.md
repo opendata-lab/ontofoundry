@@ -11,6 +11,8 @@
 > 用户仍须在交付页预览差异并显式发布。本文 §7、§12 和配套实施计划已按此
 > 修订；候选接受与三方合并保留为未来能力，不属于当前自动建模主流程。
 
+> **2026-09-26 生命周期目标修订：** 上述完整快照替换只描述已经落地的过渡实现，不再是目标产品合同。目标流程恢复为 Proposal-first：DataAgent 产出不可变 Proposal Batch，用户逐项接受或拒绝，只有 accepted Proposal 才通过 session revision 乐观锁进入草稿；发布仍执行 Workspace 级 B/L/D 三方合并。领域模型、接口、迁移和验收以 [Proposal-first 本体生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) 为准；本文 §7 在替换完成前仅用于维护现有兼容路径。
+
 ## 1. 背景与定位
 
 | 平台 | 拥有 | 不拥有 |
@@ -62,7 +64,7 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
 - 删除本仓库内的 DataAgent 后端与 Pi 运行时，改为通过同源 BFF 访问**外部**的 OpenDataWorks DataAgent。
 - 中间会话区替换为 `@opendataworks/agent-conversation` 的 `<dataagent-conversation>`，删除自制 `AgentStream` 与 `dataagentStream` reducer。
 - **自动建模页左侧（材料 / 业务场景 / 数据源）与右侧（`ModelResults`）的布局与交互保持不变。**
-- 补上"建模任务 → 完整版本草稿"的回写闭环。
+- 在保留现有完整快照兼容路径的同时，迁移到“建模任务 → Proposal Batch → 人工决策 → 会话草稿”的权威闭环。
 - DataAgent 成为聊天与运行记录的唯一权威来源。
 
 ### 非目标
@@ -70,7 +72,7 @@ OntoFoundry 是独立的领域产品和数据边界，**但不是独立的 Agent
 - 不改本体领域模型、Ossie 编译器/校验器/导入器的语义。
 - 不引入 launch token 或独立 integration 身份协议。
 - 不把数据连接与凭据下沉到 OpenDataWorks。
-- 不实现逐项候选接受或自动合并；兼容字段与接口暂时保留，后续单独设计。
+- 不在本集成文档内重复定义 Proposal 领域模型、Action 执行或 Workspace Rule；Proposal 实施统一引用 2026-09-26 独立实施设计。
 
 ## 5. 目标架构
 
@@ -269,7 +271,7 @@ X-ODW-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 
 同一组诊断在空间设置页以只读连通性检查呈现（`GET /api/v1/workspaces/{id}/settings/dataagent-health`），Agent 一项用 §6.2 的 `/api/v1/dataagent/agents/{agent_id}` 探测。**设置页不提供密钥写入**——凭据由部署环境注入，不进数据库、不经浏览器。
 
-## 7. 自动建模结果回写（当前 MVP）
+## 7. 自动建模结果回写（过渡实现，待 Proposal-first 替换）
 
 原则：**DataAgent 生成完整模型，OntoFoundry 负责结构校验、版本差异预览和发布；
 Agent 永远不能直接发布版本。** 建模结果可以原子替换建模会话中的版本草稿，但只有用户
@@ -362,11 +364,11 @@ review_conventions(ontology) ── 不合规 ─┤
 - 自动建模完成不创建 `OntologyVersionRecord`，也不改变 `current_version_id`。
 - 只有现有发布接口在校验通过且用户明确操作后创建 `vN+1`。
 
-### 7.5 暂缓能力
+### 7.5 过渡实现未覆盖的能力
 
-逐项候选、人工接受/忽略、基于 `before` 的冲突检测、增量 mapping 更新和三方模型合并
-暂缓到后续版本。数据库中的 `candidates_json` 与兼容 API 暂时保留，但自动建模不再生产
-候选，前端主流程也不调用候选接受接口。
+逐项 Proposal、人工接受/拒绝、基于 `before` 与目标内容哈希的过期检测、增量 Mapping 更新，均由 2026-09-26 Proposal-first 实施设计接管。数据库中的 `candidates_json` 与兼容 API 暂时保留，但自动建模过渡路径不生产候选，前端主流程也不调用候选接受接口。
+
+这里所说的“结果回写不做增量合并”只适用于 DataAgent 产物进入会话草稿的过渡路径，**不取消发布阶段已经存在的 B/L/D 三方结构化合并**。目标实现上线后，DataAgent 不再直接替换 `draft_json`，而是写 Proposal Batch；现有完整结果文件只保留在迁移期读取，不再作为新建模运行的输出合同。
 
 ## 7A. 历史候选方案（已停用，仅保留决策背景）
 
