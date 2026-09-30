@@ -280,6 +280,80 @@ export type Draft = {
   material_links: MaterialLink[];
   mappings: DataMapping[];
 };
+// --- Proposals (frontend contract §4) ---------------------------------------
+export type TargetKind =
+  | "object_type"
+  | "property"
+  | "link_type"
+  | "rule"
+  | "action"
+  | "material_object"
+  | "material_link"
+  | "mapping";
+
+export type ProposalStatus =
+  | "pending"
+  | "accepted"
+  | "rejected"
+  | "stale"
+  | "conflict"
+  | "superseded";
+
+export type FieldChange = { path: string; before: unknown; after: unknown };
+
+export type ElementChange = {
+  element_kind: TargetKind;
+  element_id: string;
+  label: string;
+  owner_label?: string | null;
+  change: "created" | "updated" | "deleted";
+  field_changes: FieldChange[];
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+};
+
+export type ProposalItem = {
+  id: string;
+  batch_id: string;
+  ordinal: number;
+  client_ref: string | null;
+  operation: "create" | "update" | "delete";
+  target_kind: TargetKind;
+  target_id: string;
+  display_name: string;
+  owner_label?: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  field_changes: FieldChange[];
+  evidence: EvidenceView[];
+  reason: string;
+  depends_on: string[];
+  dependency_group: string[];
+  status: ProposalStatus;
+  stored_status: "pending" | "accepted" | "rejected" | "superseded";
+  status_reason?: string;
+  accepted_revision?: number | null;
+  decided_at?: string | null;
+};
+
+export type ProposalBatch = {
+  id: string;
+  status: "validating" | "available" | "failed";
+  created_at: string;
+  source_session_revision: number;
+  base_version_id: string | null;
+  counts: Record<ProposalStatus, number>;
+  error?: { code: string; message: string } | null;
+};
+
+export type ProposalBatchDetail = ProposalBatch & { items: ProposalItem[] };
+
+export type DecisionResult = {
+  session: ModelingSession;
+  results: { proposal_id: string; status: ProposalStatus; reason?: string }[];
+  validation: VersionSummary["validation"];
+};
+
 export type Candidate = {
   id: string;
   status: string;
@@ -308,6 +382,11 @@ export type ModelingSession = {
   base_version_id: string | null;
   revision: number;
   draft: Draft;
+  draft_sha256?: string;
+  base_version_sha256?: string;
+  pending_proposal_count?: number;
+  latest_batch_id?: string | null;
+  base_diff?: ElementChange[];
   graph: TypeGraph;
   candidates: Candidate[];
   material_ids: string[];

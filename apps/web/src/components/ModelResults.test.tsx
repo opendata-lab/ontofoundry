@@ -63,7 +63,7 @@ function session(): ModelingSession {
 }
 
 describe("建模结果", () => {
-  it("only has the two agreed tabs, with real model counts and searchable attributes", () => {
+  it("without proposals shows the draft and graph tabs, with real counts and searchable attributes", () => {
     render(
       <MemoryRouter>
         <ModelResults session={session()} />
@@ -77,7 +77,7 @@ describe("建模结果", () => {
       target: { value: "不存在" },
     });
     expect(screen.queryByText("物料名称")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "语义图谱概览" }));
+    fireEvent.click(screen.getByRole("tab", { name: "语义图谱" }));
     expect(screen.getByTestId("semantic-graph")).toBeInTheDocument();
   });
   it("shows the complete result as a version draft without candidate actions", () => {
@@ -89,7 +89,7 @@ describe("建模结果", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("新版本物料")).toBeInTheDocument();
-    expect(screen.getByText(/完整的新版本草稿/)).toBeInTheDocument();
+    expect(screen.getByText(/会话草稿/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /接受/ })).not.toBeInTheDocument();
   });
   it("has an honest empty state before generation", () => {
