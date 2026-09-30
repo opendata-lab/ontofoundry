@@ -13,18 +13,12 @@ pointer compare-and-set are exercised by real concurrent transactions.
 
 import os
 import threading
-from collections.abc import Iterator
-from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
-from fastapi.testclient import TestClient
-from sqlalchemy.engine import make_url
 from test_modeling import ROOT, create_session, publish, save
 
-from ontofoundry_api.config import Settings
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
-from ontofoundry_api.main import create_app
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ADMIN_URL = os.environ.get("ONTOFOUNDRY_TEST_POSTGRES_URL")
@@ -32,34 +26,6 @@ ADMIN_URL = os.environ.get("ONTOFOUNDRY_TEST_POSTGRES_URL")
 pytestmark = pytest.mark.skipif(
     not ADMIN_URL, reason="Disposable PostgreSQL not supplied"
 )
-
-
-@pytest.fixture
-def pg_client(tmp_path) -> Iterator[TestClient]:
-    name = "of_t0_" + uuid4().hex[:12]
-    admin = sa.create_engine(ADMIN_URL, isolation_level="AUTOCOMMIT")
-    with admin.connect() as conn:
-        conn.execute(sa.text(f'CREATE DATABASE "{name}"'))
-    settings = Settings(
-        environment="test",
-        database_url=make_url(ADMIN_URL).set(database=name).render_as_string(
-            hide_password=False
-        ),
-        data_dir=tmp_path / "files",
-        auto_create_schema=True,
-        seed_demo=True,
-        auth_mode="dev",
-        session_secret="test-session-secret-with-more-than-32-chars",
-    )
-    app = create_app(settings)
-    try:
-        with TestClient(app) as client:
-            yield client
-    finally:
-        app.state.engine.dispose()
-        with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
-        admin.dispose()
 
 
 def publish_together(client, sessions):

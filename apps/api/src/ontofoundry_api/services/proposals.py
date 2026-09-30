@@ -294,3 +294,35 @@ KIND_LABELS = {
     ElementKind.MATERIAL_LINK.value: "材料关系",
     ElementKind.MAPPING.value: "映射",
 }
+
+
+def batch_items(db: Session, batch_ids: list[str]) -> list[ProposalItemRecord]:
+    if not batch_ids:
+        return []
+    return list(
+        db.scalars(
+            select(ProposalItemRecord)
+            .where(ProposalItemRecord.batch_id.in_(batch_ids))
+            .order_by(ProposalItemRecord.batch_id, ProposalItemRecord.ordinal)
+        ).all()
+    )
+
+
+def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict) -> dict[str, Any]:
+    """`pending_proposal_count` and `latest_batch_id` for session responses."""
+    ids = list(
+        db.scalars(
+            select(ProposalBatchRecord.id)
+            .where(
+                ProposalBatchRecord.workspace_id == workspace_id,
+                ProposalBatchRecord.session_id == session_id,
+            )
+            .order_by(ProposalBatchRecord.created_at.desc(), ProposalBatchRecord.id.desc())
+        ).all()
+    )
+    items = batch_items(db, ids)
+    statuses = effective_statuses(items, dependency_map(db, ids), draft)
+    return {
+        "pending_proposal_count": sum(1 for s in statuses.values() if s[0] == "pending"),
+        "latest_batch_id": ids[0] if ids else None,
+    }
