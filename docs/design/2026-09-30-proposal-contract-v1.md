@@ -1,7 +1,7 @@
 # `ontofoundry.proposals/v1` 结果合同（T1 评审交付物）
 
 **日期：** 2026-09-30  
-**状态：** 已实现；第一轮评审的 5 个 Critical 已修复，待复审  
+**状态：** 已实现，T1 评审门通过（codex 复审 92/100），合同冻结  
 **上位文档：** [Proposal-first 本体生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) §7、§T1
 
 本文是 T1 评审门要求定稿的内容。权威来源是代码，本文只做说明：

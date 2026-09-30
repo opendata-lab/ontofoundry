@@ -1181,7 +1181,7 @@ SQL 测试确实在 SQLite 测试表上执行参数化查询；模型测试使�
 
 第 2、4、5、8 节已经按本轮确认的目标生命周期修订：一个 Workspace 只有一批权威本体；建模会话固定已发布基线；DataAgent 只产生逐项 Proposal；接受 Proposal 才修改会话草稿；发布使用稳定元素 ID 做 B/L/D 三方合并，并同时校验会话 revision 与 Workspace 当前版本 ID。
 
-这是目标合同，不是当前代码完成声明。当前实现仍有以下差距：DataAgent 建模结果使用完整 Ossie 快照替换 `draft_json`；`candidates_json` 只支持有限 kind 且没有完整 create/update/delete、依赖组和幂等决策；Rule 仍是字符串数组，Action 尚无领域模型；发布预览没有返回或锁定 `current_version_id` 与合并结果摘要。实施以 [Proposal-first 本体生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) 为唯一执行入口，完成迁移、兼容和验收前不得把本节描述成已交付能力。
+**实施状态（2026-09-30）：** 已按 [Proposal-first 本体生命周期实施设计](./2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md) 的 T0–T8 实施，各阶段的交付与验证见该文档第 13 节。新建模运行默认只产出提案；完整 Ossie 快照替换草稿的旧路径只为切换前已开始的运行保留，`candidates_json` 仅保留读取兼容，清理条件与步骤见 [旧路径清理提案](../plans/2026-09-30-legacy-full-result-cleanup-proposal.md)。
 
 <a id="prototype-supplement"></a>
 

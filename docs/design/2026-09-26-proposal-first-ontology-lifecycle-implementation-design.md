@@ -1,7 +1,7 @@
 # Proposal-first 本体生命周期实施设计
 
 **日期：** 2026-09-26  
-**状态：** 已确认目标设计，待实施  
+**状态：** 已实施（T0–T8，2026-09-30）；各阶段交付见第 13 节  
 **权威上位文档：** [OntoFoundry 企业本体智能平台完整设计](./2026-09-01-enterprise-ontology-intelligence-platform-design.md)  
 **替换边界：** 取代 [DataAgent Conversation SDK 集成设计](./2026-09-21-dataagent-conversation-sdk-integration-design.md) 中“完整 Ossie 结果直接替换会话草稿”的目标合同；旧合同只作为迁移期兼容路径保留。
 
@@ -707,6 +707,8 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T1 — v2 领域模型与兼容读取
 
+**状态：已完成。** v2 模型、`read_snapshot` 边界、算法 B 哈希与测试向量、Ossie 扩展 v3、前端 `lib/draftView`；结果合同见评审交付物文档，codex 复审通过（92/100）。
+
 **评审交付物：** [`ontofoundry.proposals/v1` 结果合同](./2026-09-30-proposal-contract-v1.md)（Schema、ID 分配、证据规则、指纹向量、Action 表达式语言及实施中定稿的差异）。
 
 - **先交付并评审**：`ontofoundry.proposals/v1` 与 v2 元素的 Draft 2020-12 JSON Schema（按 `target_kind` 的 `oneOf`），每个 target kind 至少一组 create/update/delete 正例和反例；Action `effects[].expression` 的语言与求值上下文在此一并定稿（首期建议只允许引用输入参数与 `input_type` 属性的受限表达式，不可执行）。评审通过前不写 T1 代码。评审时必须同时定稿：
@@ -720,6 +722,8 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T2 — 数据库迁移、哈希与固定上下文
 
+**状态：已完成。** Alembic `20260930_000001`（PostgreSQL 上验证升级、约束、降级、再升级与同 id 跨类型中止）、身份登记、会话哈希、运行清单、`ofrun.*` 运行凭据、材料归档与 `MATERIAL_IN_USE`。
+
 - 新增 identity/proposal/decision/dependency 表、`materials.archived_at/archived_by`。
 - 按 §4.5 实现规范化哈希函数，回填 Session base/draft hash。
 - 在 PostgreSQL 验证唯一约束、复合外键、upgrade/downgrade。
@@ -727,11 +731,15 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T3 — Proposal 结果契约与消费
 
+**状态：已完成。** `modeling_result_contract` 开关、提案提示词与上下文文件（含元素哈希、Schema、MCP 凭据）、原子入库与幂等、同目标旧提案 superseded、拒收时交回修复或保留失败批次。
+
 - 按 T1 已冻结的 `ontofoundry.proposals/v1` Schema 实现解析、版本协商、引用解析、确定性 create ID、指纹和原子落库；T3 不重新设计 Schema。
 - generation guard、run token 校验；结果只入库为 Batch，绝不写 draft；运行期间草稿变化只影响各 Item 的有效状态。
 - 新运行通过 feature flag 选择 proposal contract；旧活动 run 继续兼容。
 
 ### T4 — Proposal API 与接受事务
+
+**状态：已完成。** 批次列表/详情、决策事务（幂等先于 revision、依赖闭包、完整草稿校验、身份检查），PostgreSQL 并发重放与竞争测试已做变异验证。
 
 - 实现列表、详情、accept/reject/restore。
 - 完成依赖拓扑、批量原子性、幂等键和 target hash 冲突。
@@ -739,10 +747,14 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T5 — 工作台 Proposal UI
 
+**状态：已完成。** 提案/本体草稿/语义图谱三页签、提案卡片与详情抽屉、依赖组接受、过期与冲突状态、草稿变更标记；已在运行中的应用上验证。
+
 - 替换完整草稿结果展示主流程。
 - 接受、拒绝、恢复、依赖、stale、Evidence 和错误状态都有前端测试。
 
 ### T6 — 发布预览与双重乐观锁
+
+**状态：已完成。** 预览即发布的 B/L/D 合并、结构化冲突与 latest/draft/custom/both 解决、`PREVIEW_OUTDATED`；发布页三页签与冲突解决器，已在运行中的应用上完成“预览过期→解决冲突→发布”全流程。
 
 - 预览改为真实 B/L/D merged snapshot。
 - 发布请求增加 expected current version 与 merged hash。
@@ -750,10 +762,14 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T7 — MCP 扩展与验收
 
+**状态：已完成。** `get_ontology_manifest`、`list_ontology_elements`、`get_ontology_elements`，权限裁剪一致；运行凭据只读固定版本。
+
 - 固定上下文的安全部分已在 T2 完成；此处补 `list_ontology_elements` 分页、按 kind 查询等性能与易用性改进。
 - 端到端验收：真实 DataAgent 运行只能读到本 Session 固定的 Workspace/Version/Draft/材料。
 
 ### T8 — 切换与清理准备
+
+**状态：已完成。** 默认合同改为 `proposals`；`GET /proposal-metrics` 提供旧路径在途运行数、批次失败率、过期率与决策统计；清理步骤另见 [旧路径清理提案](../plans/2026-09-30-legacy-full-result-cleanup-proposal.md)，本任务未删除任何旧字段或代码。
 
 - 新 run 默认只生成 Proposal。
 - 观测旧活动 run 清零、失败率、stale 率和决策结果。

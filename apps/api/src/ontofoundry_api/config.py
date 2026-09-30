@@ -43,10 +43,11 @@ class Settings(BaseSettings):
     dataagent_agent_id: str = "agent_ontofoundry"
     dataagent_request_timeout_seconds: int = Field(default=30, gt=0)
     dataagent_execution_mode: Literal["interactive", "background", "auto"] = "auto"
-    # Which result a modeling run is asked for: "full" replaces the draft with
-    # a complete Ossie document (legacy), "proposals" returns
-    # ontofoundry.proposals/v1 items that the user accepts one by one.
-    modeling_result_contract: Literal["full", "proposals"] = "full"
+    # Which result a new modeling run is asked for: "proposals" returns
+    # ontofoundry.proposals/v1 items the user accepts one by one (default since
+    # T8); "full" replaces the draft with a complete Ossie document (legacy,
+    # kept so runs started before the switch still complete).
+    modeling_result_contract: Literal["full", "proposals"] = "proposals"
     # Base URL the DataAgent uses to reach this API's MCP endpoint. Empty means
     # "the URL the browser used", which is right when both share a network.
     public_base_url: str = ""
