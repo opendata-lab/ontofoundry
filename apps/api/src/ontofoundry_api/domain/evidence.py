@@ -65,6 +65,9 @@ def reconcile_draft_evidence(
         for element in draft.get(collection) or []:
             element_id = str(element["id"])
             old = before.get(element_id, {})
+            ids = [str(e["id"]) for e in element.get("evidence") or []]
+            if len(ids) != len(set(ids)):
+                raise EvidenceError("EVIDENCE_ID_DUPLICATE", f"{collection}[{element_id}]：证据 id 重复")
             kept_ids = set()
             for position, evidence in enumerate(element.get("evidence") or []):
                 evidence_id = str(evidence["id"])

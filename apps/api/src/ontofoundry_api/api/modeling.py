@@ -478,8 +478,10 @@ def publish_session(
         )
         item.base_version_id = version.id
         item.base_version_sha256 = snapshot_sha256(model.model_dump(mode="json"))
-        item.draft_json = merged
-        item.draft_sha256 = draft_sha256(merged, workspace_id)
+        # The session continues from exactly what was published: same
+        # normalized form, so its draft hash equals the new base hash.
+        item.draft_json = model.model_dump(mode="json")
+        item.draft_sha256 = item.base_version_sha256
         item.revision += 1
         item.updated_at = utc_now()
         db.commit()
