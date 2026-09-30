@@ -2,15 +2,17 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { ModelResults } from "./ModelResults";
-import type { Draft, ModelingSession } from "../api/types";
+import type { Draft, DraftView, ModelingSession } from "../api/types";
+import { emptyDraft, fromView } from "../lib/draftView";
 
 vi.mock("./OntologyGraph", () => ({
   OntologyGraph: () => <div data-testid="semantic-graph" />,
 }));
 afterEach(cleanup);
-const draft: Draft = {
+// Written as the nested view for readability, stored as v2 like the API sends.
+const view: DraftView = {
   workspace_id: "w",
-  schema_version: "1",
+  requires: [],
   object_types: [
     {
       id: "material",
@@ -36,6 +38,7 @@ const draft: Draft = {
   links: [],
   mappings: [],
 };
+const draft: Draft = fromView(emptyDraft("w"), view);
 function session(): ModelingSession {
   return {
     id: "s",

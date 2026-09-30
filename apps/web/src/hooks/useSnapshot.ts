@@ -1,47 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
-import type { Draft, Workspace } from "../api/types";
+import type { DraftView, Workspace } from "../api/types";
+import { emptyDraft, toView, viewFromTypes } from "../lib/draftView";
 import { usePageActive } from "./usePageTab";
 
 export function useSnapshot(workspace: Workspace) {
   const active = usePageActive();
   const [params] = useSearchParams();
   const sid = params.get("session");
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<DraftView | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
     setError("");
-    const empty: Draft = {
-      schema_version: "1",
-      workspace_id: workspace.id,
-      object_types: [],
-      link_types: [],
-      objects: [],
-      links: [],
-      mappings: [],
-    };
+    const empty = toView(emptyDraft(workspace.id));
     if (sid && workspace.role)
       modelingApi
         .get(workspace.id, sid)
-        .then((s) => setDraft(s.draft))
+        .then((s) => setDraft(toView(s.draft)))
         .catch((e: Error) => setError(e.message));
     else if (workspace.role)
       modelingApi
         .snapshot(workspace.id)
-        .then(setDraft)
+        .then((d) => setDraft(toView(d)))
         .catch((e: Error) => setError(e.message));
     else if (!workspace.current_version) setDraft(empty);
     else
       api
         .types(workspace.id)
-        .then((r) =>
-          setDraft({
-            ...empty,
-            object_types: r.items.filter((t) => t.kind === "object_type"),
-            link_types: r.items.filter((t) => t.kind === "link_type"),
-          }),
-        )
+        .then((r) => setDraft(viewFromTypes(workspace.id, r.items)))
         .catch((e: Error) => setError(e.message));
   }, [workspace.id, workspace.role, workspace.current_version, sid]);
   useEffect(() => {

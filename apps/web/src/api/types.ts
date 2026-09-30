@@ -148,22 +148,46 @@ export type WorkspaceOverview = {
   } | null;
 };
 
+// --- Draft views -------------------------------------------------------------
+// Components read drafts through DraftView: types carry their own properties as
+// `attributes` and their rules as `requires`/`derived_by`, which is how the UI
+// presents them. Only lib/draftView converts between this and the stored Draft.
 export type ObjectDefinition = Omit<ObjectType, "kind" | "attribute_count">;
 export type LinkDefinition = Omit<LinkType, "kind" | "attribute_count">;
-export type Evidence = {
-  material_id: string;
+export type EvidenceLocator = {
+  heading?: string | null;
   line_start: number;
   line_end: number;
+};
+/** Stored shape, exactly as in drafts and version snapshots. */
+export type MaterialEvidence = {
+  kind: "material";
+  id: string;
+  material_id: string;
+  material_sha256: string | null;
+  locator: EvidenceLocator;
   quote: string;
 };
-export type DocumentObject = {
+export type ManualEvidence = {
+  kind: "manual";
+  id: string;
+  note: string;
+  created_by: string;
+  created_at: string;
+};
+export type Evidence = MaterialEvidence | ManualEvidence;
+/** Detail DTO shape: the server adds the material name for display. */
+export type EvidenceView =
+  | (MaterialEvidence & { material_name: string; material_archived: boolean })
+  | ManualEvidence;
+export type MaterialObject = {
   id: string;
   type_id: string;
   name: string;
   values: Record<string, string | number | boolean | null>;
   evidence: Evidence[];
 };
-export type DocumentLink = {
+export type MaterialLink = {
   id: string;
   type_id: string;
   source_id: string;
@@ -181,14 +205,79 @@ export type DataMapping = {
   key_column: string;
   fields: Record<string, string>;
 };
-export type Draft = {
-  schema_version: string;
+export type DraftView = {
   workspace_id: string;
-  requires?: string[];
+  requires: string[];
   object_types: ObjectDefinition[];
   link_types: LinkDefinition[];
-  objects: DocumentObject[];
-  links: DocumentLink[];
+  objects: MaterialObject[];
+  links: MaterialLink[];
+  mappings: DataMapping[];
+};
+
+// --- Stored draft (schema v2) ------------------------------------------------
+export type ObjectTypeElement = {
+  id: string;
+  name: string;
+  technical_name: string;
+  description: string;
+  tags: string[];
+  extends: string[];
+  evidence: Evidence[];
+};
+export type PropertyElement = Omit<
+  AttributeDefinition,
+  "requires" | "derived_by" | "declared_by"
+> & { owner_type_id: string; evidence: Evidence[] };
+export type LinkTypeElement = Omit<LinkDefinition, "requires" | "derived_by"> & {
+  evidence: Evidence[];
+};
+export type RuleElement = {
+  id: string;
+  name: string;
+  technical_name: string;
+  description: string;
+  owner_kind: "object_type" | "property" | "link_type" | "action";
+  owner_id: string;
+  rule_kind: "constraint" | "derivation";
+  expression: string;
+  verbalizes: string[];
+  evidence: Evidence[];
+};
+export type ActionElement = {
+  id: string;
+  name: string;
+  technical_name: string;
+  description: string;
+  input_type_id: string;
+  parameters: {
+    id: string;
+    name: string;
+    technical_name: string;
+    value_kind: string;
+    required: boolean;
+  }[];
+  precondition_rule_ids: string[];
+  effects: {
+    id: string;
+    kind: "set_property" | "create_link" | "delete_link";
+    property_id: string | null;
+    link_type_id: string | null;
+    expression: string;
+  }[];
+  evidence: Evidence[];
+};
+export type Draft = {
+  schema_version: "2";
+  workspace_id: string;
+  ontology_requires: string[];
+  object_types: ObjectTypeElement[];
+  properties: PropertyElement[];
+  link_types: LinkTypeElement[];
+  rules: RuleElement[];
+  actions: ActionElement[];
+  material_objects: MaterialObject[];
+  material_links: MaterialLink[];
   mappings: DataMapping[];
 };
 export type Candidate = {
@@ -207,8 +296,8 @@ export type Candidate = {
 } & (
   | { kind: "object_type"; value: ObjectDefinition }
   | { kind: "link_type"; value: LinkDefinition }
-  | { kind: "object"; value: DocumentObject }
-  | { kind: "link"; value: DocumentLink }
+  | { kind: "object"; value: MaterialObject }
+  | { kind: "link"; value: MaterialLink }
   | { kind: "mapping"; value: DataMapping }
   | { kind: "clarification"; value: { name: string } }
 );

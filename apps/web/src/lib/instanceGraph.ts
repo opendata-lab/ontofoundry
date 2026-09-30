@@ -1,8 +1,8 @@
-import type { DocumentObject, DocumentLink } from "../api/types";
+import type { MaterialObject, MaterialLink } from "../api/types";
 
 export function instanceNeighborhood(
-  objects: DocumentObject[],
-  links: DocumentLink[],
+  objects: MaterialObject[],
+  links: MaterialLink[],
   centerId: string,
   depth: number,
 ) {

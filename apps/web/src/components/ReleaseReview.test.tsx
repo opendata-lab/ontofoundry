@@ -27,14 +27,17 @@ const session: ModelingSession = {
   revision: 1,
   base_version_id: null,
   draft: {
-    schema_version: "1",
+    schema_version: "2",
     workspace_id: "w",
+    ontology_requires: ["original"],
     object_types: [],
+    properties: [],
     link_types: [],
-    objects: [],
-    links: [],
+    rules: [],
+    actions: [],
+    material_objects: [],
+    material_links: [],
     mappings: [],
-    requires: ["original"],
   },
   graph: {
     workspace_id: "w",
@@ -101,7 +104,7 @@ it("protects in-flight saves and reports failure without dropping edited rules",
   expect(screen.getByRole("textbox")).toBeDisabled();
   expect(modelingApi.save).toHaveBeenCalledWith(session, {
     ...session.draft,
-    requires: ["edited"],
+    ontology_requires: ["edited"],
   });
   await act(async () => reject(new Error("修订冲突")));
   expect(busy).toHaveBeenLastCalledWith(false);

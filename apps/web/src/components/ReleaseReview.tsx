@@ -67,10 +67,11 @@ export function ReleaseReview({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [rules, setRules] = useState(session.draft.requires ?? []);
+  const [rules, setRules] = useState(session.draft.ontology_requires ?? []);
   const [saving, setSaving] = useState(false);
   const dirty =
-    JSON.stringify(rules) !== JSON.stringify(session.draft.requires ?? []);
+    JSON.stringify(rules) !==
+    JSON.stringify(session.draft.ontology_requires ?? []);
   useEffect(() => {
     onDirtyChange?.(dirty);
     return () => onDirtyChange?.(false);
@@ -80,8 +81,8 @@ export function ReleaseReview({
     return () => onBusyChange?.(false);
   }, [saving, onBusyChange]);
   useEffect(() => {
-    setRules(session.draft.requires ?? []);
-  }, [session.id, session.revision, session.draft.requires]);
+    setRules(session.draft.ontology_requires ?? []);
+  }, [session.id, session.revision, session.draft.ontology_requires]);
   useEffect(() => {
     let active = true;
     setPreview(null);
@@ -162,7 +163,9 @@ export function ReleaseReview({
               onSaved(
                 await modelingApi.save(session, {
                   ...session.draft,
-                  requires: rules.map((r) => r.trim()).filter(Boolean),
+                  ontology_requires: rules
+                    .map((r) => r.trim())
+                    .filter(Boolean),
                 }),
               );
             } catch (e) {

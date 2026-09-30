@@ -14,7 +14,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { workspaceRequest } from "../api/client";
-import type { DocumentObject, DocumentLink } from "../api/types";
+import type { MaterialObject, MaterialLink } from "../api/types";
 import { instanceNeighborhood } from "../lib/instanceGraph";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useSnapshot } from "../hooks/useSnapshot";
@@ -36,8 +36,8 @@ export function InstancesPage() {
   const [depth, setDepth] = useState(1);
   const [neighborhood, setNeighborhood] = useState<{
     center_id: string;
-    objects: (DocumentObject & { key: string })[];
-    links: DocumentLink[];
+    objects: (MaterialObject & { key: string })[];
+    links: MaterialLink[];
     warnings: string[];
     truncated: boolean;
   } | null>(null);
@@ -163,7 +163,7 @@ export function InstancesPage() {
     if (sessionId) query.set("session", sessionId);
     return `/workspaces/${workspace.id}/objects/${tid}/instances/database?${query}`;
   };
-  const linkTo = (o: DocumentObject) =>
+  const linkTo = (o: MaterialObject) =>
     "key" in o
       ? dbLink(o.type_id, String(o.key))
       : `/workspaces/${workspace.id}/objects/${o.type_id}/instances/${o.id}${suffix}`;
@@ -462,7 +462,12 @@ export function InstancesPage() {
                   没有全量同步或写回源系统。
                 </p>
               ) : object.evidence.length ? (
-                object.evidence.map((ev, i) => (
+                object.evidence.map((ev, i) =>
+                  ev.kind === "manual" ? (
+                    <div className="evidence" key={i}>
+                      <p>人工确认：{ev.note}</p>
+                    </div>
+                  ) : (
                   <div className="evidence" key={i}>
                     <a
                       href={
@@ -475,11 +480,12 @@ export function InstancesPage() {
                       rel="noreferrer"
                     >
                       <FileText size={14} />
-                      查看原文 {ev.line_start}–{ev.line_end} 行
+                      查看原文 {ev.locator.line_start}–{ev.locator.line_end} 行
                     </a>
                     <p>{ev.quote}</p>
                   </div>
-                ))
+                  ),
+                )
               ) : (
                 <EmptyModel text="暂无文档证据" />
               )}

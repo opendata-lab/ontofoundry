@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { workspaceRequest, modelingApi } from "../api/client";
-import type { DataConnection, Draft } from "../api/types";
+import type { DataConnection, DraftView } from "../api/types";
 import "../styles/ontology-reading.css";
 
 type AssetColumn = {
@@ -59,7 +59,7 @@ export function DataAssets({
 }: {
   workspaceId: string;
   connections: DataConnection[];
-  draft: Draft | null;
+  draft: DraftView | null;
   sessionId: string | null;
   onBusyChange?: (busy: boolean) => void;
 }) {
