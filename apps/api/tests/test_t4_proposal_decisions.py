@@ -271,3 +271,17 @@ def test_edits_are_allowed_during_a_proposals_run_but_not_a_legacy_one(client):
         db.commit()
     session["draft"]["object_types"][0]["description"] = "运行中编辑"
     assert save(client, session, session["draft"]).status_code == 200
+
+
+def test_batches_page_by_keyset_cursor(client):
+    session = create_session(client)
+    ids = [seed_batch(client, session, chain(session)[:1], run_token=f"run-{i}")["id"] for i in range(3)]
+    first = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches?limit=2").json()
+    assert len(first["items"]) == 2 and first["next_cursor"]
+    rest = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches?limit=2&cursor={first['next_cursor']}"
+    ).json()
+    seen = [b["id"] for b in first["items"] + rest["items"]]
+    assert sorted(seen) == sorted(ids) and rest["next_cursor"] is None
+    bad = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches?cursor=nope")
+    assert bad.status_code == 422
