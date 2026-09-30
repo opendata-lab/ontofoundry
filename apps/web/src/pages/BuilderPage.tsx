@@ -21,6 +21,7 @@ import type {
 import { ModelResults } from "../components/ModelResults";
 import { SessionPicker } from "../components/SessionPicker";
 import { useModeling } from "../hooks/useModeling";
+import { useProposals } from "../hooks/useProposals";
 import { usePageTab } from "../hooks/usePageTab";
 import { createOntoFoundryConversationTransport } from "../lib/agentConversation";
 
@@ -48,6 +49,16 @@ export function BuilderPage() {
   // polls. It knows first, and it covers the parked states — waiting_input is
   // still a live run, and treating it as idle would unlock editing mid-run.
   const [running, setRunning] = useState(false);
+  const proposals = useProposals(session, setSession, model.reload);
+  const reloadProposals = proposals.reload;
+  // A stale proposal is re-modelled by the user, not automatically: fill the
+  // composer and focus it, never send.
+  const remodel = (text: string) => {
+    const el = conversation.current;
+    if (!el) return;
+    el.value = text;
+    el.focus();
+  };
   useEffect(() => {
     Promise.all([
       modelingApi.materials(workspace.id),
@@ -113,9 +124,11 @@ export function BuilderPage() {
 
     const onComplete = (event: Event) => {
       setRunning(false);
-      // Reload on any terminal state: a modeling result atomically replaces the
-      // version draft before completion is reported.
+      // Reload on any terminal state: a modeling result is stored (a new
+      // proposal batch, or a replaced draft for a legacy run) before
+      // completion is reported.
       model.reload();
+      reloadProposals();
       const { metadata } = (event as CustomEvent<CompleteDetail>).detail;
       if (metadata?.mode === "model") setError("");
     };
@@ -137,7 +150,7 @@ export function BuilderPage() {
       el.removeEventListener("dataagent-complete", onComplete);
       el.removeEventListener("dataagent-error", onError);
     };
-  }, [model, setError]);
+  }, [model, setError, reloadProposals]);
 
   // A session that does not exist yet is created on first send, so opening the
   // page never mints an empty conversation.
@@ -367,7 +380,12 @@ export function BuilderPage() {
             placeholder="向智能体提问以辅助本体构建…"
           />
         </section>
-        <ModelResults session={session} />
+        <ModelResults
+          session={session}
+          proposals={proposals}
+          running={running}
+          onRemodel={remodel}
+        />
       </div>
     </div>
   );

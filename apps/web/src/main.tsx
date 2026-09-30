@@ -5,6 +5,7 @@ import "@xyflow/react/dist/style.css";
 import "./styles/tokens.css";
 import "./styles/global.css";
 import "./styles/reference.css";
+import "./styles/proposals.css";
 import { defineAgentConversation } from "@opendataworks/agent-conversation";
 import { App } from "./App";
 

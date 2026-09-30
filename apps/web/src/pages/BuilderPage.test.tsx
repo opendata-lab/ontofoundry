@@ -33,6 +33,12 @@ vi.mock("../api/client", () => ({
       skills: [],
     }),
   },
+  proposalsApi: {
+    batches: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
+    batch: vi.fn(),
+    decide: vi.fn(),
+  },
+  ApiError: class extends Error {},
 }));
 
 function session(): ModelingSession {

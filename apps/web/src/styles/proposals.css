@@ -1,0 +1,245 @@
+/* Proposals tab, draft change markers and the proposal drawer. */
+.proposal-panel {
+  --proposal-warn: var(--color-warning, oklch(62% 0.14 70));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+.proposal-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.proposal-batch-actions {
+  display: flex;
+  gap: 8px;
+}
+.proposal-running,
+.proposal-drift {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+.proposal-drift {
+  background: color-mix(in srgb, var(--proposal-warn) 12%, var(--color-surface));
+}
+.proposal-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.chip[aria-checked="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.chip b {
+  margin-left: 4px;
+  font-weight: 600;
+}
+.proposal-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.proposal-group > h3,
+.proposal-group > summary {
+  margin: 4px 0 0;
+  padding-left: 8px;
+  border-left: 3px solid var(--color-rule-strong);
+  font-size: 14px;
+  cursor: default;
+}
+.proposal-group--blocked > h3 { border-color: var(--color-danger); }
+.proposal-group--update > h3 { border-color: var(--proposal-warn); }
+.proposal-group--delete > h3 { border-color: var(--color-danger); }
+.proposal-group--create > h3 { border-color: var(--color-success); }
+.proposal-group--history > summary { cursor: pointer; }
+.proposal-group small {
+  margin-left: 4px;
+  color: var(--color-muted);
+  font-weight: 400;
+}
+.proposal-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.proposal-card--superseded .proposal-card-title,
+.result-row--deleted .result-row-title strong {
+  text-decoration: line-through;
+  color: var(--color-muted);
+}
+.proposal-card--stale,
+.proposal-card--conflict {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-rule));
+}
+.proposal-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.proposal-card-title {
+  all: unset;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.proposal-card-title:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.op--create { color: var(--color-success); }
+.op--update { color: var(--proposal-warn, oklch(62% 0.14 70)); }
+.op--delete { color: var(--color-danger); }
+.proposal-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.proposal-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.proposal-reason {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+.evidence-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.tag--accepted, .tag--change-created { background: var(--color-success-soft); color: var(--color-success); }
+.tag--stale, .tag--conflict, .tag--change-deleted { background: var(--color-danger-soft); color: var(--color-danger); }
+.tag--change-updated { background: color-mix(in srgb, oklch(62% 0.14 70) 14%, white); color: oklch(45% 0.12 70); }
+.tag--group, .tag--pending { background: var(--color-accent-soft); color: var(--color-accent); }
+.tab-badge {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+.tab-badge--fresh { background: var(--color-success); }
+.field-diff {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.field-diff th,
+.field-diff td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--color-rule-soft);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.field-diff th[scope="row"] {
+  white-space: nowrap;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+.field-diff del {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.field-diff ins {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  text-decoration: none;
+}
+.evidence-quote {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--color-rule-strong);
+  background: var(--color-surface-soft);
+}
+.evidence-quote footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.proposal-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(560px, 100vw);
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+}
+.proposal-drawer::backdrop {
+  background: var(--color-overlay, rgb(0 0 0 / 0.25));
+}
+.proposal-drawer > header,
+.proposal-drawer > footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.proposal-drawer > header > div { flex: 1; }
+.proposal-drawer > header h2 { margin: 0; font-size: 17px; }
+.proposal-drawer > footer {
+  justify-content: space-between;
+  margin-top: auto;
+  border-top: 1px solid var(--color-rule);
+  border-bottom: 0;
+}
+.proposal-drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 16px;
+}
+.proposal-drawer-body h3 { font-size: 14px; }
+.proposal-deps { margin: 0; padding-left: 18px; }

@@ -33,7 +33,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256
-from ontofoundry_api.services.element_diff import element_label, owner_label
+from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
 from ontofoundry_api.services.errors import ConflictError, ServiceError
 from ontofoundry_api.services.identities import check_identities
 from ontofoundry_api.services.proposals import batch_items as _batch_items
@@ -107,7 +107,13 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         "owner_label": owner_label(item.target_kind, element, elements),
         "before": item.before_json,
         "after": item.after_json,
-        "field_changes": item.field_changes_json or [],
+        # Agents may omit field_changes (display data); derive them then.
+        "field_changes": item.field_changes_json
+        or (
+            field_changes(item.before_json, item.after_json)
+            if item.before_json and item.after_json
+            else []
+        ),
         "evidence": _evidence_view(
             db,
             workspace_id,

@@ -6,7 +6,10 @@ import type {
   VersionSummary,
   Workspace,
   Draft,
+  DecisionResult,
   ModelingSession,
+  ProposalBatch,
+  ProposalBatchDetail,
   ModelingSessionSummary,
   Material,
   OssieImportResult,
@@ -21,6 +24,9 @@ type ErrorBody = {
   error?: {
     code?: string;
     message?: string;
+    items?: { proposal_id: string; reason: string }[];
+    conflicts?: unknown[];
+    current_version_id?: string | null;
   };
   detail?: unknown;
 };
@@ -29,18 +35,26 @@ export class ApiError extends Error {
   status: number;
   code: string;
   detail: unknown;
+  /** Per-item reasons, e.g. which proposals were stale (body.error.items). */
+  items: { proposal_id: string; reason: string }[];
+  conflicts: unknown[];
+  currentVersionId: string | null;
 
   constructor(
     message: string,
     status: number,
     code = "HTTP_ERROR",
     detail?: unknown,
+    error?: ErrorBody["error"],
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.detail = detail;
+    this.items = error?.items ?? [];
+    this.conflicts = error?.conflicts ?? [];
+    this.currentVersionId = error?.current_version_id ?? null;
   }
 }
 
@@ -69,6 +83,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       response.status,
       body.error?.code,
       body.detail,
+      body.error,
     );
   }
   return response.json() as Promise<T>;
@@ -208,5 +223,34 @@ export const modelingApi = {
     workspaceRequest<{ items: DataTable[] }>(
       id,
       "/connections/" + connectionId + "/tables",
+    ),
+};
+
+
+export const proposalsApi = {
+  batches: (s: Pick<ModelingSession, "id" | "workspace_id">) =>
+    request<{ items: ProposalBatch[]; next_cursor: string | null }>(
+      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-batches`,
+    ),
+  batch: (s: Pick<ModelingSession, "id" | "workspace_id">, batchId: string) =>
+    request<ProposalBatchDetail>(
+      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-batches/${batchId}`,
+    ),
+  decide: (
+    s: ModelingSession,
+    decisions: { proposal_id: string; decision: "accept" | "reject" | "restore" }[],
+    idempotencyKey: string,
+  ) =>
+    request<DecisionResult>(
+      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-decisions`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idempotency_key: idempotencyKey,
+          expected_session_revision: s.revision,
+          decisions,
+        }),
+      },
     ),
 };
