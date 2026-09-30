@@ -1,13 +1,17 @@
 from uuid import UUID
 
-from ontofoundry_api.domain.models import (
+# The seed is written in the v1 nested shape it was authored in and read
+# through the same v1→v2 path as any stored v1 snapshot, so ids stay the same.
+from ontofoundry_api.domain.legacy_v1 import (
     AttributeDefinition,
     LinkTypeDefinition,
     Multiplicity,
     ObjectTypeDefinition,
-    OntologyDraft,
+    OntologyDraftV1,
     ValueKind,
 )
+from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.snapshot import read_snapshot
 
 DEMO_WORKSPACE_ID = UUID("10375c4d-64e2-4ddf-a6e6-f3fc36d23001")
 SUPPLIER_ID = UUID("10375c4d-64e2-4ddf-a6e6-f3fc36d23101")
@@ -192,8 +196,10 @@ def build_demo_draft() -> OntologyDraft:
             tags=["生产"],
         ),
     ]
-    return OntologyDraft(
-        workspace_id=DEMO_WORKSPACE_ID,
-        object_types=object_types,
-        link_types=link_types,
+    return read_snapshot(
+        OntologyDraftV1(
+            workspace_id=DEMO_WORKSPACE_ID,
+            object_types=object_types,
+            link_types=link_types,
+        ).model_dump(mode="json")
     )

@@ -5,19 +5,33 @@ from uuid import UUID, uuid4
 import pytest
 from pydantic import ValidationError
 
-from ontofoundry_api.domain.models import (
+from ontofoundry_api.domain.legacy_v1 import (
     AttributeDefinition,
     LinkTypeDefinition,
     Multiplicity,
     ObjectTypeDefinition,
-    OntologyDraft,
+    OntologyDraftV1,
     ValueKind,
 )
-from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
+from ontofoundry_api.domain.models import OntologyDraft, RuleKind
+from ontofoundry_api.domain.snapshot import read_snapshot
+from ontofoundry_api.ossie.compiler import EXTENSION_VERSION, compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
+
+
+def attrs(model, item):
+    return model.properties_of(item.id)
+
+
+def reqs(model, item):
+    return model.expressions_of(item.id, RuleKind.CONSTRAINT)
+
+
+def derived(model, item):
+    return model.expressions_of(item.id, RuleKind.DERIVATION)
 
 
 def demo_document():
@@ -132,7 +146,7 @@ def test_export_then_import_restores_the_same_model():
                 sorted(item.tags),
                 {
                     a.technical_name: (a.name, a.value_kind, a.required, a.identifier)
-                    for a in item.attributes
+                    for a in attrs(model, item)
                 },
             )
             for item in model.object_types
@@ -186,23 +200,23 @@ def test_foreign_file_keeps_inheritance_identifiers_and_expressions():
 
     # extends is kept as inheritance, not copied into the child.
     assert customer.extends == [party.id]
-    assert [a.technical_name for a in customer.attributes] == ["credit_limit"]
-    assert [a.technical_name for a in model.effective_attributes(customer.id)] == [
+    assert [a.technical_name for a in attrs(model, customer)] == ["credit_limit"]
+    assert [a.technical_name for a in model.effective_properties(customer.id)] == [
         "credit_limit",
         "party_code",
     ]
-    assert party.attributes[0].identifier is True
-    assert party.attributes[0].value_kind == "string"
+    assert attrs(model, party)[0].identifier is True
+    assert attrs(model, party)[0].value_kind == "string"
 
     # Expressions land on the concept and the relationship that carry them.
-    assert model.requires == ["EXISTS (customer)"]
-    assert customer.requires == ["customer.status = 'active'"]
+    assert model.ontology_requires == ["EXISTS (customer)"]
+    assert reqs(model, customer) == ["customer.status = 'active'"]
     placed_by = next(i for i in model.link_types if i.technical_name == "placed_by")
-    assert placed_by.derived_by == ["SELECT 1"]
+    assert derived(model, placed_by) == ["SELECT 1"]
     # An entity relationship can identify its concept, as Ossie allows.
     assert placed_by.identifier is True
     assert placed_by.verbalizes == ["{order} placed by {customer}"]
-    assert order.attributes == []
+    assert attrs(model, order) == []
 
     # A collapsed value concept is only reported when something is lost.
     assert any("party_code_value" in note for note in report["notes"])
@@ -300,11 +314,13 @@ def rich_draft():
         target_type_id=party.id,
         multiplicity=Multiplicity.MANY_TO_ONE,
     )
-    return OntologyDraft(
-        workspace_id=space,
-        requires=["EXISTS (party)"],
-        object_types=[party, customer, order],
-        link_types=[placed_by, referred_by],
+    return read_snapshot(
+        OntologyDraftV1(
+            workspace_id=space,
+            requires=["EXISTS (party)"],
+            object_types=[party, customer, order],
+            link_types=[placed_by, referred_by],
+        ).model_dump(mode="json")
     )
 
 
@@ -327,18 +343,18 @@ def test_rich_model_survives_a_full_round_trip_and_stays_publishable():
 
     assert report["skipped"] == []
     assert by_key["customer"].extends == [by_key["party"].id]
-    assert by_key["customer"].requires == ["EXISTS (customer.orders)"]
-    assert by_key["customer"].attributes[0].verbalizes == [
+    assert reqs(imported, by_key["customer"]) == ["EXISTS (customer.orders)"]
+    assert attrs(imported, by_key["customer"])[0].verbalizes == [
         "{customer}的信用额度上限是{Decimal}"
     ]
-    assert imported.requires == ["EXISTS (party)"]
+    assert imported.ontology_requires == ["EXISTS (party)"]
     order_link = next(
         item
         for item in imported.link_types
         if item.source_type_id == by_key["sales_order"].id
     )
     assert order_link.identifier is True
-    assert order_link.derived_by == ["SELECT 1"]
+    assert derived(imported, order_link) == ["SELECT 1"]
     assert order_link.verbalizes == ["{sales_order}由{customer}下单"]
     # Both relationships keep the same technical name under different concepts.
     assert sorted(item.technical_name for item in imported.link_types) == [
@@ -361,7 +377,10 @@ def test_model_rejects_what_ossie_would_reject():
         OntologyDraft.model_validate(cycle)
 
     clash = draft.model_dump(mode="json")
-    clash["object_types"][1]["attributes"][0]["technical_name"] = "party_code"
+    customer_id = clash["object_types"][1]["id"]
+    next(p for p in clash["properties"] if p["owner_type_id"] == customer_id)[
+        "technical_name"
+    ] = "party_code"
     with pytest.raises(ValidationError, match="技术名冲突"):
         OntologyDraft.model_validate(clash)
 
@@ -378,7 +397,7 @@ def test_readings_and_their_value_concepts_survive_verbatim():
     )
     model = OntologyDraft.model_validate(payload)
     party = next(i for i in model.object_types if i.technical_name == "party")
-    code = party.attributes[0]
+    code = attrs(model, party)[0]
 
     assert code.value_concept == "party_code_value"
     assert code.verbalizes == ["{party} code {party_code_value}"]
@@ -430,7 +449,7 @@ def test_one_value_concept_shared_by_several_attributes_stays_one_concept():
     payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     model = OntologyDraft.model_validate(payload)
 
-    assert [item.attributes[0].value_concept for item in model.object_types] == [
+    assert [attrs(model, item)[0].value_concept for item in model.object_types] == [
         "sku",
         "sku",
     ]
@@ -661,7 +680,7 @@ def test_merge_keeps_existing_model_instances_and_mappings():
     keys = {item.technical_name for item in merged.object_types}
 
     assert {"supplier", "material", "customer", "order"} <= keys
-    assert len(merged.objects) == len(draft.objects)
+    assert len(merged.material_objects) == len(draft.material_objects)
     assert len(merged.mappings) == len(draft.mappings)
     assert report["counts"]["objects_added"] == 3
     assert report["counts"]["objects_updated"] == 0
@@ -697,7 +716,7 @@ def test_merge_updates_matching_types_without_renaming_them():
     assert material.id == original.id
     assert material.name == "物料"  # local business name wins on update
     assert material.description == "导入后的新说明"
-    assert [a.technical_name for a in material.attributes][-1] == "shelf_life_days"
+    assert [a.technical_name for a in attrs(merged, material)][-1] == "shelf_life_days"
     assert report["counts"]["objects_updated"] == 5
     assert report["counts"]["attributes_added"] == 1
 
@@ -754,7 +773,7 @@ def test_extension_v1_files_with_flat_mappings_still_import():
     again = compile_ossie(
         OntologyDraft.model_validate(payload), ontology_name="mfg", ontology_description="制造"
     )
-    assert again["ai_context"]["ontofoundry"]["version"] == "2"
+    assert again["ai_context"]["ontofoundry"]["version"] == EXTENSION_VERSION
     assert all(
         "relationship" not in root
         for entry in again["ontology_mappings"]
@@ -917,7 +936,7 @@ def test_named_value_roles_and_stated_multiplicity_survive_round_trip():
     document = named_value_roles_document()
     payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     model = OntologyDraft.model_validate(payload)
-    by_name = {item.technical_name: item for item in model.object_types[0].attributes}
+    by_name = {item.technical_name: item for item in attrs(model, model.object_types[0])}
 
     assert report["skipped"] == []
     assert by_name["issue_key"].value_concept == "String"
@@ -971,7 +990,9 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
         item for item in snapshot["object_types"] if item["technical_name"] == "arch_issue"
     )
     key = next(
-        item for item in issue["attributes"] if item["technical_name"] == "issue_key"
+        item
+        for item in snapshot["properties"]
+        if item["owner_type_id"] == issue["id"] and item["technical_name"] == "issue_key"
     )
     assert key["target_role_name"] == "key_role"
     assert key["multiplicity"] == "many_to_one"
@@ -1015,7 +1036,7 @@ def test_editor_created_attribute_still_infers_identifier_multiplicity():
         named_value_roles_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
     )
     model = OntologyDraft.model_validate(payload)
-    model.object_types[0].attributes[0].multiplicity = None
+    attrs(model, model.object_types[0])[0].multiplicity = None
     rewritten = compile_ossie(
         model, ontology_name="governance", ontology_description="治理"
     )
@@ -1031,14 +1052,14 @@ def test_attribute_rejects_cardinality_that_ossie_cannot_export():
     payload, _ = import_ossie(
         named_value_roles_document(), workspace_id=DEMO_WORKSPACE_ID, mode="replace"
     )
-    payload["object_types"][0]["attributes"][0]["multiplicity"] = "many_to_many"
+    payload["properties"][0]["multiplicity"] = "many_to_many"
     with pytest.raises(ValidationError, match="属性的基数"):
         OntologyDraft.model_validate(payload)
 
 
 def test_internal_draft_rejects_unknown_schema_version():
     payload = build_demo_draft().model_dump(mode="json")
-    payload["schema_version"] = "2"
+    payload["schema_version"] = "3"
     with pytest.raises(ValidationError, match="schema_version"):
         OntologyDraft.model_validate(payload)
 
@@ -1059,7 +1080,7 @@ V1_EXPORT = json.loads(
 )
 
 
-def test_frozen_extension_v1_export_imports_and_reexports_as_v2():
+def test_frozen_extension_v1_export_imports_and_reexports_as_current():
     """A file exported by the extension-v1 compiler (commit e3dc4a9), frozen."""
     expected = V1_EXPORT["draft"]
     payload, report = import_ossie(
@@ -1085,7 +1106,7 @@ def test_frozen_extension_v1_export_imports_and_reexports_as_v2():
     again = compile_ossie(
         OntologyDraft.model_validate(payload), ontology_name="mfg", ontology_description="制造"
     )
-    assert again["ai_context"]["ontofoundry"]["version"] == "2"
+    assert again["ai_context"]["ontofoundry"]["version"] == EXTENSION_VERSION
     assert validate_ossie(again)["publishable"] is True
 
 

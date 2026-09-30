@@ -52,7 +52,6 @@ def test_internal_model_rejects_duplicate_names():
     duplicate = deepcopy(payload["object_types"][0])
     duplicate["id"] = "20375c4d-64e2-4ddf-a6e6-f3fc36d23101"
     duplicate["technical_name"] = "supplier_copy"
-    duplicate["attributes"] = []
     payload["object_types"].append(duplicate)
 
     with pytest.raises(ValidationError, match="同名业务对象"):
@@ -64,7 +63,7 @@ def test_ablation_ordinary_attributes_share_builtins_without_losing_identifiers(
     result = compile_ossie(draft, ontology_name="test", ontology_description="")
     values = [c for c in result["ontology"] if c["type"] == "ValueType"]
     assert len(values) == sum(
-        a.identifier for t in draft.object_types for a in t.attributes
+        p.identifier for p in draft.properties
     )
     assert (
         len(result["ontology"]) == 10
@@ -95,7 +94,7 @@ def test_compiler_sanitizes_readings_with_case_and_type_aliases():
         "{Material} 由 {Supplier} 提供",
     ]
     # Provide {String} on an identifier attribute that gets a ValueType wrapper
-    draft.object_types[0].attributes[0].verbalizes = [
+    draft.properties_of(draft.object_types[0].id)[0].verbalizes = [
         "{Supplier} 的供应商编码是 {String}",
     ]
     # Provide an invalid reading that should fall back gracefully

@@ -16,15 +16,22 @@ import unicodedata
 from typing import Any
 from uuid import UUID, uuid5
 
-from ontofoundry_api.domain.models import (
+# The file is first read into the v1 nested shape, which mirrors Ossie's own
+# nesting (relationships inside concepts), then lifted to v2 in one place.
+from ontofoundry_api.domain.legacy_v1 import (
     AttributeDefinition,
     DataMapping,
     LinkTypeDefinition,
     Multiplicity,
     ObjectTypeDefinition,
-    OntologyDraft,
+    OntologyDraftV1,
     ValueKind,
 )
+from ontofoundry_api.domain.models import (
+    OntologyDraft,
+    RuleDefinition,
+)
+from ontofoundry_api.domain.snapshot import legacy_rule_id, normalize_v1
 
 from .compiler import (
     EXTENSION_KEY,
@@ -42,7 +49,7 @@ MAX_COMPONENTS = 2000
 # files exported before the bump — and published versions exported from them —
 # still import. Listed explicitly: bumping EXTENSION_VERSION must not drop
 # the version it replaces.
-READABLE_EXTENSION_VERSIONS = ("1", "2")
+READABLE_EXTENSION_VERSIONS = ("1", "2", "3")
 VALUE_KIND_BY_CONCEPT = {name: kind for kind, name in VALUE_BASES.items()}
 MULTIPLICITY_BY_OSSIE = {
     "OneToOne": Multiplicity.ONE_TO_ONE,
@@ -86,6 +93,9 @@ class Report:
     def __init__(self) -> None:
         self.skipped: list[dict[str, str]] = []
         self.notes: list[str] = []
+        # Imported element id -> its Ossie path ("concept" or "concept.name"),
+        # used to find rule identities kept in extension v3.
+        self.paths: dict[str, str] = {}
 
     def skip(self, path: str, reason: str) -> None:
         self.skipped.append({"path": path, "reason": reason})
@@ -93,6 +103,14 @@ class Report:
     def note(self, text: str) -> None:
         if text not in self.notes:
             self.notes.append(text)
+
+
+class _PropertyView:
+    """What parse_mappings needs of a property while types are still v1-shaped."""
+
+    def __init__(self, owner_type_id: UUID, technical_name: str) -> None:
+        self.owner_type_id = owner_type_id
+        self.technical_name = technical_name
 
 
 def _extension(document: dict[str, Any]) -> dict[str, Any]:
@@ -316,6 +334,7 @@ def parse_ossie(
                     attribute_verbalizations(attribute, technical_name, target),
                 )
                 attributes.append(attribute)
+                report.paths[str(attribute.id)] = key
                 used_identifiers.add(name)
                 continue
 
@@ -365,6 +384,7 @@ def parse_ossie(
             )
         )
         by_concept_id[concept] = object_types[-1].id
+        report.paths[str(object_types[-1].id)] = concept
 
     keys_by_concept = {
         concept: item.technical_name
@@ -426,10 +446,21 @@ def parse_ossie(
             ),
         )
         link_types.append(candidate)
+        report.paths[str(candidate.id)] = f"{link['source']}.{link['name']}"
     # Mappings need the finished types, so they are read last — and joins need
     # the mappings, because a relation can only be joined when both of its
     # endpoints are backed by a table.
-    mappings = parse_mappings(document, object_types, workspace_id, report.skip)
+    mappings = parse_mappings(
+        document,
+        object_types,
+        [
+            _PropertyView(owner_type_id=item.id, technical_name=attribute.technical_name)
+            for item in object_types
+            for attribute in item.attributes
+        ],
+        workspace_id,
+        report.skip,
+    )
     parse_joins(
         document,
         object_types,
@@ -440,11 +471,137 @@ def parse_ossie(
     return object_types, link_types, mappings, ontology_requires, report
 
 
-def _merge(
-    base: OntologyDraft,
+def _lift(
+    workspace_id: str,
     objects: list[ObjectTypeDefinition],
     links: list[LinkTypeDefinition],
     mappings: list[DataMapping],
+    requires: list[str],
+    extension: dict[str, Any],
+    report: Report,
+) -> dict[str, Any]:
+    """The parsed file as a v2 draft dict, with extension-v3 identities restored."""
+    lifted = normalize_v1(
+        OntologyDraftV1(
+            workspace_id=UUID(str(workspace_id)),
+            requires=requires,
+            object_types=objects,
+            link_types=links,
+            mappings=[m.model_dump(mode="json") for m in mappings],
+        ).model_dump(mode="json")
+    )
+    kept = extension.get("rules") if isinstance(extension.get("rules"), dict) else {}
+    for rule in lifted["rules"]:
+        path = report.paths.get(rule["owner_id"])
+        match = next(
+            (
+                entry
+                for entry in kept.get(path or "", [])
+                if isinstance(entry, dict)
+                and entry.get("rule_kind") == rule["rule_kind"]
+                and entry.get("expression") == rule["expression"]
+            ),
+            None,
+        )
+        if match:
+            rule.update(
+                id=str(match.get("id") or rule["id"]),
+                name=str(match.get("name") or rule["name"]),
+                technical_name=str(match.get("technical_name") or rule["technical_name"]),
+                description=str(match.get("description") or ""),
+            )
+    lifted["actions"], action_rules = _parse_actions(lifted, extension, report)
+    lifted["rules"].extend(action_rules)
+    return lifted
+
+
+def _parse_actions(
+    draft: dict[str, Any], extension: dict[str, Any], report: Report
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Action definitions from extension v3; unresolved references are reported."""
+    entries = extension.get("actions")
+    if not isinstance(entries, list):
+        return [], []
+    by_path = {path: element_id for element_id, path in report.paths.items()}
+    types = {t["technical_name"]: t["id"] for t in draft["object_types"]}
+    concept_ids = {
+        path: element_id for path, element_id in by_path.items() if "." not in path
+    }
+    actions, rules = [], []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("technical_name") or f"actions[{index}]")
+        input_type = concept_ids.get(str(entry.get("input_type"))) or types.get(
+            str(entry.get("input_type"))
+        )
+        if not input_type:
+            report.skip(f"actions.{label}", "Action 的输入对象类型没有导入")
+            continue
+        action_id = str(entry.get("id") or uuid5(UUID(draft["workspace_id"]), f"action:{label}"))
+        own_rules = []
+        for rule in entry.get("rules") or []:
+            own_rules.append(
+                {
+                    "id": str(rule.get("id") or legacy_rule_id(
+                        UUID(draft["workspace_id"]), "action", action_id,
+                        str(rule.get("rule_kind")), str(rule.get("expression")),
+                    )),
+                    "name": str(rule.get("name") or rule.get("technical_name")),
+                    "technical_name": str(rule.get("technical_name")),
+                    "description": str(rule.get("description") or ""),
+                    "owner_kind": "action",
+                    "owner_id": action_id,
+                    "rule_kind": str(rule.get("rule_kind")),
+                    "expression": str(rule.get("expression")),
+                    "verbalizes": [],
+                    "evidence": [],
+                }
+            )
+        rule_by_name = {
+            r["technical_name"]: r["id"]
+            for r in [*draft["rules"], *own_rules]
+        }
+        effects, broken = [], False
+        for effect in entry.get("effects") or []:
+            prop = by_path.get(str(effect.get("property"))) if effect.get("property") else None
+            link = by_path.get(str(effect.get("link"))) if effect.get("link") else None
+            if (effect.get("property") and not prop) or (effect.get("link") and not link):
+                broken = True
+                break
+            effects.append(
+                {
+                    "id": str(effect.get("id") or uuid5(UUID(action_id), f"effect:{len(effects)}")),
+                    "kind": effect.get("kind"),
+                    "property_id": prop,
+                    "link_type_id": link,
+                    "expression": str(effect.get("expression") or ""),
+                }
+            )
+        preconditions = [rule_by_name.get(str(name)) for name in entry.get("preconditions") or []]
+        if broken or None in preconditions:
+            report.skip(f"actions.{label}", "Action 引用的属性、关系或前置规则没有导入")
+            continue
+        actions.append(
+            {
+                "id": action_id,
+                "name": str(entry.get("name") or label),
+                "technical_name": label,
+                "description": str(entry.get("description") or ""),
+                "input_type_id": input_type,
+                "parameters": list(entry.get("parameters") or []),
+                "precondition_rule_ids": preconditions,
+                "effects": effects,
+                "evidence": [],
+            }
+        )
+        rules.extend(own_rules)
+    return actions, rules
+
+
+def _merge(
+    base: OntologyDraft,
+    imported: OntologyDraft,
     report: Report,
 ) -> tuple[OntologyDraft, dict[str, int]]:
     """Add or update by technical name; never remove what the file omits."""
@@ -457,109 +614,166 @@ def _merge(
         "attributes_updated": 0,
         "mappings_added": 0,
     }
+    workspace = base.workspace_id
     merged = base.model_copy(deep=True)
+    remap: dict[UUID, UUID] = {}
+
     existing = {item.technical_name.casefold(): item for item in merged.object_types}
     names = {item.name.casefold() for item in merged.object_types}
     keys = set(existing)
-    for imported in objects:
-        current = existing.get(imported.technical_name.casefold())
+    updated_types: set[UUID] = set()
+    for incoming in imported.object_types:
+        current = existing.get(incoming.technical_name.casefold())
         if current is None:
-            imported.name = _unique(imported.name, names, "·")
-            imported.technical_name = _unique(imported.technical_name, keys)
-            merged.object_types.append(imported)
-            existing[imported.technical_name.casefold()] = imported
+            incoming.name = _unique(incoming.name, names, "·")
+            incoming.technical_name = _unique(incoming.technical_name, keys)
+            merged.object_types.append(incoming)
+            existing[incoming.technical_name.casefold()] = incoming
+            remap[incoming.id] = incoming.id
             counts["objects_added"] += 1
-            counts["attributes_added"] += len(imported.attributes)
             continue
+        remap[incoming.id] = current.id
+        updated_types.add(current.id)
         counts["objects_updated"] += 1
-        if imported.description:
-            current.description = imported.description
-        current.tags = sorted({*current.tags, *imported.tags})
-        if imported.requires:
-            current.requires = imported.requires
-        if imported.derived_by:
-            current.derived_by = imported.derived_by
-        # Keep the local business name: it is what the workspace already reads.
-        attributes = {item.technical_name.casefold(): item for item in current.attributes}
-        for attribute in imported.attributes:
-            found = attributes.get(attribute.technical_name.casefold())
-            if found is None:
-                current.attributes.append(attribute)
-                counts["attributes_added"] += 1
-                continue
-            found.value_kind = attribute.value_kind
-            found.value_concept = attribute.value_concept
-            found.target_role_name = attribute.target_role_name
-            found.multiplicity = attribute.multiplicity
-            found.identifier = attribute.identifier
-            found.required = attribute.required
-            found.requires = attribute.requires
-            found.derived_by = attribute.derived_by
-            found.verbalizes = attribute.verbalizes
-            if attribute.description:
-                found.description = attribute.description
-            counts["attributes_updated"] += 1
+        if incoming.description:
+            current.description = incoming.description
+        current.tags = sorted({*current.tags, *incoming.tags})
+    for incoming in imported.object_types:
+        target = next(t for t in merged.object_types if t.id == remap[incoming.id])
+        parents = [remap[p] for p in incoming.extends if p in remap]
+        if target.id in updated_types and parents or target.id not in updated_types:
+            target.extends = parents
 
-    by_key = {item.technical_name.casefold(): item.id for item in merged.object_types}
-    id_by_import = {item.id: item.technical_name.casefold() for item in objects}
-    for imported in objects:
-        current = existing.get(imported.technical_name.casefold())
-        parents = [
-            by_key[id_by_import[parent]]
-            for parent in imported.extends
-            if parent in id_by_import and id_by_import[parent] in by_key
-        ]
-        if current is not None and parents:
-            current.extends = parents
-
-    # Relationship names live inside their owning concept, so a file's `owned_by`
-    # updates that concept's `owned_by` and never another concept's.
-    def link_key(link: LinkTypeDefinition, owner: UUID) -> tuple[str, str]:
-        return (str(owner), link.technical_name.casefold())
-
-    link_index = {link_key(item, item.owner_type_id): item for item in merged.link_types}
-    for imported in links:
-        source = by_key.get(id_by_import.get(imported.source_type_id, ""))
-        target = by_key.get(id_by_import.get(imported.target_type_id, ""))
-        if source is None or target is None:  # pragma: no cover - endpoints always known
-            report.skip(imported.technical_name, "关系两端的业务对象没有导入成功")
+    # Properties: by technical name inside their (remapped) owner.
+    own = {
+        (p.owner_type_id, p.technical_name.casefold()): p for p in merged.properties
+    }
+    for incoming in imported.properties:
+        owner = remap[incoming.owner_type_id]
+        found = own.get((owner, incoming.technical_name.casefold()))
+        if found is None:
+            incoming.owner_type_id = owner
+            merged.properties.append(incoming)
+            own[(owner, incoming.technical_name.casefold())] = incoming
+            remap[incoming.id] = incoming.id
+            counts["attributes_added"] += 1
             continue
-        imported.source_type_id, imported.target_type_id = source, target
-        current = link_index.get(link_key(imported, imported.owner_type_id))
+        remap[incoming.id] = found.id
+        for field in (
+            "value_kind", "value_concept", "target_role_name", "multiplicity",
+            "identifier", "required", "verbalizes",
+        ):
+            setattr(found, field, getattr(incoming, field))
+        if incoming.description:
+            found.description = incoming.description
+        counts["attributes_updated"] += 1
+
+    # Relationship names live inside their owning concept, so a file's link
+    # updates that concept's link and never another concept's.
+    link_index = {
+        (link.owner_type_id, link.technical_name.casefold()): link
+        for link in merged.link_types
+    }
+    updated_links: set[UUID] = set()
+    for incoming in imported.link_types:
+        incoming.source_type_id = remap[incoming.source_type_id]
+        incoming.target_type_id = remap[incoming.target_type_id]
+        current = link_index.get((incoming.owner_type_id, incoming.technical_name.casefold()))
         if current is None:
             owned = [
-                item
-                for key, item in link_index.items()
-                if key[0] == str(imported.owner_type_id)
+                item for key, item in link_index.items() if key[0] == incoming.owner_type_id
             ]
-            imported.name = _unique(
-                imported.name, {item.name.casefold() for item in owned}, "·"
+            incoming.name = _unique(incoming.name, {i.name.casefold() for i in owned}, "·")
+            incoming.technical_name = _unique(
+                incoming.technical_name, {i.technical_name.casefold() for i in owned}
             )
-            imported.technical_name = _unique(
-                imported.technical_name,
-                {item.technical_name.casefold() for item in owned},
-            )
-            merged.link_types.append(imported)
-            link_index[link_key(imported, imported.owner_type_id)] = imported
+            merged.link_types.append(incoming)
+            link_index[(incoming.owner_type_id, incoming.technical_name.casefold())] = incoming
+            remap[incoming.id] = incoming.id
             counts["links_added"] += 1
             continue
+        remap[incoming.id] = current.id
+        updated_links.add(current.id)
         counts["links_updated"] += 1
-        current.source_type_id, current.target_type_id = source, target
-        current.multiplicity = imported.multiplicity
-        current.target_role_name = imported.target_role_name
-        current.identifier = imported.identifier
-        current.requires = imported.requires
-        current.derived_by = imported.derived_by
-        current.verbalizes = imported.verbalizes
-        if imported.description:
-            current.description = imported.description
-        current.tags = sorted({*current.tags, *imported.tags})
+        current.source_type_id, current.target_type_id = (
+            incoming.source_type_id,
+            incoming.target_type_id,
+        )
+        current.multiplicity = incoming.multiplicity
+        current.target_role_name = incoming.target_role_name
+        current.identifier = incoming.identifier
+        current.verbalizes = incoming.verbalizes
+        if incoming.description:
+            current.description = incoming.description
+        current.tags = sorted({*current.tags, *incoming.tags})
+
+    # Rules follow v1 import semantics: a file restates the rules of every
+    # property and link it carries; an object type's rules are replaced only
+    # for a kind the file states. Same owner + kind + expression keeps its id.
+    imported_rules: dict[tuple[UUID, str], list[RuleDefinition]] = {}
+    for rule in imported.rules:
+        if rule.owner_kind.value == "action":
+            continue
+        derived = legacy_rule_id(
+            imported.workspace_id, rule.owner_kind.value, str(rule.owner_id),
+            rule.rule_kind.value, rule.expression,
+        )
+        rule.owner_id = remap[rule.owner_id]
+        if rule.id == derived:
+            # No identity from the file: derive it from the owner it lands on.
+            rule.id = legacy_rule_id(
+                workspace, rule.owner_kind.value, str(rule.owner_id),
+                rule.rule_kind.value, rule.expression,
+            )
+        imported_rules.setdefault((rule.owner_id, rule.rule_kind.value), []).append(rule)
+    replaced: set[tuple[UUID, str]] = set(imported_rules)
+    for element_id in {remap[p.id] for p in imported.properties} | {
+        remap[link.id] for link in imported.link_types
+    }:
+        replaced |= {(element_id, "constraint"), (element_id, "derivation")}
+    kept_rules = [r for r in merged.rules if (r.owner_id, r.rule_kind.value) not in replaced]
+    previous = {
+        (r.owner_id, r.rule_kind.value, r.expression): r
+        for r in merged.rules
+        if (r.owner_id, r.rule_kind.value) in replaced
+    }
+    for (owner_id, kind), rules in imported_rules.items():
+        for rule in rules:
+            old = previous.get((owner_id, kind, rule.expression))
+            if old is not None:
+                rule.id, rule.name, rule.technical_name = old.id, old.name, old.technical_name
+            kept_rules.append(rule)
+    merged.rules = kept_rules
+
+    # Actions: by technical name; the file's definition replaces the local one.
+    actions = {a.technical_name.casefold(): a for a in merged.actions}
+    for action in imported.actions:
+        action.input_type_id = remap[action.input_type_id]
+        for effect in action.effects:
+            if effect.property_id:
+                effect.property_id = remap[effect.property_id]
+            if effect.link_type_id:
+                effect.link_type_id = remap[effect.link_type_id]
+        current = actions.get(action.technical_name.casefold())
+        if current is not None:
+            merged.rules = [
+                r for r in merged.rules if not (r.owner_kind.value == "action" and r.owner_id == current.id)
+            ]
+            merged.actions = [a for a in merged.actions if a.id != current.id]
+            old_id, action.id = action.id, current.id
+        else:
+            old_id = action.id
+        for rule in imported.rules:
+            if rule.owner_kind.value == "action" and rule.owner_id == old_id:
+                rule.owner_id = action.id
+                merged.rules.append(rule)
+        merged.actions.append(action)
 
     # A workspace's own mapping points at tables it has already checked, so the
     # file only fills in objects that have none.
     mapped = {item.type_id for item in merged.mappings}
-    for mapping in mappings:
-        type_id = by_key.get(id_by_import.get(mapping.type_id, ""))
+    for mapping in imported.mappings:
+        type_id = remap.get(mapping.type_id)
         if type_id is None or type_id in mapped:
             continue
         mapping.type_id = type_id
@@ -570,6 +784,10 @@ def _merge(
         report.note(
             "数据映射按文件里的数据源名称导入；请在“数据映射”页确认这些名称已配置连接"
         )
+    merged.ontology_requires = [
+        *merged.ontology_requires,
+        *[item for item in imported.ontology_requires if item not in merged.ontology_requires],
+    ]
     return merged, counts
 
 
@@ -580,7 +798,10 @@ def import_ossie(
     base: dict[str, Any] | None = None,
     mode: str = "merge",
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Return the resulting draft and a report of everything the import changed."""
+    """Return the resulting v2 draft and a report of everything the import changed.
+
+    `base` must already be a v2 snapshot (callers read it with read_snapshot).
+    """
     version = document.get("version") if isinstance(document, dict) else None
     if version != OSSIE_VERSION:
         raise OssieImportError(
@@ -606,6 +827,9 @@ def import_ossie(
     )
     if not objects:
         raise OssieImportError("文件里没有可导入的 EntityType 概念")
+    imported = OntologyDraft.model_validate(
+        _lift(workspace_id, objects, links, mappings, requires, extension, report)
+    )
 
     base_draft = (
         OntologyDraft.model_validate(base)
@@ -614,37 +838,27 @@ def import_ossie(
     )
     if mode == "replace":
         counts = {
-            "objects_added": len(objects),
+            "objects_added": len(imported.object_types),
             "objects_updated": 0,
-            "links_added": len(links),
+            "links_added": len(imported.link_types),
             "links_updated": 0,
-            "attributes_added": sum(len(item.attributes) for item in objects),
+            "attributes_added": len(imported.properties),
             "attributes_updated": 0,
+            "mappings_added": len(imported.mappings),
         }
-        counts["mappings_added"] = len(mappings)
-        if base_draft.objects or base_draft.links:
+        if base_draft.material_objects or base_draft.material_links:
             report.note(
                 "替换模式：文档实例与实例关系不会保留，发布后当前模型将被文件内容整体替换"
             )
         elif base_draft.object_types:
             report.note("替换模式：文件之外的业务对象与关系会在发布时消失")
-        if mappings:
+        if imported.mappings:
             report.note(
                 "数据映射按文件里的数据源名称导入；请在“数据映射”页确认这些名称已配置连接"
             )
-        draft = OntologyDraft(
-            workspace_id=UUID(str(workspace_id)),
-            requires=requires,
-            object_types=objects,
-            link_types=links,
-            mappings=mappings,
-        )
+        draft = imported
     else:
-        draft, counts = _merge(base_draft, objects, links, mappings, report)
-        draft.requires = [
-            *draft.requires,
-            *[item for item in requires if item not in draft.requires],
-        ]
+        draft, counts = _merge(base_draft, imported, report)
         report.note("合并模式：文件之外的已有对象、实例与数据映射保持不变")
 
     payload = draft.model_dump(mode="json")

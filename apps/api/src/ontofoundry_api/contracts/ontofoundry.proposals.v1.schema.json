@@ -1,0 +1,2426 @@
+{
+  "$defs": {
+    "ActionEffect": {
+      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
+      "properties": {
+        "expression": {
+          "default": "",
+          "maxLength": 480,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ActionEffectKind"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Link Type Id"
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Property Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "ActionEffect",
+      "type": "object"
+    },
+    "ActionEffectKind": {
+      "enum": [
+        "set_property",
+        "create_link",
+        "delete_link"
+      ],
+      "title": "ActionEffectKind",
+      "type": "string"
+    },
+    "ActionParameter": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind",
+          "default": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
+    "AfterActionEffect": {
+      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
+      "properties": {
+        "expression": {
+          "default": "",
+          "maxLength": 480,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AfterActionEffectKind"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ActionEffect",
+      "type": "object"
+    },
+    "AfterActionEffectKind": {
+      "enum": [
+        "set_property",
+        "create_link",
+        "delete_link"
+      ],
+      "title": "ActionEffectKind",
+      "type": "string"
+    },
+    "AfterActionParameter": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/AfterValueKind",
+          "default": "string"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
+    "AfterDataJoin": {
+      "properties": {
+        "source_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Source Column",
+          "type": "string"
+        },
+        "target_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Target Column",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_column",
+        "target_column"
+      ],
+      "title": "DataJoin",
+      "type": "object"
+    },
+    "AfterEvidenceLocator": {
+      "properties": {
+        "heading": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "AfterManualEvidence": {
+      "description": "A member vouching for a fact. Author and time are written by the server.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "AfterMaterialEvidence": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/AfterEvidenceLocator"
+        },
+        "material_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Material Id",
+          "type": "string"
+        },
+        "material_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Material Sha256"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "material_id",
+        "locator"
+      ],
+      "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "AfterMultiplicity": {
+      "enum": [
+        "one_to_one",
+        "many_to_one",
+        "one_to_many",
+        "many_to_many"
+      ],
+      "title": "Multiplicity",
+      "type": "string"
+    },
+    "AfterRuleKind": {
+      "enum": [
+        "constraint",
+        "derivation"
+      ],
+      "title": "RuleKind",
+      "type": "string"
+    },
+    "AfterRuleOwnerKind": {
+      "enum": [
+        "object_type",
+        "property",
+        "link_type",
+        "action"
+      ],
+      "title": "RuleOwnerKind",
+      "type": "string"
+    },
+    "AfterValueKind": {
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
+    },
+    "DataJoin": {
+      "properties": {
+        "source_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Source Column",
+          "type": "string"
+        },
+        "target_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Target Column",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_column",
+        "target_column"
+      ],
+      "title": "DataJoin",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "properties": {
+        "heading": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "ManualEvidence": {
+      "description": "A member vouching for a fact. Author and time are written by the server.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "MaterialEvidence": {
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "material_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Material Id",
+          "type": "string"
+        },
+        "material_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Material Sha256"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "material_id",
+        "locator"
+      ],
+      "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "Multiplicity": {
+      "enum": [
+        "one_to_one",
+        "many_to_one",
+        "one_to_many",
+        "many_to_many"
+      ],
+      "title": "Multiplicity",
+      "type": "string"
+    },
+    "RuleKind": {
+      "enum": [
+        "constraint",
+        "derivation"
+      ],
+      "title": "RuleKind",
+      "type": "string"
+    },
+    "RuleOwnerKind": {
+      "enum": [
+        "object_type",
+        "property",
+        "link_type",
+        "action"
+      ],
+      "title": "RuleOwnerKind",
+      "type": "string"
+    },
+    "ValueKind": {
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
+    },
+    "action_after": {
+      "additionalProperties": false,
+      "description": "An action contract. Only modeled and versioned; there is no executor.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/AfterActionEffect"
+          },
+          "maxItems": 40,
+          "title": "Effects",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "input_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/AfterActionParameter"
+          },
+          "maxItems": 40,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "precondition_rule_ids": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name",
+        "input_type_id"
+      ],
+      "title": "ActionDefinition",
+      "type": "object"
+    },
+    "action_element": {
+      "description": "An action contract. Only modeled and versioned; there is no executor.",
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/ActionEffect"
+          },
+          "maxItems": 40,
+          "title": "Effects",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "input_type_id": {
+          "format": "uuid",
+          "title": "Input Type Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/ActionParameter"
+          },
+          "maxItems": 40,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "precondition_rule_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Precondition Rule Ids",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "input_type_id"
+      ],
+      "title": "ActionDefinition",
+      "type": "object"
+    },
+    "item": {
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object_type_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object_type_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "object_type"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/property_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/property_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "property"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/link_type_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/link_type_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "link_type"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/rule_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/rule_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "rule"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/action_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/action_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "action"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_object_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_object_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "material_object"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_link_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_link_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "material_link"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/mapping_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/mapping_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "mapping"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "after": {},
+        "before": {},
+        "client_ref": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/AfterMaterialEvidence"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "expected_target_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "field_changes": {
+          "items": {
+            "properties": {
+              "after": {},
+              "before": {},
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "operation": {
+          "enum": [
+            "create",
+            "update",
+            "delete"
+          ]
+        },
+        "reason": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_kind": {
+          "enum": [
+            "object_type",
+            "property",
+            "link_type",
+            "rule",
+            "action",
+            "material_object",
+            "material_link",
+            "mapping"
+          ]
+        }
+      },
+      "required": [
+        "operation",
+        "target_kind",
+        "before",
+        "after"
+      ],
+      "type": "object"
+    },
+    "link_type_after": {
+      "additionalProperties": false,
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterDataJoin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "multiplicity": {
+          "$ref": "#/$defs/AfterMultiplicity",
+          "default": "many_to_one"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
+        },
+        "source_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "target_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name",
+        "source_type_id",
+        "target_type_id"
+      ],
+      "title": "LinkTypeDefinition",
+      "type": "object"
+    },
+    "link_type_element": {
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DataJoin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "multiplicity": {
+          "$ref": "#/$defs/Multiplicity",
+          "default": "many_to_one"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
+        },
+        "source_type_id": {
+          "format": "uuid",
+          "title": "Source Type Id",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "target_type_id": {
+          "format": "uuid",
+          "title": "Target Type Id",
+          "type": "string"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "source_type_id",
+        "target_type_id"
+      ],
+      "title": "LinkTypeDefinition",
+      "type": "object"
+    },
+    "mapping_after": {
+      "additionalProperties": false,
+      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
+      "properties": {
+        "connection_alias": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Connection Alias",
+          "type": "string"
+        },
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "key_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Key Column",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        },
+        "type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "type_id",
+        "connection_alias",
+        "table_name",
+        "key_column"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "mapping_element": {
+      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
+      "properties": {
+        "connection_alias": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Connection Alias",
+          "type": "string"
+        },
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Key Column",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "connection_alias",
+        "table_name",
+        "key_column"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "material_link_after": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "type_id",
+        "source_id",
+        "target_id"
+      ],
+      "title": "MaterialLink",
+      "type": "object"
+    },
+    "material_link_element": {
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "format": "uuid",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "source_id",
+        "target_id"
+      ],
+      "title": "MaterialLink",
+      "type": "object"
+    },
+    "material_object_after": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type_id",
+        "name"
+      ],
+      "title": "MaterialObject",
+      "type": "object"
+    },
+    "material_object_element": {
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "name"
+      ],
+      "title": "MaterialObject",
+      "type": "object"
+    },
+    "object_type_after": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "extends": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name"
+      ],
+      "title": "ObjectTypeDefinition",
+      "type": "object"
+    },
+    "object_type_element": {
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "extends": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Extends",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name"
+      ],
+      "title": "ObjectTypeDefinition",
+      "type": "object"
+    },
+    "property_after": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterMultiplicity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_concept": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Concept"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/AfterValueKind",
+          "default": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "owner_type_id",
+        "name",
+        "technical_name"
+      ],
+      "title": "PropertyDefinition",
+      "type": "object"
+    },
+    "property_element": {
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Multiplicity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_type_id": {
+          "format": "uuid",
+          "title": "Owner Type Id",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_concept": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Concept"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind",
+          "default": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "owner_type_id",
+        "name",
+        "technical_name"
+      ],
+      "title": "PropertyDefinition",
+      "type": "object"
+    },
+    "rule_after": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 480,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/AfterRuleOwnerKind"
+        },
+        "rule_kind": {
+          "$ref": "#/$defs/AfterRuleKind"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name",
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
+      ],
+      "title": "RuleDefinition",
+      "type": "object"
+    },
+    "rule_element": {
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 480,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "format": "uuid",
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/RuleOwnerKind"
+        },
+        "rule_kind": {
+          "$ref": "#/$defs/RuleKind"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 480,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 8,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
+      ],
+      "title": "RuleDefinition",
+      "type": "object"
+    }
+  },
+  "$id": "https://ontofoundry.local/schemas/ontofoundry.proposals.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_version_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "base_version_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/item"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "run_token": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "ontofoundry.proposals/v1"
+    },
+    "session_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "source_draft_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_session_revision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "workspace_id": {
+      "format": "uuid",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_token",
+    "workspace_id",
+    "session_id",
+    "base_version_id",
+    "base_version_sha256",
+    "source_session_revision",
+    "source_draft_sha256",
+    "items"
+  ],
+  "title": "ontofoundry.proposals/v1",
+  "type": "object"
+}

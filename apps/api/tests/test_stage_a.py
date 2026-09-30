@@ -40,10 +40,12 @@ def document_session(client):
     kind = session["draft"]["object_types"][0]
     attrs = {
         a["technical_name"]: f"code-{i}"
-        for i, a in enumerate(kind["attributes"])
+        for i, a in enumerate(
+            p for p in session["draft"]["properties"] if p["owner_type_id"] == kind["id"]
+        )
         if a["required"]
     }
-    session["draft"]["objects"] = [
+    session["draft"]["material_objects"] = [
         {
             "id": str(uuid4()),
             "type_id": kind["id"],
@@ -86,8 +88,12 @@ def test_fact_value_semantics(kind, value, valid):
 def test_incomplete_values_can_save_but_cannot_publish(client, document_session):
     session, kind = document_session
     before = client.get(SERVICE + "/version").json()["version_id"]
-    required = next(a for a in kind["attributes"] if a["required"])
-    session["draft"]["objects"][0]["values"][required["technical_name"]] = " "
+    required = next(
+        a
+        for a in session["draft"]["properties"]
+        if a["owner_type_id"] == kind["id"] and a["required"]
+    )
+    session["draft"]["material_objects"][0]["values"][required["technical_name"]] = " "
     saved = client.put(
         ROOT + f"/sessions/{session['id']}",
         json={"revision": session["revision"], "draft": session["draft"]},
@@ -96,7 +102,7 @@ def test_incomplete_values_can_save_but_cannot_publish(client, document_session)
     report = saved.json()["validation"]
     assert not report["publishable"]
     assert report["errors"][0]["code"] == "INSTANCE_REQUIRED"
-    assert report["errors"][0]["path"].startswith("$.objects[0].values.")
+    assert report["errors"][0]["path"].startswith("$.material_objects[0].values.")
     rejected = client.post(
         ROOT + f"/sessions/{session['id']}/publish",
         json={"revision": saved.json()["revision"]},
@@ -206,7 +212,8 @@ def test_nonmember_cannot_read_instances_or_private_presentation(client, documen
         assert client.get(SERVICE + "/objects").status_code == 403
         assert client.get(SERVICE + "/types").status_code == 200
         public = client.get(ROOT + f"/versions/{version}/presentation").json()["model"]
-        assert public["objects"] == public["links"] == public["mappings"] == []
+        assert public["material_objects"] == public["material_links"] == []
+        assert public["mappings"] == []
         assert all("data_join" not in relation for relation in public["link_types"])
     finally:
         client.app.dependency_overrides.clear()
@@ -264,7 +271,7 @@ def test_database_services_share_actual_rows_and_protect_mapping_export(
         headers=mapping_headers,
     ).json()["result"]["structuredContent"]
     assert complete["ontology_mappings"]
-    assert complete["ai_context"]["ontofoundry"]["version"] == "2"
+    assert complete["ai_context"]["ontofoundry"]["version"] == "3"
     concept_mappings = complete["ontology_mappings"][0]["concept_mappings"]
     mapped = next(item for item in concept_mappings if item.get("link_mappings"))
     root = mapped["link_mappings"][0]

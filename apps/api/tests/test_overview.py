@@ -35,8 +35,16 @@ def add_private_test_snapshot(client):
         snapshot = deepcopy(version.snapshot_json)
         type_id = snapshot["object_types"][0]["id"]
         relation_id = snapshot["link_types"][0]["id"]
-        evidence = [{"material_id": "private-material", "quote": "private-quote"}]
-        snapshot["objects"] = [
+        evidence = [
+            {
+                "kind": "material",
+                "id": "e0",
+                "material_id": "private-material",
+                "locator": {"line_start": 1, "line_end": 1},
+                "quote": "private-quote",
+            }
+        ]
+        snapshot["material_objects"] = [
             {
                 "id": f"o{i}",
                 "name": f"private-object-{i}",
@@ -46,7 +54,7 @@ def add_private_test_snapshot(client):
             }
             for i in range(30)
         ]
-        snapshot["links"] = [
+        snapshot["material_links"] = [
             {
                 "id": f"l{i}",
                 "type_id": relation_id,

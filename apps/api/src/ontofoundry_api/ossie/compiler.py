@@ -7,10 +7,11 @@ from collections import defaultdict
 from typing import Any
 
 from ontofoundry_api.domain.models import (
-    AttributeDefinition,
     LinkTypeDefinition,
     Multiplicity,
     OntologyDraft,
+    PropertyDefinition,
+    RuleKind,
     ValueKind,
 )
 
@@ -24,7 +25,8 @@ OSSIE_VERSION = "0.2.0.dev0"
 # so they ride there under our own key; every other consumer can ignore it, and
 # import works without it.
 EXTENSION_KEY = "ontofoundry"
-EXTENSION_VERSION = "2"
+# v3 adds stable rule identities and action definitions (`rules`, `actions`).
+EXTENSION_VERSION = "3"
 
 VALUE_BASES = {
     ValueKind.STRING: "String",
@@ -72,7 +74,7 @@ def link_verbalizations(
 
 
 def attribute_verbalizations(
-    attribute: AttributeDefinition, object_key: str, value_concept: str
+    attribute: PropertyDefinition, object_key: str, value_concept: str
 ) -> list[str]:
     value_role = value_concept + (
         f":{attribute.target_role_name}" if attribute.target_role_name else ""
@@ -132,6 +134,7 @@ def _compile_link_relationship(
     link: LinkTypeDefinition,
     source_key: str,
     target_key: str,
+    draft: OntologyDraft,
 ) -> dict[str, Any]:
     role_name = link.target_role_name or ("related" if source_key == target_key else None)
     target_ref = target_key + (":" + role_name if role_name else "")
@@ -156,11 +159,86 @@ def _compile_link_relationship(
         relationship["multiplicity"] = multiplicity
     if link.multiplicity == Multiplicity.ONE_TO_MANY:
         relationship["multiplicity"] = "ManyToOne"
-    if link.requires:
-        relationship["requires"] = list(link.requires)
-    if link.derived_by:
-        relationship["derived_by"] = list(link.derived_by)
+    _attach_rules(relationship, draft, link.id)
     return relationship
+
+
+def _attach_rules(target: dict[str, Any], draft: OntologyDraft, owner_id) -> None:
+    """Project an element's Rule elements onto Ossie `requires`/`derived_by`."""
+    requires = draft.expressions_of(owner_id, RuleKind.CONSTRAINT)
+    derived = draft.expressions_of(owner_id, RuleKind.DERIVATION)
+    if requires:
+        target["requires"] = requires
+    if derived:
+        target["derived_by"] = derived
+
+
+def _rule_entries(draft: OntologyDraft, owner_id) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": str(rule.id),
+            "name": rule.name,
+            "technical_name": rule.technical_name,
+            **({"description": rule.description} if rule.description else {}),
+            "rule_kind": rule.rule_kind.value,
+            "expression": rule.expression,
+        }
+        for rule in draft.rules_of(owner_id)
+    ]
+
+
+def _compile_actions(draft: OntologyDraft) -> list[dict[str, Any]]:
+    """Action definitions for the extension, referencing concepts by name.
+
+    Ossie has no action construct. Names rather than ids keep the extension
+    readable by the importer, which derives ids from concept names.
+    """
+    types = draft.type_by_id()
+    props = {p.id: p for p in draft.properties}
+    links = {link.id: link for link in draft.link_types}
+
+    def property_key(prop_id) -> str:
+        prop = props[prop_id]
+        return f"{types[prop.owner_type_id].technical_name}.{prop.technical_name}"
+
+    def link_key(link_id) -> str:
+        link = links[link_id]
+        return f"{types[link.owner_type_id].technical_name}.{link.technical_name}"
+
+    rules = {r.id: r for r in draft.rules}
+    result = []
+    for action in sorted(draft.actions, key=lambda a: a.technical_name.casefold()):
+        result.append(
+            {
+                "id": str(action.id),
+                "name": action.name,
+                "technical_name": action.technical_name,
+                **({"description": action.description} if action.description else {}),
+                "input_type": types[action.input_type_id].technical_name,
+                "parameters": [
+                    p.model_dump(mode="json") for p in action.parameters
+                ],
+                "preconditions": [
+                    rules[rule_id].technical_name for rule_id in action.precondition_rule_ids
+                ],
+                "effects": [
+                    {
+                        "id": str(effect.id),
+                        "kind": effect.kind.value,
+                        **(
+                            {"property": property_key(effect.property_id)}
+                            if effect.property_id
+                            else {}
+                        ),
+                        **({"link": link_key(effect.link_type_id)} if effect.link_type_id else {}),
+                        **({"expression": effect.expression} if effect.expression else {}),
+                    }
+                    for effect in action.effects
+                ],
+                "rules": _rule_entries(draft, action.id),
+            }
+        )
+    return result
 
 
 def compile_ossie(
@@ -181,6 +259,12 @@ def compile_ossie(
     display_names: dict[str, str] = {}
     tags: dict[str, list[str]] = {}
     required_attributes: list[str] = []
+    rule_ids: dict[str, list[dict[str, Any]]] = {}
+
+    def remember_rules(key: str, owner_id) -> None:
+        entries = _rule_entries(draft, owner_id)
+        if entries:
+            rule_ids[key] = entries
 
     for object_type in objects:
         relationships: list[dict[str, Any]] = []
@@ -190,13 +274,13 @@ def compile_ossie(
             tags[object_type.technical_name] = sorted(object_type.tags)
         # A composite identifier can pair attributes with identifying relations,
         # so a lone identifier is only OneToOne when nothing else identifies.
-        identifier_count = sum(item.identifier for item in object_type.attributes) + sum(
+        own_properties = draft.properties_of(object_type.id)
+        identifier_count = sum(item.identifier for item in own_properties) + sum(
             link.identifier for link in links_by_source[object_type.id]
         )
+        remember_rules(object_type.technical_name, object_type.id)
 
-        for attribute in sorted(
-            object_type.attributes, key=lambda item: item.technical_name.casefold()
-        ):
+        for attribute in sorted(own_properties, key=lambda item: item.technical_name.casefold()):
             # A stored concept name wins; otherwise identifiers get a generated
             # value concept and plain attributes point at the built-in type.
             value_concept = attribute.value_concept or (
@@ -261,11 +345,9 @@ def compile_ossie(
             )
             if attribute.identifier:
                 identifiers.append(attribute.technical_name)
-            if attribute.requires:
-                relationship["requires"] = list(attribute.requires)
-            if attribute.derived_by:
-                relationship["derived_by"] = list(attribute.derived_by)
+            _attach_rules(relationship, draft, attribute.id)
             key = f"{object_type.technical_name}.{attribute.technical_name}"
+            remember_rules(key, attribute.id)
             display_names[key] = attribute.name
             if attribute.required:
                 required_attributes.append(key)
@@ -285,12 +367,14 @@ def compile_ossie(
                     link,
                     object_type.technical_name,
                     target.technical_name,
+                    draft,
                 )
             )
             if link.identifier:
                 identifiers.append(link.technical_name)
             key = f"{object_type.technical_name}.{link.technical_name}"
             display_names[key] = link.name
+            remember_rules(key, link.id)
             if link.tags:
                 tags[key] = sorted(link.tags)
 
@@ -307,10 +391,7 @@ def compile_ossie(
             )
         if identifiers:
             component["identify_by"] = sorted(identifiers)
-        if object_type.requires:
-            component["requires"] = list(object_type.requires)
-        if object_type.derived_by:
-            component["derived_by"] = list(object_type.derived_by)
+        _attach_rules(component, draft, object_type.id)
         if relationships:
             component["relationships"] = sorted(
                 relationships, key=lambda item: item["name"].casefold()
@@ -333,15 +414,17 @@ def compile_ossie(
                 "display_names": display_names,
                 "tags": tags,
                 "required_attributes": sorted(required_attributes),
+                "rules": rule_ids,
+                "actions": _compile_actions(draft),
             },
         },
         "ontology": components,
     }
-    if draft.requires:
-        document["requires"] = list(draft.requires)
+    if draft.ontology_requires:
+        document["requires"] = list(draft.ontology_requires)
     # Data mappings travel as ontology_mappings: table, key column and the
     # column behind each attribute, with no connection or credentials.
-    ontology_mappings = compile_mappings(draft.mappings, objects, draft.link_types)
+    ontology_mappings = compile_mappings(draft, objects)
     if ontology_mappings:
         document["ontology_mappings"] = ontology_mappings
     return document

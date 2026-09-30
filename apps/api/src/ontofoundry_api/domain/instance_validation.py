@@ -43,7 +43,7 @@ def valid_value(kind: str, value) -> bool:
 
 def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list[dict]:
     issues = []
-    for attribute in draft.effective_attributes(type_id):
+    for attribute in draft.effective_properties(type_id):
         value = values.get(attribute.technical_name)
         code = None
         if (attribute.required or attribute.identifier) and (
@@ -70,9 +70,9 @@ def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list
 def instance_issues(draft: OntologyDraft) -> list[dict]:
     return [
         issue
-        for index, obj in enumerate(draft.objects)
+        for index, obj in enumerate(draft.material_objects)
         for issue in value_issues(
-            draft, obj.type_id, obj.values, f"$.objects[{index}].values"
+            draft, obj.type_id, obj.values, f"$.material_objects[{index}].values"
         )
     ]
 
