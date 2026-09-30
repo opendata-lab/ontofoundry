@@ -90,6 +90,16 @@ python3 .claude/skills/md2ossie/scripts/validate_ossie.py --strict path/to/model
 - `Total Errors: 0` 与 `Total Warnings: 0`。
 - 人工复核表达式含义、建模粒度、未转换规则和输入证据。`0 errors` 不代表表达式已经被 OSSIE 执行器验证。
 
+## OntoFoundry 提案模式
+
+当 OntoFoundry 的轮次指令要求输出 `ontofoundry.proposals/v1` 时：
+
+- 分析方法不变：按上面的转换流程判断概念、属性、关系、规则和映射，结论保守、可追溯。
+- 交付物不是完整 Ossie 文档，而是**相对上下文文件中固定草稿的提案**：只为材料确有依据的新增、修改、删除各写一条提案；草稿里已有且无需改动的元素不要重复提出。
+- 结构以轮次指令给出的 JSON Schema 为准；头部字段逐字复制指令中的值；update/delete 的 `expected_target_hash` 取上下文文件 `element_hashes`。
+- 每条提案尽量附材料证据（行号 + 原文片段），规则写在其所属的对象、属性、关系或 Action 上。
+- 需要了解已发布本体时，只使用指令给出的只读 MCP 地址与凭据；它只能读取本次固定的版本。
+
 ## 交付内容
 
 返回：

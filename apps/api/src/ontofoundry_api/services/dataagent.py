@@ -316,6 +316,54 @@ class DataAgentClient:
             ) from exc
 
 
+def proposal_instructions(
+    *,
+    run_token: str,
+    header: dict,
+    materials: list[dict],
+    schema_file: str,
+    mcp: dict | None,
+) -> str:
+    """How a proposals-contract run must answer (ontofoundry.proposals/v1)."""
+    import json as _json
+
+    material_lines = "\n".join(
+        f"- material_id={m['id']} material_sha256={m['sha256']} 文件={m.get('path', '')}"
+        for m in materials
+    ) or "- 本轮没有材料"
+    mcp_lines = (
+        f"本体 MCP（只读，只能读取本次固定的版本 {mcp['version_id']}）：\n"
+        f"  URL: {mcp['url']}\n  Authorization: Bearer {mcp['credential']}\n"
+        if mcp and mcp.get("version_id")
+        else "本次会话基于空白模型，没有可读取的已发布版本。\n"
+    )
+    return (
+        "这是明确的建模请求。不要输出完整本体，也不要覆盖草稿：请输出一组**提案**，"
+        "由用户逐条接受后才进入草稿。\n"
+        f"结果必须符合 JSON Schema 文件 {schema_file}（ontofoundry.proposals/v1）。\n"
+        "结果头部必须逐字使用以下值：\n"
+        + _json.dumps(header, ensure_ascii=False, indent=2)
+        + "\n"
+        "items 中每条提案：\n"
+        "- operation 为 create / update / delete；target_kind 为 object_type、property、"
+        "link_type、rule、action、material_object、material_link、mapping 之一。\n"
+        "- create：必须给唯一 client_ref，target_id 与 before 为 null，after 为该类元素（不含 id）。"
+        "引用同批次新元素时写 {\"client_ref\": \"…\"}，引用已有元素时写其 id。\n"
+        "- update：target_id 为上下文文件中已有元素的 id，before 为该元素原样，"
+        "expected_target_hash 取上下文文件 element_hashes 中该 id 的值，after 为修改后的完整元素。\n"
+        "- delete：同 update，但 after 为 null。\n"
+        "- 证据只能是材料证据（kind=material），material_id 与 material_sha256 必须取自下列材料，"
+        "locator 给行号，quote 必须是原文中该行范围内的文字。不要编写 kind=manual 的证据；"
+        "update 时 before 中已有的人工证据必须原样保留。\n"
+        "- Action 效果表达式只能引用 :参数名 和输入对象的属性（输入对象技术名.属性技术名）。\n"
+        "- 规则必须归属于具体元素（对象类型、属性、关系或 Action）。\n"
+        f"本轮材料：\n{material_lines}\n"
+        f"{mcp_lines}"
+        f"只将结果 JSON 写到 output/ontofoundry-result-{run_token}.json，不要覆盖其他轮次的文件。"
+        "同时在回答中概括你提出了哪些提案及理由。"
+    )
+
+
 def build_turn_prompt(
     content: str,
     *,
@@ -325,8 +373,9 @@ def build_turn_prompt(
     context_file: str,
     material_files: list[str],
     run_token: str = "",
+    proposal_prompt: str | None = None,
 ) -> str:
-    action = (
+    action = proposal_prompt if (mode == "model" and proposal_prompt) else (
         "这是明确的建模请求。请基于本轮材料生成一份完整的新版本本体。\n"
         "输出是替换当前草稿的完整快照，不是 diff，也不要把新旧模型并列或合并。\n"
         "当前本体仅用于理解已有命名：保留某个已有概念时必须原样复用其 technical_name；"
