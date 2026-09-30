@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, mcp_principal
 from ontofoundry_api.database import get_db
+from ontofoundry_api.domain.models import COLLECTIONS
 from ontofoundry_api.services.access import (
     can_read_instances,
     can_read_mappings,
@@ -27,7 +28,9 @@ from ontofoundry_api.services.ontology_query import (
     current_version,
     get_type,
     search_types,
+    snapshot_of,
     type_graph,
+    version_hashes,
     version_summary,
 )
 
@@ -82,7 +85,56 @@ TOOLS = [
         },
     ),
 ]
+TOOLS += [
+    ("get_ontology_manifest", "读取版本清单：两个版本哈希与各类元素数量", {}),
+    (
+        "list_ontology_elements",
+        "按类型分页列出本体元素（稳定 id，v2 结构）",
+        {
+            "kind": {
+                "type": "string",
+                "enum": [
+                    "object_type", "property", "link_type", "rule", "action",
+                    "material_object", "material_link", "mapping",
+                ],
+            },
+            "cursor": {"type": "string", "maxLength": 64},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+        },
+    ),
+    (
+        "get_ontology_elements",
+        "按 id 读取本体元素",
+        {
+            "element_ids": {
+                "type": "array",
+                "items": {"type": "string", "maxLength": 64},
+                "minItems": 1,
+                "maxItems": 100,
+            }
+        },
+    ),
+]
 INSTANCE_TOOLS = {"search_objects", "get_object", "expand_object_graph"}
+# Element kinds that carry material quotes or table names.
+PRIVATE_KINDS = {"material_object": "instances", "material_link": "instances", "mapping": "mappings"}
+
+
+def visible_elements(db, workspace_id, principal, snapshot) -> dict[str, list[dict]]:
+    """v2 elements this principal may read: material instances need instance
+    access, mappings need mapping access, evidence needs instance access."""
+    instances = can_read_instances(db, workspace_id, principal)
+    mappings = can_read_mappings(db, workspace_id, principal)
+    result = {}
+    for kind, collection in COLLECTIONS.items():
+        need = PRIVATE_KINDS.get(kind.value)
+        if (need == "instances" and not instances) or (need == "mappings" and not mappings):
+            continue
+        items = snapshot.get(collection) or []
+        if not instances:
+            items = [{**item, "evidence": []} if "evidence" in item else item for item in items]
+        result[kind.value] = sorted(items, key=lambda item: str(item["id"]))
+    return result
 
 
 def rpc_error(rid, code, message, status=400, data=None):
@@ -103,6 +155,10 @@ def tool_schema(name, properties):
         if name == "get_ontology_type"
         else ["ref"]
         if name in ("get_object", "expand_object_graph")
+        else ["kind"]
+        if name == "list_ontology_elements"
+        else ["element_ids"]
+        if name == "get_ontology_elements"
         else [],
         "additionalProperties": False,
     }
@@ -268,6 +324,50 @@ async def rpc(
             version = current_version(db, workspace_id, args.get("version_id"))
             if name == "get_ontology_version":
                 value = version_summary(version)
+            elif name in ("get_ontology_manifest", "list_ontology_elements", "get_ontology_elements"):
+                elements = visible_elements(db, workspace_id, principal, snapshot_of(version))
+                envelope = {
+                    "workspace_id": version.workspace_id,
+                    "version_id": version.id,
+                    **version_hashes(version),
+                }
+                if name == "get_ontology_manifest":
+                    value = {
+                        **envelope,
+                        "version": version.version_number,
+                        "counts": {kind: len(items) for kind, items in elements.items()},
+                    }
+                elif name == "list_ontology_elements":
+                    items = elements.get(args["kind"])
+                    if items is None:
+                        raise NotFoundError("没有读取该类元素的权限")
+                    cursor = args.get("cursor")
+                    start = next(
+                        (i + 1 for i, item in enumerate(items) if str(item["id"]) == cursor), 0
+                    ) if cursor else 0
+                    limit = args.get("limit", 50)
+                    page = items[start : start + limit]
+                    value = {
+                        **envelope,
+                        "kind": args["kind"],
+                        "items": page,
+                        "next_cursor": str(page[-1]["id"])
+                        if start + limit < len(items) and page
+                        else None,
+                    }
+                else:
+                    wanted = set(args["element_ids"])
+                    found = [
+                        {"kind": kind, "element": item}
+                        for kind, items in elements.items()
+                        for item in items
+                        if str(item["id"]) in wanted
+                    ]
+                    value = {
+                        **envelope,
+                        "items": found,
+                        "missing": sorted(wanted - {str(f["element"]["id"]) for f in found}),
+                    }
             elif name == "search_ontology_types":
                 value = search_types(version, query=args.get("query", ""))
             elif name == "get_ontology_type":

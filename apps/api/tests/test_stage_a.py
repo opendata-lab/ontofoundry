@@ -181,7 +181,7 @@ def test_tokens_do_not_gain_instances_implicitly_and_can_be_revoked(
                 "tools"
             ]
         )
-        == 5
+        == 8
     )
     denied = mcp_request(
         client,

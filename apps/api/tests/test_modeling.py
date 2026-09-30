@@ -201,7 +201,7 @@ def test_mcp_discover_list_call_and_notification(client):
     assert discover.json()["result"]["supportedVersions"] == ["2026-07-28"]
     assert discover.json()["result"]["resultType"] == "complete"
     tools = mcp_request(client, "tools/list").json()["result"]["tools"]
-    assert len(tools) == 8
+    assert len(tools) == 11
     result = mcp_request(client, "tools/call", {"name": "get_ontology_version"}).json()
     assert result["result"]["isError"] is False
     assert result["result"]["structuredContent"] == json.loads(
@@ -270,7 +270,7 @@ def test_mcp_legacy_initialize_negotiates_without_weakening_modern_requests(clie
         },
     )
     assert legacy_tools.status_code == 200
-    assert len(legacy_tools.json()["result"]["tools"]) == 8
+    assert len(legacy_tools.json()["result"]["tools"]) == 11
     assert "resultType" not in legacy_tools.json()["result"]
 
     modern_without_modern_headers = client.post(
