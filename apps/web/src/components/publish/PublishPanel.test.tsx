@@ -177,6 +177,30 @@ describe("publish panel", () => {
     });
   });
 
+  it("re-merges when the version moved while resolving", async () => {
+    const previewCall = vi
+      .spyOn(publishApi, "preview")
+      .mockRejectedValueOnce(
+        new ApiError("冲突", 409, "MERGE_CONFLICTS", undefined, {
+          conflicts: [conflict],
+          current_version_id: "v2",
+        }),
+      )
+      .mockResolvedValue(preview({ next_version_number: 4 }));
+    vi.spyOn(publishApi, "resolve").mockRejectedValue(
+      new ApiError("又变了", 409, "PREVIEW_OUTDATED"),
+    );
+    const onStale = vi.fn();
+    renderPanel({ onStale });
+    await screen.findByLabelText("解决冲突");
+    fireEvent.click(screen.getByRole("radio", { name: /采用我的草稿/ }));
+    fireEvent.click(screen.getByRole("button", { name: "保存并重新预览" }));
+    await screen.findByRole("button", { name: "发布 v4" });
+    expect(previewCall).toHaveBeenCalledTimes(2);
+    expect(onStale).toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("预览后已变化");
+  });
+
   it("ignores a late preview for an earlier revision", async () => {
     let late!: (value: PublishPreview) => void;
     vi.spyOn(publishApi, "preview")

@@ -53,10 +53,14 @@ export function useProposals(
       .then((r) => {
         if (!active) return;
         setBatches(r.items);
+        // Keep the user's choice; otherwise the newest batch that can be
+        // acted on, not a newer failed one.
         setSelected((current) =>
           current && r.items.some((b) => b.id === current)
             ? current
-            : (r.items[0]?.id ?? null),
+            : (r.items.find((b) => b.status === "available")?.id ??
+              r.items[0]?.id ??
+              null),
         );
       })
       .catch((e: Error) => active && setError(e.message));

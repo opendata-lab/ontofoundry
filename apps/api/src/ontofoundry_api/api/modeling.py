@@ -262,6 +262,46 @@ class MergeResolution(BaseModel):
     resolutions: dict[str, Any]
 
 
+def _json_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    return type(value).__name__
+
+
+def check_resolutions(conflicts: list[dict], resolutions: dict[str, Any]) -> None:
+    def refuse(message: str) -> ServiceError:
+        return ServiceError(message, code="RESOLUTION_INVALID", status_code=422)
+
+    by_key = {c["key"]: c for c in conflicts}
+    if set(resolutions) != set(by_key):
+        missing = sorted(set(by_key) - set(resolutions))
+        extra = sorted(set(resolutions) - set(by_key))
+        raise refuse(
+            "解决方案必须恰好对应当前的冲突"
+            + (f"；缺少 {missing}" if missing else "")
+            + (f"；多余 {extra}" if extra else "")
+        )
+    for key, answer in resolutions.items():
+        conflict = by_key[key]
+        choice = answer.get("choice") if isinstance(answer, dict) else answer
+        choice = "latest" if choice == "current" else choice
+        if choice not in conflict["allowed"]:
+            raise refuse(f"{conflict['element_label']} / {conflict['path']} 不允许选择 {choice}")
+        if choice == "custom":
+            if not isinstance(answer, dict) or "value" not in answer:
+                raise refuse(f"{conflict['element_label']} / {conflict['path']} 的自定义值缺失")
+            expected = {
+                _json_type(v) for v in (conflict["latest"], conflict["draft"]) if v is not None
+            }
+            if expected and _json_type(answer["value"]) not in expected:
+                raise refuse(
+                    f"{conflict['element_label']} / {conflict['path']} 的自定义值类型应为 "
+                    + "、".join(sorted(expected))
+                )
+
+
 @router.post("/sessions/{session_id}/resolve-merge")
 def resolve_merge(
     workspace_id: str,
@@ -282,13 +322,19 @@ def resolve_merge(
             status_code=409,
             details={"current_version_id": space.current_version_id},
         )
-    merge = three_way(
-        version_snapshot(db, workspace_id, item.base_version_id),
-        version_snapshot(db, workspace_id, space.current_version_id),
-        session_draft(item),
-        workspace_id,
-        body.resolutions,
-    )
+    base = version_snapshot(db, workspace_id, item.base_version_id)
+    latest = version_snapshot(db, workspace_id, space.current_version_id)
+    draft = session_draft(item)
+    # Resolutions must answer exactly the current conflicts, each with an
+    # allowed choice and, for custom, a value of the field's own type.
+    check_resolutions(three_way(base, latest, draft, workspace_id).conflicts, body.resolutions)
+    merge = three_way(base, latest, draft, workspace_id, body.resolutions)
+    try:
+        jsonschema.validate(merge.merged, OntologyDraft.model_json_schema())
+    except jsonschema.ValidationError as exc:
+        raise ServiceError(
+            "合并结果结构无效：" + exc.message, code="RESOLUTION_INVALID", status_code=422
+        ) from exc
     if merge.conflicts:
         raise ServiceError(
             "仍有未解决的冲突",

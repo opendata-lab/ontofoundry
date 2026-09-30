@@ -227,7 +227,7 @@ export function DeliveryPage() {
               <h3>MCP</h3>
               <p className="muted">
                 MCP 2026-07-28 ·
-                五个本体工具、三个实例工具（按权限开放）；按请求携带协议元数据，不使用旧
+                八个本体工具（含按元素读取的清单、分页与按 id 查询）、三个实例工具（按权限开放）；按请求携带协议元数据，不使用旧
                 initialize 握手。
               </p>
               <code>{serviceRoot}/mcp</code>

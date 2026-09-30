@@ -107,11 +107,14 @@ function ConflictResolver({
   currentVersionId,
   session,
   onResolved,
+  onOutdated,
 }: {
   conflicts: MergeConflict[];
   currentVersionId: string | null;
   session: ModelingSession;
   onResolved: (session: ModelingSession) => void;
+  /** The version moved again: these conflicts are no longer the right ones. */
+  onOutdated: () => void;
 }) {
   const [index, setIndex] = useState(0);
   const [choices, setChoices] = useState<Record<string, Resolution>>({});
@@ -149,6 +152,13 @@ function ConflictResolver({
       }
       onResolved(await publishApi.resolve(session, currentVersionId, resolutions));
     } catch (e) {
+      if (
+        e instanceof ApiError &&
+        (e.code === "PREVIEW_OUTDATED" || e.code === "CONFLICTS_UNRESOLVED")
+      ) {
+        onOutdated();
+        return;
+      }
       setError(e instanceof Error ? e.message : "保存失败");
     } finally {
       setBusy(false);
@@ -380,6 +390,13 @@ export function PublishPanel({
             setConflicts(null);
             setNotice("冲突已保存，已重新预览");
             onSession(next);
+          }}
+          onOutdated={() => {
+            // Same rule as an outdated publish: drop what was shown, re-merge.
+            setConflicts(null);
+            setNotice("当前最新版本在你预览后已变化，已重新合并");
+            onStale();
+            void load();
           }}
         />
       ) : !preview ? (

@@ -176,7 +176,7 @@ def test_edits_during_the_run_only_make_affected_items_stale(client, monkeypatch
 
     _, items, _ = stored(client, session["id"])
     with client.app.state.session_factory() as db:
-        deps = dependency_map(db, [items[0].batch_id])
+        deps = dependency_map(db, [items[0].batch_id], session["workspace_id"], session["id"])
     statuses = effective_statuses(items, deps, edited)
     assert statuses[items[2].id][0] == "stale"  # the edited target
     assert statuses[items[0].id][0] == statuses[items[1].id][0] == "pending"
@@ -295,3 +295,49 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt
     assert "Bearer ofrun." in prompt and session["base_version_id"] in prompt
+
+
+def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
+    from ontofoundry_api.api import agent_conversation
+
+    uploads: list[str] = []
+    prompts: list[str] = []
+
+    class FakeAgent:
+        async def create_topic(self, *_):
+            return {"topic_id": "topic-1"}
+
+        async def upload(self, topic_id, name, data, content_type):
+            uploads.append(name)
+            return {"rel_path": "inputs/" + name}
+
+        async def deliver(self, **kwargs):
+            prompts.append(kwargs["content"])
+            return {"task_id": f"task-{len(prompts)}", "task_status": "running"}
+
+    monkeypatch.setattr(agent_conversation, "_client", lambda *_: FakeAgent())
+    monkeypatch.setattr(agent_conversation, "_require_configured", lambda _r: None)
+    material = client.post(ROOT + "/materials?name=a.md", content="# a\n内容\n".encode()).json()
+    session = create_session(client)
+    session = client.put(
+        ROOT + f"/sessions/{session['id']}",
+        json={"revision": session["revision"], "draft": session["draft"], "material_ids": [material["id"]]},
+    ).json()
+
+    def turn():
+        response = client.post(
+            ROOT + f"/sessions/{session['id']}/agent-conversation/messages",
+            json={"content": "建模", "metadata": {"mode": "model"}},
+        )
+        assert response.status_code == 202, response.text
+        with client.app.state.session_factory() as db:
+            item = db.get(ModelingSessionRecord, session["id"])
+            item.task_status = "finished"
+            db.commit()
+
+    turn()
+    turn()
+    assert sum(1 for name in uploads if name.startswith(material["id"])) == 1  # uploaded once
+    assert f"inputs/{material['id']}-a.md" in prompts[1]  # still named in the second run
+    manifest = row(client, session["id"]).run_manifest_json
+    assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
