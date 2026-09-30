@@ -1,6 +1,7 @@
 {
   "$defs": {
     "ActionEffect": {
+      "additionalProperties": false,
       "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
       "properties": {
         "expression": {
@@ -61,6 +62,7 @@
       "type": "string"
     },
     "ActionParameter": {
+      "additionalProperties": false,
       "properties": {
         "id": {
           "format": "uuid",
@@ -98,6 +100,7 @@
       "type": "object"
     },
     "AfterActionEffect": {
+      "additionalProperties": false,
       "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
       "properties": {
         "expression": {
@@ -187,6 +190,7 @@
       "type": "string"
     },
     "AfterActionParameter": {
+      "additionalProperties": false,
       "properties": {
         "id": {
           "format": "uuid",
@@ -223,6 +227,7 @@
       "type": "object"
     },
     "AfterDataJoin": {
+      "additionalProperties": false,
       "properties": {
         "source_column": {
           "maxLength": 240,
@@ -245,6 +250,7 @@
       "type": "object"
     },
     "AfterEvidenceLocator": {
+      "additionalProperties": false,
       "properties": {
         "heading": {
           "anyOf": [
@@ -278,6 +284,7 @@
       "type": "object"
     },
     "AfterManualEvidence": {
+      "additionalProperties": false,
       "description": "A member vouching for a fact. Author and time are written by the server.",
       "properties": {
         "created_at": {
@@ -318,6 +325,7 @@
       "type": "object"
     },
     "AfterMaterialEvidence": {
+      "additionalProperties": false,
       "properties": {
         "id": {
           "format": "uuid",
@@ -407,6 +415,7 @@
       "type": "string"
     },
     "DataJoin": {
+      "additionalProperties": false,
       "properties": {
         "source_column": {
           "maxLength": 240,
@@ -429,6 +438,7 @@
       "type": "object"
     },
     "EvidenceLocator": {
+      "additionalProperties": false,
       "properties": {
         "heading": {
           "anyOf": [
@@ -462,6 +472,7 @@
       "type": "object"
     },
     "ManualEvidence": {
+      "additionalProperties": false,
       "description": "A member vouching for a fact. Author and time are written by the server.",
       "properties": {
         "created_at": {
@@ -502,6 +513,7 @@
       "type": "object"
     },
     "MaterialEvidence": {
+      "additionalProperties": false,
       "properties": {
         "id": {
           "format": "uuid",
@@ -697,6 +709,7 @@
       "type": "object"
     },
     "action_element": {
+      "additionalProperties": false,
       "description": "An action contract. Only modeled and versioned; there is no executor.",
       "properties": {
         "description": {
@@ -1038,6 +1051,7 @@
         },
         "field_changes": {
           "items": {
+            "additionalProperties": false,
             "properties": {
               "after": {},
               "before": {},
@@ -1244,6 +1258,7 @@
       "type": "object"
     },
     "link_type_element": {
+      "additionalProperties": false,
       "properties": {
         "data_join": {
           "anyOf": [
@@ -1444,6 +1459,7 @@
       "type": "object"
     },
     "mapping_element": {
+      "additionalProperties": false,
       "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
       "properties": {
         "connection_alias": {
@@ -1594,6 +1610,7 @@
       "type": "object"
     },
     "material_link_element": {
+      "additionalProperties": false,
       "properties": {
         "evidence": {
           "items": {
@@ -1723,6 +1740,7 @@
       "type": "object"
     },
     "material_object_element": {
+      "additionalProperties": false,
       "properties": {
         "evidence": {
           "items": {
@@ -1868,6 +1886,7 @@
       "type": "object"
     },
     "object_type_element": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "default": "",
@@ -2063,6 +2082,7 @@
       "type": "object"
     },
     "property_element": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "default": "",
@@ -2273,6 +2293,7 @@
       "type": "object"
     },
     "rule_element": {
+      "additionalProperties": false,
       "properties": {
         "description": {
           "default": "",

@@ -373,9 +373,9 @@ get_ontology_elements(workspace_id, version_id, element_ids)
 规则：
 
 - `create` 使用 batch 内唯一 `client_ref`；DataAgent 不自行决定最终 UUID。
-- 服务端先以 `UUIDv5(session_id, run_token)` 计算稳定 `proposal_batch_id`，再以 `UUIDv5(proposal_batch_id, client_ref)` 确定性分配 create 的 `target_id`，重试得到同一 Batch 和同一元素 ID。
+- 服务端先计算稳定 `proposal_batch_id`，再确定性分配 create 的 `target_id`，重试得到同一 Batch 和同一元素 ID；具体算法（带用途前缀）以 [结果合同](./2026-09-30-proposal-contract-v1.md) §4 为准。
 - 同一 Batch 内引用新元素时，任何本应填元素 ID 的字段（如 `owner_type_id`、`source_type_id`、`owner_id`、`precondition_rule_ids[]` 中的一项）改写为对象 `{"client_ref": "new-supplier-type"}`；入库前统一解析为最终 UUID，并自动把被引用 Item 加入 `depends_on`。
-- `after` 的结构按 `target_kind` 取 v2 领域模型中对应元素的完整定义（JSON Schema 随 `ontofoundry.proposals/v1` 一起发布，按 `target_kind` 做 `oneOf` 判别）：create 时省略 `id`，其余必填字段必须给出，服务端除 `id` 外不补任何默认值；update 时必须是修改后的完整元素，`id` 必须等于 `target_id`。
+- `after` 的结构按 `target_kind` 取 v2 领域模型中对应元素的完整定义（JSON Schema 随 `ontofoundry.proposals/v1` 一起发布，按 `target_kind` 做 `oneOf` 判别）：create 时省略 `id`，其余必填字段必须给出，可省略字段按模型默认值补全，存储与指纹均使用补全后的规范元素；update 时必须是修改后的完整元素，`id` 必须等于 `target_id`。
 - `update/delete` 必须携带现有 `target_id`、完整 `before` 和 `expected_target_hash`；target 必须存在于该 run 固定的草稿中。
 - `create` 的 `before` 必须为 null；`delete` 的 `after` 必须为 null；`update` 两者都非 null。
 - `field_changes` 是展示和索引数据，`before/after` 才是应用与冲突检测的权威。

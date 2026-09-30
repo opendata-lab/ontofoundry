@@ -6,26 +6,26 @@
         "effects": [
           {
             "expression": ":comment",
-            "id": "8f5bbe22-7928-497b-bfb4-1f757ab810f9",
+            "id": "4077a277-e856-46a1-81af-6302ce6b613d",
             "kind": "set_property",
             "link_type_id": null,
             "property_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23201"
           },
           {
             "expression": "",
-            "id": "7a5056c8-3fa9-467a-b699-a699c2a0dd3c",
+            "id": "4bd103d5-14b7-4003-9a8c-98f35b92fc99",
             "kind": "create_link",
             "link_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23301",
             "property_id": null
           }
         ],
         "evidence": [],
-        "id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+        "id": "9a4bf0b0-1305-486a-af31-8a28956aab10",
         "input_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
         "name": "审批供应商",
         "parameters": [
           {
-            "id": "289299c8-ff3f-44fe-a129-91acda34a370",
+            "id": "2bf58f31-de4c-4889-8255-8e341817203f",
             "name": "意见",
             "required": false,
             "technical_name": "comment",
@@ -33,8 +33,8 @@
           }
         ],
         "precondition_rule_ids": [
-          "17770b33-b539-4cb6-af5a-97e08e2a8c17",
-          "c736e41e-7b76-4024-b17c-0e9ac10de721"
+          "c75c5da9-425c-41e3-a219-ed864fe33d64",
+          "1b6e20c3-c558-457b-ab1f-176d954d4f29"
         ],
         "technical_name": "approve_supplier"
       }
@@ -365,7 +365,7 @@
         "description": "",
         "evidence": [],
         "expression": "supplier.supplier_code IS NOT NULL",
-        "id": "17770b33-b539-4cb6-af5a-97e08e2a8c17",
+        "id": "c75c5da9-425c-41e3-a219-ed864fe33d64",
         "name": "编码必填",
         "owner_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23201",
         "owner_kind": "property",
@@ -377,9 +377,9 @@
         "description": "",
         "evidence": [],
         "expression": "approved = FALSE",
-        "id": "c736e41e-7b76-4024-b17c-0e9ac10de721",
+        "id": "1b6e20c3-c558-457b-ab1f-176d954d4f29",
         "name": "仅审批一次",
-        "owner_id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+        "owner_id": "9a4bf0b0-1305-486a-af31-8a28956aab10",
         "owner_kind": "action",
         "rule_kind": "constraint",
         "technical_name": "approve_once",
@@ -399,22 +399,22 @@
             "effects": [
               {
                 "expression": ":comment",
-                "id": "8f5bbe22-7928-497b-bfb4-1f757ab810f9",
+                "id": "4077a277-e856-46a1-81af-6302ce6b613d",
                 "kind": "set_property",
                 "property": "supplier.supplier_code"
               },
               {
-                "id": "7a5056c8-3fa9-467a-b699-a699c2a0dd3c",
+                "id": "4bd103d5-14b7-4003-9a8c-98f35b92fc99",
                 "kind": "create_link",
                 "link": "supplier.supplies"
               }
             ],
-            "id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+            "id": "9a4bf0b0-1305-486a-af31-8a28956aab10",
             "input_type": "supplier",
             "name": "审批供应商",
             "parameters": [
               {
-                "id": "289299c8-ff3f-44fe-a129-91acda34a370",
+                "id": "2bf58f31-de4c-4889-8255-8e341817203f",
                 "name": "意见",
                 "required": false,
                 "technical_name": "comment",
@@ -422,13 +422,21 @@
               }
             ],
             "preconditions": [
-              "code_required",
-              "approve_once"
+              {
+                "id": "c75c5da9-425c-41e3-a219-ed864fe33d64",
+                "owner": "supplier.supplier_code",
+                "technical_name": "code_required"
+              },
+              {
+                "id": "1b6e20c3-c558-457b-ab1f-176d954d4f29",
+                "owner": "action:approve_supplier",
+                "technical_name": "approve_once"
+              }
             ],
             "rules": [
               {
                 "expression": "approved = FALSE",
-                "id": "c736e41e-7b76-4024-b17c-0e9ac10de721",
+                "id": "1b6e20c3-c558-457b-ab1f-176d954d4f29",
                 "name": "仅审批一次",
                 "rule_kind": "constraint",
                 "technical_name": "approve_once"
@@ -471,7 +479,7 @@
           "supplier.supplier_code": [
             {
               "expression": "supplier.supplier_code IS NOT NULL",
-              "id": "17770b33-b539-4cb6-af5a-97e08e2a8c17",
+              "id": "c75c5da9-425c-41e3-a219-ed864fe33d64",
               "name": "编码必填",
               "rule_kind": "constraint",
               "technical_name": "code_required"

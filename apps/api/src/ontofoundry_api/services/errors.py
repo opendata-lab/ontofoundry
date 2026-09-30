@@ -1,10 +1,28 @@
 class ServiceError(Exception):
+    """Rendered as {"error": {"code", "message", **details}}.
+
+    `details` carries structured fields such as `items`, `conflicts` or
+    `current_version_id`; it can never replace `code` or `message`.
+    """
+
     status_code = 400
     code = "SERVICE_ERROR"
 
-    def __init__(self, message: str):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        status_code: int | None = None,
+        details: dict | None = None,
+    ):
         super().__init__(message)
         self.message = message
+        if code is not None:
+            self.code = code
+        if status_code is not None:
+            self.status_code = status_code
+        self.details = details or {}
 
 
 class NotFoundError(ServiceError):

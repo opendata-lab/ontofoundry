@@ -12,7 +12,7 @@ from ontofoundry_api.api.connections import connect_readonly, get_connection
 from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MetadataSnapshotRecord, utc_now
-from ontofoundry_api.services.ontology_query import current_version
+from ontofoundry_api.services.ontology_query import current_version, snapshot_of
 from ontofoundry_api.services.workspaces import get_workspace
 
 router = APIRouter(
@@ -142,7 +142,7 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
         if version_id or space.current_version_id
         else None
     )
-    snapshot = version.snapshot_json if version else {}
+    snapshot = snapshot_of(version) if version else {}
     types = {t["id"]: t for t in snapshot.get("object_types", [])}
     schema = record.schema_name if record else schema_name
     mappings = [

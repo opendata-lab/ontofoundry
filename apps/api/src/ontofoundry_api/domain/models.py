@@ -16,7 +16,14 @@ from enum import StrEnum
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 TECHNICAL_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -26,8 +33,16 @@ PARAMETER_RE = re.compile(r"(?<![:\w]):([A-Za-z_][A-Za-z0-9_]*)")
 SQL_LITERAL_RE = re.compile(r"'(?:[^']|'')*'")
 
 
+QUALIFIED_RE = re.compile(r"(?<![:\w.])([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)")
+
+
 def expression_parameters(expression: str) -> set[str]:
     return set(PARAMETER_RE.findall(SQL_LITERAL_RE.sub("''", expression)))
+
+
+def expression_references(expression: str) -> set[tuple[str, str]]:
+    """`concept.property` references outside string literals."""
+    return set(QUALIFIED_RE.findall(SQL_LITERAL_RE.sub("''", expression)))
 
 
 def normalize_display_name(value: str) -> str:
@@ -42,6 +57,12 @@ def validate_technical_name(value: str) -> str:
     if not TECHNICAL_NAME_RE.fullmatch(value):
         raise ValueError("技术名只能包含 ASCII 字母、数字和下划线，且不能以数字开头")
     return value
+
+
+class Strict(BaseModel):
+    """Stored shapes reject unknown fields: hashing and diffs see every field."""
+
+    model_config = ConfigDict(extra="forbid")
 
 
 NonEmptyText = Annotated[str, Field(min_length=1, max_length=240)]
@@ -101,7 +122,7 @@ COLLECTIONS: dict[ElementKind, str] = {
 # --- evidence ---------------------------------------------------------------
 
 
-class EvidenceLocator(BaseModel):
+class EvidenceLocator(Strict):
     heading: str | None = Field(default=None, max_length=240)
     line_start: int = Field(ge=1)
     line_end: int = Field(ge=1)
@@ -113,7 +134,7 @@ class EvidenceLocator(BaseModel):
         return self
 
 
-class MaterialEvidence(BaseModel):
+class MaterialEvidence(Strict):
     kind: Literal["material"] = "material"
     id: UUID
     material_id: str = Field(min_length=1, max_length=64)
@@ -131,7 +152,7 @@ class MaterialEvidence(BaseModel):
         return value
 
 
-class ManualEvidence(BaseModel):
+class ManualEvidence(Strict):
     """A member vouching for a fact. Author and time are written by the server."""
 
     kind: Literal["manual"] = "manual"
@@ -142,13 +163,24 @@ class ManualEvidence(BaseModel):
 
 
 Evidence = Annotated[MaterialEvidence | ManualEvidence, Field(discriminator="kind")]
-EvidenceList = Annotated[list[Evidence], Field(default_factory=list, max_length=50)]
+def _unique_evidence(items: list) -> list:
+    ids = [item.id for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValueError("同一元素的证据 id 重复")
+    return items
+
+
+EvidenceList = Annotated[
+    list[Evidence],
+    Field(default_factory=list, max_length=50),
+    AfterValidator(_unique_evidence),
+]
 
 
 # --- definitions ------------------------------------------------------------
 
 
-class ObjectTypeDefinition(BaseModel):
+class ObjectTypeDefinition(Strict):
     id: UUID
     name: NonEmptyText
     technical_name: NonEmptyText
@@ -163,7 +195,7 @@ class ObjectTypeDefinition(BaseModel):
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
 
 
-class PropertyDefinition(BaseModel):
+class PropertyDefinition(Strict):
     id: UUID
     owner_type_id: UUID
     name: NonEmptyText
@@ -208,12 +240,12 @@ class PropertyDefinition(BaseModel):
         return value
 
 
-class DataJoin(BaseModel):
+class DataJoin(Strict):
     source_column: str = Field(min_length=1, max_length=240)
     target_column: str = Field(min_length=1, max_length=240)
 
 
-class LinkTypeDefinition(BaseModel):
+class LinkTypeDefinition(Strict):
     id: UUID
     name: NonEmptyText
     technical_name: NonEmptyText
@@ -273,7 +305,7 @@ class RuleOwnerKind(StrEnum):
     ACTION = "action"
 
 
-class RuleDefinition(BaseModel):
+class RuleDefinition(Strict):
     id: UUID
     name: NonEmptyText
     technical_name: NonEmptyText
@@ -289,7 +321,7 @@ class RuleDefinition(BaseModel):
     _validate_technical_name = field_validator("technical_name")(validate_technical_name)
 
 
-class ActionParameter(BaseModel):
+class ActionParameter(Strict):
     id: UUID
     name: NonEmptyText
     technical_name: NonEmptyText
@@ -306,7 +338,7 @@ class ActionEffectKind(StrEnum):
     DELETE_LINK = "delete_link"
 
 
-class ActionEffect(BaseModel):
+class ActionEffect(Strict):
     """What an action would change. A definition only: nothing executes it.
 
     `expression` is ANSI SQL text over the action's parameters (`:param`) and the
@@ -329,7 +361,7 @@ class ActionEffect(BaseModel):
         return self
 
 
-class ActionDefinition(BaseModel):
+class ActionDefinition(Strict):
     """An action contract. Only modeled and versioned; there is no executor."""
 
     id: UUID
@@ -363,7 +395,7 @@ class ActionDefinition(BaseModel):
 # --- instances and mappings -------------------------------------------------
 
 
-class MaterialObject(BaseModel):
+class MaterialObject(Strict):
     id: UUID
     type_id: UUID
     name: NonEmptyText
@@ -371,7 +403,7 @@ class MaterialObject(BaseModel):
     evidence: EvidenceList
 
 
-class MaterialLink(BaseModel):
+class MaterialLink(Strict):
     id: UUID
     type_id: UUID
     source_id: UUID
@@ -379,7 +411,7 @@ class MaterialLink(BaseModel):
     evidence: EvidenceList
 
 
-class DataMapping(BaseModel):
+class DataMapping(Strict):
     """Where an object type's data sits, not which connection reads it.
 
     The model names a data source (`connection_alias`) plus the table, key column
@@ -400,7 +432,7 @@ class DataMapping(BaseModel):
 # --- the draft ----------------------------------------------------------------
 
 
-class OntologyDraft(BaseModel):
+class OntologyDraft(Strict):
     schema_version: Literal["2"] = "2"
     workspace_id: UUID
     # Ossie ontology-level `requires` carried over from v1 and imported files.
@@ -580,7 +612,19 @@ class OntologyDraft(BaseModel):
                 if kinds.get(rule_id) != ElementKind.RULE:
                     raise ValueError(f"Action {action.name} 引用了不存在的前置规则")
             usable = {p.id for p in self.effective_properties(action.input_type_id)}
+            input_key = self.type_by_id()[action.input_type_id].technical_name
+            usable_names = {
+                p.technical_name for p in self.effective_properties(action.input_type_id)
+            }
             for effect in action.effects:
+                # Effects may read only the input object's properties and the
+                # action's parameters; any other concept.property is rejected.
+                for concept, name in expression_references(effect.expression):
+                    if concept != input_key or name not in usable_names:
+                        raise ValueError(
+                            f"Action {action.name} 的效果表达式只能引用输入对象 {input_key} 的属性，"
+                            f"不存在 {concept}.{name}"
+                        )
                 if effect.property_id is not None and effect.property_id not in usable:
                     raise ValueError(f"Action {action.name} 的效果引用了输入对象上不存在的属性")
                 if effect.link_type_id is not None and effect.link_type_id not in link_ids:

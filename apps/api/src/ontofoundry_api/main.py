@@ -125,7 +125,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(ServiceError)
     async def service_error_handler(_: Request, exc: ServiceError) -> JSONResponse:
-        body = {"error": {"code": exc.code, "message": exc.message}}
+        extra = {k: v for k, v in exc.details.items() if k not in ("code", "message")}
+        body = {"error": {**extra, "code": exc.code, "message": exc.message}}
         if isinstance(exc, PublishValidationError):
             body["error"]["validation"] = exc.report
         return JSONResponse(

@@ -16,9 +16,9 @@ from ontofoundry_api.contracts.proposals import (
     batch_id_for,
     create_target_id,
     item_fingerprint,
-    parse_result,
     result_schema,
 )
+from ontofoundry_api.contracts.proposals import parse_result as _parse_result
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
 from ontofoundry_api.domain.models import OntologyDraft
 
@@ -104,6 +104,10 @@ def result(ctx: RunContext, items: list[dict]) -> dict:
 
 def lookup(material_id: str):
     return (MATERIAL_SHA, MATERIAL_LINES) if material_id == MATERIAL_ID else None
+
+
+def parse_result(raw, ctx, material_lookup=lookup):
+    return _parse_result(raw, ctx, material_lookup=material_lookup)
 
 
 EVIDENCE = {
@@ -499,3 +503,148 @@ def test_fingerprint_and_domain_hash_vectors_never_change():
     # Order of set-like fields and of id-keyed collections does not matter.
     reordered = {**after, "tags": ["主数据", "采购"]}
     assert element_sha256(after) == element_sha256(reordered)
+
+
+# --- full operation matrix: every kind × create/update/delete × ok/rejected ----
+
+KINDS = {
+    "object_type": "object_types",
+    "property": "properties",
+    "link_type": "link_types",
+    "rule": "rules",
+    "action": "actions",
+    "material_object": "material_objects",
+    "material_link": "material_links",
+    "mapping": "mappings",
+}
+# A field each kind cannot do without; dropping it must be rejected.
+REQUIRED = {
+    "object_type": "technical_name",
+    "property": "owner_type_id",
+    "link_type": "source_type_id",
+    "rule": "expression",
+    "action": "input_type_id",
+    "material_object": "type_id",
+    "material_link": "source_id",
+    "mapping": "key_column",
+}
+
+
+def update_for(draft: dict, kind: str) -> dict:
+    element = draft[KINDS[kind]][0]
+    changes = {
+        "object_type": {"description": "改"},
+        "property": {"description": "改"},
+        "link_type": {"description": "改"},
+        "rule": {"expression": element.get("expression", "") + " AND 1 = 1"},
+        "action": {"description": "改"},
+        "material_object": {"name": "改名"},
+        "material_link": {"evidence": [EVIDENCE]},
+        "mapping": {"table_name": "renamed"},
+    }[kind]
+    return update(kind, element, **changes)
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_matrix_create(kind):
+    draft = pinned_draft()
+    ctx = context(draft)
+    items = create_items(draft)
+    by_kind = {item["target_kind"]: item for item in items}
+    # Keep the whole create set so client_refs resolve; check the kind's item.
+    batch = parse_result(result(ctx, items), ctx)
+    assert any(i.target_kind == kind and i.operation == "create" for i in batch.items)
+
+    broken = deepcopy(by_kind[kind])
+    broken["after"].pop(REQUIRED[kind])
+    with pytest.raises(ProposalContractError) as err:
+        parse_result(result(ctx, [i if i is not by_kind[kind] else broken for i in items]), ctx)
+    assert err.value.code in {"RESULT_SCHEMA_INVALID", "ELEMENT_INVALID"}
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_matrix_update(kind):
+    draft = pinned_draft()
+    ctx = context(draft)
+    item = update_for(draft, kind)
+    (parsed,) = parse_result(result(ctx, [item]), ctx).items
+    assert parsed.operation == "update" and parsed.after["id"] == item["target_id"]
+
+    stale = deepcopy(item)
+    stale["expected_target_hash"] = "f" * 64
+    rejected(draft, [stale], "TARGET_HASH_MISMATCH")
+
+
+@pytest.mark.parametrize("kind", list(KINDS))
+def test_matrix_delete(kind):
+    draft = pinned_draft()
+    ctx = context(draft)
+    item = delete(kind, draft[KINDS[kind]][-1])
+    (parsed,) = parse_result(result(ctx, [item]), ctx).items
+    assert parsed.operation == "delete" and parsed.after is None
+
+    wrong_before = deepcopy(item)
+    wrong_before["before"] = {**wrong_before["before"], "id": wrong_before["before"]["id"]}
+    key = next(k for k in wrong_before["before"] if k not in ("id", "evidence"))
+    wrong_before["before"][key] = "被篡改" if isinstance(wrong_before["before"][key], str) else None
+    with pytest.raises(ProposalContractError) as err:
+        parse_result(result(ctx, [wrong_before]), ctx)
+    assert err.value.code in {"BEFORE_MISMATCH", "RESULT_SCHEMA_INVALID"}
+
+
+# --- regressions from the T1 gate review ---------------------------------------
+
+
+def test_sparse_and_explicit_defaults_are_the_same_proposal():
+    draft = pinned_draft()
+    ctx = context(draft)
+    sparse = create("t", "object_type", {"name": "对象", "technical_name": "thing"})
+    explicit = create(
+        "t",
+        "object_type",
+        {
+            "name": "对象",
+            "technical_name": "thing",
+            "description": "",
+            "tags": [],
+            "extends": [],
+            "evidence": [],
+        },
+    )
+    (a,) = parse_result(result(ctx, [sparse]), ctx).items
+    (b,) = parse_result(result(ctx, [explicit]), ctx).items
+    assert a.after == b.after
+    assert a.fingerprint == b.fingerprint
+
+
+def test_item_evidence_is_validated_by_the_model():
+    draft = pinned_draft()
+    context(draft)
+    item = delete("material_link", draft["material_links"][0])
+    item["evidence"] = [{**EVIDENCE, "id": "not-a-uuid"}]
+    rejected(draft, [item], "RESULT_SCHEMA_INVALID")
+
+
+def test_duplicate_evidence_on_one_element_is_rejected():
+    draft = pinned_draft()
+    twice = create(
+        "o",
+        "material_object",
+        {"type_id": draft["object_types"][0]["id"], "name": "丙", "evidence": [EVIDENCE, EVIDENCE]},
+    )
+    rejected(draft, [twice], "ELEMENT_INVALID")
+
+
+def test_nested_after_structures_are_closed():
+    draft = pinned_draft()
+    action = create(
+        "act",
+        "action",
+        {
+            "name": "动作",
+            "technical_name": "act",
+            "input_type_id": draft["object_types"][0]["id"],
+            "parameters": [{"name": "参数", "technical_name": "p", "surprise": True}],
+        },
+    )
+    rejected(draft, [action], "RESULT_SCHEMA_INVALID")

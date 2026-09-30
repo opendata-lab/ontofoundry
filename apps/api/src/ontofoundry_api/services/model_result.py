@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from sqlalchemy import and_, or_, update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
+from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.ossie.validator import validate_schema
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
@@ -384,6 +385,7 @@ async def reconcile_run(
             )
             .values(
                 draft_json=version_draft,
+                draft_sha256=draft_sha256(version_draft, workspace_id),
                 candidates_json=[],
                 result_warnings=_result_warnings(import_report),
                 result_state="done",
