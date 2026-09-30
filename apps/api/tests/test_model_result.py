@@ -311,7 +311,7 @@ def test_worker_that_lost_its_claim_cannot_write_version_draft(client, monkeypat
 def test_manual_revision_change_during_run_is_never_overwritten(client, monkeypatch):
     session = _create_model_session(client)
     manual_draft = _empty_draft()
-    manual_draft["requires"] = ["manual change"]
+    manual_draft["ontology_requires"] = ["manual change"]
 
     async def edit_before_download_returns(self, topic_id: str, rel_path: str):
         with client.app.state.session_factory() as db:

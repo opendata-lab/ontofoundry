@@ -707,6 +707,8 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 ### T1 — v2 领域模型与兼容读取
 
+**评审交付物：** [`ontofoundry.proposals/v1` 结果合同](./2026-09-30-proposal-contract-v1.md)（Schema、ID 分配、证据规则、指纹向量、Action 表达式语言及实施中定稿的差异）。
+
 - **先交付并评审**：`ontofoundry.proposals/v1` 与 v2 元素的 Draft 2020-12 JSON Schema（按 `target_kind` 的 `oneOf`），每个 target kind 至少一组 create/update/delete 正例和反例；Action `effects[].expression` 的语言与求值上下文在此一并定稿（首期建议只允许引用输入参数与 `input_type` 属性的受限表达式，不可执行）。评审通过前不写 T1 代码。评审时必须同时定稿：
   - Manual Evidence 回显：Agent 的 update `after` 可以原样回显 `before` 中已有的 `kind=manual` Evidence，服务端接受时保持这些条目不变；Agent 新增或修改任何 `manual` 条目才整份拒收。
   - Item `fingerprint` 的 JSON 投影：`{"operation", "target_kind", "target_id", "after"}`，其中 `after` 按算法 B 规范化为单个元素、`null` 保留为 `null`；附固定测试向量。

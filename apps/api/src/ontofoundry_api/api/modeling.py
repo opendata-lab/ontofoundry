@@ -21,12 +21,15 @@ from ontofoundry_api.domain.instance_validation import (
     instance_issues,
 )
 from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.snapshot import as_v2_dict, empty_snapshot, read_snapshot_json
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
+    _query_view,
     current_version,
+    snapshot_of,
     version_summary,
 )
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
@@ -53,15 +56,31 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
     return item
 
 
+def session_draft(item) -> dict:
+    """The session draft as v2 JSON. A session created before v2 still holds a
+    v1 draft until its next write; readers never see that difference."""
+    return as_v2_dict(item.draft_json, item.workspace_id)
+
+
+def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
+    version = db.get(OntologyVersionRecord, version_id) if version_id else None
+    return snapshot_of(version) if version else empty_snapshot(workspace_id)
+
+
 def session_data(item):
-    nodes, edges = _all_graph(item.draft_json)
+    draft = session_draft(item)
+    try:
+        nodes, edges = _all_graph(_query_view(read_snapshot_json(draft)))
+    except (ValidationError, ValueError):
+        # A draft may be invalid while being edited; the graph is best effort.
+        nodes, edges = [], []
     return {
         "id": item.id,
         "title": item.title,
         "workspace_id": item.workspace_id,
         "base_version_id": item.base_version_id,
         "revision": item.revision,
-        "draft": item.draft_json,
+        "draft": draft,
         "candidates": item.candidates_json,
         "material_ids": item.material_ids,
         "task_status": item.task_status,
@@ -133,7 +152,7 @@ def revise(db, item, revision, **values):
 
 def validate_draft(draft, workspace):
     try:
-        model = OntologyDraft.model_validate(draft)
+        model = OntologyDraft.model_validate(as_v2_dict(draft, workspace.id))
         if str(model.workspace_id) != workspace.id:
             raise ValueError("草稿空间不匹配")
         return include_instance_validation(
@@ -198,18 +217,10 @@ def resolve_merge(
     if space.current_version_id != body.current_version_id:
         raise HTTPException(409, "最新版本又有变化，请重新比较")
 
-    def snapshot(vid):
-        v = db.get(OntologyVersionRecord, vid) if vid else None
-        return (
-            OntologyDraft.model_validate(v.snapshot_json).model_dump(mode="json")
-            if v
-            else OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
-        )
-
     merged, conflicts = merge_snapshots(
-        snapshot(item.base_version_id),
-        snapshot(space.current_version_id),
-        item.draft_json,
+        version_snapshot(db, workspace_id, item.base_version_id),
+        version_snapshot(db, workspace_id, space.current_version_id),
+        session_draft(item),
         body.resolutions,
     )
     if conflicts:
@@ -258,11 +269,7 @@ def create_session(
         if space.current_version_id
         else None
     )
-    draft = (
-        OntologyDraft.model_validate(version.snapshot_json).model_dump(mode="json")
-        if version
-        else OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
-    )
+    draft = snapshot_of(version) if version else empty_snapshot(workspace_id)
     item = ModelingSessionRecord(
         id=str(uuid4()),
         workspace_id=workspace_id,
@@ -331,12 +338,12 @@ def accept_candidates(
 ):
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
-    draft, candidates = deepcopy(item.draft_json), deepcopy(item.candidates_json)
+    draft, candidates = deepcopy(session_draft(item)), deepcopy(item.candidates_json)
     collection = {
         "object_type": "object_types",
         "link_type": "link_types",
-        "object": "objects",
-        "link": "links",
+        "object": "material_objects",
+        "link": "material_links",
         "mapping": "mappings",
     }
     for candidate in candidates:
@@ -406,18 +413,10 @@ def publish_session(
     # the agent is mid-way through rewriting would capture a half-applied model.
     if item.revision != body.revision or item.task_status in ACTIVE_RUN_STATUSES:
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
-    empty = OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
-
-    def snapshot(version_id):
-        version = db.get(OntologyVersionRecord, version_id) if version_id else None
-        return (
-            OntologyDraft.model_validate(version.snapshot_json).model_dump(mode="json")
-            if version
-            else empty
-        )
-
     merged, conflicts = merge_snapshots(
-        snapshot(item.base_version_id), snapshot(space.current_version_id), item.draft_json
+        version_snapshot(db, workspace_id, item.base_version_id),
+        version_snapshot(db, workspace_id, space.current_version_id),
+        session_draft(item),
     )
     if conflicts:
         raise HTTPException(
@@ -485,11 +484,7 @@ def published_snapshot(
         if space.current_version_id
         else None
     )
-    return (
-        OntologyDraft.model_validate(version.snapshot_json).model_dump(mode="json")
-        if version
-        else OntologyDraft(workspace_id=workspace_id).model_dump(mode="json")
-    )
+    return snapshot_of(version) if version else empty_snapshot(workspace_id)
 
 
 class OssieImport(BaseModel):
@@ -517,7 +512,7 @@ def import_ossie_document(
         draft, report = import_ossie(
             body.document,
             workspace_id=workspace_id,
-            base=version.snapshot_json if version else None,
+            base=snapshot_of(version) if version else None,
             mode=body.mode,
         )
     except (OssieImportError, ValidationError, ValueError) as exc:
@@ -565,11 +560,16 @@ def presentation(
     user: Principal = Depends(current_principal),
 ):
     version = current_version(db, workspace_id, version_id)
-    model = deepcopy(version.snapshot_json)
+    model = deepcopy(snapshot_of(version))
     from ontofoundry_api.services.workspaces import membership_role
 
     if not membership_role(db, workspace_id, user.id):
-        model.update(objects=[], links=[], mappings=[])
+        # Instances carry evidence quotes; mappings name tables. Members only.
+        model.update(material_objects=[], material_links=[], mappings=[])
+        for item in model["object_types"] + model["properties"] + model["link_types"] + model[
+            "rules"
+        ] + model["actions"]:
+            item["evidence"] = []
         for link in model.get("link_types", []):
             link.pop("data_join", None)
     return {"version": version_summary(version), "model": model}
@@ -588,19 +588,20 @@ def preview_definition(
     if item.revision != body.revision:
         raise HTTPException(409, "草稿已变化，请刷新后预览")
     space = get_workspace(db, workspace_id)
-    report = validate_draft(item.draft_json, space)
+    draft = session_draft(item)
+    report = validate_draft(draft, space)
     version = current_version(db, workspace_id) if space.current_version_id else None
     return {
         "revision": item.revision,
         "validation": report,
         "ossie": compile_ossie(
-            OntologyDraft.model_validate(item.draft_json),
+            OntologyDraft.model_validate(draft),
             ontology_name=space.slug.replace("-", "_"),
             ontology_description=space.description or space.name,
         )
         if report["publishable"]
         else None,
-        **compare_snapshots(version.snapshot_json if version else {}, item.draft_json),
+        **compare_snapshots(snapshot_of(version) if version else {}, draft),
     }
 
 
@@ -622,5 +623,5 @@ def compare_versions(
     return {
         "left": version_summary(left) if left else None,
         "right": version_summary(right),
-        **compare_snapshots(left.snapshot_json if left else {}, right.snapshot_json),
+        **compare_snapshots(snapshot_of(left) if left else {}, snapshot_of(right)),
     }

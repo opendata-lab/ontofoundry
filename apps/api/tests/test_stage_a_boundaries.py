@@ -70,7 +70,9 @@ def test_inherited_required_properties_are_checked():
     draft = OntologyDraft.model_validate(model)
     errors = value_issues(draft, draft.object_types[1].id, {}, "$.objects[0].values")
     inherited = [
-        attr for attr in parent["attributes"] if attr["required"] or attr["identifier"]
+        attr
+        for attr in model["properties"]
+        if attr["owner_type_id"] == parent["id"] and (attr["required"] or attr["identifier"])
     ]
     assert inherited
     for attr in inherited:

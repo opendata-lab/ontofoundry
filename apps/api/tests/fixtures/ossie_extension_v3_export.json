@@ -1,0 +1,813 @@
+{
+  "draft": {
+    "actions": [
+      {
+        "description": "把供应商标记为已审批",
+        "effects": [
+          {
+            "expression": ":comment",
+            "id": "8f5bbe22-7928-497b-bfb4-1f757ab810f9",
+            "kind": "set_property",
+            "link_type_id": null,
+            "property_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23201"
+          },
+          {
+            "expression": "",
+            "id": "7a5056c8-3fa9-467a-b699-a699c2a0dd3c",
+            "kind": "create_link",
+            "link_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23301",
+            "property_id": null
+          }
+        ],
+        "evidence": [],
+        "id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+        "input_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "name": "审批供应商",
+        "parameters": [
+          {
+            "id": "289299c8-ff3f-44fe-a129-91acda34a370",
+            "name": "意见",
+            "required": false,
+            "technical_name": "comment",
+            "value_kind": "string"
+          }
+        ],
+        "precondition_rule_ids": [
+          "17770b33-b539-4cb6-af5a-97e08e2a8c17",
+          "c736e41e-7b76-4024-b17c-0e9ac10de721"
+        ],
+        "technical_name": "approve_supplier"
+      }
+    ],
+    "link_types": [
+      {
+        "data_join": null,
+        "description": "供应商向企业提供物料。",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23301",
+        "identifier": false,
+        "multiplicity": "many_to_many",
+        "name": "提供",
+        "source_role_name": null,
+        "source_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "tags": [
+          "采购"
+        ],
+        "target_role_name": null,
+        "target_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "technical_name": "supplies",
+        "verbalizes": []
+      },
+      {
+        "data_join": null,
+        "description": "产品批次在生产中使用物料。",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23302",
+        "identifier": false,
+        "multiplicity": "many_to_many",
+        "name": "使用",
+        "source_role_name": null,
+        "source_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23103",
+        "tags": [
+          "生产"
+        ],
+        "target_role_name": null,
+        "target_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "technical_name": "uses_material",
+        "verbalizes": []
+      },
+      {
+        "data_join": null,
+        "description": "设备由指定人员负责。",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23303",
+        "identifier": false,
+        "multiplicity": "many_to_one",
+        "name": "负责人",
+        "source_role_name": null,
+        "source_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23105",
+        "tags": [
+          "设备"
+        ],
+        "target_role_name": null,
+        "target_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23104",
+        "technical_name": "owned_by",
+        "verbalizes": []
+      },
+      {
+        "data_join": null,
+        "description": "产品批次由设备生产。",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23304",
+        "identifier": false,
+        "multiplicity": "many_to_one",
+        "name": "生产于",
+        "source_role_name": null,
+        "source_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23103",
+        "tags": [
+          "生产"
+        ],
+        "target_role_name": null,
+        "target_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23105",
+        "technical_name": "produced_on",
+        "verbalizes": []
+      }
+    ],
+    "mappings": [],
+    "material_links": [],
+    "material_objects": [],
+    "object_types": [
+      {
+        "description": "向企业提供物料或服务的组织。",
+        "evidence": [],
+        "extends": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "name": "供应商",
+        "tags": [
+          "采购",
+          "供应链"
+        ],
+        "technical_name": "supplier"
+      },
+      {
+        "description": "采购、生产与库存环节管理的物料。",
+        "evidence": [],
+        "extends": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "name": "物料",
+        "tags": [
+          "采购",
+          "生产"
+        ],
+        "technical_name": "material"
+      },
+      {
+        "description": "生产过程形成并可追溯的一组产品。",
+        "evidence": [],
+        "extends": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23103",
+        "name": "产品批次",
+        "tags": [
+          "生产",
+          "质量"
+        ],
+        "technical_name": "product_batch"
+      },
+      {
+        "description": "参与业务活动的企业员工或外部人员。",
+        "evidence": [],
+        "extends": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23104",
+        "name": "人员",
+        "tags": [
+          "组织"
+        ],
+        "technical_name": "person"
+      },
+      {
+        "description": "参与生产、检测或仓储作业的设备。",
+        "evidence": [],
+        "extends": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23105",
+        "name": "设备",
+        "tags": [
+          "生产",
+          "设备"
+        ],
+        "technical_name": "equipment"
+      }
+    ],
+    "ontology_requires": [],
+    "properties": [
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23201",
+        "identifier": true,
+        "multiplicity": null,
+        "name": "供应商编码",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "required": true,
+        "target_role_name": null,
+        "technical_name": "supplier_code",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23202",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "供应商名称",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "supplier_name",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23203",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "供应商等级",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23101",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "supplier_grade",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23211",
+        "identifier": true,
+        "multiplicity": null,
+        "name": "物料编码",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "required": true,
+        "target_role_name": null,
+        "technical_name": "material_code",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23212",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "物料名称",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "material_name",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23213",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "标准成本",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23102",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "standard_cost",
+        "value_concept": null,
+        "value_kind": "decimal",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23221",
+        "identifier": true,
+        "multiplicity": null,
+        "name": "批次编号",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23103",
+        "required": true,
+        "target_role_name": null,
+        "technical_name": "batch_code",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23222",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "生产日期",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23103",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "production_date",
+        "value_concept": null,
+        "value_kind": "date",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23231",
+        "identifier": true,
+        "multiplicity": null,
+        "name": "人员编号",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23104",
+        "required": true,
+        "target_role_name": null,
+        "technical_name": "person_code",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23232",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "姓名",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23104",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "person_name",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23241",
+        "identifier": true,
+        "multiplicity": null,
+        "name": "设备编号",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23105",
+        "required": true,
+        "target_role_name": null,
+        "technical_name": "equipment_code",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23242",
+        "identifier": false,
+        "multiplicity": null,
+        "name": "设备名称",
+        "owner_type_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23105",
+        "required": false,
+        "target_role_name": null,
+        "technical_name": "equipment_name",
+        "value_concept": null,
+        "value_kind": "string",
+        "verbalizes": []
+      }
+    ],
+    "rules": [
+      {
+        "description": "",
+        "evidence": [],
+        "expression": "supplier.supplier_code IS NOT NULL",
+        "id": "17770b33-b539-4cb6-af5a-97e08e2a8c17",
+        "name": "编码必填",
+        "owner_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23201",
+        "owner_kind": "property",
+        "rule_kind": "constraint",
+        "technical_name": "code_required",
+        "verbalizes": []
+      },
+      {
+        "description": "",
+        "evidence": [],
+        "expression": "approved = FALSE",
+        "id": "c736e41e-7b76-4024-b17c-0e9ac10de721",
+        "name": "仅审批一次",
+        "owner_id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+        "owner_kind": "action",
+        "rule_kind": "constraint",
+        "technical_name": "approve_once",
+        "verbalizes": []
+      }
+    ],
+    "schema_version": "2",
+    "workspace_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23001"
+  },
+  "ossie": {
+    "ai_context": {
+      "instructions": "依据已发布的业务对象、属性和关系解释企业业务语义",
+      "ontofoundry": {
+        "actions": [
+          {
+            "description": "把供应商标记为已审批",
+            "effects": [
+              {
+                "expression": ":comment",
+                "id": "8f5bbe22-7928-497b-bfb4-1f757ab810f9",
+                "kind": "set_property",
+                "property": "supplier.supplier_code"
+              },
+              {
+                "id": "7a5056c8-3fa9-467a-b699-a699c2a0dd3c",
+                "kind": "create_link",
+                "link": "supplier.supplies"
+              }
+            ],
+            "id": "f3d590a2-ef39-4ac1-9e40-00b05818339e",
+            "input_type": "supplier",
+            "name": "审批供应商",
+            "parameters": [
+              {
+                "id": "289299c8-ff3f-44fe-a129-91acda34a370",
+                "name": "意见",
+                "required": false,
+                "technical_name": "comment",
+                "value_kind": "string"
+              }
+            ],
+            "preconditions": [
+              "code_required",
+              "approve_once"
+            ],
+            "rules": [
+              {
+                "expression": "approved = FALSE",
+                "id": "c736e41e-7b76-4024-b17c-0e9ac10de721",
+                "name": "仅审批一次",
+                "rule_kind": "constraint",
+                "technical_name": "approve_once"
+              }
+            ],
+            "technical_name": "approve_supplier"
+          }
+        ],
+        "display_names": {
+          "equipment": "设备",
+          "equipment.equipment_code": "设备编号",
+          "equipment.equipment_name": "设备名称",
+          "equipment.owned_by": "负责人",
+          "material": "物料",
+          "material.material_code": "物料编码",
+          "material.material_name": "物料名称",
+          "material.standard_cost": "标准成本",
+          "person": "人员",
+          "person.person_code": "人员编号",
+          "person.person_name": "姓名",
+          "product_batch": "产品批次",
+          "product_batch.batch_code": "批次编号",
+          "product_batch.produced_on": "生产于",
+          "product_batch.production_date": "生产日期",
+          "product_batch.uses_material": "使用",
+          "supplier": "供应商",
+          "supplier.supplier_code": "供应商编码",
+          "supplier.supplier_grade": "供应商等级",
+          "supplier.supplier_name": "供应商名称",
+          "supplier.supplies": "提供"
+        },
+        "required_attributes": [
+          "equipment.equipment_code",
+          "material.material_code",
+          "person.person_code",
+          "product_batch.batch_code",
+          "supplier.supplier_code"
+        ],
+        "rules": {
+          "supplier.supplier_code": [
+            {
+              "expression": "supplier.supplier_code IS NOT NULL",
+              "id": "17770b33-b539-4cb6-af5a-97e08e2a8c17",
+              "name": "编码必填",
+              "rule_kind": "constraint",
+              "technical_name": "code_required"
+            }
+          ]
+        },
+        "tags": {
+          "equipment": [
+            "生产",
+            "设备"
+          ],
+          "equipment.owned_by": [
+            "设备"
+          ],
+          "material": [
+            "生产",
+            "采购"
+          ],
+          "person": [
+            "组织"
+          ],
+          "product_batch": [
+            "生产",
+            "质量"
+          ],
+          "product_batch.produced_on": [
+            "生产"
+          ],
+          "product_batch.uses_material": [
+            "生产"
+          ],
+          "supplier": [
+            "供应链",
+            "采购"
+          ],
+          "supplier.supplies": [
+            "采购"
+          ]
+        },
+        "version": "3"
+      },
+      "synonyms": [
+        "制造"
+      ]
+    },
+    "description": "制造",
+    "name": "mfg",
+    "ontology": [
+      {
+        "concept": "equipment",
+        "description": "参与生产、检测或仓储作业的设备。",
+        "identify_by": [
+          "equipment_code"
+        ],
+        "relationships": [
+          {
+            "multiplicity": "OneToOne",
+            "name": "equipment_code",
+            "roles": [
+              {
+                "concept": "equipment_equipment_code_value"
+              }
+            ],
+            "verbalizes": [
+              "{equipment}的设备编号是{equipment_equipment_code_value}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "equipment_name",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{equipment}的设备名称是{String}"
+            ]
+          },
+          {
+            "description": "设备由指定人员负责。",
+            "multiplicity": "ManyToOne",
+            "name": "owned_by",
+            "roles": [
+              {
+                "concept": "person"
+              }
+            ],
+            "verbalizes": [
+              "{equipment}负责人{person}",
+              "{person}是{equipment}通过“负责人”关联的对象"
+            ]
+          }
+        ],
+        "type": "EntityType"
+      },
+      {
+        "concept": "material",
+        "description": "采购、生产与库存环节管理的物料。",
+        "identify_by": [
+          "material_code"
+        ],
+        "relationships": [
+          {
+            "multiplicity": "OneToOne",
+            "name": "material_code",
+            "roles": [
+              {
+                "concept": "material_material_code_value"
+              }
+            ],
+            "verbalizes": [
+              "{material}的物料编码是{material_material_code_value}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "material_name",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{material}的物料名称是{String}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "standard_cost",
+            "roles": [
+              {
+                "concept": "Decimal"
+              }
+            ],
+            "verbalizes": [
+              "{material}的标准成本是{Decimal}"
+            ]
+          }
+        ],
+        "type": "EntityType"
+      },
+      {
+        "concept": "person",
+        "description": "参与业务活动的企业员工或外部人员。",
+        "identify_by": [
+          "person_code"
+        ],
+        "relationships": [
+          {
+            "multiplicity": "OneToOne",
+            "name": "person_code",
+            "roles": [
+              {
+                "concept": "person_person_code_value"
+              }
+            ],
+            "verbalizes": [
+              "{person}的人员编号是{person_person_code_value}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "person_name",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{person}的姓名是{String}"
+            ]
+          }
+        ],
+        "type": "EntityType"
+      },
+      {
+        "concept": "product_batch",
+        "description": "生产过程形成并可追溯的一组产品。",
+        "identify_by": [
+          "batch_code"
+        ],
+        "relationships": [
+          {
+            "multiplicity": "OneToOne",
+            "name": "batch_code",
+            "roles": [
+              {
+                "concept": "product_batch_batch_code_value"
+              }
+            ],
+            "verbalizes": [
+              "{product_batch}的批次编号是{product_batch_batch_code_value}"
+            ]
+          },
+          {
+            "description": "产品批次由设备生产。",
+            "multiplicity": "ManyToOne",
+            "name": "produced_on",
+            "roles": [
+              {
+                "concept": "equipment"
+              }
+            ],
+            "verbalizes": [
+              "{product_batch}生产于{equipment}",
+              "{equipment}是{product_batch}通过“生产于”关联的对象"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "production_date",
+            "roles": [
+              {
+                "concept": "Date"
+              }
+            ],
+            "verbalizes": [
+              "{product_batch}的生产日期是{Date}"
+            ]
+          },
+          {
+            "description": "产品批次在生产中使用物料。",
+            "name": "uses_material",
+            "roles": [
+              {
+                "concept": "material"
+              }
+            ],
+            "verbalizes": [
+              "{product_batch}使用{material}",
+              "{material}是{product_batch}通过“使用”关联的对象"
+            ]
+          }
+        ],
+        "type": "EntityType"
+      },
+      {
+        "concept": "supplier",
+        "description": "向企业提供物料或服务的组织。",
+        "identify_by": [
+          "supplier_code"
+        ],
+        "relationships": [
+          {
+            "multiplicity": "OneToOne",
+            "name": "supplier_code",
+            "requires": [
+              "supplier.supplier_code IS NOT NULL"
+            ],
+            "roles": [
+              {
+                "concept": "supplier_supplier_code_value"
+              }
+            ],
+            "verbalizes": [
+              "{supplier}的供应商编码是{supplier_supplier_code_value}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "supplier_grade",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{supplier}的供应商等级是{String}"
+            ]
+          },
+          {
+            "multiplicity": "ManyToOne",
+            "name": "supplier_name",
+            "roles": [
+              {
+                "concept": "String"
+              }
+            ],
+            "verbalizes": [
+              "{supplier}的供应商名称是{String}"
+            ]
+          },
+          {
+            "description": "供应商向企业提供物料。",
+            "name": "supplies",
+            "roles": [
+              {
+                "concept": "material"
+              }
+            ],
+            "verbalizes": [
+              "{supplier}提供{material}",
+              "{material}是{supplier}通过“提供”关联的对象"
+            ]
+          }
+        ],
+        "type": "EntityType"
+      },
+      {
+        "concept": "equipment_equipment_code_value",
+        "extends": [
+          "String"
+        ],
+        "type": "ValueType"
+      },
+      {
+        "concept": "material_material_code_value",
+        "extends": [
+          "String"
+        ],
+        "type": "ValueType"
+      },
+      {
+        "concept": "person_person_code_value",
+        "extends": [
+          "String"
+        ],
+        "type": "ValueType"
+      },
+      {
+        "concept": "product_batch_batch_code_value",
+        "extends": [
+          "String"
+        ],
+        "type": "ValueType"
+      },
+      {
+        "concept": "supplier_supplier_code_value",
+        "extends": [
+          "String"
+        ],
+        "type": "ValueType"
+      }
+    ],
+    "version": "0.2.0.dev0"
+  },
+  "workspace_id": "10375c4d-64e2-4ddf-a6e6-f3fc36d23001"
+}

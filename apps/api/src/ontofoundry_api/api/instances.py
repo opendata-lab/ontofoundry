@@ -21,7 +21,7 @@ from ontofoundry_api.api.modeling import (
     require_member,
 )
 from ontofoundry_api.database import get_db
-from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.source_rows import source_key, validate_source_rows
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["instances"])
@@ -121,7 +121,7 @@ def neighborhood(
     return database_neighborhood(
         db,
         workspace_id,
-        OntologyDraft.model_validate(raw),
+        read_snapshot(raw, workspace_id),
         body,
         request.app.state.settings,
     )

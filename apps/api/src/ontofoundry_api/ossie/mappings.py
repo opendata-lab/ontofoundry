@@ -22,6 +22,8 @@ from ontofoundry_api.domain.models import (
     DataMapping,
     LinkTypeDefinition,
     ObjectTypeDefinition,
+    OntologyDraft,
+    PropertyDefinition,
 )
 
 COLUMN_RE = re.compile(
@@ -38,11 +40,11 @@ def _source(mapping: DataMapping) -> str:
 
 
 def compile_mappings(
-    mappings: list[DataMapping],
+    draft: OntologyDraft,
     objects: list[ObjectTypeDefinition],
-    links: list[LinkTypeDefinition],
 ) -> list[dict[str, Any]]:
     """One `OntologyMap` per data source, in a deterministic order."""
+    mappings, links = draft.mappings, draft.link_types
     by_type = {item.id: item for item in objects}
     grouped: dict[str, list[DataMapping]] = {}
     for mapping in mappings:
@@ -231,6 +233,7 @@ def _column(
 def parse_mappings(
     document: dict[str, Any],
     objects: list[ObjectTypeDefinition],
+    properties: list[PropertyDefinition],
     workspace_id: str,
     skip,
 ) -> list[DataMapping]:
@@ -296,7 +299,11 @@ def parse_mappings(
                 skip(path, "对象映射不是单列表达式，也没有 primary_key，无法确定键列")
                 continue
 
-            attributes = {item.technical_name for item in object_type.attributes}
+            attributes = {
+                item.technical_name
+                for item in properties
+                if item.owner_type_id == object_type.id
+            }
             fields: dict[str, str] = {}
             for link_mapping in children:
                 name = str(link_mapping["relationship"])

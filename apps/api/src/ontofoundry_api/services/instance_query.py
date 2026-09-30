@@ -16,7 +16,8 @@ from ontofoundry_api.api.instances import (
     database_object,
 )
 from ontofoundry_api.domain.instance_validation import value_issues
-from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.snapshot import read_snapshot
+from ontofoundry_api.services.ontology_query import version_hashes
 
 
 class ObjectSearch(BaseModel):
@@ -31,7 +32,7 @@ def envelope(version):
     return {
         "workspace_id": version.workspace_id,
         "version_id": version.id,
-        "version_sha256": version.sha256,
+        **version_hashes(version),
         "queried_at": datetime.now(UTC).isoformat(),
     }
 
@@ -81,7 +82,7 @@ def mapping_for(draft, type_id):
 
 
 def search_objects(db, version, options: ObjectSearch, settings):
-    draft = OntologyDraft.model_validate(version.snapshot_json)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
     if options.type_id and options.type_id not in {t.id for t in draft.object_types}:
         raise HTTPException(404, "业务对象类型不存在")
     context = [
@@ -131,7 +132,7 @@ def search_objects(db, version, options: ObjectSearch, settings):
         rows = sorted(
             (
                 obj
-                for obj in draft.objects
+                for obj in draft.material_objects
                 if (
                     not options.type_id or obj.type_id in draft.descendants(options.type_id)
                 )
@@ -165,9 +166,9 @@ def search_objects(db, version, options: ObjectSearch, settings):
 
 def get_object(db, version, ref, settings):
     source, identity, key = parse_ref(ref)
-    draft = OntologyDraft.model_validate(version.snapshot_json)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
     if source == "document":
-        obj = next((obj for obj in draft.objects if str(obj.id) == identity), None)
+        obj = next((obj for obj in draft.material_objects if str(obj.id) == identity), None)
         if not obj:
             raise HTTPException(404, "该版本中没有此文档实例")
         item = document_object(obj)
@@ -194,7 +195,7 @@ def get_object(db, version, ref, settings):
 
 def object_neighborhood(db, version, ref, depth, settings):
     source, identity, key = parse_ref(ref)
-    draft = OntologyDraft.model_validate(version.snapshot_json)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
     if source == "database":
         result = database_neighborhood(
             db,
@@ -207,11 +208,11 @@ def object_neighborhood(db, version, ref, depth, settings):
             obj["ref"] = db_ref(obj["type_id"], obj["key"])
     else:
         center = get_object(db, version, ref, settings)["item"]
-        by_id = {str(obj.id): obj for obj in draft.objects}
+        by_id = {str(obj.id): obj for obj in draft.material_objects}
         visible, frontier, edges, truncated = {identity}, {identity}, {}, False
         for _ in range(depth):
             following = set()
-            for link in draft.links:
+            for link in draft.material_links:
                 ends = {str(link.source_id), str(link.target_id)}
                 if not frontier.intersection(ends):
                     continue

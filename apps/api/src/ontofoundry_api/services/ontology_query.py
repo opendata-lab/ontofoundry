@@ -7,6 +7,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.db_models import OntologyVersionRecord
+from ontofoundry_api.domain.canonical import snapshot_sha256
+from ontofoundry_api.domain.snapshot import as_v2_dict
 
 from .errors import NotFoundError
 from .workspaces import get_workspace
@@ -28,16 +30,77 @@ def current_version(
     return version
 
 
+def snapshot_of(version: OntologyVersionRecord) -> dict[str, Any]:
+    """The version's snapshot as v2 JSON, normalized once per loaded record.
+
+    Published snapshots were validated when they were published, so reads only
+    normalize the shape; they do not re-run domain validation.
+    """
+    cached = getattr(version, "_v2_snapshot", None)
+    if cached is None:
+        cached = as_v2_dict(version.snapshot_json, version.workspace_id)
+        version._v2_snapshot = cached
+    return cached
+
+
+def version_hashes(version: OntologyVersionRecord) -> dict[str, str]:
+    """Both version hashes; `version_sha256` stays as the content hash alias."""
+    return {
+        "version_sha256": version.sha256,
+        "version_content_sha256": version.sha256,
+        "normalized_snapshot_sha256": snapshot_sha256(snapshot_of(version)),
+    }
+
+
+def _query_view(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Project a v2 snapshot onto the shape this query layer has always served.
+
+    Object types carry their own properties as `attributes`, and rules appear as
+    `requires`/`derived_by` on their owners. This is the published read contract
+    for REST and MCP type queries, not a storage format.
+    """
+
+    def rules(owner_id: str) -> dict[str, list[str]]:
+        owned = [r for r in snapshot["rules"] if r["owner_id"] == owner_id]
+        return {
+            "requires": [r["expression"] for r in owned if r["rule_kind"] == "constraint"],
+            "derived_by": [r["expression"] for r in owned if r["rule_kind"] == "derivation"],
+        }
+
+    properties: dict[str, list[dict[str, Any]]] = {}
+    for prop in snapshot["properties"]:
+        view = {k: v for k, v in prop.items() if k not in ("owner_type_id", "evidence")}
+        properties.setdefault(prop["owner_type_id"], []).append({**view, **rules(prop["id"])})
+    return {
+        **snapshot,
+        "object_types": [
+            {
+                **{k: v for k, v in item.items() if k != "evidence"},
+                **rules(item["id"]),
+                "attributes": properties.get(item["id"], []),
+            }
+            for item in snapshot["object_types"]
+        ],
+        "link_types": [
+            {**{k: v for k, v in item.items() if k != "evidence"}, **rules(item["id"])}
+            for item in snapshot["link_types"]
+        ],
+        "objects": snapshot["material_objects"],
+        "links": snapshot["material_links"],
+    }
+
+
+def query_view(version: OntologyVersionRecord) -> dict[str, Any]:
+    return _query_view(snapshot_of(version))
+
+
 def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
-    snapshot = version.snapshot_json
-    attributes = sum(
-        len(item.get("attributes", [])) for item in snapshot.get("object_types", [])
-    )
+    snapshot = snapshot_of(version)
     return {
         "workspace_id": version.workspace_id,
         "version_id": version.id,
         "version": version.version_number,
-        "version_sha256": version.sha256,
+        **version_hashes(version),
         "status": version.status,
         "message": version.message,
         "published_at": version.created_at
@@ -47,7 +110,9 @@ def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
         "counts": {
             "object_types": len(snapshot.get("object_types", [])),
             "link_types": len(snapshot.get("link_types", [])),
-            "attributes": attributes,
+            "attributes": len(snapshot["properties"]),
+            "rules": len(snapshot["rules"]),
+            "actions": len(snapshot["actions"]),
             "mappings": len(snapshot.get("mappings", [])),
         },
     }
@@ -62,9 +127,9 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     }
     if not include_private:
         return result
-    snapshot = version.snapshot_json
-    objects = snapshot.get("objects", [])
-    links = snapshot.get("links", [])
+    snapshot = snapshot_of(version)
+    objects = snapshot["material_objects"]
+    links = snapshot["material_links"]
     mappings = snapshot.get("mappings", [])
     sample_objects = [
         {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]
@@ -74,6 +139,7 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
         evidence["material_id"]
         for item in [*objects, *links]
         for evidence in item.get("evidence", [])
+        if evidence.get("kind") == "material"
     }
     result["details"] = {
         "object_count": len(objects),
@@ -160,7 +226,7 @@ def search_types(
     kind: str | None = None,
 ) -> dict[str, Any]:
     normalized_query = query.strip().casefold()
-    items = _type_items(version.snapshot_json)
+    items = _type_items(query_view(version))
     if kind:
         items = [item for item in items if item["kind"] == kind]
     if normalized_query:
@@ -181,19 +247,19 @@ def search_types(
     return {
         "workspace_id": version.workspace_id,
         "version_id": version.id,
-        "version_sha256": version.sha256,
+        **version_hashes(version),
         "items": items,
         "next_cursor": None,
     }
 
 
 def get_type(version: OntologyVersionRecord, type_id: str) -> dict[str, Any]:
-    for item in _type_items(version.snapshot_json):
+    for item in _type_items(query_view(version)):
         if item["id"] == type_id or item["technical_name"] == type_id:
             return {
                 "workspace_id": version.workspace_id,
                 "version_id": version.id,
-                "version_sha256": version.sha256,
+                **version_hashes(version),
                 "item": item,
             }
     raise NotFoundError("没有找到该本体类型")
@@ -277,7 +343,7 @@ def type_graph(
     focus_id: str | None = None,
     depth: int = 1,
 ) -> dict[str, Any]:
-    nodes, edges = _all_graph(version.snapshot_json)
+    nodes, edges = _all_graph(query_view(version))
     if focus_id:
         neighbors: dict[str, set[str]] = {}
         for edge in edges:
@@ -302,7 +368,7 @@ def type_graph(
     return {
         "workspace_id": version.workspace_id,
         "version_id": version.id,
-        "version_sha256": version.sha256,
+        **version_hashes(version),
         "nodes": nodes,
         "edges": edges,
     }
