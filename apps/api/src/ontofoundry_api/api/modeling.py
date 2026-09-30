@@ -31,6 +31,7 @@ from ontofoundry_api.domain.snapshot import (
 )
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
+from ontofoundry_api.services.element_diff import element_changes
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.merge import merge_snapshots
@@ -41,6 +42,7 @@ from ontofoundry_api.services.ontology_query import (
     snapshot_of,
     version_summary,
 )
+from ontofoundry_api.services.proposals import pending_summary
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -79,6 +81,23 @@ def version_snapshot_sha256(db, workspace_id: str, version_id: str | None) -> st
 def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
     version = db.get(OntologyVersionRecord, version_id) if version_id else None
     return snapshot_of(version) if version else empty_snapshot(workspace_id)
+
+
+def session_response(db, item) -> dict:
+    """A session as the API returns it: data plus proposal summary and the
+    element-level changes relative to its base version."""
+    draft = session_draft(item)
+    try:
+        base_diff = element_changes(
+            version_snapshot(db, item.workspace_id, item.base_version_id), draft
+        )
+    except ValueError:  # an invalid draft field never blocks reading the session
+        base_diff = []
+    return {
+        **session_data(item),
+        **pending_summary(db, item.workspace_id, item.id, draft),
+        "base_diff": base_diff,
+    }
 
 
 def session_data(item):
@@ -132,6 +151,14 @@ def session_data(item):
     }
 
 
+def blocks_edits(item) -> bool:
+    """Only a legacy full-result run blocks edits: its result replaces the
+    draft. A proposals run never writes the draft, so edits only make the
+    affected proposals stale (design §6.2)."""
+    manifest = item.run_manifest_json or {}
+    return item.task_status in ACTIVE_RUN_STATUSES and manifest.get("result_contract") != "proposals"
+
+
 def revise(db, item, revision, **values):
     if "draft_json" in values:
         values["draft_sha256"] = draft_sha256(values["draft_json"], item.workspace_id)
@@ -139,29 +166,14 @@ def revise(db, item, revision, **values):
         values["base_version_sha256"] = version_snapshot_sha256(
             db, item.workspace_id, values["base_version_id"]
         )
-    if item.task_status in (
-        "submitting",
-        "queued",
-        "running",
-        "waiting_input",
-        "waiting_permission",
-    ):
+    if blocks_edits(item):
         raise HTTPException(409, "当前会话正在生成，请等待完成或取消后编辑")
+    guard = [ModelingSessionRecord.id == item.id, ModelingSessionRecord.revision == revision]
+    if (item.run_manifest_json or {}).get("result_contract") != "proposals":
+        guard.append(ModelingSessionRecord.task_status.not_in(list(ACTIVE_RUN_STATUSES)))
     result = db.execute(
         update(ModelingSessionRecord)
-        .where(
-            ModelingSessionRecord.id == item.id,
-            ModelingSessionRecord.revision == revision,
-            ModelingSessionRecord.task_status.not_in(
-                [
-                    "submitting",
-                    "queued",
-                    "running",
-                    "waiting_input",
-                    "waiting_permission",
-                ]
-            ),
-        )
+        .where(*guard)
         .values(**values, revision=revision + 1, updated_at=utc_now())
     )
     if result.rowcount != 1:
@@ -169,7 +181,7 @@ def revise(db, item, revision, **values):
         raise HTTPException(409, "此会话已在其他窗口更新，请刷新后重试")
     db.commit()
     db.refresh(item)
-    return session_data(item)
+    return session_response(db, item)
 
 
 def validate_draft(draft, workspace):
@@ -304,7 +316,7 @@ def create_session(
     )
     db.add(item)
     db.commit()
-    return session_data(item)
+    return session_response(db, item)
 
 
 @router.get("/sessions/{session_id}")
@@ -315,7 +327,7 @@ def read_session(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    return session_data(get_modeling_session(db, workspace_id, session_id))
+    return session_response(db, get_modeling_session(db, workspace_id, session_id))
 
 
 @router.put("/sessions/{session_id}")
