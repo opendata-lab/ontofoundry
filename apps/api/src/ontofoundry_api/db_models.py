@@ -219,7 +219,9 @@ class OntologyElementIdentityRecord(Base):
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
     element_id: Mapped[str] = mapped_column(String(36))
     kind: Mapped[str] = mapped_column(String(24), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=utc_now
+    )
     created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -246,13 +248,15 @@ class ProposalBatchRecord(Base):
     base_version_sha256: Mapped[str] = mapped_column(String(64))
     source_session_revision: Mapped[int] = mapped_column(Integer)
     source_draft_sha256: Mapped[str] = mapped_column(String(64))
-    material_manifest_json: Mapped[list] = mapped_column(JSON, default=list)
-    producer_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    material_manifest_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    producer_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     result_sha256: Mapped[str] = mapped_column(String(64))
     # validating | available | failed — never "stale": staleness is per item.
     status: Mapped[str] = mapped_column(String(16))
     error_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=utc_now
+    )
 
 
 class ProposalItemRecord(Base):
@@ -280,16 +284,18 @@ class ProposalItemRecord(Base):
     expected_target_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     before_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     after_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    field_changes_json: Mapped[list] = mapped_column(JSON, default=list)
-    evidence_json: Mapped[list] = mapped_column(JSON, default=list)
-    reason: Mapped[str] = mapped_column(Text, default="")
+    field_changes_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    evidence_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
     # Stored decision state only: pending | accepted | rejected | superseded.
     # stale / conflict are derived on read and never written (design §7.3).
     status: Mapped[str] = mapped_column(String(16), default="pending")
     decided_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     accepted_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=utc_now
+    )
 
 
 class ProposalItemDependencyRecord(Base):
@@ -350,7 +356,9 @@ class ProposalDecisionRequestRecord(Base):
     result_session_revision: Mapped[int] = mapped_column(Integer)
     response_json: Mapped[dict] = mapped_column(JSON)
     actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=utc_now
+    )
 
 
 class ProposalDecisionItemRecord(Base):

@@ -6,6 +6,7 @@ snapshot.  Publishing remains a separate, explicit user action.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import secrets
 from datetime import timedelta
@@ -14,12 +15,27 @@ from typing import Any
 from pydantic import ValidationError
 from sqlalchemy import and_, or_, update
 
+from ontofoundry_api.contracts.proposals import (
+    ProposalContractError,
+    RunContext,
+    parse_result,
+)
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.ossie.validator import validate_schema
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
-from ontofoundry_api.services.model_review import build_repair_request, review_conventions
+from ontofoundry_api.services.materials_lookup import material_lookup
+from ontofoundry_api.services.model_review import (
+    build_proposal_repair_request,
+    build_repair_request,
+    review_conventions,
+)
+from ontofoundry_api.services.proposals import (
+    proposal_header,
+    store_batch,
+    store_failed_batch,
+)
 
 RESULT_SCHEMA_VERSION = "ontofoundry.model-result/v1"
 RESULT_LEASE = timedelta(minutes=5)
@@ -126,6 +142,7 @@ async def _request_repair(
     *,
     topic_id: str,
     problems: list[str],
+    manifest: dict[str, Any] | None = None,
 ) -> str | None:
     """Hand the complaints back to the agent and let it produce a fix.
 
@@ -142,10 +159,16 @@ async def _request_repair(
 
     next_token = secrets.token_hex(16)
     result_path = f"output/ontofoundry-result-{next_token}.json"
+    next_manifest = {**manifest, "run_token": next_token} if manifest else None
+    content = (
+        build_proposal_repair_request(problems, proposal_header(next_manifest), result_path)
+        if next_manifest
+        else build_repair_request(problems, next_token, result_path)
+    )
     try:
         submitted = await _client(app, workspace_id, session_id).deliver(
             topic_id=topic_id,
-            content=build_repair_request(problems, next_token, result_path),
+            content=content,
             agent_id=app.state.settings.dataagent_agent_id,
             execution_mode=app.state.settings.dataagent_execution_mode,
         )
@@ -166,6 +189,7 @@ async def _request_repair(
         claimed_at,
         dataagent_task_id=next_task_id,
         dataagent_run_token=next_token,
+        **({"run_manifest_json": next_manifest} if next_manifest else {}),
         result_state="",
         result_claimed_at=None,
         task_status="running",
@@ -244,6 +268,7 @@ async def reconcile_run(
         topic_id = str(item.dataagent_topic_id or "")
         run_token = str(item.dataagent_run_token or "")
         revision = item.revision
+        manifest = dict(item.run_manifest_json or {})
 
     result_path = f"output/ontofoundry-result-{run_token}.json"
     try:
@@ -267,6 +292,18 @@ async def reconcile_run(
             claimed_at,
             state="failed_permanent",
             detail=_permanent_detail(exc, result_path),
+        )
+
+    if manifest.get("result_contract") == "proposals":
+        return await _consume_proposals(
+            app,
+            workspace_id,
+            session_id,
+            task_id,
+            claimed_at,
+            topic_id=topic_id,
+            manifest=manifest,
+            content=content,
         )
 
     try:
@@ -408,6 +445,102 @@ async def reconcile_run(
                     detail="新版本草稿写入前会话已更新，请重新运行建模",
                 )
             return state
+    return "done"
+
+
+async def _consume_proposals(
+    app: Any,
+    workspace_id: str,
+    session_id: str,
+    task_id: str,
+    claimed_at,
+    *,
+    topic_id: str,
+    manifest: dict[str, Any],
+    content: bytes,
+) -> str:
+    """Store an ontofoundry.proposals/v1 result as a batch. Never touches the
+    draft: a session edited during the run only makes affected items stale."""
+    context = RunContext(
+        workspace_id=manifest["workspace_id"],
+        session_id=manifest["session_id"],
+        run_token=manifest["run_token"],
+        base_version_id=manifest.get("base_version_id"),
+        base_version_sha256=manifest["base_version_sha256"],
+        source_session_revision=manifest["source_session_revision"],
+        source_draft_sha256=manifest["source_draft_sha256"],
+        draft=manifest["pinned_draft"],
+    )
+    with app.state.session_factory() as db:
+        lookup = material_lookup(db, app.state.settings, workspace_id)
+        try:
+            parsed = parse_result(content, context, material_lookup=lookup)
+        except ProposalContractError as exc:
+            parsed, failure = None, exc
+    if parsed is None:
+        repaired = await _request_repair(
+            app,
+            workspace_id,
+            session_id,
+            task_id,
+            claimed_at,
+            topic_id=topic_id,
+            problems=[f"{failure.code}：{failure}"],
+            manifest=manifest,
+        )
+        if repaired is not None:
+            return repaired
+        with app.state.session_factory() as db:
+            store_failed_batch(
+                db,
+                workspace_id=workspace_id,
+                session_id=session_id,
+                task_id=task_id,
+                manifest=manifest,
+                result_sha256=hashlib.sha256(content).hexdigest(),
+                code=failure.code,
+                message=str(failure),
+            )
+            db.commit()
+        return _finish_failure(
+            app,
+            session_id,
+            task_id,
+            claimed_at,
+            state="failed_permanent",
+            detail=f"提案结果被拒收：{failure}",
+        )
+
+    with app.state.session_factory() as db:
+        store_batch(
+            db,
+            workspace_id=workspace_id,
+            session_id=session_id,
+            task_id=task_id,
+            manifest=manifest,
+            parsed=parsed,
+        )
+        changed = db.execute(
+            update(ModelingSessionRecord)
+            .where(
+                ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
+                ModelingSessionRecord.last_result_task_id == task_id,
+                ModelingSessionRecord.result_state == "processing",
+                ModelingSessionRecord.result_claimed_at == claimed_at,
+            )
+            .values(
+                result_state="done",
+                result_warnings=[],
+                task_status="finished",
+                task_detail=f"已生成 {len(parsed.items)} 条提案，请在“提案”中审阅",
+                updated_at=utc_now(),
+            )
+        )
+        if changed.rowcount != 1:
+            db.rollback()
+            return _current_result_state(app, session_id)
+        db.commit()
     return "done"
 
 

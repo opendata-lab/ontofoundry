@@ -21,6 +21,7 @@ from ontofoundry_api.api.modeling import (
     session_draft,
     version_snapshot_sha256,
 )
+from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MaterialRecord, ModelingSessionRecord, utc_now
 from ontofoundry_api.domain.snapshot import draft_sha256
@@ -29,12 +30,16 @@ from ontofoundry_api.services.dataagent import (
     DataAgentClient,
     DataAgentError,
     build_turn_prompt,
+    proposal_instructions,
     require_dataagent_configuration,
 )
 from ontofoundry_api.services.model_result import (
     exhaust_retriable_result,
     reconcile_run,
 )
+from ontofoundry_api.services.proposals import proposal_context, proposal_header
+from ontofoundry_api.services.run_credentials import RunGrant
+from ontofoundry_api.services.run_credentials import issue as issue_run_credential
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -61,6 +66,25 @@ class InteractionRequest(BaseModel):
     kind: Literal["permission", "question"]
     request_id: str = Field(min_length=1)
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+def run_mcp_access(request, workspace_id, session_id, run_token, item, user_id) -> dict[str, Any]:
+    settings = request.app.state.settings
+    base = (settings.public_base_url or str(request.base_url)).rstrip("/")
+    return {
+        "url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/mcp",
+        "version_id": item.base_version_id,
+        "credential": issue_run_credential(
+            settings.session_secret,
+            RunGrant(
+                workspace_id=workspace_id,
+                session_id=session_id,
+                run_token=run_token,
+                version_id=item.base_version_id,
+                user_id=user_id,
+            ),
+        ),
+    }
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
@@ -452,7 +476,14 @@ async def send_message(
             "skill": "md2ossie",
             "mode": mode,
         },
+        "result_contract": request.app.state.settings.modeling_result_contract
+        if mode == "model"
+        else None,
     }
+    proposals = manifest["result_contract"] == "proposals"
+    if proposals:
+        # Results are parsed against exactly the draft this run was given.
+        manifest["pinned_draft"] = draft
 
     changed = db.execute(
         update(ModelingSessionRecord)
@@ -516,6 +547,7 @@ async def send_message(
                 )
 
         material_paths: list[str] = []
+        material_path_by_id: dict[str, str] = {}
         for material in materials:
             if material.id in uploaded_ids:
                 continue
@@ -533,14 +565,40 @@ async def send_message(
                 "text/markdown",
             )
             material_paths.append(str(uploaded.get("rel_path") or material.name))
+            material_path_by_id[material.id] = material_paths[-1]
             newly_uploaded.append(material.id)
 
-        context = await dataagent.upload(
-            topic_id,
-            f"ontofoundry-context-r{expected_revision}.json",
-            json.dumps(draft, ensure_ascii=False, indent=2).encode(),
-            "application/json",
-        )
+        proposal_prompt = None
+        if proposals:
+            context = await dataagent.upload(
+                topic_id,
+                f"ontofoundry-context-{run_token}.json",
+                json.dumps(proposal_context(manifest, draft), ensure_ascii=False, indent=2).encode(),
+                "application/json",
+            )
+            schema = await dataagent.upload(
+                topic_id,
+                "ontofoundry.proposals.v1.schema.json",
+                json.dumps(result_schema(), ensure_ascii=False).encode(),
+                "application/json",
+            )
+            proposal_prompt = proposal_instructions(
+                run_token=run_token,
+                header=proposal_header(manifest),
+                materials=[
+                    {**m, "path": material_path_by_id.get(m["id"], "")}
+                    for m in manifest["materials"]
+                ],
+                schema_file=str(schema.get("rel_path") or ""),
+                mcp=run_mcp_access(request, workspace_id, session_id, run_token, item, user.id),
+            )
+        else:
+            context = await dataagent.upload(
+                topic_id,
+                f"ontofoundry-context-r{expected_revision}.json",
+                json.dumps(draft, ensure_ascii=False, indent=2).encode(),
+                "application/json",
+            )
         prompt = build_turn_prompt(
             body.content,
             mode=mode,
@@ -549,6 +607,7 @@ async def send_message(
             context_file=str(context.get("rel_path") or ""),
             material_files=material_paths,
             run_token=run_token,
+            proposal_prompt=proposal_prompt,
         )
         delivery_started = True
         submitted = await dataagent.deliver(
