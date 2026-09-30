@@ -515,6 +515,32 @@ def _lift(
     return lifted
 
 
+def _resolve_precondition(
+    ref: Any,
+    known_rules: list[dict[str, Any]],
+    paths: dict[str, str],
+    action_label: str,
+    action_id: str,
+) -> str | None:
+    """A precondition by id if the file kept ids, else by owner path and
+    technical name — never by technical name alone."""
+    if not isinstance(ref, dict):
+        return None
+    if str(ref.get("id")) in {r["id"] for r in known_rules}:
+        return str(ref["id"])
+    owner = str(ref.get("owner") or "")
+    matches = [
+        r["id"]
+        for r in known_rules
+        if r["technical_name"] == ref.get("technical_name")
+        and (
+            (owner == f"action:{action_label}" and r["owner_id"] == action_id)
+            or paths.get(r["owner_id"]) == owner
+        )
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
 def _parse_actions(
     draft: dict[str, Any], extension: dict[str, Any], report: Report
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -558,10 +584,7 @@ def _parse_actions(
                     "evidence": [],
                 }
             )
-        rule_by_name = {
-            r["technical_name"]: r["id"]
-            for r in [*draft["rules"], *own_rules]
-        }
+        known_rules = [*draft["rules"], *own_rules]
         effects, broken = [], False
         for effect in entry.get("effects") or []:
             prop = by_path.get(str(effect.get("property"))) if effect.get("property") else None
@@ -578,7 +601,10 @@ def _parse_actions(
                     "expression": str(effect.get("expression") or ""),
                 }
             )
-        preconditions = [rule_by_name.get(str(name)) for name in entry.get("preconditions") or []]
+        preconditions = [
+            _resolve_precondition(ref, known_rules, report.paths, label, action_id)
+            for ref in entry.get("preconditions") or []
+        ]
         if broken or None in preconditions:
             report.skip(f"actions.{label}", "Action 引用的属性、关系或前置规则没有导入")
             continue
@@ -737,10 +763,12 @@ def _merge(
         for r in merged.rules
         if (r.owner_id, r.rule_kind.value) in replaced
     }
+    rule_remap: dict[UUID, UUID] = {}
     for (owner_id, kind), rules in imported_rules.items():
         for rule in rules:
             old = previous.get((owner_id, kind, rule.expression))
             if old is not None:
+                rule_remap[rule.id] = old.id
                 rule.id, rule.name, rule.technical_name = old.id, old.name, old.technical_name
             kept_rules.append(rule)
     merged.rules = kept_rules
@@ -749,6 +777,10 @@ def _merge(
     actions = {a.technical_name.casefold(): a for a in merged.actions}
     for action in imported.actions:
         action.input_type_id = remap[action.input_type_id]
+        # A precondition follows its rule when the rule kept its local id.
+        action.precondition_rule_ids = [
+            rule_remap.get(rule_id, rule_id) for rule_id in action.precondition_rule_ids
+        ]
         for effect in action.effects:
             if effect.property_id:
                 effect.property_id = remap[effect.property_id]

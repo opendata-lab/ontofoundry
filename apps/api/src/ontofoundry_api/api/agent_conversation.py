@@ -15,7 +15,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import get_modeling_session, require_member
+from ontofoundry_api.api.modeling import get_modeling_session, require_member, session_draft
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MaterialRecord, ModelingSessionRecord, utc_now
 from ontofoundry_api.services.dataagent import (
@@ -426,7 +426,8 @@ async def send_message(
         if item.title in {"新的建模会话", "未命名建模会话"}
         else item.title
     )
-    draft = item.draft_json
+    # The agent reads the draft as v2, even from a session saved before v2.
+    draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
 
     changed = db.execute(

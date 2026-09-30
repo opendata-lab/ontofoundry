@@ -147,9 +147,14 @@ def as_v2_dict(data: dict[str, Any] | None, workspace_id: str | UUID | None = No
         if workspace_id is None:
             raise ValueError("空快照必须提供 workspace_id")
         return empty_snapshot(workspace_id)
-    if str(data.get("schema_version") or "1") == "2":
+    if workspace_id is not None and str(data.get("workspace_id")) != str(workspace_id):
+        raise ValueError("快照不属于该工作空间")
+    version = str(data.get("schema_version") or "1")
+    if version == "2":
         return data
-    return normalize_v1(data)
+    if version == "1":
+        return normalize_v1(data)
+    raise ValueError(f"不支持的快照 schema_version：{version}")
 
 
 def read_snapshot(data: dict[str, Any] | None, workspace_id: str | UUID | None = None) -> OntologyDraft:
@@ -167,3 +172,8 @@ def normalized_snapshot_sha256(
     data: dict[str, Any] | None, workspace_id: str | UUID | None = None
 ) -> str:
     return snapshot_sha256(read_snapshot_json(data, workspace_id))
+
+
+def draft_sha256(data: dict[str, Any] | None, workspace_id: str | UUID | None = None) -> str:
+    """`draft_sha256` of a stored draft of either schema (not validated)."""
+    return snapshot_sha256(as_v2_dict(data, workspace_id))

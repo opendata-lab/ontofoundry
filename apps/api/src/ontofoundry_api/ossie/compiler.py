@@ -12,6 +12,7 @@ from ontofoundry_api.domain.models import (
     OntologyDraft,
     PropertyDefinition,
     RuleKind,
+    RuleOwnerKind,
     ValueKind,
 )
 
@@ -206,6 +207,18 @@ def _compile_actions(draft: OntologyDraft) -> list[dict[str, Any]]:
         return f"{types[link.owner_type_id].technical_name}.{link.technical_name}"
 
     rules = {r.id: r for r in draft.rules}
+    actions_by_id = {a.id: a for a in draft.actions}
+
+    def rule_path(rule) -> str:
+        owner = rule.owner_id
+        if rule.owner_kind == RuleOwnerKind.ACTION:
+            return f"action:{actions_by_id[owner].technical_name}"
+        if rule.owner_kind == RuleOwnerKind.OBJECT_TYPE:
+            return types[owner].technical_name
+        if rule.owner_kind == RuleOwnerKind.PROPERTY:
+            return property_key(owner)
+        return link_key(owner)
+
     result = []
     for action in sorted(draft.actions, key=lambda a: a.technical_name.casefold()):
         result.append(
@@ -218,8 +231,15 @@ def _compile_actions(draft: OntologyDraft) -> list[dict[str, Any]]:
                 "parameters": [
                     p.model_dump(mode="json") for p in action.parameters
                 ],
+                # By stable id, plus owner path and technical name for readers
+                # without ids: rule names are unique only within their owner.
                 "preconditions": [
-                    rules[rule_id].technical_name for rule_id in action.precondition_rule_ids
+                    {
+                        "id": str(rule_id),
+                        "owner": rule_path(rules[rule_id]),
+                        "technical_name": rules[rule_id].technical_name,
+                    }
+                    for rule_id in action.precondition_rule_ids
                 ],
                 "effects": [
                     {

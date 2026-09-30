@@ -16,14 +16,23 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
     utc_now,
 )
+from ontofoundry_api.domain.canonical import snapshot_sha256
+from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.domain.instance_validation import (
     include_instance_validation,
     instance_issues,
 )
 from ontofoundry_api.domain.models import OntologyDraft
-from ontofoundry_api.domain.snapshot import as_v2_dict, empty_snapshot, read_snapshot_json
+from ontofoundry_api.domain.snapshot import (
+    as_v2_dict,
+    draft_sha256,
+    empty_snapshot,
+    read_snapshot_json,
+)
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
@@ -62,6 +71,11 @@ def session_draft(item) -> dict:
     return as_v2_dict(item.draft_json, item.workspace_id)
 
 
+def version_snapshot_sha256(db, workspace_id: str, version_id: str | None) -> str:
+    """normalized_snapshot_sha256 of a version, or of the empty snapshot."""
+    return snapshot_sha256(version_snapshot(db, workspace_id, version_id))
+
+
 def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
     version = db.get(OntologyVersionRecord, version_id) if version_id else None
     return snapshot_of(version) if version else empty_snapshot(workspace_id)
@@ -80,6 +94,8 @@ def session_data(item):
         "workspace_id": item.workspace_id,
         "base_version_id": item.base_version_id,
         "revision": item.revision,
+        "base_version_sha256": item.base_version_sha256,
+        "draft_sha256": item.draft_sha256 or draft_sha256(draft),
         "draft": draft,
         "candidates": item.candidates_json,
         "material_ids": item.material_ids,
@@ -117,6 +133,12 @@ def session_data(item):
 
 
 def revise(db, item, revision, **values):
+    if "draft_json" in values:
+        values["draft_sha256"] = draft_sha256(values["draft_json"], item.workspace_id)
+    if "base_version_id" in values:
+        values["base_version_sha256"] = version_snapshot_sha256(
+            db, item.workspace_id, values["base_version_id"]
+        )
     if item.task_status in (
         "submitting",
         "queued",
@@ -276,7 +298,9 @@ def create_session(
         created_by=user.id,
         title=body.title,
         base_version_id=space.current_version_id,
+        base_version_sha256=snapshot_sha256(draft),
         draft_json=draft,
+        draft_sha256=snapshot_sha256(draft),
     )
     db.add(item)
     db.commit()
@@ -299,6 +323,7 @@ def save_session(
     workspace_id: str,
     session_id: str,
     body: DraftSave,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -312,7 +337,17 @@ def save_session(
         jsonschema.validate(body.draft, OntologyDraft.model_json_schema())
     except jsonschema.ValidationError as exc:
         raise HTTPException(422, "草稿结构无效：" + exc.message) from exc
-    values = {"draft_json": body.draft}
+    try:
+        draft = reconcile_draft_evidence(
+            session_draft(item),
+            deepcopy(body.draft),
+            lookup=material_lookup(db, request.app.state.settings, workspace_id),
+            actor_id=user.id,
+            now=utc_now(),
+        )
+    except EvidenceError as exc:
+        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
+    values = {"draft_json": draft}
     if body.title is not None:
         values["title"] = body.title
     if body.material_ids is not None:
@@ -324,7 +359,7 @@ def save_session(
                 raise HTTPException(422, "材料不属于当前空间")
         values["material_ids"] = body.material_ids
     result = revise(db, item, body.revision, **values)
-    result["validation"] = validate_draft(body.draft, get_workspace(db, workspace_id))
+    result["validation"] = validate_draft(draft, get_workspace(db, workspace_id))
     return result
 
 
@@ -442,7 +477,9 @@ def publish_session(
             commit=False,
         )
         item.base_version_id = version.id
+        item.base_version_sha256 = snapshot_sha256(model.model_dump(mode="json"))
         item.draft_json = merged
+        item.draft_sha256 = draft_sha256(merged, workspace_id)
         item.revision += 1
         item.updated_at = utc_now()
         db.commit()
@@ -523,7 +560,9 @@ def import_ossie_document(
         created_by=user.id,
         title=body.title or f"导入 {report['name'] or 'Ossie 本体'}",
         base_version_id=space.current_version_id,
+        base_version_sha256=version_snapshot_sha256(db, workspace_id, space.current_version_id),
         draft_json=draft,
+        draft_sha256=draft_sha256(draft, workspace_id),
     )
     db.add(item)
     db.commit()

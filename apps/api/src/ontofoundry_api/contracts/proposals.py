@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
@@ -24,12 +23,18 @@ from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
+from ontofoundry_api.domain.evidence import (
+    EvidenceError,
+    MaterialLookup,
+    check_material_evidence,
+)
 from ontofoundry_api.domain.models import (
     COLLECTIONS,
     ActionDefinition,
     DataMapping,
     ElementKind,
     LinkTypeDefinition,
+    MaterialEvidence,
     MaterialLink,
     MaterialObject,
     ObjectTypeDefinition,
@@ -170,6 +175,7 @@ def result_schema() -> dict[str, Any]:
                     "type": "object",
                     "properties": {"path": {"type": "string"}, "before": {}, "after": {}},
                     "required": ["path"],
+                    "additionalProperties": False,
                 },
             },
             "evidence": {
@@ -262,10 +268,6 @@ class ParsedBatch:
     items: list[ParsedItem]
 
 
-MaterialLookup = Callable[[str], tuple[str, list[str]] | None]
-"""material_id -> (sha256, normalized text lines) for this workspace, or None."""
-
-
 def batch_id_for(session_id: str, run_token: str) -> str:
     return str(uuid5(UUID(session_id), f"proposal-batch:{run_token}"))
 
@@ -290,29 +292,18 @@ def _fail(code: str, message: str) -> ProposalContractError:
     return ProposalContractError(code, message)
 
 
-def _check_quote(evidence: dict, lookup: MaterialLookup | None, where: str) -> None:
-    if lookup is None:
-        return
-    found = lookup(str(evidence["material_id"]))
-    if found is None:
-        raise _fail("EVIDENCE_INVALID", f"{where}：材料 {evidence['material_id']} 不属于当前空间")
-    sha, lines = found
-    if evidence.get("material_sha256") != sha:
-        raise _fail("EVIDENCE_INVALID", f"{where}：材料哈希与已保存的材料不一致")
-    start, end = evidence["locator"]["line_start"], evidence["locator"]["line_end"]
-    if end > len(lines):
-        raise _fail("EVIDENCE_INVALID", f"{where}：证据行号超出材料范围")
-    quote = " ".join((evidence.get("quote") or "").split())
-    window = " ".join(" ".join(lines[start - 1 : end]).split())
-    if quote and quote not in window:
-        raise _fail("EVIDENCE_INVALID", f"{where}：引用原文与材料第 {start}–{end} 行不符")
+def _check_quote(evidence: dict, lookup: MaterialLookup, where: str) -> None:
+    try:
+        check_material_evidence(evidence, lookup, where)
+    except EvidenceError as exc:
+        raise _fail(exc.code, str(exc)) from exc
 
 
 def parse_result(
     raw: bytes | str | dict[str, Any],
     context: RunContext,
     *,
-    material_lookup: MaterialLookup | None = None,
+    material_lookup: MaterialLookup,
 ) -> ParsedBatch:
     raw_bytes = (
         raw if isinstance(raw, bytes) else raw.encode("utf-8") if isinstance(raw, str) else None
@@ -443,18 +434,27 @@ def parse_result(
                     str(uuid5(UUID(target_id), "evidence:" + canonical({k: v for k, v in evidence.items() if k != "id"}))),
                 )
                 _check_quote(evidence, material_lookup, f"{where}.evidence[{position}]")
+            try:
+                # The stored and fingerprinted form is the model's own dump:
+                # omitted fields take their defaults, so a sparse `after` and
+                # one spelling the defaults out are the same proposal.
+                after = MODELS[kind].model_validate(after).model_dump(mode="json")
+            except ValidationError as exc:
+                raise _fail("ELEMENT_INVALID", f"{where}：{exc.errors()[0]['msg']}") from exc
+
             # Manual evidence is echoed from `before`, never authored: after must
             # carry exactly the same manual entries, unchanged.
             def manual(element: dict | None) -> str:
                 entries = [e for e in (element or {}).get("evidence") or [] if e.get("kind") == "manual"]
                 return canonical(entries, "evidence")
 
-            if manual(item["after"]) != manual(item["before"]):
+            before_model = (
+                MODELS[kind].model_validate(item["before"]).model_dump(mode="json")
+                if item["before"] is not None
+                else None
+            )
+            if manual(after) != manual(before_model):
                 raise _fail("MANUAL_EVIDENCE_FORBIDDEN", f"{where}：智能体不能新增、修改或删除人工证据")
-            try:
-                MODELS[kind].model_validate(after)
-            except ValidationError as exc:
-                raise _fail("ELEMENT_INVALID", f"{where}：{exc.errors()[0]['msg']}") from exc
         evidence = []
         for position, entry in enumerate(item.get("evidence") or []):
             entry = deepcopy(entry)
@@ -462,6 +462,10 @@ def parse_result(
                 "id",
                 str(uuid5(UUID(target_id), "item-evidence:" + canonical({k: v for k, v in entry.items() if k != "id"}))),
             )
+            try:
+                entry = MaterialEvidence.model_validate(entry).model_dump(mode="json")
+            except ValidationError as exc:
+                raise _fail("RESULT_SCHEMA_INVALID", f"{where}.evidence[{position}]：{exc.errors()[0]['msg']}") from exc
             _check_quote(entry, material_lookup, f"{where}.evidence[{position}]")
             evidence.append(entry)
         deps_by_index[index] = deps

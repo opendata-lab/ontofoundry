@@ -15,6 +15,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.instance_validation import include_instance_validation
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
+from ontofoundry_api.domain.snapshot import as_v2_dict
 from ontofoundry_api.ossie.compiler import compile_ossie, sha256_json, validate_ossie
 
 from .errors import ConflictError, NotFoundError, PublishValidationError
@@ -119,7 +120,7 @@ def workspace_summary(session: Session, workspace: WorkspaceRecord, user_id: str
         if workspace.current_version_id
         else None
     )
-    draft = version.snapshot_json if version else {}
+    draft = as_v2_dict(version.snapshot_json, workspace.id) if version else {}
     return {
         "id": workspace.id,
         "slug": workspace.slug,

@@ -343,3 +343,174 @@ def test_session_from_a_v1_head_is_v2_and_publishes_v2(client):
     )
     assert comparison.status_code == 200
     assert any(c["path"].endswith(".description") for c in comparison.json()["changes"])
+
+
+# --- regressions from the T1 gate review ---------------------------------------
+
+
+def test_snapshot_boundary_rejects_unknown_versions_and_foreign_workspaces():
+    payload = action_draft().model_dump(mode="json")
+    future = {**payload, "schema_version": "3"}
+    with pytest.raises(ValueError, match="schema_version"):
+        read_snapshot(future)
+    with pytest.raises(ValueError, match="工作空间"):
+        read_snapshot(payload, workspace_id=uuid4())
+
+
+def test_action_effects_may_reference_only_input_properties():
+    payload = action_draft().model_dump(mode="json")
+    supplier = payload["object_types"][0]["technical_name"]
+    code = payload["properties"][0]["technical_name"]
+    good = deepcopy(payload)
+    good["actions"][0]["effects"][0]["expression"] = f"COALESCE(:comment, {supplier}.{code}) || '.x.y'"
+    OntologyDraft.model_validate(good)
+
+    for expression in (f"{supplier}.missing", f"other_concept.{code}"):
+        bad = deepcopy(payload)
+        bad["actions"][0]["effects"][0]["expression"] = expression
+        with pytest.raises(ValidationError, match="只能引用输入对象"):
+            OntologyDraft.model_validate(bad)
+
+
+def test_same_named_rules_under_different_owners_round_trip_to_the_right_one():
+    payload = action_draft().model_dump(mode="json")
+    supplier = payload["object_types"][0]
+    twin = {
+        **payload["rules"][0],
+        "id": str(uuid4()),
+        "owner_kind": "object_type",
+        "owner_id": supplier["id"],
+        "expression": "EXISTS (supplier)",
+    }  # same technical_name, different owner
+    payload["rules"].append(twin)
+    draft = OntologyDraft.model_validate(payload)
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+
+    # With ids, and with ids stripped (owner path + technical name must suffice).
+    stripped = deepcopy(document)
+    for entry in stripped["ai_context"]["ontofoundry"]["actions"][0]["preconditions"]:
+        entry.pop("id")
+    for sample in (document, stripped):
+        payload2, report = import_ossie(sample, workspace_id=str(WORKSPACE), mode="replace")
+        imported = OntologyDraft.model_validate(payload2)
+        assert report["skipped"] == []
+        by_id = {r.id: r for r in imported.rules}
+        chosen = [by_id[i] for i in imported.actions[0].precondition_rule_ids]
+        assert [(r.owner_kind.value, r.expression) for r in chosen] == [
+            (r.owner_kind.value, r.expression)
+            for r in (by_id.get(i) or next(x for x in draft.rules if x.id == i) for i in draft.actions[0].precondition_rule_ids)
+        ]
+
+
+def test_merge_import_remaps_preconditions_to_rules_that_keep_local_ids():
+    draft = action_draft()
+    document = compile_ossie(draft, ontology_name="mfg", ontology_description="制造")
+    extension = document["ai_context"]["ontofoundry"]
+    # A file from elsewhere: same rules and action, but freshly minted rule ids.
+    fresh = {}
+    for entries in extension["rules"].values():
+        for entry in entries:
+            fresh[entry["id"]] = str(uuid4())
+            entry["id"] = fresh[entry["id"]]
+    for action in extension["actions"]:
+        for entry in action["rules"]:
+            fresh[entry["id"]] = str(uuid4())
+            entry["id"] = fresh[entry["id"]]
+        for ref in action["preconditions"]:
+            ref["id"] = fresh[ref["id"]]
+    payload, report = import_ossie(
+        document, workspace_id=str(WORKSPACE), base=draft.model_dump(mode="json"), mode="merge"
+    )
+    merged = OntologyDraft.model_validate(payload)
+    rule_ids = {r.id for r in merged.rules}
+    property_rule = next(r for r in draft.rules if r.owner_kind.value == "property")
+    assert property_rule.id in rule_ids  # kept its local id
+    assert set(merged.actions[0].precondition_rule_ids) <= rule_ids
+    assert property_rule.id in merged.actions[0].precondition_rule_ids
+
+
+# --- evidence integrity on draft saves -----------------------------------------
+
+
+def upload_material(client, text: str) -> dict:
+    response = client.post(ROOT + "/materials?name=evidence.md", content=text.encode())
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def test_saved_manual_evidence_is_stamped_by_the_server(client):
+    session = create_session(client)
+    session["draft"]["object_types"][0]["evidence"] = [
+        {
+            "kind": "manual",
+            "id": str(uuid4()),
+            "note": "业务确认",
+            "created_by": "someone-else",
+            "created_at": "2000-01-01T00:00:00Z",
+        }
+    ]
+    saved = save(client, session, session["draft"])
+    assert saved.status_code == 200, saved.text
+    (evidence,) = saved.json()["draft"]["object_types"][0]["evidence"]
+    assert evidence["created_by"] != "someone-else"
+    assert not evidence["created_at"].startswith("2000")
+
+    tampered = saved.json()
+    tampered["draft"]["object_types"][0]["evidence"][0]["note"] = "改过"
+    response = save(client, tampered, tampered["draft"])
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "MANUAL_EVIDENCE_IMMUTABLE"
+
+
+def test_nobody_removes_another_members_manual_evidence(client):
+    session = create_session(client)
+    element_id = session["draft"]["object_types"][0]["id"]
+    with client.app.state.session_factory() as db:
+        from ontofoundry_api.db_models import ModelingSessionRecord
+
+        item = db.get(ModelingSessionRecord, session["id"])
+        draft = deepcopy(item.draft_json)
+        draft["object_types"][0]["evidence"] = [
+            {
+                "kind": "manual",
+                "id": str(uuid4()),
+                "note": "别人录入",
+                "created_by": "other-user",
+                "created_at": "2026-09-01T00:00:00+00:00",
+            }
+        ]
+        item.draft_json = draft
+        db.commit()
+    current = client.get(ROOT + "/sessions/" + session["id"]).json()
+    assert current["draft"]["object_types"][0]["id"] == element_id
+    current["draft"]["object_types"][0]["evidence"] = []
+    response = save(client, current, current["draft"])
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "MANUAL_EVIDENCE_IMMUTABLE"
+
+
+def test_new_material_evidence_must_match_the_stored_material(client):
+    material = upload_material(client, "# 标题\n供应商甲供应物料乙。\n")
+    session = create_session(client)
+    good = {
+        "kind": "material",
+        "id": str(uuid4()),
+        "material_id": material["id"],
+        "material_sha256": material["sha256"],
+        "locator": {"line_start": 2, "line_end": 2},
+        "quote": "供应商甲供应物料乙",
+    }
+    session["draft"]["object_types"][0]["evidence"] = [good]
+    saved = save(client, session, session["draft"])
+    assert saved.status_code == 200, saved.text
+
+    for broken in (
+        {**good, "id": str(uuid4()), "material_sha256": None},
+        {**good, "id": str(uuid4()), "quote": "编造"},
+        {**good, "id": str(uuid4()), "material_id": str(uuid4())},
+    ):
+        attempt = saved.json()
+        attempt["draft"]["object_types"][1]["evidence"] = [broken]
+        response = save(client, attempt, attempt["draft"])
+        assert response.status_code == 422, broken
+        assert response.json()["error"]["code"] == "EVIDENCE_INVALID"
