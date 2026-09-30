@@ -10,6 +10,8 @@ import type {
   ModelingSession,
   ProposalBatch,
   ProposalBatchDetail,
+  PublishPreview,
+  Resolution,
   ModelingSessionSummary,
   Material,
   OssieImportResult,
@@ -250,6 +252,47 @@ export const proposalsApi = {
           idempotency_key: idempotencyKey,
           expected_session_revision: s.revision,
           decisions,
+        }),
+      },
+    ),
+};
+
+
+export const publishApi = {
+  preview: (s: ModelingSession) =>
+    request<PublishPreview>(`/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ expected_session_revision: s.revision }),
+    }),
+  publish: (s: ModelingSession, preview: PublishPreview, message: string) =>
+    request<{ version: VersionSummary; session: ModelingSession }>(
+      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/publish`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expected_session_revision: s.revision,
+          expected_current_version_id: preview.current_version_id,
+          expected_merged_snapshot_sha256: preview.merged_snapshot_sha256,
+          message,
+        }),
+      },
+    ),
+  resolve: (
+    s: ModelingSession,
+    currentVersionId: string | null,
+    resolutions: Record<string, Resolution>,
+  ) =>
+    request<ModelingSession>(
+      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/resolve-merge`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expected_session_revision: s.revision,
+          expected_current_version_id: currentVersionId,
+          resolutions,
         }),
       },
     ),

@@ -60,3 +60,22 @@ export function acceptableIds(items: ProposalItem[]) {
     )
     .map((i) => i.id);
 }
+
+export const FIELD_LABELS: Record<string, string> = {
+  name: "名称",
+  technical_name: "技术名",
+  description: "描述",
+  tags: "标签",
+  extends: "继承",
+  value_kind: "值类型",
+  required: "必填",
+  identifier: "标识",
+  multiplicity: "基数",
+  expression: "表达式",
+  verbalizes: "读法",
+  evidence: "证据",
+  values: "属性值",
+  table_name: "数据表",
+  key_column: "主键列",
+  fields: "字段映射",
+};

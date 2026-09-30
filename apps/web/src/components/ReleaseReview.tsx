@@ -9,11 +9,6 @@ type Comparison = {
   changes: { path: string; kind: string; before: unknown; after: unknown }[];
   impacts: { id: string; kind: string; label: string }[];
 };
-type Preview = Comparison & {
-  revision: number;
-  ossie: unknown;
-  validation: VersionSummary["validation"];
-};
 
 function Changes({ value }: { value: Comparison }) {
   return (
@@ -51,7 +46,12 @@ function Changes({ value }: { value: Comparison }) {
   );
 }
 
-export function ReleaseReview({
+/**
+ * Workspace-level constraints (Ossie ontology `requires`), edited on the
+ * saved draft. The publish preview reflects only saved revisions, so unsaved
+ * edits here are flagged and publishing waits for them.
+ */
+export function WorkspaceConstraints({
   session,
   onSaved,
   disabled = false,
@@ -64,9 +64,7 @@ export function ReleaseReview({
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
-  const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState("");
-  const [attempt, setAttempt] = useState(0);
   const [rules, setRules] = useState(session.draft.ontology_requires ?? []);
   const [saving, setSaving] = useState(false);
   const dirty =
@@ -83,61 +81,9 @@ export function ReleaseReview({
   useEffect(() => {
     setRules(session.draft.ontology_requires ?? []);
   }, [session.id, session.revision, session.draft.ontology_requires]);
-  useEffect(() => {
-    let active = true;
-    setPreview(null);
-    setError("");
-    workspaceRequest<Preview>(
-      session.workspace_id,
-      `/sessions/${session.id}/preview`,
-      { revision: session.revision },
-    )
-      .then((r) => {
-        if (active) setPreview(r);
-      })
-      .catch((e: Error) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [session.workspace_id, session.id, session.revision, attempt]);
   return (
-    <div className="release-review">
-      <details className="expression-editor">
-        <summary>发布预览与变化</summary>
-        {error ? (
-          <p className="inline-error" role="alert">
-            {error}
-            <button onClick={() => setAttempt(attempt + 1)}>重试</button>
-          </p>
-        ) : !preview ? (
-          <p>正在编译草稿…</p>
-        ) : (
-          <>
-            <p className="muted">
-              草稿修订 {preview.revision} · 相对当前已发布版本
-            </p>
-            <Changes value={preview} />
-            {preview.validation.errors.map((issue, i) => (
-              <p className="inline-error" key={i}>
-                {(issue as { path?: string }).path}{" "}
-                {(issue as { message: string }).message}
-              </p>
-            ))}
-            {preview.ossie ? (
-              <details>
-                <summary>Ossie JSON</summary>
-                <pre className="definition-preview">
-                  {JSON.stringify(preview.ossie, null, 2)}
-                </pre>
-              </details>
-            ) : (
-              <p className="muted">修正校验错误后可查看本次标准定义。</p>
-            )}
-          </>
-        )}
-      </details>
+    <details className="expression-editor workspace-constraints">
+      <summary>工作空间约束</summary>
       <ExpressionsEditor
         disabled={disabled || saving}
         label="工作空间约束"
@@ -150,6 +96,11 @@ export function ReleaseReview({
       {dirty && (
         <p className="muted" role="status">
           空间约束尚未保存。预览对应已保存的修订，请保存后再发布。
+        </p>
+      )}
+      {error && (
+        <p className="inline-error" role="alert">
+          {error}
         </p>
       )}
       {dirty && (
@@ -178,7 +129,7 @@ export function ReleaseReview({
           {saving ? "正在保存…" : "保存空间约束"}
         </button>
       )}
-    </div>
+    </details>
   );
 }
 

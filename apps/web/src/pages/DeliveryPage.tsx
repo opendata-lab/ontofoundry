@@ -1,36 +1,35 @@
-import { ReleaseReview, HistoryComparison } from "../components/ReleaseReview";
+import { HistoryComparison, WorkspaceConstraints } from "../components/ReleaseReview";
+import { PublishPanel } from "../components/publish/PublishPanel";
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle2, Download, Rocket, KeyRound, Trash2 } from "lucide-react";
-import { api, ApiError, modelingApi, workspaceRequest } from "../api/client";
-import type { ModelingSession, VersionSummary } from "../api/types";
+import { Link, useSearchParams } from "react-router-dom";
+import { CheckCircle2, Download, KeyRound, Trash2 } from "lucide-react";
+import { api, workspaceRequest } from "../api/client";
+import type { VersionSummary } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
 
-type MergeConflict = {
-  path: string;
-  base: unknown;
-  current: unknown;
-  draft: unknown;
-};
+type PageTab = "publish" | "history" | "service";
+
 export function DeliveryPage() {
   const { workspace, refresh } = useWorkspaceContext();
   const model = useModeling(workspace.id, !!workspace.role, true);
+  const [params, setParams] = useSearchParams();
+  const tab: PageTab =
+    (params.get("tab") as PageTab | null) ?? (workspace.role ? "publish" : "history");
+  const setTab = (next: PageTab) =>
+    setParams(
+      (p) => {
+        const value = new URLSearchParams(p);
+        value.set("tab", next);
+        return value;
+      },
+      { replace: true },
+    );
   const [versions, setVersions] = useState<VersionSummary[]>([]);
-  const [report, setReport] = useState<VersionSummary["validation"] | null>(
-    null,
-  );
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
   const [reviewDirty, setReviewDirty] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [result, setResult] = useState("");
-  const [conflict, setConflict] = useState<{
-    current_version_id: string;
-    conflicts: MergeConflict[];
-  } | null>(null);
-  const [choices, setChoices] = useState<Record<string, string>>({});
   const [tokens, setTokens] = useState<
     { id: string; name: string; scopes?: string[] }[]
   >([]);
@@ -38,8 +37,8 @@ export function DeliveryPage() {
   const { setError } = model;
   usePageTab({
     title: model.session ? `发布 · ${model.session.title}` : undefined,
-    dirty: reviewDirty || !!message.trim() || Object.keys(choices).length > 0,
-    busy: busy || reviewBusy,
+    dirty: reviewDirty,
+    busy: reviewBusy,
   });
   const loadVersions = useCallback(
     () =>
@@ -59,40 +58,18 @@ export function DeliveryPage() {
         .then((r) => setTokens(r.items))
         .catch((e: Error) => setError(e.message));
   }, [workspace.id, workspace.role, loadVersions, setError]);
-  const publish = async () => {
-    if (!model.session || busy || reviewBusy || reviewDirty) return;
-    setBusy(true);
-    model.setError("");
-    setConflict(null);
-    try {
-      const validation = await modelingApi.validate(model.session);
-      setReport(validation);
-      if (!validation.publishable) return;
-      const r = await modelingApi.publish(model.session, message);
-      model.setSession(r.session);
-      setResult("已整体发布 v" + r.version.version);
-      setMessage("");
-      setChoices({});
-      await loadVersions();
-      refresh();
-    } catch (e) {
-      if (
-        e instanceof ApiError &&
-        e.status === 409 &&
-        typeof e.detail === "object" &&
-        e.detail &&
-        "conflicts" in e.detail
-      )
-        setConflict(e.detail as typeof conflict);
-      else model.setError(e instanceof Error ? e.message : "发布失败");
-    } finally {
-      setBusy(false);
-    }
-  };
   const serviceRoot =
     window.location.origin + "/api/v1/ontology/workspaces/" + workspace.id;
+  const session = model.session;
+  const base = versions.find((v) => v.version_id === session?.base_version_id);
+  const latest = versions[0];
   return (
     <div className="ref-catalog">
+      <nav className="breadcrumb" aria-label="面包屑">
+        <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体自动构建</Link>
+        <span aria-hidden> / </span>
+        <span>发布与服务</span>
+      </nav>
       <header className="catalog-toolbar">
         <h1>发布与服务</h1>
         <div className="toolbar-spacer" />
@@ -103,181 +80,89 @@ export function DeliveryPage() {
           </span>
         )}
       </header>
-      <div className="management-content delivery-content">
+      <div className="ref-tabs page-tabs" role="tablist" aria-label="发布与服务">
         {workspace.role && (
-          <section className="detail-section">
-            <h2>整体发布本体</h2>
-            <p className="muted">
-              发布当前会话的完整草稿。本体视图、REST API 与 MCP
-              同时使用这个版本。
-            </p>
-            <select
-              aria-label="选择发布草稿"
-              disabled={busy || reviewBusy || reviewDirty}
-              value={model.session?.id ?? ""}
-              onChange={(e) => model.select(e.target.value)}
-            >
-              <option value="">选择一个建模会话</option>
-              {model.sessions.map((s) => (
-                <option value={s.id} key={s.id}>
-                  {s.title}
-                </option>
-              ))}
-            </select>
-            {model.session && (
-              <>
-                <ReleaseReview
-                  key={model.session.id}
-                  session={model.session}
-                  onSaved={model.setSession}
-                  disabled={busy}
-                  onDirtyChange={setReviewDirty}
-                  onBusyChange={setReviewBusy}
-                />
-                <div className="release-stats">
-                  <span>
-                    实体 <b>{model.session.draft.object_types.length}</b>
-                  </span>
-                  <span>
-                    关系 <b>{model.session.draft.link_types.length}</b>
-                  </span>
-                  <span>
-                    文档实例 <b>{model.session.draft.material_objects.length}</b>
-                  </span>
-                  <span>
-                    映射 <b>{model.session.draft.mappings.length}</b>
-                  </span>
-                </div>
-                <label className="section-field">
-                  <span>版本说明</span>
-                  <input
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    maxLength={240}
-                    placeholder="说明本次模型变化"
-                  />
-                </label>
-                <div className="row-actions">
-                  <Link
-                    className="button button--secondary"
-                    to={"../builder?session=" + model.session.id}
-                  >
-                    返回草稿
-                  </Link>
-                  <button
-                    className="button button--secondary"
-                    disabled={busy || reviewBusy || reviewDirty}
-                    onClick={() => {
-                      setBusy(true);
-                      modelingApi
-                        .validate(model.session!)
-                        .then(setReport)
-                        .catch((e: Error) => model.setError(e.message))
-                        .finally(() => setBusy(false));
-                    }}
-                  >
-                    校验 JSON
-                  </button>
-                  <button
-                    className="button button--primary"
-                    disabled={busy || reviewBusy || reviewDirty}
-                    onClick={publish}
-                  >
-                    <Rocket size={14} />
-                    {busy ? "校验与发布中…" : "发布整个空间"}
-                  </button>
-                </div>
-              </>
-            )}
-            {report && (
-              <div
-                className={
-                  report.publishable ? "validation-pass" : "inline-error"
-                }
+          <button role="tab" aria-selected={tab === "publish"} onClick={() => setTab("publish")}>
+            发布
+          </button>
+        )}
+        <button role="tab" aria-selected={tab === "history"} onClick={() => setTab("history")}>
+          版本历史
+        </button>
+        <button role="tab" aria-selected={tab === "service"} onClick={() => setTab("service")}>
+          服务接入
+        </button>
+      </div>
+      <div className="management-content delivery-content">
+        {tab === "publish" && workspace.role && (
+          <section className="publish-tab">
+            <div className="publish-context">
+              <select
+                aria-label="选择发布草稿"
+                disabled={reviewBusy || reviewDirty}
+                value={session?.id ?? ""}
+                onChange={(e) => model.select(e.target.value)}
               >
-                {report.publishable
-                  ? "JSON Schema 与语义引用校验通过"
-                  : "校验未通过"}
-                {report.errors.map((e, i) => (
-                  <p key={i}>{(e as { message: string }).message}</p>
+                <option value="">选择一个建模会话</option>
+                {model.sessions.map((s) => (
+                  <option value={s.id} key={s.id}>
+                    {s.title}
+                  </option>
                 ))}
-              </div>
-            )}
+              </select>
+              {session && (
+                <span className="version-chips" aria-label="版本">
+                  <span className="chip">基线 {base ? `v${base.version}` : "空白"}</span>→
+                  <span className="chip">最新 {latest ? `v${latest.version}` : "无"}</span>→
+                  <span className="chip">草稿 r{session.revision}</span>
+                </span>
+              )}
+              {session && (
+                <Link className="button button--text" to={"../builder?session=" + session.id}>
+                  返回建模
+                </Link>
+              )}
+            </div>
             {result && (
               <p className="validation-pass" role="status">
                 {result}
               </p>
             )}
-            {conflict && (
-              <div className="merge-conflicts">
-                <h3>合并冲突</h3>
-                {conflict.conflicts.map((c) => (
-                  <div key={c.path}>
-                    <strong>{c.path}</strong>
-                    <div className="merge-columns">
-                      <section>
-                        <small>基线</small>
-                        <pre>{JSON.stringify(c.base, null, 2)}</pre>
-                      </section>
-                      <section>
-                        <label>
-                          <input
-                            type="radio"
-                            name={c.path}
-                            checked={choices[c.path] === "current"}
-                            onChange={() =>
-                              setChoices({ ...choices, [c.path]: "current" })
-                            }
-                          />
-                          使用最新版本
-                        </label>
-                        <pre>{JSON.stringify(c.current, null, 2)}</pre>
-                      </section>
-                      <section>
-                        <label>
-                          <input
-                            type="radio"
-                            name={c.path}
-                            checked={choices[c.path] === "draft"}
-                            onChange={() =>
-                              setChoices({ ...choices, [c.path]: "draft" })
-                            }
-                          />
-                          使用当前草稿
-                        </label>
-                        <pre>{JSON.stringify(c.draft, null, 2)}</pre>
-                      </section>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  className="button button--primary"
-                  disabled={conflict.conflicts.some((c) => !choices[c.path])}
-                  onClick={() =>
-                    workspaceRequest<ModelingSession>(
-                      workspace.id,
-                      "/sessions/" + model.session!.id + "/resolve-merge",
-                      {
-                        revision: model.session!.revision,
-                        current_version_id: conflict.current_version_id,
-                        resolutions: choices,
-                      },
-                    )
-                      .then((s) => {
-                        model.setSession(s);
-                        setConflict(null);
-                        setResult("冲突已合并，请重新校验后发布");
-                      })
-                      .catch((e: Error) => model.setError(e.message))
-                  }
-                >
-                  保存合并结果
-                </button>
-              </div>
+            {session ? (
+              <>
+                <PublishPanel
+                  key={session.id}
+                  session={session}
+                  disabled={reviewBusy || reviewDirty}
+                  onSession={model.setSession}
+                  onStale={() => {
+                    // The workspace moved on: versions and header too.
+                    model.reload();
+                    void loadVersions();
+                    refresh();
+                  }}
+                  onPublished={(version, next) => {
+                    model.setSession(next);
+                    setResult("已发布 v" + version.version);
+                    void loadVersions();
+                    refresh();
+                  }}
+                />
+                <WorkspaceConstraints
+                  key={session.id + "-constraints"}
+                  session={session}
+                  onSaved={model.setSession}
+                  onDirtyChange={setReviewDirty}
+                  onBusyChange={setReviewBusy}
+                />
+              </>
+            ) : (
+              <p className="muted">选择一个建模会话以预览并发布。</p>
             )}
+            {model.error && <p className="inline-error">{model.error}</p>}
           </section>
         )}
-        {model.error && <p className="inline-error">{model.error}</p>}
+        {tab === "history" && (
         <section className="detail-section">
           <h2>已发布版本</h2>
           {workspace.role && versions.length > 0 && (
@@ -318,6 +203,8 @@ export function DeliveryPage() {
           </table>
           {!versions.length && <p className="muted">还没有已发布版本。</p>}
         </section>
+        )}
+        {tab === "service" && (
         <section className="detail-section">
           <h2>本体服务</h2>
           <div className="service-columns">
@@ -431,6 +318,7 @@ export function DeliveryPage() {
             </>
           )}
         </section>
+        )}
       </div>
     </div>
   );
