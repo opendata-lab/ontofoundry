@@ -145,13 +145,16 @@ def test_preview_returns_revision_validation_ossie_and_diff(client):
     assert body["revision"] == s["revision"]
     assert body["validation"]["publishable"] is True
     assert body["ossie"]["version"]
-    assert any(c["path"].endswith(".description") for c in body["changes"])
+    # T6: element-level changes of the merged result.
+    assert any(
+        any(f["path"] == "description" for f in c["field_changes"]) for c in body["changes"]
+    )
 
 
-def test_preview_compares_the_raw_draft_not_the_merged_result(client):
-    # KNOWN GAP (T6): preview must show the B/L/D merged snapshot and return
-    # current_version_id; today it diffs the raw draft against the latest
-    # version, so another session's published change reads as a revert.
+def test_preview_shows_the_merged_result_other_sessions_included(client):
+    # Was KNOWN GAP (T0): preview diffed the raw draft against the latest
+    # version, so another session's published change read as a revert. Since
+    # T6 preview is the B/L/D merge that publish will produce.
     a, b = create_session(client), create_session(client)
     a["draft"]["object_types"][0]["description"] = "A 已发布的修改"
     b["draft"]["object_types"][1]["description"] = "B 的修改"
@@ -162,9 +165,10 @@ def test_preview_compares_the_raw_draft_not_the_merged_result(client):
     body = preview(client, b).json()
 
     a_type = a["draft"]["object_types"][0]["id"]
-    assert any(a_type in c["path"] and c["path"].endswith(".description") for c in body["changes"])
-    assert "current_version_id" not in body
-    # ...while publishing merges and keeps A's change.
+    b_type = b["draft"]["object_types"][1]["id"]
+    assert [c["element_id"] for c in body["changes"]] == [b_type]
+    assert any(c["element_id"] == a_type for c in body["auto_merged"])
+    assert body["current_version_id"] == client.get(ONTOLOGY + "/version").json()["version_id"]
     published = publish(client, b)
     assert published.status_code == 200
     snapshot = client.get(ROOT + "/published-snapshot").json()
