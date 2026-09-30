@@ -767,6 +767,12 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 - 固定上下文的安全部分已在 T2 完成；此处补 `list_ontology_elements` 分页、按 kind 查询等性能与易用性改进。
 - 端到端验收：真实 DataAgent 运行只能读到本 Session 固定的 Workspace/Version/Draft/材料。
 
+**真实 DataAgent 端到端验收（2026-09-30，已通过）。** 环境：opendataworks DataAgent（pi_agent_core 运行时）+ DeepSeek `deepseek-v4-pro`（Anthropic 兼容接口），智能体按 `integrations/dataagent/agents/agent_ontofoundry.md` 配置，OntoFoundry 使用 PostgreSQL 且 `modeling_result_contract=proposals`。
+
+- 运行 1（材料“采购管理制度”，base v1）：生成 8 条提案（新建对象类型/属性/关系/Action，更新属性），证据全部为材料原文；整批接受 → 预览 → 发布 v2 成功。
+- 运行 2（新会话，base v2，要求先查已发布本体）：智能体用运行凭据调用 MCP `tools/list`、`get_ontology_manifest`、`list_ontology_elements`，未重复提出 v2 已有元素，生成 4 条提案（含归属对象的规则与 client_ref 依赖）；接受 → 发布 v3 成功。
+- 发现并处理：DataAgent Pi 运行时把单次输出上限写死为 8192 tokens，DeepSeek 的思考会耗尽上限而不写结果文件，且运行被记为成功（OntoFoundry 侧正确判为 `failed_permanent`）。智能体提示词已改为分步写文件；DataAgent 侧仍需让运行时采用模型配置的 `max_output_tokens`，并把截断的回合判为失败（本次验收在本地以环境变量临时放宽到 32000）。
+
 ### T8 — 切换与清理准备
 
 **状态：已完成。** 默认合同改为 `proposals`；`GET /proposal-metrics` 提供旧路径在途运行数、批次失败率、过期率与决策统计；清理步骤另见 [旧路径清理提案](../plans/2026-09-30-legacy-full-result-cleanup-proposal.md)，本任务未删除任何旧字段或代码。
