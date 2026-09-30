@@ -1,10 +1,11 @@
 from copy import deepcopy
+from typing import Any
 from uuid import uuid4
 
 import jsonschema
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,6 @@ from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.element_diff import element_changes
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
-from ontofoundry_api.services.merge import merge_snapshots
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
     _query_view,
@@ -43,6 +43,7 @@ from ontofoundry_api.services.ontology_query import (
     version_summary,
 )
 from ontofoundry_api.services.proposals import pending_summary
+from ontofoundry_api.services.publish_preview import auto_merged, impacts, three_way
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -227,14 +228,38 @@ class CandidateAction(BaseModel):
 
 
 class SessionPublish(BaseModel):
-    revision: int
+    """Publish/preview request. `expected_*` fields are the current contract
+    (design §9.3); `revision` alone is the legacy form, kept during migration."""
+
+    revision: int | None = None
+    expected_session_revision: int | None = None
+    expected_current_version_id: str | None = None
+    expected_merged_snapshot_sha256: str | None = None
     message: str = Field(default="", max_length=240)
+
+    @property
+    def session_revision(self) -> int:
+        value = (
+            self.expected_session_revision
+            if self.expected_session_revision is not None
+            else self.revision
+        )
+        if value is None:
+            raise HTTPException(422, "缺少 expected_session_revision")
+        return value
+
+    @property
+    def strict(self) -> bool:
+        return self.expected_merged_snapshot_sha256 is not None
 
 
 class MergeResolution(BaseModel):
-    revision: int
-    current_version_id: str
-    resolutions: dict[str, str]
+    revision: int | None = None
+    expected_session_revision: int | None = None
+    current_version_id: str | None = None
+    expected_current_version_id: str | None = None
+    # key -> "current"/"draft" (legacy) or {"choice", "value"}
+    resolutions: dict[str, Any]
 
 
 @router.post("/sessions/{session_id}/resolve-merge")
@@ -248,19 +273,33 @@ def resolve_merge(
     require_member(db, workspace_id, user.id)
     space = get_workspace(db, workspace_id)
     item = get_modeling_session(db, workspace_id, session_id)
-    if space.current_version_id != body.current_version_id:
-        raise HTTPException(409, "最新版本又有变化，请重新比较")
-
-    merged, conflicts = merge_snapshots(
+    expected_current = body.expected_current_version_id or body.current_version_id
+    revision = body.expected_session_revision if body.expected_session_revision is not None else body.revision
+    if space.current_version_id != expected_current:
+        raise ServiceError(
+            "最新版本又有变化，请重新预览",
+            code="PREVIEW_OUTDATED",
+            status_code=409,
+            details={"current_version_id": space.current_version_id},
+        )
+    merge = three_way(
         version_snapshot(db, workspace_id, item.base_version_id),
         version_snapshot(db, workspace_id, space.current_version_id),
         session_draft(item),
+        workspace_id,
         body.resolutions,
     )
-    if conflicts:
-        raise HTTPException(422, "仍有未解决的字段冲突")
+    if merge.conflicts:
+        raise ServiceError(
+            "仍有未解决的冲突",
+            code="CONFLICTS_UNRESOLVED",
+            status_code=422,
+            details={"conflicts": merge.conflicts, "current_version_id": space.current_version_id},
+        )
+    # The draft now starts from the current version: resolved conflicts are
+    # its content, and the base moves so they are never asked again.
     return revise(
-        db, item, body.revision, draft_json=merged, base_version_id=space.current_version_id
+        db, item, revision, draft_json=merge.merged, base_version_id=space.current_version_id
     )
 
 
@@ -458,22 +497,57 @@ def publish_session(
     # All five active states, not just the two obvious ones: a run parked on
     # waiting_input or waiting_permission is still live, and publishing a draft
     # the agent is mid-way through rewriting would capture a half-applied model.
-    if item.revision != body.revision or item.task_status in ACTIVE_RUN_STATUSES:
+    if item.revision != body.session_revision or item.task_status in ACTIVE_RUN_STATUSES:
+        if body.strict:
+            raise ServiceError(
+                "会话已变化或仍在生成，请重新预览",
+                code="PREVIEW_OUTDATED",
+                status_code=409,
+                details={"current_version_id": space.current_version_id},
+            )
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
-    merged, conflicts = merge_snapshots(
+    if body.strict and space.current_version_id != body.expected_current_version_id:
+        # Even a change that would merge cleanly is content the user has not
+        # seen: never publish it silently (design §9.3).
+        raise ServiceError(
+            "最新版本在你预览后已变化，请重新预览",
+            code="PREVIEW_OUTDATED",
+            status_code=409,
+            details={"current_version_id": space.current_version_id},
+        )
+    merge = three_way(
         version_snapshot(db, workspace_id, item.base_version_id),
         version_snapshot(db, workspace_id, space.current_version_id),
         session_draft(item),
+        workspace_id,
     )
-    if conflicts:
+    merged = merge.merged
+    if merge.conflicts:
+        if body.strict:
+            raise ServiceError(
+                "当前版本与草稿存在冲突，请先解决",
+                code="MERGE_CONFLICTS",
+                status_code=409,
+                details={"conflicts": merge.conflicts, "current_version_id": space.current_version_id},
+            )
         raise HTTPException(
             409,
             {
                 "message": "当前版本与草稿存在冲突，请在编辑页合并后重试",
-                "conflicts": conflicts,
+                "conflicts": [
+                    {"path": c["key"], "base": c["base"], "current": c["latest"], "draft": c["draft"]}
+                    for c in merge.conflicts
+                ],
                 "current_version_id": space.current_version_id,
                 "merged": merged,
             },
+        )
+    if body.strict and merge.merged_sha256 != body.expected_merged_snapshot_sha256:
+        raise ServiceError(
+            "待发布内容与预览不一致，请重新预览",
+            code="PREVIEW_OUTDATED",
+            status_code=409,
+            details={"current_version_id": space.current_version_id},
         )
     try:
         model = OntologyDraft.model_validate(merged)
@@ -500,7 +574,7 @@ def publish_session(
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(409, "另一会话刚刚发布，请重新比较后重试") from exc
-    return {"version": version_summary(version), "session": session_data(item)}
+    return {"version": version_summary(version), "session": session_response(db, item)}
 
 
 @router.get("/versions")
@@ -636,25 +710,57 @@ def preview_definition(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    """Exactly what publishing now would produce: the B/L/D merge of base,
+    latest and draft, validated and compiled, with the values publish checks."""
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
-    if item.revision != body.revision:
-        raise HTTPException(409, "草稿已变化，请刷新后预览")
+    if item.revision != body.session_revision:
+        raise ServiceError("草稿已更新，请重新预览", code="SESSION_REVISION_CHANGED", status_code=409)
     space = get_workspace(db, workspace_id)
-    draft = session_draft(item)
-    report = validate_draft(draft, space)
-    version = current_version(db, workspace_id) if space.current_version_id else None
+    merge = three_way(
+        version_snapshot(db, workspace_id, item.base_version_id),
+        version_snapshot(db, workspace_id, space.current_version_id),
+        session_draft(item),
+        workspace_id,
+    )
+    if merge.conflicts:
+        raise ServiceError(
+            f"与最新版本存在 {len(merge.conflicts)} 处冲突，请先解决",
+            code="MERGE_CONFLICTS",
+            status_code=409,
+            details={"conflicts": merge.conflicts, "current_version_id": space.current_version_id},
+        )
+    report = validate_draft(merge.merged, space)
+    current = current_version(db, workspace_id) if space.current_version_id else None
+    changes = element_changes(merge.latest, merge.merged)
     return {
         "revision": item.revision,
+        "session_revision": item.revision,
+        "base_version_id": item.base_version_id,
+        "current_version_id": space.current_version_id,
+        "current_version_number": current.version_number if current else None,
+        "next_version_number": (
+            db.scalar(
+                select(func.max(OntologyVersionRecord.version_number)).where(
+                    OntologyVersionRecord.workspace_id == workspace_id
+                )
+            )
+            or 0
+        )
+        + 1,
+        "current_version_sha256": snapshot_sha256(merge.latest),
+        "merged_snapshot_sha256": merge.merged_sha256,
         "validation": report,
+        "changes": changes,
+        "impacts": impacts(changes, merge.merged),
+        "auto_merged": auto_merged(merge),
         "ossie": compile_ossie(
-            OntologyDraft.model_validate(draft),
+            OntologyDraft.model_validate(merge.merged),
             ontology_name=space.slug.replace("-", "_"),
             ontology_description=space.description or space.name,
         )
         if report["publishable"]
         else None,
-        **compare_snapshots(snapshot_of(version) if version else {}, draft),
     }
 
 

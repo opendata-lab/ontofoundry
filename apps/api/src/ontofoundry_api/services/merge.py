@@ -33,9 +33,16 @@ def merge_snapshots(
             maps = [{x["id"]: x for x in values} for values in (b, c, d)]
             return list(merge(*maps, path).values())
         side = (resolutions or {}).get(path)
-        if side in ("current", "draft"):
-            chosen = c if side == "current" else d
+        # Legacy form: "current" | "draft". Current form:
+        # {"choice": "latest" | "draft" | "custom" | "both", "value": ...}.
+        choice = side.get("choice") if isinstance(side, dict) else side
+        if choice in ("current", "latest", "draft"):
+            chosen = d if choice == "draft" else c
             return deepcopy(chosen) if chosen is not MISSING else MISSING
+        if choice == "custom":
+            return deepcopy(side.get("value"))
+        if choice == "both" and isinstance(c, list) and isinstance(d, list):
+            return deepcopy(c) + [deepcopy(x) for x in d if x not in c]
         conflicts.append(
             {
                 "path": path,

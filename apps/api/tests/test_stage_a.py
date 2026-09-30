@@ -328,7 +328,9 @@ def test_preview_and_history_diff_use_saved_revision_without_publication(client)
     ).json()
     assert preview["validation"]["publishable"] and preview["ossie"]
     assert any(
-        c["path"] == f"$.object_types[{target['id']}].name" for c in preview["changes"]
+        c["element_id"] == target["id"]
+        and any(f["path"] == "name" for f in c["field_changes"])
+        for c in preview["changes"]
     )
     assert client.get(SERVICE + "/version").json()["version_id"] == before["version_id"]
     assert (
@@ -344,7 +346,12 @@ def test_preview_and_history_diff_use_saved_revision_without_publication(client)
         params={"left_id": after["version_id"], "right_id": before["version_id"]},
     ).json()
     assert compared["left"]["version_id"] == before["version_id"]
-    assert compared["changes"] == preview["changes"]
+    # History stays path-based; preview is element-level. Same change.
+    assert [(c["path"], c["before"], c["after"]) for c in compared["changes"]] == [
+        (f"$.object_types[{c['element_id']}].{f['path']}", f["before"], f["after"])
+        for c in preview["changes"]
+        for f in c["field_changes"]
+    ]
     assert (
         client.get(
             ROOT + "/version-comparison",
