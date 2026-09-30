@@ -38,6 +38,9 @@ class Principal:
     service_token_id: str | None = None
     service_workspace_id: str | None = None
     scopes: frozenset[str] = frozenset()
+    # Set for a modeling run's MCP credential: every versioned read is forced
+    # onto this version ("" means the session had no base version).
+    pinned_version_id: str | None = None
 
 
 def _settings(request: Request) -> Settings:
@@ -125,15 +128,49 @@ def safe_return_to(value: str) -> str:
     )
 
 
+def _run_principal(request: Request, session: Session, token: str, workspace_id: str | None) -> Principal:
+    from ontofoundry_api.db_models import ModelingSessionRecord
+    from ontofoundry_api.services.run_credentials import verify
+    from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
+
+    grant = verify(_settings(request).session_secret, token)
+    item = session.get(ModelingSessionRecord, grant.session_id) if grant else None
+    if (
+        grant is None
+        or item is None
+        or item.workspace_id != grant.workspace_id
+        or grant.workspace_id != workspace_id
+        or item.dataagent_run_token != grant.run_token
+        or item.task_status not in ACTIVE_RUN_STATUSES
+    ):
+        raise HTTPException(401, "建模运行凭据无效、已失效或不属于当前空间")
+    user = session.get(UserRecord, grant.user_id)
+    if not user:
+        raise HTTPException(401, "运行发起用户不存在")
+    return replace(
+        _principal(user),
+        service_token_id=f"run:{grant.run_token}",
+        service_workspace_id=grant.workspace_id,
+        scopes=frozenset(["ontology:read"]),
+        pinned_version_id=grant.version_id or "",
+    )
+
+
 def _ontology_principal(
     request: Request,
     session: Session,
     *,
     workspace_id: str | None,
+    allow_run: bool = False,
 ) -> Principal:
     authorization = request.headers.get("authorization", "")
     if authorization:
         scheme, _, token = authorization.partition(" ")
+        if token.startswith("ofrun."):
+            # Run credentials are for the MCP endpoint only.
+            if not allow_run or scheme.lower() != "bearer":
+                raise HTTPException(401, "建模运行凭据只能用于本体 MCP")
+            return _run_principal(request, session, token, workspace_id)
         record = session.scalar(
             select(ServiceTokenRecord).where(
                 ServiceTokenRecord.token_hash == hashlib.sha256(token.encode()).hexdigest()
@@ -167,6 +204,15 @@ def ontology_principal(request: Request, session: Session = Depends(get_db)) -> 
         request,
         session,
         workspace_id=request.path_params.get("workspace_id"),
+    )
+
+
+def mcp_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
+    return _ontology_principal(
+        request,
+        session,
+        workspace_id=request.path_params.get("workspace_id"),
+        allow_run=True,
     )
 
 

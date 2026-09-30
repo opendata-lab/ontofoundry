@@ -9,14 +9,14 @@ from jsonschema import ValidationError, validate
 from pydantic import ValidationError as ModelValidationError
 from sqlalchemy.orm import Session
 
-from ontofoundry_api.api.auth import Principal, ontology_principal
+from ontofoundry_api.api.auth import Principal, mcp_principal
 from ontofoundry_api.database import get_db
 from ontofoundry_api.services.access import (
     can_read_instances,
     can_read_mappings,
     require_instances,
 )
-from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.errors import NotFoundError, ServiceError
 from ontofoundry_api.services.instance_query import (
     ObjectSearch,
     get_object,
@@ -138,7 +138,7 @@ async def rpc(
     workspace_id: str,
     request: Request,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(ontology_principal),
+    principal: Principal = Depends(mcp_principal),
 ):
     raw = bytearray()
     async for chunk in request.stream():
@@ -255,6 +255,16 @@ async def rpc(
         try:
             if name in INSTANCE_TOOLS:
                 require_instances(db, workspace_id, principal)
+            if principal.pinned_version_id is not None:
+                # A modeling run reads only the version its session is based on.
+                pinned = principal.pinned_version_id
+                if not pinned:
+                    raise NotFoundError("该建模会话基于空白模型，没有可读取的已发布版本")
+                if args.get("version_id") not in (None, pinned):
+                    return rpc_error(
+                        rid, -32602, f"本次建模运行只能读取固定版本 {pinned}"
+                    )
+                args = {**args, "version_id": pinned}
             version = current_version(db, workspace_id, args.get("version_id"))
             if name == "get_ontology_version":
                 value = version_summary(version)

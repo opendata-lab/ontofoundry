@@ -17,6 +17,7 @@ from ontofoundry_api.domain.instance_validation import include_instance_validati
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
 from ontofoundry_api.domain.snapshot import as_v2_dict
 from ontofoundry_api.ossie.compiler import compile_ossie, sha256_json, validate_ossie
+from ontofoundry_api.services.identities import sync_identities
 
 from .errors import ConflictError, NotFoundError, PublishValidationError
 
@@ -231,6 +232,9 @@ def publish_draft(
     )
     session.add(version)
     session.flush()
+    sync_identities(
+        session, workspace_id, snapshot, user_id=user_id, now=datetime.now(UTC)
+    )
     changed = session.execute(
         update(WorkspaceRecord)
         .where(
