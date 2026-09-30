@@ -459,6 +459,14 @@ async def send_message(
     # The agent reads the draft as v2, even from a session saved before v2.
     draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
+    # Where earlier runs put material in this topic, read before the claim
+    # below replaces the manifest: a proposals prompt must name every
+    # material's file, not only this turn's uploads.
+    known_paths: dict[str, str] = {
+        str(entry["id"]): str(entry["path"])
+        for entry in (item.run_manifest_json or {}).get("materials") or []
+        if entry.get("path")
+    }
     # Everything this run is pinned to. The claim below bumps the revision,
     # so the run's source revision is the one after it.
     manifest = {
@@ -547,9 +555,9 @@ async def send_message(
                 )
 
         material_paths: list[str] = []
-        material_path_by_id: dict[str, str] = {}
+        material_path_by_id: dict[str, str] = dict(known_paths)
         for material in materials:
-            if material.id in uploaded_ids:
+            if material.id in uploaded_ids and material.id in material_path_by_id:
                 continue
             path = (
                 request.app.state.settings.data_dir / workspace_id / f"{material.sha256}.md"
@@ -666,6 +674,13 @@ async def send_message(
                     dataagent_task_id=task_id,
                     dataagent_task_mode=mode,
                     uploaded_material_ids=sorted(uploaded_ids | set(newly_uploaded)),
+                    run_manifest_json={
+                        **manifest,
+                        "materials": [
+                            {**m, "path": material_path_by_id.get(m["id"], "")}
+                            for m in manifest["materials"]
+                        ],
+                    },
                     updated_at=utc_now(),
                 )
             )

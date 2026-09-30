@@ -1,7 +1,7 @@
 # Proposal-first 本体生命周期实施设计
 
 **日期：** 2026-09-26  
-**状态：** 已实施（T0–T8，2026-09-30）；各阶段交付见第 13 节  
+**状态：** 已实施（T0–T8，2026-09-30）；各阶段交付见第 13 节。迁移期仍保留两条兼容路径，均列入[旧路径清理提案](../plans/2026-09-30-legacy-full-result-cleanup-proposal.md)：旧形态的发布请求（只带 `revision`，不做三值校验；新前端不再使用）与 `modeling_result_contract=full` 回退开关（默认已为 `proposals`）。在它们被移除前，§16 中“新运行只生成提案”和“发布锁定三个 expected 值”对新前端与默认配置成立，对这两条兼容路径不成立。  
 **权威上位文档：** [OntoFoundry 企业本体智能平台完整设计](./2026-09-01-enterprise-ontology-intelligence-platform-design.md)  
 **替换边界：** 取代 [DataAgent Conversation SDK 集成设计](./2026-09-21-dataagent-conversation-sdk-integration-design.md) 中“完整 Ossie 结果直接替换会话草稿”的目标合同；旧合同只作为迁移期兼容路径保留。
 

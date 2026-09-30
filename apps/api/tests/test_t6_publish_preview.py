@@ -167,3 +167,34 @@ def test_resolving_against_a_moved_version_is_refused(client):
     )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "PREVIEW_OUTDATED"
+
+
+def test_invalid_resolutions_are_refused_before_anything_is_saved(client):
+    a, b = edited(client, "A"), edited(client, "B")
+    assert publish(client, a, preview(client, a).json()).status_code == 200
+    error = preview(client, b).json()["error"]
+    key = error["conflicts"][0]["key"]
+
+    def resolve(resolutions):
+        return client.post(
+            ROOT + f"/sessions/{b['id']}/resolve-merge",
+            json={
+                "expected_session_revision": b["revision"],
+                "expected_current_version_id": error["current_version_id"],
+                "resolutions": resolutions,
+            },
+        )
+
+    for bad in (
+        {},  # missing
+        {key: {"choice": "draft"}, "/object_types/x/name": {"choice": "draft"}},  # extra
+        {key: {"choice": "both"}},  # not allowed for a scalar
+        {key: {"choice": "custom"}},  # no value
+        {key: {"choice": "custom", "value": 42}},  # wrong type
+    ):
+        response = resolve(bad)
+        assert response.status_code == 422, bad
+        assert response.json()["error"]["code"] == "RESOLUTION_INVALID"
+    after = client.get(ROOT + f"/sessions/{b['id']}").json()
+    assert after["revision"] == b["revision"] and after["base_version_id"] == b["base_version_id"]
+    assert resolve({key: {"choice": "custom", "value": "合并"}}).status_code == 200

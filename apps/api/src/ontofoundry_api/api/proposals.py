@@ -163,8 +163,11 @@ def list_batches(
         ids = [b.id for b in batches]
         batches = batches[ids.index(cursor) + 1 :] if cursor in ids else []
     page = batches[:limit]
-    items = _batch_items(db, [b.id for b in page])
-    statuses = effective_statuses(items, dependency_map(db, [b.id for b in page]), session_draft(session))
+    ids = [b.id for b in page]
+    items = _batch_items(db, ids, workspace_id, session_id)
+    statuses = effective_statuses(
+        items, dependency_map(db, ids, workspace_id, session_id), session_draft(session)
+    )
     by_batch: dict[str, list] = {}
     for item in items:
         by_batch.setdefault(item.batch_id, []).append(item)
@@ -188,8 +191,8 @@ def read_batch(
     if batch is None or batch.workspace_id != workspace_id or batch.session_id != session_id:
         raise _fail(404, "BATCH_NOT_FOUND", "提案批次不存在")
     draft = session_draft(session)
-    items = _batch_items(db, [batch.id])
-    dependencies = dependency_map(db, [batch.id])
+    items = _batch_items(db, [batch.id], workspace_id, session_id)
+    dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
     statuses = effective_statuses(items, dependencies, draft)
     elements = _session_elements(draft)
     for item in items:
@@ -314,8 +317,8 @@ def decide(
             items=[{"proposal_id": i, "reason": "不存在或不属于本会话"} for i in missing],
         )
     batch_ids = sorted({item.batch_id for item in items.values()})
-    batch_items = _batch_items(db, batch_ids)
-    dependencies = dependency_map(db, batch_ids)
+    batch_items = _batch_items(db, batch_ids, workspace_id, session_id)
+    dependencies = dependency_map(db, batch_ids, workspace_id, session_id)
     draft = deepcopy(session_draft(session))
     statuses = effective_statuses(batch_items, dependencies, draft)
     by_id = {item.id: item for item in batch_items}
@@ -402,7 +405,7 @@ def decide(
         item.decided_by, item.decided_at = user.id, now
     db.flush()
     after_statuses = effective_statuses(
-        _batch_items(db, batch_ids), dependencies, session_draft(session)
+        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session_draft(session)
     )
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]
@@ -500,8 +503,9 @@ def proposal_metrics(
     )
     for session in sessions:
         ids = [b.id for b in batches if b.session_id == session.id]
-        items = _batch_items(db, ids)
-        for status, _ in effective_statuses(items, dependency_map(db, ids), session_draft(session)).values():
+        items = _batch_items(db, ids, workspace_id, session.id)
+        deps = dependency_map(db, ids, workspace_id, session.id)
+        for status, _ in effective_statuses(items, deps, session_draft(session)).values():
             effective[status] += 1
     decisions: dict[str, int] = {"accept": 0, "reject": 0, "restore": 0}
     for row in db.scalars(

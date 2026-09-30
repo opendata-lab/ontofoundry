@@ -260,12 +260,20 @@ def effective_statuses(
     return result
 
 
-def dependency_map(db: Session, batch_ids: list[str]) -> dict[str, list[str]]:
+def dependency_map(
+    db: Session, batch_ids: list[str], workspace_id: str, session_id: str
+) -> dict[str, list[str]]:
+    """Dependencies of the given batches, always within one workspace and
+    session (design §7.2: never trust a bare global id)."""
+    if not batch_ids:
+        return {}
     rows = db.scalars(
         select(ProposalItemDependencyRecord).where(
-            ProposalItemDependencyRecord.batch_id.in_(batch_ids)
+            ProposalItemDependencyRecord.batch_id.in_(batch_ids),
+            ProposalItemDependencyRecord.workspace_id == workspace_id,
+            ProposalItemDependencyRecord.session_id == session_id,
         )
-    ).all() if batch_ids else []
+    ).all()
     result: dict[str, list[str]] = {}
     for row in rows:
         result.setdefault(row.item_id, []).append(row.depends_on_item_id)
@@ -296,13 +304,19 @@ KIND_LABELS = {
 }
 
 
-def batch_items(db: Session, batch_ids: list[str]) -> list[ProposalItemRecord]:
+def batch_items(
+    db: Session, batch_ids: list[str], workspace_id: str, session_id: str
+) -> list[ProposalItemRecord]:
     if not batch_ids:
         return []
     return list(
         db.scalars(
             select(ProposalItemRecord)
-            .where(ProposalItemRecord.batch_id.in_(batch_ids))
+            .where(
+                ProposalItemRecord.batch_id.in_(batch_ids),
+                ProposalItemRecord.workspace_id == workspace_id,
+                ProposalItemRecord.session_id == session_id,
+            )
             .order_by(ProposalItemRecord.batch_id, ProposalItemRecord.ordinal)
         ).all()
     )
@@ -310,19 +324,20 @@ def batch_items(db: Session, batch_ids: list[str]) -> list[ProposalItemRecord]:
 
 def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict) -> dict[str, Any]:
     """`pending_proposal_count` and `latest_batch_id` for session responses."""
-    ids = list(
-        db.scalars(
-            select(ProposalBatchRecord.id)
-            .where(
-                ProposalBatchRecord.workspace_id == workspace_id,
-                ProposalBatchRecord.session_id == session_id,
-            )
-            .order_by(ProposalBatchRecord.created_at.desc(), ProposalBatchRecord.id.desc())
-        ).all()
-    )
-    items = batch_items(db, ids)
-    statuses = effective_statuses(items, dependency_map(db, ids), draft)
+    batches = db.execute(
+        select(ProposalBatchRecord.id, ProposalBatchRecord.status)
+        .where(
+            ProposalBatchRecord.workspace_id == workspace_id,
+            ProposalBatchRecord.session_id == session_id,
+        )
+        .order_by(ProposalBatchRecord.created_at.desc(), ProposalBatchRecord.id.desc())
+    ).all()
+    ids = [row.id for row in batches]
+    items = batch_items(db, ids, workspace_id, session_id)
+    statuses = effective_statuses(items, dependency_map(db, ids, workspace_id, session_id), draft)
+    # The batch to show by default: the newest one that can be acted on.
+    available = [row.id for row in batches if row.status == "available"]
     return {
         "pending_proposal_count": sum(1 for s in statuses.values() if s[0] == "pending"),
-        "latest_batch_id": ids[0] if ids else None,
+        "latest_batch_id": (available or ids or [None])[0],
     }

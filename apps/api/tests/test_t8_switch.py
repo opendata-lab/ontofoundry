@@ -30,3 +30,28 @@ def test_metrics_report_legacy_runs_batches_staleness_and_decisions(client):
     assert metrics["items"]["conflict"] == 2  # dependents of the rejected root
     assert metrics["stale_rate"] == 1.0
     assert metrics["decisions"]["reject"] == 1
+
+
+def test_a_proposals_run_refuses_an_old_full_snapshot_result(client, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from run_helpers import install_download, reconcile, row
+    from test_t3_proposal_results import proposals_run
+
+    from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+
+    session, _manifest = proposals_run(client)
+    legacy = json.loads((Path(__file__).parent / "fixtures" / "ontofoundry_result_v1.json").read_text("utf-8"))
+    install_download(monkeypatch, [legacy])
+
+    async def refuse(self, **_):
+        raise DataAgentError("unavailable")
+
+    monkeypatch.setattr(DataAgentClient, "deliver", refuse)
+
+    assert reconcile(client, session["id"]) == "failed_permanent"
+    assert row(client, session["id"]).draft_json == session["draft"]
+    batch = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches").json()["items"][0]
+    assert batch["status"] == "failed"
+    assert batch["error"]["code"] == "RESULT_SCHEMA_INVALID"

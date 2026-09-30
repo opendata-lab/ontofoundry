@@ -66,3 +66,24 @@ def test_two_different_requests_on_one_item_let_one_win(pg_client):
     assert sorted(r.status_code for r in results) == [200, 409], [r.text for r in results]
     after = pg_client.get(ROOT + f"/sessions/{session['id']}").json()
     assert after["revision"] == session["revision"] + 1
+
+
+def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
+    from test_t4_proposal_decisions import chain
+
+    session = create_session(pg_client)
+    po, prop, link = seed_batch(pg_client, session, chain(session))["items"]
+    group = [(po["id"], "accept"), (prop["id"], "accept"), (link["id"], "accept")]
+
+    results = race(
+        [
+            lambda: decide(pg_client, session, group, key="group-key-a1"),
+            lambda: decide(pg_client, session, group, key="group-key-b2"),
+        ]
+    )
+
+    assert sorted(r.status_code for r in results) == [200, 409], [r.text for r in results]
+    draft = pg_client.get(ROOT + f"/sessions/{session['id']}").json()["draft"]
+    assert sum(t["technical_name"] == "purchase_order" for t in draft["object_types"]) == 1
+    assert sum(p["technical_name"] == "order_no" for p in draft["properties"]) == 1
+    assert sum(link["technical_name"] == "supplied_by" for link in draft["link_types"]) == 1
