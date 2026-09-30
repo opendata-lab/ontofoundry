@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -158,10 +158,21 @@ def list_batches(
         )
         .order_by(ProposalBatchRecord.created_at.desc(), ProposalBatchRecord.id.desc())
     )
-    batches = list(db.scalars(query).all())
     if cursor:
-        ids = [b.id for b in batches]
-        batches = batches[ids.index(cursor) + 1 :] if cursor in ids else []
+        anchor = db.get(ProposalBatchRecord, cursor)
+        if anchor is None or anchor.session_id != session_id or anchor.workspace_id != workspace_id:
+            raise _fail(422, "INVALID_CURSOR", "游标无效")
+        # Keyset paging in (created_at, id) descending order.
+        query = query.where(
+            or_(
+                ProposalBatchRecord.created_at < anchor.created_at,
+                and_(
+                    ProposalBatchRecord.created_at == anchor.created_at,
+                    ProposalBatchRecord.id < anchor.id,
+                ),
+            )
+        )
+    batches = list(db.scalars(query.limit(limit + 1)).all())
     page = batches[:limit]
     ids = [b.id for b in page]
     items = _batch_items(db, ids, workspace_id, session_id)
