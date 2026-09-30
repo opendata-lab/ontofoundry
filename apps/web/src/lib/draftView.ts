@@ -99,6 +99,10 @@ export function fromView(original: Draft, view: DraftView): Draft {
     (lines ?? []).map((line) => line.trim()).filter(Boolean);
 
   const rules: RuleElement[] = [];
+  // Rule identity survives editing: an expression that is unchanged keeps its
+  // rule; the remaining edited expressions take over the remaining old rules
+  // in order (an edit keeps the id, only a real addition mints one); old
+  // rules left over were deleted.
   const restate = (
     ownerKind: RuleElement["owner_kind"],
     ownerId: string,
@@ -109,13 +113,21 @@ export function fromView(original: Draft, view: DraftView): Draft {
       const previous = original.rules.filter(
         (r) => r.owner_id === ownerId && r.rule_kind === kind,
       );
-      const seen = new Set<string>();
-      clean(source[FIELD[kind]]).forEach((expression, index) => {
-        if (seen.has(expression)) return;
-        seen.add(expression);
-        const kept = previous.find((r) => r.expression === expression);
+      const expressions = [...new Set(clean(source[FIELD[kind]]))];
+      const exact = new Map<string, RuleElement>();
+      for (const rule of previous)
+        if (expressions.includes(rule.expression) && !exact.has(rule.expression))
+          exact.set(rule.expression, rule);
+      const spare = previous.filter((r) => ![...exact.values()].includes(r));
+      expressions.forEach((expression, index) => {
+        const kept = exact.get(expression);
         if (kept) {
           rules.push(kept);
+          return;
+        }
+        const edited = spare.shift();
+        if (edited) {
+          rules.push({ ...edited, expression });
           return;
         }
         const id = crypto.randomUUID();

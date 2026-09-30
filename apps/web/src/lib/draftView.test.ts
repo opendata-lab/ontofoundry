@@ -85,7 +85,18 @@ describe("draftView", () => {
     expect(fromView(original, toView(original))).toEqual(original);
   });
 
-  it("keeps rule ids for unchanged expressions and mints new ones", () => {
+  it("keeps a rule's id when its expression is edited", () => {
+    const original = draft();
+    const view = toView(original);
+    view.object_types[0].attributes[0].requires = ["LENGTH(supplier.code) = 8"];
+    const next = fromView(original, view);
+    const rule = next.rules.find((r) => r.owner_id === "p1");
+    expect(rule?.id).toBe("r1");
+    expect(rule?.expression).toBe("LENGTH(supplier.code) = 8");
+    expect(rule?.technical_name).toBe("code_required");
+  });
+
+  it("mints ids only for real additions and keeps action rules", () => {
     const original = draft();
     const view = toView(original);
     view.object_types[0].attributes[0].requires = [
@@ -99,8 +110,28 @@ describe("draftView", () => {
     expect(propertyRules[0].id).toBe("r1");
     expect(propertyRules[1].id).not.toBe("r1");
     expect(propertyRules[1].technical_name).toMatch(/^constraint_[0-9a-f]{8}$/);
-    // Action-owned rules are outside the view and survive untouched.
+    // Action-owned rules are outside the view and survive untouched, so an
+    // action precondition pointing at r2 stays valid.
     expect(next.rules.find((r) => r.id === "r2")).toEqual(original.rules[1]);
+  });
+
+  it("keeps ids when one of several expressions is edited", () => {
+    const original = draft();
+    original.rules.splice(1, 0, {
+      ...original.rules[0],
+      id: "r3",
+      technical_name: "second",
+      expression: "supplier.code <> ''",
+    });
+    const view = toView(original);
+    view.object_types[0].attributes[0].requires = [
+      "supplier.code IS NOT NULL",
+      "supplier.code <> 'x'",
+    ];
+    const ids = fromView(original, view)
+      .rules.filter((r) => r.owner_id === "p1")
+      .map((r) => r.id);
+    expect(ids).toEqual(["r1", "r3"]);
   });
 
   it("drops rules whose expressions were removed", () => {

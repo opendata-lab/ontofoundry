@@ -173,3 +173,27 @@ def test_cited_material_can_only_be_archived(client):
     assert client.get(ROOT + "/materials/" + material["id"]).status_code == 200  # still readable
 
     assert client.delete(ROOT + "/materials/" + unused["id"]).status_code == 204
+
+
+def test_duplicate_evidence_ids_are_refused_on_save(client):
+    session = create_session(client)
+    entry = {
+        "kind": "manual",
+        "id": str(uuid4()),
+        "note": "x",
+        "created_by": "u",
+        "created_at": "2026-09-01T00:00:00Z",
+    }
+    session["draft"]["object_types"][0]["evidence"] = [entry, dict(entry)]
+    response = save(client, session, session["draft"])
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "EVIDENCE_ID_DUPLICATE"
+
+
+def test_after_publish_the_session_draft_is_the_published_form(client):
+    session = create_session(client)
+    session["draft"]["object_types"][0]["description"] = "发布"
+    published = publish(client, save(client, session, session["draft"]).json()).json()
+    after = published["session"]
+    assert after["draft_sha256"] == after["base_version_sha256"]
+    assert after["draft_sha256"] == snapshot_sha256(after["draft"])
