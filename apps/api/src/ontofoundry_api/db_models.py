@@ -108,8 +108,10 @@ class ModelingSessionRecord(Base):
     draft_json: Mapped[dict] = mapped_column(JSON)
     # normalized_snapshot_sha256 of the base version, pinned at creation, and
     # the domain hash of draft_json, kept in step with every draft write.
-    base_version_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    draft_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    base_version_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    draft_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    # What the current run was pinned to when it was claimed (design §6.2).
+    run_manifest_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     candidates_json: Mapped[list] = mapped_column(JSON, default=list)
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
     task_status: Mapped[str] = mapped_column(String(24), default="idle")

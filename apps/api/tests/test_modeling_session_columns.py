@@ -50,6 +50,8 @@ def _new_record(*, status: str = "idle") -> ModelingSessionRecord:
         created_by="test-user",
         title="显式字段测试",
         draft_json=OntologyDraft(workspace_id=workspace_id).model_dump(mode="json"),
+        base_version_sha256="0" * 64,
+        draft_sha256="0" * 64,
         candidates_json=[],
         material_ids=[],
         task_status=status,

@@ -15,9 +15,15 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import get_modeling_session, require_member, session_draft
+from ontofoundry_api.api.modeling import (
+    get_modeling_session,
+    require_member,
+    session_draft,
+    version_snapshot_sha256,
+)
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MaterialRecord, ModelingSessionRecord, utc_now
+from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.dataagent import (
     ACTIVE_TASK_STATUSES,
     DataAgentClient,
@@ -429,6 +435,24 @@ async def send_message(
     # The agent reads the draft as v2, even from a session saved before v2.
     draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
+    # Everything this run is pinned to. The claim below bumps the revision,
+    # so the run's source revision is the one after it.
+    manifest = {
+        "run_token": run_token,
+        "workspace_id": workspace_id,
+        "session_id": session_id,
+        "base_version_id": item.base_version_id,
+        "base_version_sha256": item.base_version_sha256
+        or version_snapshot_sha256(db, workspace_id, item.base_version_id),
+        "source_session_revision": expected_revision + 1,
+        "source_draft_sha256": draft_sha256(draft),
+        "materials": [{"id": m.id, "sha256": m.sha256} for m in materials],
+        "producer": {
+            "agent_id": request.app.state.settings.dataagent_agent_id,
+            "skill": "md2ossie",
+            "mode": mode,
+        },
+    }
 
     changed = db.execute(
         update(ModelingSessionRecord)
@@ -444,6 +468,7 @@ async def send_message(
             dataagent_task_id=None,
             dataagent_task_mode=mode,
             dataagent_run_token=run_token,
+            run_manifest_json=manifest,
             revision=expected_revision + 1,
             updated_at=utc_now(),
         )
