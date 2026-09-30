@@ -142,7 +142,7 @@ export function DeliveryPage() {
                     关系 <b>{model.session.draft.link_types.length}</b>
                   </span>
                   <span>
-                    文档实例 <b>{model.session.draft.objects.length}</b>
+                    文档实例 <b>{model.session.draft.material_objects.length}</b>
                   </span>
                   <span>
                     映射 <b>{model.session.draft.mappings.length}</b>

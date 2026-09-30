@@ -1,11 +1,12 @@
 import { Box, Braces, Database, GitBranch } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { Draft, ModelingSession, TypeGraph } from "../api/types";
+import type { DraftView, ModelingSession, TypeGraph } from "../api/types";
+import { toView } from "../lib/draftView";
 import { EmptyModel } from "./EmptyModel";
 import { OntologyGraph } from "./OntologyGraph";
 
-function draftGraph(draft: Draft): TypeGraph {
+function draftGraph(draft: DraftView): TypeGraph {
   return {
     workspace_id: draft.workspace_id,
     version_id: "draft",
@@ -36,7 +37,7 @@ export function ModelResults({ session }: { session: ModelingSession | null }) {
   const [tab, setTab] = useState("models");
   const [kind, setKind] = useState("object_type");
   const [query, setQuery] = useState("");
-  const model = session?.draft ?? null;
+  const model = session ? toView(session.draft) : null;
   const rows =
     kind === "object_type"
       ? (model?.object_types ?? [])

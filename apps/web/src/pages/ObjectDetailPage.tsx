@@ -13,7 +13,7 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { usePageTab } from "../hooks/usePageTab";
-import type { Draft, ObjectDefinition } from "../api/types";
+import type { DraftView, ObjectDefinition } from "../api/types";
 
 // Expressions are stored and reference-checked, never executed by the platform.
 function ExpressionList({
@@ -46,7 +46,7 @@ function ExpressionList({
 }
 
 // Supertypes closest first, mirroring how the model resolves inheritance.
-function inheritedAttributes(draft: Draft, type: ObjectDefinition) {
+function inheritedAttributes(draft: DraftView, type: ObjectDefinition) {
   const byId = new Map(draft.object_types.map((item) => [item.id, item]));
   const seen = new Set<string>([type.id]);
   const frontier = [...(type.extends ?? [])];

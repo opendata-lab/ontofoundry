@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, workspaceRequest } from "../api/client";
-import type { Draft, TypeGraph, VersionSummary } from "../api/types";
+import type { Draft, DraftView, TypeGraph, VersionSummary } from "../api/types";
+import { toView } from "../lib/draftView";
 import { OntologyGraph } from "./OntologyGraph";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
 import "../styles/ontology-reading.css";
@@ -24,7 +25,7 @@ export function OntologyReading({
   member: boolean;
 }) {
   const navigate = useNavigate();
-  const [model, setModel] = useState<Draft | null>(null);
+  const [model, setModel] = useState<DraftView | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [section, setSection] = useState("objects");
@@ -42,7 +43,7 @@ export function OntologyReading({
       `/versions/${versionId}/presentation`,
     )
       .then((r) => {
-        if (active) setModel(r.model);
+        if (active) setModel(toView(r.model));
       })
       .catch((e: Error) => {
         if (active) setError(e.message);

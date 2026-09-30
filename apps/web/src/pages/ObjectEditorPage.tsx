@@ -15,7 +15,8 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { modelingApi } from "../api/client";
-import type { Draft, ObjectDefinition, LinkDefinition } from "../api/types";
+import type { DraftView, ObjectDefinition, LinkDefinition } from "../api/types";
+import { fromView, toView } from "../lib/draftView";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useModeling } from "../hooks/useModeling";
 import { MappingForm } from "../components/MappingForm";
@@ -56,7 +57,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
   const navigate = useNavigate();
   const initialized = useRef("");
   const model = useModeling(workspace.id);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<DraftView | null>(null);
   const [type, setType] = useState<ObjectDefinition | LinkDefinition | null>(
     null,
   );
@@ -77,7 +78,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
     const key = `${model.session.id}/${relation}/${typeId}`;
     if (initialized.current === key) return;
     initialized.current = key;
-    const d = structuredClone(model.session.draft);
+    const d = toView(structuredClone(model.session.draft));
     setDraft(d);
     const existing = (relation ? d.link_types : d.object_types).find(
       (t) => t.id === typeId,
@@ -135,9 +136,12 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
         trimmed,
       ];
     try {
-      const result = await modelingApi.save(model.session!, next);
+      const result = await modelingApi.save(
+        model.session!,
+        fromView(model.session!.draft, next),
+      );
       model.setSession(result);
-      setDraft(result.draft);
+      setDraft(toView(result.draft));
       setSaved(true);
       setDirty(false);
       if (typeId === "new") {
