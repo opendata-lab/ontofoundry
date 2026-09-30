@@ -354,6 +354,43 @@ export type DecisionResult = {
   validation: VersionSummary["validation"];
 };
 
+export type MergeConflict = {
+  key: string;
+  element_kind: TargetKind | null;
+  element_id: string | null;
+  element_label: string;
+  path: string;
+  kind: "field" | "delete_modify" | "duplicate_name" | "dangling_reference";
+  base: unknown;
+  latest: unknown;
+  draft: unknown;
+  allowed: ("latest" | "draft" | "custom" | "both")[];
+};
+
+export type Resolution = { choice: "latest" | "draft" | "custom" | "both"; value?: unknown };
+
+export type Impact = {
+  element_kind: TargetKind;
+  element_id: string;
+  label: string;
+  reason: string;
+};
+
+export type PublishPreview = {
+  session_revision: number;
+  base_version_id: string | null;
+  current_version_id: string | null;
+  current_version_number: number | null;
+  next_version_number: number;
+  current_version_sha256: string;
+  merged_snapshot_sha256: string;
+  validation: VersionSummary["validation"];
+  changes: ElementChange[];
+  impacts: Impact[];
+  auto_merged: (ElementChange & { side: "latest" | "both" })[];
+  ossie: Record<string, unknown> | null;
+};
+
 export type Candidate = {
   id: string;
   status: string;

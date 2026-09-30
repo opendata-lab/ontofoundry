@@ -6,6 +6,7 @@ import "./styles/tokens.css";
 import "./styles/global.css";
 import "./styles/reference.css";
 import "./styles/proposals.css";
+import "./styles/publish.css";
 import { defineAgentConversation } from "@opendataworks/agent-conversation";
 import { App } from "./App";
 
