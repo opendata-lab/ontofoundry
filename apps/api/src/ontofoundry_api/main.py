@@ -150,6 +150,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ontology.router)
     app.include_router(modeling.router)
     app.include_router(proposals.router)
+    app.include_router(proposals.metrics_router)
     app.include_router(materials.router)
     app.include_router(agent_conversation.router)
     app.include_router(connections.router)

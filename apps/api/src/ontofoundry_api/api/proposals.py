@@ -46,6 +46,7 @@ from ontofoundry_api.services.proposals import (
 router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/sessions/{session_id}", tags=["proposals"]
 )
+metrics_router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["proposals"])
 
 
 def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
@@ -466,3 +467,56 @@ def _workspace(db: Session, workspace_id: str):
     from ontofoundry_api.services.workspaces import get_workspace
 
     return get_workspace(db, workspace_id)
+
+
+@metrics_router.get("/proposal-metrics")
+def proposal_metrics(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """What T8 watches before legacy code can go: legacy runs still active,
+    batch outcomes, how often proposals go stale, and what users decide."""
+    require_member(db, workspace_id, user.id)
+    from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
+
+    sessions = db.scalars(
+        select(ModelingSessionRecord).where(ModelingSessionRecord.workspace_id == workspace_id)
+    ).all()
+    legacy_active = sum(
+        1
+        for s in sessions
+        if s.task_status in ACTIVE_RUN_STATUSES
+        and (s.run_manifest_json or {}).get("result_contract") != "proposals"
+    )
+    batches = db.scalars(
+        select(ProposalBatchRecord).where(ProposalBatchRecord.workspace_id == workspace_id)
+    ).all()
+    by_status: dict[str, int] = {}
+    for batch in batches:
+        by_status[batch.status] = by_status.get(batch.status, 0) + 1
+    effective: dict[str, int] = dict.fromkeys(
+        ("pending", "accepted", "rejected", "stale", "conflict", "superseded"), 0
+    )
+    for session in sessions:
+        ids = [b.id for b in batches if b.session_id == session.id]
+        items = _batch_items(db, ids)
+        for status, _ in effective_statuses(items, dependency_map(db, ids), session_draft(session)).values():
+            effective[status] += 1
+    decisions: dict[str, int] = {"accept": 0, "reject": 0, "restore": 0}
+    for row in db.scalars(
+        select(ProposalDecisionItemRecord).where(
+            ProposalDecisionItemRecord.workspace_id == workspace_id
+        )
+    ):
+        decisions[row.decision] = decisions.get(row.decision, 0) + 1
+    total_batches = len(batches)
+    open_items = effective["pending"] + effective["stale"] + effective["conflict"]
+    return {
+        "legacy_active_runs": legacy_active,
+        "batches": {"total": total_batches, **by_status},
+        "batch_failure_rate": round(by_status.get("failed", 0) / total_batches, 4) if total_batches else 0.0,
+        "items": effective,
+        "stale_rate": round((effective["stale"] + effective["conflict"]) / open_items, 4) if open_items else 0.0,
+        "decisions": decisions,
+    }
