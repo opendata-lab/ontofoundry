@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from urllib.parse import urlsplit
 
 from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row
 from sqlalchemy import select, update
@@ -294,7 +295,26 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt
-    assert "Bearer ofrun." in prompt and session["base_version_id"] in prompt
+    assert session["base_version_id"] in prompt
+    # The prompt is shown as the user's chat message: the credential lives in a file.
+    assert "ofrun." not in prompt
+    access_name = f"ontofoundry-mcp-{manifest['run_token']}.json"
+    assert "inputs/" + access_name in prompt
+    access = json.loads(uploads[access_name])
+    assert access["headers"]["Authorization"].startswith("Bearer ofrun.")
+    # The file is enough to call the pinned MCP as written.
+    path = urlsplit(access["url"]).path
+    called = client.post(
+        path,
+        headers=access["headers"],
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "get_ontology_manifest", "arguments": {}},
+        },
+    ).json()
+    assert called["result"]["structuredContent"]["version_id"] == session["base_version_id"]
 
 
 def test_material_paths_carry_over_to_later_runs(client, monkeypatch):

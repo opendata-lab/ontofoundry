@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import secrets
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
@@ -84,6 +85,45 @@ def run_mcp_access(request, workspace_id, session_id, run_token, item, user_id) 
                 user_id=user_id,
             ),
         ),
+    }
+
+
+# What reaches DataAgent is the turn prompt: run context, contract and the
+# user's words. The chat shows only the words; a run credential never shows,
+# including in messages stored before it moved into an uploaded file.
+USER_MESSAGE_MARK = "[用户消息]\n"
+_RUN_CREDENTIAL = re.compile(r"ofrun\.[A-Za-z0-9_.\-]+")
+
+
+def redact_credentials(text: str) -> str:
+    return _RUN_CREDENTIAL.sub("ofrun.***", text)
+
+
+def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    shown = []
+    for message in messages:
+        content = message.get("content")
+        if (
+            message.get("sender_type") == "user"
+            and isinstance(content, str)
+            and USER_MESSAGE_MARK in content
+        ):
+            message = {**message, "content": content.split(USER_MESSAGE_MARK, 1)[1]}
+        shown.append(json.loads(redact_credentials(json.dumps(message, ensure_ascii=False))))
+    return shown
+
+
+def mcp_access_file(access: dict[str, Any]) -> dict[str, Any]:
+    """What the agent reads to call the pinned MCP; the only place the credential appears."""
+    return {
+        "url": access["url"],
+        "version_id": access["version_id"],
+        "headers": {
+            "Authorization": "Bearer " + access["credential"],
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2025-11-25",
+        },
     }
 
 
@@ -421,7 +461,7 @@ async def snapshot(
                 mode=local_mode,
                 detail=local_detail,
             )
-        return {"messages": messages, "run": run}
+        return {"messages": present_messages(messages), "run": run}
     except DataAgentError as exc:
         _raise_dataagent(exc)
 
@@ -590,6 +630,20 @@ async def send_message(
                 json.dumps(result_schema(), ensure_ascii=False).encode(),
                 "application/json",
             )
+            mcp = None
+            if item.base_version_id:
+                access = run_mcp_access(request, workspace_id, session_id, run_token, item, user.id)
+                uploaded_access = await dataagent.upload(
+                    topic_id,
+                    f"ontofoundry-mcp-{run_token}.json",
+                    json.dumps(mcp_access_file(access), indent=2).encode(),
+                    "application/json",
+                )
+                mcp = {
+                    "url": access["url"],
+                    "version_id": access["version_id"],
+                    "file": str(uploaded_access.get("rel_path") or ""),
+                }
             proposal_prompt = proposal_instructions(
                 run_token=run_token,
                 header=proposal_header(manifest),
@@ -598,7 +652,7 @@ async def send_message(
                     for m in manifest["materials"]
                 ],
                 schema_file=str(schema.get("rel_path") or ""),
-                mcp=run_mcp_access(request, workspace_id, session_id, run_token, item, user.id),
+                mcp=mcp,
             )
         else:
             context = await dataagent.upload(
@@ -753,7 +807,7 @@ async def events(
                     with suppress(ValueError, TypeError):
                         event = json.loads(payload)
                         cursor = max(cursor, int(event.get("seq_id") or cursor))
-                    yield f"event: agent-event\ndata: {payload}\n\n"
+                    yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
 
             payload = _data_payload(buffer)
             if payload is not None:
@@ -761,7 +815,7 @@ async def events(
                 with suppress(ValueError, TypeError):
                     event = json.loads(payload)
                     cursor = max(cursor, int(event.get("seq_id") or cursor))
-                yield f"event: agent-event\ndata: {payload}\n\n"
+                yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
 
             yield ": ping\n\n"
             task = await dataagent.task(task_id)
