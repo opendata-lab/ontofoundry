@@ -771,7 +771,8 @@ Identity 回填包含 Object Type、Property、Link Type、Material Object/Link 
 
 - 运行 1（材料“采购管理制度”，base v1）：生成 8 条提案（新建对象类型/属性/关系/Action，更新属性），证据全部为材料原文；整批接受 → 预览 → 发布 v2 成功。
 - 运行 2（新会话，base v2，要求先查已发布本体）：智能体用运行凭据调用 MCP `tools/list`、`get_ontology_manifest`、`list_ontology_elements`，未重复提出 v2 已有元素，生成 4 条提案（含归属对象的规则与 client_ref 依赖）；接受 → 发布 v3 成功。
-- 发现并处理：DataAgent Pi 运行时把单次输出上限写死为 8192 tokens，DeepSeek 的思考会耗尽上限而不写结果文件，且运行被记为成功（OntoFoundry 侧正确判为 `failed_permanent`）。智能体提示词已改为分步写文件；DataAgent 侧仍需让运行时采用模型配置的 `max_output_tokens`，并把截断的回合判为失败（本次验收在本地以环境变量临时放宽到 32000）。
+- 发现并处理：DataAgent Pi 运行时把单次输出上限写死为 8192 tokens，DeepSeek 的思考会耗尽上限而不写结果文件，且运行被记为成功（OntoFoundry 侧正确判为 `failed_permanent`）。智能体提示词已改为分步写文件。DataAgent 侧已修复（opendataworks `1228e130`）：运行时改用模型配置的“最大输出 tokens”（未配置时仍为 8192），截断的运行以 `PI_OUTPUT_TRUNCATED` 失败。接入 DeepSeek 等先长篇思考的模型时，需在 DataAgent 模型配置中设置该值（本次验收为 32000）。
+- 运行凭据不进入对话：MCP 连接信息（含凭据）随运行上传为 `ontofoundry-mcp-{run_token}.json`，提示词只给出文件路径；会话 BFF 只展示用户原话，并遮蔽历史与实时事件中的 `ofrun.*` 凭据。
 
 ### T8 — 切换与清理准备
 
