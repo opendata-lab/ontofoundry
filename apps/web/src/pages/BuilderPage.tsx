@@ -29,7 +29,6 @@ export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
-  console.log("[DEBUG BuilderPage render]", { sessionId, sessionTitle: session?.title, modelSessionsCount: model.sessions.length });
   const [materials, setMaterials] = useState<Material[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [scenario, setScenario] = useState("");
