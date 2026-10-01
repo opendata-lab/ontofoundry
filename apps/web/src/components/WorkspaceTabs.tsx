@@ -1,4 +1,5 @@
 import {
+  memo,
   Suspense,
   useCallback,
   useEffect,
@@ -9,6 +10,9 @@ import {
 } from "react";
 import {
   createPath,
+  NavigationType,
+  parsePath,
+  UNSAFE_LocationContext as LocationContext,
   useBlocker,
   useLocation,
   useNavigate,
@@ -35,7 +39,10 @@ import { LoadingSurface } from "./AsyncState";
 import { WorkspaceRoutes } from "./WorkspaceRoutes";
 import "../styles/page-tabs.css";
 
-function TabPanel({
+// Each panel reads its own location, fixed to the tab's href. The router's
+// context changes on every navigation; without this every open page, hidden
+// or not, re-rendered on each menu switch.
+const TabPanel = memo(function TabPanel({
   tab,
   active,
   update,
@@ -52,6 +59,20 @@ function TabPanel({
     () => ({ active, update: setMeta }),
     [active, setMeta],
   );
+  const location = useMemo(
+    () => ({
+      location: {
+        pathname: "/",
+        search: "",
+        hash: "",
+        ...parsePath(tab.href),
+        state: null,
+        key: tab.id,
+      },
+      navigationType: NavigationType.Pop,
+    }),
+    [tab.href, tab.id],
+  );
   return (
     <section
       className="route-panel"
@@ -61,14 +82,16 @@ function TabPanel({
       hidden={!active}
       inert={!active}
     >
-      <PageTabContext.Provider value={context}>
-        <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
-          <WorkspaceRoutes href={tab.href} />
-        </Suspense>
-      </PageTabContext.Provider>
+      <LocationContext.Provider value={location}>
+        <PageTabContext.Provider value={context}>
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <WorkspaceRoutes href={tab.href} />
+          </Suspense>
+        </PageTabContext.Provider>
+      </LocationContext.Provider>
     </section>
   );
-}
+});
 
 export function WorkspaceTabs({
   workspaceId,
@@ -95,7 +118,6 @@ export function WorkspaceTabs({
   const [seen, setSeen] = useState(location.key + href);
   if (seen !== location.key + href) {
     const nextState = openTab(state, href, navigationType === "REPLACE");
-    console.log("[DEBUG WorkspaceTabs openTab]", { currentHref: state.tabs[0]?.href, nextHref: nextState.tabs[0]?.href, passedHref: href, replace: navigationType === "REPLACE" });
     setSeen(location.key + href);
     setState(nextState);
   }

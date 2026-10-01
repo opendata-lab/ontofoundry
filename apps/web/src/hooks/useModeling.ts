@@ -22,7 +22,6 @@ export function useModeling(
   const wasActive = useRef(pageActive);
   const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
-  console.log("[DEBUG useModeling]", { sessionId, pageActive, params: params.toString(), location: window.location.href, stack: new Error().stack?.split("\n").slice(1, 4).join(" | ") });
   const [session, setSession] = useState<ModelingSession | null>(null);
   const [sessions, setSessions] = useState<ModelingSessionSummary[]>([]);
   const [error, setError] = useState("");
