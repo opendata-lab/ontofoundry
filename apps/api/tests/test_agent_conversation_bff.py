@@ -269,6 +269,33 @@ def test_get_fetches_all_history_pages(client, monkeypatch):
     assert pages == [1, 2, 3]
 
 
+def test_history_shows_the_users_words_and_never_a_run_credential(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(client, session["id"], dataagent_topic_id="topic-1")
+    credential = "ofrun..eJxtyjsOAjEMANG7.ar0SSA.JnYQncKX-zLKQeSs"
+    prompt = (
+        "[OntoFoundry 会话上下文]\nrun_token: abc\n"
+        f"Authorization: Bearer {credential}\n\n[用户消息]\n补充采购员"
+    )
+    items = [
+        {"message_id": "m1", "topic_id": "topic-1", "sender_type": "user",
+         "type": "text", "content": prompt, "seq_id": 1},
+        {"message_id": "m2", "topic_id": "topic-1", "sender_type": "assistant",
+         "type": "text", "content": "完成", "seq_id": 2,
+         "blocks": [{"type": "tool", "input": {"command": f'TOKEN="{credential}" curl …'}}]},
+    ]
+    _install_transport(monkeypatch, lambda _r: _messages_response(items, page=1, total=2))
+
+    response = client.get(_endpoint(session["id"]))
+
+    assert response.status_code == 200, response.text
+    user, assistant = response.json()["messages"]
+    assert user["content"] == "补充采购员"
+    assert "ofrun..eJ" not in response.text
+    assert assistant["blocks"][0]["input"]["command"] == 'TOKEN="ofrun.***" curl …'
+
+
 def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
     _configure(client)
     session = _create_session(client)

@@ -331,9 +331,13 @@ def proposal_instructions(
         f"- material_id={m['id']} material_sha256={m['sha256']} 文件={m.get('path', '')}"
         for m in materials
     ) or "- 本轮没有材料"
+    # The credential itself stays in the uploaded file: the prompt is stored as
+    # the user's chat message and shown in the conversation.
     mcp_lines = (
         f"本体 MCP（只读，只能读取本次固定的版本 {mcp['version_id']}）：\n"
-        f"  URL: {mcp['url']}\n  Authorization: Bearer {mcp['credential']}\n"
+        f"  连接信息在 {mcp['file']}（url 与 headers）。用 python3 读取该文件后发送 JSON-RPC 请求"
+        "（method 为 tools/call，可用 get_ontology_manifest、list_ontology_elements、"
+        "get_ontology_elements）；不要在命令、输出或回答中写出凭据原文。\n"
         if mcp and mcp.get("version_id")
         else "本次会话基于空白模型，没有可读取的已发布版本。\n"
     )

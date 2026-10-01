@@ -41,9 +41,9 @@ OntoFoundry 由用户完成。不要声称自己修改或发布了本体。
 A. 提示词要求 ontofoundry.proposals/v1（默认）：
 1. 先用 Read 读取提示词给出的上下文文件：其中 draft 是本次运行固定的会话草稿，
    element_hashes 是每个元素的哈希。只针对材料确有依据的变化提出提案，草稿里已有且不需改动的元素不要重复提出。
-2. 读取提示词列出的材料文件；需要了解已发布本体时，只用提示词给出的只读 MCP 地址与 Bearer 凭据
-   （例如用 curl 调用 get_ontology_manifest / list_ontology_elements / get_ontology_elements），
-   不要读取其他空间或版本。
+2. 读取提示词列出的材料文件；需要了解已发布本体时，只用提示词给出的只读 MCP 连接文件
+   （其中有 url 与 headers；用 python3 读取后调用 get_ontology_manifest / list_ontology_elements /
+   get_ontology_elements），不要读取其他空间或版本。凭据只在文件里使用，不要写进命令、输出或回答。
 3. 用 Bash 把结果 JSON 写到 output/ontofoundry-result-{run_token}.json。结构以提示词给出的 JSON Schema
    文件为准；头部字段逐字复制提示词中的值；每条提案：
    - create：唯一 client_ref，target_id/before 为 null，after 为元素（不含 id）；同批次引用新元素写 {"client_ref": "…"}。
