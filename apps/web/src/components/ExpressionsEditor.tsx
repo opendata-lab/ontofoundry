@@ -6,18 +6,18 @@ export function ExpressionsEditor({
   label = "规则与约束",
   onlyConstraints = false,
   disabled = false,
-  defaultOpen = false,
+  bare = false,
 }: {
   value: { requires?: string[]; derived_by?: string[] };
   onChange: (next: { requires?: string[]; derived_by?: string[] }) => void;
   label?: string;
   onlyConstraints?: boolean;
   disabled?: boolean;
-  defaultOpen?: boolean;
+  /** Render without the collapsible frame, for a host that frames it itself. */
+  bare?: boolean;
 }) {
-  return (
-    <details className="expression-editor" open={defaultOpen}>
-      <summary>{label}</summary>
+  const body = (
+    <>
       <p className="muted">表达式随本体校验和发布保存，当前不执行推理。</p>
       {(["requires", "derived_by"] as const)
         .filter((kind) => !onlyConstraints || kind === "requires")
@@ -73,6 +73,13 @@ export function ExpressionsEditor({
             ))}
           </section>
         ))}
+    </>
+  );
+  if (bare) return <div className="expression-editor">{body}</div>;
+  return (
+    <details className="expression-editor">
+      <summary>{label}</summary>
+      {body}
     </details>
   );
 }

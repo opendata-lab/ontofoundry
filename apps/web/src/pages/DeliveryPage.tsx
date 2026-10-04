@@ -62,7 +62,6 @@ export function DeliveryPage() {
     window.location.origin + "/api/v1/ontology/workspaces/" + workspace.id;
   const session = model.session;
   const base = versions.find((v) => v.version_id === session?.base_version_id);
-  const latest = versions[0];
   return (
     <div className="ref-catalog">
       <nav className="breadcrumb" aria-label="面包屑">
@@ -96,44 +95,44 @@ export function DeliveryPage() {
       <div className="management-content delivery-content">
         {tab === "publish" && workspace.role && (
           <section className="publish-tab">
-            <div className="publish-context">
-              <select
-                aria-label="选择发布草稿"
-                disabled={reviewBusy || reviewDirty}
-                value={session?.id ?? ""}
-                onChange={(e) => model.select(e.target.value)}
-              >
-                <option value="">选择一个建模会话</option>
-                {model.sessions.map((s) => (
-                  <option value={s.id} key={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-              </select>
-              {session && (
-                <span className="version-chips" aria-label="版本">
-                  <span className="chip">基线 {base ? `v${base.version}` : "空白"}</span>→
-                  <span className="chip">最新 {latest ? `v${latest.version}` : "无"}</span>→
-                  <span className="chip">草稿 r{session.revision}</span>
-                </span>
-              )}
-              {session && (
-                <Link className="button button--text" to={"../builder?session=" + session.id}>
-                  返回建模
-                </Link>
-              )}
-            </div>
             {result && (
               <p className="validation-pass" role="status">
                 {result}
               </p>
             )}
-            {session ? (
-              <>
+            {(() => {
+              const picker = (
+                <select
+                  aria-label="选择发布草稿"
+                  disabled={reviewBusy || reviewDirty}
+                  value={session?.id ?? ""}
+                  onChange={(e) => model.select(e.target.value)}
+                >
+                  <option value="">选择一个建模会话</option>
+                  {model.sessions.map((s) => (
+                    <option value={s.id} key={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </select>
+              );
+              if (!session)
+                return (
+                  <div className="publish-context">
+                    {picker}
+                    <p className="muted">选择一个建模会话以预览并发布。</p>
+                  </div>
+                );
+              return (
                 <PublishPanel
                   key={session.id}
                   session={session}
+                  picker={picker}
+                  baseLabel={base ? `v${base.version}` : "空白模型"}
                   disabled={reviewBusy || reviewDirty}
+                  blockedReason={
+                    reviewBusy ? "正在保存工作空间约束" : reviewDirty ? "工作空间约束尚未保存" : ""
+                  }
                   onSession={model.setSession}
                   onStale={() => {
                     // The workspace moved on: versions and header too.
@@ -147,18 +146,18 @@ export function DeliveryPage() {
                     void loadVersions();
                     refresh();
                   }}
+                  constraints={
+                    <WorkspaceConstraints
+                      key={session.id + "-constraints"}
+                      session={session}
+                      onSaved={model.setSession}
+                      onDirtyChange={setReviewDirty}
+                      onBusyChange={setReviewBusy}
+                    />
+                  }
                 />
-                <WorkspaceConstraints
-                  key={session.id + "-constraints"}
-                  session={session}
-                  onSaved={model.setSession}
-                  onDirtyChange={setReviewDirty}
-                  onBusyChange={setReviewBusy}
-                />
-              </>
-            ) : (
-              <p className="muted">选择一个建模会话以预览并发布。</p>
-            )}
+              );
+            })()}
             {model.error && <p className="inline-error">{model.error}</p>}
           </section>
         )}

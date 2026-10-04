@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { workspaceRequest } from "../api/client";
 import type { ModelingSession, VersionSummary } from "../api/types";
 import { ExpressionsEditor } from "./ExpressionsEditor";
@@ -67,6 +68,7 @@ export function WorkspaceConstraints({
   const [error, setError] = useState("");
   const [rules, setRules] = useState(session.draft.ontology_requires ?? []);
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<"object" | "json">("object");
   const dirty =
     JSON.stringify(rules) !==
     JSON.stringify(session.draft.ontology_requires ?? []);
@@ -82,17 +84,35 @@ export function WorkspaceConstraints({
     setRules(session.draft.ontology_requires ?? []);
   }, [session.id, session.revision, session.draft.ontology_requires]);
   return (
-    <div className="workspace-constraints">
-      <ExpressionsEditor
-        disabled={disabled || saving}
-        label="工作空间约束"
-        value={{ requires: rules }}
-        onChange={(next) => {
-          if (next.requires) setRules(next.requires);
-        }}
-        onlyConstraints
-        defaultOpen
-      />
+    <article className="change-card workspace-constraints" aria-label="工作空间约束">
+      <header>
+        <span className="change-card-kind">
+          <ShieldCheck size={14} aria-hidden /> 工作空间约束
+        </span>
+        <small className="muted">{rules.length} 条</small>
+        {dirty && <span className="tag tag--stale">未保存</span>}
+        <span className="view-switch" role="group" aria-label="工作空间约束 展示方式">
+          {(["object", "json"] as const).map((m) => (
+            <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
+              {m === "object" ? "对象" : "JSON"}
+            </button>
+          ))}
+        </span>
+      </header>
+      {mode === "json" ? (
+        <pre className="definition-preview">{JSON.stringify({ requires: rules }, null, 2)}</pre>
+      ) : (
+        <ExpressionsEditor
+          disabled={disabled || saving}
+          label="工作空间约束"
+          value={{ requires: rules }}
+          onChange={(next) => {
+            if (next.requires) setRules(next.requires);
+          }}
+          onlyConstraints
+          bare
+        />
+      )}
       {dirty && (
         <p className="muted" role="status">
           空间约束尚未保存。预览对应已保存的修订，请保存后再发布。
@@ -129,7 +149,7 @@ export function WorkspaceConstraints({
           {saving ? "正在保存…" : "保存空间约束"}
         </button>
       )}
-    </div>
+    </article>
   );
 }
 
