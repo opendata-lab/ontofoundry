@@ -82,8 +82,7 @@ export function WorkspaceConstraints({
     setRules(session.draft.ontology_requires ?? []);
   }, [session.id, session.revision, session.draft.ontology_requires]);
   return (
-    <details className="expression-editor workspace-constraints">
-      <summary>工作空间约束</summary>
+    <div className="workspace-constraints">
       <ExpressionsEditor
         disabled={disabled || saving}
         label="工作空间约束"
@@ -92,6 +91,7 @@ export function WorkspaceConstraints({
           if (next.requires) setRules(next.requires);
         }}
         onlyConstraints
+        defaultOpen
       />
       {dirty && (
         <p className="muted" role="status">
@@ -129,7 +129,7 @@ export function WorkspaceConstraints({
           {saving ? "正在保存…" : "保存空间约束"}
         </button>
       )}
-    </details>
+    </div>
   );
 }
 
