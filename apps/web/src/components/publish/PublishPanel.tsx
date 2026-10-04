@@ -83,7 +83,7 @@ function FieldList({
   );
   if (!rows.length) return <p className="muted">无字段内容</p>;
   return (
-    <dl className={"field-list" + (removed ? " field-list--removed" : "")}>
+    <dl className={"field-list " + (removed ? "field-list--removed" : "field-list--added")}>
       {rows.map(([key, v]) => (
         <div key={key}>
           <dt>{FIELD_LABELS[key] ?? key}</dt>
@@ -94,6 +94,21 @@ function FieldList({
   );
 }
 
+/** Pretty JSON with the lines the other side lacks marked, as in a diff. */
+function JsonLines({ value, other, mark }: { value: unknown; other: unknown; mark: "removed" | "added" }) {
+  const lines = JSON.stringify(value, null, 2).split("\n");
+  const others = new Set(JSON.stringify(other, null, 2).split("\n"));
+  return (
+    <pre className="definition-preview json-lines">
+      {lines.map((line, i) => (
+        <span key={i} className={others.has(line) ? undefined : `json-line--${mark}`}>
+          {line}
+        </span>
+      ))}
+    </pre>
+  );
+}
+
 function JsonView({ change }: { change: ElementChange }) {
   const json = (value: unknown) => JSON.stringify(value, null, 2);
   if (change.change === "updated")
@@ -101,11 +116,11 @@ function JsonView({ change }: { change: ElementChange }) {
       <div className="json-split">
         <div>
           <small>当前最新</small>
-          <pre className="definition-preview">{json(change.before)}</pre>
+          <JsonLines value={change.before} other={change.after} mark="removed" />
         </div>
         <div>
           <small>发布后</small>
-          <pre className="definition-preview">{json(change.after)}</pre>
+          <JsonLines value={change.after} other={change.before} mark="added" />
         </div>
       </div>
     );

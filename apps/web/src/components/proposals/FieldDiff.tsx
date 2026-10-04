@@ -11,6 +11,9 @@ function show(value: unknown): string {
   return JSON.stringify(value);
 }
 
+const isEmpty = (value: unknown) =>
+  value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
+
 /** Field-by-field before/after, reused by proposals and the publish preview. */
 export function FieldDiff({
   changes,
@@ -39,10 +42,10 @@ export function FieldDiff({
           <tr key={change.path}>
             <th scope="row">{FIELD_LABELS[change.path] ?? change.path}</th>
             <td>
-              <del>{show(change.before)}</del>
+              {isEmpty(change.before) ? <span className="muted">（空）</span> : <del>{show(change.before)}</del>}
             </td>
             <td>
-              <ins>{show(change.after)}</ins>
+              {isEmpty(change.after) ? <span className="muted">（空）</span> : <ins>{show(change.after)}</ins>}
             </td>
           </tr>
         ))}
