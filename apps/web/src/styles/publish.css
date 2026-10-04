@@ -1,4 +1,4 @@
-/* 发布与服务: page tabs, stepper, change summary, confirm card, conflicts. */
+/* 发布与服务: page tabs, pull-request style publish panel, conflicts. */
 .breadcrumb {
   display: flex;
   gap: 6px;
@@ -31,33 +31,6 @@
   color: var(--color-muted);
 }
 .version-chips .chip { cursor: default; background: var(--color-surface-soft); }
-.publish-stepper {
-  display: flex;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.publish-stepper .step {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--color-muted);
-}
-.publish-stepper .step small { display: block; font-size: 12px; }
-.step-dot {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--color-rule-strong);
-  font-weight: 600;
-}
-.step--current { color: var(--color-accent); font-weight: 600; }
-.step--current .step-dot { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
-.step--done .step-dot { background: var(--color-accent-soft); border-color: var(--color-accent); color: var(--color-accent); }
 .publish-notice {
   display: flex;
   align-items: center;
@@ -67,67 +40,180 @@
   border-radius: 6px;
   background: color-mix(in srgb, oklch(80% 0.14 85) 25%, var(--color-surface));
 }
-.publish-columns {
+.publish-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Header: what merges into what, on the left; the publish button, top right. */
+.pr-header {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
-  gap: 16px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-rule);
 }
-@media (max-width: 900px) {
-  .publish-columns { grid-template-columns: 1fr; }
-}
-.publish-summary,
-.publish-confirm {
-  padding: 16px;
-  border: 1px solid var(--color-rule);
-  border-radius: 8px;
-  background: var(--color-surface);
-}
-.publish-summary > header {
+.pr-title {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
-.publish-summary h2,
-.publish-confirm h2 { margin: 0 0 8px; font-size: 17px; }
-.summary-counts { display: flex; gap: 14px; margin: 0; color: var(--color-muted); }
+.pr-flow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+}
+.pr-flow b { color: var(--color-ink); font-weight: 600; }
+.pr-actions { display: flex; justify-content: flex-end; }
+.pr-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.pr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  background: var(--color-surface-soft);
+  color: var(--color-muted);
+}
+.pr-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pr-status--ok { background: var(--color-success-soft); color: var(--color-success); }
+.pr-status--warn { background: color-mix(in srgb, oklch(62% 0.14 70) 14%, white); color: oklch(45% 0.12 70); }
+.pr-status--error { background: var(--color-danger-soft); color: var(--color-danger); }
+.pr-counts { display: inline-flex; gap: 8px; font-variant-numeric: tabular-nums; }
 .count-created { color: var(--color-success); }
 .count-updated { color: oklch(55% 0.13 70); }
 .count-deleted { color: var(--color-danger); }
-.change-group h3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 12px 0 4px;
-  font-size: 14px;
-}
-.change-group h3 small { color: var(--color-muted); font-weight: 400; }
-.change-row { border-bottom: 1px solid var(--color-rule-soft); }
-.change-row-head {
-  all: unset;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 4px;
-  cursor: pointer;
-}
-.change-row-head > span:first-child { flex: 1; }
-.change-row-head:focus-visible { outline: 2px solid var(--color-focus); }
-.change-extra { margin-top: 12px; }
-.publish-confirm {
-  position: sticky;
-  top: 12px;
+.pr-tabs { margin: 0; }
+.pr-tabs small { color: var(--color-muted); font-weight: 400; }
+.check-pass { color: var(--color-success); }
+.check-fail { color: var(--color-danger); }
+.check-warn { color: oklch(55% 0.13 70); }
+.check-idle { color: var(--color-muted); }
+
+/* Changes: one card per element, like files in a pull request. */
+.pr-changes,
+.pr-constraints {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.next-version { margin: 0; font-size: 20px; }
-.next-version b { color: var(--color-accent); font-size: 28px; }
-.publish-button { width: 100%; justify-content: center; }
+.pr-constraints[hidden] { display: none; }
+.pr-filter { display: flex; flex-wrap: wrap; gap: 6px; }
+.pr-filter button,
+.view-switch button {
+  padding: 3px 10px;
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pr-filter button { border-radius: 999px; }
+.pr-filter button[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.pr-empty { padding: 24px 0; text-align: center; }
+.change-card {
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.change-card > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-surface-soft);
+  border-bottom: 1px solid var(--color-rule-soft);
+}
+.change-card > :not(header) { margin: 12px; }
+.change-card-toggle {
+  all: unset;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-muted);
+}
+.change-card-toggle:focus-visible { outline: 2px solid var(--color-focus); }
+.change-card-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+.view-switch { display: inline-flex; margin-left: auto; }
+.view-switch button:first-child { border-radius: 6px 0 0 6px; }
+.view-switch button:last-child { border-radius: 0 6px 6px 0; border-left: 0; }
+.view-switch button[aria-pressed="true"] { background: var(--color-surface); color: var(--color-ink); font-weight: 600; }
+.field-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+}
+.field-list > div { display: contents; }
+.field-list dt { color: var(--color-muted); }
+.field-list dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.field-list--removed dd { color: var(--color-muted); text-decoration: line-through; }
+.json-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.json-split small { color: var(--color-muted); }
+.change-card .definition-preview { margin: 4px 0 0; max-height: 360px; overflow: auto; }
+.change-extra { margin-top: 4px; }
+.change-extra > .change-card { margin-top: 8px; }
+
+/* Checks: one row per check, like a pull request's checks tab. */
+.check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+.check-list > li {
+  display: grid;
+  grid-template-columns: 20px 120px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-rule-soft);
+}
+.check-list > li:last-child { border-bottom: 0; }
+.check-list small { color: var(--color-muted); }
+.check-issues { grid-column: 2 / -1; margin: 4px 0 0; padding-left: 18px; }
+.publish-confirm-dialog { width: min(480px, calc(100vw - 32px)); }
+.publish-confirm-dialog > header { display: block; }
+.publish-confirm-dialog h2 { margin: 0 0 4px; font-size: 18px; }
+.publish-confirm-dialog > header p { margin: 0; }
+.publish-confirm-dialog footer { justify-content: flex-end; }
 .conflict-resolver {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr);

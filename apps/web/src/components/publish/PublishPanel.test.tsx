@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, publishApi } from "../../api/client";
 import type { MergeConflict, ModelingSession, PublishPreview } from "../../api/types";
@@ -97,8 +97,16 @@ const renderPanel = (props: Partial<Parameters<typeof PublishPanel>[0]> = {}) =>
     />,
   );
 
+/** Open the confirm dialog from the top-right button and confirm. */
+async function publishFromHeader(version: number, note = "") {
+  fireEvent.click(await screen.findByRole("button", { name: `发布为 v${version}` }));
+  const dialog = await screen.findByRole("dialog", { name: `发布为 v${version}` });
+  if (note) fireEvent.change(within(dialog).getByPlaceholderText("说明本次模型变化"), { target: { value: note } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "确认发布" }));
+}
+
 describe("publish panel", () => {
-  it("shows the merged result and publishes with exactly the previewed values", async () => {
+  it("shows the changes as cards and publishes with exactly the previewed values", async () => {
     vi.spyOn(publishApi, "preview").mockResolvedValue(preview());
     const publish = vi.spyOn(publishApi, "publish").mockResolvedValue({
       version: { version: 3 } as never,
@@ -106,15 +114,18 @@ describe("publish panel", () => {
     });
     const onPublished = vi.fn();
     renderPanel({ onPublished });
-    await screen.findByText("变更摘要");
-    expect(screen.getByText(/将发布为/)).toHaveTextContent("v3");
-    expect(screen.getByText("当前最新 v2")).toBeInTheDocument();
+    await screen.findByRole("button", { name: "发布为 v3" });
+    expect(screen.getByText("可发布")).toBeInTheDocument();
+    expect(screen.getByLabelText("变更计数")).toHaveTextContent("+1~1−0");
     expect(screen.getByText("仅定义")).toBeInTheDocument();
-    expect(screen.getByText(/自动合并了其他会话的 1 项变更/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /^供应商/ }));
-    expect(screen.getByText("新定义")).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText("说明本次模型变化"), { target: { value: "上线" } });
-    fireEvent.click(screen.getByRole("button", { name: "发布 v3" }));
+    expect(screen.getByText(/来自其他会话的变更 1/)).toBeInTheDocument();
+    // Cards open on the object view; the header toggles to JSON.
+    const card = screen.getByRole("article", { name: "实体 供应商" });
+    expect(within(card).getByText("新定义")).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "JSON" }));
+    expect(within(card).getByText("发布后")).toBeInTheDocument();
+
+    await publishFromHeader(3, "上线");
     await waitFor(() => expect(onPublished).toHaveBeenCalled());
     expect(publish).toHaveBeenCalledWith(session, preview(), "上线");
   });
@@ -129,14 +140,14 @@ describe("publish panel", () => {
     );
     const onStale = vi.fn();
     renderPanel({ onStale });
-    fireEvent.click(await screen.findByRole("button", { name: "发布 v3" }));
-    await screen.findByRole("button", { name: "发布 v4" });
+    await publishFromHeader(3);
+    await screen.findByRole("button", { name: "发布为 v4" });
     expect(previewCall).toHaveBeenCalledTimes(2);
     expect(onStale).toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent("预览后已变化");
   });
 
-  it("blocks publishing while validation fails", async () => {
+  it("blocks publishing while validation fails and shows why in the checks tab", async () => {
     vi.spyOn(publishApi, "preview").mockResolvedValue(
       preview({
         validation: {
@@ -147,8 +158,33 @@ describe("publish panel", () => {
       }),
     );
     renderPanel();
-    expect(await screen.findByRole("button", { name: "发布 v3" })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: "发布为 v3" })).toBeDisabled();
+    expect(screen.getByText("校验未通过 · 1 个错误")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /检查/ }));
     expect(screen.getByRole("alert")).toHaveTextContent("名称重复");
+  });
+
+  it("does not offer to publish a version without changes", async () => {
+    vi.spyOn(publishApi, "preview").mockResolvedValue(preview({ changes: [], auto_merged: [] }));
+    renderPanel();
+    expect(await screen.findByRole("button", { name: "发布为 v3" })).toBeDisabled();
+    expect(screen.getByText("草稿与最新版本一致，没有可发布的变更。")).toBeInTheDocument();
+  });
+
+  it("waits for unsaved workspace constraints", async () => {
+    vi.spyOn(publishApi, "preview").mockResolvedValue(preview());
+    renderPanel({ blockedReason: "工作空间约束尚未保存", disabled: true });
+    expect(await screen.findByRole("button", { name: "发布为 v3" })).toBeDisabled();
+    expect(screen.getByText("工作空间约束尚未保存")).toBeInTheDocument();
+  });
+
+  it("keeps the constraints box mounted while the checks tab is open", async () => {
+    vi.spyOn(publishApi, "preview").mockResolvedValue(preview());
+    renderPanel({ constraints: <textarea aria-label="约束草稿" defaultValue="未保存的约束" /> });
+    await screen.findByRole("button", { name: "发布为 v3" });
+    fireEvent.click(screen.getByRole("tab", { name: /检查/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /变更/ }));
+    expect(screen.getByLabelText("约束草稿")).toHaveValue("未保存的约束");
   });
 
   it("resolves conflicts one at a time and saves them together", async () => {
@@ -195,7 +231,7 @@ describe("publish panel", () => {
     await screen.findByLabelText("解决冲突");
     fireEvent.click(screen.getByRole("radio", { name: /采用我的草稿/ }));
     fireEvent.click(screen.getByRole("button", { name: "保存并重新预览" }));
-    await screen.findByRole("button", { name: "发布 v4" });
+    await screen.findByRole("button", { name: "发布为 v4" });
     expect(previewCall).toHaveBeenCalledTimes(2);
     expect(onStale).toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent("预览后已变化");
@@ -210,8 +246,8 @@ describe("publish panel", () => {
     view.rerender(
       <PublishPanel session={{ ...session, revision: 5 }} onSession={vi.fn()} onPublished={vi.fn()} onStale={vi.fn()} />,
     );
-    await screen.findByRole("button", { name: "发布 v9" });
+    await screen.findByRole("button", { name: "发布为 v9" });
     await act(async () => late(preview()));
-    expect(screen.queryByRole("button", { name: "发布 v3" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "发布为 v3" })).not.toBeInTheDocument();
   });
 });
