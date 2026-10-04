@@ -64,12 +64,12 @@ export function DeliveryPage() {
   const base = versions.find((v) => v.version_id === session?.base_version_id);
   return (
     <div className="ref-catalog">
-      <nav className="breadcrumb" aria-label="面包屑">
-        <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体自动构建</Link>
-        <span aria-hidden> / </span>
-        <span>发布与服务</span>
-      </nav>
       <header className="catalog-toolbar">
+        {/* The way back to modeling, folded into the title so the page name shows once. */}
+        <nav className="breadcrumb" aria-label="面包屑">
+          <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体自动构建</Link>
+          <span aria-hidden>/</span>
+        </nav>
         <h1>发布与服务</h1>
         <div className="toolbar-spacer" />
         {workspace.current_version && (
