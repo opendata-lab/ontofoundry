@@ -6,15 +6,17 @@ export function ExpressionsEditor({
   label = "规则与约束",
   onlyConstraints = false,
   disabled = false,
+  defaultOpen = false,
 }: {
   value: { requires?: string[]; derived_by?: string[] };
   onChange: (next: { requires?: string[]; derived_by?: string[] }) => void;
   label?: string;
   onlyConstraints?: boolean;
   disabled?: boolean;
+  defaultOpen?: boolean;
 }) {
   return (
-    <details className="expression-editor">
+    <details className="expression-editor" open={defaultOpen}>
       <summary>{label}</summary>
       <p className="muted">表达式随本体校验和发布保存，当前不执行推理。</p>
       {(["requires", "derived_by"] as const)
