@@ -63,7 +63,7 @@ export function DeliveryPage() {
       <header className="catalog-toolbar">
         {/* The way back to modeling, folded into the title so the page name shows once. */}
         <nav className="breadcrumb" aria-label="面包屑">
-          <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体自动构建</Link>
+          <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体构建</Link>
           <span aria-hidden>/</span>
         </nav>
         <h1>发布与服务</h1>

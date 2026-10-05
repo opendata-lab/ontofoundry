@@ -85,7 +85,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
     return (
       <div className="empty-state">
         <p>没有找到此本体</p>
-        <Link to="../objects">返回业务对象</Link>
+        <Link to="../objects">返回本体对象</Link>
       </div>
     );
   const inherited =
@@ -115,7 +115,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
       <header className="breadcrumb-bar">
         <Link to={"../" + (relation ? "relations" : "objects") + suffix}>
           <ArrowLeft size={14} />
-          {relation ? "本体关系" : "业务对象"}
+          {relation ? "本体关系" : "本体对象"}
         </Link>
         <span>/</span>
         <span>{type.name}</span>

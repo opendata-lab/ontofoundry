@@ -175,7 +175,7 @@ export function InstancesPage() {
       <header className="breadcrumb-bar">
         <Link to={"../objects" + suffix}>
           <ArrowLeft size={14} />
-          业务对象
+          本体对象
         </Link>
         <span>/</span>
         <Link to={"../objects/" + type.id + suffix}>{type.name}</Link>

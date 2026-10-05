@@ -169,7 +169,7 @@ describe("页签交互", () => {
     await act(() => router.navigate("/workspaces/w/view"));
     expect(tabs().getAllByRole("tab")).toHaveLength(2);
     expect(document.querySelectorAll(".route-panel")).toHaveLength(1);
-    fireEvent.click(tabs().getByRole("button", { name: "关闭 业务对象" }));
+    fireEvent.click(tabs().getByRole("button", { name: "关闭 本体对象" }));
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/workspaces/w/view");

@@ -26,9 +26,9 @@ export function tabTitle(href: string) {
   return (
     {
       view: "本体视图",
-      objects: "业务对象",
+      objects: "本体对象",
       relations: "本体关系",
-      builder: "本体自动构建",
+      builder: "本体构建",
       mappings: "数据映射",
       delivery: "发布与服务",
       settings: "空间设置",
