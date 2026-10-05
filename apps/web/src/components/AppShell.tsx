@@ -5,6 +5,7 @@ import {
   Network,
   Search,
   Settings,
+  Rocket,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
@@ -28,9 +29,8 @@ import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
 
-// 发布与服务不再占一级导航：发布是本体视图、对象目录和建模工作台上的操作，
-// 版本与服务说明作为它的二级页面打开。
-// 本体管理 / 数据管理 / 空间设置。数据管理里先接数据源再做映射，跟着实际操作顺序走。
+// 本体管理 / 数据管理 / 空间设置。本体管理按“看 → 建 → 发布”排列；
+// 数据管理里先接数据源再做映射，跟着实际操作顺序走。
 const navigation = [
   {
     group: "本体管理",
@@ -39,6 +39,7 @@ const navigation = [
       { to: "objects", label: "本体对象", icon: Box },
       { to: "relations", label: "本体关系", icon: GitBranch },
       { to: "builder", label: "本体构建", icon: Sparkles },
+      { to: "delivery", label: "本体发布", icon: Rocket },
     ],
   },
   {
@@ -50,8 +51,9 @@ const navigation = [
   },
   { group: "空间设置", items: [{ to: "settings", label: "空间设置", icon: Settings }] },
 ];
-/** What a reader without a workspace role may open: the published ontology. */
-const READER_PAGES = ["view", "objects", "relations"];
+/** What a reader without a workspace role may open: the published ontology,
+ * and the release page, whose history and service tabs need no role. */
+const READER_PAGES = ["view", "objects", "relations", "delivery"];
 export function AppShell() {
   const { workspaceId = "" } = useParams();
   const location = useLocation();
@@ -112,7 +114,6 @@ export function AppShell() {
       <header className="ref-topbar">
         <Link to="/" className="ref-brand">
           <Brand />
-          <span>本体管理</span>
         </Link>
         <div className="ref-topbar-actions">
           <button

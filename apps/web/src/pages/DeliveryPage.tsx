@@ -2,7 +2,7 @@ import { HistoryComparison } from "../components/ReleaseReview";
 import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
 import { useCallback, useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { CheckCircle2, Download, KeyRound, Trash2 } from "lucide-react";
 import { api, workspaceRequest } from "../api/client";
 import type { VersionSummary } from "../api/types";
@@ -61,12 +61,7 @@ export function DeliveryPage() {
   return (
     <div className="ref-catalog">
       <header className="catalog-toolbar">
-        {/* The way back to modeling, folded into the title so the page name shows once. */}
-        <nav className="breadcrumb" aria-label="面包屑">
-          <Link to={"../builder" + (session ? "?session=" + session.id : "")}>本体构建</Link>
-          <span aria-hidden>/</span>
-        </nav>
-        <h1>发布与服务</h1>
+        <h1>本体发布</h1>
         <div className="toolbar-spacer" />
         {workspace.current_version && (
           <span className="available">
@@ -75,7 +70,7 @@ export function DeliveryPage() {
           </span>
         )}
       </header>
-      <div className="ref-tabs page-tabs" role="tablist" aria-label="发布与服务">
+      <div className="ref-tabs page-tabs" role="tablist" aria-label="本体发布">
         {workspace.role && (
           <button role="tab" aria-selected={tab === "publish"} onClick={() => setTab("publish")}>
             发布

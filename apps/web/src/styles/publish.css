@@ -1,14 +1,4 @@
 /* 发布与服务: page tabs, pull-request style publish panel, conflicts. */
-.breadcrumb {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-right: 6px;
-  color: var(--color-muted);
-  font-size: 14px;
-}
-.breadcrumb a { color: var(--color-muted); }
-.breadcrumb a:hover { color: var(--color-accent); }
 .page-tabs { margin: 0 24px; }
 .publish-tab {
   display: flex;
