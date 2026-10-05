@@ -379,6 +379,8 @@ export type Impact = {
 export type PublishPreview = {
   session_revision: number;
   base_version_id: string | null;
+  /** The version the session started from; null for a blank start. */
+  base_version_number: number | null;
   current_version_id: string | null;
   current_version_number: number | null;
   next_version_number: number;
@@ -386,6 +388,10 @@ export type PublishPreview = {
   merged_snapshot_sha256: string;
   validation: VersionSummary["validation"];
   changes: ElementChange[];
+  /** Workspace constraints publishing changes; null when unchanged. */
+  requires_change: { before: string[]; after: string[] } | null;
+  /** Display labels by element id, across the current version and the merge. */
+  labels: Record<string, string>;
   impacts: Impact[];
   auto_merged: (ElementChange & { side: "latest" | "both" })[];
   ossie: Record<string, unknown> | null;

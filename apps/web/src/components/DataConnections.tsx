@@ -1,4 +1,4 @@
-import { Database, Plus, X, PlugZap } from "lucide-react";
+import { Database, X, PlugZap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { modelingApi, workspaceRequest } from "../api/client";
 import type { DataConnection } from "../api/types";

@@ -43,7 +43,13 @@ from ontofoundry_api.services.ontology_query import (
     version_summary,
 )
 from ontofoundry_api.services.proposals import pending_summary
-from ontofoundry_api.services.publish_preview import auto_merged, impacts, three_way
+from ontofoundry_api.services.publish_preview import (
+    auto_merged,
+    element_labels,
+    impacts,
+    requires_change,
+    three_way,
+)
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -779,10 +785,12 @@ def preview_definition(
     report = validate_draft(merge.merged, space)
     current = current_version(db, workspace_id) if space.current_version_id else None
     changes = element_changes(merge.latest, merge.merged)
+    base = db.get(OntologyVersionRecord, item.base_version_id) if item.base_version_id else None
     return {
         "revision": item.revision,
         "session_revision": item.revision,
         "base_version_id": item.base_version_id,
+        "base_version_number": base.version_number if base else None,
         "current_version_id": space.current_version_id,
         "current_version_number": current.version_number if current else None,
         "next_version_number": (
@@ -798,6 +806,8 @@ def preview_definition(
         "merged_snapshot_sha256": merge.merged_sha256,
         "validation": report,
         "changes": changes,
+        "requires_change": requires_change(merge),
+        "labels": element_labels(merge.latest, merge.merged),
         "impacts": impacts(changes, merge.merged),
         "auto_merged": auto_merged(merge),
         "ossie": compile_ossie(

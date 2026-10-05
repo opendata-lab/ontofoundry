@@ -4,6 +4,7 @@ import {
   Database,
   FileText,
   GitBranch,
+  ListChecks,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import type {
 import type { ProposalsState } from "../hooks/useProposals";
 import { toView } from "../lib/draftView";
 import { EmptyModel } from "./EmptyModel";
+import { WorkspaceConstraints } from "./ReleaseReview";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
 
@@ -70,11 +72,18 @@ export function ModelResults({
   proposals,
   running = false,
   onRemodel = () => undefined,
+  onSession,
+  onConstraintsDirty,
+  onConstraintsBusy,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
   running?: boolean;
   onRemodel?: (text: string) => void;
+  /** Saves edits made here (workspace constraints) back into the page's session. */
+  onSession?: (value: ModelingSession) => void;
+  onConstraintsDirty?: (dirty: boolean) => void;
+  onConstraintsBusy?: (busy: boolean) => void;
 }) {
   const [params, setParams] = useSearchParams();
   const pending = session?.pending_proposal_count ?? 0;
@@ -182,6 +191,13 @@ export function ModelResults({
     { key: "action", text: "Action", icon: Zap, count: actions.length, cls: "action" },
     { key: "instance", text: "材料实例", icon: FileText, count: model?.objects.length ?? 0, cls: "instance" },
     { key: "mapping", text: "映射", icon: Database, count: model?.mappings.length ?? 0, cls: "mapping" },
+    {
+      key: "constraint",
+      text: "空间约束",
+      icon: ListChecks,
+      count: session?.draft.ontology_requires?.length ?? 0,
+      cls: "rule",
+    },
   ];
   const warnings = session?.result_warnings ?? [];
   const visibleRows = rows.filter((r) =>
@@ -230,6 +246,21 @@ export function ModelResults({
               </button>
             ))}
           </div>
+          {kind === "constraint" ? (
+            session && onSession ? (
+              <WorkspaceConstraints
+                key={session.id}
+                session={session}
+                onSaved={onSession}
+                disabled={running}
+                onDirtyChange={onConstraintsDirty}
+                onBusyChange={onConstraintsBusy}
+              />
+            ) : (
+              <EmptyModel text="暂无构建结果" />
+            )
+          ) : (
+          <>
           <label className="ref-search results-search">
             <input
               aria-label="搜索模型"
@@ -282,10 +313,11 @@ export function ModelResults({
               <EmptyModel text={query ? "没有匹配的模型" : model ? "暂无此类模型" : "暂无构建结果"} />
             )}
           </div>
+          </>
+          )}
           {session && (
             <footer className="result-footnote">
-              会话草稿 · 基于 {session.base_version_id ? "已发布版本" : "空白模型"} · r{session.revision} ·
-              发布前需预览合并结果
+              本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
             </footer>
           )}
         </>

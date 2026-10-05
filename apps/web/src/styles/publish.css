@@ -62,22 +62,6 @@
   gap: 10px;
   min-width: 0;
 }
-/* The draft picker stands where a pull request shows its title. */
-.pr-title select {
-  /* Size to the chosen title, so the chevron sits next to it. */
-  field-sizing: content;
-  max-width: 420px;
-  padding: 4px 28px 4px 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background-color: transparent;
-  color: var(--color-ink);
-  font-size: 18px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.pr-title select:hover,
-.pr-title select:focus-visible { border-color: var(--color-rule); background-color: var(--color-surface); }
 .pr-flow {
   display: inline-flex;
   align-items: center;
@@ -150,13 +134,21 @@
 .check-idle { color: var(--color-muted); }
 
 /* Changes: one card per element, like files in a pull request. */
-.pr-changes,
-.pr-constraints {
+.pr-changes {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.pr-constraints[hidden] { display: none; }
+.pr-changes[hidden],
+.pr-checks[hidden] { display: none; }
+.pr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.pr-toolbar h2 { margin: 0; font-size: 15px; }
+.pr-toolbar > .button { margin-left: auto; }
 .pr-filter { display: flex; flex-wrap: wrap; gap: 6px; }
 .pr-filter button,
 .view-switch button {
@@ -280,6 +272,29 @@
 .publish-confirm-dialog h2 { margin: 0 0 4px; font-size: 18px; }
 .publish-confirm-dialog > header p { margin: 0; }
 .publish-confirm-dialog footer { justify-content: flex-end; }
+.confirm-warnings {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, oklch(80% 0.14 85) 18%, var(--color-surface));
+}
+.confirm-warnings p { display: flex; align-items: center; gap: 6px; margin: 0; }
+.confirm-warnings ul { margin: 6px 0 0; padding-left: 20px; }
+.requires-diff { margin: 0; padding: 0; list-style: none; font-size: 13px; }
+.requires-diff > li { padding: 6px 12px; border-bottom: 1px solid var(--color-rule-soft); }
+.requires-diff > li:last-child { border-bottom: 0; }
+.requires-diff--added { box-shadow: inset 3px 0 0 var(--color-success); }
+.requires-diff--removed { box-shadow: inset 3px 0 0 var(--color-danger); }
+.requires-diff ins { background: var(--color-success-soft); color: var(--color-success); text-decoration: none; }
+.requires-diff del { background: var(--color-danger-soft); color: var(--color-danger); }
+.change-card > .requires-diff { margin: 0; }
+/* Side-by-side comparisons stack on narrow screens. */
+@media (max-width: 720px) {
+  .json-split,
+  .three-way { grid-template-columns: 1fr; }
+  .check-list > li { grid-template-columns: 20px minmax(0, 1fr); }
+  .check-list > li > small,
+  .check-list > li > .button { grid-column: 2; }
+}
 .conflict-resolver {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr);
