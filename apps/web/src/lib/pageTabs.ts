@@ -50,12 +50,41 @@ export function isTabPromotion(from: string, to: string) {
   );
 }
 
+/** Pages whose session is a choice made inside the page, not a different view. */
+const SESSION_PAGES = /\/(builder|delivery)$/;
+
+/**
+ * The open tab a bare link to a session page should bring forward: the menu
+ * names only the page, so the most recently used tab of that page wins over
+ * opening another one without a session.
+ */
+function samePage(state: TabState, href: string): PageTab | undefined {
+  const url = new URL(href, "http://local");
+  const path = url.pathname.replace(/\/$/, "");
+  if (url.search || !SESSION_PAGES.test(path)) return undefined;
+  const onPage = (t: PageTab) => new URL(t.href, "http://local").pathname.replace(/\/$/, "") === path;
+  return (
+    [...state.recent]
+      .reverse()
+      .map((id) => state.tabs.find((t) => t.id === id))
+      .find((t): t is PageTab => !!t && onPage(t)) ?? state.tabs.find(onPage)
+  );
+}
+
 export function openTab(
   state: TabState,
   href: string,
   replace = false,
 ): TabState {
   const found = state.tabs.find((t) => tabKey(t.href) === tabKey(href));
+  const reused = found ? undefined : samePage(state, href);
+  if (reused)
+    // Keep the tab's own address: the caller syncs the URL to it.
+    return {
+      tabs: state.tabs.map((t) => (t.id === reused.id ? { ...t, visited: true } : t)),
+      active: reused.id,
+      recent: [...state.recent.filter((id) => id !== reused.id), reused.id],
+    };
   const previous = state.tabs.find((t) => t.id === state.active);
   const promoted =
     !found && replace && previous && isTabPromotion(previous.href, href)

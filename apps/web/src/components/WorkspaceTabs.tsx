@@ -33,8 +33,10 @@ import {
   closeTab,
   openTab,
   restoreTabs,
+  tabKey,
   type PageTab,
 } from "../lib/pageTabs";
+import { preloadWorkspacePages } from "../lib/workspacePages";
 import { LoadingSurface } from "./AsyncState";
 import { WorkspaceRoutes } from "./WorkspaceRoutes";
 import "../styles/page-tabs.css";
@@ -115,12 +117,29 @@ export function WorkspaceTabs({
     }
     return openTab(restoreTabs(raw, base), href);
   });
-  const [seen, setSeen] = useState(location.key + href);
-  if (seen !== location.key + href) {
-    const nextState = openTab(state, href, navigationType === "REPLACE");
-    setSeen(location.key + href);
-    setState(nextState);
-  }
+  // Open (or bring forward) the tab for each location. This runs in a layout
+  // effect with a functional update rather than during render: the router
+  // renders a navigation inside a transition, and a state update made during
+  // that render could be dropped when a page's synchronous title update
+  // landed alongside it, leaving the previous tab on screen.
+  const resyncTo = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    setState((current) => {
+      const next = openTab(current, href, navigationType === "REPLACE");
+      const target = next.tabs.find((t) => t.id === next.active);
+      // A bare menu link that brought an open tab forward leaves the URL short
+      // of that tab's address (its session); put the address back.
+      resyncTo.current = target && tabKey(target.href) !== tabKey(href) ? target.href : null;
+      return next;
+    });
+  }, [location.key, href, navigationType]);
+  useEffect(() => {
+    const to = resyncTo.current;
+    if (!to) return;
+    resyncTo.current = null;
+    void navigate(to, { replace: true });
+  });
+  useEffect(() => preloadWorkspacePages(), []);
   const strip = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
