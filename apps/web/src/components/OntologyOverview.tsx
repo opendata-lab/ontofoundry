@@ -143,7 +143,7 @@ export function OntologyOverview({
                     </button>
                   ) : layer.id === "instance" ? (
                     <Link to="../objects">
-                      浏览业务对象
+                      浏览本体对象
                       <ArrowUpRight size={12} />
                     </Link>
                   ) : layer.id === "service" ? (

@@ -178,7 +178,7 @@ export function BuilderPage() {
   return (
     <div className="ref-builder">
       <header className="context-bar">
-        <h1>本体自动构建</h1>
+        <h1>本体构建</h1>
         <SessionPicker
           session={session}
           sessionId={sessionId}

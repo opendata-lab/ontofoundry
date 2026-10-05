@@ -30,16 +30,28 @@ import { ErrorSurface, LoadingSurface } from "./AsyncState";
 
 // 发布与服务不再占一级导航：发布是本体视图、对象目录和建模工作台上的操作，
 // 版本与服务说明作为它的二级页面打开。
+// 本体管理 / 数据管理 / 空间设置。数据管理里先接数据源再做映射，跟着实际操作顺序走。
 const navigation = [
-  { to: "view", label: "本体视图", icon: Network },
-  { to: "objects", label: "业务对象", icon: Box },
-  { to: "relations", label: "本体关系", icon: GitBranch },
-  // 先接数据源，再做映射——菜单顺序跟着实际操作顺序走。
-  { to: "connections", label: "数据连接", icon: Plug },
-  { to: "mappings", label: "数据映射", icon: Database },
-  { to: "builder", label: "本体自动构建", icon: Sparkles },
-  { to: "settings", label: "空间设置", icon: Settings },
+  {
+    group: "本体管理",
+    items: [
+      { to: "view", label: "本体视图", icon: Network },
+      { to: "objects", label: "本体对象", icon: Box },
+      { to: "relations", label: "本体关系", icon: GitBranch },
+      { to: "builder", label: "本体构建", icon: Sparkles },
+    ],
+  },
+  {
+    group: "数据管理",
+    items: [
+      { to: "connections", label: "数据连接", icon: Plug },
+      { to: "mappings", label: "数据映射", icon: Database },
+    ],
+  },
+  { group: "空间设置", items: [{ to: "settings", label: "空间设置", icon: Settings }] },
 ];
+/** What a reader without a workspace role may open: the published ontology. */
+const READER_PAGES = ["view", "objects", "relations"];
 export function AppShell() {
   const { workspaceId = "" } = useParams();
   const location = useLocation();
@@ -124,22 +136,27 @@ export function AppShell() {
       </header>
       <aside className="ref-sidebar">
         <nav aria-label="工作空间导航">
-          {navigation
-            .filter(
-              (n) =>
-                workspace.role ||
-                ["view", "objects", "relations"].includes(n.to),
-            )
-            .map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={`/workspaces/${workspaceId}/${to}`}
-                title={collapsed ? label : undefined}
-              >
-                <Icon size={17} />
-                <span>{label}</span>
-              </NavLink>
-            ))}
+          {navigation.map(({ group, items }) => {
+            const visible = items.filter((n) => workspace.role || READER_PAGES.includes(n.to));
+            if (!visible.length) return null;
+            // A group of one item needs no heading: the item names itself.
+            const heading = visible.length > 1 || visible[0].label !== group;
+            return (
+              <div className="nav-group" key={group} role="group" aria-label={group}>
+                {heading && <h2 className="nav-group-title">{group}</h2>}
+                {visible.map(({ to, label, icon: Icon }) => (
+                  <NavLink
+                    key={to}
+                    to={`/workspaces/${workspaceId}/${to}`}
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon size={17} />
+                    <span>{label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            );
+          })}
         </nav>
         <button
           className="collapse-nav"

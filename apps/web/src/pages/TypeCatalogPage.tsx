@@ -33,7 +33,7 @@ export function TypeCatalogPage({
         ? await modelingApi.get(workspace.id, sessionId)
         : await modelingApi.create(
             workspace.id,
-            kind === "object_type" ? "手工编辑业务对象" : "手工编辑本体关系",
+            kind === "object_type" ? "手工编辑本体对象" : "手工编辑本体关系",
           );
       navigate(
         "../" +
@@ -59,7 +59,7 @@ export function TypeCatalogPage({
   return (
     <div className="ref-catalog">
       <header className="catalog-toolbar">
-        <h1>{kind === "object_type" ? "业务对象" : "本体关系"}</h1>
+        <h1>{kind === "object_type" ? "本体对象" : "本体关系"}</h1>
         <span className="muted">{sessionId ? "会话草稿" : "已发布"}</span>
         <div className="toolbar-spacer" />
         <select

@@ -175,7 +175,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
           }
         >
           <ArrowLeft size={14} />
-          {relation ? "本体关系" : "业务对象"}
+          {relation ? "本体关系" : "本体对象"}
         </Link>
         <span>/</span>
         <span>编辑本体 {type.name && "【" + type.name + "】"}</span>

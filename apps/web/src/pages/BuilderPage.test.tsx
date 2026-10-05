@@ -141,5 +141,5 @@ it("reloads the session after an agent error advances the backend revision", asy
   expect(context.setError).toHaveBeenCalledWith(
     "DataAgent unavailable（retry later）",
   );
-  expect(screen.getByRole("heading", { name: "本体自动构建" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "本体构建" })).toBeInTheDocument();
 });
