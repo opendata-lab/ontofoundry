@@ -1,52 +1,53 @@
 import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { pageLoaders } from "../lib/workspacePages";
 const BuilderPage = lazy(() =>
-  import("../pages/BuilderPage").then((module) => ({
+  pageLoaders.BuilderPage().then((module) => ({
     default: module.BuilderPage,
   })),
 );
 const OntologyViewPage = lazy(() =>
-  import("../pages/OntologyViewPage").then((module) => ({
+  pageLoaders.OntologyViewPage().then((module) => ({
     default: module.OntologyViewPage,
   })),
 );
 const TypeCatalogPage = lazy(() =>
-  import("../pages/TypeCatalogPage").then((module) => ({
+  pageLoaders.TypeCatalogPage().then((module) => ({
     default: module.TypeCatalogPage,
   })),
 );
 const ObjectDetailPage = lazy(() =>
-  import("../pages/ObjectDetailPage").then((module) => ({
+  pageLoaders.ObjectDetailPage().then((module) => ({
     default: module.ObjectDetailPage,
   })),
 );
 const ObjectEditorPage = lazy(() =>
-  import("../pages/ObjectEditorPage").then((module) => ({
+  pageLoaders.ObjectEditorPage().then((module) => ({
     default: module.ObjectEditorPage,
   })),
 );
 const ConnectionsPage = lazy(() =>
-  import("../pages/ConnectionsPage").then((module) => ({
+  pageLoaders.ConnectionsPage().then((module) => ({
     default: module.ConnectionsPage,
   })),
 );
 const MappingsPage = lazy(() =>
-  import("../pages/MappingsPage").then((module) => ({
+  pageLoaders.MappingsPage().then((module) => ({
     default: module.MappingsPage,
   })),
 );
 const InstancesPage = lazy(() =>
-  import("../pages/InstancesPage").then((module) => ({
+  pageLoaders.InstancesPage().then((module) => ({
     default: module.InstancesPage,
   })),
 );
 const DeliveryPage = lazy(() =>
-  import("../pages/DeliveryPage").then((module) => ({
+  pageLoaders.DeliveryPage().then((module) => ({
     default: module.DeliveryPage,
   })),
 );
 const SettingsPage = lazy(() =>
-  import("../pages/SettingsPage").then((module) => ({
+  pageLoaders.SettingsPage().then((module) => ({
     default: module.SettingsPage,
   })),
 );
