@@ -60,7 +60,7 @@ export function TypeCatalogPage({
     <div className="ref-catalog">
       <header className="catalog-toolbar">
         <h1>{kind === "object_type" ? "本体对象" : "本体关系"}</h1>
-        <span className="muted">{sessionId ? "会话草稿" : "已发布"}</span>
+        <span className="muted">{sessionId ? "本会话的修改" : "已发布"}</span>
         <div className="toolbar-spacer" />
         <select
           aria-label="标签筛选"

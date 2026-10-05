@@ -147,9 +147,8 @@ export function OntologyOverview({
                       <ArrowUpRight size={12} />
                     </Link>
                   ) : layer.id === "service" ? (
-                    // 发布与服务没有一级导航入口，服务层是它在全局视图里的入口。
                     <Link to="../delivery">
-                      发布与服务
+                      本体发布
                       <ArrowUpRight size={12} />
                     </Link>
                   ) : details ? (

@@ -148,7 +148,7 @@ export function DataAssets({
         : await modelingApi.create(workspaceId, `映射 ${table.name}`);
       if (current !== request.current) return;
       if (!session.draft.object_types.some((t) => t.id === targetType))
-        throw new Error("对象不在当前草稿中，请重新选择");
+        throw new Error("对象不在当前会话中，请重新选择");
       // Pass source context to the editor. A mapping is changed only after the
       // user selects its identity field and explicitly saves the draft there.
       const search = new URLSearchParams({
@@ -398,7 +398,7 @@ export function DataAssets({
                                   }
                                   onClick={() => void mapObject(table)}
                                 >
-                                  {opening ? "正在打开…" : "在草稿中配置映射"}
+                                  {opening ? "正在打开…" : "在会话中配置映射"}
                                 </button>
                                 <span className="muted">
                                   进入编辑页后确认数据表、标识字段与属性，保存并发布后生效。

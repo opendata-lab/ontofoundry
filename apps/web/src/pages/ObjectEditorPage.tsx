@@ -666,7 +666,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
             ? issues.length
               ? "草稿已保存，请修正校验问题后发布"
               : "草稿已保存"
-            : "修改保存在会话草稿中"}
+            : "修改保存在本会话中"}
         </span>
         <div className="toolbar-spacer" />
         {step > 0 && (

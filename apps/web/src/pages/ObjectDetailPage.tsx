@@ -121,7 +121,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
         <span>{type.name}</span>
         <div className="toolbar-spacer" />
         <span className="muted">
-          {sessionId ? "会话草稿" : "已发布 v" + workspace.current_version}
+          {sessionId ? "本会话的修改" : "已发布 v" + workspace.current_version}
         </span>
       </header>
       {workspace.role && mapping && (
