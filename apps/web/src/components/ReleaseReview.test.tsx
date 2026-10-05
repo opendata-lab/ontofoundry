@@ -32,7 +32,6 @@ const session = {
 it("flags unsaved constraints as dirty", () => {
   const dirty = vi.fn();
   render(<WorkspaceConstraints session={session} onSaved={vi.fn()} onDirtyChange={dirty} />);
-  fireEvent.click(screen.getAllByText("工作空间约束")[0]);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "edited" } });
   expect(dirty).toHaveBeenLastCalledWith(true);
   expect(screen.getByRole("status")).toHaveTextContent("尚未保存");
@@ -49,7 +48,6 @@ it("protects in-flight saves and reports failure without dropping edited rules",
   const busy = vi.fn(),
     saved = vi.fn();
   render(<WorkspaceConstraints session={session} onSaved={saved} onBusyChange={busy} />);
-  fireEvent.click(screen.getAllByText("工作空间约束")[0]);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "  edited  " } });
   fireEvent.click(screen.getByRole("button", { name: "保存空间约束" }));
   expect(busy).toHaveBeenLastCalledWith(true);

@@ -94,6 +94,29 @@ def auto_merged(merge: Merge) -> list[dict[str, Any]]:
     return [{**c, "side": "both" if c["element_id"] in mine else "latest"} for c in theirs]
 
 
+def requires_change(merge: Merge) -> dict[str, list[str]] | None:
+    """The workspace constraints publishing changes, or None. They are a set:
+    reordering alone changes nothing."""
+    before = list(merge.latest.get("ontology_requires") or [])
+    after = list(merge.merged.get("ontology_requires") or [])
+    return None if sorted(before) == sorted(after) else {"before": before, "after": after}
+
+
+def element_labels(*snapshots: dict[str, Any]) -> dict[str, str]:
+    """Display labels by element id, so the preview names references in any
+    of the snapshots, including ones only the latest version or the merge has."""
+    labels: dict[str, str] = {}
+    for snapshot in snapshots:
+        elements = {
+            str(e["id"]): (kind.value, e)
+            for kind, collection in COLLECTIONS.items()
+            for e in snapshot.get(collection) or []
+        }
+        for element_id, (kind, element) in elements.items():
+            labels[element_id] = element_label(kind, element, elements)
+    return labels
+
+
 def impacts(changes: list[dict[str, Any]], merged: dict[str, Any]) -> list[dict[str, Any]]:
     """Elements not changed themselves but depending on something that was."""
     changed = {c["element_id"] for c in changes}

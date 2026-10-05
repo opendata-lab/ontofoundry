@@ -1,4 +1,5 @@
-import { HistoryComparison, WorkspaceConstraints } from "../components/ReleaseReview";
+import { HistoryComparison } from "../components/ReleaseReview";
+import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -27,8 +28,6 @@ export function DeliveryPage() {
       { replace: true },
     );
   const [versions, setVersions] = useState<VersionSummary[]>([]);
-  const [reviewDirty, setReviewDirty] = useState(false);
-  const [reviewBusy, setReviewBusy] = useState(false);
   const [result, setResult] = useState("");
   const [tokens, setTokens] = useState<
     { id: string; name: string; scopes?: string[] }[]
@@ -37,8 +36,6 @@ export function DeliveryPage() {
   const { setError } = model;
   usePageTab({
     title: model.session ? `发布 · ${model.session.title}` : undefined,
-    dirty: reviewDirty,
-    busy: reviewBusy,
   });
   const loadVersions = useCallback(
     () =>
@@ -61,7 +58,6 @@ export function DeliveryPage() {
   const serviceRoot =
     window.location.origin + "/api/v1/ontology/workspaces/" + workspace.id;
   const session = model.session;
-  const base = versions.find((v) => v.version_id === session?.base_version_id);
   return (
     <div className="ref-catalog">
       <header className="catalog-toolbar">
@@ -102,19 +98,12 @@ export function DeliveryPage() {
             )}
             {(() => {
               const picker = (
-                <select
-                  aria-label="选择发布草稿"
-                  disabled={reviewBusy || reviewDirty}
-                  value={session?.id ?? ""}
-                  onChange={(e) => model.select(e.target.value)}
-                >
-                  <option value="">选择一个建模会话</option>
-                  {model.sessions.map((s) => (
-                    <option value={s.id} key={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
+                <SessionPicker
+                  session={session}
+                  sessionId={session?.id ?? null}
+                  sessions={model.sessions}
+                  onSelect={model.select}
+                />
               );
               if (!session)
                 return (
@@ -128,11 +117,6 @@ export function DeliveryPage() {
                   key={session.id}
                   session={session}
                   picker={picker}
-                  baseLabel={base ? `v${base.version}` : "空白模型"}
-                  disabled={reviewBusy || reviewDirty}
-                  blockedReason={
-                    reviewBusy ? "正在保存工作空间约束" : reviewDirty ? "工作空间约束尚未保存" : ""
-                  }
                   onSession={model.setSession}
                   onStale={() => {
                     // The workspace moved on: versions and header too.
@@ -146,15 +130,6 @@ export function DeliveryPage() {
                     void loadVersions();
                     refresh();
                   }}
-                  constraints={
-                    <WorkspaceConstraints
-                      key={session.id + "-constraints"}
-                      session={session}
-                      onSaved={model.setSession}
-                      onDirtyChange={setReviewDirty}
-                      onBusyChange={setReviewBusy}
-                    />
-                  }
                 />
               );
             })()}

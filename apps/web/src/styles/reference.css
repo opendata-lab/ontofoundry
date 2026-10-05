@@ -2280,3 +2280,7 @@ small,
   line-height: 1.6;
   color: #92400e;
 }
+
+/* Workspace constraints, edited in the draft tab like the other categories. */
+.ref-results .workspace-constraints { padding: 4px 14px 12px; }
+.ref-results .workspace-constraints .button--secondary { margin-top: 8px; }

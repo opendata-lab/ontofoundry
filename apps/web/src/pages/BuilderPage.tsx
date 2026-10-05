@@ -36,13 +36,15 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
+  const [constraintsDirty, setConstraintsDirty] = useState(false);
+  const [constraintsBusy, setConstraintsBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
-    dirty: !!scenario.trim(),
-    busy: busy || uploading,
+    dirty: !!scenario.trim() || constraintsDirty,
+    busy: busy || uploading || constraintsBusy,
   });
   // Run state comes from the element, not from a status column the page
   // polls. It knows first, and it covers the parked states — waiting_input is
@@ -384,6 +386,9 @@ export function BuilderPage() {
           proposals={proposals}
           running={running}
           onRemodel={remodel}
+          onSession={setSession}
+          onConstraintsDirty={setConstraintsDirty}
+          onConstraintsBusy={setConstraintsBusy}
         />
       </div>
     </div>

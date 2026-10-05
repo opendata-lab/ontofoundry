@@ -198,3 +198,21 @@ def test_invalid_resolutions_are_refused_before_anything_is_saved(client):
     after = client.get(ROOT + f"/sessions/{b['id']}").json()
     assert after["revision"] == b["revision"] and after["base_version_id"] == b["base_version_id"]
     assert resolve({key: {"choice": "custom", "value": "合并"}}).status_code == 200
+
+
+def test_a_constraints_only_change_is_a_change_and_the_preview_names_its_base(client):
+    session = create_session(client)
+    session["draft"]["ontology_requires"] = ["供应商必须有统一社会信用代码"]
+    session = save(client, session, session["draft"]).json()
+
+    body = preview(client, session).json()
+
+    assert body["changes"] == []
+    assert body["requires_change"] == {"before": [], "after": ["供应商必须有统一社会信用代码"]}
+    assert body["base_version_number"] == body["current_version_number"] == 1
+    first = session["draft"]["object_types"][0]
+    assert body["labels"][first["id"]] == first["name"]
+    assert publish(client, session, body).status_code == 200
+    assert preview(client, client.get(ROOT + f"/sessions/{session['id']}").json()).json()[
+        "requires_change"
+    ] is None
