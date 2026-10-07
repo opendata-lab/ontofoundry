@@ -4,6 +4,9 @@ import type { Capabilities, DataAgentHealth } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { usePageTab } from "../hooks/usePageTab";
 
+// Restore these sections when workspace-level configuration is available.
+const showAgentSettings = false;
+
 export function SettingsPage() {
   const { workspace, user, refresh } = useWorkspaceContext();
   const [members, setMembers] = useState<
@@ -34,6 +37,7 @@ export function SettingsPage() {
   );
   useEffect(() => {
     load().catch((e: Error) => setError(e.message));
+    if (!showAgentSettings) return;
     modelingApi
       .capabilities(workspace.id)
       .then(setCap)
@@ -178,11 +182,7 @@ export function SettingsPage() {
             </form>
           )}
         </section>
-        {/* 这里只留用户用得上的两条：问数能不能用，材料该传成什么样。
-            原本还列了「协议」和「内置方法」：协议是写死的字面量，后端支持两种
-            api_format 之后它可能是错的，而 ontofoundry 本就不知道管理员配了哪种；
-            「内置方法」是 skill 目录名，属内部实现。模型那行的值是固定的运行时名
-            而非模型名，标签却写「内网大模型」——三条都不可操作，也无法自证。 */}
+        {showAgentSettings && <>
         <section className="detail-section">
           <h2>智能问数</h2>
           <dl className="ref-definition">
@@ -239,6 +239,7 @@ export function SettingsPage() {
             <p className="muted">正在检查…</p>
           )}
         </section>
+        </>}
       </div>
     </div>
   );

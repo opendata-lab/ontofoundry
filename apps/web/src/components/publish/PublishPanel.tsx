@@ -20,6 +20,7 @@ import { FieldDiff } from "../proposals/FieldDiff";
 import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
 import { lineDiff } from "../../lib/lineDiff";
 import { ConflictResolver } from "./ConflictResolver";
+import { useElementInspector } from "../../hooks/useElementInspector";
 
 const CHANGE_LABEL: Record<ElementChange["change"], string> = {
   created: "新增",
@@ -191,10 +192,12 @@ function ChangeCard({
   change,
   names,
   expand,
+  onInspect,
 }: {
   change: ElementChange;
   names: Map<string, string>;
   expand: ExpandSignal;
+  onInspect?: () => void;
 }) {
   const label =
     (change.owner_label && change.element_kind === "property" ? `${change.owner_label}.` : "") + change.label;
@@ -207,6 +210,7 @@ function ChangeCard({
       expand={expand}
       extra={
         <>
+          {onInspect && <button type="button" className="button button--text" onClick={onInspect}>查看发布后的元素</button>}
           {change.element_kind === "action" && <span className="tag">仅定义</span>}
           {change.change === "updated" && change.field_changes.length > 0 && (
             <small className="muted">{change.field_changes.length} 个字段</small>
@@ -318,6 +322,7 @@ export function PublishPanel({
   /** The session selector, shown where a pull request names its branch. */
   picker?: ReactNode;
 }) {
+  const inspector = useElementInspector();
   const [preview, setPreview] = useState<PublishPreview | null>(null);
   const [previewedAt, setPreviewedAt] = useState<Date | null>(null);
   const [conflicts, setConflicts] = useState<{ items: MergeConflict[]; current: string | null } | null>(null);
@@ -593,7 +598,7 @@ export function PublishPanel({
               </button>
             </div>
             {shown.map((c) => (
-              <ChangeCard key={c.element_id} change={c} names={names} expand={expand} />
+              <ChangeCard key={c.element_id} change={c} names={names} expand={expand} onInspect={c.change !== "deleted" ? () => inspector.open({ kind: c.element_kind, id: c.element_id, sessionId: session.id, previewHash: preview.merged_snapshot_sha256 }) : undefined} />
             ))}
             {showRequires && <RequiresCard change={requires} expand={expand} />}
             {!shown.length && !showRequires && <p className="muted pr-empty">此筛选下没有变更。</p>}

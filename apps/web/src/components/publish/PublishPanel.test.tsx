@@ -5,6 +5,7 @@ import type { MergeConflict, ModelingSession, PublishPreview } from "../../api/t
 import { emptyDraft } from "../../lib/draftView";
 import { lineDiff } from "../../lib/lineDiff";
 import { PublishPanel } from "./PublishPanel";
+import { MemoryRouter } from "react-router-dom";
 
 afterEach(() => {
   cleanup();
@@ -99,6 +100,7 @@ const renderPanel = (props: Partial<Parameters<typeof PublishPanel>[0]> = {}) =>
       onStale={vi.fn()}
       {...props}
     />,
+    { wrapper: MemoryRouter },
   );
 
 /** Open the confirm dialog from the top-right button and confirm. */

@@ -4,6 +4,7 @@ import { api, modelingApi } from "../api/client";
 import type { DraftView, Workspace } from "../api/types";
 import { emptyDraft, toView, viewFromTypes } from "../lib/draftView";
 import { usePageActive } from "./usePageTab";
+import { ONTOLOGY_SAVED, type OntologySaved } from "../lib/elementInspector";
 
 export function useSnapshot(workspace: Workspace) {
   const active = usePageActive();
@@ -34,6 +35,16 @@ export function useSnapshot(workspace: Workspace) {
   useEffect(() => {
     if (active) load();
   }, [load, active]);
+  useEffect(() => {
+    const saved = (event: Event) => {
+      const detail = (event as CustomEvent<OntologySaved>).detail;
+      if (detail.workspaceId !== workspace.id) return;
+      if (sid && detail.session?.id === sid) setDraft(toView(detail.session.draft));
+      else if (active && !sid) load();
+    };
+    window.addEventListener(ONTOLOGY_SAVED, saved);
+    return () => window.removeEventListener(ONTOLOGY_SAVED, saved);
+  }, [workspace.id, sid, active, load]);
   return {
     draft,
     setDraft,

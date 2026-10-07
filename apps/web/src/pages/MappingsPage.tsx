@@ -8,9 +8,11 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { DatasetPicker } from "../components/DatasetPicker";
 import { usePageTab } from "../hooks/usePageTab";
+import { useElementInspector } from "../hooks/useElementInspector";
 
 export function MappingsPage() {
   const { workspace } = useWorkspaceContext();
+  const inspector = useElementInspector();
   const snapshot = useSnapshot(workspace);
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
@@ -41,16 +43,7 @@ export function MappingsPage() {
           浏览数据目录
         </button>
       </header>
-      <div className="management-content">
-        {(error || snapshot.error) && (
-          <div className="inline-error">{error || snapshot.error}</div>
-        )}
-        {status && (
-          <p className="muted" role="status">
-            {status}
-          </p>
-        )}
-        <div className="reading-switch">
+        <div className="management-tabs" role="group" aria-label="数据映射视图">
           <button
             aria-pressed={view === "assets"}
             disabled={assetBusy}
@@ -66,6 +59,11 @@ export function MappingsPage() {
             本体映射
           </button>
         </div>
+      <div className="management-content">
+        {(error || snapshot.error) && (
+          <div className="inline-error">{error || snapshot.error}</div>
+        )}
+        {status && <p className="muted" role="status">{status}</p>}
         {view === "assets" ? (
           <DataAssets
             key={workspace.id + ":" + snapshot.sessionId}
@@ -76,8 +74,9 @@ export function MappingsPage() {
             sessionId={snapshot.sessionId}
           />
         ) : (
-          <>
+          <section className="detail-section">
             <h2>本体与数据集</h2>
+            <div className="management-table-scroll">
             <table className="ref-table">
               <thead>
                 <tr>
@@ -108,7 +107,7 @@ export function MappingsPage() {
                       <td>
                         <Link
                           className="button button--text"
-                          to={"../objects/" + t.id + snapshot.suffix}
+                          to={inspector.href({ kind: "object_type", id: t.id, tab: "mapping", sessionId: snapshot.sessionId })}
                         >
                           查看与编辑
                           <ExternalLink size={13} />
@@ -119,7 +118,8 @@ export function MappingsPage() {
                 })}
               </tbody>
             </table>
-          </>
+            </div>
+          </section>
         )}
       </div>
       <DatasetPicker
@@ -128,7 +128,7 @@ export function MappingsPage() {
         onClose={() => setPicker(false)}
         onSelect={(c, t) =>
           setStatus(
-            c.name + " / " + t.name + " 已选择。进入对应本体的编辑页配置映射。",
+            c.name + " / " + t.name + " 已选择。打开对应本体的“映射”页签进行配置。",
           )
         }
       />

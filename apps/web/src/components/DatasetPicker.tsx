@@ -105,9 +105,7 @@ export function DatasetPicker({
               ))
           )}
           {!connections.length && (
-            <p className="muted">
-              尚无数据连接，请先在数据映射页添加只读连接。
-            </p>
+            <p>暂无数据连接</p>
           )}
         </section>
         <section>

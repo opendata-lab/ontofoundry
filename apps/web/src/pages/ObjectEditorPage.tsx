@@ -21,6 +21,7 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useModeling } from "../hooks/useModeling";
 import { MappingForm } from "../components/MappingForm";
 import { VerbalizationEditor } from "../components/VerbalizationEditor";
+import { TagList } from "../components/TagList";
 import { placeholders, valueConcept } from "../lib/verbalization";
 import { usePageTab } from "../hooks/usePageTab";
 
@@ -264,6 +265,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                     })
                   }
                 />
+                <TagList tags={type.tags} />
               </label>
               <label className="section-field">
                 <span>描述</span>

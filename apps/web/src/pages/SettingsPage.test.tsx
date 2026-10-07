@@ -71,20 +71,19 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-describe("DataAgent diagnostics", () => {
-  it("renders every read-only health check and its repair hint", async () => {
+describe("空间设置", () => {
+  it("keeps member management and skips hidden agent diagnostics", () => {
     render(<SettingsPage />);
 
     expect(
-      await screen.findByRole("heading", { name: "DataAgent 连通性" }),
+      screen.getByRole("heading", { name: "空间成员" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("配置完整性")).toBeInTheDocument();
-    expect(screen.getByText("连通性")).toBeInTheDocument();
-    expect(screen.getByText("站点放行")).toBeInTheDocument();
-    expect(screen.getByText("Agent 存在性")).toBeInTheDocument();
-    expect(screen.getByText("DataAgent 上找不到该 Agent")).toBeInTheDocument();
-    expect(screen.getByText("创建 agent_id=missing-agent")).toBeInTheDocument();
-    expect(screen.queryByLabelText(/密钥/)).not.toBeInTheDocument();
-    expect(screen.queryByPlaceholderText(/密钥/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "添加成员" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存空间信息" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "智能问数" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "DataAgent 连通性" })).not.toBeInTheDocument();
+    expect(modelingApi.capabilities).not.toHaveBeenCalled();
+    expect(workspaceRequest).toHaveBeenCalledTimes(1);
+    expect(workspaceRequest).toHaveBeenCalledWith("w1", "/members");
   });
 });

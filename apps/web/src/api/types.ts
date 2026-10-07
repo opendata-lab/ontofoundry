@@ -386,6 +386,8 @@ export type PublishPreview = {
   next_version_number: number;
   current_version_sha256: string;
   merged_snapshot_sha256: string;
+  /** Actual merged v2 snapshot, including changes from other sessions. */
+  merged_model?: Draft;
   validation: VersionSummary["validation"];
   changes: ElementChange[];
   /** Workspace constraints publishing changes; null when unchanged. */

@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ArrowUpRight, LockKeyhole, Maximize, Minus, Plus } from "lucide-react";
+import { useElementInspector } from "../hooks/useElementInspector";
 import type { WorkspaceOverview } from "../api/types";
 import type { SelectedGraphItem } from "./OntologyGraph";
 import "../styles/ontology-overview.css";
@@ -52,7 +53,7 @@ export function OntologyOverview({
   const [active, setActive] = useState<Layer | null>(null);
   const [zoom, setZoom] = useState(1);
   const pattern = useId().replace(/:/g, "");
-  const navigate = useNavigate();
+  const inspector = useElementInspector();
   const { graph, details } = overview;
   const types = graph.nodes.filter((n) => n.kind === "object_type");
   const shownTypes = types.slice(0, 24);
@@ -64,8 +65,8 @@ export function OntologyOverview({
   const relations = graph.edges.filter((e) => e.kind === "link_type");
   const toggle = (id: Layer) =>
     setActive((current) => (current === id ? null : id));
-  const visitObject = (typeId: string, id: string) =>
-    navigate("../objects/" + typeId + "/instances/" + id);
+  const visitObject = (_typeId: string, id: string) =>
+    inspector.open({ kind: "material_object", id, sessionId: null });
   const line = (
     id: string,
     from: { x: number; y: number } | undefined,
@@ -378,11 +379,11 @@ export function OntologyOverview({
                             role="button"
                             tabIndex={0}
                             aria-label={"查看映射：" + m.table_name}
-                            onClick={() => navigate("../objects/" + m.type_id)}
+                            onClick={() => inspector.open({ kind: "mapping", id: m.id, sessionId: null })}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                navigate("../objects/" + m.type_id);
+                                inspector.open({ kind: "mapping", id: m.id, sessionId: null });
                               }
                             }}
                           >

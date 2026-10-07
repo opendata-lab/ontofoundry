@@ -18,6 +18,7 @@ import type {
   Capabilities,
   DataConnection,
   DataTable,
+  TargetKind,
 } from "./types";
 
 type ErrorBody = {
@@ -196,6 +197,16 @@ export const modelingApi = {
       { revision: s.revision, message },
     ),
   snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  saveElement: (id: string, payload: {
+    target_kind: Extract<TargetKind, "object_type" | "link_type">;
+    target_id: string;
+    expected_current_version_id: string | null;
+    session_id: string | null;
+    expected_session_revision: number | null;
+    draft: Draft;
+  }) => workspaceRequest<{ version: VersionSummary; draft: Draft; session: ModelingSession | null }>(
+    id, "/element-saves", payload,
+  ),
   importOssie: (
     id: string,
     document: unknown,

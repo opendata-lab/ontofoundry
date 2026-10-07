@@ -9,6 +9,8 @@ export type CardActions = {
   restore: (item: ProposalItem) => void;
   open: (item: ProposalItem) => void;
   remodel: (item: ProposalItem) => void;
+  viewElement?: (item: ProposalItem) => void;
+  canViewElement?: (item: ProposalItem) => boolean;
 };
 
 export function ProposalCard({
@@ -69,6 +71,7 @@ export function ProposalCard({
         )}
       </div>
       <div className="proposal-card-actions">
+        {actions.viewElement && <button type="button" className="button button--text" disabled={busy || actions.canViewElement?.(item) === false} title={actions.canViewElement?.(item) === false ? "此元素尚未加入草稿或已被删除，请查看提案详情" : undefined} onClick={() => actions.viewElement?.(item)}>查看元素</button>}
         {item.status === "pending" && (
           <>
             <button
