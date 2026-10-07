@@ -56,6 +56,7 @@ export function ProposalDetail({
         <button type="button" className="icon-button" aria-label="关闭详情" onClick={onClose}>
           <X size={16} />
         </button>
+        {actions.viewElement && <button type="button" className="button button--text" disabled={busy || actions.canViewElement?.(item) === false} onClick={() => actions.viewElement?.(item)}>查看元素</button>}
       </header>
       <div className="proposal-drawer-body">
         {item.status_reason && <p className="proposal-reason">{item.status_reason}</p>}

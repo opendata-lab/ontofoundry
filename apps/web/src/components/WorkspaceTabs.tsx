@@ -53,13 +53,26 @@ const TabPanel = memo(function TabPanel({
   active: boolean;
   update: (id: string, meta: PageTabMeta) => void;
 }) {
+  const pageMeta = useRef<PageTabMeta>({});
+  const elementMeta = useRef<PageTabMeta>({});
+  const report = useCallback(() => update(tab.id, {
+    ...pageMeta.current,
+    dirty: !!pageMeta.current.dirty || !!elementMeta.current.dirty,
+    busy: !!pageMeta.current.busy || !!elementMeta.current.busy,
+    elementDirty: !!elementMeta.current.dirty,
+    elementBusy: !!elementMeta.current.busy,
+  }), [update, tab.id]);
   const setMeta = useCallback(
-    (meta: PageTabMeta) => update(tab.id, meta),
-    [update, tab.id],
+    (meta: PageTabMeta) => { pageMeta.current = meta; report(); },
+    [report],
+  );
+  const setElementMeta = useCallback(
+    (meta: PageTabMeta) => { elementMeta.current = meta; report(); },
+    [report],
   );
   const context = useMemo(
-    () => ({ active, update: setMeta }),
-    [active, setMeta],
+    () => ({ active, update: setMeta, updateElement: setElementMeta }),
+    [active, setMeta, setElementMeta],
   );
   const location = useMemo(
     () => ({
@@ -146,12 +159,22 @@ export function WorkspaceTabs({
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
+  const inspectionKey = (address: string) => {
+    const url = new URL(address, "http://local");
+    return JSON.stringify([url.pathname, url.searchParams.get("inspect"),
+      url.searchParams.get("inspectSession") ?? url.searchParams.get("session"),
+      url.searchParams.get("inspectSource"), url.searchParams.get("inspectPreviewHash")]);
+  };
   // Pages stay mounted in their tabs, so switching within the workspace does
   // not interrupt a request running in another tab. Protect only navigation
   // that would unmount the entire workspace.
   const blocker = useBlocker(
-    ({ nextLocation }) =>
-      (busy || dirty) && !nextLocation.pathname.startsWith(base + "/"),
+    ({ nextLocation }) => {
+      const current = state.tabs.find((t) => t.id === state.active);
+      return ((busy || dirty) && !nextLocation.pathname.startsWith(base + "/")) ||
+        (!!(current?.elementDirty || current?.elementBusy) &&
+          inspectionKey(current.href) !== inspectionKey(createPath(nextLocation)));
+    },
   );
   const blocked = blocker.state === "blocked";
   const blockingBusy = blocked && busy && !closing;
@@ -193,7 +216,9 @@ export function WorkspaceTabs({
       if (
         title === tab.title &&
         !!meta.dirty === !!tab.dirty &&
-        !!meta.busy === !!tab.busy
+          !!meta.busy === !!tab.busy
+          && !!meta.elementDirty === !!tab.elementDirty
+          && !!meta.elementBusy === !!tab.elementBusy
       )
         return current;
       return {
@@ -350,7 +375,9 @@ export function WorkspaceTabs({
             ? "请等待当前操作完成后再离开空间。"
             : target
               ? `关闭「${target.title}」将丢失未保存的修改。`
-              : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
+              : blocker.state === "blocked" && blocker.location.pathname.startsWith(base + "/")
+                ? "离开当前内容将丢失尚未保存的修改，是否继续？"
+                : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
         </p>
         <footer className="row-actions">
           <button

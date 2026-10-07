@@ -12,6 +12,7 @@ import { modelingApi } from "../api/client";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { useSnapshot } from "../hooks/useSnapshot";
+import { TagList } from "../components/TagList";
 import { usePageTab } from "../hooks/usePageTab";
 import type { DraftView, ObjectDefinition } from "../api/types";
 
@@ -200,7 +201,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                 </div>
                 <div>
                   <dt>标签</dt>
-                  <dd>{type.tags.join(" · ") || "—"}</dd>
+                  <dd><TagList tags={type.tags} empty="—" /></dd>
                 </div>
                 {"attributes" in type && (
                   <div>

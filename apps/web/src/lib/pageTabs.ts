@@ -5,6 +5,8 @@ export type PageTab = {
   visited: boolean;
   dirty?: boolean;
   busy?: boolean;
+  elementDirty?: boolean;
+  elementBusy?: boolean;
 };
 export type TabState = { tabs: PageTab[]; active: string; recent: string[] };
 
@@ -39,6 +41,11 @@ export function tabTitle(href: string) {
 export function isTabPromotion(from: string, to: string) {
   const a = new URL(from, "http://local");
   const b = new URL(to, "http://local");
+  // Old detail/editor links now promote into their catalog with an inspector.
+  if (/\/(objects|relations)\/[^/]+(?:\/edit)?$/.test(a.pathname) &&
+      b.searchParams.has("inspect") &&
+      a.pathname.startsWith(b.pathname + "/") &&
+      a.searchParams.get("session") === b.searchParams.get("session")) return true;
   if (a.pathname === b.pathname && /\/(builder|delivery)$/.test(a.pathname))
     return !a.searchParams.has("session") && b.searchParams.has("session");
   return (

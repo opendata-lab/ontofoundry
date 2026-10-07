@@ -14,6 +14,7 @@ import type {
   DraftView,
   ElementChange,
   ModelingSession,
+  TargetKind,
   TypeGraph,
 } from "../api/types";
 import type { ProposalsState } from "../hooks/useProposals";
@@ -22,6 +23,7 @@ import { EmptyModel } from "./EmptyModel";
 import { WorkspaceConstraints } from "./ReleaseReview";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
+import { useElementInspector } from "../hooks/useElementInspector";
 
 function draftGraph(draft: DraftView): TypeGraph {
   return {
@@ -86,6 +88,7 @@ export function ModelResults({
   onConstraintsBusy?: (busy: boolean) => void;
 }) {
   const [params, setParams] = useSearchParams();
+  const inspector = useElementInspector();
   const pending = session?.pending_proposal_count ?? 0;
   const requested = params.get("panel") as Panel | null;
   const [tab, setTabState] = useState<Panel>(
@@ -300,9 +303,9 @@ export function ModelResults({
                         </tbody>
                       </table>
                     )}
-                    {session && kind === "object_type" && !r.deleted && (
-                      <Link className="button button--text" to={"../objects/" + r.id + "/edit?session=" + session.id}>
-                        编辑本体
+                    {session && !r.deleted && (
+                      <Link className="button button--text" to={inspector.href({ kind: (kind === "attribute" ? "property" : kind === "instance" ? "material_object" : kind) as TargetKind, id: r.id, sessionId: session.id })}>
+                        查看元素
                       </Link>
                     )}
                   </div>
@@ -324,7 +327,9 @@ export function ModelResults({
       ) : (
         <div className="result-graph">
           {model?.object_types.length ? (
-            <OntologyGraph graph={draftGraph(model)} query="" onSelect={() => undefined} />
+            <OntologyGraph graph={draftGraph(model)} query="" onSelect={(selected) => {
+              if (selected && session) inspector.open({ kind: selected.category === "node" ? "object_type" : "link_type", id: selected.item.id, sessionId: session.id, tab: selected.category === "node" ? "properties" : "endpoints" });
+            }} />
           ) : (
             <EmptyModel />
           )}

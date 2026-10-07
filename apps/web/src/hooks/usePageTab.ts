@@ -1,9 +1,10 @@
 import { createContext, useContext, useLayoutEffect } from "react";
 
-export type PageTabMeta = { title?: string; dirty?: boolean; busy?: boolean };
+export type PageTabMeta = { title?: string; dirty?: boolean; busy?: boolean; elementDirty?: boolean; elementBusy?: boolean };
 export const PageTabContext = createContext<{
   active: boolean;
   update: (meta: PageTabMeta) => void;
+  updateElement?: (meta: PageTabMeta) => void;
 } | null>(null);
 
 export function usePageActive() {

@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import jsonschema
@@ -33,6 +33,7 @@ from ontofoundry_api.domain.snapshot import (
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.element_diff import element_changes
+from ontofoundry_api.services.element_save import scoped_draft
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.ontology_query import (
@@ -59,6 +60,88 @@ from ontofoundry_api.services.workspaces import (
 )
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"])
+
+
+class ElementSave(BaseModel):
+    target_kind: Literal["object_type", "link_type"]
+    target_id: str
+    expected_current_version_id: str | None
+    session_id: str | None = None
+    expected_session_revision: int | None = None
+    draft: dict
+
+
+@router.post("/element-saves")
+def save_element(
+    workspace_id: str, body: ElementSave, request: Request,
+    db: Session = Depends(get_db), user: Principal = Depends(current_principal),
+):
+    """One Save action validates and commits an immutable, immediately active version."""
+    require_member(db, workspace_id, user.id)
+    space = db.scalar(select(WorkspaceRecord).where(
+        WorkspaceRecord.id == workspace_id).with_for_update())
+    if space.current_version_id != body.expected_current_version_id:
+        raise ServiceError("内容已被其他人更新，请重新打开后再保存", code="VERSION_CHANGED",
+                           status_code=409)
+    latest = version_snapshot(db, workspace_id, space.current_version_id)
+    item = None
+    if body.session_id:
+        item = db.scalar(select(ModelingSessionRecord).where(
+            ModelingSessionRecord.id == body.session_id,
+            ModelingSessionRecord.workspace_id == workspace_id).with_for_update())
+        if not item:
+            raise HTTPException(404, "建模会话不存在")
+        if item.revision != body.expected_session_revision or blocks_edits(item):
+            raise ServiceError("内容已变化，请重新打开后再保存", code="SESSION_REVISION_CHANGED",
+                               status_code=409)
+    original = session_draft(item) if item else latest
+    try:
+        jsonschema.validate(body.draft, OntologyDraft.model_json_schema())
+        edited = reconcile_draft_evidence(
+            original, deepcopy(body.draft),
+            lookup=material_lookup(db, request.app.state.settings, workspace_id),
+            actor_id=user.id, now=utc_now(),
+        )
+        base = version_snapshot(db, workspace_id, item.base_version_id) if item else latest
+        scoped = scoped_draft(base, original, edited, body.target_kind, body.target_id)
+        merge = three_way(base, latest, scoped, workspace_id)
+        if merge.conflicts:
+            raise ServiceError("此元素与最新内容存在冲突，请重新打开后核对", code="MERGE_CONFLICTS",
+                               status_code=409, details={"conflicts": merge.conflicts})
+        model = OntologyDraft.model_validate(merge.merged)
+        version = publish_draft(db, workspace_id=workspace_id, draft=model, user_id=user.id,
+                                message="保存本体元素", commit=False)
+        if item:
+            # Keep unrelated draft changes, while displaying the actual merged
+            # values of the element just saved (latest may add untouched fields).
+            merged = model.model_dump(mode="json")
+            updated_draft = scoped_draft(edited, merged, merged, body.target_kind, body.target_id)
+            # CAS also protects SQLite and a proposal decision racing this request.
+            changed = db.execute(update(ModelingSessionRecord).where(
+                ModelingSessionRecord.id == item.id,
+                ModelingSessionRecord.revision == body.expected_session_revision,
+            ).values(draft_json=updated_draft, draft_sha256=snapshot_sha256(updated_draft),
+                     revision=item.revision + 1, updated_at=utc_now()))
+            if changed.rowcount != 1:
+                db.rollback()
+                raise ServiceError("内容已变化，请重新打开后再保存", code="SESSION_REVISION_CHANGED",
+                                   status_code=409)
+        db.commit()
+        if item:
+            db.refresh(item)
+    except (jsonschema.ValidationError, ValidationError) as exc:
+        db.rollback()
+        raise ServiceError("内容校验失败：" + str(exc), code="ELEMENT_VALIDATION_FAILED",
+                           status_code=422) from exc
+    except EvidenceError as exc:
+        db.rollback()
+        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise ServiceError("内容已被其他人更新，请重新打开后再保存", code="VERSION_CHANGED",
+                           status_code=409) from exc
+    return {"version": version_summary(version), "draft": model.model_dump(mode="json"),
+            "session": session_response(db, item) if item else None}
 
 
 def require_member(db: Session, workspace_id: str, user_id: str, admin=False):
@@ -804,6 +887,7 @@ def preview_definition(
         + 1,
         "current_version_sha256": snapshot_sha256(merge.latest),
         "merged_snapshot_sha256": merge.merged_sha256,
+        "merged_model": merge.merged,
         "validation": report,
         "changes": changes,
         "requires_change": requires_change(merge),

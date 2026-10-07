@@ -20,6 +20,7 @@ import type {
 } from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
 import { SessionPicker } from "../components/SessionPicker";
+import { TagList } from "../components/TagList";
 import { useModeling } from "../hooks/useModeling";
 import { useProposals } from "../hooks/useProposals";
 import { usePageTab } from "../hooks/usePageTab";
@@ -256,7 +257,7 @@ export function BuilderPage() {
             <div className="build-config-scroll">
               <section>
                 <h3>业务场景标签</h3>
-                <div className="context-tag">{workspace.name}</div>
+                <TagList tags={[workspace.name]} />
               </section>
               <section>
                 <h3>业务知识</h3>

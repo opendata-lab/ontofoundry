@@ -1,7 +1,9 @@
+import { useElementInspector } from "../hooks/useElementInspector";
+import { Database, Table2 } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { workspaceRequest, modelingApi } from "../api/client";
+import { workspaceRequest } from "../api/client";
 import type { DataConnection, DraftView } from "../api/types";
 import "../styles/ontology-reading.css";
 
@@ -64,6 +66,7 @@ export function DataAssets({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const navigate = useNavigate();
+  const inspector = useElementInspector();
   const [params] = useSearchParams();
   const preferred = connections.find(
     (c) => c.name === params.get("source"),
@@ -143,28 +146,19 @@ export function DataAssets({
     setOpening(true);
     setError("");
     try {
-      const session = sessionId
-        ? await modelingApi.get(workspaceId, sessionId)
-        : await modelingApi.create(workspaceId, `映射 ${table.name}`);
-      if (current !== request.current) return;
-      if (!session.draft.object_types.some((t) => t.id === targetType))
-        throw new Error("对象不在当前会话中，请重新选择");
-      // Pass source context to the editor. A mapping is changed only after the
-      // user selects its identity field and explicitly saves the draft there.
-      const search = new URLSearchParams({
-        session: session.id,
-        step: "1",
-        mapping_source: connection.name,
-        mapping_table: table.name,
-        mapping_schema: table.schema ?? "",
-      });
+      if (!draft?.object_types.some((t) => t.id === targetType))
+        throw new Error("对象已变化，请重新选择");
+      const to = new URL(inspector.href({ kind: "object_type", id: targetType, tab: "mapping", mode: "edit", sessionId }), window.location.origin);
+      to.searchParams.set("mapping_source", connection.name);
+      to.searchParams.set("mapping_table", table.name);
+      to.searchParams.set("mapping_schema", table.schema ?? "");
       // Complete the guarded request before navigating; otherwise the workspace
       // tab blocker treats this successful transition as leaving an active write.
       flushSync(() => {
         setOpening(false);
         onBusyChange?.(false);
       });
-      navigate(`../objects/${targetType}/edit?${search}`);
+      navigate(to.pathname + to.search);
     } catch (e) {
       if (current === request.current)
         setError(e instanceof Error ? e.message : "打开映射失败");
@@ -179,7 +173,7 @@ export function DataAssets({
         .includes(query.toLowerCase()),
     ) ?? [];
   const objectHref = (id: string) =>
-    `../objects/${id}${sessionId ? `?session=${encodeURIComponent(sessionId)}` : ""}`;
+    inspector.href({ kind: "object_type", id, tab: "mapping", sessionId });
 
   return (
     <section className="asset-workspace" aria-label="数据资产目录">
@@ -241,21 +235,13 @@ export function DataAssets({
       </aside>
       <div className="asset-main">
         <div className="reading-heading">
-          <div>
-            <h2>源表与本体映射</h2>
-            <p className="muted">映射对照已发布定义；编辑会进入建模草稿。</p>
-            <p className="muted">
-              {data?.observed_at
-                ? `结构读取于 ${new Date(data.observed_at).toLocaleString("zh-CN")}`
-                : "尚未读取数据结构"}
-            </p>
-          </div>
+          <h2>数据表映射</h2>
           <button
             className="button button--secondary"
             disabled={!connectionId || busy}
             onClick={() => void refresh()}
           >
-            {loading ? "正在读取…" : "刷新结构"}
+            {loading ? "加载中…" : "刷新表结构"}
           </button>
         </div>
         {(error || data?.error) && (
@@ -272,15 +258,20 @@ export function DataAssets({
           </p>
         )}
         {!connections.length ? (
-          <p className="muted">
-            添加只读数据连接后，即可读取表结构并关联本体。
-          </p>
+          <div className="asset-empty">
+            <span className="workspace-empty-icon"><Database size={26} aria-hidden="true" /></span>
+            <h3>暂无数据连接</h3>
+            <Link className="button button--primary" to="../connections">
+              添加数据连接
+            </Link>
+          </div>
         ) : data?.status === "unobserved" ? (
-          <p className="muted">
-            点击“刷新结构”建立元数据基线，业务数据保留在源系统。
-          </p>
+          <div className="asset-empty">
+            <span className="workspace-empty-icon"><Table2 size={26} aria-hidden="true" /></span>
+            <h3>表结构未加载</h3>
+          </div>
         ) : loading && !data ? (
-          <p role="status">正在读取资产…</p>
+          <p role="status">加载中…</p>
         ) : (
           data && (
             <>
@@ -398,11 +389,8 @@ export function DataAssets({
                                   }
                                   onClick={() => void mapObject(table)}
                                 >
-                                  {opening ? "正在打开…" : "在会话中配置映射"}
+                                  {opening ? "正在打开…" : "配置映射"}
                                 </button>
-                                <span className="muted">
-                                  进入编辑页后确认数据表、标识字段与属性，保存并发布后生效。
-                                </span>
                               </div>
                             )}
                             <table className="ref-table">
@@ -458,7 +446,7 @@ export function DataAssets({
                 </tbody>
               </table>
               {!tables.length && (
-                <p className="muted">没有匹配的表，调整筛选或刷新结构。</p>
+                <p>{query ? "未找到匹配的数据表" : "暂无数据表"}</p>
               )}
             </>
           )

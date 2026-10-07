@@ -5,11 +5,12 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, modelingApi } from "../api/client";
 import type { TypeGraph, Workspace, WorkspaceOverview } from "../api/types";
 import { OntologyViewPage } from "./OntologyViewPage";
+import type { SelectedGraphItem } from "../components/OntologyGraph";
 
 const context = vi.hoisted(() => ({ workspace: {} as Workspace }));
 vi.mock("../hooks/useWorkspaceContext", () => ({
@@ -20,10 +21,10 @@ vi.mock("../api/client", () => ({
   modelingApi: { importOssie: vi.fn() },
 }));
 vi.mock("../components/OntologyGraph", () => ({
-  OntologyGraph: ({ graph }: { graph: TypeGraph }) => (
+  OntologyGraph: ({ graph, onSelect }: { graph: TypeGraph; onSelect: (item: SelectedGraphItem) => void }) => (
     <div data-testid="semantic-graph" data-edges={graph.edges.length}>
       {graph.nodes.map((n) => (
-        <span key={n.id}>{n.label}</span>
+        <button key={n.id} onClick={() => onSelect({ category: "node", item: n })}>{n.label}</button>
       ))}
     </div>
   ),
@@ -111,10 +112,14 @@ function overview(): WorkspaceOverview {
     },
   };
 }
+function LocationProbe() {
+  return <output aria-label="查看地址">{useLocation().search}</output>;
+}
 function show() {
   return render(
     <MemoryRouter>
       <OntologyViewPage />
+      <LocationProbe />
     </MemoryRouter>,
   );
 }
@@ -149,6 +154,8 @@ describe("本体视图", () => {
     expect(screen.getByText("暂无已发布文档实例")).toBeInTheDocument();
     expect(screen.getByText("暂无已发布数据映射")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "语义视图" }));
+    for (const name of ["图谱", "业务", "技术"])
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
     expect(container.querySelectorAll("[data-layer]")).toHaveLength(0);
     expect(api.exportUrl).toHaveBeenLastCalledWith("w", "v2");
     // Attributes are entity fields, so the value type and the attribute edge
@@ -184,9 +191,7 @@ describe("本体视图", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看本体：物料" }),
     );
-    expect(
-      screen.getByRole("link", { name: "打开本体详情" }),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("查看地址")).toHaveTextContent("inspect=object_type%3Amaterial");
     fireEvent.click(screen.getByRole("button", { name: "放大全局图" }));
     expect(screen.getByText("120%")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "适配全局图" }));
@@ -197,6 +202,8 @@ describe("本体视图", () => {
       "aria-selected",
       "true",
     );
+    fireEvent.click(screen.getByRole("button", { name: "供应商" }));
+    expect(screen.getByLabelText("查看地址")).toHaveTextContent("inspect=object_type%3Asupplier");
     expect(
       screen.queryByRole("link", { name: "打开本体详情" }),
     ).not.toBeInTheDocument();

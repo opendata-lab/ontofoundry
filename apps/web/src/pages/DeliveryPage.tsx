@@ -3,7 +3,7 @@ import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CheckCircle2, Download, KeyRound, Trash2 } from "lucide-react";
+import { CheckCircle2, Download, KeyRound, Rocket, Trash2 } from "lucide-react";
 import { api, workspaceRequest } from "../api/client";
 import type { VersionSummary } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -70,7 +70,7 @@ export function DeliveryPage() {
           </span>
         )}
       </header>
-      <div className="ref-tabs page-tabs" role="tablist" aria-label="本体发布">
+      <div className="ref-tabs page-tabs management-tabs" role="tablist" aria-label="本体发布">
         {workspace.role && (
           <button role="tab" aria-selected={tab === "publish"} onClick={() => setTab("publish")}>
             发布
@@ -102,9 +102,10 @@ export function DeliveryPage() {
               );
               if (!session)
                 return (
-                  <div className="publish-context">
+                  <div className="publish-context publish-context--empty">
+                    <span className="workspace-empty-icon"><Rocket size={26} aria-hidden="true" /></span>
+                    <h2>选择待发布的本体</h2>
                     {picker}
-                    <p className="muted">选择一个建模会话以预览并发布。</p>
                   </div>
                 );
               return (
