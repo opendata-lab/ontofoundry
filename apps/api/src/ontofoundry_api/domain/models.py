@@ -1,5 +1,6 @@
-"""Ontology draft, schema v2: every ontology element is a top-level item with a
-stable id.
+"""The sole OntologyDraft model, with explicit v2 and frozen v3 shapes.
+
+The runtime defaults to v2 during P0. Every element has a stable ID.
 
 Object Types, Properties, Link Types, Rules, Actions, Material Objects/Links and
 Mappings each live in their own top-level collection and are addressed only by
@@ -21,8 +22,31 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    TypeAdapter,
     field_validator,
+    model_serializer,
     model_validator,
+)
+
+from ontofoundry_api.domain.models_v3 import (
+    V3_COLLECTION_MODELS,
+    V3_ONLY_FIELDS,
+    AIContext,
+    ConceptMapping,
+    Dataset,
+    DatasetField,
+    DatasetRelationship,
+    LinkTypeV3,
+    MappingNode,
+    MaterialLinkV3,
+    Metric,
+    ObjectTypeV3,
+    PlatformExtensionV4,
+    PropertyV3,
+    RuleV3,
+    SemanticModel,
+    ValueTypeDefinition,
+    validate_v3_graph,
 )
 
 TECHNICAL_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -433,20 +457,122 @@ class DataMapping(Strict):
 
 
 class OntologyDraft(Strict):
-    schema_version: Literal["2"] = "2"
+    schema_version: Literal["2", "3"] = "2"
     workspace_id: UUID
     # Ossie ontology-level `requires` carried over from v1 and imported files.
     # Not a Rule element: rules must belong to a concrete element, so these stay
     # a plain field that merges atomically and is not a proposal target.
-    ontology_requires: Expressions
-    object_types: list[ObjectTypeDefinition] = Field(default_factory=list)
-    properties: list[PropertyDefinition] = Field(default_factory=list)
-    link_types: list[LinkTypeDefinition] = Field(default_factory=list)
-    rules: list[RuleDefinition] = Field(default_factory=list)
+    ontology_requires: list[str] = Field(default_factory=list)
+    object_types: list[ObjectTypeDefinition | ObjectTypeV3] = Field(default_factory=list)
+    properties: list[PropertyDefinition | PropertyV3] = Field(default_factory=list)
+    link_types: list[LinkTypeDefinition | LinkTypeV3] = Field(default_factory=list)
+    rules: list[RuleDefinition | RuleV3] = Field(default_factory=list)
     actions: list[ActionDefinition] = Field(default_factory=list)
     material_objects: list[MaterialObject] = Field(default_factory=list)
-    material_links: list[MaterialLink] = Field(default_factory=list)
+    material_links: list[MaterialLink | MaterialLinkV3] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
+
+    # v3 is explicit opt-in during P0; v2 dumps omit this entire section.
+    hash_algorithm: Literal["ontofoundry-domain-v3"] | None = None
+    ossie_version: Literal["0.2.0.dev0"] = "0.2.0.dev0"
+    ossie_name: str | None = None
+    ossie_description: str | None = None
+    ai_context: AIContext = None
+    native_presence: list[str] = Field(default_factory=list)
+    document_origin: Literal["platform", "imported", "migrated"] = "platform"
+    # Core-spec standalone envelope shares the same semantic model collections.
+    core_version: Literal["0.2.0.dev0"] | None = None
+    core_presence: list[str] = Field(default_factory=list)
+    extension_v4: PlatformExtensionV4 = Field(default_factory=PlatformExtensionV4)
+    value_types: list[ValueTypeDefinition] = Field(default_factory=list)
+    semantic_models: list[SemanticModel] = Field(default_factory=list)
+    datasets: list[Dataset] = Field(default_factory=list)
+    dataset_fields: list[DatasetField] = Field(default_factory=list)
+    dataset_relationships: list[DatasetRelationship] = Field(default_factory=list)
+    metrics: list[Metric] = Field(default_factory=list)
+    concept_mappings: list[ConceptMapping] = Field(default_factory=list)
+    mapping_nodes: list[MappingNode] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def select_version(cls, data):
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        version = data.get("schema_version", "2")
+        if version == "3":
+            if data.get("hash_algorithm") != "ontofoundry-domain-v3":
+                raise ValueError("schema_version 3 必须显式指定 hash_algorithm")
+            for collection, model in V3_COLLECTION_MODELS.items():
+                entries = [model.model_validate(item) for item in data.get(collection, [])]
+                for entry in entries:
+                    if hasattr(entry, "evidence"):
+                        TypeAdapter(EvidenceList).validate_python(entry.evidence)
+                data[collection] = entries
+        elif version == "2":
+            if V3_ONLY_FIELDS.intersection(data):
+                raise ValueError("schema_version 2 不能包含 v3 字段")
+            TypeAdapter(Expressions).validate_python(data.get("ontology_requires", []))
+        return data
+
+    @classmethod
+    def model_json_schema(cls, *, draft_version: str = "2", **kwargs):
+        """Keep current API structural validation on v2 until P1 opts in.
+
+        Both versions share this model; the schema projection is versioned,
+        just as read_snapshot is, so merely freezing v3 cannot enable v3 saves.
+        """
+        schema = super().model_json_schema(**kwargs)
+        properties = schema["properties"]
+        if draft_version == "2":
+            for key in V3_ONLY_FIELDS:
+                properties.pop(key, None)
+            properties["schema_version"] = {"const": "2", "default": "2", "title": "Schema Version", "type": "string"}
+            properties["ontology_requires"] = {**TypeAdapter(Expressions).json_schema(), "title": "Ontology Requires"}
+            for collection in ("object_types", "properties", "link_types", "rules", "material_links"):
+                properties[collection]["items"] = properties[collection]["items"]["anyOf"][0]
+        elif draft_version == "3":
+            properties["schema_version"] = {"const": "3", "title": "Schema Version", "type": "string"}
+            properties["hash_algorithm"] = {"const": "ontofoundry-domain-v3", "type": "string"}
+            schema["required"] = [*schema.get("required", []), "schema_version", "hash_algorithm"]
+            properties["mappings"]["maxItems"] = 0
+            for collection in ("object_types", "properties", "link_types", "rules", "material_links"):
+                properties[collection]["items"] = properties[collection]["items"]["anyOf"][1]
+        else:
+            raise ValueError(f"不支持的目标 schema_version：{draft_version}")
+        # Remove unreachable definitions too: current API validators must not
+        # validate a large unrelated v3 schema or expose v3 through $defs.
+        definitions = schema.get("$defs", {})
+        reachable = set()
+
+        def references(node):
+            if isinstance(node, dict):
+                if "$ref" in node:
+                    name = node["$ref"].rsplit("/", 1)[-1]
+                    if name in definitions and name not in reachable:
+                        reachable.add(name)
+                        references(definitions[name])
+                for key, child in node.items():
+                    if key != "$defs":
+                        references(child)
+            elif isinstance(node, list):
+                for child in node:
+                    references(child)
+
+        references(schema)
+        schema["$defs"] = {name: value for name, value in definitions.items() if name in reachable}
+        return schema
+
+    @model_serializer(mode="wrap")
+    def dump_version(self, handler):
+        result = handler(self)
+        if self.schema_version == "2":
+            return {k: v for k, v in result.items() if k not in V3_ONLY_FIELDS}
+        # 'from' is a native OSI property, irrespective of dump(by_alias=...).
+        for rel in result.get("dataset_relationships", []):
+            if "from_" in rel:
+                rel["from"] = rel.pop("from_")
+        return result
 
     # -- lookups ---------------------------------------------------------------
 
@@ -521,6 +647,17 @@ class OntologyDraft(Strict):
 
     @model_validator(mode="after")
     def validate_graph(self) -> OntologyDraft:
+        if self.schema_version == "3":
+            validate_v3_graph(self)
+            return self
+        legacy_models = {
+            "object_types": ObjectTypeDefinition, "properties": PropertyDefinition,
+            "link_types": LinkTypeDefinition, "rules": RuleDefinition,
+            "material_links": MaterialLink,
+        }
+        if any(not isinstance(item, model) for collection, model in legacy_models.items()
+               for item in getattr(self, collection)):
+            raise ValueError("schema_version 2 不能包含 v3 元素")
         kinds = self.element_kind_of()
         total = sum(len(getattr(self, c)) for c in COLLECTIONS.values())
         if total != len(kinds):

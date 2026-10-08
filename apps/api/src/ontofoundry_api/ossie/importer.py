@@ -42,6 +42,7 @@ from .compiler import (
     attribute_verbalizations,
     link_verbalizations,
 )
+from .coverage import unsupported_constructs
 from .mappings import parse_joins, parse_mappings
 from .validator import validate_schema
 
@@ -218,6 +219,8 @@ def parse_ossie(
     """Turn a schema-valid Ossie document into internal types plus a report."""
     if not isinstance(document, dict):
         raise OssieImportError("文件内容不是 JSON 对象")
+    for path, reason in unsupported_constructs(document):
+        raise OssieImportError(f"{path}：不支持的 Ossie 构造：{reason}")
     components = document.get("ontology")
     if not isinstance(components, list) or not components:
         raise OssieImportError("文件缺少 ontology 组件列表")
