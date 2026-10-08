@@ -17,6 +17,8 @@ from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid5
 
+from sqlalchemy.engine.default import DefaultDialect
+
 from ontofoundry_api.domain.models import (
     DataJoin,
     DataMapping,
@@ -27,8 +29,20 @@ from ontofoundry_api.domain.models import (
 )
 
 COLUMN_RE = re.compile(
-    r"^\s*(?:(?P<dataset>[A-Za-z_][\w]*)\.)?(?P<column>[A-Za-z_][\w]*)\s*$"
+    r"^\s*(?:(?P<dataset>[A-Za-z_][\w]*)\.)?"
+    r'(?P<column>[A-Za-z_][\w]*|"(?:[^"]|"")+")\s*$'
 )
+_IDENTIFIERS = DefaultDialect().identifier_preparer
+
+
+def _column_name(token: str) -> str:
+    # Store the physical name, not SQL quoting: instance queries look it up in
+    # reflected table columns. A quoted identifier is still a single column.
+    return token[1:-1].replace('""', '"') if token.startswith('"') else token
+
+
+def _column_sql(name: str) -> str:
+    return _IDENTIFIERS.quote(name)
 
 
 def _source(mapping: DataMapping) -> str:
@@ -79,7 +93,12 @@ def compile_mappings(
                         {
                             "name": name,
                             "expression": {
-                                "dialects": [{"dialect": "ANSI_SQL", "expression": column}]
+                                "dialects": [
+                                    {
+                                        "dialect": "ANSI_SQL",
+                                        "expression": _column_sql(column),
+                                    }
+                                ]
                             },
                         }
                         for name, column in sorted(mapping.fields.items())
@@ -89,16 +108,20 @@ def compile_mappings(
             concept_mappings.append(
                 {
                     "concept": dataset,
-                    "object_mappings": [{"expression": f"{dataset}.{mapping.key_column}"}],
+                    "object_mappings": [
+                        {"expression": f"{dataset}.{_column_sql(mapping.key_column)}"}
+                    ],
                     "link_mappings": [
                         {
                             "object_mapping": {
-                                "expression": f"{dataset}.{mapping.key_column}"
+                                "expression": f"{dataset}.{_column_sql(mapping.key_column)}"
                             },
                             "children": [
                                 {
                                     "relationship": name,
-                                    "object_mapping": {"expression": f"{dataset}.{column}"},
+                                    "object_mapping": {
+                                        "expression": f"{dataset}.{_column_sql(column)}"
+                                    },
                                 }
                                 for name, column in sorted(mapping.fields.items())
                             ],
@@ -133,7 +156,7 @@ def compile_mappings(
                         "relationship": link.technical_name,
                         "object_mapping": {
                             "concept": target if owner == source else source,
-                            "expression": f"{owner}.{join.source_column if owner == source else join.target_column}",
+                            "expression": f"{owner}.{_column_sql(join.source_column if owner == source else join.target_column)}",
                         },
                     }
                 )
@@ -168,7 +191,9 @@ def _link_tree(
     ambiguous is reported and skipped, never guessed.
     """
     entries = [
-        item for item in concept_mapping.get("link_mappings") or [] if isinstance(item, dict)
+        item
+        for item in concept_mapping.get("link_mappings") or []
+        if isinstance(item, dict)
     ]
     roots = [item for item in entries if not item.get("relationship")]
     flat = [item for item in entries if item.get("relationship")]
@@ -211,7 +236,7 @@ def _dataset_fields(dataset: dict[str, Any], dataset_name: str) -> dict[str, str
         )
         match = COLUMN_RE.fullmatch(expression.strip())
         resolved[name] = (
-            match.group("column")
+            _column_name(match.group("column"))
             if match and match.group("dataset") in (None, dataset_name)
             else None
         )
@@ -221,12 +246,12 @@ def _dataset_fields(dataset: dict[str, Any], dataset_name: str) -> dict[str, str
 def _column(
     expression: Any, dataset: str, fields: dict[str, str | None] | None = None
 ) -> str | None:
-    match = COLUMN_RE.match(str(expression or ""))
+    match = COLUMN_RE.fullmatch(str(expression or ""))
     if not match:
         return None
     if match.group("dataset") and match.group("dataset") != dataset:
         return None
-    name = match.group("column")
+    name = _column_name(match.group("column"))
     return fields[name] if fields is not None and name in fields else name
 
 
@@ -356,24 +381,34 @@ def parse_joins(
     """
     datasets_by_concept = {item.technical_name: item.id for item in objects}
     names_by_id = {item.id: item.technical_name for item in objects}
-    for entry in document.get("ontology_mappings") or []:
+    for index, entry in enumerate(document.get("ontology_mappings") or []):
         if not isinstance(entry, dict):
             continue
         model = entry.get("semantic_model") or {}
-        for relationship in model.get("relationships") or []:
+        for relationship_index, relationship in enumerate(model.get("relationships") or []):
             if not isinstance(relationship, dict):
                 continue
             source = datasets_by_concept.get(str(relationship.get("from") or ""))
             target = datasets_by_concept.get(str(relationship.get("to") or ""))
             columns = relationship.get("from_columns") or []
             targets = relationship.get("to_columns") or []
-            if not source or not target or len(columns) != 1 or len(targets) != 1:
+            path = (
+                f"ontology_mappings[{index}].semantic_model.relationships"
+                f"[{relationship_index}]"
+            )
+            if len(columns) != 1 or len(targets) != 1:
+                skip(path, "复合列的 dataset 连接没有承载位置，未导入")
                 continue
+            if not source or not target:
+                skip(path, "dataset 名称不能定位到已导入的业务对象，该连接未导入")
+                continue
+            matched = False
             for link in links:
                 if link.technical_name != str(relationship.get("name") or ""):
                     continue
                 if {link.source_type_id, link.target_type_id} != {source, target}:
                     continue
+                matched = True
                 unmapped = {link.source_type_id, link.target_type_id} - mapped_type_ids
                 if unmapped:
                     missing = "、".join(
@@ -389,3 +424,5 @@ def parse_joins(
                     source_column=str(columns[0] if forward else targets[0]),
                     target_column=str(targets[0] if forward else columns[0]),
                 )
+            if not matched:
+                skip(path, "没有同名且端点一致的本体关系，该 dataset 连接未导入")

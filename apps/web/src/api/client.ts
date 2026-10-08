@@ -75,11 +75,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       body.error?.message ??
       body.message ??
-      (typeof body.detail === "string"
-        ? body.detail
-        : body.detail
-          ? JSON.stringify(body.detail)
-          : null) ??
+      detailMessage(body.detail) ??
       "请求失败（HTTP " + response.status + "）";
     throw new ApiError(
       body.hint ? message + "\n" + body.hint : message,
@@ -90,6 +86,27 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   return response.json() as Promise<T>;
+}
+
+// FastAPI answers with a string, a structured {code, message} object, or a
+// list of validation errors; show people the sentence, never the JSON.
+function detailMessage(detail: unknown): string | null {
+  if (!detail) return null;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => detailMessage(item))
+      .filter((item): item is string => Boolean(item));
+    return messages.length ? messages.join("；") : null;
+  }
+  if (typeof detail === "object") {
+    const record = detail as Record<string, unknown>;
+    for (const key of ["message", "msg", "detail"]) {
+      const value = detailMessage(record[key]);
+      if (value) return value;
+    }
+  }
+  return null;
 }
 
 export const api = {
@@ -232,6 +249,12 @@ export const modelingApi = {
     workspaceRequest<Capabilities>(id, "/capabilities"),
   connections: (id: string) =>
     workspaceRequest<{ items: DataConnection[] }>(id, "/connections"),
+  tableMaterial: (id: string, connectionId: string, tables: string[]) =>
+    workspaceRequest<Material>(
+      id,
+      "/connections/" + connectionId + "/table-material",
+      { tables },
+    ),
   tables: (id: string, connectionId: string) =>
     workspaceRequest<{ items: DataTable[] }>(
       id,

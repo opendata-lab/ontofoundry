@@ -10,7 +10,8 @@ OntoFoundry 这一侧维护、由管理员在 DataAgent 管理端手工安装的
 ```
 integrations/dataagent/
 ├── skills/md2ossie/             Skill 源码，唯一真相，纳入版本控制
-├── agents/agent_ontofoundry.md  Agent 定义参考
+├── agents/agent_ontofoundry.md  建模 Agent 定义参考（OntoFoundry 按 id 引用）
+├── agents/agent_ontofoundry_qa.md  问数 Agent 定义参考（经 MCP 查本体与业务数据）
 ├── Makefile                     make zip → dist/md2ossie.zip
 └── dist/                        生成产物，不提交
 ```
@@ -90,7 +91,7 @@ curl -s http://<dataagent>/api/v1/dataagent/agents/capabilities \
 | `ONTOFOUNDRY_DATAAGENT_API_PREFIX` | `/api/v1/nl2sql`（默认值，一般不用改） |
 | `ONTOFOUNDRY_DATAAGENT_WEBSITE_ID` | `ontofoundry` |
 | `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` | 第 1 步生成的明文 |
-| `ONTOFOUNDRY_DATAAGENT_AGENT_ID` | `agent_ontofoundry` |
+| `ONTOFOUNDRY_DATAAGENT_AGENT_ID` | 第 3 步创建接口返回的 ID，如 `agent_7895f271d13c40f9bc2fabf7` |
 | `ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS` | `30` |
 
 凭据只经部署环境注入，**不进数据库、不经浏览器**。设置页只读展示连通性，不提供

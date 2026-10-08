@@ -717,8 +717,24 @@ def test_merge_updates_matching_types_without_renaming_them():
     assert material.name == "物料"  # local business name wins on update
     assert material.description == "导入后的新说明"
     assert [a.technical_name for a in attrs(merged, material)][-1] == "shelf_life_days"
-    assert report["counts"]["objects_updated"] == 5
+    # Only 物料 changed; the other matched types are counted as unchanged.
+    assert report["counts"]["objects_updated"] == 1
     assert report["counts"]["attributes_added"] == 1
+
+
+def test_importing_the_same_file_twice_reports_nothing_updated():
+    draft = build_demo_draft()
+    document = demo_document()
+    first, _ = import_ossie(
+        document, workspace_id=str(draft.workspace_id),
+        base=draft.model_dump(mode="json"), mode="merge",
+    )
+    _, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), base=first, mode="merge",
+    )
+    counts = report["counts"]
+    assert counts["objects_added"] == counts["links_added"] == counts["attributes_added"] == 0
+    assert counts["objects_updated"] == counts["links_updated"] == counts["attributes_updated"] == 0
 
 
 def test_import_refuses_documents_that_are_not_valid_ossie():

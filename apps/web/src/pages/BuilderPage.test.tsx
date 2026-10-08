@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ModelingSession, Workspace } from "../api/types";
@@ -25,6 +25,7 @@ vi.mock("../components/ModelResults", () => ({
 vi.mock("../api/client", () => ({
   modelingApi: {
     materials: vi.fn().mockResolvedValue({ items: [] }),
+    connections: vi.fn().mockResolvedValue({ items: [] }),
     capabilities: vi.fn().mockResolvedValue({
       agent_configured: true,
       model: "DataAgent",
@@ -142,4 +143,39 @@ it("reloads the session after an agent error advances the backend revision", asy
     "DataAgent unavailable（retry later）",
   );
   expect(screen.getByRole("heading", { name: "本体构建" })).toBeInTheDocument();
+});
+
+it("starts a modeling run only from 开始建模, tagged so the BFF expects proposals", async () => {
+  context.model.session = { ...session(), material_ids: ["m1"] };
+  const { container } = render(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  const conversation = container.querySelector(
+    "dataagent-conversation",
+  ) as AgentConversationElement;
+  const sendMessage = vi.fn();
+  Object.defineProperty(conversation, "sendMessage", { value: sendMessage });
+  Object.defineProperty(conversation, "value", { value: "", configurable: true });
+  const start = await screen.findByRole("button", { name: "开始建模" });
+  await waitFor(() => expect(start).toBeEnabled());
+
+  fireEvent.change(screen.getByPlaceholderText(/描述你希望构建的业务本体/), {
+    target: { value: "渠道销售" },
+  });
+  fireEvent.click(start);
+
+  expect(sendMessage).toHaveBeenCalledWith("渠道销售", {
+    metadata: { mode: "model" },
+  });
+});
+
+it("keeps 开始建模 disabled without material or a scenario", async () => {
+  render(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByRole("button", { name: "开始建模" })).toBeDisabled();
 });

@@ -461,6 +461,7 @@ export type OssieImportReport = {
     links_updated: number;
     attributes_added: number;
     attributes_updated: number;
+    mappings_added?: number;
   };
   skipped: { path: string; reason: string }[];
   notes: string[];

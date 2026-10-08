@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { workspaceRequest, modelingApi } from "../api/client";
-import type { Capabilities, DataAgentHealth } from "../api/types";
+import { workspaceRequest } from "../api/client";
+import type { DataAgentHealth } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { usePageTab } from "../hooks/usePageTab";
-
-// Restore these sections when workspace-level configuration is available.
-const showAgentSettings = false;
 
 export function SettingsPage() {
   const { workspace, user, refresh } = useWorkspaceContext();
@@ -18,7 +15,6 @@ export function SettingsPage() {
       role: string;
     }[]
   >([]);
-  const [cap, setCap] = useState<Capabilities | null>(null);
   const [dataagentHealth, setDataagentHealth] =
     useState<DataAgentHealth | null>(null);
   const [error, setError] = useState("");
@@ -37,11 +33,6 @@ export function SettingsPage() {
   );
   useEffect(() => {
     load().catch((e: Error) => setError(e.message));
-    if (!showAgentSettings) return;
-    modelingApi
-      .capabilities(workspace.id)
-      .then(setCap)
-      .catch((e: Error) => setError(e.message));
     workspaceRequest<DataAgentHealth>(
       workspace.id,
       "/settings/dataagent-health",
@@ -122,7 +113,7 @@ export function SettingsPage() {
                 <tr key={m.id}>
                   <td>{m.name}</td>
                   <td>{m.subject}</td>
-                  <td>{m.role === "admin" ? "admin" : "成员"}</td>
+                  <td>{m.role === "admin" ? "管理员" : "成员"}</td>
                   <td>
                     {workspace.role === "admin" && m.user_id !== user.id && (
                       <button
@@ -182,21 +173,6 @@ export function SettingsPage() {
             </form>
           )}
         </section>
-        {showAgentSettings && <>
-        <section className="detail-section">
-          <h2>智能问数</h2>
-          <dl className="ref-definition">
-            <div>
-              <dt>状态</dt>
-              <dd>{cap?.agent_configured ? "可用" : "尚未配置"}</dd>
-            </div>
-            <div>
-              <dt>材料格式</dt>
-              <dd>Markdown · 最大 {cap?.max_file_mb ?? 256} MB</dd>
-            </div>
-          </dl>
-          <p className="muted">模型接口由服务器环境配置。</p>
-        </section>
         <section className="detail-section">
           <h2>DataAgent 连通性</h2>
           <p className="muted">
@@ -239,7 +215,6 @@ export function SettingsPage() {
             <p className="muted">正在检查…</p>
           )}
         </section>
-        </>}
       </div>
     </div>
   );

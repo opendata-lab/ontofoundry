@@ -62,13 +62,27 @@ TOOLS = [
     ("export_ontology", "读取官方 Ossie JSON", {}),
     (
         "search_objects",
-        "搜索已发布文档实例或按已发布映射查询数据库实例",
+        "搜索实例。source=document（默认）查材料中抽取的文档实例；source=database 按已发布映射"
+        "实时查询数据库行，此时必须给 type_id（先用 list_ontology_elements kind=mapping 找到"
+        "有映射的对象）。结果分页：next_cursor 非空表示还有更多，统计或汇总前必须翻完所有页。",
         {
-            "type_id": {"type": "string", "format": "uuid"},
-            "source": {"type": "string", "enum": ["document", "database"]},
-            "q": {"type": "string", "maxLength": 240},
-            "cursor": {"type": "string", "maxLength": 4000},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            "type_id": {
+                "type": "string", "format": "uuid",
+                "description": "业务对象类型 id；source=database 时必填",
+            },
+            "source": {
+                "type": "string", "enum": ["document", "database"], "default": "document",
+                "description": "document=文档实例，database=映射的数据库实例",
+            },
+            "q": {"type": "string", "maxLength": 240, "description": "关键字，可省略"},
+            "cursor": {
+                "type": "string", "maxLength": 4000,
+                "description": "上一页返回的 next_cursor",
+            },
+            "limit": {
+                "type": "integer", "minimum": 1, "maximum": 100, "default": 20,
+                "description": "每页条数，最大 100",
+            },
         },
     ),
     (
@@ -161,6 +175,9 @@ def tool_schema(name, properties):
         if name == "get_ontology_elements"
         else [],
         "additionalProperties": False,
+        # Database rows are only reachable through one type's published mapping.
+        **({"if": {"properties": {"source": {"const": "database"}}, "required": ["source"]},
+            "then": {"required": ["type_id"]}} if name == "search_objects" else {}),
     }
 
 
@@ -307,6 +324,9 @@ async def rpc(
         try:
             validate(args, schema)
         except ValidationError as exc:
+            if name == "search_objects" and exc.validator == "required":
+                return rpc_error(rid, -32602, "source=database 时必须提供 type_id；先用 "
+                                 "list_ontology_elements(kind=mapping) 查看有映射的业务对象")
             return rpc_error(rid, -32602, exc.message)
         try:
             if name in INSTANCE_TOOLS:

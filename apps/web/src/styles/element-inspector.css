@@ -647,3 +647,12 @@
 .element-table tbody td {
   background: #fff;
 }
+
+/* Same treatment as the builder's .result-warnings. */
+.element-note--warn {
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-left: 3px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}

@@ -68,7 +68,13 @@ def document_session(client):
     [
         ("integer", True, False),
         ("integer", 3, True),
-        ("integer", "3", False),
+        ("integer", "3", True),
+        ("integer", "3.5", False),
+        ("integer", "约3个", False),
+        ("decimal", "240", True),
+        ("decimal", "120.50", True),
+        ("decimal", "3,000,000", False),
+        ("decimal", "约240元", False),
         ("boolean", 1, False),
         ("boolean", False, True),
         ("string", 3, False),
@@ -77,22 +83,26 @@ def document_session(client):
         ("date", "2024-02-29", True),
         ("date", "2025-02-29", False),
         ("date", "20260201", False),
-        ("datetime", "2026-02-01", False),
+        # Documents give a day or a minute; both are valid at that precision.
+        ("datetime", "2026-02-01", True),
+        ("datetime", "2026-01-20 10:12", True),
         ("datetime", "2026-02-01T08:30:00+08:00", True),
+        ("datetime", "2026-02-30 10:00", False),
+        ("datetime", "2026/02/01 10:00", False),
+        ("datetime", "2026-02-01 10", False),
     ],
 )
 def test_fact_value_semantics(kind, value, valid):
     assert valid_value(kind, value) is valid
 
 
-def test_incomplete_values_can_save_but_cannot_publish(client, document_session):
+def test_missing_document_values_warn_but_wrong_types_block(client, document_session):
+    """Documents rarely carry system numbers: a fact missing a required value is
+    flagged for completion and still publishable; a value of the wrong kind is not."""
     session, kind = document_session
     before = client.get(SERVICE + "/version").json()["version_id"]
-    required = next(
-        a
-        for a in session["draft"]["properties"]
-        if a["owner_type_id"] == kind["id"] and a["required"]
-    )
+    props = [a for a in session["draft"]["properties"] if a["owner_type_id"] == kind["id"]]
+    required = next(a for a in props if a["required"])
     session["draft"]["material_objects"][0]["values"][required["technical_name"]] = " "
     saved = client.put(
         ROOT + f"/sessions/{session['id']}",
@@ -100,12 +110,24 @@ def test_incomplete_values_can_save_but_cannot_publish(client, document_session)
     )
     assert saved.status_code == 200
     report = saved.json()["validation"]
-    assert not report["publishable"]
-    assert report["errors"][0]["code"] == "INSTANCE_REQUIRED"
-    assert report["errors"][0]["path"].startswith("$.material_objects[0].values.")
+    assert report["publishable"]
+    warning = next(w for w in report["warnings"] if w["code"] == "INSTANCE_REQUIRED")
+    assert warning["path"].startswith("$.material_objects[0].values.")
+    assert "待补全" in warning["message"]
+
+    draft = saved.json()["draft"]
+    typed = {**required, "id": str(uuid4()), "name": "退款金额", "technical_name": "refund_amount",
+             "value_kind": "decimal", "required": False, "identifier": False, "evidence": []}
+    draft["properties"].append(typed)
+    draft["material_objects"][0]["values"]["refund_amount"] = "不是数值"
+    broken = client.put(
+        ROOT + f"/sessions/{session['id']}",
+        json={"revision": saved.json()["revision"], "draft": draft},
+    )
+    assert not broken.json()["validation"]["publishable"]
     rejected = client.post(
         ROOT + f"/sessions/{session['id']}/publish",
-        json={"revision": saved.json()["revision"]},
+        json={"revision": broken.json()["revision"]},
     )
     assert rejected.status_code == 422
     assert client.get(SERVICE + "/version").json()["version_id"] == before
@@ -359,3 +381,16 @@ def test_preview_and_history_diff_use_saved_revision_without_publication(client)
         ).status_code
         == 422
     )
+
+
+def test_mcp_database_search_requires_type_id(client, document_session):
+    publish(client, document_session[0])
+    tools = mcp_request(client, "tools/list").json()["result"]["tools"]
+    schema = next(t for t in tools if t["name"] == "search_objects")["inputSchema"]
+    assert schema["then"] == {"required": ["type_id"]}
+    assert schema["properties"]["source"]["default"] == "document"
+    error = mcp_request(
+        client, "tools/call",
+        {"name": "search_objects", "arguments": {"source": "database"}},
+    ).json()["error"]
+    assert "type_id" in error["message"] and "list_ontology_elements" in error["message"]
