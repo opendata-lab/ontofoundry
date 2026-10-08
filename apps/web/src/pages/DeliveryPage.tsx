@@ -3,7 +3,15 @@ import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CheckCircle2, Download, KeyRound, Rocket, Trash2 } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  Copy,
+  Download,
+  KeyRound,
+  Rocket,
+  Trash2,
+} from "lucide-react";
 import { api, workspaceRequest } from "../api/client";
 import type { VersionSummary } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -11,6 +19,42 @@ import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
 
 type PageTab = "publish" | "history" | "service";
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [state, setState] = useState<"idle" | "done" | "failed">("idle");
+  return (
+    <button
+      type="button"
+      className="button button--text"
+      onClick={() =>
+        navigator.clipboard
+          .writeText(text)
+          .then(() => setState("done"))
+          .catch(() => setState("failed"))
+      }
+    >
+      {state === "done" ? <Check size={14} /> : <Copy size={14} />}
+      {state === "done" ? "已复制" : state === "failed" ? "复制失败，请手动选择" : label}
+    </button>
+  );
+}
+
+// The `mcpServers` shape DataAgent (and most MCP clients) import as is.
+function mcpConfig(url: string, token: string) {
+  return JSON.stringify(
+    {
+      mcpServers: {
+        ontofoundry: {
+          type: "http",
+          url,
+          headers: { Authorization: "Bearer " + token },
+        },
+      },
+    },
+    null,
+    2,
+  );
+}
 
 export function DeliveryPage() {
   const { workspace, refresh } = useWorkspaceContext();
@@ -184,23 +228,28 @@ export function DeliveryPage() {
                 指定版本读取模型与语义图谱；获准的调用方可读取文档或数据库实例。
               </p>
               <code>{serviceRoot}/types</code>
-              <a
-                className="button button--text"
-                target="_blank"
-                rel="noreferrer"
-                href="/docs"
-              >
-                查看接口文档
-              </a>
+              <div className="service-links">
+                <CopyButton text={serviceRoot + "/types"} label="复制地址" />
+                <a
+                  className="button button--text"
+                  target="_blank"
+                  rel="noreferrer"
+                  href="/docs"
+                >
+                  查看接口文档
+                </a>
+              </div>
             </div>
             <div>
               <h3>MCP</h3>
               <p className="muted">
-                MCP 2026-07-28 ·
-                八个本体工具（含按元素读取的清单、分页与按 id 查询）、三个实例工具（按权限开放）；按请求携带协议元数据，不使用旧
-                initialize 握手。
+                供智能体调用：8 个本体查询工具、3 个业务数据查询工具（令牌需允许查询业务数据）。兼容
+                MCP 2026-07-28 与 2025 系列客户端。
               </p>
               <code>{serviceRoot}/mcp</code>
+              <div className="service-links">
+                <CopyButton text={serviceRoot + "/mcp"} label="复制地址" />
+              </div>
             </div>
           </div>
           {workspace.role === "admin" && (
@@ -236,7 +285,7 @@ export function DeliveryPage() {
                 />
                 <label>
                   <input type="checkbox" name="instances" />
-                  允许读取业务实例与证据
+                  允许查询业务数据（问数需要）
                 </label>
                 <button className="button button--secondary">
                   <KeyRound size={14} />
@@ -247,6 +296,18 @@ export function DeliveryPage() {
                 <div className="token-result">
                   <strong>请保存令牌，仅此时显示</strong>
                   <code>{token}</code>
+                  <CopyButton text={token} label="复制令牌" />
+                  <strong>智能体 MCP 配置</strong>
+                  <p className="muted">
+                    在 DataAgent「MCP 服务 → 导入」中粘贴，即可让智能体通过本体查询数据。
+                  </p>
+                  <pre className="token-config">
+                    {mcpConfig(serviceRoot + "/mcp", token)}
+                  </pre>
+                  <CopyButton
+                    text={mcpConfig(serviceRoot + "/mcp", token)}
+                    label="复制 MCP 配置"
+                  />
                   <button
                     className="button button--text"
                     onClick={() => setToken("")}

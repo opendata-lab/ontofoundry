@@ -7,18 +7,19 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, modelingApi } from "../api/client";
+import { api, modelingApi, publishApi } from "../api/client";
 import type { TypeGraph, Workspace, WorkspaceOverview } from "../api/types";
 import { OntologyViewPage } from "./OntologyViewPage";
 import type { SelectedGraphItem } from "../components/OntologyGraph";
 
-const context = vi.hoisted(() => ({ workspace: {} as Workspace }));
+const context = vi.hoisted(() => ({ workspace: {} as Workspace, refresh: vi.fn() }));
 vi.mock("../hooks/useWorkspaceContext", () => ({
   useWorkspaceContext: () => context,
 }));
 vi.mock("../api/client", () => ({
   api: { overview: vi.fn(), exportUrl: vi.fn(() => "/export") },
   modelingApi: { importOssie: vi.fn() },
+  publishApi: { preview: vi.fn(), publish: vi.fn() },
 }));
 vi.mock("../components/OntologyGraph", () => ({
   OntologyGraph: ({ graph, onSelect }: { graph: TypeGraph; onSelect: (item: SelectedGraphItem) => void }) => (
@@ -265,7 +266,8 @@ describe("本体视图", () => {
     expect(screen.getByRole("link", { name: "开始建模" })).toBeInTheDocument();
   });
 
-  it("imports an Ossie file into a reviewable draft and reports what it dropped", async () => {
+  it("first import: reports what it dropped and publishes as the initial version", async () => {
+    context.workspace = { ...context.workspace, current_version: null } as Workspace;
     const document = {
       version: "0.2.0.dev0",
       name: "crm",
@@ -309,18 +311,59 @@ describe("本体视图", () => {
     });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    expect(await screen.findByText(/已生成建模草稿/)).toBeInTheDocument();
-    expect(modelingApi.importOssie).toHaveBeenCalledWith(
-      "w",
-      document,
-      "merge",
-    );
+    expect(await screen.findByText(/确认下方报告无误后发布为初始版本/)).toBeInTheDocument();
+    // Nothing to merge with: the file is the model.
+    expect(modelingApi.importOssie).toHaveBeenCalledWith("w", document, "replace");
     expect(screen.getByText("2 个 role 的关系暂不支持")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "打开导入草稿" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "先看草稿，稍后发布" })).toHaveAttribute(
       "href",
       "/builder?session=session-1",
     );
-    expect(api.overview).toHaveBeenCalledTimes(1);
+    expect(api.overview).not.toHaveBeenCalled();
+
+    const preview = { validation: { publishable: true, errors: [] } };
+    vi.mocked(publishApi.preview).mockResolvedValue(preview as never);
+    vi.mocked(publishApi.publish).mockResolvedValue({ version: { version: 3 } } as never);
+    fireEvent.click(screen.getByRole("button", { name: "确认并发布为初始版本" }));
+    expect(await screen.findByText(/已发布为 v3/)).toBeInTheDocument();
+    expect(publishApi.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "session-1" }), preview, "导入 crm",
+    );
+    // The page refreshes only once the confirmation has been seen and closed.
+    expect(context.refresh).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    expect(context.refresh).toHaveBeenCalled();
+  });
+
+  it("re-import: merges by default and goes to compare and merge before publishing", async () => {
+    vi.mocked(modelingApi.importOssie).mockResolvedValue({
+      id: "session-2",
+      title: "导入 crm",
+      import_report: {
+        name: "crm", description: "", mode: "merge",
+        counts: { objects_added: 1, objects_updated: 2, links_added: 0, links_updated: 0,
+          attributes_added: 0, attributes_updated: 1 },
+        skipped: [], notes: [],
+      },
+    } as never);
+    show();
+    fireEvent.click(await screen.findByRole("tab", { name: "语义视图" }));
+    fireEvent.click(screen.getByRole("button", { name: "导入" }));
+    expect(screen.getByText(/空间已有 v1：导入后进入对比与合并/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("选择 Ossie JSON 文件"), {
+      target: { files: [new File(['{"version":"0.2.0.dev0","name":"crm","ontology":[]}'], "crm.json")] },
+    });
+    const button = await screen.findByRole("button", { name: /导入 crm\.json/ });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(await screen.findByText(/请对比差异并合并后发布/)).toBeInTheDocument();
+    expect(vi.mocked(modelingApi.importOssie).mock.calls[0][2]).toBe("merge");
+    expect(screen.getByRole("link", { name: "对比并合并" })).toHaveAttribute(
+      "href",
+      "/delivery?session=session-2",
+    );
+    expect(screen.queryByRole("button", { name: /确认并发布/ })).not.toBeInTheDocument();
+    expect(publishApi.publish).not.toHaveBeenCalled();
   });
 
   it("offers an explicit retry without retry loops or fake fallback data", async () => {

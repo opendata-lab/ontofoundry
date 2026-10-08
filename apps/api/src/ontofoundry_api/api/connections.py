@@ -11,6 +11,7 @@ from sqlalchemy import (
     Table,
     cast,
     create_engine,
+    func,
     inspect,
     or_,
     select,
@@ -25,6 +26,7 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
 from ontofoundry_api.services.source_rows import validate_source_rows
+from ontofoundry_api.services.table_material import SAMPLE_ROWS, tables_markdown
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["data"])
 
@@ -234,6 +236,67 @@ def tables(
                 ]
             }
         return {"items": [{"name": n, "schema": schema_name, "columns": []} for n in names]}
+
+
+class TableMaterialRequest(BaseModel):
+    schema_name: str | None = Field(default=None, max_length=120)
+    tables: list[str] = Field(min_length=1, max_length=20)
+
+
+@router.post("/connections/{connection_id}/table-material", status_code=201)
+def table_material(
+    workspace_id: str,
+    connection_id: str,
+    body: TableMaterialRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """Bottom-up modeling: turn selected tables into a material a modeling run reads."""
+    # Imported here: materials imports modeling, which this module's callers load first.
+    from ontofoundry_api.api.materials import describe, store_text_material
+
+    require_member(db, workspace_id, user.id)
+    item = get_connection(db, workspace_id, connection_id)
+    schema = body.schema_name
+    described = []
+    with connect_readonly(item, request.app.state.settings) as conn:
+        inspector = inspect(conn)
+        names = set(inspector.get_table_names(schema=schema) + inspector.get_view_names(schema=schema))
+        missing = [t for t in body.tables if t not in names]
+        if missing:
+            raise HTTPException(404, "数据表不存在：" + "、".join(missing))
+        for name in dict.fromkeys(body.tables):
+            pks = inspector.get_pk_constraint(name, schema=schema).get("constrained_columns", [])
+            columns = inspector.get_columns(name, schema=schema)
+            table = Table(name, MetaData(), schema=schema, autoload_with=conn)
+            samples = [dict(row._mapping) for row in conn.execute(select(table).limit(SAMPLE_ROWS))]
+            count = conn.execute(select(func.count()).select_from(table)).scalar()
+            described.append({
+                "name": name,
+                "comment": (inspector.get_table_comment(name, schema=schema) or {}).get("text"),
+                "row_count": count,
+                "columns": [{
+                    "name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable"),
+                    "primary_key": c["name"] in pks, "comment": c.get("comment"),
+                } for c in columns],
+                "foreign_keys": [
+                    {"column": fk["constrained_columns"][0], "table": fk["referred_table"]}
+                    for fk in inspector.get_foreign_keys(name, schema=schema)
+                    if len(fk.get("constrained_columns") or []) == 1
+                ],
+                "samples": samples,
+            })
+    config = item.config_json
+    text_value = tables_markdown(
+        source=item.name, kind=item.kind, database=config["database"], schema=schema,
+        tables=described,
+    )
+    file_name = f"数据表结构-{item.name}-{'-'.join(body.tables)}"[:200] + ".md"
+    material = store_text_material(
+        db, request.app.state.settings, workspace_id, file_name, text_value
+    )
+    return describe(material)
 
 
 class PreviewRequest(BaseModel):

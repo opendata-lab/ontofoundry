@@ -1,3 +1,4 @@
+import { databaseTypeHints, documentGapHints } from "../../lib/instanceHints";
 import { ArrowLeft, ArrowRight, Database, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Draft, MaterialObject } from "../../api/types";
@@ -18,7 +19,16 @@ export function ElementInstances({
   canBrowseDatabase: boolean;
   initialObjectId?: string;
 }) {
-  const [source, setSource] = useState("document");
+  // Open on the source that has something to show: an object known only from
+  // its table would otherwise greet the viewer with an empty document list.
+  const [source, setSource] = useState(() =>
+    !initialObjectId &&
+    canBrowseDatabase &&
+    draft.mappings.some((m) => m.type_id === type.id) &&
+    !draft.material_objects.some((o) => o.type_id === type.id)
+      ? "database"
+      : "document",
+  );
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
@@ -296,6 +306,16 @@ export function ElementInstances({
           正在读取实例…
         </p>
       )}
+      {(source === "database" && mapping
+        ? databaseTypeHints(properties, mapping.fields, rows)
+        : source === "document"
+          ? documentGapHints(properties, documentRows)
+          : []
+      ).map((hint) => (
+        <p key={hint} className="element-note element-note--warn" role="note">
+          {hint}
+        </p>
+      ))}
       <div className="element-table-wrap">
         <table className="element-table">
           <thead>

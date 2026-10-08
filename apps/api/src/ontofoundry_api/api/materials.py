@@ -95,6 +95,39 @@ def material_references(db: Session, workspace_id: str, material_id: str) -> lis
     return found
 
 
+def store_text_material(db: Session, settings, workspace_id: str, name: str, text: str):
+    """Save generated Markdown exactly like an upload: same dedupe by content,
+    same line-numbered chunks, so evidence can cite it the same way."""
+    data = text.encode("utf-8")
+    sha = hashlib.sha256(data).hexdigest()
+    existing = db.scalar(
+        select(MaterialRecord).where(
+            MaterialRecord.workspace_id == workspace_id, MaterialRecord.sha256 == sha
+        )
+    )
+    if existing:
+        return existing
+    item = MaterialRecord(
+        id=str(uuid4()), workspace_id=workspace_id, name=Path(name).name,
+        sha256=sha, byte_size=len(data),
+    )
+    db.add(item)
+    db.flush()
+    count, line = 0, 1
+    for start in range(0, len(text), 12000):
+        chunk = text[start:start + 12000]
+        end = line + chunk.count("\n")
+        db.add(MaterialChunkRecord(material_id=item.id, ordinal=count,
+                                   line_start=line, line_end=end, text=chunk))
+        count, line = count + 1, end
+    item.chunk_count = count
+    destination = settings.data_dir.resolve() / workspace_id / (sha + ".md")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_bytes(data)
+    db.commit()
+    return item
+
+
 @router.get("")
 def list_materials(
     workspace_id: str,

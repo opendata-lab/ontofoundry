@@ -404,8 +404,13 @@ small,
       310px,
       1.05fr
     );
+  /* One row, exactly the space left under the context bar. Left auto, the row
+     grows to the tallest column and the panels' own scroll areas never engage:
+     the bottom of the page is cut off instead of scrolling. */
+  grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 .ref-builder-columns.config-collapsed {
   grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr);
@@ -413,6 +418,7 @@ small,
 .ref-build-config {
   border-right: 1px solid var(--color-rule);
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -897,6 +903,9 @@ small,
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  /* The lists inside scroll on their own; this only catches a tab whose
+     content has no scroll area of its own, so nothing is ever unreachable. */
+  overflow-y: auto;
   background: var(--color-surface);
 }
 .category-grid {
@@ -2026,6 +2035,23 @@ small,
   background: var(--color-accent-soft);
   padding: 16px;
 }
+.service-links {
+  display: flex;
+  gap: 4px;
+  margin-left: -8px;
+}
+.token-result .button--text {
+  align-self: flex-start;
+  margin-left: -8px;
+}
+.token-config {
+  margin: 0;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule-soft);
+  font-size: 12px;
+  overflow-x: auto;
+}
 .token-result code {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -2345,3 +2371,32 @@ small,
 /* Workspace constraints, edited in the draft tab like the other categories. */
 .ref-results .workspace-constraints { padding: 4px 14px 12px; }
 .ref-results .workspace-constraints .button--secondary { margin-top: 8px; }
+
+.start-modeling {
+  width: 100%;
+  justify-content: center;
+  margin-top: 12px;
+}
+.table-material-picker select {
+  width: 100%;
+}
+.table-choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 168px;
+  overflow: auto;
+}
+.table-choice-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.table-material-picker > .button {
+  align-self: flex-start;
+}
+.table-material-picker > .muted {
+  font-size: 11px;
+  line-height: 1.5;
+}

@@ -16,6 +16,8 @@ import unicodedata
 from typing import Any
 from uuid import UUID, uuid5
 
+from ontofoundry_api.domain.canonical import canonical
+
 # The file is first read into the v1 nested shape, which mirrors Ossie's own
 # nesting (relationships inside concepts), then lifted to v2 in one place.
 from ontofoundry_api.domain.legacy_v1 import (
@@ -223,6 +225,42 @@ def parse_ossie(
         raise OssieImportError(f"组件数量超过 {MAX_COMPONENTS} 个上限")
 
     report = Report()
+    context = document.get("ai_context") or {}
+    for key in context:
+        if key != EXTENSION_KEY:
+            report.note(
+                f"ai_context.{key}：内置模型只读取 OntoFoundry 扩展，"
+                "此上下文不保存；导出时重新生成 instructions/synonyms"
+            )
+    for index, entry in enumerate(document.get("ontology_mappings") or []):
+        path = f"ontology_mappings[{index}]"
+        model = entry.get("semantic_model") or {}
+        if model.get("datasets"):
+            report.note(
+                f"{path}.semantic_model.datasets：仅保存已导入对象的表、键列与属性列；"
+                "导出按每个对象重建 dataset，未使用的数据集、逻辑字段名称与其元数据不保留"
+            )
+        if entry.get("description"):
+            report.note(f"{path}.description：映射描述不保存，导出时按数据源名称生成")
+        if model.get("name") != (entry.get("name") or model.get("name")):
+            report.note(f"{path}.semantic_model.name：导出时改用数据源名称")
+        for key in ("description", "ai_context", "metrics"):
+            if model.get(key):
+                report.note(f"{path}.semantic_model.{key}：内置数据映射没有承载位置，不保存")
+        for dataset_index, dataset in enumerate(model.get("datasets") or []):
+            dataset_path = f"{path}.semantic_model.datasets[{dataset_index}]"
+            if dataset.get("description"):
+                report.note(f"{dataset_path}.description：导出时改用业务对象描述")
+            if dataset.get("ai_context"):
+                report.note(f"{dataset_path}.ai_context：内置数据映射没有承载位置，不保存")
+            if any(
+                set(field) - {"name", "expression"}
+                for field in dataset.get("fields") or []
+            ):
+                report.note(
+                    f"{dataset_path}.fields：字段仅保留可映射的单列表达式；"
+                    "datatype、description、ai_context 等字段元数据不保存"
+                )
     by_concept: dict[str, dict[str, Any]] = {}
     for index, component in enumerate(components):
         if not isinstance(component, dict) or not component.get("concept"):
@@ -820,6 +858,22 @@ def _merge(
         *merged.ontology_requires,
         *[item for item in imported.ontology_requires if item not in merged.ontology_requires],
     ]
+    # "Updated" means the content changed, judged the way the publish diff
+    # judges it (canonical form: set order and empty fields do not count), not
+    # that the name matched. A file imported twice reports nothing updated.
+    for key, collection in (
+        ("objects_updated", "object_types"),
+        ("attributes_updated", "properties"),
+        ("links_updated", "link_types"),
+    ):
+        before = {
+            item.id: canonical(item.model_dump(mode="json")) for item in getattr(base, collection)
+        }
+        counts[key] = sum(
+            1
+            for item in getattr(merged, collection)
+            if item.id in before and canonical(item.model_dump(mode="json")) != before[item.id]
+        )
     return merged, counts
 
 

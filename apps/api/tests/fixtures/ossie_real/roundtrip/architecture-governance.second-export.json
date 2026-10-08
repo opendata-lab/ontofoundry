@@ -1,0 +1,2497 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "architecture_governance",
+  "description": "架构治理领域的 Apache Ossie 本体、逻辑语义模型与标准映射。",
+  "ai_context": {
+    "instructions": "依据已发布的业务对象、属性和关系解释企业业务语义",
+    "synonyms": [
+      "架构治理领域的 Apache Ossie 本体、逻辑语义模型与标准映射。"
+    ],
+    "ontofoundry": {
+      "version": "3",
+      "display_names": {
+        "api_interface": "api_interface",
+        "api_interface.interface_name": "interface_name",
+        "api_interface.owner": "owner",
+        "arch_issue": "arch_issue",
+        "arch_issue.introduced_at": "introduced_at",
+        "arch_issue.issue_args": "issue_args",
+        "arch_issue.issue_key": "issue_key",
+        "arch_issue.issue_site": "issue_site",
+        "arch_issue.issue_status": "issue_status",
+        "arch_issue.issue_type": "issue_type",
+        "arch_issue.level": "level",
+        "arch_issue.resolved_at": "resolved_at",
+        "arch_issue.sql_text": "sql_text",
+        "arch_issue.suggestion": "suggestion",
+        "arch_issue.detected_on_component": "detected_on_component",
+        "arch_issue.detected_on_interface": "detected_on_interface",
+        "arch_issue.environment": "environment",
+        "arch_issue.violates_rule": "violates_rule",
+        "arch_rule": "arch_rule",
+        "arch_rule.description": "description",
+        "arch_rule.domain": "domain",
+        "arch_rule.improvement": "improvement",
+        "arch_rule.issue_site_template": "issue_site_template",
+        "arch_rule.label": "label",
+        "arch_rule.level": "level",
+        "arch_rule.negative": "negative",
+        "arch_rule.positive": "positive",
+        "arch_rule.rule_key": "rule_key",
+        "arch_rule.title": "title",
+        "architecture_risk": "architecture_risk",
+        "cfc_config": "cfc_config",
+        "component": "component",
+        "component.architecture_type": "architecture_type",
+        "component.business_importance_label": "business_importance_label",
+        "component.component_name": "component_name",
+        "component.component_name_cn": "component_name_cn",
+        "component.component_type": "component_type",
+        "component.is_core": "is_core",
+        "component.system_level": "system_level",
+        "component.belongs_to_department": "belongs_to_department",
+        "component.belongs_to_system": "belongs_to_system",
+        "component.declares_dependency_on": "declares_dependency_on",
+        "component.deployed_in_cluster": "deployed_in_cluster",
+        "component.deployed_on_host": "deployed_on_host",
+        "component.located_in": "located_in",
+        "component.owns_interface": "owns_interface",
+        "component.references_global_cfc_config": "references_global_cfc_config",
+        "component.references_private_cfc_config": "references_private_cfc_config",
+        "component.runs_in": "runs_in",
+        "component.uses_redis_db": "uses_redis_db",
+        "core_service": "core_service",
+        "database_instance": "database_instance",
+        "database_instance.database_ip": "database_ip",
+        "database_instance.database_name": "database_name",
+        "database_instance.database_port": "database_port",
+        "database_instance.database_type": "database_type",
+        "database_instance.environment": "environment",
+        "database_schema": "database_schema",
+        "database_schema.schema_name": "schema_name",
+        "database_schema.database": "database",
+        "department": "department",
+        "department.department_name": "department_name",
+        "deployment_cluster": "deployment_cluster",
+        "deployment_cluster.cluster_name": "cluster_name",
+        "environment": "environment",
+        "environment.env_name": "env_name",
+        "global_cfc_config": "global_cfc_config",
+        "global_cfc_config.config_key": "config_key",
+        "global_cfc_config.environment": "environment",
+        "graded_assurance_component": "graded_assurance_component",
+        "graded_assurance_microservice_component": "graded_assurance_microservice_component",
+        "host": "host",
+        "host.host_type": "host_type",
+        "host.hostname": "hostname",
+        "host.system_uuid": "system_uuid",
+        "kafka_cluster": "kafka_cluster",
+        "kafka_cluster.kafka_addr": "kafka_addr",
+        "kafka_cluster.kafka_name": "kafka_name",
+        "kafka_topic": "kafka_topic",
+        "kafka_topic.partition_count": "partition_count",
+        "kafka_topic.replica_count": "replica_count",
+        "kafka_topic.topic_name": "topic_name",
+        "kafka_topic.cluster": "cluster",
+        "maven_third_party_library": "maven_third_party_library",
+        "maven_third_party_library.coordinate": "coordinate",
+        "maven_third_party_library.package_name": "package_name",
+        "maven_third_party_library.package_version": "package_version",
+        "microservice_component": "microservice_component",
+        "non_core_service": "non_core_service",
+        "optimization_suggestion": "optimization_suggestion",
+        "private_cfc_config": "private_cfc_config",
+        "private_cfc_config.config_environment": "config_environment",
+        "private_cfc_config.config_file": "config_file",
+        "private_cfc_config.config_key": "config_key",
+        "private_cfc_config.config_value": "config_value",
+        "private_cfc_config.created_at": "created_at",
+        "private_cfc_config.updated_at": "updated_at",
+        "private_cfc_config.owner": "owner",
+        "redis_db": "redis_db",
+        "redis_db.database_number": "database_number",
+        "redis_db.instance": "instance",
+        "redis_instance": "redis_instance",
+        "redis_instance.redis_addr": "redis_addr",
+        "redis_instance.redis_name": "redis_name",
+        "second_party_library": "second_party_library",
+        "second_party_library.package_name": "package_name",
+        "second_party_library.package_version": "package_version",
+        "system": "system",
+        "system.display_name": "display_name",
+        "system.system_id": "system_id",
+        "system.system_level": "system_level",
+        "system.system_name": "system_name",
+        "table_asset": "table_asset",
+        "table_asset.table_name": "table_name",
+        "table_asset.schema": "schema",
+        "zone": "zone",
+        "zone.zone_code": "zone_code"
+      },
+      "tags": {},
+      "required_attributes": [],
+      "rules": {
+        "arch_issue.issue_status": [
+          {
+            "id": "67998fbf-1a42-56c5-a3fc-f6afe725eb93",
+            "name": "arch_issue.issue_status·约束1",
+            "technical_name": "constraint_67998fbf",
+            "rule_kind": "constraint",
+            "expression": "issue_status IN ('resolved', 'unresolved')"
+          }
+        ],
+        "arch_issue.issue_type": [
+          {
+            "id": "a1b0bcb3-110f-5c4c-81fc-e52934801747",
+            "name": "arch_issue.issue_type·约束1",
+            "technical_name": "constraint_a1b0bcb3",
+            "rule_kind": "constraint",
+            "expression": "issue_type IN ('静态', '动态')"
+          }
+        ],
+        "arch_issue.level": [
+          {
+            "id": "f17e91e9-3d0b-5a38-9e8a-e5bb98079ab6",
+            "name": "arch_issue.level·约束1",
+            "technical_name": "constraint_f17e91e9",
+            "rule_kind": "constraint",
+            "expression": "issue_level IN ('架构风险', '优化建议')"
+          }
+        ],
+        "arch_rule.level": [
+          {
+            "id": "4b98f96d-eaed-55db-a09c-5151f0713cfb",
+            "name": "arch_rule.level·约束1",
+            "technical_name": "constraint_4b98f96d",
+            "rule_kind": "constraint",
+            "expression": "rule_level IN ('致命', '严重', '一般', '提示')"
+          }
+        ],
+        "architecture_risk": [
+          {
+            "id": "65d76c0c-0e07-5e75-8c89-486dc1548f45",
+            "name": "architecture_risk·派生1",
+            "technical_name": "derivation_65d76c0c",
+            "rule_kind": "derivation",
+            "expression": "arch_issue.level == '架构风险'"
+          }
+        ],
+        "component.component_type": [
+          {
+            "id": "77b026b0-f937-59cb-ab5d-b0fb167e486a",
+            "name": "component.component_type·约束1",
+            "technical_name": "constraint_77b026b0",
+            "rule_kind": "constraint",
+            "expression": "component_type IN ('FRONTEND', 'BACKEND', 'MIDDLEWARE', 'DB', 'SDK')"
+          }
+        ],
+        "component.is_core": [
+          {
+            "id": "fce7a170-dddf-576c-9ba6-37f7b220696b",
+            "name": "component.is_core·约束1",
+            "technical_name": "constraint_fce7a170",
+            "rule_kind": "constraint",
+            "expression": "is_core IN ('Y', 'N')"
+          }
+        ],
+        "component.system_level": [
+          {
+            "id": "1ff34084-0c6e-5ef8-b5d1-499ae54aed5f",
+            "name": "component.system_level·约束1",
+            "technical_name": "constraint_1ff34084",
+            "rule_kind": "constraint",
+            "expression": "system_level IN ('1', '2', '3', '4')"
+          }
+        ],
+        "component.owns_interface": [
+          {
+            "id": "5e30f2e4-d979-5ea9-bf4b-f86f3306ba17",
+            "name": "owns_interface·派生1",
+            "technical_name": "derivation_5e30f2e4",
+            "rule_kind": "derivation",
+            "expression": "api_interface.owner(component)"
+          }
+        ],
+        "component.references_global_cfc_config": [
+          {
+            "id": "548cac0d-6f5a-5c62-9581-08ed2b2963d7",
+            "name": "references_global_cfc_config·派生1",
+            "technical_name": "derivation_548cac0d",
+            "rule_kind": "derivation",
+            "expression": "component.config_reference_observation(reference_type, referenced_config_key, raw_value) AND reference_type == 'global_config_reference' AND global_config.config_key(referenced_config_key)"
+          }
+        ],
+        "component.references_private_cfc_config": [
+          {
+            "id": "266c7c5c-1bc0-50bf-9214-80de305f1247",
+            "name": "references_private_cfc_config·派生1",
+            "technical_name": "derivation_266c7c5c",
+            "rule_kind": "derivation",
+            "expression": "component.config_reference_observation(reference_type, referenced_config_key, raw_value) AND reference_type == 'private_config_reference' AND private_config.owner(component) AND private_config.config_key(referenced_config_key)"
+          }
+        ],
+        "core_service": [
+          {
+            "id": "b44ac3c0-d6bf-5b2d-8ef6-ffa7a90d7e39",
+            "name": "core_service·派生1",
+            "technical_name": "derivation_b44ac3c0",
+            "rule_kind": "derivation",
+            "expression": "component.is_core == 'Y'"
+          }
+        ],
+        "database_instance.database_type": [
+          {
+            "id": "a000ad0e-fa42-50bf-84a6-027f4763796d",
+            "name": "database_instance.database_type·约束1",
+            "technical_name": "constraint_a000ad0e",
+            "rule_kind": "constraint",
+            "expression": "database_type IN ('gbase', 'kingbase', 'oracle', 'mysql')"
+          }
+        ],
+        "graded_assurance_component": [
+          {
+            "id": "b129a97b-db98-5802-829b-b346edfbf4f7",
+            "name": "graded_assurance_component·派生1",
+            "technical_name": "derivation_b129a97b",
+            "rule_kind": "derivation",
+            "expression": "component.component_type <> 'DB' AND EXISTS ( component.system_level )"
+          }
+        ],
+        "graded_assurance_microservice_component": [
+          {
+            "id": "f5c7f141-c350-5ac6-b4d0-7e091886fa98",
+            "name": "graded_assurance_microservice_component·派生1",
+            "technical_name": "derivation_f5c7f141",
+            "rule_kind": "derivation",
+            "expression": "component.component_type <> 'DB' AND component.architecture_type == 'microservice' AND EXISTS ( component.system_level )"
+          }
+        ],
+        "host.host_type": [
+          {
+            "id": "2a5dc2ca-1caf-54fd-9068-816c7ea92186",
+            "name": "host.host_type·约束1",
+            "technical_name": "constraint_2a5dc2ca",
+            "rule_kind": "constraint",
+            "expression": "host_type IN ('physical', 'virtual')"
+          }
+        ],
+        "microservice_component": [
+          {
+            "id": "f4abcdce-abca-5dfb-8737-1e1256c77c2b",
+            "name": "microservice_component·派生1",
+            "technical_name": "derivation_f4abcdce",
+            "rule_kind": "derivation",
+            "expression": "component.component_type <> 'DB' AND component.architecture_type == 'microservice'"
+          }
+        ],
+        "non_core_service": [
+          {
+            "id": "355b8450-adc3-51e0-bcd6-7f743879fa28",
+            "name": "non_core_service·派生1",
+            "technical_name": "derivation_355b8450",
+            "rule_kind": "derivation",
+            "expression": "component.is_core == 'N'"
+          }
+        ],
+        "optimization_suggestion": [
+          {
+            "id": "b529854b-20bc-5b79-8a9d-a981df0d70c3",
+            "name": "optimization_suggestion·派生1",
+            "technical_name": "derivation_b529854b",
+            "rule_kind": "derivation",
+            "expression": "arch_issue.level == '优化建议'"
+          }
+        ],
+        "system.system_level": [
+          {
+            "id": "bdf831f2-0a26-5260-b856-708bbd24f7d4",
+            "name": "system.system_level·约束1",
+            "technical_name": "constraint_bdf831f2",
+            "rule_kind": "constraint",
+            "expression": "system_level IN ('1', '2', '3', '4')"
+          }
+        ]
+      },
+      "actions": []
+    }
+  },
+  "ontology": [
+    {
+      "concept": "api_interface",
+      "type": "EntityType",
+      "description": "由组件拥有的 API 接口。 别名：接口、API、endpoint。",
+      "identify_by": [
+        "interface_name",
+        "owner"
+      ],
+      "relationships": [
+        {
+          "name": "interface_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{api_interface} 路径是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "owner",
+          "description": "API 接口所属的组件；用于查询接口属于哪个组件，以及组件拥有的接口。",
+          "roles": [
+            {
+              "concept": "component"
+            }
+          ],
+          "verbalizes": [
+            "{api_interface} 属于 {component}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "arch_issue",
+      "type": "EntityType",
+      "description": "架构治理问题；逻辑身份由发生组件、环境、违反规则和问题标识共同确定，对应物理字段 cmp_name、env_name、rule_key、issue_key；风险和优化建议由 level 派生。 别名：架构问题、治理问题、问题明细。",
+      "identify_by": [
+        "detected_on_component",
+        "environment",
+        "issue_key",
+        "violates_rule"
+      ],
+      "relationships": [
+        {
+          "name": "detected_on_component",
+          "description": "架构问题发生或检测到的组件；用于从问题定位受影响组件。",
+          "roles": [
+            {
+              "concept": "component"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 发生于 {component}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "detected_on_interface",
+          "description": "架构问题涉及的 API 接口；用于定位接口级架构问题。",
+          "roles": [
+            {
+              "concept": "api_interface"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 涉及 {api_interface}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "environment",
+          "description": "架构问题发生的逻辑环境；同一问题在不同环境中分别观测。",
+          "roles": [
+            {
+              "concept": "environment"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 发生于 {environment}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "introduced_at",
+          "roles": [
+            {
+              "concept": "DateTime"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 引入时间是 {DateTime}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "issue_args",
+          "description": "架构问题判定时使用的业务参数或规则参数。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_args"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 的问题参数是 {String:issue_args}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "issue_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 标识是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "issue_site",
+          "description": "架构问题发生的代码、接口、SQL 或资源位置。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_site"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 的问题位置是 {String:issue_site}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "issue_status",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_status"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 状态是 {String:issue_status}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "issue_status IN ('resolved', 'unresolved')"
+          ]
+        },
+        {
+          "name": "issue_type",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_type"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 发现类型是 {String:issue_type}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "issue_type IN ('静态', '动态')"
+          ]
+        },
+        {
+          "name": "level",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_level"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 级别是 {String:issue_level}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "issue_level IN ('架构风险', '优化建议')"
+          ]
+        },
+        {
+          "name": "resolved_at",
+          "roles": [
+            {
+              "concept": "DateTime"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 解决时间是 {DateTime}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "sql_text",
+          "description": "与架构问题相关的 SQL 文本；只在 SQL 类问题中存在。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "sql_text"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 关联的 SQL 是 {String:sql_text}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "suggestion",
+          "description": "架构问题治理建议或优化建议。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "suggestion"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 的治理建议是 {String:suggestion}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "violates_rule",
+          "description": "架构问题违反的架构规则；用于从问题追溯判定规则。",
+          "roles": [
+            {
+              "concept": "arch_rule"
+            }
+          ],
+          "verbalizes": [
+            "{arch_issue} 违反 {arch_rule}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "arch_rule",
+      "type": "EntityType",
+      "description": "架构治理规则。 别名：架构规则、治理规则、规范。",
+      "identify_by": [
+        "rule_key"
+      ],
+      "relationships": [
+        {
+          "name": "description",
+          "description": "架构规则的业务含义和判定说明。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "description"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的业务说明是 {String:description}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "domain",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 领域是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "improvement",
+          "description": "违反架构规则后的治理和改进建议。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "improvement"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的改进建议是 {String:improvement}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "issue_site_template",
+          "description": "架构规则生成问题位置说明时使用的模板。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "issue_site_template"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的问题位置模板是 {String:issue_site_template}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "label",
+          "description": "架构规则的业务标签，可用于规则分类、筛选和展示。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "label"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的标签是 {String:label}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "level",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "rule_level"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 严重程度是 {String:rule_level}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "rule_level IN ('致命', '严重', '一般', '提示')"
+          ]
+        },
+        {
+          "name": "negative",
+          "description": "违反架构规则时的反向说明或错误示例。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "negative"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的反向说明是 {String:negative}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "positive",
+          "description": "符合架构规则时的正向说明或正确示例。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "positive"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的正向说明是 {String:positive}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "rule_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 标识是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "title",
+          "description": "架构规则标题，用于查询结果展示和文本筛选。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "title"
+            }
+          ],
+          "verbalizes": [
+            "{arch_rule} 的标题是 {String:title}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "architecture_risk",
+      "type": "EntityType",
+      "description": "level 为架构风险的架构问题。 别名：日常架构风险、架构风险。",
+      "extends": [
+        "arch_issue"
+      ],
+      "derived_by": [
+        "arch_issue.level == '架构风险'"
+      ]
+    },
+    {
+      "concept": "cfc_config",
+      "type": "EntityType",
+      "description": "CFC 配置的抽象父概念。 别名：CFC配置、配置项。"
+    },
+    {
+      "concept": "component",
+      "type": "EntityType",
+      "description": "逻辑组件；同名组件在 DEV/TEST/PROD 中是同一组件，环境和快照只是上下文。 别名：组件、服务、应用组件、微服务组件。",
+      "identify_by": [
+        "component_name"
+      ],
+      "relationships": [
+        {
+          "name": "architecture_type",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "architecture_type"
+            }
+          ],
+          "verbalizes": [
+            "{component} 架构类型是 {String:architecture_type}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "belongs_to_department",
+          "description": "组件所属的业务部门；用于查询组件归属部门以及部门下的组件。",
+          "roles": [
+            {
+              "concept": "department"
+            }
+          ],
+          "verbalizes": [
+            "{component} 属于 {department}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "belongs_to_system",
+          "description": "组件所属的业务系统；用于查询组件属于哪个系统以及系统下的组件。",
+          "roles": [
+            {
+              "concept": "system"
+            }
+          ],
+          "verbalizes": [
+            "{component} 属于 {system}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "business_importance_label",
+          "description": "组件业务重要性原始标签；保留源数据代码，不直接等同于核心/非核心分类。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "business_importance_label"
+            }
+          ],
+          "verbalizes": [
+            "{component} 业务重要性标签是 {String:business_importance_label}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "component_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{component} 名称是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "component_name_cn",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{component} 中文名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "component_type",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "component_type"
+            }
+          ],
+          "verbalizes": [
+            "{component} 资产类型是 {String:component_type}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "component_type IN ('FRONTEND', 'BACKEND', 'MIDDLEWARE', 'DB', 'SDK')"
+          ]
+        },
+        {
+          "name": "declares_dependency_on",
+          "description": "组件声明依赖的另一组件；表示静态依赖导航，不包含调用次数或滚动窗口。",
+          "roles": [
+            {
+              "concept": "component",
+              "name": "dependency"
+            }
+          ],
+          "verbalizes": [
+            "{component} 声明依赖 {component:dependency}"
+          ]
+        },
+        {
+          "name": "deployed_in_cluster",
+          "description": "组件部署所在的部署集群；用于查询组件与集群的部署归属。",
+          "roles": [
+            {
+              "concept": "deployment_cluster"
+            }
+          ],
+          "verbalizes": [
+            "{component} 部署于 {deployment_cluster}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "deployed_on_host",
+          "description": "组件部署所在的主机；用于查询组件部署在哪台主机以及主机上的组件。",
+          "roles": [
+            {
+              "concept": "host"
+            }
+          ],
+          "verbalizes": [
+            "{component} 部署在 {host}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "is_core",
+          "description": "由业务重要性标签归一化得到的核心标记：core、opt 为 Y；base、external 和空标签不分类；其他非空标签为 N。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "is_core"
+            }
+          ],
+          "verbalizes": [
+            "{component} 核心标记是 {String:is_core}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "is_core IN ('Y', 'N')"
+          ]
+        },
+        {
+          "name": "located_in",
+          "description": "组件所在的部署区域或可用区；用于按区域查询组件。",
+          "roles": [
+            {
+              "concept": "zone"
+            }
+          ],
+          "verbalizes": [
+            "{component} 位于 {zone}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "owns_interface",
+          "description": "api_interface.owner 的反向关系，用于从组件导航到其拥有的接口。",
+          "roles": [
+            {
+              "concept": "api_interface"
+            }
+          ],
+          "verbalizes": [
+            "{component} 拥有 {api_interface}"
+          ],
+          "multiplicity": "ManyToOne",
+          "derived_by": [
+            "api_interface.owner(component)"
+          ]
+        },
+        {
+          "name": "references_global_cfc_config",
+          "description": "组件引用的环境级全局 CFC 配置；由全局配置引用事实派生。",
+          "roles": [
+            {
+              "concept": "global_cfc_config",
+              "name": "global_config"
+            }
+          ],
+          "verbalizes": [
+            "{component} 引用 {global_cfc_config:global_config}"
+          ],
+          "derived_by": [
+            "component.config_reference_observation(reference_type, referenced_config_key, raw_value) AND reference_type == 'global_config_reference' AND global_config.config_key(referenced_config_key)"
+          ]
+        },
+        {
+          "name": "references_private_cfc_config",
+          "description": "组件引用或拥有的私有 CFC 配置；由私有配置归属关系派生。",
+          "roles": [
+            {
+              "concept": "private_cfc_config",
+              "name": "private_config"
+            }
+          ],
+          "verbalizes": [
+            "{component} 引用 {private_cfc_config:private_config}"
+          ],
+          "derived_by": [
+            "component.config_reference_observation(reference_type, referenced_config_key, raw_value) AND reference_type == 'private_config_reference' AND private_config.owner(component) AND private_config.config_key(referenced_config_key)"
+          ]
+        },
+        {
+          "name": "runs_in",
+          "description": "组件运行所在的逻辑环境；用于应用默认环境或环境筛选。",
+          "roles": [
+            {
+              "concept": "environment"
+            }
+          ],
+          "verbalizes": [
+            "{component} 运行于 {environment}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "system_level",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "system_level"
+            }
+          ],
+          "verbalizes": [
+            "{component} 保障等级是 {String:system_level}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "system_level IN ('1', '2', '3', '4')"
+          ]
+        },
+        {
+          "name": "uses_redis_db",
+          "description": "组件使用的 Redis 逻辑数据库；表示使用关系，不包含调用次数。",
+          "roles": [
+            {
+              "concept": "redis_db"
+            }
+          ],
+          "verbalizes": [
+            "{component} 使用 {redis_db}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "core_service",
+      "type": "EntityType",
+      "description": "核心微服务；微服务组件中由业务重要性标签归一化后 is_core 为 Y 的对象。 别名：核心服务、核心微服务。",
+      "extends": [
+        "microservice_component"
+      ],
+      "derived_by": [
+        "component.is_core == 'Y'"
+      ]
+    },
+    {
+      "concept": "database_instance",
+      "type": "EntityType",
+      "description": "数据库实例；同一环境内由数据库 IP 和端口唯一识别，数据库名仅作为属性。 别名：数据库、数据库实例、DB。",
+      "identify_by": [
+        "database_ip",
+        "database_port",
+        "environment"
+      ],
+      "relationships": [
+        {
+          "name": "database_ip",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{database_instance} IP是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "database_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{database_instance} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "database_port",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{database_instance} 端口是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "database_type",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "database_type"
+            }
+          ],
+          "verbalizes": [
+            "{database_instance} 类型是 {String:database_type}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "database_type IN ('gbase', 'kingbase', 'oracle', 'mysql')"
+          ]
+        },
+        {
+          "name": "environment",
+          "description": "数据库实例所属的逻辑环境；它参与数据库实例的本体身份。",
+          "roles": [
+            {
+              "concept": "environment"
+            }
+          ],
+          "verbalizes": [
+            "{database_instance} 属于 {environment}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "database_schema",
+      "type": "EntityType",
+      "description": "数据库实例中的 Schema。 别名：Schema、数据库模式。",
+      "identify_by": [
+        "database",
+        "schema_name"
+      ],
+      "relationships": [
+        {
+          "name": "database",
+          "description": "数据库 Schema 所属的数据库实例；用于从 Schema 定位实例。",
+          "roles": [
+            {
+              "concept": "database_instance"
+            }
+          ],
+          "verbalizes": [
+            "{database_schema} 属于 {database_instance}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "schema_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{database_schema} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "department",
+      "type": "EntityType",
+      "description": "业务部门或组织单元。 别名：部门、组织单元。",
+      "identify_by": [
+        "department_name"
+      ],
+      "relationships": [
+        {
+          "name": "department_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{department} 名称是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "deployment_cluster",
+      "type": "EntityType",
+      "description": "组件部署集群。 别名：部署集群、K8s集群、容器集群。",
+      "identify_by": [
+        "cluster_name"
+      ],
+      "relationships": [
+        {
+          "name": "cluster_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{deployment_cluster} 名称是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "environment",
+      "type": "EntityType",
+      "description": "组件或资源所在的逻辑环境。 别名：环境、运行环境。",
+      "identify_by": [
+        "env_name"
+      ],
+      "relationships": [
+        {
+          "name": "env_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{environment} 名称是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "global_cfc_config",
+      "type": "EntityType",
+      "description": "环境级全局 CFC 配置。 别名：全局配置。",
+      "extends": [
+        "cfc_config"
+      ],
+      "identify_by": [
+        "config_key",
+        "environment"
+      ],
+      "relationships": [
+        {
+          "name": "config_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{global_cfc_config} 键是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "environment",
+          "description": "全局 CFC 配置所属的逻辑环境；同名配置在不同环境中分别识别。",
+          "roles": [
+            {
+              "concept": "environment"
+            }
+          ],
+          "verbalizes": [
+            "{global_cfc_config} 属于 {environment}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "graded_assurance_component",
+      "type": "EntityType",
+      "description": "非 DB 且具有非空保障等级的组件。 别名：分级保障组件、分保组件。",
+      "extends": [
+        "component"
+      ],
+      "derived_by": [
+        "component.component_type <> 'DB' AND EXISTS ( component.system_level )"
+      ]
+    },
+    {
+      "concept": "graded_assurance_microservice_component",
+      "type": "EntityType",
+      "description": "非 DB、架构类型为 microservice 且具有非空保障等级的组件。 别名：分级保障微服务、分保微服务。",
+      "extends": [
+        "graded_assurance_component",
+        "microservice_component"
+      ],
+      "derived_by": [
+        "component.component_type <> 'DB' AND component.architecture_type == 'microservice' AND EXISTS ( component.system_level )"
+      ]
+    },
+    {
+      "concept": "host",
+      "type": "EntityType",
+      "description": "部署主机或服务器。 别名：主机、服务器、物理机。",
+      "identify_by": [
+        "hostname"
+      ],
+      "relationships": [
+        {
+          "name": "host_type",
+          "description": "主机类型；physical 表示物理机，virtual 表示虚拟机。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "host_type"
+            }
+          ],
+          "verbalizes": [
+            "{host} 类型是 {String:host_type}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "host_type IN ('physical', 'virtual')"
+          ]
+        },
+        {
+          "name": "hostname",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{host} 主机名是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "system_uuid",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{host} 系统标识是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "kafka_cluster",
+      "type": "EntityType",
+      "description": "Kafka 集群。 别名：Kafka集群。",
+      "identify_by": [
+        "kafka_addr"
+      ],
+      "relationships": [
+        {
+          "name": "kafka_addr",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_cluster} 地址是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "kafka_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_cluster} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "kafka_topic",
+      "type": "EntityType",
+      "description": "Kafka Topic。 别名：Kafka主题、Topic。",
+      "identify_by": [
+        "topic_name"
+      ],
+      "relationships": [
+        {
+          "name": "cluster",
+          "description": "Kafka Topic 所属的 Kafka 集群；用于定位 Topic 的承载集群。",
+          "roles": [
+            {
+              "concept": "kafka_cluster"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_topic} 属于 {kafka_cluster}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "partition_count",
+          "description": "Kafka Topic 当前配置的分区数量。",
+          "roles": [
+            {
+              "concept": "Integer",
+              "name": "partition_count"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_topic} 的分区数量是 {Integer:partition_count}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "replica_count",
+          "description": "Kafka Topic 当前配置的副本数量。",
+          "roles": [
+            {
+              "concept": "Integer",
+              "name": "replica_count"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_topic} 的副本数量是 {Integer:replica_count}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "topic_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{kafka_topic} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "maven_third_party_library",
+      "type": "EntityType",
+      "description": "Maven 三方软件包。 别名：Maven三方包、三方库。",
+      "identify_by": [
+        "coordinate",
+        "package_version"
+      ],
+      "relationships": [
+        {
+          "name": "coordinate",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{maven_third_party_library} 坐标是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "package_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{maven_third_party_library} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "package_version",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{maven_third_party_library} 版本是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "microservice_component",
+      "type": "EntityType",
+      "description": "非 DB 且架构类型为 microservice 的组件。 别名：微服务。",
+      "extends": [
+        "component"
+      ],
+      "derived_by": [
+        "component.component_type <> 'DB' AND component.architecture_type == 'microservice'"
+      ]
+    },
+    {
+      "concept": "non_core_service",
+      "type": "EntityType",
+      "description": "非核心微服务；微服务组件中由业务重要性标签归一化后 is_core 为 N 的对象；base、external 和空标签不属于该概念。 别名：非核心服务、非核心微服务。",
+      "extends": [
+        "microservice_component"
+      ],
+      "derived_by": [
+        "component.is_core == 'N'"
+      ]
+    },
+    {
+      "concept": "optimization_suggestion",
+      "type": "EntityType",
+      "description": "level 为优化建议的架构问题。 别名：优化建议、优化项、治理建议。",
+      "extends": [
+        "arch_issue"
+      ],
+      "derived_by": [
+        "arch_issue.level == '优化建议'"
+      ]
+    },
+    {
+      "concept": "private_cfc_config",
+      "type": "EntityType",
+      "description": "组件私有 CFC 配置。 别名：私有配置。",
+      "extends": [
+        "cfc_config"
+      ],
+      "identify_by": [
+        "config_file",
+        "config_key",
+        "owner"
+      ],
+      "relationships": [
+        {
+          "name": "config_environment",
+          "description": "私有 CFC 配置声明的配置环境，可用于配置环境筛选。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "config_environment"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 的配置环境是 {String:config_environment}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "config_file",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 文件是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "config_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 键是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "config_value",
+          "description": "私有配置值；查询和展示必须遵守执行平台的权限及脱敏策略。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "config_value"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 的配置值是 {String:config_value}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "created_at",
+          "description": "私有 CFC 配置的创建时间。",
+          "roles": [
+            {
+              "concept": "DateTime",
+              "name": "created_at"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 创建于 {DateTime:created_at}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "owner",
+          "description": "私有 CFC 配置所属的组件；用于查询配置属于哪个组件。",
+          "roles": [
+            {
+              "concept": "component"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 属于 {component}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "updated_at",
+          "description": "私有 CFC 配置最近一次更新时间。",
+          "roles": [
+            {
+              "concept": "DateTime",
+              "name": "updated_at"
+            }
+          ],
+          "verbalizes": [
+            "{private_cfc_config} 最近更新于 {DateTime:updated_at}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "redis_db",
+      "type": "EntityType",
+      "description": "Redis 实例中的逻辑数据库。 别名：Redis DB、Redis库。",
+      "identify_by": [
+        "database_number",
+        "instance"
+      ],
+      "relationships": [
+        {
+          "name": "database_number",
+          "roles": [
+            {
+              "concept": "Integer"
+            }
+          ],
+          "verbalizes": [
+            "{redis_db} 编号是 {Integer}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "instance",
+          "description": "Redis 逻辑数据库所属的 Redis 实例；用于从逻辑库定位实例。",
+          "roles": [
+            {
+              "concept": "redis_instance"
+            }
+          ],
+          "verbalizes": [
+            "{redis_db} 属于 {redis_instance}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "redis_instance",
+      "type": "EntityType",
+      "description": "Redis 实例。 别名：Redis实例。",
+      "identify_by": [
+        "redis_addr"
+      ],
+      "relationships": [
+        {
+          "name": "redis_addr",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{redis_instance} 地址是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "redis_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{redis_instance} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "second_party_library",
+      "type": "EntityType",
+      "description": "组织内部二方软件包。 别名：二方包、二方库。",
+      "identify_by": [
+        "package_name",
+        "package_version"
+      ],
+      "relationships": [
+        {
+          "name": "package_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{second_party_library} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "package_version",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{second_party_library} 版本是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "system",
+      "type": "EntityType",
+      "description": "业务系统。 别名：系统、子系统。",
+      "identify_by": [
+        "system_name"
+      ],
+      "relationships": [
+        {
+          "name": "display_name",
+          "description": "业务系统用于结果展示和中文名称筛选的显示名称。",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "display_name"
+            }
+          ],
+          "verbalizes": [
+            "{system} 的显示名称是 {String:display_name}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "system_id",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{system} 平台标识是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "system_level",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "system_level"
+            }
+          ],
+          "verbalizes": [
+            "{system} 保障等级是 {String:system_level}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "system_level IN ('1', '2', '3', '4')"
+          ]
+        },
+        {
+          "name": "system_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{system} 名称是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "table_asset",
+      "type": "EntityType",
+      "description": "数据库 Schema 中的表资产。 别名：表、数据表、表资产。",
+      "identify_by": [
+        "schema",
+        "table_name"
+      ],
+      "relationships": [
+        {
+          "name": "schema",
+          "description": "数据库表所属的 Schema；用于查询表位于哪个 Schema。",
+          "roles": [
+            {
+              "concept": "database_schema"
+            }
+          ],
+          "verbalizes": [
+            "{table_asset} 属于 {database_schema}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "table_name",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{table_asset} 名称是 {String}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "zone",
+      "type": "EntityType",
+      "description": "部署区域或可用区。 别名：区域、可用区。",
+      "identify_by": [
+        "zone_code"
+      ],
+      "relationships": [
+        {
+          "name": "zone_code",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{zone} 编码是 {String}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    }
+  ],
+  "ontology_mappings": [
+    {
+      "name": "architecture_governance_mapping",
+      "description": "architecture_governance_mapping 的数据映射",
+      "semantic_model": {
+        "name": "architecture_governance_mapping",
+        "datasets": [
+          {
+            "name": "arch_rule",
+            "source": "tech.dim_tech_arch_rule_f",
+            "primary_key": [
+              "key"
+            ],
+            "description": "架构治理规则。 别名：架构规则、治理规则、规范。",
+            "fields": [
+              {
+                "name": "description",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "des"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "domain",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "domain"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "improvement",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "improvement"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "issue_site_template",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "issue_site_tpl"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "label",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "label"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "level",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "level"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "negative",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "negative"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "positive",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "positive"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "title",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "title"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "component",
+            "source": "public.dim_tech_public_env_cmp_df",
+            "primary_key": [
+              "cmp_name"
+            ],
+            "description": "逻辑组件；同名组件在 DEV/TEST/PROD 中是同一组件，环境和快照只是上下文。 别名：组件、服务、应用组件、微服务组件。",
+            "fields": [
+              {
+                "name": "architecture_type",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "prop_com_arch_type"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "business_importance_label",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "prop_com_importance_type"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "component_name",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "cmp_name"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "component_name_cn",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "cn_cmp_name"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "component_type",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "component_type"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "system_level",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "system_level"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "department",
+            "source": "public.dim_tech_public_env_cmp_df",
+            "primary_key": [
+              "dept_name"
+            ],
+            "description": "业务部门或组织单元。 别名：部门、组织单元。",
+            "fields": []
+          },
+          {
+            "name": "deployment_cluster",
+            "source": "public.dwd_tech_public_env_cmp_deploy_df",
+            "primary_key": [
+              "cluster_name"
+            ],
+            "description": "组件部署集群。 别名：部署集群、K8s集群、容器集群。",
+            "fields": []
+          },
+          {
+            "name": "environment",
+            "source": "public.dim_tech_public_env_cmp_df",
+            "primary_key": [
+              "env_name"
+            ],
+            "description": "组件或资源所在的逻辑环境。 别名：环境、运行环境。",
+            "fields": []
+          },
+          {
+            "name": "host",
+            "source": "tech.dwd_tech_ops_host_info_df",
+            "primary_key": [
+              "hostname"
+            ],
+            "description": "部署主机或服务器。 别名：主机、服务器、物理机。",
+            "fields": [
+              {
+                "name": "host_type",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "host_type"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "system_uuid",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "system_uuid"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "kafka_cluster",
+            "source": "tech.dim_tech_ops_kafka_topic_f",
+            "primary_key": [
+              "kafka_addr"
+            ],
+            "description": "Kafka 集群。 别名：Kafka集群。",
+            "fields": [
+              {
+                "name": "kafka_name",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "kafka_name"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "kafka_topic",
+            "source": "tech.dim_tech_ops_kafka_topic_f",
+            "primary_key": [
+              "kafka_topic"
+            ],
+            "description": "Kafka Topic。 别名：Kafka主题、Topic。",
+            "fields": [
+              {
+                "name": "partition_count",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "partition_num"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "replica_count",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "replica_num"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "redis_instance",
+            "source": "tech.dim_tech_ops_redis_f",
+            "primary_key": [
+              "redis_addr"
+            ],
+            "description": "Redis 实例。 别名：Redis实例。",
+            "fields": [
+              {
+                "name": "redis_name",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "redis_name"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "system",
+            "source": "public.dim_tech_public_sys_df",
+            "primary_key": [
+              "system_name"
+            ],
+            "description": "业务系统。 别名：系统、子系统。",
+            "fields": [
+              {
+                "name": "display_name",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "cn_system_name"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "system_id",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "system_id"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "system_level",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "system_level"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "system_name",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "system_name"
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "zone",
+            "source": "public.dim_tech_public_env_cmp_df",
+            "primary_key": [
+              "zone"
+            ],
+            "description": "部署区域或可用区。 别名：区域、可用区。",
+            "fields": []
+          }
+        ]
+      },
+      "concept_mappings": [
+        {
+          "concept": "arch_rule",
+          "object_mappings": [
+            {
+              "expression": "arch_rule.key"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "arch_rule.key"
+              },
+              "children": [
+                {
+                  "relationship": "description",
+                  "object_mapping": {
+                    "expression": "arch_rule.des"
+                  }
+                },
+                {
+                  "relationship": "domain",
+                  "object_mapping": {
+                    "expression": "arch_rule.domain"
+                  }
+                },
+                {
+                  "relationship": "improvement",
+                  "object_mapping": {
+                    "expression": "arch_rule.improvement"
+                  }
+                },
+                {
+                  "relationship": "issue_site_template",
+                  "object_mapping": {
+                    "expression": "arch_rule.issue_site_tpl"
+                  }
+                },
+                {
+                  "relationship": "label",
+                  "object_mapping": {
+                    "expression": "arch_rule.label"
+                  }
+                },
+                {
+                  "relationship": "level",
+                  "object_mapping": {
+                    "expression": "arch_rule.level"
+                  }
+                },
+                {
+                  "relationship": "negative",
+                  "object_mapping": {
+                    "expression": "arch_rule.negative"
+                  }
+                },
+                {
+                  "relationship": "positive",
+                  "object_mapping": {
+                    "expression": "arch_rule.positive"
+                  }
+                },
+                {
+                  "relationship": "title",
+                  "object_mapping": {
+                    "expression": "arch_rule.title"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "component",
+          "object_mappings": [
+            {
+              "expression": "component.cmp_name"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "component.cmp_name"
+              },
+              "children": [
+                {
+                  "relationship": "architecture_type",
+                  "object_mapping": {
+                    "expression": "component.prop_com_arch_type"
+                  }
+                },
+                {
+                  "relationship": "business_importance_label",
+                  "object_mapping": {
+                    "expression": "component.prop_com_importance_type"
+                  }
+                },
+                {
+                  "relationship": "component_name",
+                  "object_mapping": {
+                    "expression": "component.cmp_name"
+                  }
+                },
+                {
+                  "relationship": "component_name_cn",
+                  "object_mapping": {
+                    "expression": "component.cn_cmp_name"
+                  }
+                },
+                {
+                  "relationship": "component_type",
+                  "object_mapping": {
+                    "expression": "component.component_type"
+                  }
+                },
+                {
+                  "relationship": "system_level",
+                  "object_mapping": {
+                    "expression": "component.system_level"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "department",
+          "object_mappings": [
+            {
+              "expression": "department.dept_name"
+            }
+          ]
+        },
+        {
+          "concept": "deployment_cluster",
+          "object_mappings": [
+            {
+              "expression": "deployment_cluster.cluster_name"
+            }
+          ]
+        },
+        {
+          "concept": "environment",
+          "object_mappings": [
+            {
+              "expression": "environment.env_name"
+            }
+          ]
+        },
+        {
+          "concept": "host",
+          "object_mappings": [
+            {
+              "expression": "host.hostname"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "host.hostname"
+              },
+              "children": [
+                {
+                  "relationship": "host_type",
+                  "object_mapping": {
+                    "expression": "host.host_type"
+                  }
+                },
+                {
+                  "relationship": "system_uuid",
+                  "object_mapping": {
+                    "expression": "host.system_uuid"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "kafka_cluster",
+          "object_mappings": [
+            {
+              "expression": "kafka_cluster.kafka_addr"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "kafka_cluster.kafka_addr"
+              },
+              "children": [
+                {
+                  "relationship": "kafka_name",
+                  "object_mapping": {
+                    "expression": "kafka_cluster.kafka_name"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "kafka_topic",
+          "object_mappings": [
+            {
+              "expression": "kafka_topic.kafka_topic"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "kafka_topic.kafka_topic"
+              },
+              "children": [
+                {
+                  "relationship": "partition_count",
+                  "object_mapping": {
+                    "expression": "kafka_topic.partition_num"
+                  }
+                },
+                {
+                  "relationship": "replica_count",
+                  "object_mapping": {
+                    "expression": "kafka_topic.replica_num"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "redis_instance",
+          "object_mappings": [
+            {
+              "expression": "redis_instance.redis_addr"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "redis_instance.redis_addr"
+              },
+              "children": [
+                {
+                  "relationship": "redis_name",
+                  "object_mapping": {
+                    "expression": "redis_instance.redis_name"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "system",
+          "object_mappings": [
+            {
+              "expression": "system.system_name"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "system.system_name"
+              },
+              "children": [
+                {
+                  "relationship": "display_name",
+                  "object_mapping": {
+                    "expression": "system.cn_system_name"
+                  }
+                },
+                {
+                  "relationship": "system_id",
+                  "object_mapping": {
+                    "expression": "system.system_id"
+                  }
+                },
+                {
+                  "relationship": "system_level",
+                  "object_mapping": {
+                    "expression": "system.system_level"
+                  }
+                },
+                {
+                  "relationship": "system_name",
+                  "object_mapping": {
+                    "expression": "system.system_name"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "zone",
+          "object_mappings": [
+            {
+              "expression": "zone.zone"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
