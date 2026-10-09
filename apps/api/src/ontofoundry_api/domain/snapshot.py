@@ -180,11 +180,15 @@ def read_snapshot_json(
 def normalized_snapshot_sha256(
     data: dict[str, Any] | None, workspace_id: str | UUID | None = None
 ) -> str:
-    return snapshot_sha256(read_snapshot_json(data, workspace_id))
+    return snapshot_sha256(read_snapshot_json(data, workspace_id, target_version="3" if data and data.get("schema_version") == "3" else "2"))
 
 
 def draft_sha256(data: dict[str, Any] | None, workspace_id: str | UUID | None = None) -> str:
     """`draft_sha256` of a stored draft of either schema (not validated)."""
+    if data and data.get("schema_version") == "3":
+        if workspace_id is not None and str(data.get("workspace_id")) != str(workspace_id):
+            raise ValueError("快照不属于该工作空间")
+        return snapshot_sha256(data)
     return snapshot_sha256(as_v2_dict(data, workspace_id))
 
 
@@ -401,6 +405,21 @@ def normalize_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
             for old in legacy.mappings:
                 if old.connection_alias == document["name"] and old.type_id == UUID(concept_refs[cm["concept"]]["ref"]):
                     result["extension_v4"]["legacy_mapping_ids"][str(old.id)] = cm_id
+    # Legacy v2 omitted compiler defaults. Materialize its compatible readings
+    # during migration, never during native import/export. These are reconstructed
+    # platform semantics, explicitly marked migrated, not source-file presence.
+    concept_names = {i["id"]: i["concept"] for c in ("object_types", "value_types") for i in result[c]}
+    for link in [*result["properties"], *result["link_types"]]:
+        role = link["roles"][0]
+        if not link["verbalizes"]:
+            owner_name = concept_names[link["owner_ref"]["ref"]]
+            role = link["roles"][0]
+            target_name = concept_names.get(role["concept"]["ref"], role["concept"]["ref"])
+            target_ref = target_name + (":" + role["name"] if role["name"] else "")
+            link["verbalizes"] = ["{" + owner_name + "}" + link["name"] + "{" + target_ref + "}"]
+        if link in result["properties"] and link["multiplicity"] is None:
+            link["multiplicity"] = "OneToOne" if link["identifier"] and sum(p["identifier"] for p in result["properties"] if p["owner_ref"] == link["owner_ref"]) == 1 else "ManyToOne"
+            link["native_presence"].append("multiplicity")
     # Frozen identity registry includes role identities as well as elements.
     registry = {f"/{collection}/{i['id']}": i["id"] for collection in (
         *V3_MIGRATED_COLLECTIONS, "actions", "material_objects",
@@ -422,6 +441,10 @@ V3_MIGRATED_COLLECTIONS = (
 
 def as_v3_dict(data: dict[str, Any] | None, workspace_id: str | UUID | None = None) -> dict[str, Any]:
     """v1 → v2 → v3 or validated v3; fresh JSON, no mutation even for v3."""
+    if not data:
+        if workspace_id is None:
+            raise ValueError("空快照必须提供 workspace_id")
+        return OntologyDraft(schema_version="3", hash_algorithm="ontofoundry-domain-v3", workspace_id=workspace_id).model_dump(mode="json")
     if data and str(data.get("schema_version")) == "3":
         if workspace_id is not None and str(data.get("workspace_id")) != str(workspace_id):
             raise ValueError("快照不属于该工作空间")

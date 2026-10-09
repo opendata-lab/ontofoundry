@@ -23,7 +23,7 @@ def with_instance(client):
     required = {
         p["technical_name"]: "S1"
         for p in session["draft"]["properties"]
-        if p["owner_type_id"] == supplier["id"] and (p["required"] or p["identifier"])
+        if p["owner_ref"]["ref"] == supplier["id"] and (p["required"] or p["identifier"])
     }
     session["draft"]["material_objects"] = [
         {

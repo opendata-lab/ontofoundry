@@ -18,7 +18,6 @@ import sqlalchemy as sa
 from sqlalchemy.engine import make_url
 from test_t1_v2_model import v1_demo
 
-from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.snapshot import as_v2_dict
 
 ADMIN_URL = os.environ.get("ONTOFOUNDRY_TEST_POSTGRES_URL")
@@ -90,7 +89,8 @@ def seed_v1_deployment(engine) -> dict:
             ),
             {"id": session_id, "w": workspace_id, "u": user_id, "v": version_id, "draft": json.dumps(v1)},
         )
-    return {"v1": v1, "workspace_id": workspace_id, "session_id": session_id, "user_id": user_id}
+    return {"v1": v1, "workspace_id": workspace_id, "version_id": version_id,
+            "session_id": session_id, "user_id": user_id}
 
 
 def test_upgrade_backfills_and_constraints_hold_then_round_trips(database):
@@ -101,11 +101,12 @@ def test_upgrade_backfills_and_constraints_hold_then_round_trips(database):
 
     expected = as_v2_dict(seeded["v1"])
     with engine.connect() as conn:
-        base, draft = conn.execute(
-            sa.text("SELECT base_version_sha256, draft_sha256 FROM modeling_sessions WHERE id = :id"),
-            {"id": seeded["session_id"]},
-        ).one()
-        assert base == draft == snapshot_sha256(expected)
+        # Product policy retires old sessions at head; published snapshots and
+        # their identity backfill still survive unchanged.
+        assert conn.execute(sa.text("SELECT id FROM modeling_sessions WHERE id = :id"),
+                            {"id": seeded["session_id"]}).first() is None
+        assert conn.scalar(sa.text("SELECT snapshot_json FROM ontology_versions WHERE id = :id"),
+                           {"id": seeded["version_id"]}) == seeded["v1"]
         identities = dict(
             conn.execute(sa.text("SELECT element_id, kind FROM ontology_element_identities")).all()
         )

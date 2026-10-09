@@ -12,6 +12,7 @@ import {
 import type { ProposalItem, ProposalStatus, TargetKind } from "../../api/types";
 
 export const KIND: Record<TargetKind, { label: string; icon: LucideIcon; cls: string }> = {
+  value_type: { label: "值概念", icon: Box, cls: "value" },
   object_type: { label: "实体", icon: Box, cls: "object" },
   property: { label: "属性", icon: Braces, cls: "attribute" },
   link_type: { label: "关系", icon: GitBranch, cls: "relation" },

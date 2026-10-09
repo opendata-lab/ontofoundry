@@ -880,7 +880,7 @@ def _merge(
     return merged, counts
 
 
-def import_ossie(
+def import_ossie_v2(
     document: dict[str, Any],
     *,
     workspace_id: str,
@@ -960,3 +960,111 @@ def import_ossie(
         "skipped": report.skipped,
         "notes": report.notes,
     }
+
+
+def import_ossie(document, *, workspace_id, base=None, mode="merge", target_version="3"):
+    """Native v3 import, enabled at the runtime cutover in M2."""
+    if target_version == "2":
+        return import_ossie_v2(document, workspace_id=workspace_id, base=base, mode=mode)
+    if target_version != "3":
+        raise OssieImportError("未知目标快照版本")
+    from copy import deepcopy
+
+    from ontofoundry_api.domain.canonical import V3_HASH_ALGORITHM
+    from ontofoundry_api.domain.snapshot import as_v3_dict
+
+    from .native import parse_native
+
+    version = document.get("version") if isinstance(document, dict) else None
+    if version != OSSIE_VERSION:
+        raise OssieImportError(f"OSSIE_VERSION_UNSUPPORTED: 仅支持 Apache Ossie {OSSIE_VERSION}，文件版本为 {version!r}")
+    issues = validate_schema(document)
+    if issues:
+        raise OssieImportError("文件不符合 Apache Ossie 结构：" + issues[0]["message"])
+    for path, reason in unsupported_constructs(document):
+        raise OssieImportError(f"{path}：不支持的 Ossie 构造：{reason}")
+    extension = _extension(document)
+    if extension and extension.get("version") not in (*READABLE_EXTENSION_VERSIONS, "4"):
+        raise OssieImportError("ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED: 未知扩展版本")
+    try:
+        imported = parse_native(document, workspace_id).model_dump(mode="json")
+        existing = as_v3_dict(base, workspace_id)
+        counts = dict(objects_added=0, objects_updated=0, links_added=0, links_updated=0,
+                      attributes_added=0, attributes_updated=0, mappings_added=0, mappings_updated=0,
+                      values_added=0, values_updated=0)
+        remap = {}
+        for collection, _prefix in (("object_types", "objects"), ("value_types", "values")):
+            current = {i["concept"]: i for i in existing[collection]}
+            for item in imported[collection]:
+                old = current.get(item["concept"]) if mode != "replace" else None
+                remap[item["id"]] = old["id"] if old else item["id"]
+        for collection, _prefix in (("properties", "attributes"), ("link_types", "links")):
+            current = {(i["owner_ref"]["ref"], i["technical_name"]): i for i in existing[collection]}
+            for item in imported[collection]:
+                old = current.get((remap.get(item["owner_ref"]["ref"], item["owner_ref"]["ref"]), item["technical_name"])) if mode != "replace" else None
+                remap[item["id"]] = old["id"] if old else item["id"]
+                if old:
+                    for index, role in enumerate(item["roles"]):
+                        if role["id"] not in {r["id"] for r in old["roles"]} and index < len(old["roles"]):
+                            remap[role["id"]] = old["roles"][index]["id"]
+        identifier_fields = {'id', 'owner_id', 'input_type_id', 'type_id', 'property_id', 'link_type_id', 'source_id', 'target_id',
+                             'role_id', 'object_id', 'semantic_model_id', 'dataset_id', 'concept_mapping_id', 'parent_id', 'ref'}
+        reference_lists = {'requires', 'derived_by', 'precondition_rule_ids'}
+        def rewrite(value, field=None, depth=0):
+            if field == 'ai_context':
+                return deepcopy(value)  # native/vendor strings are never ID-rewritten
+            if isinstance(value, dict):
+                return {k: rewrite(v, k, depth + 1) for k, v in value.items()}
+            if isinstance(value, list):
+                return [rewrite(v, field, depth + 1) for v in value]
+            return remap.get(value, value) if isinstance(value, str) and (field in identifier_fields or (field in reference_lists and depth > 1)) else value
+        imported = rewrite(imported)
+        if mode != "replace":
+            previous_rules = {}
+            for old in existing["rules"]:
+                previous_rules.setdefault((old["owner_id"], old["rule_kind"], old["expression"]), []).append(old)
+            rule_ids = {}
+            for rule in imported["rules"]:
+                matches = previous_rules.get((rule["owner_id"], rule["rule_kind"], rule["expression"]), [])
+                if matches:
+                    old = matches.pop(0)
+                    rule_ids[rule["id"]] = old["id"]
+                    for field in ("id", "name", "technical_name", "description"):
+                        rule[field] = old[field]
+            for collection in ("object_types", "value_types", "properties", "link_types"):
+                for item in imported[collection]:
+                    for field in ("requires", "derived_by"):
+                        item[field] = [rule_ids.get(rid, rid) for rid in item[field]]
+            for action in imported.get("actions", []):
+                action["precondition_rule_ids"] = [rule_ids.get(rid, rid) for rid in action["precondition_rule_ids"]]
+        draft = imported if mode == "replace" else deepcopy(existing)
+        for collection, prefix in (("object_types", "objects"), ("value_types", "values"), ("properties", "attributes"), ("link_types", "links")):
+            old = {i["id"]: i for i in existing[collection]}
+            for item in imported[collection]:
+                counts[prefix + ("_updated" if item["id"] in old else "_added")] += int(item["id"] not in old or canonical(old[item["id"]], hash_algorithm=V3_HASH_ALGORITHM) != canonical(item, hash_algorithm=V3_HASH_ALGORITHM))
+            if mode != "replace":
+                incoming_ids = {i["id"] for i in imported[collection]}
+                kept = [i for i in draft[collection] if i["id"] not in incoming_ids]
+                # Imported arrays retain positions; local-only elements follow.
+                for i in kept:
+                    i["position"] = None
+                draft[collection] = imported[collection] + kept
+        if mode != "replace":
+            incoming_actions = {a["id"] for a in imported["actions"]}
+            draft["actions"] = [a for a in draft["actions"] if a["id"] not in incoming_actions] + imported["actions"]
+            owners = {i["id"] for c in ("object_types", "value_types", "properties", "link_types", "actions") for i in imported[c]}
+            draft["rules"] = [r for r in draft["rules"] if r["owner_id"] not in owners] + imported["rules"]
+            for key in ("semantic_models", "datasets", "dataset_fields", "dataset_relationships", "metrics", "concept_mappings", "mapping_nodes"):
+                incoming = {i["id"] for i in imported[key]}
+                draft[key] = [i for i in draft[key] if i["id"] not in incoming] + imported[key]
+            for key in ("ossie_version", "ossie_name", "ossie_description", "ai_context", "native_presence", "document_origin", "ontology_requires"):
+                draft[key] = imported[key]
+        previous = {i['id']: i for i in existing['concept_mappings']}
+        counts['mappings_added'] = sum(i['id'] not in previous for i in imported['concept_mappings'])
+        counts['mappings_updated'] = sum(i['id'] in previous and previous[i['id']] != i
+                                        for i in imported['concept_mappings'])
+        draft = OntologyDraft.model_validate(draft).model_dump(mode="json")
+    except (ValueError, KeyError) as exc:
+        raise OssieImportError(str(exc)) from exc
+    return draft, dict(name=document.get("name", ""), description=document.get("description", ""), mode=mode,
+                       counts=counts, skipped=[], notes=["已原生保留概念、角色、字段出现状态与数组顺序"])

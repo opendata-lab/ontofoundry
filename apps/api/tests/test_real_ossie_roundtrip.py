@@ -18,6 +18,7 @@ import pytest
 
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.runtime_views import mappings_of
 from ontofoundry_api.ossie.compiler import canonical_json, compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.ossie.mappings import _column, _dataset_fields
@@ -223,29 +224,14 @@ def test_real_ossie_roundtrip(client, tmp_path, stem):
     assert first["description"] == document["description"]
     differences = semantic_differences(document, first)
     losses = [item for item in differences if item["category"] == "a"]
-    # Freeze every known loss's path AND original/exported value. New losses or
-    # accidental changes fail; intentional model expansion must update this ledger.
-    expected = json.loads((FIXTURES / f"{stem}.losses.json").read_text())
-    assert losses == expected
-    assert len(first["ontology"]) == len(document["ontology"])
-    assert any("ai_context.synonyms" in note for note in report["notes"])
-    if stem == "REDACTED":
-        assert report["counts"]["mappings_added"] == 11
-        mapped = first["ontology_mappings"][0]["concept_mappings"]
-        rule = next(item for item in mapped if item["concept"] == "REDACTED")
-        assert rule["object_mappings"] == [{"expression": "REDACTED.key"}]
-        assert len(rule["link_mappings"][0]["children"]) == 9
-        assert any("semantic_model.metrics" in note for note in report["notes"])
-        assert (
-            len(
-                [
-                    s
-                    for s in report["skipped"]
-                    if ".semantic_model.relationships[" in s["path"]
-                ]
-            )
-            == 14
-        )
+    assert losses == []
+    assert first == document
+    assert report["skipped"] == []
+    expected_nary = 6 if stem == "REDACTED" else 8
+    relationships = [(c["concept"], r) for c in document["ontology"] for r in c.get("relationships", []) if len(r.get("roles", [])) >= 2]
+    exported_relationships = [(c["concept"], r) for c in first["ontology"] for r in c.get("relationships", []) if len(r.get("roles", [])) >= 2]
+    assert len(relationships) == expected_nary
+    assert exported_relationships == relationships
     directory = Path(os.environ.get("OSSIE_REAL_ARTIFACT_DIR", tmp_path))
     directory.mkdir(parents=True, exist_ok=True)
     for suffix, payload in (
@@ -284,11 +270,11 @@ def test_ansi_quoted_column_mapping_roundtrip(column):
     payload, report = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     draft = OntologyDraft.model_validate(payload)
     assert report["counts"]["mappings_added"] == 1
-    assert draft.mappings[0].key_column == column  # reflected physical column name
+    assert mappings_of(draft)[0].key_column == column  # reflected physical column name
     first = compile_ossie(draft, ontology_name="rules", ontology_description="")
     assert validate_schema(first) == []
     payload, _ = import_ossie(first, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
-    assert OntologyDraft.model_validate(payload).mappings[0].key_column == column
+    assert mappings_of(OntologyDraft.model_validate(payload))[0].key_column == column
     assert (
         compile_ossie(
             OntologyDraft.model_validate(payload),
@@ -316,5 +302,5 @@ def test_publish_uses_destination_workspace_metadata(client, stem):
     exported, report = publish_export(client, document)
     assert report["name"] == document["name"]
     assert report["description"] == document["description"]
-    assert exported["name"] == destination_name != document["name"]
-    assert exported["description"] == destination_description != document["description"]
+    assert exported["name"] == document["name"] != destination_name
+    assert exported["description"] == document["description"] != destination_description

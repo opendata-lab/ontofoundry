@@ -1,3 +1,4 @@
+import { materialLinkEndpoints } from "../../lib/instanceGraph";
 import { databaseTypeHints, documentGapHints } from "../../lib/instanceHints";
 import { ArrowLeft, ArrowRight, Database, Search } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -19,6 +20,9 @@ export function ElementInstances({
   canBrowseDatabase: boolean;
   initialObjectId?: string;
 }) {
+  draft = { ...draft, material_links: draft.material_links.map(fact => ({ ...fact,
+    ...materialLinkEndpoints(fact, draft.link_types.find(r => r.id === fact.type_id)),
+  })) };
   // Open on the source that has something to show: an object known only from
   // its table would otherwise greet the viewer with an empty document list.
   const [source, setSource] = useState(() =>
@@ -144,20 +148,25 @@ export function ElementInstances({
         <h3>关联关系</h3>
         {links
           .filter(
-            (l) => l.source_id === selected.id || l.target_id === selected.id,
+            (l) => l.source_id === selected.id || l.target_id === selected.id || l.role_values?.some(v => v.object_id === selected.id),
           )
-          .map((l) => {
+          .flatMap(l => {
+            const roleIds = l.role_values?.flatMap(v => v.object_id && v.object_id !== selected.id ? [v.object_id] : []) ?? [];
+            const ids = roleIds.length ? roleIds : [l.source_id === selected.id ? l.target_id : l.source_id];
+            return [...new Set(ids)].map(id => ({ l, id }));
+          })
+          .map(({ l, id }) => {
             const other = objects.find(
               (o) =>
                 o.id ===
-                (l.source_id === selected.id ? l.target_id : l.source_id),
+                id,
             );
             return (
               other && (
                 <button
                   type="button"
                   className="element-relation-row"
-                  key={l.id}
+                  key={`${l.id}:${other.id}`}
                   disabled={busy}
                   onClick={() => {
                     if ("key" in other)

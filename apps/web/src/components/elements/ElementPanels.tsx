@@ -1,3 +1,5 @@
+import { RelationshipRoles } from "../RelationshipRoles";
+import { relationReadOnly } from "../../lib/nativeDraft";
 import {
   ArrowRight,
   Box,
@@ -11,7 +13,7 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type {
-  Draft,
+  LegacyDraft,
   Evidence,
   PropertyElement,
   RuleElement,
@@ -452,6 +454,7 @@ export function PropertiesPanel(props: PanelProps) {
 export function EndpointsPanel(props: PanelProps) {
   const { type, draft, editing, open } = props;
   if (isObject(type)) return null;
+  if (relationReadOnly(type)) return <section className="element-section"><RelationshipRoles link={type} /><p className="muted">暂只读</p></section>;
   return (
     <section className="element-section">
       <h3>关系端点</h3>
@@ -710,7 +713,7 @@ export function DataSample({
   showSource = true,
 }: {
   workspaceId: string;
-  mapping: Draft["mappings"][number];
+  mapping: LegacyDraft["mappings"][number];
   showSource?: boolean;
 }) {
   const [rows, setRows] = useState<Record<string, unknown>[] | null>(null);

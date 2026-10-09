@@ -8,19 +8,20 @@ are exactly what the user previewed.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
 from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
-from ontofoundry_api.domain.snapshot import empty_snapshot
+from ontofoundry_api.domain.snapshot import as_v3_dict
 
 from .element_diff import element_changes, element_label
 from .merge import merge_snapshots
 
 COLLECTION_KIND = {collection: kind.value for kind, collection in COLLECTIONS.items()}
 # Fields whose values are sets: both sides' additions can be kept together.
-SET_FIELDS = {"tags", "extends", "precondition_rule_ids", "ontology_requires"}
+SET_FIELDS = {"tags", "precondition_rule_ids"}
 
 
 @dataclass
@@ -43,8 +44,9 @@ def three_way(
     workspace_id: str,
     resolutions: dict[str, Any] | None = None,
 ) -> Merge:
-    base = base or empty_snapshot(workspace_id)
-    latest = latest or empty_snapshot(workspace_id)
+    base = as_v3_dict(base, workspace_id)
+    latest = as_v3_dict(latest, workspace_id)
+    draft = deepcopy(draft) if draft.get("schema_version") == "3" else as_v3_dict(draft, workspace_id)
     merged, raw = merge_snapshots(base, latest, draft, resolutions)
     elements = {
         str(e["id"]): (COLLECTION_KIND[c], e)
@@ -99,7 +101,7 @@ def requires_change(merge: Merge) -> dict[str, list[str]] | None:
     reordering alone changes nothing."""
     before = list(merge.latest.get("ontology_requires") or [])
     after = list(merge.merged.get("ontology_requires") or [])
-    return None if sorted(before) == sorted(after) else {"before": before, "after": after}
+    return None if before == after else {"before": before, "after": after}
 
 
 def element_labels(*snapshots: dict[str, Any]) -> dict[str, str]:

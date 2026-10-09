@@ -1,3 +1,5 @@
+import { RelationshipRoles } from "../components/RelationshipRoles";
+import { relationReadOnly } from "../lib/nativeDraft";
 import {
   Box,
   GitBranch,
@@ -33,7 +35,7 @@ export function TypeCatalogPage({
   const filtered = items.filter(
     (i) =>
       (!tag || i.tags.includes(tag)) &&
-      (i.name + i.technical_name + i.description)
+      (i.name + i.technical_name + i.description + ("roles" in i ? JSON.stringify(i.role_concepts ?? i.roles) + JSON.stringify(i.verbalizes) : ""))
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -126,7 +128,7 @@ export function TypeCatalogPage({
                         draft.link_types.filter(
                           (r) =>
                             r.source_type_id === item.id ||
-                            r.target_type_id === item.id,
+                            r.target_type_id === item.id || r.owner_ref?.ref === item.id || !!r.roles?.some(role => role.concept.ref === item.id),
                         ).length
                       }
                     </b>
@@ -141,6 +143,8 @@ export function TypeCatalogPage({
                     </b>
                   </span>
                 </>
+              ) : relationReadOnly(item) ? (
+                <RelationshipRoles link={item} compact />
               ) : (
                 <p className="relation-endpoints">
                   {

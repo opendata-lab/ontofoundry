@@ -20,6 +20,13 @@ export type User = {
   email: string | null;
 };
 
+export type ConceptRef = { kind: "object_type" | "value_type" | "builtin" | "any"; ref: string };
+export type NativeRole = { id: string; name?: string | null; concept: ConceptRef; position?: number | null; native_presence?: string[]; origin?: "platform" | "imported" | "migrated"; client_ref?: null; implicit_owner?: boolean };
+export type RoleConcept = { id: string; name?: string | null; concept: string; kind: ConceptRef["kind"] };
+export type NativeFields = { native_presence?: string[]; position?: number | null; origin?: "platform" | "imported" | "migrated" };
+export type NativeRelationFields = NativeFields & { owner_ref?: ConceptRef; roles?: NativeRole[]; owner_role_id?: string; all_roles?: NativeRole[]; role_concepts?: RoleConcept[]; readonly?: boolean; endpoint_direction?: "forward" | "reverse"; owner_role_name?: string | null; legacy_multiplicity?: string | null };
+export type LegacyMappingForm = { mappings: DataMapping[]; joins: Record<string, { source_column: string; target_column: string } | null> };
+
 export type AttributeDefinition = {
   id: string;
   name: string;
@@ -54,7 +61,7 @@ export type ObjectType = {
   inherited_attributes?: AttributeDefinition[];
 };
 
-export type LinkType = {
+export type LinkType = NativeRelationFields & {
   id: string;
   kind: "link_type";
   name: string;
@@ -63,6 +70,8 @@ export type LinkType = {
   tags: string[];
   source_type_id: string;
   target_type_id: string;
+  source_role_name?: string | null;
+  target_role_name?: string | null;
   multiplicity: string;
   attribute_count: 0;
   identifier?: boolean;
@@ -99,11 +108,15 @@ export type VersionSummary = {
 
 export type GraphNode = {
   id: string;
-  kind: "object_type" | "value_type";
+  kind: "object_type" | "value_type" | "link_type";
   label: string;
   technical_name: string;
   description: string;
   tags: string[];
+  roles?: NativeRole[];
+  all_roles?: NativeRole[];
+  verbalizes?: string[];
+  owner_ref?: ConceptRef;
   attribute_count?: number;
   value_kind?: string;
   identifier?: boolean;
@@ -111,11 +124,13 @@ export type GraphNode = {
 
 export type GraphEdge = {
   id: string;
-  kind: "attribute" | "link_type" | "extends";
+  kind: "attribute" | "link_type" | "extends" | "role";
   label: string;
   technical_name: string;
   source: string;
   target: string;
+  link_type_id?: string;
+  role_id?: string;
   multiplicity?: string;
   description?: string;
   tags?: string[];
@@ -187,11 +202,12 @@ export type MaterialObject = {
   values: Record<string, string | number | boolean | null>;
   evidence: Evidence[];
 };
-export type MaterialLink = {
+export type MaterialLink = NativeRelationFields & {
   id: string;
   type_id: string;
-  source_id: string;
-  target_id: string;
+  source_id: string | null;
+  target_id: string | null;
+  role_values?: { role_id: string; object_id?: string | null; value?: unknown }[];
   evidence: Evidence[];
 };
 export type DataMapping = {
@@ -216,7 +232,7 @@ export type DraftView = {
 };
 
 // --- Stored draft (schema v2) ------------------------------------------------
-export type ObjectTypeElement = {
+export type ObjectTypeElement = NativeFields & {
   id: string;
   name: string;
   technical_name: string;
@@ -228,7 +244,7 @@ export type ObjectTypeElement = {
 export type PropertyElement = Omit<
   AttributeDefinition,
   "requires" | "derived_by" | "declared_by"
-> & { owner_type_id: string; evidence: Evidence[] };
+> & NativeRelationFields & { owner_type_id: string; evidence: Evidence[] };
 export type LinkTypeElement = Omit<LinkDefinition, "requires" | "derived_by"> & {
   evidence: Evidence[];
 };
@@ -237,7 +253,7 @@ export type RuleElement = {
   name: string;
   technical_name: string;
   description: string;
-  owner_kind: "object_type" | "property" | "link_type" | "action";
+  owner_kind: "object_type" | "value_type" | "property" | "link_type" | "action";
   owner_id: string;
   rule_kind: "constraint" | "derivation";
   expression: string;
@@ -267,7 +283,7 @@ export type ActionElement = {
   }[];
   evidence: Evidence[];
 };
-export type Draft = {
+export type LegacyDraft = {
   schema_version: "2";
   workspace_id: string;
   ontology_requires: string[];
@@ -280,8 +296,27 @@ export type Draft = {
   material_links: MaterialLink[];
   mappings: DataMapping[];
 };
+export type NativeConcept = Omit<ObjectTypeElement, "extends" | "description"> & { concept: string; description: string | null; extends: ConceptRef[]; identify_by: string[]; requires: string[]; derived_by: string[] };
+export type NativeLink = Omit<LinkTypeElement, "source_type_id" | "target_type_id" | "multiplicity" | "description" | "data_join"> & { owner_ref: ConceptRef; roles: NativeRole[]; multiplicity: "ManyToOne" | "OneToOne" | null; description: string | null; requires: string[]; derived_by: string[] };
+export type NativeProperty = NativeLink & { value_kind: string; required: boolean; identifier: boolean; owner_type_id?: never };
+export type NativeDraft = Omit<LegacyDraft, "schema_version" | "object_types" | "properties" | "link_types"> & {
+  schema_version: "3"; hash_algorithm: "ontofoundry-domain-v3";
+  object_types: NativeConcept[]; value_types: NativeConcept[];
+  properties: NativeProperty[]; link_types: NativeLink[];
+  document_origin: "platform" | "imported" | "migrated"; native_presence: string[];
+  ossie_version: string; ossie_name: string | null; ossie_description: string | null; ai_context: unknown;
+  semantic_models: { id: string; [key: string]: unknown }[];
+  datasets: unknown[]; dataset_fields: unknown[]; dataset_relationships: unknown[]; metrics: unknown[];
+  concept_mappings: unknown[]; mapping_nodes: unknown[];
+  core_version?: string | null; core_presence?: string[]; extension_v4: Record<string, unknown>;
+  /** Client-only copy of the existing mapping form; excluded from draft JSON. */
+  _legacy_form?: LegacyMappingForm;
+};
+export type Draft = LegacyDraft | NativeDraft;
+
 // --- Proposals (frontend contract §4) ---------------------------------------
 export type TargetKind =
+  | "value_type"
   | "object_type"
   | "property"
   | "link_type"

@@ -13,7 +13,7 @@ from datetime import timedelta
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import and_, or_, update
+from sqlalchemy import and_, or_, select, update
 
 from ontofoundry_api.contracts.proposals import (
     ProposalContractError,
@@ -360,7 +360,7 @@ async def reconcile_run(
                 mode="replace",
             )
         except OssieImportError as exc:
-            blocking = [f"结果无法导入为本体草稿：{exc}"]
+            blocking = [f"结果无法导入为本体草稿：{exc}", *review_conventions(payload["ontology"])]
         except ValidationError as exc:
             blocking = [f"结果不满足草稿约束：{_first_validation_message(exc)}"]
 
@@ -491,6 +491,13 @@ async def _consume_proposals(
         if repaired is not None:
             return repaired
         with app.state.session_factory() as db:
+            current = db.scalar(select(ModelingSessionRecord).where(
+                ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
+                ModelingSessionRecord.result_claimed_at == claimed_at,
+            ).with_for_update())
+            if current is None:
+                return _current_result_state(app, session_id)
             store_failed_batch(
                 db,
                 workspace_id=workspace_id,
@@ -512,6 +519,13 @@ async def _consume_proposals(
         )
 
     with app.state.session_factory() as db:
+        current = db.scalar(select(ModelingSessionRecord).where(
+            ModelingSessionRecord.id == session_id,
+            ModelingSessionRecord.dataagent_task_id == task_id,
+            ModelingSessionRecord.result_claimed_at == claimed_at,
+        ).with_for_update())
+        if current is None:
+            return _current_result_state(app, session_id)
         store_batch(
             db,
             workspace_id=workspace_id,

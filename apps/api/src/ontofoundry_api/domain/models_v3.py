@@ -115,6 +115,10 @@ class LinkTypeV3(Native):
     legacy_multiplicity: Literal["one_to_one", "many_to_one", "one_to_many", "many_to_many"] | None = None
 
     @property
+    def owner_type_id(self) -> UUID:
+        return self.owner_ref.ref
+
+    @property
     def owner_role_id(self) -> UUID:
         return uuid5(self.id, "role:owner")
 
@@ -151,6 +155,15 @@ class LinkTypeV3(Native):
 
 
 class PropertyV3(LinkTypeV3):
+    @property
+    def value_concept(self):
+        role = self.roles[0]
+        return role.concept.ref if role.concept.kind == "builtin" else None
+
+    @property
+    def target_role_name(self):
+        return self.roles[0].name
+
     required: bool = False
     value_kind: str = "string"
 
@@ -399,6 +412,16 @@ def validate_v3_graph(draft) -> None:
         if any(r.kind not in {"value_type", "builtin"} for r in item.extends):
             raise ValueError("ValueType 只能继承值概念")
     concept_by_id = {i.id: i for i in [*draft.object_types, *draft.value_types]}
+    import re
+    for item in draft.object_types:
+        if item.origin != "imported" and (not item.name.strip() or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item.technical_name)):
+            raise ValueError("平台对象名称不能为空，技术名只能包含 ASCII 字母、数字和下划线")
+    platform_labels = [i.name for i in draft.object_types if i.origin != "imported"]
+    if len(set(platform_labels)) != len(platform_labels):
+        raise ValueError("工作空间中存在同名业务对象")
+    platform_keys = [i.technical_name.casefold() for i in draft.object_types if i.origin != "imported"]
+    if len(set(platform_keys)) != len(platform_keys):
+        raise ValueError("工作空间中存在技术名冲突的业务对象")
     names = [i.concept for i in concept_by_id.values()]
     if len(set(names)) != len(names):
         raise ValueError("概念名称重复")
@@ -497,11 +520,33 @@ def validate_v3_graph(draft) -> None:
             children = [i for i in nodes.values() if i.parent_id == node.id and i.slot == "object_mapping"]
             if len(children) != 1:
                 raise ValueError("link 节点必须有且只有一个 object 子节点")
+    # Existing Action and document-fact checks also apply to native drafts.
+    from ontofoundry_api.domain.models import expression_references
+    action_keys = [a.technical_name.casefold() for a in draft.actions]
+    if len(set(action_keys)) != len(action_keys):
+        raise ValueError("工作空间中存在技术名冲突的 Action")
+    for action in draft.actions:
+        if action.input_type_id not in concepts["object_type"]:
+            raise ValueError("Action 输入对象类型不存在")
+        if any(r not in rules for r in action.precondition_rule_ids):
+            raise ValueError("Action 引用了不存在的前置规则")
+        usable = draft.effective_properties(action.input_type_id)
+        input_key = concept_by_id[action.input_type_id].technical_name
+        for effect in action.effects:
+            if any(c != input_key or n not in {p.technical_name for p in usable}
+                   for c, n in expression_references(effect.expression)):
+                raise ValueError("Action 的效果表达式只能引用输入对象的属性")
+            if effect.property_id is not None and effect.property_id not in {p.id for p in usable}:
+                raise ValueError("Action 效果引用了输入对象上不存在的属性")
+            if effect.link_type_id is not None and effect.link_type_id not in {link.id for link in draft.link_types}:
+                raise ValueError("Action 效果引用了不存在的关系")
     # Instance role values include the implicit owner role, never only extras.
     objects = {i.id: i for i in draft.material_objects}
     for obj in objects.values():
         if obj.type_id not in concepts["object_type"]:
             raise ValueError("材料实例类型不存在")
+        if set(obj.values) - {p.technical_name for p in draft.effective_properties(obj.type_id)}:
+            raise ValueError("实例含未定义的属性")
     links = {i.id: i for i in draft.link_types}
 
     def bases(ref, seen=None):
@@ -526,6 +571,9 @@ def validate_v3_graph(draft) -> None:
                 valid = type(value) is int
             elif base in {"Decimal", "Float"}:
                 valid = type(value) in {int, float}
+                if type(value) is float:
+                    import math
+                    valid = math.isfinite(value)
             elif base == "Boolean":
                 valid = type(value) is bool
             elif base in {"String", "Date", "DateTime"}:
@@ -540,10 +588,14 @@ def validate_v3_graph(draft) -> None:
 
     cardinality = {}
     inverse = {}
-    for fact in draft.material_links:
+    for index, fact in enumerate(draft.material_links):
         link = links.get(fact.type_id)
         if link is None:
             raise ValueError("实例关系类型不存在")
+        from ontofoundry_api.domain.fact_views import binary_fact_view
+
+        fact = MaterialLinkV3.model_validate(binary_fact_view(link.model_dump(mode="json"), fact.model_dump(mode="json")))
+        draft.material_links[index] = fact
         expected = {link.owner_role_id: link.owner_ref, **{r.id: r.concept for r in link.roles}}
         actual = [v.role_id for v in fact.role_values]
         if len(set(actual)) != len(actual) or set(actual) != set(expected):
@@ -583,15 +635,6 @@ def validate_v3_graph(draft) -> None:
             if link.multiplicity == "OneToOne" and key in inverse and inverse[key] != owner_value:
                 raise ValueError("实例角色值违反 OneToOne 基数")
             inverse[key] = owner_value
-        if link.source_type_id is None:
-            if fact.source_id is not None or fact.target_id is not None:
-                raise ValueError("一元或多元关系不能提供二元端点")
-        else:
-            owner = next(v.object_id for v in fact.role_values if v.role_id == link.owner_role_id)
-            target = next(v.object_id for v in fact.role_values if v.role_id == link.roles[0].id)
-            source, end = (owner, target) if link.endpoint_direction == "forward" else (target, owner)
-            if fact.source_id != source or fact.target_id != end:
-                raise ValueError("实例二元端点与角色值不一致")
     # The extension envelope is an export projection of these same elements,
     # never an independently editable second truth for display data/actions.
     by_id = {i.id: i for i in items}

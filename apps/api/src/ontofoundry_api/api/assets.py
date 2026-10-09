@@ -142,7 +142,8 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
         if version_id or space.current_version_id
         else None
     )
-    snapshot = snapshot_of(version) if version else {}
+    from ontofoundry_api.domain.runtime_views import query_compat
+    snapshot = query_compat(snapshot_of(version)) if version else {}
     types = {t["id"]: t for t in snapshot.get("object_types", [])}
     schema = record.schema_name if record else schema_name
     mappings = [

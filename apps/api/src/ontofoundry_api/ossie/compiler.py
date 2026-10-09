@@ -268,6 +268,10 @@ def compile_ossie(
     ontology_description: str,
 ) -> dict[str, Any]:
     """Compile the internal graph into deterministic Apache Ossie JSON."""
+    if draft.schema_version == "3":
+        from .native import compile_native
+
+        return compile_native(draft, ontology_name, ontology_description)
     objects = sorted(draft.object_types, key=lambda item: item.technical_name.casefold())
     by_id = {item.id: item for item in objects}
     links_by_source: dict[Any, list[LinkTypeDefinition]] = defaultdict(list)

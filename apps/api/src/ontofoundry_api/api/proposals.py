@@ -35,7 +35,7 @@ from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraf
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
 from ontofoundry_api.services.errors import ConflictError, ServiceError
-from ontofoundry_api.services.identities import check_identities
+from ontofoundry_api.services.identities import check_identities, element_kinds
 from ontofoundry_api.services.proposals import batch_items as _batch_items
 from ontofoundry_api.services.proposals import (
     dependency_group,
@@ -132,6 +132,8 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
 
 
 def _session_elements(draft: dict) -> dict[str, tuple[str, dict]]:
+    from ontofoundry_api.domain.runtime_views import proposal_snapshot
+    draft = proposal_snapshot(draft)
     return {
         str(element["id"]): (kind.value, element)
         for kind, collection in COLLECTIONS.items()
@@ -177,7 +179,7 @@ def list_batches(
     ids = [b.id for b in page]
     items = _batch_items(db, ids, workspace_id, session_id)
     statuses = effective_statuses(
-        items, dependency_map(db, ids, workspace_id, session_id), session_draft(session)
+        items, dependency_map(db, ids, workspace_id, session_id), session.draft_json
     )
     by_batch: dict[str, list] = {}
     for item in items:
@@ -204,7 +206,7 @@ def read_batch(
     draft = session_draft(session)
     items = _batch_items(db, [batch.id], workspace_id, session_id)
     dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
-    statuses = effective_statuses(items, dependencies, draft)
+    statuses = effective_statuses(items, dependencies, session.draft_json)
     elements = _session_elements(draft)
     for item in items:
         for element in (item.after_json, item.before_json):
@@ -249,6 +251,17 @@ def _apply(draft: dict, item: ProposalItemRecord) -> None:
         ]
     else:
         draft[collection] = [e for e in elements if str(e["id"]) != item.target_id]
+    if draft.get("schema_version") == "3" and item.target_kind == "rule":
+        for owner_collection in ("object_types", "value_types", "properties", "link_types"):
+            for owner in draft[owner_collection]:
+                for key, kind in (("requires", "constraint"), ("derived_by", "derivation")):
+                    belongs = item.after_json and item.after_json["owner_id"] == owner["id"] and item.after_json["rule_kind"] == kind
+                    refs = owner.get(key, [])
+                    if belongs and item.target_id not in refs:
+                        owner[key] = [*refs, item.target_id]
+                        owner["native_presence"] = list(dict.fromkeys([*owner.get("native_presence", []), key]))
+                    elif not belongs and item.target_id in refs:
+                        owner[key] = [ref for ref in refs if ref != item.target_id]
 
 
 def _topological(items: list[ProposalItemRecord], dependencies: dict[str, list[str]]):
@@ -373,8 +386,32 @@ def decide(
 
     # Apply accepted items in dependency order and validate the whole draft.
     accepted_items = _topological([items[i] for i in accepts], dependencies)
+    from ontofoundry_api.domain.runtime_views import (
+        apply_legacy_mappings,
+        binary_links_of,
+        mappings_of,
+    )
+    compatibility = {"mappings": [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(draft))]}
+    joins = {str(link.id): link.data_join.model_dump(mode="json") if link.data_join else None
+             for link in binary_links_of(OntologyDraft.model_validate(draft))}
+    compatibility_changed = False
     for item in accepted_items:
+        if item.target_kind == "mapping":
+            _apply(compatibility, item)
+            compatibility_changed = True
+            continue
         _apply(draft, item)
+        if item.target_kind == "link_type" and item.after_json and "data_join" in item.after_json:
+            joins[item.target_id] = item.after_json["data_join"]
+            for link in draft["link_types"]:
+                if link["id"] == item.target_id:
+                    link.pop("data_join", None)
+            compatibility_changed = True
+    if compatibility_changed:
+        try:
+            draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
+        except ValueError as exc:
+            raise _fail(422, "VALIDATION_FAILED", "映射提案无效：" + str(exc)) from exc
     if accepted_items:
         try:
             model = OntologyDraft.model_validate(draft)
@@ -396,6 +433,7 @@ def decide(
             },
         )
         draft = model.model_dump(mode="json")
+        check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
     new_revision = session.revision + 1 if accepted_items else session.revision
@@ -416,7 +454,7 @@ def decide(
         item.decided_by, item.decided_at = user.id, now
     db.flush()
     after_statuses = effective_statuses(
-        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session_draft(session)
+        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session.draft_json
     )
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]

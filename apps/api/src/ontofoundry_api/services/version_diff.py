@@ -2,6 +2,8 @@
 
 
 def compare_snapshots(left, right):
+    from ontofoundry_api.domain.runtime_views import query_compat
+    left, right = query_compat(left), query_compat(right)
     changes = []
 
     def walk(a, b, path):

@@ -75,6 +75,15 @@ function classes(...values: (string | false | undefined)[]) {
 
 function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
   const { item, emphasis, focused } = data;
+  if (item.kind === "link_type") return (
+    <div className={classes("ontology-node", "ontology-node--hyperedge", emphasis === "dimmed" && "is-dimmed", emphasis === "match" && "is-match", selected && "is-selected", focused && "is-focused")}
+      title={[item.label, ...(item.verbalizes ?? [])].join("\n")} aria-label={`多元关系：${item.label}`}>
+      <Handle type="target" position={Position.Left} />
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 1L25 13L13 25L1 13Z" /></svg>
+      <strong>{item.label}</strong>
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
   return (
     <div
       className={classes(
@@ -186,7 +195,8 @@ const edgeTypes = { ontology: OntologyEdgeView };
 // Attributes are entity fields, not graph nodes: only object types are drawn,
 // and only the edges that run between two of them.
 function buildElements(graph: TypeGraph) {
-  const shown = graph.nodes.filter((node) => node.kind === "object_type");
+  const roleTargets = new Set(graph.edges.filter(e => e.kind === "role").map(e => e.target));
+  const shown = graph.nodes.filter((node) => node.kind === "object_type" || node.kind === "link_type" || roleTargets.has(node.id));
   const ids = new Set(shown.map((node) => node.id));
   const edges = graph.edges.filter(
     (edge) =>

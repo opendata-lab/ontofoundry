@@ -29,8 +29,10 @@ import {
   publishApi,
   workspaceRequest,
 } from "../../api/client";
+import { editorDraft, nativeFromEditor, relationReadOnly } from "../../lib/nativeDraft";
 import type {
   Draft,
+  LegacyDraft,
   ModelingSession,
   TargetKind,
   VersionSummary,
@@ -80,7 +82,7 @@ const KINDS: TargetKind[] = [
   "mapping",
 ];
 function resolve(
-  draft: Draft,
+  draft: LegacyDraft,
   kind: string,
   id: string,
 ): { type: ElementType | undefined; tab?: ElementTab; objectId?: string } {
@@ -187,8 +189,8 @@ function Inspector({
   const dialog = useRef<HTMLDialogElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
-  const [editing, setEditing] = useState(
+  const [draft, setDraft] = useState<LegacyDraft | null>(null);
+  const [editingIntent, setEditing] = useState(
     !previewHash && params.get("inspectMode") === "edit" && !!workspace.role,
   );
   const [dirty, setDirty] = useState(false);
@@ -241,7 +243,7 @@ function Inspector({
           : emptyDraft(workspace.id);
         source = { draft: model, session: null, versionId: current.version_id };
       }
-      let value = structuredClone(source.draft);
+      let value = editorDraft(source.draft);
       if (id === "new") {
         if (!workspace.role) throw new Error("没有权限创建本体元素");
         const base = {
@@ -324,12 +326,14 @@ function Inspector({
   const resolved = draft ? resolve(draft, kind, effectiveId) : null;
   const type = resolved?.type;
   const object = type ? isObject(type) : kind !== "link_type";
+  const readOnly = !!type && !isObject(type) && relationReadOnly(type);
+  const editing = editingIntent && !readOnly;
   const properties =
     draft?.properties.filter((p) => p.owner_type_id === type?.id) ?? [];
   const mappings = draft?.mappings.filter((m) => m.type_id === type?.id) ?? [];
   const relations =
     draft?.link_types.filter(
-      (r) => r.source_type_id === type?.id || r.target_type_id === type?.id,
+      (r) => r.source_type_id === type?.id || r.target_type_id === type?.id || r.owner_ref?.ref === type?.id || r.roles?.some(role => role.concept.ref === type?.id),
     ) ?? [];
   const rules = draft && type ? rulesFor(draft, type) : [];
   const actions =
@@ -387,7 +391,7 @@ function Inspector({
       setDirty(false);
       setEditing(false);
       setError("");
-      setDraft(loaded ? structuredClone(loaded.draft) : null);
+      setDraft(loaded ? editorDraft(loaded.draft) : null);
     });
     reportElement?.({ dirty: false, busy: false });
   };
@@ -415,18 +419,19 @@ function Inspector({
     );
   };
   const save = async () => {
-    if (!draft || !type || !loaded || busy) return;
+    if (!draft || !type || !loaded || busy || readOnly) return;
     setBusy(true);
     setError("");
     setNotice("");
     try {
+      const source = loaded;
       const result = await modelingApi.saveElement(workspace.id, {
         target_kind: object ? "object_type" : "link_type",
         target_id: type.id,
         expected_current_version_id: loaded.versionId,
-        session_id: loaded.session?.id ?? null,
-        expected_session_revision: loaded.session?.revision ?? null,
-        draft,
+        session_id: source.session?.id ?? null,
+        expected_session_revision: source.session?.revision ?? null,
+        draft: nativeFromEditor(source.draft, draft),
       });
       const next: Loaded = {
         draft: result.session?.draft ?? result.draft,
@@ -435,7 +440,7 @@ function Inspector({
       };
       flushSync(() => {
         setLoaded(next);
-        setDraft(structuredClone(next.draft));
+        setDraft(editorDraft(next.draft));
         setDirty(false);
         setEditing(false);
         setBusy(false);
@@ -467,7 +472,7 @@ function Inspector({
     }
   };
   const beginEdit = () => {
-    if (!loaded || !draft || loading) return;
+    if (!loaded || !draft || loading || readOnly) return;
     setEditing(true);
     setNotice("");
   };
@@ -583,9 +588,10 @@ function Inspector({
                     className="button button--primary"
                     type="button"
                     onClick={beginEdit}
-                    disabled={!type || loading}
+                    disabled={!type || loading || readOnly}
+                    title={readOnly ? "暂只读" : undefined}
                   >
-                    编辑
+                    {readOnly ? "暂只读" : "编辑"}
                   </button>
                 )}
               </>

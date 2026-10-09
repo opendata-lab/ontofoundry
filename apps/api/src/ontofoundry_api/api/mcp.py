@@ -103,12 +103,12 @@ TOOLS += [
     ("get_ontology_manifest", "读取版本清单：两个版本哈希与各类元素数量", {}),
     (
         "list_ontology_elements",
-        "按类型分页列出本体元素（稳定 id，v2 结构）",
+        "按类型分页列出本体元素（稳定 id，v3 原生角色结构）",
         {
             "kind": {
                 "type": "string",
                 "enum": [
-                    "object_type", "property", "link_type", "rule", "action",
+                    "object_type", "value_type", "property", "link_type", "rule", "action",
                     "material_object", "material_link", "mapping",
                 ],
             },
@@ -135,16 +135,22 @@ PRIVATE_KINDS = {"material_object": "instances", "material_link": "instances", "
 
 
 def visible_elements(db, workspace_id, principal, snapshot) -> dict[str, list[dict]]:
-    """v2 elements this principal may read: material instances need instance
+    """Native elements this principal may read: material instances need instance
     access, mappings need mapping access, evidence needs instance access."""
     instances = can_read_instances(db, workspace_id, principal)
     mappings = can_read_mappings(db, workspace_id, principal)
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.domain.runtime_views import all_roles_of, mappings_of
     result = {}
     for kind, collection in COLLECTIONS.items():
         need = PRIVATE_KINDS.get(kind.value)
         if (need == "instances" and not instances) or (need == "mappings" and not mappings):
             continue
         items = snapshot.get(collection) or []
+        if collection == "mappings" and snapshot.get("schema_version") == "3":
+            items = [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(snapshot))]
+        if collection in ("properties", "link_types") and snapshot.get("schema_version") == "3":
+            items = [{**item, "owner_role_id": all_roles_of(item)[0]["id"], "all_roles": all_roles_of(item)} for item in items]
         if not instances:
             items = [{**item, "evidence": []} if "evidence" in item else item for item in items]
         result[kind.value] = sorted(items, key=lambda item: str(item["id"]))

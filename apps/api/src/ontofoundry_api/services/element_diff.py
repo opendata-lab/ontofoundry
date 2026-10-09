@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ontofoundry_api.domain.canonical import canonical
+from ontofoundry_api.domain.canonical import V3_HASH_ALGORITHM, canonical
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 
 
@@ -25,18 +25,26 @@ def element_label(kind: str, element: dict, snapshot_elements: dict[str, tuple[s
     if kind == ElementKind.MAPPING.value:
         return f"{element.get('connection_alias', '')} · {element.get('table_name', '')}"
     if kind == ElementKind.MATERIAL_LINK.value:
-        names = [
-            snapshot_elements.get(str(element.get(key)), ("", {}))[1].get("name", "?")
-            for key in ("source_id", "target_id")
-        ]
-        return " → ".join(names)
+        from ontofoundry_api.domain.fact_views import binary_fact_view
+
+        definition = snapshot_elements.get(str(element.get("type_id")), ("", {}))[1]
+        try:
+            view = binary_fact_view(definition, element)
+        except ValueError:
+            view = element
+        if view.get("source_id") is not None and view.get("target_id") is not None:
+            ids = [view["source_id"], view["target_id"]]
+        else:
+            ids = [value["object_id"] for value in view.get("role_values", []) if value.get("object_id")]
+        names = [snapshot_elements.get(str(oid), ("", {}))[1].get("name", str(oid)) for oid in ids]
+        return " → ".join(names) if len(names) == 2 else " · ".join(names) or str(element.get("id", "实例关系"))
     return str(element.get("name") or element.get("technical_name") or element.get("id"))
 
 
 def owner_label(kind: str, element: dict, elements: dict[str, tuple[str, dict]]) -> str | None:
     owner = None
     if kind == ElementKind.PROPERTY.value:
-        owner = element.get("owner_type_id")
+        owner = element.get("owner_type_id", element.get("owner_ref", {}).get("ref"))
     elif kind == ElementKind.RULE.value:
         owner = element.get("owner_id")
     elif kind in (ElementKind.MATERIAL_OBJECT.value, ElementKind.MAPPING.value):
@@ -53,7 +61,7 @@ def field_changes(before: dict, after: dict) -> list[dict[str, Any]]:
         if key == "id":
             continue
         old, new = before.get(key), after.get(key)
-        if canonical(old, key) != canonical(new, key):
+        if canonical(old, key, hash_algorithm=V3_HASH_ALGORITHM) != canonical(new, key, hash_algorithm=V3_HASH_ALGORITHM):
             changes.append({"path": key, "before": old, "after": new})
     return changes
 
@@ -66,7 +74,7 @@ def element_changes(left: dict[str, Any], right: dict[str, Any]) -> list[dict[st
     for element_id in sorted(old.keys() | new.keys()):
         before = old.get(element_id)
         after = new.get(element_id)
-        if before and after and canonical(before[1]) == canonical(after[1]):
+        if before and after and canonical(before[1], hash_algorithm=V3_HASH_ALGORITHM) == canonical(after[1], hash_algorithm=V3_HASH_ALGORITHM):
             continue
         kind = (after or before)[0]
         element = (after or before)[1]
