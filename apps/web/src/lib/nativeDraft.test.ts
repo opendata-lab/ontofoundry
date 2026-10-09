@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { NativeDraft } from "../api/types";
 import fixture from "./nativeDraft.fixture.json";
-import { fromView, toView } from "./draftView";
+import { fromView, toView, viewFromTypes } from "./draftView";
 import { editorDraft, nativeFromEditor } from "./nativeDraft";
 
 export const nativeFixture = () => structuredClone(fixture) as NativeDraft;
@@ -81,4 +81,34 @@ describe("v3 editor adapter", () => {
     expect(result.link_types[0].roles[0].native_presence).not.toContain("name");
   });
 
+});
+
+describe("P2 concept context", () => {
+  it.each(["object_type", "value_type"] as const)("stores %s context only under the stable ID extension", kind => {
+    const original = nativeFixture();
+    const id = (kind === "object_type" ? original.object_types : original.value_types)[0].id;
+    original.extension_v4.concept_context = { [id]: { synonyms: ["旧别名", "旧别名"], instructions: "原说明" } };
+    const edited = editorDraft(original);
+    const concept = (kind === "object_type" ? edited.object_types : edited.value_types!)[0];
+    expect(concept.concept_context?.synonyms).toEqual(["旧别名", "旧别名"]);
+    concept.concept_context = { synonyms: ["新别名", "新别名"], instructions: "平台口径" };
+    const saved = nativeFromEditor(original, edited) as NativeDraft;
+    expect(saved.extension_v4.concept_context?.[id]).toEqual(concept.concept_context);
+    expect(saved.object_types).toEqual(original.object_types);
+    expect(saved.value_types).toEqual(original.value_types);
+    expect(saved.ai_context).toEqual(original.ai_context);
+    expect(saved.semantic_models).toEqual(original.semantic_models);
+    expect(editorDraft(saved).value_types).toHaveLength(original.value_types.length);
+    expect(saved.object_types[0]).not.toHaveProperty("concept_context");
+    expect(original.extension_v4.concept_context[id].synonyms).toEqual(["旧别名", "旧别名"]);
+  });
+});
+
+
+it("keeps public value concept context in the catalog projection", () => {
+  const value = nativeFixture().value_types[0];
+  const context = { synonyms: ["金额别名"], instructions: "金额口径" };
+  const view = viewFromTypes("workspace", [{ ...value, kind: "value_type", concept_context: context }]);
+  expect(view.value_types?.[0]).toMatchObject({ id: value.id, concept_kind: "value_type", concept_context: context });
+  expect(view.object_types).toEqual([]);
 });

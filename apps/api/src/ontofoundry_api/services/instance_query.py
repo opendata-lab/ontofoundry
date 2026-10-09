@@ -19,6 +19,7 @@ from ontofoundry_api.domain.instance_validation import value_issues
 from ontofoundry_api.domain.runtime_views import mappings_of
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.ontology_query import version_hashes
+from ontofoundry_api.services.public_projection import public_projection
 
 
 class ObjectSearch(BaseModel):
@@ -254,7 +255,7 @@ def object_neighborhood(db, version, ref, depth, settings):
         if fact.get("source_id") is not None:
             fact["source_name"] = names.get(fact["source_id"], fact["source_id"])
             fact["target_name"] = names.get(fact["target_id"], fact["target_id"])
-    return {
+    return public_projection({
         **envelope(version),
         **result,
         "data_mode": "live" if source == "database" else "snapshot",
@@ -265,4 +266,4 @@ def object_neighborhood(db, version, ref, depth, settings):
                 draft, UUID(item["type_id"]), item["values"], item["ref"]
             )
         ],
-    }
+    })

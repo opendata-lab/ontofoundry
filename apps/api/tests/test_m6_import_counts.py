@@ -24,7 +24,9 @@ def test_export_reimport_reports_zero_actual_additions(stem, mode):
     assert first['counts']['mappings_added'] == len(base['concept_mappings'])
     assert report['counts']['mappings_added'] == report['counts']['mappings_updated'] == 0
     assert all(v == 0 for v in report['counts'].values()), report['counts']
-    assert second == base
+    # The newly emitted ID envelope becomes native source context on reimport.
+    assert second['ai_context'] == exported['ai_context']
+    assert {k: v for k, v in second.items() if k != 'ai_context'} == {k: v for k, v in base.items() if k != 'ai_context'}
 
 
 def test_partial_import_counts_only_one_new_concept_and_mapping_and_real_updates():

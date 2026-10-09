@@ -66,6 +66,7 @@ export const FIELD_LABELS: Record<string, string> = {
   name: "名称",
   technical_name: "技术名",
   description: "描述",
+  concept_context: "概念上下文（平台扩展）",
   tags: "标签",
   extends: "继承",
   value_kind: "值类型",

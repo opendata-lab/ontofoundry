@@ -46,6 +46,7 @@ export type AttributeDefinition = {
 };
 
 export type ObjectType = {
+  concept_context?: ConceptContext;
   id: string;
   kind: "object_type";
   name: string;
@@ -81,7 +82,10 @@ export type LinkType = NativeRelationFields & {
   data_join?: { source_column: string; target_column: string } | null;
 };
 
-export type OntologyType = ObjectType | LinkType;
+export type ValueType = Omit<ObjectType, "kind" | "extends" | "description" | "attributes" | "attribute_count"> & {
+  kind: "value_type"; concept: string; extends: ConceptRef[]; description: string | null;
+};
+export type OntologyType = ObjectType | LinkType | ValueType;
 
 export type VersionSummary = {
   workspace_id: string;
@@ -225,6 +229,7 @@ export type DraftView = {
   workspace_id: string;
   requires: string[];
   object_types: ObjectDefinition[];
+  value_types?: ObjectTypeElement[];
   link_types: LinkDefinition[];
   objects: MaterialObject[];
   links: MaterialLink[];
@@ -232,7 +237,12 @@ export type DraftView = {
 };
 
 // --- Stored draft (schema v2) ------------------------------------------------
+export type ConceptContext = { synonyms: string[]; instructions: string | null };
+
 export type ObjectTypeElement = NativeFields & {
+  /** Read/edit projection; persisted only in extension_v4.concept_context. */
+  concept_context?: ConceptContext;
+  concept_kind?: "object_type" | "value_type";
   id: string;
   name: string;
   technical_name: string;
@@ -288,6 +298,7 @@ export type LegacyDraft = {
   workspace_id: string;
   ontology_requires: string[];
   object_types: ObjectTypeElement[];
+  value_types?: ObjectTypeElement[];
   properties: PropertyElement[];
   link_types: LinkTypeElement[];
   rules: RuleElement[];
@@ -296,10 +307,10 @@ export type LegacyDraft = {
   material_links: MaterialLink[];
   mappings: DataMapping[];
 };
-export type NativeConcept = Omit<ObjectTypeElement, "extends" | "description"> & { concept: string; description: string | null; extends: ConceptRef[]; identify_by: string[]; requires: string[]; derived_by: string[] };
+export type NativeConcept = Omit<ObjectTypeElement, "extends" | "description" | "concept_context" | "concept_kind"> & { concept: string; description: string | null; extends: ConceptRef[]; identify_by: string[]; requires: string[]; derived_by: string[] };
 export type NativeLink = Omit<LinkTypeElement, "source_type_id" | "target_type_id" | "multiplicity" | "description" | "data_join"> & { owner_ref: ConceptRef; roles: NativeRole[]; multiplicity: "ManyToOne" | "OneToOne" | null; description: string | null; requires: string[]; derived_by: string[] };
 export type NativeProperty = NativeLink & { value_kind: string; required: boolean; identifier: boolean; owner_type_id?: never };
-export type NativeDraft = Omit<LegacyDraft, "schema_version" | "object_types" | "properties" | "link_types"> & {
+export type NativeDraft = Omit<LegacyDraft, "schema_version" | "object_types" | "value_types" | "properties" | "link_types"> & {
   schema_version: "3"; hash_algorithm: "ontofoundry-domain-v3";
   object_types: NativeConcept[]; value_types: NativeConcept[];
   properties: NativeProperty[]; link_types: NativeLink[];
@@ -308,7 +319,7 @@ export type NativeDraft = Omit<LegacyDraft, "schema_version" | "object_types" | 
   semantic_models: { id: string; [key: string]: unknown }[];
   datasets: unknown[]; dataset_fields: unknown[]; dataset_relationships: unknown[]; metrics: unknown[];
   concept_mappings: unknown[]; mapping_nodes: unknown[];
-  core_version?: string | null; core_presence?: string[]; extension_v4: Record<string, unknown>;
+  core_version?: string | null; core_presence?: string[]; extension_v4: Record<string, unknown> & { concept_context?: Record<string, ConceptContext> };
   /** Client-only copy of the existing mapping form; excluded from draft JSON. */
   _legacy_form?: LegacyMappingForm;
 };

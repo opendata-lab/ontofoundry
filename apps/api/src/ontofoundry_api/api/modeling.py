@@ -72,7 +72,7 @@ class LegacyFormRequest(BaseModel):
 
 
 class ElementSave(LegacyFormRequest):
-    target_kind: Literal["object_type", "link_type"]
+    target_kind: Literal["object_type", "value_type", "link_type"]
     target_id: str
     expected_current_version_id: str | None
     session_id: str | None = None

@@ -490,3 +490,30 @@ describe("v3 native relations", () => {
     expect(payload.link_types[1]).toEqual(native.link_types[1]);
   });
 });
+
+describe("P2 platform concept context editor", () => {
+  it.each(["object_type", "value_type"] as const)("edits %s synonyms with a non-standard notice and native fields unchanged", async kind => {
+    const native = structuredClone(nativeJson) as NativeDraft;
+    const concept = (kind === "object_type" ? native.object_types : native.value_types)[0];
+    native.extension_v4.concept_context = { [concept.id]: { synonyms: ["原同义词"], instructions: "原上下文" } };
+    vi.mocked(workspaceRequest).mockResolvedValue({ model: native });
+    vi.mocked(modelingApi.snapshot).mockResolvedValue(native);
+    vi.mocked(modelingApi.saveElement).mockResolvedValue({ draft: native, version: { version_id: "v2" } as never, session: null });
+    show(`/workspaces/w/objects?inspect=${kind}:${concept.id}&inspectTab=basic`);
+    const el = await screen.findByRole("dialog", { name: concept.name });
+    expect(within(el).getByText("平台扩展，导出到其他工具会被忽略")).toBeInTheDocument();
+    expect(within(el).getByText("原同义词")).toBeInTheDocument();
+    fireEvent.click(within(el).getByRole("button", { name: "编辑" }));
+    fireEvent.change(within(el).getByLabelText("同义词"), { target: { value: "别名甲\n别名乙" } });
+    fireEvent.change(within(el).getByLabelText("上下文说明"), { target: { value: "业务口径" } });
+    fireEvent.click(within(el).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const request = vi.mocked(modelingApi.saveElement).mock.calls[0][1];
+    expect(request.target_kind).toBe(kind);
+    const saved = request.draft as NativeDraft;
+    expect(saved.extension_v4.concept_context?.[concept.id]).toEqual({ synonyms: ["别名甲", "别名乙"], instructions: "业务口径" });
+    expect(saved.object_types).toEqual(native.object_types);
+    expect(saved.value_types).toEqual(native.value_types);
+    expect(saved.ai_context).toEqual(native.ai_context);
+  });
+});

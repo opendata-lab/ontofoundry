@@ -149,6 +149,10 @@ def _after_schema(kind: ElementKind, draft_version="2") -> dict[str, Any]:
         else:
             schema["properties"][path] = _REF
     if draft_version == "3":
+        if kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            from ontofoundry_api.domain.models_v3 import ConceptContext
+            defs['ConceptContext'] = ConceptContext.model_json_schema()
+            schema['properties']['concept_context'] = {'anyOf': [{'$ref': '#/$defs/ConceptContext'}, {'type': 'null'}]}
         for key in ("requires", "derived_by"):
             if key in schema["properties"]:
                 schema["properties"][key] = {"type": "array", "items": _REF}
@@ -183,6 +187,10 @@ def result_schema(draft_version="3") -> dict[str, Any]:
         defs.update(after["defs"])
         full = models_for(draft_version)[kind].model_json_schema(ref_template="#/$defs/{model}")
         defs.update(full.pop("$defs", {}))
+        if draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            from ontofoundry_api.domain.models_v3 import ConceptContext
+            defs['ConceptContext'] = ConceptContext.model_json_schema()
+            full['properties']['concept_context'] = {'anyOf': [{'$ref': '#/$defs/ConceptContext'}, {'type': 'null'}]}
         defs[f"{kind.value}_after"] = after["schema"]
         defs[f"{kind.value}_element"] = full
         variants.append(
@@ -453,7 +461,11 @@ def parse_result(
         if item["before"] is None or (op == "update") != (item["after"] is not None):
             raise _fail("OPERATION_SHAPE", f"{where}：{op} 的 before/after 形态不正确")
         current = existing[target][1]
-        if canonical(item["before"], None, hash_algorithm=algorithm) != canonical(current, None, hash_algorithm=algorithm):
+        before = deepcopy(item['before'])
+        if (draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE)
+                and 'concept_context' in before and before.pop('concept_context') != draft['extension_v4']['concept_context'].get(target)):
+            raise _fail('BEFORE_MISMATCH', f'{where}：before 的平台概念上下文与固定草稿不一致')
+        if canonical(before, None, hash_algorithm=algorithm) != canonical(current, None, hash_algorithm=algorithm):
             raise _fail("BEFORE_MISMATCH", f"{where}：before 与固定草稿中的目标不一致")
         if item.get("expected_target_hash") != element_sha256(current, hash_algorithm=algorithm, collection=COLLECTIONS[kind]):
             raise _fail("TARGET_HASH_MISMATCH", f"{where}：expected_target_hash 与目标不一致")
@@ -589,8 +601,15 @@ def parse_result(
                 # The stored and fingerprinted form is the model's own dump:
                 # omitted fields take their defaults, so a sparse `after` and
                 # one spelling the defaults out are the same proposal.
+                has_context = draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE) and 'concept_context' in after
+                concept_context = after.pop('concept_context') if has_context else None
+                if has_context and concept_context is not None:
+                    from ontofoundry_api.domain.models_v3 import ConceptContext
+                    concept_context = ConceptContext.model_validate(concept_context).model_dump(mode='json')
                 legacy_join = after.pop("data_join", ...) if draft_version == "3" and kind == ElementKind.LINK_TYPE else ...
                 after = models[kind].model_validate(after).model_dump(mode="json")
+                if has_context:
+                    after['concept_context'] = concept_context
                 if legacy_join is not ...:
                     after["data_join"] = legacy_join
             except ValidationError as exc:
@@ -603,7 +622,7 @@ def parse_result(
                 return canonical(entries, "evidence")
 
             before_model = (
-                models[kind].model_validate(item["before"]).model_dump(mode="json")
+                models[kind].model_validate({k: v for k, v in item["before"].items() if k != "concept_context"}).model_dump(mode="json")
                 if item["before"] is not None
                 else None
             )
@@ -622,6 +641,11 @@ def parse_result(
                 raise _fail("RESULT_SCHEMA_INVALID", f"{where}.evidence[{position}]：{exc.errors()[0]['msg']}") from exc
             _check_quote(entry, material_lookup, f"{where}.evidence[{position}]")
             evidence.append(entry)
+        stored_before = deepcopy(item['before'])
+        if draft_version == '3' and stored_before is not None and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            context_change = after is not None and 'concept_context' in after
+            if context_change or (item['operation'] == 'delete' and target_id in draft['extension_v4']['concept_context']):
+                stored_before['concept_context'] = deepcopy(draft['extension_v4']['concept_context'].get(target_id))
         deps_by_index[index] = deps
         parsed.append(
             ParsedItem(
@@ -632,7 +656,7 @@ def parse_result(
                 target_kind=kind.value,
                 target_id=target_id,
                 expected_target_hash=item.get("expected_target_hash"),
-                before=item["before"],
+                before=stored_before,
                 after=after,
                 field_changes=item.get("field_changes") or [],
                 evidence=evidence,

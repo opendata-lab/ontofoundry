@@ -983,9 +983,6 @@ def import_ossie(document, *, workspace_id, base=None, mode="merge", target_vers
         raise OssieImportError("文件不符合 Apache Ossie 结构：" + issues[0]["message"])
     for path, reason in unsupported_constructs(document):
         raise OssieImportError(f"{path}：不支持的 Ossie 构造：{reason}")
-    extension = _extension(document)
-    if extension and extension.get("version") not in (*READABLE_EXTENSION_VERSIONS, "4"):
-        raise OssieImportError("ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED: 未知扩展版本")
     try:
         imported = parse_native(document, workspace_id).model_dump(mode="json")
         existing = as_v3_dict(base, workspace_id)
@@ -1019,6 +1016,7 @@ def import_ossie(document, *, workspace_id, base=None, mode="merge", target_vers
                 return [rewrite(v, field, depth + 1) for v in value]
             return remap.get(value, value) if isinstance(value, str) and (field in identifier_fields or (field in reference_lists and depth > 1)) else value
         imported = rewrite(imported)
+        imported['extension_v4']['concept_context'] = {remap.get(key, key): value for key, value in imported['extension_v4']['concept_context'].items()}
         if mode != "replace":
             previous_rules = {}
             for old in existing["rules"]:
@@ -1059,6 +1057,14 @@ def import_ossie(document, *, workspace_id, base=None, mode="merge", target_vers
                 draft[key] = [i for i in draft[key] if i["id"] not in incoming] + imported[key]
             for key in ("ossie_version", "ossie_name", "ossie_description", "ai_context", "native_presence", "document_origin", "ontology_requires"):
                 draft[key] = imported[key]
+        if mode != 'replace':
+            from .extensions import extension_of
+            source_extension = extension_of(document)
+            if source_extension.get('version') == '4' and 'concept_context' in source_extension:
+                for item in [*imported['object_types'], *imported['value_types']]:
+                    draft['extension_v4']['concept_context'].pop(item['id'], None)
+            draft['extension_v4']['concept_context'].update(imported['extension_v4']['concept_context'])
+            draft['extension_v4']['legacy_mapping_ids'].update(imported['extension_v4']['legacy_mapping_ids'])
         previous = {i['id']: i for i in existing['concept_mappings']}
         counts['mappings_added'] = sum(i['id'] not in previous for i in imported['concept_mappings'])
         counts['mappings_updated'] = sum(i['id'] in previous and previous[i['id']] != i
@@ -1066,5 +1072,11 @@ def import_ossie(document, *, workspace_id, base=None, mode="merge", target_vers
         draft = OntologyDraft.model_validate(draft).model_dump(mode="json")
     except (ValueError, KeyError) as exc:
         raise OssieImportError(str(exc)) from exc
+    from .extensions import extension_collisions
+    from .native import compile_native
+    collisions = extension_collisions(compile_native(OntologyDraft.model_validate(draft), '', ''))
+    notes = ['已原生保留概念、角色、字段出现状态与数组顺序']
+    if collisions:
+        notes.append('平台扩展碰撞：' + '、'.join(collisions) + '；导出记录原值与平台新增内容，可逆恢复原文。')
     return draft, dict(name=document.get("name", ""), description=document.get("description", ""), mode=mode,
-                       counts=counts, skipped=[], notes=["已原生保留概念、角色、字段出现状态与数组顺序"])
+                       counts=counts, skipped=[], notes=notes)

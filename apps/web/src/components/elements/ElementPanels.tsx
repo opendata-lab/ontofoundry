@@ -90,12 +90,14 @@ export function Field({
 export function BasicPanel(props: PanelProps) {
   const { type, draft, editing, open } = props;
   const update = (patch: Partial<ElementType>) => changeType(props, patch);
+  const nativeEditing = editing && !(isObject(type) && type.concept_kind === "value_type");
+  const context = isObject(type) ? type.concept_context ?? { synonyms: [], instructions: null } : null;
   return (
     <section className="element-section">
       <h3>基本信息</h3>
       <div className="element-basic-grid">
         <Field label="名称">
-          {editing ? (
+          {nativeEditing ? (
             <input
               required
               maxLength={240}
@@ -107,7 +109,7 @@ export function BasicPanel(props: PanelProps) {
           )}
         </Field>
         <Field label="英文名称">
-          {editing ? (
+          {nativeEditing ? (
             <input
               required
               pattern="[A-Za-z_][A-Za-z0-9_]*"
@@ -120,16 +122,16 @@ export function BasicPanel(props: PanelProps) {
         </Field>
         <div className="element-field">
           <span>标签</span>
-          {editing ? (
+          {nativeEditing ? (
             <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
           ) : (
             <TagList tags={type.tags} />
           )}
         </div>
-        {isObject(type) && (
+        {isObject(type) && type.concept_kind !== "value_type" && (
           <div className="element-field">
             <span>继承自</span>
-            {editing ? (
+            {nativeEditing ? (
               <select
                 aria-label="继承自"
                 value={type.extends[0] ?? ""}
@@ -165,7 +167,7 @@ export function BasicPanel(props: PanelProps) {
         )}
         <div className="element-field-wide">
           <Field label="描述">
-            {editing ? (
+            {nativeEditing ? (
               <textarea
                 maxLength={4000}
                 rows={4}
@@ -180,6 +182,21 @@ export function BasicPanel(props: PanelProps) {
             )}
           </Field>
         </div>
+        {context && (
+          <div className="element-field-wide">
+            <p className="element-note">平台扩展，导出到其他工具会被忽略</p>
+            <Field label="同义词">
+              {editing ? <textarea rows={3} placeholder="每行一个同义词" value={context.synonyms.join("\n")}
+                onChange={e => update({ concept_context: { ...context, synonyms: e.target.value.split("\n").filter(value => value !== "") } })} />
+                : <span className="element-value">{context.synonyms.join("、") || "尚未填写同义词"}</span>}
+            </Field>
+            <Field label="上下文说明">
+              {editing ? <textarea rows={3} value={context.instructions ?? ""} placeholder="帮助智能体理解此概念的业务口径"
+                onChange={e => update({ concept_context: { ...context, instructions: e.target.value } })} />
+                : <span className="element-value">{context.instructions || "尚未填写上下文说明"}</span>}
+            </Field>
+          </div>
+        )}
       </div>
     </section>
   );

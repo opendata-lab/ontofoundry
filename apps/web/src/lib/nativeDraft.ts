@@ -36,7 +36,8 @@ export function editorDraft(source: Draft): LegacyDraft {
   });
   return {
     schema_version: "2", workspace_id: draft.workspace_id, ontology_requires: [...draft.ontology_requires],
-    object_types: draft.object_types.map(c => ({ ...c, description: c.description ?? "", extends: c.extends.filter(r => r.kind === "object_type").map(r => r.ref) })),
+    value_types: draft.value_types.map(c => ({ ...c, concept_kind: "value_type", concept_context: structuredClone(draft.extension_v4.concept_context?.[c.id]), description: c.description ?? "", extends: [] })),
+    object_types: draft.object_types.map(c => ({ ...c, concept_context: structuredClone(draft.extension_v4.concept_context?.[c.id]), description: c.description ?? "", extends: c.extends.filter(r => r.kind === "object_type").map(r => r.ref) })),
     properties: draft.properties.map(p => ({ ...p, owner_type_id: p.owner_ref.ref, description: p.description ?? "", value_concept: concepts.get(p.roles[0].concept.ref)?.concept ?? p.roles[0].concept.ref, target_role_name: p.roles[0].name, multiplicity: p.multiplicity === "OneToOne" ? "one_to_one" : p.multiplicity === "ManyToOne" ? "many_to_one" : null })),
     link_types: links, rules: structuredClone(draft.rules), actions: structuredClone(draft.actions),
     material_objects: structuredClone(draft.material_objects), material_links: draft.material_links.map(fact => ({ ...structuredClone(fact), ...materialLinkEndpoints(fact, draft.link_types.find(r => r.id === fact.type_id)) })),
@@ -64,13 +65,27 @@ export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
   const oldLinks = new Map(original.link_types.map(l => [l.id, l]));
   result.object_types = edited.object_types.map(c => {
     const old = oldConcepts.get(c.id);
-    const node: NativeConcept = old ? structuredClone(old) : { ...c, concept: c.technical_name, extends: [], identify_by: [], requires: [], derived_by: [], native_presence: [], position: null, origin: "platform" };
+    const { concept_context: _context, concept_kind: _kind, ...native } = c;
+    void _context; void _kind;
+    const node: NativeConcept = old ? structuredClone(old) : { ...native, concept: c.technical_name, extends: [], identify_by: [], requires: [], derived_by: [], native_presence: [], position: null, origin: "platform" };
     const prev = before.object_types.find(p => p.id === c.id);
     for (const key of ["name", "technical_name", "tags"]) field(node, prev, c, key);
     field(node, prev, c, "description", true);
     if (!prev || !same(prev.extends, c.extends)) { node.extends = c.extends.map(ref => ({ kind: "object_type", ref })); node.native_presence = [...new Set([...(node.native_presence ?? []), "extends"])]; }
     return node;
   });
+  // Context is a platform extension keyed by stable concept ID, never a native node field.
+  const contexts = structuredClone(original.extension_v4.concept_context ?? {});
+  for (const concept of [...edited.object_types, ...(edited.value_types ?? [])]) {
+    const previous = [...before.object_types, ...(before.value_types ?? [])].find(c => c.id === concept.id);
+    if (!same(previous?.concept_context, concept.concept_context)) {
+      if (concept.concept_context) contexts[concept.id] = structuredClone(concept.concept_context);
+      else delete contexts[concept.id];
+    }
+  }
+  const keptIds = new Set([...edited.object_types, ...(edited.value_types ?? [])].map(c => c.id));
+  for (const key of Object.keys(contexts)) if (!keptIds.has(key)) delete contexts[key];
+  if (!same(contexts, original.extension_v4.concept_context ?? {})) result.extension_v4.concept_context = contexts;
   result.properties = edited.properties.map(p => {
     const old = oldProps.get(p.id);
     const prev = before.properties.find(prop => prop.id === p.id);

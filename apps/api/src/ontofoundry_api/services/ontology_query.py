@@ -11,6 +11,8 @@ from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.snapshot import as_v3_dict
 
 from .errors import NotFoundError
+from .ontology_context import concept_context, context_elements, document_context, matches
+from .public_projection import public_projection
 from .workspaces import get_workspace
 
 
@@ -214,7 +216,9 @@ def _type_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "attribute_count": 0,
             }
         )
-    return objects + links
+    values = [{**concept_context({k: v for k, v in item.items() if k != "evidence"}, snapshot), "kind": "value_type", "attribute_count": 0}
+              for item in snapshot.get("value_types", [])]
+    return [concept_context(item, snapshot) for item in objects] + links + values
 
 
 def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -225,50 +229,44 @@ def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def search_types(
     version: OntologyVersionRecord,
-    *,
-    query: str = "",
-    kind: str | None = None,
+    *, query: str = '', kind: str | None = None, include_context_elements: bool = False, include_document_context: bool = False,
 ) -> dict[str, Any]:
     normalized_query = query.strip().casefold()
+    snapshot = snapshot_of(version)
     items = _type_items(query_view(version))
+    if include_context_elements:
+        items += [item for group in context_elements(snapshot).values() for item in group]
+    if include_document_context and (normalized_query or kind == 'document'):
+        items.append(document_context(snapshot))
     if kind:
-        items = [item for item in items if item["kind"] == kind]
+        items = [item for item in items if item['kind'] == kind]
     if normalized_query:
-        items = [
-            item
-            for item in items
-            if normalized_query
-            in " ".join(
-                [
-                    item.get("name", ""),
-                    item.get("technical_name", ""),
-                    item.get("description") or "",
-                    " ".join(item.get("tags", [])),
-                    " ".join((r.get("name") or "") + " " + r["concept"] for r in item.get("role_concepts", [])),
-                    " ".join(item.get("verbalizes", [])),
-                ]
-            ).casefold()
-        ]
-    items.sort(key=lambda item: (item["kind"], item["technical_name"].casefold()))
+        items = [{**item, 'matches': matches(item, normalized_query)} for item in items]
+        items = [item for item in items if item['matches']]
+    items.sort(key=lambda item: (item['kind'], item['technical_name'].casefold(), item['id']))
     return {
-        "workspace_id": version.workspace_id,
-        "version_id": version.id,
-        **version_hashes(version),
-        "items": items,
-        "next_cursor": None,
+        'workspace_id': version.workspace_id, 'version_id': version.id, **version_hashes(version),
+        'items': public_projection(items), 'next_cursor': None, 'ambiguous': bool(normalized_query) and len(items) > 1,
+        'document_context': public_projection(document_context(snapshot)),
     }
 
 
-def get_type(version: OntologyVersionRecord, type_id: str) -> dict[str, Any]:
-    for item in _type_items(query_view(version)):
-        if item["id"] == type_id or item["technical_name"] == type_id:
-            return {
-                "workspace_id": version.workspace_id,
-                "version_id": version.id,
-                **version_hashes(version),
-                "item": item,
-            }
-    raise NotFoundError("没有找到该本体类型")
+def get_type(version: OntologyVersionRecord, type_id: str, *, include_context_elements: bool = False, include_document_context: bool = False) -> dict[str, Any]:
+    snapshot = snapshot_of(version)
+    items = _type_items(query_view(version))
+    if include_context_elements:
+        items += [item for group in context_elements(snapshot).values() for item in group]
+    if include_document_context:
+        items.append(document_context(snapshot))
+    found = [item for item in items if item['id'] == type_id]
+    if not found:
+        found = [item for item in items if item['technical_name'] == type_id]
+    if not found:
+        raise NotFoundError('没有找到该本体类型')
+    envelope = dict(workspace_id=version.workspace_id, version_id=version.id, **version_hashes(version))
+    if len(found) > 1:
+        return {**envelope, 'item': None, 'candidates': public_projection(found), 'ambiguous': True}
+    return {**envelope, 'item': public_projection(found[0]), 'ambiguous': False}
 
 
 def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
@@ -359,7 +357,7 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                 "identifier": link.get("identifier", False),
             }
         )
-    return nodes, edges
+    return public_projection(nodes), public_projection(edges)
 
 
 def type_graph(

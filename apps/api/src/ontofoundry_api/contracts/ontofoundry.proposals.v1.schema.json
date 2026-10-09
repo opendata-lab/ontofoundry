@@ -240,6 +240,32 @@
       "title": "ManualEvidence",
       "type": "object"
     },
+    "AfterConceptContext": {
+      "additionalProperties": false,
+      "properties": {
+        "synonyms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        }
+      },
+      "title": "ConceptContext",
+      "type": "object"
+    },
     "ClientRef": {
       "additionalProperties": false,
       "properties": {
@@ -292,6 +318,32 @@
       "type": "object"
     },
     "JsonValue": {},
+    "ConceptContext": {
+      "additionalProperties": false,
+      "properties": {
+        "synonyms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        }
+      },
+      "title": "ConceptContext",
+      "type": "object"
+    },
     "object_type_after": {
       "additionalProperties": false,
       "properties": {
@@ -433,6 +485,16 @@
               }
             ]
           }
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -548,6 +610,16 @@
           },
           "title": "Evidence",
           "type": "array"
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -698,6 +770,16 @@
               }
             ]
           }
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -813,6 +895,16 @@
           },
           "title": "Evidence",
           "type": "array"
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

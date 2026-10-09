@@ -121,12 +121,14 @@ def types(
     workspace_id: str,
     version_id: str | None = None,
     q: str = "",
-    kind: str | None = Query(default=None, pattern="^(object_type|link_type)$"),
+    kind: str | None = Query(default=None, pattern="^(object_type|value_type|link_type|document|semantic_model|dataset|dataset_field|metric)$"),
     session: Session = Depends(get_db),
-    _: Principal = Depends(current_principal),
+    principal: Principal = Depends(current_principal),
 ) -> dict:
     return search_types(
-        current_version(session, workspace_id, version_id), query=q, kind=kind
+        current_version(session, workspace_id, version_id), query=q, kind=kind,
+        include_context_elements=kind in ('semantic_model', 'dataset', 'dataset_field', 'metric') and can_read_mappings(session, workspace_id, principal),
+        include_document_context=kind == 'document',
     )
 
 
@@ -136,9 +138,10 @@ def type_detail(
     type_id: str,
     version_id: str | None = None,
     session: Session = Depends(get_db),
-    _: Principal = Depends(current_principal),
+    principal: Principal = Depends(current_principal),
 ) -> dict:
-    return get_type(current_version(session, workspace_id, version_id), type_id)
+    return get_type(current_version(session, workspace_id, version_id), type_id,
+                    include_context_elements=can_read_mappings(session, workspace_id, principal), include_document_context=True)
 
 
 @router.get("/{workspace_id}/type-graph/neighborhood")

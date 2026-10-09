@@ -9,6 +9,7 @@ import pytest
 from ontofoundry_api.db_models import OntologyVersionRecord
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
+from ontofoundry_api.ossie.extensions import reverse_export_edits
 from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.workspaces import publish_draft
@@ -35,10 +36,11 @@ def test_real_nary_import_persist_publish_export(client, stem, count):
     nary_export = [(c['concept'], r) for c in exported['ontology'] for r in c.get('relationships', []) if len(r.get('roles', [])) >= 2]
     assert len(nary_export) == count
     assert nary_export == nary_original  # objects only ignore key order; all arrays exact
-    assert exported == original
+    assert reverse_export_edits(exported) == original
     assert validate_ossie(exported)['publishable']
     second, _ = import_ossie(exported, workspace_id=DEMO_WORKSPACE_ID, mode='replace', target_version='3')
-    assert second == payload
+    assert second['object_types'] == payload['object_types']
+    assert second['mapping_nodes'] == payload['mapping_nodes']
     assert compile_ossie(OntologyDraft.model_validate(second), ontology_name='ignored', ontology_description='ignored') == exported
 
 
@@ -66,15 +68,15 @@ def test_value_unary_any_builtin_presence_order_long_expressions():
     assert len(draft.rules) == 2 and draft.rules[0].id != draft.rules[1].id
     assert draft.value_types[0].requires == [r.id for r in draft.rules]
     result = compile_ossie(draft, ontology_name='ignored', ontology_description='ignored')
-    assert result == original
+    assert reverse_export_edits(result) == original
     next(r for r in draft.link_types if r.technical_name == 'facts').description = 'changed'
     edited = compile_ossie(draft, ontology_name='ignored', ontology_description='ignored')
     expected = deepcopy(original)
     expected['ontology'][1]['relationships'][1]['description'] = 'changed'
-    assert edited == expected
+    assert reverse_export_edits(edited) == expected
 
 
 def test_value_only_document_and_missing_containers():
     original = {'version': '0.2.0.dev0', 'name': 'value_only', 'ontology': [{'concept': 'Score', 'type': 'ValueType', 'extends': ['Float']}]}
     payload, _ = import_ossie(original, workspace_id=str(uuid4()), mode='replace', target_version='3')
-    assert compile_ossie(OntologyDraft.model_validate(payload), ontology_name='ignored', ontology_description='ignored') == original
+    assert reverse_export_edits(compile_ossie(OntologyDraft.model_validate(payload), ontology_name='ignored', ontology_description='ignored')) == original

@@ -872,7 +872,7 @@ def test_import_endpoint_rejects_invalid_files(client):
     assert "导入失败" in response.json()["detail"]
 
 
-def test_import_endpoint_accepts_v1_and_reports_unknown_extension_versions(client):
+def test_import_endpoint_accepts_v1_and_preserves_unknown_vendor_extension(client):
     draft = mapped_draft()
     response = client.post(
         ROOT + "/imports/ossie",
@@ -886,8 +886,12 @@ def test_import_endpoint_accepts_v1_and_reports_unknown_extension_versions(clien
         ROOT + "/imports/ossie",
         json={"document": unknown, "mode": "replace"},
     )
-    assert response.status_code == 422
-    assert "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED" in response.json()["detail"]
+    assert response.status_code == 201, response.text
+    assert response.json()['draft']['ai_context'] == unknown['ai_context']
+    from ontofoundry_api.ossie.extensions import reverse_export_edits
+    exported = compile_ossie(OntologyDraft.model_validate(response.json()['draft']), ontology_name='ignored', ontology_description='ignored')
+    assert reverse_export_edits(exported) == unknown
+
 
 
 def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():

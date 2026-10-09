@@ -12,6 +12,7 @@ from test_t4_proposal_decisions import decide, seed_batch
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.domain.runtime_views import apply_mapping_form, legacy_mapping_form
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
+from ontofoundry_api.ossie.extensions import reverse_export_edits
 from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
@@ -30,7 +31,7 @@ def test_unchanged_form_never_rewrites_native_semantic_nodes(client, stem):
     })
     assert saved.status_code == 200, saved.text
     assert saved.json()['draft'] == session['draft']
-    assert compile_ossie(OntologyDraft.model_validate(saved.json()['draft']), ontology_name='ignored', ontology_description='ignored') == original
+    assert reverse_export_edits(compile_ossie(OntologyDraft.model_validate(saved.json()['draft']), ontology_name='ignored', ontology_description='ignored')) == original
 
 
 def test_platform_mapping_identity_survives_export_reimport_and_retains_unrelated_native_nodes():

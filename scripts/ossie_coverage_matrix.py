@@ -178,7 +178,7 @@ def render():
     for source, definition, field, spec in scalars:
         lines.append(f"| `{source}#/$defs/{definition}` | {spec.get('description', definition)} | {SCALAR_LANDINGS[source,definition]} | 原生 | {counts[0][source,definition,field]} | {counts[1][source,definition,field]} | 无属性标量；保留原文/遵守固定枚举 |")
     lines += ["", "## 平台扩展合同", "", "下列是平台新增内容，不替代上表的原生字段；A/B 次数统计输入中已有的平台路径，不按未来导出量计数。", "", "| Ossie 路径 | 语义 | v3 落点（字段/集合） | 原生/扩展/不支持 | A 出现次数 | B 出现次数 | 说明 |", "| --- | --- | --- | --- | ---: | ---: | --- |",
-              "| `ai_context.ontofoundry.ids` | 稳定 ID 注册表 | extension_v4.ids | 扩展 | 0 | 0 | version=4；作用域路径 → UUID，包括附加角色及隐含 owner 角色 |",
+              "| `ai_context.ontofoundry.ids` | 稳定 ID 注册表 | extension_v4.ids | 扩展 | 0 | 0 | version=4；id_namespace 保存 UUID 派生命名空间，ids 只记录无法按作用域路径推导的例外；owner 由关系 ID 派生，Action 内显式 ID 不重复登记 |",
               "| `ai_context.ontofoundry`（显示信息） | 中文显示名、tags、required | extension_v4.display_names/tags/required_properties | 扩展 | 0 | 0 | 原生 name 不被显示名替换 |",
               "| `ai_context.ontofoundry.rule_metadata` | 规则 ID、名称 | extension_v4.rule_metadata | 扩展 | 0 | 0 | 原生约束/派生表达式保留原文、顺序、重复项 |",
               "| `ai_context.ontofoundry.actions` | Action 定义 | extension_v4.actions + actions | 扩展 | 0 | 0 | 平台定义，Ossie 无对应构造 |",
@@ -217,7 +217,7 @@ CONTRACT = '''## 表示与 canonical 合同
 
 ## 待后续阶段决定的实现细节
 
-没有阻塞 P0 的数据形状未决点。P1/M6 按产品修订清理非 v3 会话，保留版本纯读迁移与新会话 revision CAS，落实角色顺序合并与端点只读保护；P2 落实扩展碰撞的 UI 提示；P3 实现 mapping_view/join_view、复杂映射只读交互与 schema 全构造无损往返。这些不能改变本文冻结的数据形状和哈希算法。
+没有阻塞 P0 的数据形状未决点。P1/M6 按产品修订清理非 v3 会话，保留版本纯读迁移与新会话 revision CAS，落实角色顺序合并与端点只读保护；P2 已接入 v4 例外注册表与紧凑命名空间、可逆扩展覆盖/字符串上下文、概念上下文编辑/提案与 MCP 同义词来源；新增导出省略冗余显示名、默认规则元数据与空集合，已有扩展覆盖仍可逆。MCP/REST 查询使用独立对外投影，过滤保真位置/来源等内部字段（原生开放上下文与实例属性保留原意），完整编辑草稿保留保真字段；碰撞以导入说明及非阻断预览警告展示。概念上下文仅存 extension_v4.concept_context，编辑/提案的同名字段是输入投影；不改变原生节点或旧元素哈希，另固定并验证上下文 before 防止并发覆盖。MCP 文档级同义词只命中文档候选，语义层 field/dataset/metric 别名只属于对应节点，歧义保留全部候选。P3 实现 mapping_view/join_view、复杂映射只读交互与 schema 全构造无损往返。这些不能改变本文冻结的数据形状和哈希算法。
 '''
 
 if __name__ == "__main__":

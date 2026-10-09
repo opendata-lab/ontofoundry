@@ -35,7 +35,7 @@ export function TypeCatalogPage({
   const filtered = items.filter(
     (i) =>
       (!tag || i.tags.includes(tag)) &&
-      (i.name + i.technical_name + i.description + ("roles" in i ? JSON.stringify(i.role_concepts ?? i.roles) + JSON.stringify(i.verbalizes) : ""))
+      (i.name + i.technical_name + i.description + ("concept_context" in i ? JSON.stringify(i.concept_context) : "") + ("roles" in i ? JSON.stringify(i.role_concepts ?? i.roles) + JSON.stringify(i.verbalizes) : ""))
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
@@ -165,6 +165,16 @@ export function TypeCatalogPage({
           </Link>
         ))}
       </div>
+      {kind === "object_type" && !!draft.value_types?.length && <>
+        <h2>值概念</h2>
+        <div className="object-card-grid">
+          {draft.value_types.filter(value => (!tag || value.tags.includes(tag)) &&
+            (value.name + value.technical_name + JSON.stringify(value.concept_context ?? {})).toLowerCase().includes(query.toLowerCase()))
+            .map(value => <Link className="object-card" key={value.id} to={inspector.href({ kind: "value_type", id: value.id, tab: "basic", sessionId })}>
+              <h2>{value.name}</h2><p className="api-name">{value.technical_name}</p><p>值概念 · 上下文</p>
+            </Link>)}
+        </div>
+      </>}
       {!filtered.length && query && <EmptyModel text="没有匹配的本体模型" />}
       {!items.length && !workspace.role && <EmptyModel text="暂无已发布本体" />}
     </div>

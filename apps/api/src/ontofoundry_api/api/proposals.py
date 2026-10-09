@@ -243,11 +243,22 @@ def _request_sha256(body: DecisionRequest) -> str:
 def _apply(draft: dict, item: ProposalItemRecord) -> None:
     collection = COLLECTIONS[ElementKind(item.target_kind)]
     elements = draft.setdefault(collection, [])
+    after = deepcopy(item.after_json)
+    if draft.get('schema_version') == '3' and item.target_kind in ('object_type', 'value_type'):
+        contexts = draft['extension_v4']['concept_context']
+        if item.operation == 'delete':
+            contexts.pop(item.target_id, None)
+        elif 'concept_context' in after:
+            context = after.pop('concept_context')
+            if context is None:
+                contexts.pop(item.target_id, None)
+            else:
+                contexts[item.target_id] = context
     if item.operation == "create":
-        elements.append(deepcopy(item.after_json))
+        elements.append(after)
     elif item.operation == "update":
         draft[collection] = [
-            deepcopy(item.after_json) if str(e["id"]) == item.target_id else e for e in elements
+            after if str(e["id"]) == item.target_id else e for e in elements
         ]
     else:
         draft[collection] = [e for e in elements if str(e["id"]) != item.target_id]

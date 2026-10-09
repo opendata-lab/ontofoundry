@@ -39,7 +39,6 @@ import type {
 } from "../../api/types";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
-import { emptyDraft } from "../../lib/draftView";
 import {
   inspectorHref,
   notifyOntologySaved,
@@ -73,6 +72,7 @@ type Loaded = {
 };
 const KINDS: TargetKind[] = [
   "object_type",
+  "value_type",
   "property",
   "link_type",
   "rule",
@@ -86,6 +86,8 @@ function resolve(
   kind: string,
   id: string,
 ): { type: ElementType | undefined; tab?: ElementTab; objectId?: string } {
+  if (kind === "value_type")
+    return { type: draft.value_types?.find(t => t.id === id) };
   if (kind === "object_type")
     return { type: draft.object_types.find((t) => t.id === id) };
   if (kind === "link_type")
@@ -240,7 +242,7 @@ function Inspector({
                 `/versions/${current.version_id}/presentation`,
               )
             ).model
-          : emptyDraft(workspace.id);
+          : await modelingApi.snapshot(workspace.id);
         source = { draft: model, session: null, versionId: current.version_id };
       }
       let value = editorDraft(source.draft);
@@ -344,6 +346,8 @@ function Inspector({
             : a.effects.some((e) => e.link_type_id === type.id),
         )
       : [];
+  const valueConcept = type && isObject(type) && type.concept_kind === "value_type";
+  const selectedKind = valueConcept ? "value_type" : object ? "object_type" : "link_type";
   const allTabs: {
     id: ElementTab;
     name: string;
@@ -367,7 +371,7 @@ function Inspector({
     { id: "actions", name: "动作", count: actions.length },
     { id: "instances", name: "实例", private: true },
   ];
-  const tabs = allTabs.filter((tab) => !tab.private || workspace.role);
+  const tabs = allTabs.filter((tab) => valueConcept ? tab.id === "basic" : !tab.private || workspace.role);
   const requestedTab = params.get("inspectTab") ?? resolved?.tab ?? "basic";
   const compatibleTab = requestedTab === "data" ? "mapping" : requestedTab;
   const selectedTab = tabs.find((t) => t.id === compatibleTab)?.id ?? "basic";
@@ -404,7 +408,7 @@ function Inspector({
     if (
       type &&
       request.id === type.id &&
-      request.kind === (object ? "object_type" : "link_type") &&
+      request.kind === selectedKind &&
       request.mode !== "edit"
     ) {
       selectTab(request.tab ?? "basic");
@@ -426,7 +430,7 @@ function Inspector({
     try {
       const source = loaded;
       const result = await modelingApi.saveElement(workspace.id, {
-        target_kind: object ? "object_type" : "link_type",
+        target_kind: selectedKind,
         target_id: type.id,
         expected_current_version_id: loaded.versionId,
         session_id: source.session?.id ?? null,
@@ -453,7 +457,7 @@ function Inspector({
       refresh();
       setNotice("已保存");
       const target = inspectorHref(createPath(location), {
-        kind: object ? "object_type" : "link_type",
+        kind: selectedKind,
         id: type.id,
         tab: selectedTab,
         sessionId,

@@ -4,20 +4,24 @@ from uuid import UUID, uuid5
 
 from ontofoundry_api.domain.models import OntologyDraft
 
+from .extensions import extension_of, pointer_part, write_extension
+
 BUILTINS = {'String', 'Integer', 'Decimal', 'Float', 'Boolean', 'Date', 'DateTime'}
 
 
 def parse_native(document, workspace_id):
     workspace = UUID(str(workspace_id))
-    ext = document.get('ai_context', {})
-    ext = ext.get('ontofoundry', {}) if isinstance(ext, dict) else {}
-    ext = ext if isinstance(ext, dict) else {}
+    source_extension = extension_of(document)
+    ext = source_extension if source_extension.get('version') in ('1', '2', '3', '4') else {}
     ids = ext.get('ids', {}) if ext.get('version') == '4' else {}
+    namespace = UUID(str(ext.get('id_namespace', workspace))) if ext.get('version') == '4' else workspace
     labels = ext.get('display_names', {})
     tags = ext.get('tags', {})
 
     def identity(path):
-        return str(ids.get(path) or uuid5(workspace, 'ossie:' + path))
+        # P1 exports used a singular object_mapping path without its /0 index.
+        legacy_path = path.replace('/object_mapping/0', '/object_mapping')
+        return str(ids.get(path) or ids.get(legacy_path) or uuid5(namespace, 'ossie:' + path))
 
     def meta(node, index):
         return dict(native_presence=sorted(node), position=index, origin='imported')
@@ -32,7 +36,7 @@ def parse_native(document, workspace_id):
         if field in document:
             result[{'name': 'ossie_name', 'description': 'ossie_description'}.get(field, field)] = deepcopy(document[field])
     refs = {c['concept']: dict(kind='object_type' if c['type'] == 'EntityType' else 'value_type',
-                             ref=identity('/ontology/' + c['concept'])) for c in document['ontology']}
+                             ref=identity('/ontology/' + pointer_part(c['concept']))) for c in document['ontology']}
 
     def ref(name):
         return deepcopy(refs.get(name) or dict(kind='any' if name == 'Any' else 'builtin', ref=name))
@@ -56,7 +60,7 @@ def parse_native(document, workspace_id):
 
     for ci, node in enumerate(document['ontology']):
         name = node['concept']
-        path = '/ontology/' + name
+        path = '/ontology/' + pointer_part(name)
         kind = refs[name]['kind']
         item = dict(id=refs[name]['ref'], concept=name, name=labels.get(refs[name]['ref'], labels.get(name, name)),
                     technical_name=name, tags=tags.get(refs[name]['ref'], tags.get(name, [])), **meta(node, ci))
@@ -68,11 +72,14 @@ def parse_native(document, workspace_id):
         result['object_types' if kind == 'object_type' else 'value_types'].append(item)
         for li, relationship in enumerate(node.get('relationships', [])):
             lname = relationship['name']
-            lpath = path + '/relationships/' + lname
+            lpath = path + '/relationships/' + pointer_part(lname)
             lid = identity(lpath)
             role_nodes = relationship.get('roles', [])
             is_prop = len(role_nodes) == 1 and ref(role_nodes[0]['concept'])['kind'] in ('value_type', 'builtin')
             lkind = 'property' if is_prop else 'link_type'
+            owner_id = ids.get(lpath + '/owner')
+            if owner_id is not None and UUID(str(owner_id)) != uuid5(UUID(lid), 'role:owner'):
+                raise ValueError('扩展隐含 owner 角色 ID 与关系 ID 不一致：' + lpath)
             link = dict(id=lid, name=labels.get(lid, labels.get(name + '.' + lname, lname)), technical_name=lname,
                         owner_ref=ref(name), identifier=lname in node.get('identify_by', []),
                         tags=tags.get(lid, tags.get(name + '.' + lname, [])), roles=[], **meta(relationship, li))
@@ -130,7 +137,7 @@ def parse_native(document, workspace_id):
                 for ni, node in enumerate(cm.get(slot, [])):
                     flatten(node, cid, f'{cpath}/{slot}/{ni}', slot, ni)
     if ext.get('version') == '4':
-        result['extension_v4'] = {'version': '4', 'legacy_mapping_ids': deepcopy(ext.get('legacy_mapping_ids', {}))}
+        result['extension_v4'] = {'version': '4', 'concept_context': deepcopy(ext.get('concept_context', {})), 'legacy_mapping_ids': deepcopy(ext.get('legacy_mapping_ids', {}))}
         result['actions'] = deepcopy(ext.get('actions', []))
         for rid, metadata in ext.get('rule_metadata', {}).items():
             if metadata.get('owner_kind') == 'action':
@@ -255,87 +262,77 @@ def compile_native(draft, ontology_name, ontology_description):
         maps.append(mapping)
     if 'ontology_mappings' in draft.native_presence or maps:
         document['ontology_mappings'] = maps
-    prior_extension = draft.ai_context.get('ontofoundry') if isinstance(draft.ai_context, dict) else None
-    source_labels = prior_extension.get('display_names', {}) if isinstance(prior_extension, dict) else {}
-    source_tags = prior_extension.get('tags', {}) if isinstance(prior_extension, dict) else {}
-    def source_path(item):
-        return item.concept if hasattr(item, 'concept') else concepts[item.owner_ref.ref].concept + '.' + item.technical_name
-    platform_metadata = any(i.origin == 'platform' or i.name != source_labels.get(str(i.id), source_labels.get(source_path(i), i.concept if hasattr(i, 'concept') else i.technical_name))
-                            or i.tags != source_tags.get(str(i.id), source_tags.get(source_path(i), []))
-                            for i in [*concepts.values(), *draft.properties, *draft.link_types])
-    source_required = prior_extension.get('required_properties', []) if isinstance(prior_extension, dict) else []
-    legacy_required = prior_extension.get('required_attributes', []) if isinstance(prior_extension, dict) else []
-    platform_metadata = platform_metadata or bool(draft.extension_v4.legacy_mapping_ids) or any(
-        p.required != (str(p.id) in source_required or source_path(p) in legacy_required) for p in draft.properties)
-    if draft.document_origin != 'imported' or platform_metadata or (isinstance(prior_extension, dict) and prior_extension.get('version') == '4'):
-        registry = {}
-        for item in concepts.values():
-            path = '/ontology/' + item.concept
-            registry[path] = str(item.id)
-            for field in ('requires', 'derived_by'):
-                for index, rid in enumerate(getattr(item, field)):
-                    registry[f'{path}/{field}/{index}'] = str(rid)
-        for item in [*draft.properties, *draft.link_types]:
-            path = '/ontology/' + concepts[item.owner_ref.ref].concept + '/relationships/' + item.technical_name
-            registry[path] = str(item.id)
-            registry[path + '/owner'] = str(item.owner_role_id)
-            for index, role in enumerate(item.roles):
-                registry[f'{path}/roles/{index}'] = str(role.id)
-            for field in ('requires', 'derived_by'):
-                for index, rid in enumerate(getattr(item, field)):
-                    registry[f'{path}/{field}/{index}'] = str(rid)
-        def register_tree(node, path):
-            registry[path] = str(node.id)
-            for slot in ('object_mapping', 'children', 'referent_mappings'):
-                children = ordered([n for n in draft.mapping_nodes if n.parent_id == node.id and n.slot == slot])
-                for index, child in enumerate(children):
-                    register_tree(child, path + '/' + slot + ('' if slot == 'object_mapping' else '/' + str(index)))
-        for mi, model in enumerate(ordered(draft.semantic_models)):
-            path = f'/ontology_mappings/{mi}'
-            registry[path + '/semantic_model'] = str(model.id)
-            for container, group in (('datasets', draft.datasets), ('relationships', draft.dataset_relationships), ('metrics', draft.metrics)):
-                for index, item in enumerate(ordered([i for i in group if i.semantic_model_id == model.id])):
-                    ipath = f'{path}/{container}/{index}'
-                    registry[ipath] = str(item.id)
-                    if container == 'datasets':
-                        for fi, field in enumerate(ordered([f for f in draft.dataset_fields if f.dataset_id == item.id])):
-                            registry[f'{ipath}/fields/{fi}'] = str(field.id)
-            for ci, cm in enumerate(ordered([c for c in draft.concept_mappings if c.semantic_model_id == model.id])):
-                cpath = f'{path}/concept_mappings/{ci}'
-                registry[cpath] = str(cm.id)
-                for slot in ('object_mappings', 'link_mappings'):
-                    roots = ordered([n for n in draft.mapping_nodes if n.concept_mapping_id == cm.id and n.parent_id is None and n.slot == slot])
-                    for ni, root in enumerate(roots):
-                        register_tree(root, f'{cpath}/{slot}/{ni}')
-        extension = dict(version='4', ids=registry,
-                         display_names={str(i.id): i.name for i in [*concepts.values(), *draft.properties, *draft.link_types]},
-                         tags={str(i.id): i.tags for i in [*concepts.values(), *draft.properties, *draft.link_types] if i.tags},
-                         required_properties=[str(i.id) for i in draft.properties if i.required],
-                         rule_metadata={str(r.id): ({f: getattr(r, f) for f in ('name', 'technical_name', 'description')} if r.owner_kind != 'action' else {k: v for k, v in r.model_dump(mode='json').items() if k != 'id'}) for r in draft.rules},
-                         actions=[a.model_dump(mode='json') for a in draft.actions],
-                         legacy_mapping_ids={str(old): str(new) for old, new in draft.extension_v4.legacy_mapping_ids.items()})
-        context = deepcopy(document.get('ai_context'))
-        if not isinstance(context, dict):
-            context = {'instructions': context} if isinstance(context, str) else {}
-        prior = context.get('ontofoundry')
-        if isinstance(prior, dict) and all(prior.get(k) == v for k, v in extension.items()):
-            return document  # importing an export preserves the audit bytes
-        combined = {**(prior if isinstance(prior, dict) else {}), **extension}
-        context['ontofoundry'] = combined
-        if 'ai_context' not in document or not isinstance(document.get('ai_context'), dict):
-            edits = [dict(path='/ai_context', was_present='ai_context' in document,
-                          original=deepcopy(document.get('ai_context')), written=deepcopy(context))]
-        elif not isinstance(prior, dict):
-            edits = [dict(path='/ai_context/ontofoundry', was_present='ontofoundry' in document['ai_context'],
-                          original=deepcopy(prior), written=deepcopy(combined))]
-        else:
-            edits = [dict(path='/ai_context/ontofoundry/' + key, was_present=key in prior,
-                          original=deepcopy(prior.get(key)), written=deepcopy(value))
-                     for key, value in extension.items() if prior.get(key) != value or key not in prior]
-        if isinstance(prior, dict) and 'export_edits' in prior:
-            # The input audit is vendor input too; keep it in the reversible record.
-            edits.append(dict(path='/ai_context/ontofoundry/export_edits', was_present=True,
-                              original=deepcopy(prior['export_edits']), written=None))
-        combined['export_edits'] = edits
-        document['ai_context'] = context
-    return document
+    registry = {}
+    source_extension = extension_of(document)
+    namespace = UUID(str(source_extension.get('id_namespace', draft.workspace_id))) if source_extension.get('version') == '4' else draft.workspace_id
+    metadata = {}
+
+    def register(path, element_id):
+        # A single derivation namespace also preserves imported identities when
+        # this document travels to another workspace. Only path/UUID exceptions
+        # (creation, rename, move or reorder) need per-element entries.
+        if element_id != uuid5(namespace, 'ossie:' + path):
+            registry[path] = str(element_id)
+
+    def register_rules(item, path):
+        for field, kind in (('requires', 'constraint'), ('derived_by', 'derivation')):
+            for index, rid in enumerate(getattr(item, field)):
+                register(f'{path}/{field}/{index}', rid)
+                rule = rules[rid]
+                defaults = dict(name=f'{item.name}·{kind}{index + 1}', technical_name=f'{kind}_{index}', description='')
+                values = {key: getattr(rule, key) for key, default in defaults.items() if getattr(rule, key) != default}
+                if values:
+                    metadata[str(rid)] = values
+
+    for item in concepts.values():
+        path = '/ontology/' + pointer_part(item.concept)
+        register(path, item.id)
+        register_rules(item, path)
+    for item in [*draft.properties, *draft.link_types]:
+        path = '/ontology/' + pointer_part(concepts[item.owner_ref.ref].concept) + '/relationships/' + pointer_part(item.technical_name or item.name)
+        register(path, item.id)
+        # The implicit owner is always uuid5(relationship_id, 'role:owner').
+        for index, role in enumerate(item.roles):
+            register(f'{path}/roles/{index}', role.id)
+        register_rules(item, path)
+    def register_tree(node, path):
+        register(path, node.id)
+        for slot in ('object_mapping', 'children', 'referent_mappings'):
+            children = ordered([n for n in draft.mapping_nodes if n.parent_id == node.id and n.slot == slot])
+            for index, child in enumerate(children):
+                register_tree(child, path + '/' + slot + '/' + str(index))
+    for mi, model in enumerate(ordered(draft.semantic_models)):
+        path = f'/ontology_mappings/{mi}'
+        register(path + '/semantic_model', model.id)
+        for container, group in (('datasets', draft.datasets), ('relationships', draft.dataset_relationships), ('metrics', draft.metrics)):
+            for index, item in enumerate(ordered([i for i in group if i.semantic_model_id == model.id])):
+                ipath = f'{path}/{container}/{index}'
+                register(ipath, item.id)
+                if container == 'datasets':
+                    for fi, field in enumerate(ordered([f for f in draft.dataset_fields if f.dataset_id == item.id])):
+                        register(f'{ipath}/fields/{fi}', field.id)
+        for ci, cm in enumerate(ordered([c for c in draft.concept_mappings if c.semantic_model_id == model.id])):
+            cpath = f'{path}/concept_mappings/{ci}'
+            register(cpath, cm.id)
+            for slot in ('object_mappings', 'link_mappings'):
+                roots = ordered([n for n in draft.mapping_nodes if n.concept_mapping_id == cm.id and n.parent_id is None and n.slot == slot])
+                for ni, root in enumerate(roots):
+                    register_tree(root, f'{cpath}/{slot}/{ni}')
+    # Action, parameter, effect and action-rule IDs are already explicit in
+    # their platform-only payload; registering them again adds no information.
+    metadata.update({str(r.id): r.model_dump(mode='json', exclude={'id', 'evidence'}, exclude_defaults=True)
+                     for r in draft.rules if r.owner_kind == 'action'})
+    extension = dict(version='4', id_namespace=str(namespace), ids=registry,
+                     concept_context={str(key): value.model_dump(mode='json', exclude_defaults=True) for key, value in draft.extension_v4.concept_context.items()},
+                     display_names={str(i.id): i.name for i in [*concepts.values(), *draft.properties, *draft.link_types]
+                                    if i.name != (i.concept if hasattr(i, 'concept') else i.technical_name or i.name)},
+                     tags={str(i.id): i.tags for i in [*concepts.values(), *draft.properties, *draft.link_types] if i.tags},
+                     required_properties=[str(i.id) for i in draft.properties if i.required],
+                     rule_metadata=metadata,
+                     actions=[a.model_dump(mode='json', exclude={'evidence'}, exclude_defaults=True) for a in draft.actions],
+                     legacy_mapping_ids={str(old): str(new) for old, new in draft.extension_v4.legacy_mapping_ids.items()})
+    # Empty owned collections are omitted even when clearing source keys;
+    # their original appearance/value is retained solely in the reversal log.
+    empty_keys = {key for key, value in extension.items() if not value}
+    extension = {key: value for key, value in extension.items() if value}
+    return write_extension(document, extension, remove_keys=empty_keys)

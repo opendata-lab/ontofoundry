@@ -36,10 +36,10 @@ export function changeType(
   { draft, type, change }: PanelProps,
   patch: Partial<ElementType>,
 ) {
-  const key = isObject(type) ? "object_types" : "link_types";
+  const key = isObject(type) ? type.concept_kind === "value_type" ? "value_types" : "object_types" : "link_types";
   change({
     ...draft,
-    [key]: draft[key].map((item) =>
+    [key]: (draft[key] ?? []).map((item) =>
       item.id === type.id ? { ...item, ...patch } : item,
     ),
   });

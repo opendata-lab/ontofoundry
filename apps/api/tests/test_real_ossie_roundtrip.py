@@ -20,6 +20,7 @@ from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.domain.runtime_views import mappings_of
 from ontofoundry_api.ossie.compiler import canonical_json, compile_ossie, validate_ossie
+from ontofoundry_api.ossie.extensions import reverse_export_edits
 from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.ossie.mappings import _column, _dataset_fields
 from ontofoundry_api.ossie.validator import validate_schema
@@ -222,10 +223,10 @@ def test_real_ossie_roundtrip(client, tmp_path, stem):
     assert second_report["skipped"] == []
     assert first["name"] == document["name"]
     assert first["description"] == document["description"]
-    differences = semantic_differences(document, first)
+    differences = semantic_differences(document, reverse_export_edits(first))
     losses = [item for item in differences if item["category"] == "a"]
     assert losses == []
-    assert first == document
+    assert reverse_export_edits(first) == document
     assert report["skipped"] == []
     expected_nary = 6 if stem == "REDACTED" else 8
     relationships = [(c["concept"], r) for c in document["ontology"] for r in c.get("relationships", []) if len(r.get("roles", [])) >= 2]
