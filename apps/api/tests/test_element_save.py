@@ -3,6 +3,8 @@ from uuid import uuid4
 
 from test_modeling import ONTOLOGY, ROOT, create_session, save
 
+from ontofoundry_api.domain.models import OntologyDraft
+
 
 def submit(client, draft, *, kind="object_type", target_id=None, session=None, version=None):
     return client.post(ROOT + "/element-saves", json={
@@ -125,18 +127,18 @@ def test_action_owned_rules_and_parameters_survive_object_save(client):
     assert response.status_code == 200, response.text
     current = client.get(ROOT + "/published-snapshot").json()
     assert current["actions"] == draft["actions"]
-    assert current["rules"] == draft["rules"]
+    assert current["rules"] == OntologyDraft.model_validate(draft).model_dump(mode="json")["rules"]
     preview = client.post(ROOT + f"/sessions/{session['id']}/preview", json={"expected_session_revision": response.json()["session"]["revision"]})
     assert preview.status_code == 200, preview.text
     assert preview.json()["merged_model"]["actions"] == draft["actions"]
-    assert preview.json()["merged_model"]["rules"] == draft["rules"]
+    assert preview.json()["merged_model"]["rules"] == OntologyDraft.model_validate(draft).model_dump(mode="json")["rules"]
 
 
 def test_cannot_take_another_types_property_by_changing_owner(client):
     draft = client.get(ROOT + "/published-snapshot").json()
     selected = draft["object_types"][0]["id"]
-    other = next(p for p in draft["properties"] if p["owner_type_id"] != selected)
-    other["owner_type_id"] = selected
+    other = next(p for p in draft["properties"] if p["owner_ref"]["ref"] != selected)
+    other["owner_ref"]["ref"] = selected
     response = submit(client, draft)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"

@@ -21,6 +21,7 @@ from ontofoundry_api.api.modeling import (
     require_member,
 )
 from ontofoundry_api.database import get_db
+from ontofoundry_api.domain.runtime_views import binary_links_of, mappings_of
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.source_rows import source_key, validate_source_rows
 
@@ -121,14 +122,14 @@ def neighborhood(
     return database_neighborhood(
         db,
         workspace_id,
-        read_snapshot(raw, workspace_id),
+        read_snapshot(raw, workspace_id, target_version="3"),
         body,
         request.app.state.settings,
     )
 
 
 def database_neighborhood(db, workspace_id, draft, body, settings):
-    mappings = {str(m.type_id): m for m in draft.mappings}
+    mappings = {str(m.type_id): m for m in mappings_of(draft)}
     if body.type_id not in mappings:
         raise HTTPException(422, "此对象尚未配置数据映射")
     center_rows = query_mapping(
@@ -147,7 +148,7 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
     for _ in range(body.depth):
         next_frontier = []
         for current in frontier:
-            for relation in draft.link_types:
+            for relation in binary_links_of(draft):
                 endpoints = (str(relation.source_type_id), str(relation.target_type_id))
                 if current["type_id"] not in endpoints:
                     continue

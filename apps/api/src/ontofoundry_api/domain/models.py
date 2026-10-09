@@ -121,6 +121,7 @@ class ElementKind(StrEnum):
     """Everything a proposal may create, update or delete."""
 
     OBJECT_TYPE = "object_type"
+    VALUE_TYPE = "value_type"
     PROPERTY = "property"
     LINK_TYPE = "link_type"
     RULE = "rule"
@@ -133,6 +134,7 @@ class ElementKind(StrEnum):
 # Draft collection that stores each element kind.
 COLLECTIONS: dict[ElementKind, str] = {
     ElementKind.OBJECT_TYPE: "object_types",
+    ElementKind.VALUE_TYPE: "value_types",
     ElementKind.PROPERTY: "properties",
     ElementKind.LINK_TYPE: "link_types",
     ElementKind.RULE: "rules",
@@ -593,6 +595,9 @@ class OntologyDraft(Strict):
     def expressions_of(self, owner_id: UUID, kind: RuleKind) -> list[str]:
         return [r.expression for r in self.rules_of(owner_id, kind)]
 
+    def parent_ids(self, item):
+        return [r.ref for r in item.extends if r.kind == "object_type"] if self.schema_version == "3" else item.extends
+
     def ancestors(self, type_id: UUID) -> list[ObjectTypeDefinition]:
         """Supertypes closest first, without repeats or infinite loops.
 
@@ -602,7 +607,7 @@ class OntologyDraft(Strict):
         by_id = self.type_by_id()
         ordered: list[ObjectTypeDefinition] = []
         seen: set[UUID] = set()
-        frontier = list(by_id[type_id].extends) if type_id in by_id else []
+        frontier = list(self.parent_ids(by_id[type_id])) if type_id in by_id else []
         while frontier:
             parent_id = frontier.pop(0)
             if parent_id in seen or parent_id not in by_id:
@@ -610,7 +615,7 @@ class OntologyDraft(Strict):
             seen.add(parent_id)
             parent = by_id[parent_id]
             ordered.append(parent)
-            frontier.extend(parent.extends)
+            frontier.extend(self.parent_ids(parent))
         return ordered
 
     def effective_properties(self, type_id: UUID) -> list[PropertyDefinition]:
@@ -631,7 +636,7 @@ class OntologyDraft(Strict):
             for item in self.object_types:
                 if item.id in found:
                     continue
-                if found & set(item.extends):
+                if found & set(self.parent_ids(item)):
                     found.add(item.id)
                     changed = True
         return found

@@ -133,7 +133,7 @@
 
 | 风险 | 对策 |
 | --- | --- |
-| 迁移集中、哈希变化导致活动会话提案失效 | **读取保持纯函数**（不在读时改写）；会话切换到 v3 通过 revision 校验的独立事务完成，隔离旧运行结果与提案；保留旧 pinned manifest 与旧哈希验证算法；三方合并的 base/latest/draft 统一先迁移再合并；旧 mapping 的 ID 不换 kind 复用 |
+| 迁移集中、哈希变化导致活动会话提案失效 | **2026-10-09 M6 产品修订**：不兼容旧会话，Alembic 清理草稿非 v3 的会话及其依赖；移除旧会话切换/审计/提案翻译。版本与快照读取保持纯函数，保留历史版本及旧哈希验证算法；新会话直接使用 v3 与正常 revision CAS；三方合并的 base/latest/draft 统一先迁移再合并；旧 mapping 的 ID 不换 kind 复用。详见覆盖矩阵迁移合同与 P1 进度 M6 |
 | canonical 哈希对原生 JSON 的改写 | **按路径区分"领域字段"与"原生 JSON"**：原生 JSON（AIContext、custom_extensions、表达式、unique_keys 等）保留 null、数组顺序与重复项；哈希算法版本化（`hash_algorithm` 字段），旧版本按旧算法验证 |
 | `link_types` 结构变化波及面大（提案、合并、MCP、前端） | 二元兼容视图保持现有字段；按模块逐个切换并全量回归 |
 | 实例查询依赖 DataMapping | `mapping_view` 派生保持接口不变 |

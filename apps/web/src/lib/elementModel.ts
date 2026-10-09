@@ -1,5 +1,5 @@
 import type {
-  Draft,
+  LegacyDraft,
   LinkTypeElement,
   ObjectTypeElement,
   PropertyElement,
@@ -8,10 +8,10 @@ import type { ElementRequest } from "./elementInspector";
 
 export type ElementType = ObjectTypeElement | LinkTypeElement;
 export type PanelProps = {
-  draft: Draft;
+  draft: LegacyDraft;
   type: ElementType;
   editing: boolean;
-  change: (next: Draft) => void;
+  change: (next: LegacyDraft) => void;
   open: (request: ElementRequest) => void;
 };
 export const VALUE_KINDS: Record<string, string> = {
@@ -44,7 +44,7 @@ export function changeType(
     ),
   });
 }
-export function inheritedProperties(draft: Draft, type: ObjectTypeElement) {
+export function inheritedProperties(draft: LegacyDraft, type: ObjectTypeElement) {
   const seenTypes = new Set([type.id]);
   const seenProps = new Set(
     draft.properties
@@ -70,7 +70,7 @@ export function inheritedProperties(draft: Draft, type: ObjectTypeElement) {
   }
   return rows;
 }
-export function rulesFor(draft: Draft, type: ElementType) {
+export function rulesFor(draft: LegacyDraft, type: ElementType) {
   const props = new Set(
     draft.properties
       .filter((p) => p.owner_type_id === type.id)

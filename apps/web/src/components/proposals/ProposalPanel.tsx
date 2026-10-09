@@ -50,6 +50,7 @@ export function ProposalPanel({
   };
   const actions: CardActions = {
     canViewElement: (item) => {
+      if (item.target_kind === "value_type") return false;
       const collections = { object_type: "object_types", property: "properties", link_type: "link_types", rule: "rules", action: "actions", mapping: "mappings", material_object: "material_objects", material_link: "material_links" } as const;
       return !!session?.draft[collections[item.target_kind]].some((e) => e.id === item.target_id);
     },

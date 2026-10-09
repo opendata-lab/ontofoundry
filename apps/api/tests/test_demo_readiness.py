@@ -57,7 +57,7 @@ def test_live_events_are_compacted_and_small_ones_pass_verbatim():
 def test_object_without_properties_is_a_warning(client):
     draft = client.post(ROOT + "/sessions", json={}).json()["draft"]
     kind = draft["object_types"][0]
-    bare = {**kind, "id": str(uuid4()), "name": "退货单", "technical_name": "return_order"}
+    bare = {**kind, "id": str(uuid4()), "name": "退货单", "technical_name": "return_order", "concept": "return_order", "position": None}
     draft["object_types"].append(bare)
     # A concept named in a document, with an instance known only by name.
     draft["material_objects"] = [{
@@ -78,9 +78,9 @@ def test_abstract_parents_are_not_flagged(client):
     draft = client.post(ROOT + "/sessions", json={}).json()["draft"]
     kind = draft["object_types"][0]
     parent = {**kind, "id": str(uuid4()), "name": "保证金账户", "technical_name": "margin_account",
-              "extends": []}
+              "extends": [], "concept": "margin_account", "position": None}
     child = {**kind, "id": str(uuid4()), "name": "专用资金账户", "technical_name": "fund_account",
-             "extends": [parent["id"]]}
+             "extends": [{"kind": "object_type", "ref": parent["id"]}], "concept": "fund_account", "position": None}
     draft["object_types"] += [parent, child]
     report = include_instance_validation(
         {"errors": [], "warnings": [], "publishable": True},

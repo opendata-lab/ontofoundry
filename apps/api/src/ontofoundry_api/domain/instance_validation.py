@@ -104,7 +104,7 @@ def completeness_warnings(draft: OntologyDraft) -> list[dict]:
     """A document often names a concept without saying what it records. That
     is a valid model, but it should be finished from a table or by hand."""
     # A parent that others extend is a category; it needs no fields of its own.
-    parents = {str(parent) for item in draft.object_types for parent in item.extends}
+    parents = {str(parent) for item in draft.object_types for parent in draft.parent_ids(item)}
     return [
         {
             "severity": "warning",

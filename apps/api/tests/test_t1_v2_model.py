@@ -14,7 +14,7 @@ from ontofoundry_api.domain.legacy_v1 import OntologyDraftV1
 from ontofoundry_api.domain.models import OntologyDraft, RuleKind
 from ontofoundry_api.domain.snapshot import read_snapshot, read_snapshot_json
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
-from ontofoundry_api.ossie.importer import import_ossie
+from ontofoundry_api.ossie.importer import import_ossie_v2 as import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -307,7 +307,7 @@ def install_v1_head(client) -> dict:
 def test_historical_v1_version_is_readable_comparable_and_exportable(client):
     install_v1_head(client)
     snapshot = client.get(ROOT + "/published-snapshot").json()
-    assert snapshot["schema_version"] == "2"
+    assert snapshot["schema_version"] == "3"
     assert len(snapshot["rules"]) == 2
 
     versions = client.get(ROOT + "/versions").json()["items"]
@@ -321,10 +321,10 @@ def test_historical_v1_version_is_readable_comparable_and_exportable(client):
     assert exported.status_code == 200
 
 
-def test_session_from_a_v1_head_is_v2_and_publishes_v2(client):
+def test_session_from_a_v1_head_is_v3_and_publishes_v3(client):
     install_v1_head(client)
     session = create_session(client)
-    assert session["draft"]["schema_version"] == "2"
+    assert session["draft"]["schema_version"] == "3"
     session["draft"]["object_types"][0]["description"] = "基于历史 v1 版本修改"
     session = save(client, session, session["draft"]).json()
     published = publish(client, session)
@@ -333,7 +333,7 @@ def test_session_from_a_v1_head_is_v2_and_publishes_v2(client):
     with client.app.state.session_factory() as db:
         space = db.get(WorkspaceRecord, str(DEMO_WORKSPACE_ID))
         latest = db.get(OntologyVersionRecord, space.current_version_id)
-        assert latest.snapshot_json["schema_version"] == "2"
+        assert latest.snapshot_json["schema_version"] == "3"
         assert len(latest.snapshot_json["rules"]) == 2
 
     items = client.get(ROOT + "/versions").json()["items"]

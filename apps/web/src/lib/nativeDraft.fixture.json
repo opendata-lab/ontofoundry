@@ -1,0 +1,332 @@
+{
+  "schema_version": "3",
+  "workspace_id": "11111111-1111-4111-8111-111111111111",
+  "ontology_requires": [],
+  "object_types": [
+    {
+      "native_presence": [
+        "concept",
+        "description",
+        "relationships",
+        "type"
+      ],
+      "position": 0,
+      "origin": "imported",
+      "id": "4c21b73c-f9a6-55e9-8bab-8fa0fdc5e1dd",
+      "concept": "supplier",
+      "description": "供应商",
+      "extends": [],
+      "identify_by": [],
+      "requires": [],
+      "derived_by": [],
+      "name": "supplier",
+      "technical_name": "supplier",
+      "tags": [],
+      "evidence": []
+    },
+    {
+      "native_presence": [
+        "concept",
+        "type"
+      ],
+      "position": 1,
+      "origin": "imported",
+      "id": "cd1cf493-08a3-560c-942f-e910e739a592",
+      "concept": "product",
+      "description": null,
+      "extends": [],
+      "identify_by": [],
+      "requires": [],
+      "derived_by": [],
+      "name": "product",
+      "technical_name": "product",
+      "tags": [],
+      "evidence": []
+    }
+  ],
+  "properties": [
+    {
+      "native_presence": [
+        "name",
+        "roles",
+        "verbalizes"
+      ],
+      "position": 0,
+      "origin": "imported",
+      "id": "00c5ebac-6bf5-5222-8dab-38dcfff8655c",
+      "name": "code",
+      "technical_name": "code",
+      "description": null,
+      "owner_ref": {
+        "kind": "object_type",
+        "ref": "4c21b73c-f9a6-55e9-8bab-8fa0fdc5e1dd"
+      },
+      "roles": [
+        {
+          "native_presence": [
+            "concept"
+          ],
+          "position": 0,
+          "origin": "imported",
+          "id": "691b1f67-2a14-568b-899c-0def219a16a7",
+          "name": null,
+          "concept": {
+            "kind": "builtin",
+            "ref": "String"
+          },
+          "client_ref": null
+        }
+      ],
+      "multiplicity": null,
+      "verbalizes": [
+        "{supplier} has {String}"
+      ],
+      "requires": [],
+      "derived_by": [],
+      "tags": [],
+      "evidence": [],
+      "endpoint_direction": "forward",
+      "identifier": false,
+      "owner_role_name": null,
+      "legacy_multiplicity": null,
+      "required": false,
+      "value_kind": "string"
+    }
+  ],
+  "link_types": [
+    {
+      "native_presence": [
+        "name",
+        "roles",
+        "verbalizes"
+      ],
+      "position": 1,
+      "origin": "imported",
+      "id": "9df0ddbd-408f-5603-a5b8-381c3ff6ea7d",
+      "name": "supply",
+      "technical_name": "supply",
+      "description": null,
+      "owner_ref": {
+        "kind": "object_type",
+        "ref": "4c21b73c-f9a6-55e9-8bab-8fa0fdc5e1dd"
+      },
+      "roles": [
+        {
+          "native_presence": [
+            "concept",
+            "name"
+          ],
+          "position": 0,
+          "origin": "imported",
+          "id": "8cda13d5-92d8-5d96-a32a-13f8e1814922",
+          "name": "product",
+          "concept": {
+            "kind": "object_type",
+            "ref": "cd1cf493-08a3-560c-942f-e910e739a592"
+          },
+          "client_ref": null
+        }
+      ],
+      "multiplicity": null,
+      "verbalizes": [
+        "{supplier} supplies {product:product}"
+      ],
+      "requires": [],
+      "derived_by": [],
+      "tags": [],
+      "evidence": [],
+      "endpoint_direction": "forward",
+      "identifier": false,
+      "owner_role_name": null,
+      "legacy_multiplicity": null
+    },
+    {
+      "native_presence": [
+        "name",
+        "roles",
+        "verbalizes"
+      ],
+      "position": 2,
+      "origin": "imported",
+      "id": "33282435-68fe-5777-afb7-19b9970a02eb",
+      "name": "sale",
+      "technical_name": "sale",
+      "description": null,
+      "owner_ref": {
+        "kind": "object_type",
+        "ref": "4c21b73c-f9a6-55e9-8bab-8fa0fdc5e1dd"
+      },
+      "roles": [
+        {
+          "native_presence": [
+            "concept",
+            "name"
+          ],
+          "position": 0,
+          "origin": "imported",
+          "id": "3c6494e3-2a1f-5aa2-a701-38f01533e7fc",
+          "name": "product",
+          "concept": {
+            "kind": "object_type",
+            "ref": "cd1cf493-08a3-560c-942f-e910e739a592"
+          },
+          "client_ref": null
+        },
+        {
+          "native_presence": [
+            "concept",
+            "name"
+          ],
+          "position": 1,
+          "origin": "imported",
+          "id": "fdca3049-0688-5087-810d-6b5ebbdca121",
+          "name": "amount",
+          "concept": {
+            "kind": "value_type",
+            "ref": "24e6b38f-ad71-5205-9e57-5346d3132d97"
+          },
+          "client_ref": null
+        },
+        {
+          "native_presence": [
+            "concept",
+            "name"
+          ],
+          "position": 2,
+          "origin": "imported",
+          "id": "15e56d61-d5b8-5817-ad63-66e57b055e6d",
+          "name": "party",
+          "concept": {
+            "kind": "any",
+            "ref": "Any"
+          },
+          "client_ref": null
+        }
+      ],
+      "multiplicity": null,
+      "verbalizes": [
+        "{supplier} sells {product:product} for {amount:amount} with {Any:party}",
+        "{supplier} sells {product:product} for {amount:amount} with {Any:party}"
+      ],
+      "requires": [],
+      "derived_by": [],
+      "tags": [],
+      "evidence": [],
+      "endpoint_direction": "forward",
+      "identifier": false,
+      "owner_role_name": null,
+      "legacy_multiplicity": null
+    }
+  ],
+  "rules": [
+    {
+      "native_presence": [],
+      "position": 0,
+      "origin": "imported",
+      "id": "e7583aef-55aa-5b72-927e-5cbdb420d940",
+      "owner_kind": "value_type",
+      "owner_id": "24e6b38f-ad71-5205-9e57-5346d3132d97",
+      "rule_kind": "constraint",
+      "expression": "  x > 0  ",
+      "name": "amount·constraint1",
+      "technical_name": "constraint_0",
+      "description": "",
+      "verbalizes": [],
+      "evidence": []
+    },
+    {
+      "native_presence": [],
+      "position": 1,
+      "origin": "imported",
+      "id": "735d358f-1c6f-5a68-8bf3-aa3be51d8382",
+      "owner_kind": "value_type",
+      "owner_id": "24e6b38f-ad71-5205-9e57-5346d3132d97",
+      "rule_kind": "constraint",
+      "expression": "  x > 0  ",
+      "name": "amount·constraint2",
+      "technical_name": "constraint_1",
+      "description": "",
+      "verbalizes": [],
+      "evidence": []
+    }
+  ],
+  "actions": [],
+  "material_objects": [],
+  "material_links": [],
+  "mappings": [],
+  "hash_algorithm": "ontofoundry-domain-v3",
+  "ossie_version": "0.2.0.dev0",
+  "ossie_name": "native",
+  "ossie_description": null,
+  "ai_context": {
+    "vendor": {
+      "tags": [
+        "z",
+        "a"
+      ],
+      "nested": [
+        "same",
+        "same"
+      ]
+    }
+  },
+  "native_presence": [
+    "ai_context",
+    "name",
+    "ontology",
+    "version"
+  ],
+  "document_origin": "imported",
+  "core_version": null,
+  "core_presence": [],
+  "extension_v4": {
+    "version": "4",
+    "ids": {},
+    "concept_context": {},
+    "display_names": {},
+    "tags": {},
+    "required_properties": [],
+    "rule_metadata": {},
+    "actions": [],
+    "export_edits": [],
+    "legacy_mapping_ids": {}
+  },
+  "value_types": [
+    {
+      "native_presence": [
+        "concept",
+        "extends",
+        "requires",
+        "type"
+      ],
+      "position": 2,
+      "origin": "imported",
+      "id": "24e6b38f-ad71-5205-9e57-5346d3132d97",
+      "concept": "amount",
+      "description": null,
+      "extends": [
+        {
+          "kind": "builtin",
+          "ref": "Decimal"
+        }
+      ],
+      "identify_by": [],
+      "requires": [
+        "e7583aef-55aa-5b72-927e-5cbdb420d940",
+        "735d358f-1c6f-5a68-8bf3-aa3be51d8382"
+      ],
+      "derived_by": [],
+      "name": "amount",
+      "technical_name": "amount",
+      "tags": [],
+      "evidence": []
+    }
+  ],
+  "semantic_models": [],
+  "datasets": [],
+  "dataset_fields": [],
+  "dataset_relationships": [],
+  "metrics": [],
+  "concept_mappings": [],
+  "mapping_nodes": []
+}

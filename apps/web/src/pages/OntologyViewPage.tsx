@@ -35,6 +35,10 @@ export function OntologyViewPage() {
   const inspect = (selected: SelectedGraphItem) => {
     if (selected?.category === "node" && selected.item.kind === "object_type")
       inspector.open({ kind: "object_type", id: selected.item.id, tab: "properties", sessionId: null });
+    else if (selected?.category === "node" && selected.item.kind === "link_type")
+      inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
+    else if (selected?.category === "edge" && selected.item.kind === "role")
+      inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.source, tab: "endpoints", sessionId: null });
     else if (selected?.category === "edge" && selected.item.kind === "link_type")
       inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
   };
@@ -65,8 +69,9 @@ export function OntologyViewPage() {
   // carries object types and the edges between them and nothing else.
   const visible = useMemo(() => {
     if (!graph) return null;
+    const roleTargets = new Set(graph.edges.filter(e => e.kind === "role").map(e => e.target));
     const nodes = graph.nodes.filter(
-      (n) => n.kind === "object_type" && (!tag || n.tags.includes(tag)),
+      (n) => (n.kind === "object_type" || n.kind === "link_type" || roleTargets.has(n.id)) && (!tag || n.tags.includes(tag)),
     );
     const ids = new Set(nodes.map((n) => n.id));
     return {
@@ -232,7 +237,7 @@ export function OntologyViewPage() {
             </span>
             <span>
               <GitBranch size={12} />
-              关系 {graph.edges.filter((e) => e.kind === "link_type").length}
+              关系 {graph.edges.filter((e) => e.kind === "link_type").length + graph.nodes.filter(n => n.kind === "link_type").length}
             </span>
             <span>
               <Braces size={12} />

@@ -41,7 +41,7 @@ def document_session(client):
     attrs = {
         a["technical_name"]: f"code-{i}"
         for i, a in enumerate(
-            p for p in session["draft"]["properties"] if p["owner_type_id"] == kind["id"]
+            p for p in session["draft"]["properties"] if p["owner_ref"]["ref"] == kind["id"]
         )
         if a["required"]
     }
@@ -101,7 +101,7 @@ def test_missing_document_values_warn_but_wrong_types_block(client, document_ses
     flagged for completion and still publishable; a value of the wrong kind is not."""
     session, kind = document_session
     before = client.get(SERVICE + "/version").json()["version_id"]
-    props = [a for a in session["draft"]["properties"] if a["owner_type_id"] == kind["id"]]
+    props = [a for a in session["draft"]["properties"] if a["owner_ref"]["ref"] == kind["id"]]
     required = next(a for a in props if a["required"])
     session["draft"]["material_objects"][0]["values"][required["technical_name"]] = " "
     saved = client.put(
@@ -118,6 +118,8 @@ def test_missing_document_values_warn_but_wrong_types_block(client, document_ses
     draft = saved.json()["draft"]
     typed = {**required, "id": str(uuid4()), "name": "退款金额", "technical_name": "refund_amount",
              "value_kind": "decimal", "required": False, "identifier": False, "evidence": []}
+    typed["roles"] = [{**required["roles"][0], "id": str(uuid4()), "concept": {"kind": "builtin", "ref": "Decimal"}}]
+    typed["position"] = None
     draft["properties"].append(typed)
     draft["material_objects"][0]["values"]["refund_amount"] = "不是数值"
     broken = client.put(
@@ -293,7 +295,7 @@ def test_database_services_share_actual_rows_and_protect_mapping_export(
         headers=mapping_headers,
     ).json()["result"]["structuredContent"]
     assert complete["ontology_mappings"]
-    assert complete["ai_context"]["ontofoundry"]["version"] == "3"
+    assert complete["ai_context"]["ontofoundry"]["version"] == "4"
     concept_mappings = complete["ontology_mappings"][0]["concept_mappings"]
     mapped = next(item for item in concept_mappings if item.get("link_mappings"))
     root = mapped["link_mappings"][0]

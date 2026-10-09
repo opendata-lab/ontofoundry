@@ -17,7 +17,7 @@ if config.config_file_name is not None:
     # CLI, which owns its process, but not when migrations run in-process — a
     # test calling command.upgrade() would take pytest's caplog down with it and
     # the failure surfaces far away, as an unrelated assertion on empty log text.
-    fileConfig(config.config_file_name, disable_existing_loggers=False)
+    fileConfig(config.config_file_name, disable_existing_loggers=False, encoding="utf-8")
 
 target_metadata = Base.metadata
 

@@ -16,7 +16,8 @@ from ontofoundry_api.domain.legacy_v1 import (
 from ontofoundry_api.domain.models import OntologyDraft, RuleKind
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.ossie.compiler import EXTENSION_VERSION, compile_ossie, validate_ossie
-from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
+from ontofoundry_api.ossie.importer import OssieImportError
+from ontofoundry_api.ossie.importer import import_ossie_v2 as import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
@@ -1008,10 +1009,10 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
     key = next(
         item
         for item in snapshot["properties"]
-        if item["owner_type_id"] == issue["id"] and item["technical_name"] == "issue_key"
+        if item["owner_ref"]["ref"] == issue["id"] and item["technical_name"] == "issue_key"
     )
-    assert key["target_role_name"] == "key_role"
-    assert key["multiplicity"] == "many_to_one"
+    assert key["roles"][0]["name"] == "key_role"
+    assert key["multiplicity"] == "ManyToOne"
 
     exported = client.get(
         f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}/versions/{version_id}/export"

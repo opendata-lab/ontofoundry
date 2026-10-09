@@ -327,8 +327,12 @@ export function ModelResults({
       ) : (
         <div className="result-graph">
           {model?.object_types.length ? (
-            <OntologyGraph graph={draftGraph(model)} query="" onSelect={(selected) => {
-              if (selected && session) inspector.open({ kind: selected.category === "node" ? "object_type" : "link_type", id: selected.item.id, sessionId: session.id, tab: selected.category === "node" ? "properties" : "endpoints" });
+            <OntologyGraph graph={session?.graph ?? draftGraph(model)} query="" onSelect={(selected) => {
+              if (selected && session) {
+                if (selected.category === "node" && selected.item.kind === "value_type") return;
+                const object = selected.category === "node" && selected.item.kind === "object_type";
+                inspector.open({ kind: object ? "object_type" : "link_type", id: selected.category === "edge" ? selected.item.link_type_id ?? selected.item.id : selected.item.id, sessionId: session.id, tab: object ? "properties" : "endpoints" });
+              }
             }} />
           ) : (
             <EmptyModel />

@@ -628,7 +628,7 @@ async def send_message(
         if item.title in {"新的建模会话", "未命名建模会话"}
         else item.title
     )
-    # The agent reads the draft as v2, even from a session saved before v2.
+    # Modeling sessions and new runs use v3.
     draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
     # Where earlier runs put material in this topic, read before the claim
@@ -643,6 +643,8 @@ async def send_message(
     # so the run's source revision is the one after it.
     manifest = {
         "run_token": run_token,
+        "draft_schema_version": "3",
+        "hash_algorithm": draft["hash_algorithm"],
         "workspace_id": workspace_id,
         "session_id": session_id,
         "base_version_id": item.base_version_id,

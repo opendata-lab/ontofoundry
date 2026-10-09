@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.db_models import OntologyVersionRecord
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.snapshot import as_v2_dict
+from ontofoundry_api.domain.snapshot import as_v3_dict
 
 from .errors import NotFoundError
 from .workspaces import get_workspace
@@ -31,15 +31,15 @@ def current_version(
 
 
 def snapshot_of(version: OntologyVersionRecord) -> dict[str, Any]:
-    """The version's snapshot as v2 JSON, normalized once per loaded record.
+    """The version's snapshot as v3 JSON, normalized once per loaded record.
 
     Published snapshots were validated when they were published, so reads only
     normalize the shape; they do not re-run domain validation.
     """
-    cached = getattr(version, "_v2_snapshot", None)
+    cached = getattr(version, "_v3_snapshot", None)
     if cached is None:
-        cached = as_v2_dict(version.snapshot_json, version.workspace_id)
-        version._v2_snapshot = cached
+        cached = as_v3_dict(version.snapshot_json, version.workspace_id)
+        version._v3_snapshot = cached
     return cached
 
 
@@ -53,12 +53,15 @@ def version_hashes(version: OntologyVersionRecord) -> dict[str, str]:
 
 
 def _query_view(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Project a v2 snapshot onto the shape this query layer has always served.
+    """Project a native snapshot onto the shape this query layer has always served.
 
     Object types carry their own properties as `attributes`, and rules appear as
     `requires`/`derived_by` on their owners. This is the published read contract
     for REST and MCP type queries, not a storage format.
     """
+
+    from ontofoundry_api.domain.runtime_views import query_compat
+    snapshot = query_compat(snapshot)
 
     def rules(owner_id: str) -> dict[str, list[str]]:
         owned = [r for r in snapshot["rules"] if r["owner_id"] == owner_id]
@@ -113,7 +116,7 @@ def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
             "attributes": len(snapshot["properties"]),
             "rules": len(snapshot["rules"]),
             "actions": len(snapshot["actions"]),
-            "mappings": len(snapshot.get("mappings", [])),
+            "mappings": len(query_view(version).get("mappings", [])),
         },
     }
 
@@ -130,7 +133,8 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     snapshot = snapshot_of(version)
     objects = snapshot["material_objects"]
     links = snapshot["material_links"]
-    mappings = snapshot.get("mappings", [])
+    from ontofoundry_api.domain.runtime_views import query_compat
+    mappings = query_compat(snapshot).get("mappings", [])
     sample_objects = [
         {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]
     ]
@@ -238,8 +242,10 @@ def search_types(
                 [
                     item.get("name", ""),
                     item.get("technical_name", ""),
-                    item.get("description", ""),
+                    item.get("description") or "",
                     " ".join(item.get("tags", [])),
+                    " ".join((r.get("name") or "") + " " + r["concept"] for r in item.get("role_concepts", [])),
+                    " ".join(item.get("verbalizes", [])),
                 ]
             ).casefold()
         ]
@@ -319,7 +325,26 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                     "description": f"{object_type['name']} 继承自上级业务对象",
                 }
             )
+    known = {n["id"] for n in nodes}
+    concepts = {i["id"]: i for i in [*snapshot.get("object_types", []), *snapshot.get("value_types", [])]}
     for link in snapshot.get("link_types", []):
+        if link.get("owner_ref") and not link.get("source_type_id"):
+            nodes.append({"id": link["id"], "kind": "link_type", "label": link["name"],
+                          "technical_name": link["technical_name"], "description": link.get("description") or "",
+                          "tags": link.get("tags", []), "roles": link["roles"], "owner_ref": link["owner_ref"],
+                          "all_roles": link["all_roles"], "verbalizes": link.get("verbalizes", [])})
+            for role in link["all_roles"]:
+                ref = role["concept"]
+                target = ref["ref"] if ref["kind"] in ("object_type", "value_type") else ref["kind"] + ":" + ref["ref"]
+                if target not in known:
+                    concept = concepts.get(target, {})
+                    nodes.append({"id": target, "kind": "value_type", "label": concept.get("name") or ref["ref"],
+                                  "technical_name": concept.get("concept") or ref["ref"], "description": concept.get("description") or "", "tags": []})
+                    known.add(target)
+                edges.append({"id": link["id"] + ":role:" + role["id"], "kind": "role", "link_type_id": link["id"],
+                              "role_id": role["id"], "label": role.get("name") or concepts.get(target, {}).get("name") or ref["ref"],
+                              "technical_name": link["technical_name"], "source": link["id"], "target": target})
+            continue
         edges.append(
             {
                 "id": link["id"],
@@ -359,6 +384,9 @@ def type_graph(
                 if neighbor not in visible:
                     visible.add(neighbor)
                     queue.append((neighbor, current_depth + 1))
+        # A reached hyperedge always exposes its complete role incidence.
+        hyperedges = {n["id"] for n in nodes if n["kind"] == "link_type" and n["id"] in visible}
+        visible.update(e["target"] for e in edges if e["kind"] == "role" and e["source"] in hyperedges)
         nodes = [node for node in nodes if node["id"] in visible]
         edges = [
             edge

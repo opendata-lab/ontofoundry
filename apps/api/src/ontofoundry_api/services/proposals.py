@@ -21,7 +21,10 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
-from ontofoundry_api.domain.canonical import element_sha256
+from ontofoundry_api.domain.canonical import (
+    LEGACY_HASH_ALGORITHM,
+    element_sha256,
+)
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 
 
@@ -184,13 +187,16 @@ def proposal_header(manifest: dict[str, Any]) -> dict[str, Any]:
 def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
     """What the agent reads: the pinned draft and the hash of every element,
     which update and delete proposals must quote as expected_target_hash."""
+    from ontofoundry_api.domain.runtime_views import proposal_snapshot
+    elements = proposal_snapshot(draft)
     return {
+        "legacy_mapping_form": elements.get("mappings", []),
         "run": {key: manifest[key] for key in ("run_token", "base_version_id", "source_session_revision")},
         "draft": draft,
         "element_hashes": {
-            str(element["id"]): element_sha256(element)
+            str(element["id"]): element_sha256(element, hash_algorithm=draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM, collection=collection)
             for collection in COLLECTIONS.values()
-            for element in draft.get(collection) or []
+            for element in elements.get(collection) or []
         },
     }
 
@@ -212,7 +218,8 @@ def effective_statuses(
     draft: dict[str, Any],
 ) -> dict[str, tuple[str, str]]:
     """item id -> (effective status, reason). Pure; see module docstring."""
-    elements = _elements(draft)
+    from ontofoundry_api.domain.runtime_views import proposal_snapshot
+    elements = _elements(proposal_snapshot(draft))
     by_id = {item.id: item for item in items}
     result: dict[str, tuple[str, str]] = {}
 
@@ -226,7 +233,7 @@ def effective_statuses(
             return "pending", ""
         if found is None or found[0] != item.target_kind:
             return "conflict", "目标元素已被删除或类型已改变"
-        if element_sha256(found[1]) != item.expected_target_hash:
+        if element_sha256(found[1], hash_algorithm=draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM, collection=COLLECTIONS[ElementKind(found[0])]) != item.expected_target_hash:
             return "stale", "目标在提案生成后已被修改"
         return "pending", ""
 
@@ -294,6 +301,7 @@ def dependency_group(item_id: str, dependencies: dict[str, list[str]]) -> list[s
 
 KIND_LABELS = {
     ElementKind.OBJECT_TYPE.value: "实体",
+    ElementKind.VALUE_TYPE.value: "值概念",
     ElementKind.PROPERTY.value: "属性",
     ElementKind.LINK_TYPE.value: "关系",
     ElementKind.RULE.value: "规则",
@@ -309,7 +317,7 @@ def batch_items(
 ) -> list[ProposalItemRecord]:
     if not batch_ids:
         return []
-    return list(
+    items = list(
         db.scalars(
             select(ProposalItemRecord)
             .where(
@@ -320,6 +328,7 @@ def batch_items(
             .order_by(ProposalItemRecord.batch_id, ProposalItemRecord.ordinal)
         ).all()
     )
+    return items
 
 
 def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict) -> dict[str, Any]:
