@@ -24,6 +24,11 @@ from ontofoundry_api.services.instance_query import (
     object_neighborhood,
     search_objects,
 )
+from ontofoundry_api.services.ontology_context import (
+    concept_context,
+    context_elements,
+    document_context,
+)
 from ontofoundry_api.services.ontology_query import (
     current_version,
     get_type,
@@ -49,8 +54,8 @@ INSTRUCTIONS = (
 )
 TOOLS = [
     ("get_ontology_version", "读取当前已发布本体版本", {}),
-    ("search_ontology_types", "搜索已发布业务对象和关系", {"query": {"type": "string"}}),
-    ("get_ontology_type", "读取业务对象或关系定义", {"type_id": {"type": "string"}}),
+    ("search_ontology_types", "按名称或同义词搜索概念、文档上下文与语义层字段/数据集/指标，返回来源；歧义时保留所有候选", {"query": {"type": "string"}}),
+    ("get_ontology_type", "读取概念、关系或语义层定义及同义词来源", {"type_id": {"type": "string"}}),
     (
         "get_ontology_graph",
         "读取已发布的语义图谱",
@@ -110,6 +115,7 @@ TOOLS += [
                 "enum": [
                     "object_type", "value_type", "property", "link_type", "rule", "action",
                     "material_object", "material_link", "mapping",
+                    "document", "semantic_model", "dataset", "dataset_field", "metric",
                 ],
             },
             "cursor": {"type": "string", "maxLength": 64},
@@ -147,14 +153,20 @@ def visible_elements(db, workspace_id, principal, snapshot) -> dict[str, list[di
         if (need == "instances" and not instances) or (need == "mappings" and not mappings):
             continue
         items = snapshot.get(collection) or []
+        if collection in ("object_types", "value_types"):
+            items = [concept_context(item, snapshot) for item in items]
         if collection == "mappings" and snapshot.get("schema_version") == "3":
             items = [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(snapshot))]
         if collection in ("properties", "link_types") and snapshot.get("schema_version") == "3":
             items = [{**item, "owner_role_id": all_roles_of(item)[0]["id"], "all_roles": all_roles_of(item)} for item in items]
         if not instances:
             items = [{**item, "evidence": []} if "evidence" in item else item for item in items]
-        result[kind.value] = sorted(items, key=lambda item: str(item["id"]))
-    return result
+        result[kind.value] = sorted([{**item, 'kind': kind.value} for item in items], key=lambda item: str(item["id"]))
+    result['document'] = [document_context(snapshot)]
+    if mappings:
+        result.update(context_elements(snapshot))
+    from ontofoundry_api.services.public_projection import public_projection
+    return public_projection(result)
 
 
 def rpc_error(rid, code, message, status=400, data=None):
@@ -395,9 +407,11 @@ async def rpc(
                         "missing": sorted(wanted - {str(f["element"]["id"]) for f in found}),
                     }
             elif name == "search_ontology_types":
-                value = search_types(version, query=args.get("query", ""))
+                value = search_types(version, query=args.get('query', ''), include_document_context=True,
+                                     include_context_elements=can_read_mappings(db, workspace_id, principal))
             elif name == "get_ontology_type":
-                value = get_type(version, args["type_id"])
+                value = get_type(version, args["type_id"], include_document_context=True,
+                                 include_context_elements=can_read_mappings(db, workspace_id, principal))
             elif name == "get_ontology_graph":
                 value = type_graph(
                     version, focus_id=args.get("focus_id"), depth=args.get("depth", 1)

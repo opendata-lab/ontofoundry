@@ -12,7 +12,7 @@ def element_scope(draft: dict, kind: str, element_id: str) -> dict[str, set[str]
     )}
     if draft.get("schema_version") == "3":
         scope["value_types"] = set()
-    collection = "object_types" if kind == "object_type" else "link_types"
+    collection = {"object_type": "object_types", "value_type": "value_types", "link_type": "link_types"}[kind]
     scope[collection].add(element_id)
     if kind == "link_type" and draft.get("schema_version") == "3":
         link = next((link for link in draft["link_types"] if link["id"] == element_id), None)
@@ -54,7 +54,22 @@ def scoped_draft(base: dict, original: dict, edited: dict, kind: str, element_id
     before, after = element_scope(original, kind, element_id), element_scope(edited, kind, element_id)
     baseline = element_scope(base, kind, element_id)
     result = deepcopy(base)
-    collection = "object_types" if kind == "object_type" else "link_types"
+    if original.get('schema_version') == '3':
+        for field in original['extension_v4']:
+            if field != 'concept_context' and edited['extension_v4'].get(field) != original['extension_v4'][field]:
+                raise ServiceError('请勿在元素保存中修改扩展注册信息', status_code=422, code='ELEMENT_SCOPE_INVALID')
+        old_context = original['extension_v4']['concept_context']
+        new_context = edited['extension_v4']['concept_context']
+        changed_context = {key for key in old_context.keys() | new_context.keys() if old_context.get(key) != new_context.get(key)}
+        allowed_context = {element_id} if kind in ('object_type', 'value_type') else set()
+        if changed_context - allowed_context:
+            raise ServiceError('概念上下文包含其他元素的修改', status_code=422, code='ELEMENT_SCOPE_INVALID')
+        for key in allowed_context:
+            if key in new_context:
+                result['extension_v4']['concept_context'][key] = deepcopy(new_context[key])
+            else:
+                result['extension_v4']['concept_context'].pop(key, None)
+    collection = {"object_type": "object_types", "value_type": "value_types", "link_type": "link_types"}[kind]
     if not any(e["id"] == element_id for e in edited[collection]):
         raise ServiceError("没有找到要保存的元素", status_code=422, code="ELEMENT_NOT_FOUND")
     for key in before:

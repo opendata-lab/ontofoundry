@@ -14,11 +14,16 @@ from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 
 
 def _index(snapshot: dict[str, Any]) -> dict[str, tuple[str, dict]]:
-    return {
-        str(element["id"]): (kind.value, element)
-        for kind, collection in COLLECTIONS.items()
-        for element in snapshot.get(collection) or []
-    }
+    contexts = snapshot.get('extension_v4', {}).get('concept_context', {})
+    result = {}
+    for kind, collection in COLLECTIONS.items():
+        for element in snapshot.get(collection) or []:
+            view = element
+            if kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+                view = {**element, 'concept_context': contexts.get(str(element['id']))}
+            result[str(element['id'])] = (kind.value, view)
+    return result
+
 
 
 def element_label(kind: str, element: dict, snapshot_elements: dict[str, tuple[str, dict]]) -> str:

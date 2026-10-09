@@ -462,6 +462,10 @@ def validate_ossie(document: dict[str, Any]) -> dict[str, Any]:
         else []
     )
     issues = schema_issues + semantic_issues
+    from .extensions import extension_collisions
+    for path in extension_collisions(document):
+        issues.append({'severity': 'warning', 'code': 'PLATFORM_EXTENSION_COLLISION', 'path': path,
+                       'message': '平台扩展覆盖输入同名键；原值与新增内容已记录，可逆恢复原文。'})
     errors = [item for item in issues if item["severity"] == "error"]
     warnings = [item for item in issues if item["severity"] == "warning"]
     return {

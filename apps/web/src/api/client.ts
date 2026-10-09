@@ -238,7 +238,7 @@ export const modelingApi = {
     return draft;
   },
   saveElement: (id: string, payload: {
-    target_kind: Extract<TargetKind, "object_type" | "link_type">;
+    target_kind: Extract<TargetKind, "object_type" | "value_type" | "link_type">;
     target_id: string;
     expected_current_version_id: string | null;
     session_id: string | null;

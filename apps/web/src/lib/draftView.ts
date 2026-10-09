@@ -67,6 +67,7 @@ export function toView(source: Draft): DraftView {
   return {
     workspace_id: draft.workspace_id,
     requires: draft.ontology_requires ?? [],
+    ...(draft.value_types ? { value_types: draft.value_types } : {}),
     object_types: draft.object_types.map((type) => {
       const { evidence: _evidence, ...rest } = type;
       void _evidence;
@@ -224,6 +225,8 @@ export function viewFromTypes(
   return {
     workspace_id: workspaceId,
     requires: [],
+    value_types: items.filter((t): t is Extract<OntologyType, { kind: "value_type" }> => t.kind === "value_type")
+      .map(value => ({ ...value, concept_kind: "value_type", description: value.description ?? "", extends: [], evidence: [] })),
     object_types: items.filter(
       (t): t is Extract<OntologyType, { kind: "object_type" }> =>
         t.kind === "object_type",

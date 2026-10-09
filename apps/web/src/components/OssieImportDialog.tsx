@@ -203,6 +203,7 @@ export function OssieImportDialog({
               </table>
             </>
           )}
+          {report.notes.filter(note => note.startsWith("平台扩展碰撞")).map(note => <p className="element-note" role="status" key={note}>{note}</p>)}
           {!!report.notes.length && (
             <details className="import-notes">
               <summary>导入说明（{report.notes.length} 条）</summary>

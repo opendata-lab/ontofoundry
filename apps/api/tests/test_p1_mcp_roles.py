@@ -26,8 +26,9 @@ def test_mcp_lists_gets_and_searches_complete_native_roles(client, nary_version)
     found = next(r for r in listing['items'] if r['id'] == link['id'])
     single = call(client, 'get_ontology_elements', element_ids=[link['id']])['items'][0]['element']
     typed = call(client, 'get_ontology_type', type_id=link['id'])['item']
+    public_roles = [{key: role[key] for key in ('id', 'name', 'concept')} for role in link['roles']]
     for result in (found, single, typed):
-        assert result['owner_ref'] == link['owner_ref'] and result['roles'] == link['roles']
+        assert result['owner_ref'] == link['owner_ref'] and result['roles'] == public_roles
         assert len(result['all_roles']) == 4 and result['all_roles'][0]['implicit_owner']
         assert [r['id'] for r in result['all_roles'][1:]] == [r['id'] for r in link['roles']]
     assert typed['source_type_id'] is None and typed['target_type_id'] is None
@@ -41,7 +42,8 @@ def test_semantic_hyperedge_keeps_every_ordered_role_incidence(client, nary_vers
     link = next(r for r in nary_version['link_types'] if r['technical_name'] == 'sale')
     graph = call(client, 'get_ontology_graph', focus_id=link['id'], depth=1)
     center = next(n for n in graph['nodes'] if n['id'] == link['id'])
-    assert center['kind'] == 'link_type' and center['roles'] == link['roles']
+    assert center['kind'] == 'link_type'
+    assert center['roles'] == [{key: role[key] for key in ('id', 'name', 'concept')} for role in link['roles']]
     roles = [e for e in graph['edges'] if e['kind'] == 'role']
     assert [e['role_id'] for e in roles] == [r['id'] for r in center['all_roles']]
     assert all(e['source'] == link['id'] for e in roles)

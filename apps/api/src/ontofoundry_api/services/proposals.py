@@ -235,6 +235,10 @@ def effective_statuses(
             return "conflict", "目标元素已被删除或类型已改变"
         if element_sha256(found[1], hash_algorithm=draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM, collection=COLLECTIONS[ElementKind(found[0])]) != item.expected_target_hash:
             return "stale", "目标在提案生成后已被修改"
+        if item.before_json and 'concept_context' in item.before_json:
+            current_context = draft.get('extension_v4', {}).get('concept_context', {}).get(item.target_id)
+            if current_context != item.before_json['concept_context']:
+                return 'stale', '概念上下文在提案生成后已被修改'
         return "pending", ""
 
     def resolve(item_id: str, trail: tuple[str, ...] = ()) -> tuple[str, str]:

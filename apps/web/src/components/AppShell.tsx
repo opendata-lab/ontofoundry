@@ -203,7 +203,7 @@ export function AppShell() {
           <input
             autoFocus
             aria-label="搜索关键词"
-            placeholder="名称、API 标识或描述"
+            placeholder="名称、API 标识、描述或同义词"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -211,7 +211,7 @@ export function AppShell() {
         <div className="search-results">
           {results
             .filter((r) =>
-              (r.name + r.technical_name + r.description)
+              (r.name + r.technical_name + r.description + ("concept_context" in r ? JSON.stringify(r.concept_context ?? {}) : ""))
                 .toLowerCase()
                 .includes(query.toLowerCase()),
             )
@@ -224,7 +224,9 @@ export function AppShell() {
                     "/workspaces/" +
                       workspaceId +
                       "/" +
-                      (r.kind === "object_type"
+                      (r.kind === "value_type"
+                        ? "objects?inspect=value_type:" + r.id + "&inspectTab=basic"
+                        : r.kind === "object_type"
                         ? "objects/" + r.id
                         : "relations/" + r.id),
                   );
