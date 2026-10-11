@@ -252,15 +252,17 @@ def stage_data() -> None:
     types = {t["technical_name"]: t for t in draft["object_types"]}
     props = {}
     for prop in draft["properties"]:
-        props.setdefault(prop["owner_type_id"], {})[prop["technical_name"]] = prop
+        props.setdefault(prop["owner_ref"]["ref"], {})[prop["technical_name"]] = prop
+    form = session["legacy_mapping_form"]
     mappings = []
+    joins = {}
     for technical, (table, columns) in TABLES.items():
         owner = types[technical]
         known = props.get(owner["id"], {})
         missing = set(columns) - set(known)
         if missing:
             raise SystemExit(f"{owner['name']} 缺少属性 {sorted(missing)}，请核对建模结果")
-        old = next((m for m in draft.get("mappings", []) if m["type_id"] == owner["id"]), None)
+        old = next((m for m in form["mappings"] if m["type_id"] == owner["id"]), None)
         mappings.append({
             "id": old["id"] if old else str(uuid.uuid4()),
             "type_id": owner["id"], "connection_alias": CONNECTION["name"],
@@ -269,20 +271,24 @@ def stage_data() -> None:
         })
     by_id = {t["id"]: t["technical_name"] for t in draft["object_types"]}
     for link in draft["link_types"]:
-        ends = (by_id[link["source_type_id"]], by_id[link["target_type_id"]])
+        owner = link["owner_ref"]["ref"]
+        if len(link["roles"]) != 1 or link["roles"][0]["concept"]["kind"] != "object_type":
+            continue
+        other = link["roles"][0]["concept"]["ref"]
+        ends = (by_id[owner], by_id[other])
         if ends in FOREIGN_KEYS:
-            link["data_join"] = {"source_column": "id", "target_column": FOREIGN_KEYS[ends]}
+            joins[link["id"]] = {"owner_columns": ["id"], "role_columns": [FOREIGN_KEYS[ends]]}
         elif ends[::-1] in FOREIGN_KEYS:
-            link["data_join"] = {"source_column": FOREIGN_KEYS[ends[::-1]], "target_column": "id"}
+            joins[link["id"]] = {"owner_columns": [FOREIGN_KEYS[ends[::-1]]], "role_columns": ["id"]}
         else:
             raise SystemExit(f"关系 {link['name']} 的两端 {ends} 没有对应外键")
-        print("  关系", link["name"], ends, link["data_join"])
+        print("  关系", link["name"], ends, joins[link["id"]])
     for prop in draft["properties"]:
         if prop["technical_name"] in INTEGER_IDS:
             prop["value_kind"] = "integer"
-    draft["mappings"] = mappings
+            prop["roles"][0]["concept"] = {"kind": "builtin", "ref": "Integer"}
     session = call("PUT", ws_path(ws, "/sessions/" + session["id"]),
-                   {"revision": session["revision"], "draft": draft})
+                   {"revision": session["revision"], "draft": draft, "legacy_mappings": mappings, "legacy_joins": joins})
     publish_session(ws, session, "对接销售业务库：四个业务对象与三条关系")
 
 
@@ -358,7 +364,10 @@ def stage_check() -> None:
     vid = version["version_id"]
     types = {t["name"]: t["id"] for t in mcp(ws, token, "list_ontology_elements",
                                              {"kind": "object_type", "version_id": vid})["items"]}
-    print("版本", version.get("version"), "对象", sorted(types))
+    mapping_elements = mcp(ws, token, "list_ontology_elements", {"kind": "mapping", "version_id": vid})["items"]
+    if len(mapping_elements) != 4:
+        raise SystemExit("简单映射视图应有 4 个可查询概念，请检查原生语义层")
+    print("版本", version.get("version"), "对象", sorted(types), "可查询映射", len(mapping_elements))
     customer = every_row(ws, token, vid, types["客户"], "星海贸易")[0]
     print("Q1 星海贸易:", json.dumps(customer.get("values") or customer, ensure_ascii=False)[:300])
     product = every_row(ws, token, vid, types["商品"], "经典手冲壶")[0]

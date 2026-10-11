@@ -25,7 +25,16 @@ export type NativeRole = { id: string; name?: string | null; concept: ConceptRef
 export type RoleConcept = { id: string; name?: string | null; concept: string; kind: ConceptRef["kind"] };
 export type NativeFields = { native_presence?: string[]; position?: number | null; origin?: "platform" | "imported" | "migrated" };
 export type NativeRelationFields = NativeFields & { owner_ref?: ConceptRef; roles?: NativeRole[]; owner_role_id?: string; all_roles?: NativeRole[]; role_concepts?: RoleConcept[]; readonly?: boolean; endpoint_direction?: "forward" | "reverse"; owner_role_name?: string | null; legacy_multiplicity?: string | null };
-export type LegacyMappingForm = { mappings: DataMapping[]; joins: Record<string, { source_column: string; target_column: string } | null> };
+export type MappingStatus = { state: "queryable" | "readonly" | "unmapped"; reason: string | null; message: string | null; dataset_id: string | null };
+export type JoinView = { source_column: string; target_column: string; source_columns?: string[]; target_columns?: string[] };
+export type RoleJoin = { owner_columns: string[]; role_columns: string[] };
+export type LegacyMappingForm = { mappings: DataMapping[]; joins: Record<string, RoleJoin | JoinView | null>; mapping_status?: Record<string, MappingStatus> };
+export type SemanticExpression = { dialects: { dialect: string; expression: string }[] };
+export type SemanticInfo = { id: string; name: string; description?: string | null; ai_context?: unknown };
+export type SemanticField = SemanticInfo & { expression: SemanticExpression; datatype?: string | null; dimension?: { is_time?: boolean | null } | null };
+export type SemanticDataset = SemanticInfo & { source: string; primary_key: string[]; unique_keys: string[][]; fields: SemanticField[] };
+export type SemanticMetric = SemanticInfo & { expression: SemanticExpression; datatype?: string | null; ambiguous?: boolean; concepts: { id: string; name: string; technical_name: string }[] };
+export type SemanticCatalog = { items: (SemanticInfo & { connection_alias: string | null; datasets: SemanticDataset[]; relationships: { id: string; name: string; from: string; to: string; from_columns: string[]; to_columns: string[] }[]; metrics: SemanticMetric[] })[]; mapping_status: Record<string, MappingStatus> };
 
 export type AttributeDefinition = {
   id: string;
@@ -79,7 +88,7 @@ export type LinkType = NativeRelationFields & {
   requires?: string[];
   derived_by?: string[];
   verbalizes?: string[];
-  data_join?: { source_column: string; target_column: string } | null;
+  data_join?: JoinView | null;
 };
 
 export type ValueType = Omit<ObjectType, "kind" | "extends" | "description" | "attributes" | "attribute_count"> & {
@@ -234,6 +243,7 @@ export type DraftView = {
   objects: MaterialObject[];
   links: MaterialLink[];
   mappings: DataMapping[];
+  mapping_status?: Record<string, MappingStatus>;
 };
 
 // --- Stored draft (schema v2) ------------------------------------------------
@@ -306,6 +316,7 @@ export type LegacyDraft = {
   material_objects: MaterialObject[];
   material_links: MaterialLink[];
   mappings: DataMapping[];
+  mapping_status?: Record<string, MappingStatus>;
 };
 export type NativeConcept = Omit<ObjectTypeElement, "extends" | "description" | "concept_context" | "concept_kind"> & { concept: string; description: string | null; extends: ConceptRef[]; identify_by: string[]; requires: string[]; derived_by: string[] };
 export type NativeLink = Omit<LinkTypeElement, "source_type_id" | "target_type_id" | "multiplicity" | "description" | "data_join"> & { owner_ref: ConceptRef; roles: NativeRole[]; multiplicity: "ManyToOne" | "OneToOne" | null; description: string | null; requires: string[]; derived_by: string[] };

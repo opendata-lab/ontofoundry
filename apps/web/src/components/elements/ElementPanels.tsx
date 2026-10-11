@@ -575,6 +575,8 @@ export function MappingPanel(
   const { draft, type, editing, change, suggestedSource } = props;
   const mapping = draft.mappings.find((m) => m.type_id === type.id);
   if (isObject(type)) {
+    const status = draft.mapping_status?.[type.id];
+    if (status?.state === "readonly") return <section className="element-section"><h3>数据映射</h3><p role="status">{status.message ?? "复杂映射：暂只读"}</p><p className="muted">请在数据映射的“语义模型”页签查看原生映射。</p></section>;
     const object = toView(draft).object_types.find((t) => t.id === type.id)!;
     if (editing)
       return (
@@ -647,6 +649,7 @@ export function MappingPanel(
       </>
     );
   }
+  if (type.data_join?.source_columns) return <section className="element-section"><h3>关系映射</h3><p>复合键连接：暂只读</p><ul>{type.data_join.source_columns.map((column, i) => <li key={i}>{column} = {type.data_join?.target_columns?.[i]}</li>)}</ul></section>;
   return (
     <>
       <section className="element-section">

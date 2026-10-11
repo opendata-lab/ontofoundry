@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
@@ -297,6 +297,7 @@ def decide(
     workspace_id: str,
     session_id: str,
     body: DecisionRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -396,15 +397,14 @@ def decide(
                 )
 
     # Apply accepted items in dependency order and validate the whole draft.
+    before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
     from ontofoundry_api.domain.runtime_views import (
         apply_legacy_mappings,
-        binary_links_of,
-        mappings_of,
+        legacy_mapping_form,
     )
-    compatibility = {"mappings": [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(draft))]}
-    joins = {str(link.id): link.data_join.model_dump(mode="json") if link.data_join else None
-             for link in binary_links_of(OntologyDraft.model_validate(draft))}
+    compatibility = legacy_mapping_form(draft)
+    joins = compatibility["joins"]
     compatibility_changed = False
     for item in accepted_items:
         if item.target_kind == "mapping":
@@ -434,6 +434,8 @@ def decide(
                 f"接受后草稿校验未通过：{message}",
                 items=[{"proposal_id": i.id, "reason": message} for i in accepted_items],
             ) from exc
+        from ontofoundry_api.services.join_validation import validate_join_columns
+        validate_join_columns(db, workspace_id, before_mapping_write, model.model_dump(mode="json"), request.app.state.settings)
         check_identities(
             db,
             workspace_id,

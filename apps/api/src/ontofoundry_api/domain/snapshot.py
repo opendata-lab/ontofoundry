@@ -336,6 +336,10 @@ def normalize_v2_to_v3(data: dict[str, Any]) -> dict[str, Any]:
                 }}],
             }],
         })
+    from .semantic_fields import complete_generated_fields
+
+    for document in documents:
+        complete_generated_fields(document)
     concept_refs = {o.technical_name: ref("object_type", o.id) for o in legacy.object_types}
 
     def flatten(node, cm_id, path, slot, position, parent_id=None):

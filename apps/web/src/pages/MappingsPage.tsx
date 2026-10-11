@@ -1,3 +1,4 @@
+import { SemanticModels } from "../components/SemanticModels";
 import { DataAssets } from "../components/DataAssets";
 import { Database, ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,7 +17,7 @@ export function MappingsPage() {
   const snapshot = useSnapshot(workspace);
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
-  const [view, setView] = useState<"assets" | "mappings">("assets");
+  const [view, setView] = useState<"assets" | "mappings" | "semantic">("assets");
   // DatasetPicker 选中表之后在这里提示，和连接测试无关，所以没随连接管理搬走。
   const [status, setStatus] = useState("");
   const [assetBusy, setAssetBusy] = useState(false);
@@ -58,6 +59,7 @@ export function MappingsPage() {
           >
             本体映射
           </button>
+          <button aria-pressed={view === "semantic"} disabled={assetBusy} onClick={() => setView("semantic")}>语义模型</button>
         </div>
       <div className="management-content">
         {(error || snapshot.error) && (
@@ -73,7 +75,7 @@ export function MappingsPage() {
             draft={snapshot.draft}
             sessionId={snapshot.sessionId}
           />
-        ) : (
+        ) : view === "semantic" ? <SemanticModels workspaceId={workspace.id} sessionId={snapshot.sessionId} /> : (
           <section className="detail-section">
             <h2>本体与数据集</h2>
             <div className="management-table-scroll">
@@ -89,6 +91,7 @@ export function MappingsPage() {
               </thead>
               <tbody>
                 {snapshot.draft?.object_types.map((t) => {
+                  const mappingStatus = snapshot.draft?.mapping_status?.[t.id];
                   const m = snapshot.draft?.mappings.find(
                     (m) => m.type_id === t.id,
                   );
@@ -98,7 +101,7 @@ export function MappingsPage() {
                         {t.name}
                         <small>{t.technical_name}</small>
                       </td>
-                      <td>{m?.table_name ?? "未映射"}</td>
+                      <td>{m?.table_name ?? (mappingStatus?.state === "readonly" ? "复杂映射：暂只读" : "未映射")}</td>
                       <td>{m?.key_column ?? "—"}</td>
                       <td>
                         {Object.keys(m?.fields ?? {}).length}/

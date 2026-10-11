@@ -5,7 +5,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import MetaData, Table, select
+from sqlalchemy import MetaData, Table, and_, select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -21,7 +21,7 @@ from ontofoundry_api.api.modeling import (
     require_member,
 )
 from ontofoundry_api.database import get_db
-from ontofoundry_api.domain.runtime_views import binary_links_of, mappings_of
+from ontofoundry_api.domain.semantic_views import SemanticViews, join_columns
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.source_rows import source_key, validate_source_rows
 
@@ -66,8 +66,17 @@ def related_rows(
             schema=target_mapping.schema_name,
             autoload_with=conn,
         ).alias("target_object")
-        if join.source_column not in source.c or join.target_column not in target.c:
-            raise HTTPException(422, "关系字段已不存在，请检查关系映射")
+        source_columns, target_columns = join_columns(join)
+        missing = [
+            f"{mapping.table_name}.{column}"
+            for mapping, table, columns in (
+                (source_mapping, source, source_columns),
+                (target_mapping, target, target_columns),
+            )
+            for column in columns if column not in table.c
+        ]
+        if missing:
+            raise HTTPException(422, "关系物理字段不存在：" + "、".join(missing))
         current, current_mapping = (
             (source, source_mapping) if forward else (target, target_mapping)
         )
@@ -92,7 +101,7 @@ def related_rows(
             )
             .select_from(
                 source.join(
-                    target, source.c[join.source_column] == target.c[join.target_column]
+                    target, and_(*(source.c[a] == target.c[b] for a, b in zip(source_columns, target_columns, strict=True)))
                 )
             )
             .where(current.c[current_mapping.key_column] == key)
@@ -129,9 +138,10 @@ def neighborhood(
 
 
 def database_neighborhood(db, workspace_id, draft, body, settings):
-    mappings = {str(m.type_id): m for m in mappings_of(draft)}
-    if body.type_id not in mappings:
-        raise HTTPException(422, "此对象尚未配置数据映射")
+    from ontofoundry_api.services.instance_query import mapping_for
+    mapping_for(draft, body.type_id)
+    views = SemanticViews(draft)
+    mappings = {str(t.id): a.mapping for t in draft.object_types if (a := views.analyze(t.id)).mapping}
     center_rows = query_mapping(
         db,
         workspace_id,
@@ -148,16 +158,20 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
     for _ in range(body.depth):
         next_frontier = []
         for current in frontier:
-            for relation in binary_links_of(draft):
+            for relation in draft.link_types:
+                if relation.source_type_id is None:
+                    continue
                 endpoints = (str(relation.source_type_id), str(relation.target_type_id))
                 if current["type_id"] not in endpoints:
                     continue
                 source, target = (mappings.get(tid) for tid in endpoints)
-                if not relation.data_join or not source or not target:
-                    warnings.add(f"{relation.name}：未配置完整关系映射")
-                    continue
-                if source.connection_alias != target.connection_alias:
+                join = views.join(relation.id)
+                if source and target and source.connection_alias != target.connection_alias:
                     warnings.add(f"{relation.name}：两端在不同数据源，关系不可查询")
+                    continue
+                if not join or not source or not target:
+                    reason = views.join_errors.get(str(relation.id), "未配置完整关系映射")
+                    warnings.add(f"{relation.name}：{reason}")
                     continue
                 for forward in (True, False):
                     if current["type_id"] != endpoints[0 if forward else 1]:
@@ -178,7 +192,7 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
                             settings,
                             source,
                             target,
-                            relation.data_join,
+                            join,
                             current["key"],
                             forward,
                             100,

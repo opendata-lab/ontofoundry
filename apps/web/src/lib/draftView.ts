@@ -90,6 +90,7 @@ export function toView(source: Draft): DraftView {
     objects: draft.material_objects,
     links: draft.material_links,
     mappings: draft.mappings,
+    mapping_status: draft.mapping_status,
   };
 }
 

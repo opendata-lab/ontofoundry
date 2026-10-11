@@ -33,7 +33,12 @@ OntoFoundry 也不会按 id 引用它，因此 Agent ID 用 DataAgent 生成的�
 1. 第一次回答前调用 get_ontology_version 记下 version_id，后续所有调用都带上同一个 version_id，
    保证一次回答内看到的是同一版本。
 2. 用 search_ontology_types 或 list_ontology_elements(kind=object_type / link_type) 找到问题涉及的
-   业务对象和关系，用 get_ontology_type 了解属性的中文名称、含义和单位。
+   业务对象和关系；优先按同义词定位概念/指标。检查返回 matches 的来源：
+   document.ai_context.synonyms 是整个文档的别名，concept_context.synonyms 是非标准概念平台扩展，
+   field/dataset/metric.ai_context.synonyms 属于各自的语义层节点，不能跨作用域挪用。
+   有 ambiguous 或多个候选时列出候选及来源，结合业务上下文辨认；无法确定时请用户澄清，不自行选第一个。
+   用 get_ontology_type 了解概念属性或指标定义、含义和单位；指标定义是口径，不能当作已查询的数值。
+   list_ontology_elements(kind=dataset / dataset_field / metric) 和 get_ontology_elements 可读取相应节点。
 3. 用 list_ontology_elements(kind=mapping) 确认对象有数据映射。没有映射的对象没有数据，直接告诉
    用户“该对象尚未对接数据”，不要推测。
 4. 业务数据有两种来源，先判断问题问的是哪一种：

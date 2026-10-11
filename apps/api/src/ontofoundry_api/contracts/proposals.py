@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
@@ -50,6 +51,7 @@ from ontofoundry_api.domain.models import (
     RuleDefinition,
 )
 from ontofoundry_api.domain.models_v3 import V3_COLLECTION_MODELS, ValueTypeDefinition
+from ontofoundry_api.domain.role_join import RoleJoin, role_join_input
 
 SCHEMA_VERSION = "ontofoundry.proposals/v1"
 MAX_ITEMS = 500
@@ -157,7 +159,7 @@ def _after_schema(kind: ElementKind, draft_version="2") -> dict[str, Any]:
             if key in schema["properties"]:
                 schema["properties"][key] = {"type": "array", "items": _REF}
         if kind == ElementKind.LINK_TYPE:
-            schema["properties"]["data_join"] = {"anyOf": [DataJoin.model_json_schema(), {"type": "null"}]}
+            schema["properties"]["data_join"] = {"anyOf": [RoleJoin.model_json_schema(), DataJoin.model_json_schema(), {"type": "null"}]}
         if kind == ElementKind.MATERIAL_LINK:
             schema["required"] = [key for key in schema["required"] if key != "role_values"]
             schema["properties"]["type_id"] = _REF
@@ -372,6 +374,39 @@ def _native_binary_proposal(after: dict) -> dict:
     return result
 
 
+def _placeholder(role: dict | None, concept_names: dict[str, str]) -> str | None:
+    """How a reading names a role: its concept, qualified by the role name."""
+    concept = (role or {}).get("concept") or {}
+    if not concept.get("ref"):
+        return None
+    name = concept["ref"] if concept.get("kind") in ("builtin", "any") else concept_names.get(str(concept["ref"]))
+    if name is None:
+        return None
+    return name + (":" + role["name"] if role.get("name") else "")
+
+
+def _carry_placeholders(previous: dict, after: dict, concept_names: dict[str, str]) -> list[str]:
+    """Keep untouched readings pointing at their roles when a role's concept changes.
+
+    An update that retypes a role (String -> Integer) but leaves the readings as
+    they were would otherwise leave `{String}` naming a role that no longer exists.
+    """
+    renames = {}
+    old_roles = {str(role.get("id")): role for role in previous.get("roles", [])}
+    for role in after.get("roles", []):
+        old, new = _placeholder(old_roles.get(str(role.get("id"))), concept_names), _placeholder(role, concept_names)
+        if old and new and old != new:
+            renames["{" + old + "}"] = "{" + new + "}"
+    old_owner = _placeholder({"concept": previous.get("owner_ref"), "name": previous.get("owner_role_name")}, concept_names)
+    new_owner = _placeholder({"concept": after.get("owner_ref"), "name": after.get("owner_role_name")}, concept_names)
+    if old_owner and new_owner and old_owner != new_owner:
+        renames["{" + old_owner + "}"] = "{" + new_owner + "}"
+    if not renames:
+        return list(after.get("verbalizes") or [])
+    pattern = re.compile("|".join(re.escape(key) for key in renames))
+    return [pattern.sub(lambda match: renames[match.group(0)], text) for text in after.get("verbalizes") or []]
+
+
 def parse_result(
     raw: bytes | str | dict[str, Any],
     context: RunContext,
@@ -471,6 +506,16 @@ def parse_result(
             raise _fail("TARGET_HASH_MISMATCH", f"{where}：expected_target_hash 与目标不一致")
         targets[index] = target
 
+    concept_names = {
+        str(element["id"]): element["concept"]
+        for collection in ("object_types", "value_types")
+        for element in draft.get(collection, [])
+        if element.get("concept")
+    }
+    for index, item in enumerate(raw_items):
+        if item["operation"] == "create" and item["after"] and item["after"].get("concept"):
+            concept_names[targets[index]] = item["after"]["concept"]
+
     role_refs = {}
     existing_roles = set()
     if draft_version == "3":
@@ -561,6 +606,8 @@ def parse_result(
                         role["object_id"] = resolve(role["object_id"], index, deps, f"{where}.role_values.object_id")
             if draft_version == "3" and item["before"] is not None:
                 previous = item["before"]
+                if "verbalizes" in after and after["verbalizes"] == previous.get("verbalizes"):
+                    after["verbalizes"] = _carry_placeholders(previous, after, concept_names)
                 native_fields = ("description", "extends", "identify_by", "roles", "multiplicity", "verbalizes", "requires", "derived_by")
                 after["native_presence"] = list(after.get("native_presence", previous.get("native_presence", [])))
                 for key in native_fields:
@@ -611,7 +658,8 @@ def parse_result(
                 if has_context:
                     after['concept_context'] = concept_context
                 if legacy_join is not ...:
-                    after["data_join"] = legacy_join
+                    normalized_join = role_join_input(legacy_join)
+                    after["data_join"] = normalized_join.model_dump(mode="json") if normalized_join else None
             except ValidationError as exc:
                 raise _fail("ELEMENT_INVALID", f"{where}：{exc.errors()[0]['msg']}") from exc
 

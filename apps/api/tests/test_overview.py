@@ -70,6 +70,7 @@ def test_member_overview_bounds_previews_and_omits_raw_evidence_and_configuratio
     assert details["evidence_material_count"] == 1
     assert details["mapping_count"] == 30
     assert len(details["objects"]) == len(details["mappings"]) == 24
+    assert all(m["state"] == "readonly" and m["reason"] == "multiple_concept_mappings" for m in details["mappings"])
     assert len(details["links"]) == 48
     ids = {o["id"] for o in details["objects"]}
     assert all(

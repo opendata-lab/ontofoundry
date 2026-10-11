@@ -1,69 +1,231 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ontofoundry.local/schemas/ontofoundry.proposals.v1.json",
-  "title": "ontofoundry.proposals/v1",
-  "type": "object",
-  "properties": {
-    "schema_version": {
-      "const": "ontofoundry.proposals/v1"
-    },
-    "run_token": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 128
-    },
-    "workspace_id": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "session_id": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "base_version_id": {
-      "anyOf": [
-        {
-          "type": "string",
-          "format": "uuid"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "base_version_sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "source_session_revision": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "source_draft_sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
-    },
-    "items": {
-      "type": "array",
-      "maxItems": 500,
-      "items": {
-        "$ref": "#/$defs/item"
-      }
-    }
-  },
-  "required": [
-    "schema_version",
-    "run_token",
-    "workspace_id",
-    "session_id",
-    "base_version_id",
-    "base_version_sha256",
-    "source_session_revision",
-    "source_draft_sha256",
-    "items"
-  ],
-  "additionalProperties": false,
   "$defs": {
+    "ActionEffect": {
+      "additionalProperties": false,
+      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
+      "properties": {
+        "expression": {
+          "default": "",
+          "maxLength": 480,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ActionEffectKind"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Link Type Id"
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Property Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "ActionEffect",
+      "type": "object"
+    },
+    "ActionEffectKind": {
+      "enum": [
+        "set_property",
+        "create_link",
+        "delete_link"
+      ],
+      "title": "ActionEffectKind",
+      "type": "string"
+    },
+    "ActionParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind",
+          "default": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
+    "AfterActionEffect": {
+      "additionalProperties": false,
+      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
+      "properties": {
+        "expression": {
+          "default": "",
+          "maxLength": 480,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AfterActionEffectKind"
+        },
+        "link_type_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "property_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ActionEffect",
+      "type": "object"
+    },
+    "AfterActionEffectKind": {
+      "enum": [
+        "set_property",
+        "create_link",
+        "delete_link"
+      ],
+      "title": "ActionEffectKind",
+      "type": "string"
+    },
+    "AfterActionParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/AfterValueKind",
+          "default": "string"
+        }
+      },
+      "required": [
+        "name",
+        "technical_name"
+      ],
+      "title": "ActionParameter",
+      "type": "object"
+    },
     "AfterClientRef": {
       "additionalProperties": false,
       "properties": {
@@ -77,6 +239,32 @@
         "client_ref"
       ],
       "title": "ClientRef",
+      "type": "object"
+    },
+    "AfterConceptContext": {
+      "additionalProperties": false,
+      "properties": {
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        },
+        "synonyms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Synonyms",
+          "type": "array"
+        }
+      },
+      "title": "ConceptContext",
       "type": "object"
     },
     "AfterConceptRef": {
@@ -115,7 +303,6 @@
       "title": "ConceptRef",
       "type": "object"
     },
-    "AfterJsonValue": {},
     "AfterEvidenceLocator": {
       "additionalProperties": false,
       "properties": {
@@ -132,14 +319,14 @@
           "default": null,
           "title": "Heading"
         },
-        "line_start": {
-          "minimum": 1,
-          "title": "Line Start",
-          "type": "integer"
-        },
         "line_end": {
           "minimum": 1,
           "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
           "type": "integer"
         }
       },
@@ -150,19 +337,64 @@
       "title": "EvidenceLocator",
       "type": "object"
     },
-    "AfterMaterialEvidence": {
+    "AfterJsonValue": {},
+    "AfterManualEvidence": {
       "additionalProperties": false,
+      "description": "A member vouching for a fact. Author and time are written by the server.",
       "properties": {
-        "kind": {
-          "const": "material",
-          "default": "material",
-          "title": "Kind",
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
           "type": "string"
         },
         "id": {
           "format": "uuid",
           "title": "Id",
           "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "AfterMaterialEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/AfterEvidenceLocator"
         },
         "material_id": {
           "maxLength": 64,
@@ -182,9 +414,6 @@
           "default": null,
           "title": "Material Sha256"
         },
-        "locator": {
-          "$ref": "#/$defs/AfterEvidenceLocator"
-        },
         "quote": {
           "default": "",
           "maxLength": 2000,
@@ -199,58 +428,10 @@
       "title": "MaterialEvidence",
       "type": "object"
     },
-    "AfterManualEvidence": {
-      "additionalProperties": false,
-      "description": "A member vouching for a fact. Author and time are written by the server.",
-      "properties": {
-        "kind": {
-          "const": "manual",
-          "default": "manual",
-          "title": "Kind",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "note": {
-          "default": "",
-          "maxLength": 2000,
-          "title": "Note",
-          "type": "string"
-        },
-        "created_by": {
-          "maxLength": 64,
-          "minLength": 1,
-          "title": "Created By",
-          "type": "string"
-        },
-        "created_at": {
-          "format": "date-time",
-          "title": "Created At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "created_by",
-        "created_at"
-      ],
-      "title": "ManualEvidence",
-      "type": "object"
-    },
-    "AfterConceptContext": {
+    "AfterRoleRef": {
       "additionalProperties": false,
       "properties": {
-        "synonyms": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Synonyms",
-          "type": "array"
-        },
-        "instructions": {
+        "client_ref": {
           "anyOf": [
             {
               "type": "string"
@@ -260,11 +441,140 @@
             }
           ],
           "default": null,
-          "title": "Instructions"
+          "title": "Client Ref"
+        },
+        "concept": {
+          "$ref": "#/$defs/AfterConceptRef"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
         }
       },
-      "title": "ConceptContext",
+      "required": [
+        "concept"
+      ],
+      "title": "RoleRef",
       "type": "object"
+    },
+    "AfterRoleValue": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "client_ref": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "client_ref"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/AfterJsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "role_id"
+      ],
+      "title": "RoleValue",
+      "type": "object"
+    },
+    "AfterValueKind": {
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
     },
     "ClientRef": {
       "additionalProperties": false,
@@ -279,6 +589,32 @@
         "client_ref"
       ],
       "title": "ClientRef",
+      "type": "object"
+    },
+    "ConceptContext": {
+      "additionalProperties": false,
+      "properties": {
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        },
+        "synonyms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Synonyms",
+          "type": "array"
+        }
+      },
+      "title": "ConceptContext",
       "type": "object"
     },
     "ConceptRef": {
@@ -317,2032 +653,6 @@
       "title": "ConceptRef",
       "type": "object"
     },
-    "JsonValue": {},
-    "ConceptContext": {
-      "additionalProperties": false,
-      "properties": {
-        "synonyms": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Synonyms",
-          "type": "array"
-        },
-        "instructions": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Instructions"
-        }
-      },
-      "title": "ConceptContext",
-      "type": "object"
-    },
-    "object_type_after": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "concept": {
-          "title": "Concept",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "extends": {
-          "items": {
-            "$ref": "#/$defs/AfterConceptRef"
-          },
-          "title": "Extends",
-          "type": "array"
-        },
-        "identify_by": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Identify By",
-          "type": "array"
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "derived_by": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
-        },
-        "concept_context": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AfterConceptContext"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "concept"
-      ],
-      "title": "ObjectTypeV3",
-      "type": "object"
-    },
-    "object_type_element": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "concept": {
-          "title": "Concept",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "extends": {
-          "items": {
-            "$ref": "#/$defs/ConceptRef"
-          },
-          "title": "Extends",
-          "type": "array"
-        },
-        "identify_by": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Identify By",
-          "type": "array"
-        },
-        "requires": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Requires",
-          "type": "array"
-        },
-        "derived_by": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Derived By",
-          "type": "array"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "concept_context": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ConceptContext"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "concept"
-      ],
-      "title": "ObjectTypeV3",
-      "type": "object"
-    },
-    "value_type_after": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "concept": {
-          "title": "Concept",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "extends": {
-          "items": {
-            "$ref": "#/$defs/AfterConceptRef"
-          },
-          "title": "Extends",
-          "type": "array"
-        },
-        "identify_by": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Identify By",
-          "type": "array"
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "derived_by": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
-        },
-        "concept_context": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AfterConceptContext"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "concept"
-      ],
-      "title": "ValueTypeDefinition",
-      "type": "object"
-    },
-    "value_type_element": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "concept": {
-          "title": "Concept",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "extends": {
-          "items": {
-            "$ref": "#/$defs/ConceptRef"
-          },
-          "title": "Extends",
-          "type": "array"
-        },
-        "identify_by": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Identify By",
-          "type": "array"
-        },
-        "requires": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Requires",
-          "type": "array"
-        },
-        "derived_by": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Derived By",
-          "type": "array"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "concept_context": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ConceptContext"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "id",
-        "concept"
-      ],
-      "title": "ValueTypeDefinition",
-      "type": "object"
-    },
-    "AfterRoleRef": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "concept": {
-          "$ref": "#/$defs/AfterConceptRef"
-        },
-        "client_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Client Ref"
-        }
-      },
-      "required": [
-        "concept"
-      ],
-      "title": "RoleRef",
-      "type": "object"
-    },
-    "RoleRef": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Name"
-        },
-        "concept": {
-          "$ref": "#/$defs/ConceptRef"
-        },
-        "client_ref": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Client Ref"
-        }
-      },
-      "required": [
-        "id",
-        "concept"
-      ],
-      "title": "RoleRef",
-      "type": "object"
-    },
-    "property_after": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "owner_ref": {
-          "$ref": "#/$defs/AfterConceptRef"
-        },
-        "roles": {
-          "items": {
-            "$ref": "#/$defs/AfterRoleRef"
-          },
-          "title": "Roles",
-          "type": "array"
-        },
-        "multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "ManyToOne",
-                "OneToOne"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Multiplicity"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "derived_by": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
-        },
-        "endpoint_direction": {
-          "default": "forward",
-          "enum": [
-            "forward",
-            "reverse"
-          ],
-          "title": "Endpoint Direction",
-          "type": "string"
-        },
-        "identifier": {
-          "default": false,
-          "title": "Identifier",
-          "type": "boolean"
-        },
-        "owner_role_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Owner Role Name"
-        },
-        "legacy_multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "one_to_one",
-                "many_to_one",
-                "one_to_many",
-                "many_to_many"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Legacy Multiplicity"
-        },
-        "required": {
-          "default": false,
-          "title": "Required",
-          "type": "boolean"
-        },
-        "value_kind": {
-          "default": "string",
-          "title": "Value Kind",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name",
-        "owner_ref"
-      ],
-      "title": "PropertyV3",
-      "type": "object"
-    },
-    "property_element": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "owner_ref": {
-          "$ref": "#/$defs/ConceptRef"
-        },
-        "roles": {
-          "items": {
-            "$ref": "#/$defs/RoleRef"
-          },
-          "title": "Roles",
-          "type": "array"
-        },
-        "multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "ManyToOne",
-                "OneToOne"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Multiplicity"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "requires": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Requires",
-          "type": "array"
-        },
-        "derived_by": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Derived By",
-          "type": "array"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "endpoint_direction": {
-          "default": "forward",
-          "enum": [
-            "forward",
-            "reverse"
-          ],
-          "title": "Endpoint Direction",
-          "type": "string"
-        },
-        "identifier": {
-          "default": false,
-          "title": "Identifier",
-          "type": "boolean"
-        },
-        "owner_role_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Owner Role Name"
-        },
-        "legacy_multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "one_to_one",
-                "many_to_one",
-                "one_to_many",
-                "many_to_many"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Legacy Multiplicity"
-        },
-        "required": {
-          "default": false,
-          "title": "Required",
-          "type": "boolean"
-        },
-        "value_kind": {
-          "default": "string",
-          "title": "Value Kind",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "owner_ref"
-      ],
-      "title": "PropertyV3",
-      "type": "object"
-    },
-    "link_type_after": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "owner_ref": {
-          "$ref": "#/$defs/AfterConceptRef"
-        },
-        "roles": {
-          "items": {
-            "$ref": "#/$defs/AfterRoleRef"
-          },
-          "title": "Roles",
-          "type": "array"
-        },
-        "multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "ManyToOne",
-                "OneToOne"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Multiplicity"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "requires": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "derived_by": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
-        },
-        "endpoint_direction": {
-          "default": "forward",
-          "enum": [
-            "forward",
-            "reverse"
-          ],
-          "title": "Endpoint Direction",
-          "type": "string"
-        },
-        "identifier": {
-          "default": false,
-          "title": "Identifier",
-          "type": "boolean"
-        },
-        "owner_role_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Owner Role Name"
-        },
-        "legacy_multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "one_to_one",
-                "many_to_one",
-                "one_to_many",
-                "many_to_many"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Legacy Multiplicity"
-        },
-        "data_join": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "source_column": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "title": "Source Column",
-                  "type": "string"
-                },
-                "target_column": {
-                  "maxLength": 240,
-                  "minLength": 1,
-                  "title": "Target Column",
-                  "type": "string"
-                }
-              },
-              "required": [
-                "source_column",
-                "target_column"
-              ],
-              "title": "DataJoin",
-              "type": "object"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": [
-        "name",
-        "owner_ref"
-      ],
-      "title": "LinkTypeV3",
-      "type": "object"
-    },
-    "link_type_element": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Description"
-        },
-        "owner_ref": {
-          "$ref": "#/$defs/ConceptRef"
-        },
-        "roles": {
-          "items": {
-            "$ref": "#/$defs/RoleRef"
-          },
-          "title": "Roles",
-          "type": "array"
-        },
-        "multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "ManyToOne",
-                "OneToOne"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Multiplicity"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "requires": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Requires",
-          "type": "array"
-        },
-        "derived_by": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "title": "Derived By",
-          "type": "array"
-        },
-        "tags": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Tags",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "endpoint_direction": {
-          "default": "forward",
-          "enum": [
-            "forward",
-            "reverse"
-          ],
-          "title": "Endpoint Direction",
-          "type": "string"
-        },
-        "identifier": {
-          "default": false,
-          "title": "Identifier",
-          "type": "boolean"
-        },
-        "owner_role_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Owner Role Name"
-        },
-        "legacy_multiplicity": {
-          "anyOf": [
-            {
-              "enum": [
-                "one_to_one",
-                "many_to_one",
-                "one_to_many",
-                "many_to_many"
-              ],
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Legacy Multiplicity"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "owner_ref"
-      ],
-      "title": "LinkTypeV3",
-      "type": "object"
-    },
-    "rule_after": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "owner_kind": {
-          "enum": [
-            "object_type",
-            "value_type",
-            "property",
-            "link_type",
-            "action"
-          ],
-          "title": "Owner Kind",
-          "type": "string"
-        },
-        "owner_id": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                }
-              },
-              "required": [
-                "client_ref"
-              ],
-              "additionalProperties": false
-            }
-          ]
-        },
-        "rule_kind": {
-          "enum": [
-            "constraint",
-            "derivation"
-          ],
-          "title": "Rule Kind",
-          "type": "string"
-        },
-        "expression": {
-          "title": "Expression",
-          "type": "string"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "default": "",
-          "title": "Description",
-          "type": "string"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
-        }
-      },
-      "required": [
-        "owner_kind",
-        "owner_id",
-        "rule_kind",
-        "expression"
-      ],
-      "title": "RuleV3",
-      "type": "object"
-    },
-    "rule_element": {
-      "additionalProperties": false,
-      "properties": {
-        "native_presence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Native Presence",
-          "type": "array"
-        },
-        "position": {
-          "anyOf": [
-            {
-              "minimum": 0,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Position"
-        },
-        "origin": {
-          "default": "platform",
-          "enum": [
-            "platform",
-            "imported",
-            "migrated"
-          ],
-          "title": "Origin",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "owner_kind": {
-          "enum": [
-            "object_type",
-            "value_type",
-            "property",
-            "link_type",
-            "action"
-          ],
-          "title": "Owner Kind",
-          "type": "string"
-        },
-        "owner_id": {
-          "format": "uuid",
-          "title": "Owner Id",
-          "type": "string"
-        },
-        "rule_kind": {
-          "enum": [
-            "constraint",
-            "derivation"
-          ],
-          "title": "Rule Kind",
-          "type": "string"
-        },
-        "expression": {
-          "title": "Expression",
-          "type": "string"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "default": "",
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "description": {
-          "default": "",
-          "title": "Description",
-          "type": "string"
-        },
-        "verbalizes": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Verbalizes",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
-        }
-      },
-      "required": [
-        "id",
-        "owner_kind",
-        "owner_id",
-        "rule_kind",
-        "expression"
-      ],
-      "title": "RuleV3",
-      "type": "object"
-    },
-    "AfterActionEffect": {
-      "additionalProperties": false,
-      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/AfterActionEffectKind"
-        },
-        "property_id": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "client_ref": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                    }
-                  },
-                  "required": [
-                    "client_ref"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "link_type_id": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "client_ref": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                    }
-                  },
-                  "required": [
-                    "client_ref"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "expression": {
-          "default": "",
-          "maxLength": 480,
-          "title": "Expression",
-          "type": "string"
-        }
-      },
-      "required": [
-        "kind"
-      ],
-      "title": "ActionEffect",
-      "type": "object"
-    },
-    "AfterActionEffectKind": {
-      "enum": [
-        "set_property",
-        "create_link",
-        "delete_link"
-      ],
-      "title": "ActionEffectKind",
-      "type": "string"
-    },
-    "AfterActionParameter": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "value_kind": {
-          "$ref": "#/$defs/AfterValueKind",
-          "default": "string"
-        },
-        "required": {
-          "default": false,
-          "title": "Required",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "name",
-        "technical_name"
-      ],
-      "title": "ActionParameter",
-      "type": "object"
-    },
-    "AfterValueKind": {
-      "enum": [
-        "string",
-        "integer",
-        "decimal",
-        "float",
-        "boolean",
-        "date",
-        "datetime"
-      ],
-      "title": "ValueKind",
-      "type": "string"
-    },
-    "ActionEffect": {
-      "additionalProperties": false,
-      "description": "What an action would change. A definition only: nothing executes it.\n\n`expression` is ANSI SQL text over the action's parameters (`:param`) and the\ninput object's properties, stored and displayed like any Ossie expression.",
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "kind": {
-          "$ref": "#/$defs/ActionEffectKind"
-        },
-        "property_id": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Property Id"
-        },
-        "link_type_id": {
-          "anyOf": [
-            {
-              "format": "uuid",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Link Type Id"
-        },
-        "expression": {
-          "default": "",
-          "maxLength": 480,
-          "title": "Expression",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "kind"
-      ],
-      "title": "ActionEffect",
-      "type": "object"
-    },
-    "ActionEffectKind": {
-      "enum": [
-        "set_property",
-        "create_link",
-        "delete_link"
-      ],
-      "title": "ActionEffectKind",
-      "type": "string"
-    },
-    "ActionParameter": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
-        "value_kind": {
-          "$ref": "#/$defs/ValueKind",
-          "default": "string"
-        },
-        "required": {
-          "default": false,
-          "title": "Required",
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "technical_name"
-      ],
-      "title": "ActionParameter",
-      "type": "object"
-    },
     "EvidenceLocator": {
       "additionalProperties": false,
       "properties": {
@@ -2359,14 +669,14 @@
           "default": null,
           "title": "Heading"
         },
-        "line_start": {
-          "minimum": 1,
-          "title": "Line Start",
-          "type": "integer"
-        },
         "line_end": {
           "minimum": 1,
           "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
           "type": "integer"
         }
       },
@@ -2377,25 +687,14 @@
       "title": "EvidenceLocator",
       "type": "object"
     },
+    "JsonValue": {},
     "ManualEvidence": {
       "additionalProperties": false,
       "description": "A member vouching for a fact. Author and time are written by the server.",
       "properties": {
-        "kind": {
-          "const": "manual",
-          "default": "manual",
-          "title": "Kind",
-          "type": "string"
-        },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "note": {
-          "default": "",
-          "maxLength": 2000,
-          "title": "Note",
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
           "type": "string"
         },
         "created_by": {
@@ -2404,9 +703,21 @@
           "title": "Created By",
           "type": "string"
         },
-        "created_at": {
-          "format": "date-time",
-          "title": "Created At",
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
           "type": "string"
         }
       },
@@ -2421,16 +732,19 @@
     "MaterialEvidence": {
       "additionalProperties": false,
       "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
         "kind": {
           "const": "material",
           "default": "material",
           "title": "Kind",
           "type": "string"
         },
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
         },
         "material_id": {
           "maxLength": 64,
@@ -2450,9 +764,6 @@
           "default": null,
           "title": "Material Sha256"
         },
-        "locator": {
-          "$ref": "#/$defs/EvidenceLocator"
-        },
         "quote": {
           "default": "",
           "maxLength": 2000,
@@ -2466,6 +777,111 @@
         "locator"
       ],
       "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "RoleRef": {
+      "additionalProperties": false,
+      "properties": {
+        "client_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Client Ref"
+        },
+        "concept": {
+          "$ref": "#/$defs/ConceptRef"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        }
+      },
+      "required": [
+        "id",
+        "concept"
+      ],
+      "title": "RoleRef",
+      "type": "object"
+    },
+    "RoleValue": {
+      "additionalProperties": false,
+      "properties": {
+        "object_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Object Id"
+        },
+        "role_id": {
+          "format": "uuid",
+          "title": "Role Id",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "role_id"
+      ],
+      "title": "RoleValue",
       "type": "object"
     },
     "ValueKind": {
@@ -2485,75 +901,10 @@
       "additionalProperties": false,
       "description": "An action contract. Only modeled and versioned; there is no executor.",
       "properties": {
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
         "description": {
           "default": "",
           "title": "Description",
           "type": "string"
-        },
-        "input_type_id": {
-          "anyOf": [
-            {
-              "type": "string",
-              "format": "uuid"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                }
-              },
-              "required": [
-                "client_ref"
-              ],
-              "additionalProperties": false
-            }
-          ]
-        },
-        "parameters": {
-          "items": {
-            "$ref": "#/$defs/AfterActionParameter"
-          },
-          "maxItems": 40,
-          "title": "Parameters",
-          "type": "array"
-        },
-        "precondition_rule_ids": {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "client_ref": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                  }
-                },
-                "required": [
-                  "client_ref"
-                ],
-                "additionalProperties": false
-              }
-            ]
-          }
         },
         "effects": {
           "items": {
@@ -2564,8 +915,6 @@
           "type": "array"
         },
         "evidence": {
-          "type": "array",
-          "maxItems": 50,
           "items": {
             "anyOf": [
               {
@@ -2575,7 +924,74 @@
                 "$ref": "#/$defs/AfterManualEvidence"
               }
             ]
-          }
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "input_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/AfterActionParameter"
+          },
+          "maxItems": 40,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "precondition_rule_ids": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
         }
       },
       "required": [
@@ -2590,49 +1006,10 @@
       "additionalProperties": false,
       "description": "An action contract. Only modeled and versioned; there is no executor.",
       "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
         "description": {
           "default": "",
           "title": "Description",
           "type": "string"
-        },
-        "input_type_id": {
-          "format": "uuid",
-          "title": "Input Type Id",
-          "type": "string"
-        },
-        "parameters": {
-          "items": {
-            "$ref": "#/$defs/ActionParameter"
-          },
-          "maxItems": 40,
-          "title": "Parameters",
-          "type": "array"
-        },
-        "precondition_rule_ids": {
-          "items": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "maxItems": 40,
-          "title": "Precondition Rule Ids",
-          "type": "array"
         },
         "effects": {
           "items": {
@@ -2663,6 +1040,45 @@
           "maxItems": 50,
           "title": "Evidence",
           "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "input_type_id": {
+          "format": "uuid",
+          "title": "Input Type Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/ActionParameter"
+          },
+          "maxItems": 40,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "precondition_rule_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 40,
+          "title": "Precondition Rule Ids",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
         }
       },
       "required": [
@@ -2674,62 +1090,454 @@
       "title": "ActionDefinition",
       "type": "object"
     },
-    "material_object_after": {
+    "item": {
       "additionalProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object_type_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/object_type_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "object_type"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_type_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/value_type_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "value_type"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/property_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/property_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "property"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/link_type_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/link_type_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "link_type"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/rule_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/rule_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "rule"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/action_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/action_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "action"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_object_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_object_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "material_object"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_link_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/material_link_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "material_link"
+            }
+          }
+        },
+        {
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/mapping_after"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "before": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/mapping_element"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_kind": {
+              "const": "mapping"
+            }
+          }
+        }
+      ],
       "properties": {
-        "type_id": {
+        "after": {},
+        "before": {},
+        "client_ref": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+          "type": "string"
+        },
+        "depends_on": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/AfterMaterialEvidence"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "expected_target_hash": {
           "anyOf": [
             {
-              "type": "string",
-              "format": "uuid"
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
             },
             {
-              "type": "object",
-              "properties": {
-                "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                }
-              },
-              "required": [
-                "client_ref"
-              ],
-              "additionalProperties": false
+              "type": "null"
             }
           ]
         },
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
+        "field_changes": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "after": {},
+              "before": {},
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "type": "object"
+          },
+          "maxItems": 200,
+          "type": "array"
+        },
+        "operation": {
+          "enum": [
+            "create",
+            "update",
+            "delete"
+          ]
+        },
+        "reason": {
+          "maxLength": 2000,
           "type": "string"
         },
-        "values": {
-          "additionalProperties": {
+        "target_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_kind": {
+          "enum": [
+            "object_type",
+            "value_type",
+            "property",
+            "link_type",
+            "rule",
+            "action",
+            "material_object",
+            "material_link",
+            "mapping"
+          ]
+        }
+      },
+      "required": [
+        "operation",
+        "target_kind",
+        "before",
+        "after"
+      ],
+      "type": "object"
+    },
+    "link_type_after": {
+      "additionalProperties": false,
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "owner_columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "title": "Owner Columns",
+                  "type": "array"
+                },
+                "role_columns": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "title": "Role Columns",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "owner_columns",
+                "role_columns"
+              ],
+              "title": "RoleJoin",
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "source_column": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "title": "Source Column",
+                  "type": "string"
+                },
+                "target_column": {
+                  "maxLength": 240,
+                  "minLength": 1,
+                  "title": "Target Column",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source_column",
+                "target_column"
+              ],
+              "title": "DataJoin",
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derived_by": {
+          "items": {
             "anyOf": [
               {
+                "format": "uuid",
                 "type": "string"
               },
               {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
               }
             ]
           },
-          "title": "Values",
-          "type": "object"
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "endpoint_direction": {
+          "default": "forward",
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Endpoint Direction",
+          "type": "string"
         },
         "evidence": {
-          "type": "array",
-          "maxItems": 50,
           "items": {
             "anyOf": [
               {
@@ -2739,164 +1547,24 @@
                 "$ref": "#/$defs/AfterManualEvidence"
               }
             ]
-          }
-        }
-      },
-      "required": [
-        "type_id",
-        "name"
-      ],
-      "title": "MaterialObject",
-      "type": "object"
-    },
-    "material_object_element": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "format": "uuid",
-          "title": "Id",
-          "type": "string"
-        },
-        "type_id": {
-          "format": "uuid",
-          "title": "Type Id",
-          "type": "string"
-        },
-        "name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Name",
-          "type": "string"
-        },
-        "values": {
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "title": "Values",
-          "type": "object"
-        },
-        "evidence": {
-          "items": {
-            "discriminator": {
-              "mapping": {
-                "manual": "#/$defs/ManualEvidence",
-                "material": "#/$defs/MaterialEvidence"
-              },
-              "propertyName": "kind"
-            },
-            "oneOf": [
-              {
-                "$ref": "#/$defs/MaterialEvidence"
-              },
-              {
-                "$ref": "#/$defs/ManualEvidence"
-              }
-            ]
           },
           "maxItems": 50,
-          "title": "Evidence",
           "type": "array"
-        }
-      },
-      "required": [
-        "id",
-        "type_id",
-        "name"
-      ],
-      "title": "MaterialObject",
-      "type": "object"
-    },
-    "AfterRoleValue": {
-      "additionalProperties": false,
-      "properties": {
-        "role_id": {
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "legacy_multiplicity": {
           "anyOf": [
             {
-              "type": "string",
-              "format": "uuid"
-            },
-            {
-              "type": "object",
-              "properties": {
-                "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                }
-              },
-              "required": [
-                "client_ref"
+              "enum": [
+                "one_to_one",
+                "many_to_one",
+                "one_to_many",
+                "many_to_many"
               ],
-              "additionalProperties": false
-            }
-          ]
-        },
-        "object_id": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "client_ref": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-                    }
-                  },
-                  "required": [
-                    "client_ref"
-                  ],
-                  "additionalProperties": false
-                }
-              ]
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "value": {
-          "$ref": "#/$defs/AfterJsonValue",
-          "default": null
-        }
-      },
-      "required": [
-        "role_id"
-      ],
-      "title": "RoleValue",
-      "type": "object"
-    },
-    "RoleValue": {
-      "additionalProperties": false,
-      "properties": {
-        "role_id": {
-          "format": "uuid",
-          "title": "Role Id",
-          "type": "string"
-        },
-        "object_id": {
-          "anyOf": [
-            {
-              "format": "uuid",
               "type": "string"
             },
             {
@@ -2904,63 +1572,484 @@
             }
           ],
           "default": null,
-          "title": "Object Id"
+          "title": "Legacy Multiplicity"
         },
-        "value": {
-          "$ref": "#/$defs/JsonValue",
-          "default": null
+        "multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "ManyToOne",
+                "OneToOne"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multiplicity"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_ref": {
+          "$ref": "#/$defs/AfterConceptRef"
+        },
+        "owner_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Role Name"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/AfterRoleRef"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
         }
       },
       "required": [
-        "role_id"
+        "name",
+        "owner_ref"
       ],
-      "title": "RoleValue",
+      "title": "LinkTypeV3",
       "type": "object"
     },
-    "material_link_after": {
+    "link_type_element": {
       "additionalProperties": false,
       "properties": {
+        "derived_by": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "endpoint_direction": {
+          "default": "forward",
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Endpoint Direction",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "legacy_multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "one_to_one",
+                "many_to_one",
+                "one_to_many",
+                "many_to_many"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legacy Multiplicity"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "ManyToOne",
+                "OneToOne"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multiplicity"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_ref": {
+          "$ref": "#/$defs/ConceptRef"
+        },
+        "owner_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Role Name"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/RoleRef"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner_ref"
+      ],
+      "title": "LinkTypeV3",
+      "type": "object"
+    },
+    "mapping_after": {
+      "additionalProperties": false,
+      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
+      "properties": {
+        "connection_alias": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Connection Alias",
+          "type": "string"
+        },
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "key_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Key Column",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        },
         "type_id": {
           "anyOf": [
             {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             },
             {
-              "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
                 }
               },
               "required": [
                 "client_ref"
               ],
-              "additionalProperties": false
+              "type": "object"
             }
           ]
+        }
+      },
+      "required": [
+        "type_id",
+        "connection_alias",
+        "table_name",
+        "key_column"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "mapping_element": {
+      "additionalProperties": false,
+      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
+      "properties": {
+        "connection_alias": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Connection Alias",
+          "type": "string"
+        },
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Key Column",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "connection_alias",
+        "table_name",
+        "key_column"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "material_link_after": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "role_values": {
+          "items": {
+            "$ref": "#/$defs/AfterRoleValue"
+          },
+          "title": "Role Values",
+          "type": "array"
         },
         "source_id": {
           "anyOf": [
             {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "format": "uuid",
+                  "type": "string"
                 },
                 {
-                  "type": "object",
+                  "additionalProperties": false,
                   "properties": {
                     "client_ref": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
                     }
                   },
                   "required": [
                     "client_ref"
                   ],
-                  "additionalProperties": false
+                  "type": "object"
                 }
               ]
             },
@@ -2974,21 +2063,21 @@
             {
               "anyOf": [
                 {
-                  "type": "string",
-                  "format": "uuid"
+                  "format": "uuid",
+                  "type": "string"
                 },
                 {
-                  "type": "object",
+                  "additionalProperties": false,
                   "properties": {
                     "client_ref": {
-                      "type": "string",
-                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                      "type": "string"
                     }
                   },
                   "required": [
                     "client_ref"
                   ],
-                  "additionalProperties": false
+                  "type": "object"
                 }
               ]
             },
@@ -2997,26 +2086,26 @@
             }
           ]
         },
-        "role_values": {
-          "items": {
-            "$ref": "#/$defs/AfterRoleValue"
-          },
-          "title": "Role Values",
-          "type": "array"
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/$defs/AfterMaterialEvidence"
+        "type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
               },
-              {
-                "$ref": "#/$defs/AfterManualEvidence"
-              }
-            ]
-          }
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
+          ]
         }
       },
       "required": [
@@ -3028,15 +2117,24 @@
     "material_link_element": {
       "additionalProperties": false,
       "properties": {
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
           "type": "string"
         },
-        "type_id": {
-          "format": "uuid",
-          "title": "Type Id",
-          "type": "string"
+        "role_values": {
+          "items": {
+            "$ref": "#/$defs/RoleValue"
+          },
+          "title": "Role Values",
+          "type": "array"
         },
         "source_id": {
           "anyOf": [
@@ -3064,19 +2162,10 @@
           "default": null,
           "title": "Target Id"
         },
-        "role_values": {
-          "items": {
-            "$ref": "#/$defs/RoleValue"
-          },
-          "title": "Role Values",
-          "type": "array"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/JsonValue"
-          },
-          "title": "Evidence",
-          "type": "array"
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
         }
       },
       "required": [
@@ -3087,85 +2176,115 @@
       "title": "MaterialLinkV3",
       "type": "object"
     },
-    "mapping_after": {
+    "material_object_after": {
       "additionalProperties": false,
-      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
       "properties": {
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
         "type_id": {
           "anyOf": [
             {
-              "type": "string",
-              "format": "uuid"
+              "format": "uuid",
+              "type": "string"
             },
             {
-              "type": "object",
+              "additionalProperties": false,
               "properties": {
                 "client_ref": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
                 }
               },
               "required": [
                 "client_ref"
               ],
-              "additionalProperties": false
+              "type": "object"
             }
           ]
         },
-        "connection_alias": {
-          "maxLength": 120,
-          "minLength": 1,
-          "title": "Connection Alias",
-          "type": "string"
-        },
-        "table_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Table Name",
-          "type": "string"
-        },
-        "schema_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Schema Name"
-        },
-        "key_column": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Key Column",
-          "type": "string"
-        },
-        "fields": {
+        "values": {
           "additionalProperties": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
-          "title": "Fields",
+          "title": "Values",
           "type": "object"
         }
       },
       "required": [
         "type_id",
-        "connection_alias",
-        "table_name",
-        "key_column"
+        "name"
       ],
-      "title": "DataMapping",
+      "title": "MaterialObject",
       "type": "object"
     },
-    "mapping_element": {
+    "material_object_element": {
       "additionalProperties": false,
-      "description": "Where an object type's data sits, not which connection reads it.\n\nThe model names a data source (`connection_alias`) plus the table, key column\nand field columns. Which credentials serve that alias is workspace\nconfiguration, resolved at query time, so a published version carries no\nconnection identifiers or secrets and stays portable between environments.",
       "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
           "type": "string"
         },
         "type_id": {
@@ -3173,19 +2292,80 @@
           "title": "Type Id",
           "type": "string"
         },
-        "connection_alias": {
-          "maxLength": 120,
-          "minLength": 1,
-          "title": "Connection Alias",
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "name"
+      ],
+      "title": "MaterialObject",
+      "type": "object"
+    },
+    "object_type_after": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "title": "Concept",
           "type": "string"
         },
-        "table_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Table Name",
-          "type": "string"
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
-        "schema_name": {
+        "derived_by": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "description": {
           "anyOf": [
             {
               "type": "string"
@@ -3195,373 +2375,1220 @@
             }
           ],
           "default": null,
-          "title": "Schema Name"
+          "title": "Description"
         },
-        "key_column": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Key Column",
-          "type": "string"
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
         },
-        "fields": {
-          "additionalProperties": {
+        "extends": {
+          "items": {
+            "$ref": "#/$defs/AfterConceptRef"
+          },
+          "title": "Extends",
+          "type": "array"
+        },
+        "identify_by": {
+          "items": {
             "type": "string"
           },
-          "title": "Fields",
-          "type": "object"
+          "title": "Identify By",
+          "type": "array"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "concept"
+      ],
+      "title": "ObjectTypeV3",
+      "type": "object"
+    },
+    "object_type_element": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "title": "Concept",
+          "type": "string"
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derived_by": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "extends": {
+          "items": {
+            "$ref": "#/$defs/ConceptRef"
+          },
+          "title": "Extends",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identify_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identify By",
+          "type": "array"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "type_id",
-        "connection_alias",
-        "table_name",
-        "key_column"
+        "concept"
       ],
-      "title": "DataMapping",
+      "title": "ObjectTypeV3",
       "type": "object"
     },
-    "item": {
-      "type": "object",
+    "property_after": {
+      "additionalProperties": false,
       "properties": {
-        "client_ref": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
+        "derived_by": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
         },
-        "operation": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "endpoint_direction": {
+          "default": "forward",
           "enum": [
-            "create",
-            "update",
-            "delete"
+            "forward",
+            "reverse"
+          ],
+          "title": "Endpoint Direction",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "legacy_multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "one_to_one",
+                "many_to_one",
+                "one_to_many",
+                "many_to_many"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legacy Multiplicity"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "ManyToOne",
+                "OneToOne"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multiplicity"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_ref": {
+          "$ref": "#/$defs/AfterConceptRef"
+        },
+        "owner_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Role Name"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "requires": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/AfterRoleRef"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "default": "string",
+          "title": "Value Kind",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "owner_ref"
+      ],
+      "title": "PropertyV3",
+      "type": "object"
+    },
+    "property_element": {
+      "additionalProperties": false,
+      "properties": {
+        "derived_by": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "endpoint_direction": {
+          "default": "forward",
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Endpoint Direction",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "legacy_multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "one_to_one",
+                "many_to_one",
+                "one_to_many",
+                "many_to_many"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legacy Multiplicity"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "enum": [
+                "ManyToOne",
+                "OneToOne"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multiplicity"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_ref": {
+          "$ref": "#/$defs/ConceptRef"
+        },
+        "owner_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Role Name"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "requires": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "$ref": "#/$defs/RoleRef"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "default": "string",
+          "title": "Value Kind",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner_ref"
+      ],
+      "title": "PropertyV3",
+      "type": "object"
+    },
+    "rule_after": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "expression": {
+          "title": "Expression",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "client_ref": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "client_ref"
+              ],
+              "type": "object"
+            }
           ]
         },
-        "target_kind": {
+        "owner_kind": {
           "enum": [
             "object_type",
             "value_type",
             "property",
             "link_type",
-            "rule",
-            "action",
-            "material_object",
-            "material_link",
-            "mapping"
-          ]
+            "action"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
         },
-        "target_id": {
+        "position": {
           "anyOf": [
             {
-              "type": "string",
-              "format": "uuid"
+              "minimum": 0,
+              "type": "integer"
             },
             {
               "type": "null"
             }
-          ]
+          ],
+          "default": null,
+          "title": "Position"
         },
-        "expected_target_hash": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+        "rule_kind": {
+          "enum": [
+            "constraint",
+            "derivation"
+          ],
+          "title": "Rule Kind",
+          "type": "string"
         },
-        "before": {},
-        "after": {},
-        "field_changes": {
-          "type": "array",
-          "maxItems": 200,
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
           "items": {
-            "type": "object",
-            "properties": {
-              "path": {
-                "type": "string"
-              },
-              "before": {},
-              "after": {}
-            },
-            "required": [
-              "path"
-            ],
-            "additionalProperties": false
-          }
-        },
-        "evidence": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "$ref": "#/$defs/AfterMaterialEvidence"
-          }
-        },
-        "depends_on": {
-          "type": "array",
-          "maxItems": 50,
-          "items": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
-          }
-        },
-        "reason": {
-          "type": "string",
-          "maxLength": 2000
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
         }
       },
       "required": [
-        "operation",
-        "target_kind",
-        "before",
-        "after"
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
       ],
+      "title": "RuleV3",
+      "type": "object"
+    },
+    "rule_element": {
       "additionalProperties": false,
-      "oneOf": [
-        {
-          "properties": {
-            "target_kind": {
-              "const": "object_type"
+      "properties": {
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "owner_id": {
+          "format": "uuid",
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "enum": [
+            "object_type",
+            "value_type",
+            "property",
+            "link_type",
+            "action"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
             },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/object_type_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/object_type_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+            {
+              "type": "null"
             }
-          }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "rule_kind": {
+          "enum": [
+            "constraint",
+            "derivation"
+          ],
+          "title": "Rule Kind",
+          "type": "string"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
+      ],
+      "title": "RuleV3",
+      "type": "object"
+    },
+    "value_type_after": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "title": "Concept",
+          "type": "string"
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AfterConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derived_by": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "evidence": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "extends": {
+          "items": {
+            "$ref": "#/$defs/AfterConceptRef"
+          },
+          "title": "Extends",
+          "type": "array"
+        },
+        "identify_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identify By",
+          "type": "array"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_ref": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "client_ref"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "concept"
+      ],
+      "title": "ValueTypeDefinition",
+      "type": "object"
+    },
+    "value_type_element": {
+      "additionalProperties": false,
+      "properties": {
+        "concept": {
+          "title": "Concept",
+          "type": "string"
+        },
+        "concept_context": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConceptContext"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "derived_by": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "extends": {
+          "items": {
+            "$ref": "#/$defs/ConceptRef"
+          },
+          "title": "Extends",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identify_by": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identify By",
+          "type": "array"
+        },
+        "name": {
+          "default": "",
+          "title": "Name",
+          "type": "string"
+        },
+        "native_presence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Native Presence",
+          "type": "array"
+        },
+        "origin": {
+          "default": "platform",
+          "enum": [
+            "platform",
+            "imported",
+            "migrated"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "position": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Position"
+        },
+        "requires": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Requires",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "default": "",
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "concept"
+      ],
+      "title": "ValueTypeDefinition",
+      "type": "object"
+    }
+  },
+  "$id": "https://ontofoundry.local/schemas/ontofoundry.proposals.v1.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_version_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
         },
         {
-          "properties": {
-            "target_kind": {
-              "const": "value_type"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/value_type_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/value_type_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "property"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/property_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/property_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "link_type"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/link_type_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/link_type_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "rule"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/rule_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/rule_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "action"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/action_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/action_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "material_object"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/material_object_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/material_object_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "material_link"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/material_link_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/material_link_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "properties": {
-            "target_kind": {
-              "const": "mapping"
-            },
-            "after": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/mapping_after"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "before": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/mapping_element"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            }
-          }
+          "type": "null"
         }
       ]
+    },
+    "base_version_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "items": {
+      "items": {
+        "$ref": "#/$defs/item"
+      },
+      "maxItems": 500,
+      "type": "array"
+    },
+    "run_token": {
+      "maxLength": 128,
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "ontofoundry.proposals/v1"
+    },
+    "session_id": {
+      "format": "uuid",
+      "type": "string"
+    },
+    "source_draft_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "source_session_revision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "workspace_id": {
+      "format": "uuid",
+      "type": "string"
     }
-  }
+  },
+  "required": [
+    "schema_version",
+    "run_token",
+    "workspace_id",
+    "session_id",
+    "base_version_id",
+    "base_version_sha256",
+    "source_session_revision",
+    "source_draft_sha256",
+    "items"
+  ],
+  "title": "ontofoundry.proposals/v1",
+  "type": "object"
 }

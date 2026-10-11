@@ -28,9 +28,8 @@ def element_scope(draft: dict, kind: str, element_id: str) -> dict[str, set[str]
         scope["actions"] = {
             a["id"] for a in draft["actions"] if a["input_type_id"] == element_id
         }
-        scope["mappings"] = {
-            m["id"] for m in draft["mappings"] if m["type_id"] == element_id
-        }
+        if draft.get("schema_version") == "2":
+            scope["mappings"] = {m["id"] for m in draft["mappings"] if m["type_id"] == element_id}
     owners = {
         kind: {element_id}, "property": scope["properties"], "action": scope["actions"],
     }

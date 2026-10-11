@@ -262,7 +262,11 @@ def test_mapping_migration_keeps_keys_expressions_joins_and_new_identity_kinds()
     migrated = normalize_v2_to_v3(data)
     assert len(migrated["semantic_models"]) == 1
     assert len(migrated["datasets"]) == 2
-    assert len(migrated["dataset_fields"]) == 3
+    names = {d["id"]: d["name"] for d in migrated["datasets"]}
+    assert {(names[f["dataset_id"]], f["name"]) for f in migrated["dataset_fields"]} == {
+        ("supplier", "supplier_code"), ("supplier", "supplier_name"), ("supplier", "code"),
+        ("material", "material_code"), ("material", "code"), ("material", "supplier_code"),
+    }
     assert len(migrated["dataset_relationships"]) == 1
     assert len(migrated["concept_mappings"]) == 2
     assert {i["slot"] for i in migrated["mapping_nodes"]} == {"object_mappings", "link_mappings", "object_mapping", "children"}

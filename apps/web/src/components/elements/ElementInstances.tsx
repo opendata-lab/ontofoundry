@@ -48,6 +48,7 @@ export function ElementInstances({
     warnings: string[];
     truncated: boolean;
   } | null>(null);
+  const mappingStatus = draft.mapping_status?.[type.id];
   const mapping = draft.mappings.find((m) => m.type_id === type.id);
   useEffect(() => {
     if (source !== "database" || !mapping) return;
@@ -127,7 +128,8 @@ export function ElementInstances({
           返回实例列表
         </button>
         <h3>{selected.name}</h3>
-        {error && (
+        {mappingStatus?.state === "readonly" && <p role="status">{mappingStatus.message ?? "复杂映射：暂只读"}</p>}
+      {error && (
           <p className="inline-error" role="alert">
             {error}
           </p>
@@ -305,6 +307,7 @@ export function ElementInstances({
           当前可预览数据列表；保存后再查看实例关系。
         </p>
       )}
+      {mappingStatus?.state === "readonly" && <p role="status">{mappingStatus.message ?? "复杂映射：暂只读"}</p>}
       {error && (
         <p className="inline-error" role="alert">
           {error}

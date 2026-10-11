@@ -167,10 +167,16 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
                 join = relation.get("data_join")
                 if not join:
                     continue
-                if relation["source_type_id"] == mapping["type_id"]:
-                    used_columns.add(join["source_column"])
-                if relation["target_type_id"] == mapping["type_id"]:
-                    used_columns.add(join["target_column"])
+                if "owner_columns" in join:
+                    if relation["owner_ref"]["ref"] == mapping["type_id"]:
+                        used_columns.update(join["owner_columns"])
+                    if relation["roles"][0]["concept"]["ref"] == mapping["type_id"]:
+                        used_columns.update(join["role_columns"])
+                else:
+                    if relation["source_type_id"] == mapping["type_id"]:
+                        used_columns.update(join.get("source_columns", [join["source_column"]]))
+                    if relation["target_type_id"] == mapping["type_id"]:
+                        used_columns.update(join.get("target_columns", [join["target_column"]]))
             missing = sorted(used_columns - columns)
             changed = [
                 change
