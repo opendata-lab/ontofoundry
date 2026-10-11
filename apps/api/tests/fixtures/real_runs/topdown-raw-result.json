@@ -1,0 +1,1123 @@
+{
+  "schema_version": "ontofoundry.proposals/v1",
+  "run_token": "b17f70ff3e7abeaef68df3a4a0315aa2",
+  "workspace_id": "3dfb86f7-76ca-4d57-b2bb-147046b71536",
+  "session_id": "912a7c9f-660b-45fe-8014-8e04f33fd775",
+  "base_version_id": "1494fba9-a6be-4b57-883f-6ff6d8910d8f",
+  "base_version_sha256": "c26c74ec83424f952583e02e472f5cf7d44b1b297bb824c837bdf46712289b5f",
+  "source_session_revision": 2,
+  "source_draft_sha256": "c26c74ec83424f952583e02e472f5cf7d44b1b297bb824c837bdf46712289b5f",
+  "items": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "sales_return",
+      "before": null,
+      "after": {
+        "name": "退货单",
+        "tags": [],
+        "origin": "platform",
+        "concept": "sales_return",
+        "extends": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "退货单是客户针对一张已发货订单发起的退货申请。"
+          }
+        ],
+        "position": 4,
+        "requires": [],
+        "derived_by": [],
+        "description": "客户针对一张已发货订单发起的退货申请。",
+        "identify_by": [
+          "return_no"
+        ],
+        "technical_name": "sales_return",
+        "native_presence": []
+      },
+      "reason": "材料一第7行明确退货单是售后退货的核心对象，据此新建对象类型。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "return_no",
+      "before": null,
+      "after": {
+        "name": "退货单号",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "- **退货单号**：退货单的唯一标识。"
+          }
+        ],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "string",
+        "verbalizes": [
+          "{sales_return}退货单号{String}"
+        ],
+        "description": "退货单的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "return_no",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "reason": "材料一第9行定义退货单号字段。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "apply_time",
+      "before": null,
+      "after": {
+        "name": "申请时间",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "DateTime",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 10,
+              "line_end": 10
+            },
+            "quote": "- **申请时间**：客户提交退货申请的时间。"
+          }
+        ],
+        "position": 1,
+        "required": false,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "value_kind": "datetime",
+        "verbalizes": [
+          "{sales_return}申请时间{DateTime}"
+        ],
+        "description": "客户提交退货申请的时间。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "apply_time",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "reason": "材料一第10行定义申请时间字段。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "return_reason",
+      "before": null,
+      "after": {
+        "name": "退货原因",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "- **退货原因**：例如质量问题、发错货、运输破损。"
+          }
+        ],
+        "position": 2,
+        "required": false,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "value_kind": "string",
+        "verbalizes": [
+          "{sales_return}退货原因{String}"
+        ],
+        "description": "退货原因，例如质量问题、发错货、运输破损。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "return_reason",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "reason": "材料一第11行定义退货原因字段。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "return_refund_amount",
+      "before": null,
+      "after": {
+        "name": "退款金额",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "Decimal",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 12,
+              "line_end": 12
+            },
+            "quote": "- **退款金额**：本次退货应退还客户的金额，单位为人民币元。"
+          }
+        ],
+        "position": 3,
+        "required": false,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "value_kind": "decimal",
+        "verbalizes": [
+          "{sales_return}退款金额{Decimal}"
+        ],
+        "description": "本次退货应退还客户的金额，单位为人民币元。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "refund_amount",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "reason": "材料一第12行定义退款金额字段。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "return_status",
+      "before": null,
+      "after": {
+        "name": "处理状态",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 13,
+              "line_end": 13
+            },
+            "quote": "- **处理状态**：取值为“待审核”“已同意”“已拒绝”“已退款”。"
+          }
+        ],
+        "position": 4,
+        "required": false,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "value_kind": "string",
+        "verbalizes": [
+          "{sales_return}处理状态{String}"
+        ],
+        "description": "处理状态，取值为“待审核”“已同意”“已拒绝”“已退款”。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "return_status",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "reason": "材料一第13行定义处理状态字段。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "return_targets_order",
+      "before": null,
+      "after": {
+        "name": "退货单针对订单",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": "return_targets_order:order",
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 17,
+              "line_end": 17
+            },
+            "quote": "- 每张退货单针对一张**订单**；一张订单可以产生多张退货单。"
+          }
+        ],
+        "position": 6,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{sales_return}退货单针对订单{order}"
+        ],
+        "description": "每张退货单针对一张订单；一张订单可以产生多张退货单。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "return_targets_order",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": "many_to_one"
+      },
+      "reason": "材料一第17行定义退货单与订单的关联关系。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "return_initiated_by_customer",
+      "before": null,
+      "after": {
+        "name": "退货单由客户发起",
+        "tags": [],
+        "roles": [
+          {
+            "name": null,
+            "origin": "platform",
+            "concept": {
+              "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": "return_initiated_by_customer:customer",
+            "native_presence": []
+          }
+        ],
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 18,
+              "line_end": 18
+            },
+            "quote": "- 退货单由提交该订单的**客户**发起。"
+          }
+        ],
+        "position": 7,
+        "requires": [],
+        "owner_ref": {
+          "ref": {
+            "client_ref": "sales_return"
+          },
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{sales_return}退货单由客户发起{customer}"
+        ],
+        "description": "退货单由提交该订单的客户发起。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "return_initiated_by_customer",
+        "native_presence": [],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": "many_to_one"
+      },
+      "reason": "材料一第18行定义退货单与客户的关联关系。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "only_shipped_order_can_return",
+      "before": null,
+      "after": {
+        "name": "仅已发货订单可申请退货",
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 22,
+              "line_end": 22
+            },
+            "quote": "1. 只有“已发货”的订单可以申请退货。"
+          }
+        ],
+        "owner_id": {
+          "client_ref": "sales_return"
+        },
+        "position": 0,
+        "rule_kind": "constraint",
+        "expression": "退货单.订单.订单状态 = “已发货”",
+        "owner_kind": "object_type",
+        "verbalizes": [],
+        "description": "只有“已发货”的订单可以申请退货。",
+        "technical_name": "only_shipped_order_can_return",
+        "native_presence": []
+      },
+      "reason": "材料一第22行规则第1条。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "refund_amount_not_exceed_order_amount",
+      "before": null,
+      "after": {
+        "name": "退款金额不超过订单金额",
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 23,
+              "line_end": 23
+            },
+            "quote": "2. 退款金额不得超过对应订单的订单金额。"
+          }
+        ],
+        "owner_id": {
+          "client_ref": "return_refund_amount"
+        },
+        "position": 0,
+        "rule_kind": "constraint",
+        "expression": "退款金额 ≤ 订单.订单金额",
+        "owner_kind": "property",
+        "verbalizes": [],
+        "description": "退款金额不得超过对应订单的订单金额。",
+        "technical_name": "refund_amount_not_exceed_order_amount",
+        "native_presence": []
+      },
+      "reason": "材料一第23行规则第2条，约束退款金额不超过订单金额。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "must_approve_before_refund",
+      "before": null,
+      "after": {
+        "name": "退货单审核同意后方可退款",
+        "origin": "platform",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+            "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+            "locator": {
+              "line_start": 24,
+              "line_end": 24
+            },
+            "quote": "3. 退货单审核同意后才能进入“已退款”状态。"
+          }
+        ],
+        "owner_id": {
+          "client_ref": "sales_return"
+        },
+        "position": 1,
+        "rule_kind": "constraint",
+        "expression": "退货单.处理状态 变更为“已退款”时，当前状态必须为“已同意”",
+        "owner_kind": "object_type",
+        "verbalizes": [],
+        "description": "退货单审核同意后才能进入“已退款”状态。",
+        "technical_name": "must_approve_before_refund",
+        "native_presence": []
+      },
+      "reason": "材料一第24行规则第3条。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_return_001",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "sales_return"
+        },
+        "name": "RT-202601-001",
+        "values": {
+          "return_no": "RT-202601-001",
+          "apply_time": "2026-01-20 10:12",
+          "return_reason": "运输破损",
+          "refund_amount": 120,
+          "return_status": "已退款"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 5,
+              "line_end": 12
+            },
+            "quote": "## RT-202601-001\n\n- 发起客户：星海贸易\n- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）\n- 申请时间：2026-01-20 10:12\n- 退货原因：运输破损\n- 退款金额：120 元\n- 处理状态：已退款"
+          }
+        ]
+      },
+      "reason": "材料二第5-12行登记的第一笔退货。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_return_002",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "sales_return"
+        },
+        "name": "RT-202601-002",
+        "values": {
+          "return_no": "RT-202601-002",
+          "apply_time": "2026-01-24 15:40",
+          "return_reason": "发错货",
+          "refund_amount": 168,
+          "return_status": "已同意"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 14,
+              "line_end": 21
+            },
+            "quote": "## RT-202601-002\n\n- 发起客户：远山咖啡\n- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）\n- 申请时间：2026-01-24 15:40\n- 退货原因：发错货\n- 退款金额：168 元\n- 处理状态：已同意"
+          }
+        ]
+      },
+      "reason": "材料二第14-21行登记的第二笔退货。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_return_003",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "sales_return"
+        },
+        "name": "RT-202601-003",
+        "values": {
+          "return_no": "RT-202601-003",
+          "apply_time": "2026-01-27 09:05",
+          "return_reason": "质量问题",
+          "refund_amount": 88,
+          "return_status": "待审核"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 23,
+              "line_end": 30
+            },
+            "quote": "## RT-202601-003\n\n- 发起客户：木棉生活\n- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）\n- 申请时间：2026-01-27 09:05\n- 退货原因：质量问题\n- 退款金额：88 元\n- 处理状态：待审核"
+          }
+        ]
+      },
+      "reason": "材料二第23-30行登记的第三笔退货。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_order_001",
+      "before": null,
+      "after": {
+        "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+        "name": "订单编号 1",
+        "values": {
+          "order_no": "1",
+          "order_time": "2026-01-15",
+          "order_amount": 240,
+          "order_status": "已发货"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第8行出现的订单实例，作为退货关联目标。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_order_042",
+      "before": null,
+      "after": {
+        "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+        "name": "订单编号 42",
+        "values": {
+          "order_no": "42",
+          "order_time": "2026-01-20",
+          "order_amount": 762,
+          "order_status": "已发货"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 17,
+              "line_end": 17
+            },
+            "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第17行出现的订单实例。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_order_031",
+      "before": null,
+      "after": {
+        "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+        "name": "订单编号 31",
+        "values": {
+          "order_no": "31",
+          "order_time": "2026-01-19",
+          "order_amount": 550,
+          "order_status": "已发货"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 26,
+              "line_end": 26
+            },
+            "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第26行出现的订单实例。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_customer_xinghai",
+      "before": null,
+      "after": {
+        "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+        "name": "星海贸易",
+        "values": {
+          "customer_name": "星海贸易"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "- 发起客户：星海贸易"
+          }
+        ]
+      },
+      "reason": "材料二第7行出现的客户实例。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_customer_yuanshan",
+      "before": null,
+      "after": {
+        "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+        "name": "远山咖啡",
+        "values": {
+          "customer_name": "远山咖啡"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "- 发起客户：远山咖啡"
+          }
+        ]
+      },
+      "reason": "材料二第16行出现的客户实例。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "mo_customer_mumian",
+      "before": null,
+      "after": {
+        "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+        "name": "木棉生活",
+        "values": {
+          "customer_name": "木棉生活"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 25,
+              "line_end": 25
+            },
+            "quote": "- 发起客户：木棉生活"
+          }
+        ]
+      },
+      "reason": "材料二第25行出现的客户实例。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_001_order",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_targets_order"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_001"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:order"
+            },
+            "object_id": {
+              "client_ref": "mo_order_001"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第8行：退货单 RT-202601-001 针对订单编号 1。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_002_order",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_targets_order"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_002"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:order"
+            },
+            "object_id": {
+              "client_ref": "mo_order_042"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 17,
+              "line_end": 17
+            },
+            "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第17行：退货单 RT-202601-002 针对订单编号 42。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_003_order",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_targets_order"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_003"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_targets_order:order"
+            },
+            "object_id": {
+              "client_ref": "mo_order_031"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 26,
+              "line_end": 26
+            },
+            "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）"
+          }
+        ]
+      },
+      "reason": "材料二第26行：退货单 RT-202601-003 针对订单编号 31。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_001_customer",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_initiated_by_customer"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_001"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:customer"
+            },
+            "object_id": {
+              "client_ref": "mo_customer_xinghai"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "- 发起客户：星海贸易"
+          }
+        ]
+      },
+      "reason": "材料二第7行：退货单 RT-202601-001 由星海贸易发起。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_002_customer",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_initiated_by_customer"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_002"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:customer"
+            },
+            "object_id": {
+              "client_ref": "mo_customer_yuanshan"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "- 发起客户：远山咖啡"
+          }
+        ]
+      },
+      "reason": "材料二第16行：退货单 RT-202601-002 由远山咖啡发起。",
+      "target_id": null,
+      "expected_target_hash": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "ml_return_003_customer",
+      "before": null,
+      "after": {
+        "type_id": {
+          "client_ref": "return_initiated_by_customer"
+        },
+        "role_values": [
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:owner"
+            },
+            "object_id": {
+              "client_ref": "mo_return_003"
+            }
+          },
+          {
+            "role_id": {
+              "client_ref": "return_initiated_by_customer:customer"
+            },
+            "object_id": {
+              "client_ref": "mo_customer_mumian"
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+            "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+            "locator": {
+              "line_start": 25,
+              "line_end": 25
+            },
+            "quote": "- 发起客户：木棉生活"
+          }
+        ]
+      },
+      "reason": "材料二第25行：退货单 RT-202601-003 由木棉生活发起。",
+      "target_id": null,
+      "expected_target_hash": null
+    }
+  ]
+}

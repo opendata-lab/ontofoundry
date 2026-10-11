@@ -169,7 +169,7 @@ describe("页签交互", () => {
     await act(() => router.navigate("/workspaces/w/view"));
     expect(tabs().getAllByRole("tab")).toHaveLength(2);
     expect(document.querySelectorAll(".route-panel")).toHaveLength(1);
-    fireEvent.click(tabs().getByRole("button", { name: "关闭 业务对象" }));
+    fireEvent.click(tabs().getByRole("button", { name: "关闭 本体对象" }));
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
@@ -183,7 +183,7 @@ describe("页签交互", () => {
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(screen.getByRole("status")).toHaveTextContent("本体视图」的操作正在进行");
     fireEvent.click(screen.getByRole("button", { name: "关闭提示" }));
-    fireEvent.click(tabs().getByRole("button", { name: "关闭 发布与服务" }));
+    fireEvent.click(tabs().getByRole("button", { name: "关闭 本体发布" }));
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
     fireEvent.click(screen.getByRole("link", { name: "离开空间" }));
     expect(screen.getByRole("dialog")).toHaveTextContent("操作正在进行");

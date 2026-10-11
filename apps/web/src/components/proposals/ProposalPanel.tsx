@@ -4,6 +4,7 @@ import type { ProposalsState } from "../../hooks/useProposals";
 import { EmptyModel } from "../EmptyModel";
 import { ProposalCard, type CardActions } from "./ProposalCard";
 import { ProposalDetail } from "./ProposalDetail";
+import { useElementInspector } from "../../hooks/useElementInspector";
 import { acceptableIds, itemTitle } from "./elementMeta";
 
 type Filter = "all" | "blocked" | "update" | "delete" | "create";
@@ -26,6 +27,7 @@ export function ProposalPanel({
   running: boolean;
   onRemodel: (text: string) => void;
 }) {
+  const inspector = useElementInspector();
   const [filter, setFilter] = useState<Filter>("all");
   const [open, setOpen] = useState<string | null>(null);
   const { detail, batches } = proposals;
@@ -47,6 +49,12 @@ export function ProposalPanel({
     return proposals.decide(ids.map((proposal_id) => ({ proposal_id, decision })));
   };
   const actions: CardActions = {
+    canViewElement: (item) => {
+      if (item.target_kind === "value_type") return false;
+      const collections = { object_type: "object_types", property: "properties", link_type: "link_types", rule: "rules", action: "actions", mapping: "mappings", material_object: "material_objects", material_link: "material_links" } as const;
+      return !!session?.draft[collections[item.target_kind]].some((e) => e.id === item.target_id);
+    },
+    viewElement: (item) => { if (session) { setOpen(null); inspector.open({ kind: item.target_kind, id: item.target_id, sessionId: session.id }); } },
     accept: (item) => void decideGroup(item, "accept"),
     reject: (item) => void decideGroup(item, "reject"),
     restore: (item) => void decideGroup(item, "restore"),

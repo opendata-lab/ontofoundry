@@ -15,7 +15,7 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.instance_validation import include_instance_validation
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
-from ontofoundry_api.domain.snapshot import as_v2_dict
+from ontofoundry_api.domain.snapshot import as_v3_dict
 from ontofoundry_api.ossie.compiler import compile_ossie, sha256_json, validate_ossie
 from ontofoundry_api.services.identities import sync_identities
 
@@ -121,7 +121,7 @@ def workspace_summary(session: Session, workspace: WorkspaceRecord, user_id: str
         if workspace.current_version_id
         else None
     )
-    draft = as_v2_dict(version.snapshot_json, workspace.id) if version else {}
+    draft = as_v3_dict(version.snapshot_json, workspace.id) if version else {}
     return {
         "id": workspace.id,
         "slug": workspace.slug,
@@ -175,6 +175,10 @@ def publish_draft(
 ) -> OntologyVersionRecord:
     workspace = get_workspace(session, workspace_id)
     previous_version_id = workspace.current_version_id
+    if draft.schema_version != "3":
+        draft = OntologyDraft.model_validate(as_v3_dict(draft.model_dump(mode="json"), workspace_id))
+        # A direct platform publication has never been a stored historic row.
+        draft.document_origin = "platform"
     if str(draft.workspace_id) != workspace.id:
         raise PublishValidationError(
             "草稿所属工作空间与发布目标不一致",

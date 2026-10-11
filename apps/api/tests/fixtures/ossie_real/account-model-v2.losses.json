@@ -1,0 +1,225 @@
+[
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[0]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "账户模型语义",
+    "after": "中金所账户模型 v2"
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[1]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "账户问数",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[2]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "保证金账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[3]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "资金明细账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[4]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "虚拟资金账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[5]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "担保金账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[6]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "担保品账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ai_context.synonyms[7]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": "会员担保品账户",
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=custodian_institution].relationships[name=has_member_collateral_account]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "has_member_collateral_account",
+      "verbalizes": [
+        "{custodian_institution} 为结算会员 {settlement_member} 开立并托管会员担保品账户 {member_collateral_account}",
+        "{member_collateral_account} 是结算会员 {settlement_member} 在托管机构 {custodian_institution} 开立的唯一有效担保品账户"
+      ],
+      "roles": [
+        {
+          "concept": "settlement_member"
+        },
+        {
+          "concept": "member_collateral_account"
+        }
+      ],
+      "multiplicity": "ManyToOne",
+      "description": "会员担保品账户"
+    },
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=dedicated_settlement_account].relationships[name=manages_settle_sub_account]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "manages_settle_sub_account",
+      "verbalizes": [
+        "{dedicated_settlement_account} 为结算会员 {settlement_member} 设立并管理资金明细账户 {settle_account}",
+        "{settle_account} 是专用结算账户 {dedicated_settlement_account} 为结算会员 {settlement_member} 设立的资金明细账户"
+      ],
+      "roles": [
+        {
+          "concept": "settlement_member"
+        },
+        {
+          "concept": "settle_account"
+        }
+      ],
+      "requires": [
+        "settle_account.settle_account_code MATCHES CONCAT('^', settlement_member.member_code, '(0[1-9]|[1-9][0-9])$')"
+      ],
+      "description": "资金明细账户分账管理"
+    },
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=exchange_guarantee_fund_account].relationships[name=has_guarantee_fund_sub_ledger]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "has_guarantee_fund_sub_ledger",
+      "verbalizes": [
+        "{exchange_guarantee_fund_account} 为结算会员 {settlement_member} 设立明细记账单元 {guarantee_fund_sub_ledger}",
+        "{guarantee_fund_sub_ledger} 是交易所担保金专用账户 {exchange_guarantee_fund_account} 为结算会员 {settlement_member} 设置的明细账户"
+      ],
+      "roles": [
+        {
+          "concept": "settlement_member"
+        },
+        {
+          "concept": "guarantee_fund_sub_ledger"
+        }
+      ],
+      "description": "担保金明细账户"
+    },
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=member_collateral_account].relationships[name=collateral_pledged_to]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "collateral_pledged_to",
+      "verbalizes": [
+        "{member_collateral_account} 中的担保品经折算后冲抵结算会员 {settlement_member} 的专用资金账户 {dedicated_fund_account} 实际可用金额",
+        "{dedicated_fund_account} 接受结算会员 {settlement_member} 的会员担保品账户 {member_collateral_account} 折后价值冲抵保证金"
+      ],
+      "roles": [
+        {
+          "concept": "settlement_member"
+        },
+        {
+          "concept": "dedicated_fund_account"
+        }
+      ],
+      "requires": [
+        "settlement_member.has_dedicated_fund_account(dedicated_fund_account)"
+      ],
+      "description": "担保品冲抵专用资金账户"
+    },
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=settlement_member].relationships[name=reports_collateral_to_exchange]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "reports_collateral_to_exchange",
+      "verbalizes": [
+        "{settlement_member} 将客户担保品账户 {client_collateral_account} 汇总申报给金融期货交易所 {financial_futures_exchange}",
+        "{financial_futures_exchange} 接收结算会员 {settlement_member} 汇总申报的客户担保品账户 {client_collateral_account}"
+      ],
+      "roles": [
+        {
+          "concept": "client_collateral_account"
+        },
+        {
+          "concept": "financial_futures_exchange"
+        }
+      ],
+      "multiplicity": "ManyToOne",
+      "description": "担保品账户报给交易所"
+    },
+    "after": {
+      "$missing": true
+    }
+  },
+  {
+    "category": "a",
+    "path": "$.ontology[concept=trading_member].relationships[name=reports_collateral_to_settlement_member]",
+    "reason": "内容丢失、改变或新增语义",
+    "before": {
+      "name": "reports_collateral_to_settlement_member",
+      "verbalizes": [
+        "{trading_member} 将客户担保品账户 {client_collateral_account} 申报给结算会员 {settlement_member}",
+        "{settlement_member} 接收交易会员 {trading_member} 对客户担保品账户 {client_collateral_account} 的申报"
+      ],
+      "roles": [
+        {
+          "concept": "client_collateral_account"
+        },
+        {
+          "concept": "settlement_member"
+        }
+      ],
+      "multiplicity": "ManyToOne",
+      "description": "担保品账户报给结算会员"
+    },
+    "after": {
+      "$missing": true
+    }
+  }
+]

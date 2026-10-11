@@ -37,6 +37,24 @@ describe("路由页签身份", () => {
     expect(s.active).toBe(editor);
     expect(s.tabs).toHaveLength(3);
   });
+  it("菜单链接回到已打开的构建或发布页签，保留其会话", () => {
+    let s = openTab(empty(), base + "/builder?session=s1");
+    const first = s.active;
+    s = openTab(s, base + "/builder?session=s2");
+    const second = s.active;
+    s = openTab(s, base + "/delivery?session=s1");
+    const release = s.active;
+    s = openTab(s, base + "/view");
+    s = openTab(s, base + "/builder");
+    expect(s.tabs).toHaveLength(4);
+    expect(s.active).toBe(second);
+    expect(s.tabs.find((t) => t.id === second)?.href).toBe(base + "/builder?session=s2");
+    s = openTab(s, base + "/builder?session=s1");
+    s = openTab(s, base + "/delivery");
+    expect(s.active).toBe(release);
+    s = openTab(s, base + "/builder");
+    expect(s.active).toBe(first);
+  });
   it("关闭当前页返回最近访问页，关闭其他页不改变当前页", () => {
     let s = openTab(empty(), base + "/view");
     const home = s.active;

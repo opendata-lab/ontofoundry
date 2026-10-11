@@ -12,6 +12,7 @@ import {
 import type { ProposalItem, ProposalStatus, TargetKind } from "../../api/types";
 
 export const KIND: Record<TargetKind, { label: string; icon: LucideIcon; cls: string }> = {
+  value_type: { label: "值概念", icon: Box, cls: "value" },
   object_type: { label: "实体", icon: Box, cls: "object" },
   property: { label: "属性", icon: Braces, cls: "attribute" },
   link_type: { label: "关系", icon: GitBranch, cls: "relation" },
@@ -65,6 +66,7 @@ export const FIELD_LABELS: Record<string, string> = {
   name: "名称",
   technical_name: "技术名",
   description: "描述",
+  concept_context: "概念上下文（平台扩展）",
   tags: "标签",
   extends: "继承",
   value_kind: "值类型",

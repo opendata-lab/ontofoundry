@@ -89,7 +89,7 @@ describe("建模结果", () => {
       </MemoryRouter>,
     );
     expect(screen.getByText("新版本物料")).toBeInTheDocument();
-    expect(screen.getByText(/会话草稿/)).toBeInTheDocument();
+    expect(screen.getByText(/本会话的修改/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /接受/ })).not.toBeInTheDocument();
   });
   it("has an honest empty state before generation", () => {

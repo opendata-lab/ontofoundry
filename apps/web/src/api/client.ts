@@ -6,6 +6,7 @@ import type {
   VersionSummary,
   Workspace,
   Draft,
+  LegacyMappingForm,
   DecisionResult,
   ModelingSession,
   ProposalBatch,
@@ -18,6 +19,7 @@ import type {
   Capabilities,
   DataConnection,
   DataTable,
+  TargetKind,
 } from "./types";
 
 type ErrorBody = {
@@ -74,11 +76,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const message =
       body.error?.message ??
       body.message ??
-      (typeof body.detail === "string"
-        ? body.detail
-        : body.detail
-          ? JSON.stringify(body.detail)
-          : null) ??
+      detailMessage(body.detail) ??
       "请求失败（HTTP " + response.status + "）";
     throw new ApiError(
       body.hint ? message + "\n" + body.hint : message,
@@ -88,7 +86,44 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body.error,
     );
   }
-  return response.json() as Promise<T>;
+  const body: unknown = await response.json();
+  hydrateNativeResponse(body);
+  return body as T;
+}
+
+function hydrateNativeResponse(body: unknown) {
+  if (!body || typeof body !== "object") return;
+  const result = body as { draft?: Draft; model?: Draft; merged_model?: Draft; legacy_mapping_form?: LegacyMappingForm | null; session?: unknown };
+  const draft = result.draft ?? result.model ?? result.merged_model;
+  if (draft?.schema_version === "3" && result.legacy_mapping_form) draft._legacy_form = result.legacy_mapping_form;
+  if (result.session) hydrateNativeResponse(result.session);
+}
+
+function draftRequest(draft: Draft) {
+  if (draft.schema_version === "2") return { draft };
+  const { _legacy_form, ...native } = draft;
+  return { draft: native, ...(_legacy_form ? { legacy_mappings: _legacy_form.mappings, legacy_joins: _legacy_form.joins } : {}) };
+}
+
+// FastAPI answers with a string, a structured {code, message} object, or a
+// list of validation errors; show people the sentence, never the JSON.
+function detailMessage(detail: unknown): string | null {
+  if (!detail) return null;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => detailMessage(item))
+      .filter((item): item is string => Boolean(item));
+    return messages.length ? messages.join("；") : null;
+  }
+  if (typeof detail === "object") {
+    const record = detail as Record<string, unknown>;
+    for (const key of ["message", "msg", "detail"]) {
+      const value = detailMessage(record[key]);
+      if (value) return value;
+    }
+  }
+  return null;
 }
 
 export const api = {
@@ -170,13 +205,15 @@ export const modelingApi = {
     workspaceRequest<ModelingSession>(id, "/sessions", { title }),
   get: (id: string, sid: string) =>
     workspaceRequest<ModelingSession>(id, "/sessions/" + sid),
-  save: (s: ModelingSession, draft: Draft, extra = {}) =>
-    workspaceRequest<ModelingSession>(
+  save: async (session: ModelingSession, draft: Draft, extra = {}) => {
+    const s = session;
+    return workspaceRequest<ModelingSession>(
       s.workspace_id,
       "/sessions/" + s.id,
-      { revision: s.revision, draft, ...extra },
+      { revision: s.revision, ...draftRequest(draft), ...extra },
       "PUT",
-    ),
+    );
+  },
   candidates: (s: ModelingSession, ids: string[], action: string) =>
     workspaceRequest<ModelingSession>(
       s.workspace_id,
@@ -195,7 +232,21 @@ export const modelingApi = {
       "/sessions/" + s.id + "/publish",
       { revision: s.revision, message },
     ),
-  snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  snapshot: async (id: string) => {
+    const draft = await workspaceRequest<Draft>(id, "/published-snapshot");
+    if (draft.schema_version === "3") draft._legacy_form = await workspaceRequest<LegacyMappingForm>(id, "/published-legacy-form");
+    return draft;
+  },
+  saveElement: (id: string, payload: {
+    target_kind: Extract<TargetKind, "object_type" | "value_type" | "link_type">;
+    target_id: string;
+    expected_current_version_id: string | null;
+    session_id: string | null;
+    expected_session_revision: number | null;
+    draft: Draft;
+  }) => workspaceRequest<{ version: VersionSummary; draft: Draft; session: ModelingSession | null }>(
+    id, "/element-saves", { ...payload, ...draftRequest(payload.draft) },
+  ),
   importOssie: (
     id: string,
     document: unknown,
@@ -221,6 +272,12 @@ export const modelingApi = {
     workspaceRequest<Capabilities>(id, "/capabilities"),
   connections: (id: string) =>
     workspaceRequest<{ items: DataConnection[] }>(id, "/connections"),
+  tableMaterial: (id: string, connectionId: string, tables: string[]) =>
+    workspaceRequest<Material>(
+      id,
+      "/connections/" + connectionId + "/table-material",
+      { tables },
+    ),
   tables: (id: string, connectionId: string) =>
     workspaceRequest<{ items: DataTable[] }>(
       id,
@@ -265,20 +322,22 @@ export const publishApi = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ expected_session_revision: s.revision }),
     }),
-  publish: (s: ModelingSession, preview: PublishPreview, message: string) =>
-    request<{ version: VersionSummary; session: ModelingSession }>(
+  publish: async (session: ModelingSession, preview: PublishPreview, message: string) => {
+    const s = session;
+    return request<{ version: VersionSummary; session: ModelingSession }>(
       `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/publish`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          expected_session_revision: s.revision,
+          expected_session_revision: preview.session_revision,
           expected_current_version_id: preview.current_version_id,
           expected_merged_snapshot_sha256: preview.merged_snapshot_sha256,
           message,
         }),
       },
-    ),
+    );
+  },
   resolve: (
     s: ModelingSession,
     currentVersionId: string | null,

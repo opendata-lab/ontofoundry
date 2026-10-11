@@ -5,6 +5,8 @@ export type PageTab = {
   visited: boolean;
   dirty?: boolean;
   busy?: boolean;
+  elementDirty?: boolean;
+  elementBusy?: boolean;
 };
 export type TabState = { tabs: PageTab[]; active: string; recent: string[] };
 
@@ -26,11 +28,11 @@ export function tabTitle(href: string) {
   return (
     {
       view: "本体视图",
-      objects: "业务对象",
+      objects: "本体对象",
       relations: "本体关系",
-      builder: "本体自动构建",
+      builder: "本体构建",
       mappings: "数据映射",
-      delivery: "发布与服务",
+      delivery: "本体发布",
       settings: "空间设置",
     }[path[0]] ?? "本体视图"
   );
@@ -39,6 +41,11 @@ export function tabTitle(href: string) {
 export function isTabPromotion(from: string, to: string) {
   const a = new URL(from, "http://local");
   const b = new URL(to, "http://local");
+  // Old detail/editor links now promote into their catalog with an inspector.
+  if (/\/(objects|relations)\/[^/]+(?:\/edit)?$/.test(a.pathname) &&
+      b.searchParams.has("inspect") &&
+      a.pathname.startsWith(b.pathname + "/") &&
+      a.searchParams.get("session") === b.searchParams.get("session")) return true;
   if (a.pathname === b.pathname && /\/(builder|delivery)$/.test(a.pathname))
     return !a.searchParams.has("session") && b.searchParams.has("session");
   return (
@@ -50,12 +57,41 @@ export function isTabPromotion(from: string, to: string) {
   );
 }
 
+/** Pages whose session is a choice made inside the page, not a different view. */
+const SESSION_PAGES = /\/(builder|delivery)$/;
+
+/**
+ * The open tab a bare link to a session page should bring forward: the menu
+ * names only the page, so the most recently used tab of that page wins over
+ * opening another one without a session.
+ */
+function samePage(state: TabState, href: string): PageTab | undefined {
+  const url = new URL(href, "http://local");
+  const path = url.pathname.replace(/\/$/, "");
+  if (url.search || !SESSION_PAGES.test(path)) return undefined;
+  const onPage = (t: PageTab) => new URL(t.href, "http://local").pathname.replace(/\/$/, "") === path;
+  return (
+    [...state.recent]
+      .reverse()
+      .map((id) => state.tabs.find((t) => t.id === id))
+      .find((t): t is PageTab => !!t && onPage(t)) ?? state.tabs.find(onPage)
+  );
+}
+
 export function openTab(
   state: TabState,
   href: string,
   replace = false,
 ): TabState {
   const found = state.tabs.find((t) => tabKey(t.href) === tabKey(href));
+  const reused = found ? undefined : samePage(state, href);
+  if (reused)
+    // Keep the tab's own address: the caller syncs the URL to it.
+    return {
+      tabs: state.tabs.map((t) => (t.id === reused.id ? { ...t, visited: true } : t)),
+      active: reused.id,
+      recent: [...state.recent.filter((id) => id !== reused.id), reused.id],
+    };
   const previous = state.tabs.find((t) => t.id === state.active);
   const promoted =
     !found && replace && previous && isTabPromotion(previous.href, href)

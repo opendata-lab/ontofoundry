@@ -1,6 +1,8 @@
+import { editorDraft, nativeFromView } from "./nativeDraft";
 import type {
   AttributeDefinition,
   Draft,
+  LegacyDraft,
   DraftView,
   LinkDefinition,
   ObjectDefinition,
@@ -16,7 +18,7 @@ import type {
  * evidence untouched.
  */
 
-export function emptyDraft(workspaceId: string): Draft {
+export function emptyDraft(workspaceId: string): LegacyDraft {
   return {
     schema_version: "2",
     workspace_id: workspaceId,
@@ -43,23 +45,29 @@ export function expressionsOf(
   ownerId: string,
   kind: RuleKind,
 ): string[] {
+  if (draft.schema_version === "3") {
+    const owner = [...draft.object_types, ...draft.value_types, ...draft.properties, ...draft.link_types].find(o => o.id === ownerId);
+    if (owner) return owner[FIELD[kind]].map(id => draft.rules.find(r => r.id === id)?.expression ?? "");
+  }
   return draft.rules
     .filter((r) => r.owner_id === ownerId && r.rule_kind === kind)
     .map((r) => r.expression);
 }
 
 export function propertiesOf(draft: Draft, typeId: string) {
-  return draft.properties.filter((p) => p.owner_type_id === typeId);
+  return editorDraft(draft).properties.filter((p) => p.owner_type_id === typeId);
 }
 
-export function toView(draft: Draft): DraftView {
+export function toView(source: Draft): DraftView {
+  const draft = editorDraft(source);
   const rules = (id: string) => ({
-    requires: expressionsOf(draft, id, "constraint"),
-    derived_by: expressionsOf(draft, id, "derivation"),
+    requires: expressionsOf(source, id, "constraint"),
+    derived_by: expressionsOf(source, id, "derivation"),
   });
   return {
     workspace_id: draft.workspace_id,
     requires: draft.ontology_requires ?? [],
+    ...(draft.value_types ? { value_types: draft.value_types } : {}),
     object_types: draft.object_types.map((type) => {
       const { evidence: _evidence, ...rest } = type;
       void _evidence;
@@ -82,6 +90,7 @@ export function toView(draft: Draft): DraftView {
     objects: draft.material_objects,
     links: draft.material_links,
     mappings: draft.mappings,
+    mapping_status: draft.mapping_status,
   };
 }
 
@@ -90,6 +99,7 @@ function ruleTechnicalName(kind: RuleKind, id: string) {
 }
 
 export function fromView(original: Draft, view: DraftView): Draft {
+  if (original.schema_version === "3") return nativeFromView(original, view);
   const byId = <T extends { id: string }>(items: T[]) =>
     new Map(items.map((item) => [item.id, item]));
   const oldTypes = byId(original.object_types);
@@ -147,7 +157,7 @@ export function fromView(original: Draft, view: DraftView): Draft {
     }
   };
 
-  const properties: Draft["properties"] = [];
+  const properties: LegacyDraft["properties"] = [];
   const objectTypes = view.object_types.map((type) => {
     const {
       attributes,
@@ -216,6 +226,8 @@ export function viewFromTypes(
   return {
     workspace_id: workspaceId,
     requires: [],
+    value_types: items.filter((t): t is Extract<OntologyType, { kind: "value_type" }> => t.kind === "value_type")
+      .map(value => ({ ...value, concept_kind: "value_type", description: value.description ?? "", extends: [], evidence: [] })),
     object_types: items.filter(
       (t): t is Extract<OntologyType, { kind: "object_type" }> =>
         t.kind === "object_type",

@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.db_models import OntologyVersionRecord
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.snapshot import as_v2_dict
+from ontofoundry_api.domain.snapshot import as_v3_dict
 
 from .errors import NotFoundError
+from .ontology_context import concept_context, context_elements, document_context, matches
+from .public_projection import public_projection
 from .workspaces import get_workspace
 
 
@@ -31,15 +33,15 @@ def current_version(
 
 
 def snapshot_of(version: OntologyVersionRecord) -> dict[str, Any]:
-    """The version's snapshot as v2 JSON, normalized once per loaded record.
+    """The version's snapshot as v3 JSON, normalized once per loaded record.
 
     Published snapshots were validated when they were published, so reads only
     normalize the shape; they do not re-run domain validation.
     """
-    cached = getattr(version, "_v2_snapshot", None)
+    cached = getattr(version, "_v3_snapshot", None)
     if cached is None:
-        cached = as_v2_dict(version.snapshot_json, version.workspace_id)
-        version._v2_snapshot = cached
+        cached = as_v3_dict(version.snapshot_json, version.workspace_id)
+        version._v3_snapshot = cached
     return cached
 
 
@@ -53,12 +55,15 @@ def version_hashes(version: OntologyVersionRecord) -> dict[str, str]:
 
 
 def _query_view(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Project a v2 snapshot onto the shape this query layer has always served.
+    """Project a native snapshot onto the shape this query layer has always served.
 
     Object types carry their own properties as `attributes`, and rules appear as
     `requires`/`derived_by` on their owners. This is the published read contract
     for REST and MCP type queries, not a storage format.
     """
+
+    from ontofoundry_api.domain.runtime_views import query_compat
+    snapshot = query_compat(snapshot)
 
     def rules(owner_id: str) -> dict[str, list[str]]:
         owned = [r for r in snapshot["rules"] if r["owner_id"] == owner_id]
@@ -113,7 +118,7 @@ def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
             "attributes": len(snapshot["properties"]),
             "rules": len(snapshot["rules"]),
             "actions": len(snapshot["actions"]),
-            "mappings": len(snapshot.get("mappings", [])),
+            "mappings": len(query_view(version).get("mappings", [])),
         },
     }
 
@@ -130,7 +135,18 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     snapshot = snapshot_of(version)
     objects = snapshot["material_objects"]
     links = snapshot["material_links"]
-    mappings = snapshot.get("mappings", [])
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.domain.semantic_views import SemanticViews
+    model = OntologyDraft.model_validate(snapshot)
+    views = SemanticViews(model)
+    # A read-only native mapping still belongs in the member's overview. Counts
+    # describe native mappings; queryability comes from the same instance view.
+    mappings = []
+    for cm in model.concept_mappings:
+        analysis = views.analyze(cm.concept_id.ref)
+        mappings.append({"id": str(cm.id), "type_id": str(cm.concept_id.ref),
+                         "table_name": analysis.mapping.table_name if analysis.mapping else "复杂映射：暂只读",
+                         "state": analysis.public(cm.concept_id.ref)["state"], "reason": analysis.reason})
     sample_objects = [
         {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]
     ]
@@ -153,7 +169,7 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
             if item["source_id"] in sample_ids and item["target_id"] in sample_ids
         ][:48],
         "mappings": [
-            {key: item[key] for key in ("id", "type_id", "table_name")}
+            {key: item[key] for key in ("id", "type_id", "table_name", "state", "reason")}
             for item in mappings[:24]
         ],
     }
@@ -210,7 +226,9 @@ def _type_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "attribute_count": 0,
             }
         )
-    return objects + links
+    values = [{**concept_context({k: v for k, v in item.items() if k != "evidence"}, snapshot), "kind": "value_type", "attribute_count": 0}
+              for item in snapshot.get("value_types", [])]
+    return [concept_context(item, snapshot) for item in objects] + links + values
 
 
 def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -221,48 +239,44 @@ def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
 
 def search_types(
     version: OntologyVersionRecord,
-    *,
-    query: str = "",
-    kind: str | None = None,
+    *, query: str = '', kind: str | None = None, include_context_elements: bool = False, include_document_context: bool = False,
 ) -> dict[str, Any]:
     normalized_query = query.strip().casefold()
+    snapshot = snapshot_of(version)
     items = _type_items(query_view(version))
+    if include_context_elements:
+        items += [item for group in context_elements(snapshot).values() for item in group]
+    if include_document_context and (normalized_query or kind == 'document'):
+        items.append(document_context(snapshot))
     if kind:
-        items = [item for item in items if item["kind"] == kind]
+        items = [item for item in items if item['kind'] == kind]
     if normalized_query:
-        items = [
-            item
-            for item in items
-            if normalized_query
-            in " ".join(
-                [
-                    item.get("name", ""),
-                    item.get("technical_name", ""),
-                    item.get("description", ""),
-                    " ".join(item.get("tags", [])),
-                ]
-            ).casefold()
-        ]
-    items.sort(key=lambda item: (item["kind"], item["technical_name"].casefold()))
+        items = [{**item, 'matches': matches(item, normalized_query)} for item in items]
+        items = [item for item in items if item['matches']]
+    items.sort(key=lambda item: (item['kind'], item['technical_name'].casefold(), item['id']))
     return {
-        "workspace_id": version.workspace_id,
-        "version_id": version.id,
-        **version_hashes(version),
-        "items": items,
-        "next_cursor": None,
+        'workspace_id': version.workspace_id, 'version_id': version.id, **version_hashes(version),
+        'items': public_projection(items), 'next_cursor': None, 'ambiguous': bool(normalized_query) and len(items) > 1,
+        'document_context': public_projection(document_context(snapshot)),
     }
 
 
-def get_type(version: OntologyVersionRecord, type_id: str) -> dict[str, Any]:
-    for item in _type_items(query_view(version)):
-        if item["id"] == type_id or item["technical_name"] == type_id:
-            return {
-                "workspace_id": version.workspace_id,
-                "version_id": version.id,
-                **version_hashes(version),
-                "item": item,
-            }
-    raise NotFoundError("没有找到该本体类型")
+def get_type(version: OntologyVersionRecord, type_id: str, *, include_context_elements: bool = False, include_document_context: bool = False) -> dict[str, Any]:
+    snapshot = snapshot_of(version)
+    items = _type_items(query_view(version))
+    if include_context_elements:
+        items += [item for group in context_elements(snapshot).values() for item in group]
+    if include_document_context:
+        items.append(document_context(snapshot))
+    found = [item for item in items if item['id'] == type_id]
+    if not found:
+        found = [item for item in items if item['technical_name'] == type_id]
+    if not found:
+        raise NotFoundError('没有找到该本体类型')
+    envelope = dict(workspace_id=version.workspace_id, version_id=version.id, **version_hashes(version))
+    if len(found) > 1:
+        return {**envelope, 'item': None, 'candidates': public_projection(found), 'ambiguous': True}
+    return {**envelope, 'item': public_projection(found[0]), 'ambiguous': False}
 
 
 def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
@@ -319,7 +333,26 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                     "description": f"{object_type['name']} 继承自上级业务对象",
                 }
             )
+    known = {n["id"] for n in nodes}
+    concepts = {i["id"]: i for i in [*snapshot.get("object_types", []), *snapshot.get("value_types", [])]}
     for link in snapshot.get("link_types", []):
+        if link.get("owner_ref") and not link.get("source_type_id"):
+            nodes.append({"id": link["id"], "kind": "link_type", "label": link["name"],
+                          "technical_name": link["technical_name"], "description": link.get("description") or "",
+                          "tags": link.get("tags", []), "roles": link["roles"], "owner_ref": link["owner_ref"],
+                          "all_roles": link["all_roles"], "verbalizes": link.get("verbalizes", [])})
+            for role in link["all_roles"]:
+                ref = role["concept"]
+                target = ref["ref"] if ref["kind"] in ("object_type", "value_type") else ref["kind"] + ":" + ref["ref"]
+                if target not in known:
+                    concept = concepts.get(target, {})
+                    nodes.append({"id": target, "kind": "value_type", "label": concept.get("name") or ref["ref"],
+                                  "technical_name": concept.get("concept") or ref["ref"], "description": concept.get("description") or "", "tags": []})
+                    known.add(target)
+                edges.append({"id": link["id"] + ":role:" + role["id"], "kind": "role", "link_type_id": link["id"],
+                              "role_id": role["id"], "label": role.get("name") or concepts.get(target, {}).get("name") or ref["ref"],
+                              "technical_name": link["technical_name"], "source": link["id"], "target": target})
+            continue
         edges.append(
             {
                 "id": link["id"],
@@ -334,7 +367,7 @@ def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
                 "identifier": link.get("identifier", False),
             }
         )
-    return nodes, edges
+    return public_projection(nodes), public_projection(edges)
 
 
 def type_graph(
@@ -359,6 +392,9 @@ def type_graph(
                 if neighbor not in visible:
                     visible.add(neighbor)
                     queue.append((neighbor, current_depth + 1))
+        # A reached hyperedge always exposes its complete role incidence.
+        hyperedges = {n["id"] for n in nodes if n["kind"] == "link_type" and n["id"] in visible}
+        visible.update(e["target"] for e in edges if e["kind"] == "role" and e["source"] in hyperedges)
         nodes = [node for node in nodes if node["id"] in visible]
         edges = [
             edge

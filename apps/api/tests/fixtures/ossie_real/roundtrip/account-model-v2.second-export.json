@@ -1,0 +1,926 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "account_model_v2",
+  "description": "中金所账户模型 v2",
+  "ai_context": {
+    "instructions": "依据已发布的业务对象、属性和关系解释企业业务语义",
+    "synonyms": [
+      "中金所账户模型 v2"
+    ],
+    "ontofoundry": {
+      "version": "3",
+      "display_names": {
+        "client_collateral_account": "client_collateral_account",
+        "client_collateral_account.collateral_haircut_rate": "collateral_haircut_rate",
+        "client_collateral_account.collateral_market_value": "collateral_market_value",
+        "client_collateral_account.haircut_adjusted_value": "haircut_adjusted_value",
+        "comprehensive_settlement_member": "comprehensive_settlement_member",
+        "custodian_institution": "custodian_institution",
+        "custodian_institution.institution_name": "institution_name",
+        "dedicated_fund_account": "dedicated_fund_account",
+        "dedicated_fund_account.bank_account_number": "bank_account_number",
+        "dedicated_fund_account.is_primary_margin_account": "is_primary_margin_account",
+        "dedicated_fund_account.fund_account_at_bank": "fund_account_at_bank",
+        "dedicated_fund_account.has_settle_account": "has_settle_account",
+        "dedicated_fund_account.settles_with": "settles_with",
+        "dedicated_settlement_account": "dedicated_settlement_account",
+        "dedicated_settlement_account.bank_account_number": "bank_account_number",
+        "dedicated_settlement_account.settlement_account_at_bank": "settlement_account_at_bank",
+        "exchange_guarantee_fund_account": "exchange_guarantee_fund_account",
+        "exchange_guarantee_fund_account.bank_account_number": "bank_account_number",
+        "exchange_guarantee_fund_account.exchange_guarantee_fund_account_at_bank": "exchange_guarantee_fund_account_at_bank",
+        "exchange_member": "exchange_member",
+        "exchange_member.member_code": "member_code",
+        "exchange_member.member_name": "member_name",
+        "exchange_member.has_client_collateral_account": "has_client_collateral_account",
+        "exchange_proprietary_fund_account": "exchange_proprietary_fund_account",
+        "exchange_proprietary_fund_account.proprietary_fund_transfer_cycle": "proprietary_fund_transfer_cycle",
+        "exchange_risk_reserve_account": "exchange_risk_reserve_account",
+        "exchange_risk_reserve_account.risk_reserve_extraction_ratio": "risk_reserve_extraction_ratio",
+        "financial_futures_exchange": "financial_futures_exchange",
+        "financial_futures_exchange.exchange_name": "exchange_name",
+        "financial_futures_exchange.has_dedicated_settlement_account": "has_dedicated_settlement_account",
+        "financial_futures_exchange.has_exchange_guarantee_fund_account": "has_exchange_guarantee_fund_account",
+        "financial_futures_exchange.has_proprietary_fund_account": "has_proprietary_fund_account",
+        "financial_futures_exchange.has_risk_reserve_account": "has_risk_reserve_account",
+        "financial_futures_exchange.has_settlement_bank": "has_settlement_bank",
+        "guarantee_fund_account": "guarantee_fund_account",
+        "guarantee_fund_sub_ledger": "guarantee_fund_sub_ledger",
+        "guarantee_fund_sub_ledger.guarantee_fund_balance": "guarantee_fund_balance",
+        "guarantee_fund_sub_ledger.guarantee_fund_type": "guarantee_fund_type",
+        "margin_account": "margin_account",
+        "member_collateral_account": "member_collateral_account",
+        "member_collateral_account.securities_account_number": "securities_account_number",
+        "member_collateral_account.has_client_collateral_account": "has_client_collateral_account",
+        "member_guarantee_fund_account": "member_guarantee_fund_account",
+        "member_guarantee_fund_account.bank_account_number": "bank_account_number",
+        "member_guarantee_fund_account.member_guarantee_fund_account_at_bank": "member_guarantee_fund_account_at_bank",
+        "party": "party",
+        "party.party_id": "party_id",
+        "party.party_name": "party_name",
+        "party.has_client_collateral_account": "has_client_collateral_account",
+        "settle_account": "settle_account",
+        "settle_account.settle_account_code": "settle_account_code",
+        "settle_account.settle_account_type": "settle_account_type",
+        "settlement_bank": "settlement_bank",
+        "settlement_bank.bank_name": "bank_name",
+        "settlement_bank.transfers_funds_to": "transfers_funds_to",
+        "settlement_member": "settlement_member",
+        "settlement_member.has_dedicated_fund_account": "has_dedicated_fund_account",
+        "settlement_member.has_member_guarantee_fund_account": "has_member_guarantee_fund_account",
+        "trading_member": "trading_member",
+        "trading_member.settles_through": "settles_through",
+        "trading_settlement_member": "trading_settlement_member"
+      },
+      "tags": {},
+      "required_attributes": [],
+      "rules": {
+        "client_collateral_account.haircut_adjusted_value": [
+          {
+            "id": "4672a0ee-f9f9-5d0a-8a38-29e4b32d9f6e",
+            "name": "client_collateral_account.haircut_adjusted_value·派生1",
+            "technical_name": "derivation_4672a0ee",
+            "rule_kind": "derivation",
+            "expression": "client_collateral_account.collateral_market_value * (1 - client_collateral_account.collateral_haircut_rate)"
+          }
+        ],
+        "exchange_guarantee_fund_account.exchange_guarantee_fund_account_at_bank": [
+          {
+            "id": "9e32abdd-3907-58a4-a2a2-c2bf48cbd73f",
+            "name": "exchange_guarantee_fund_account_at_bank·约束1",
+            "technical_name": "constraint_9e32abdd",
+            "rule_kind": "constraint",
+            "expression": "settlement_bank.bank_name IN ('中国工商银行', '中国银行', '中国农业银行', '中国建设银行', '交通银行')"
+          }
+        ],
+        "exchange_member.member_code": [
+          {
+            "id": "962db5aa-0efe-5282-b81c-ff30d6b8b21a",
+            "name": "exchange_member.member_code·约束1",
+            "technical_name": "constraint_962db5aa",
+            "rule_kind": "constraint",
+            "expression": "member_code MATCHES '^[0-9]{4}$'"
+          }
+        ],
+        "exchange_proprietary_fund_account.proprietary_fund_transfer_cycle": [
+          {
+            "id": "55900e0e-b9a0-522d-b4b6-dec7408f4b81",
+            "name": "exchange_proprietary_fund_account.proprietary_fund_transfer_cycle·约束1",
+            "technical_name": "constraint_55900e0e",
+            "rule_kind": "constraint",
+            "expression": "proprietary_fund_transfer_cycle == 'weekly'"
+          }
+        ],
+        "exchange_risk_reserve_account.risk_reserve_extraction_ratio": [
+          {
+            "id": "37a1d3bb-beca-5917-a23e-b7e06f2709ca",
+            "name": "exchange_risk_reserve_account.risk_reserve_extraction_ratio·约束1",
+            "technical_name": "constraint_37a1d3bb",
+            "rule_kind": "constraint",
+            "expression": "risk_reserve_extraction_ratio == 0.20"
+          }
+        ],
+        "guarantee_fund_sub_ledger.guarantee_fund_type": [
+          {
+            "id": "80da4409-2e2d-552e-b404-0e948a580ce9",
+            "name": "guarantee_fund_sub_ledger.guarantee_fund_type·约束1",
+            "technical_name": "constraint_80da4409",
+            "rule_kind": "constraint",
+            "expression": "guarantee_fund_type IN ('基础担保金', '变动担保金')"
+          }
+        ],
+        "member_guarantee_fund_account.member_guarantee_fund_account_at_bank": [
+          {
+            "id": "2a1ea530-fff0-5662-b240-f53cc96f58b9",
+            "name": "member_guarantee_fund_account_at_bank·约束1",
+            "technical_name": "constraint_2a1ea530",
+            "rule_kind": "constraint",
+            "expression": "settlement_bank.bank_name IN ('中国工商银行', '中国银行', '中国农业银行', '中国建设银行', '交通银行')"
+          }
+        ],
+        "settle_account.settle_account_code": [
+          {
+            "id": "62a7d2b6-4486-5687-b814-a2e2163bc1a8",
+            "name": "settle_account.settle_account_code·约束1",
+            "technical_name": "constraint_62a7d2b6",
+            "rule_kind": "constraint",
+            "expression": "settle_account_code MATCHES '^[0-9]{6}$'"
+          }
+        ]
+      },
+      "actions": []
+    }
+  },
+  "ontology": [
+    {
+      "concept": "client_collateral_account",
+      "type": "EntityType",
+      "description": "客户担保品账户",
+      "relationships": [
+        {
+          "name": "collateral_haircut_rate",
+          "description": "担保品折扣率",
+          "roles": [
+            {
+              "concept": "Decimal",
+              "name": "collateral_haircut_rate"
+            }
+          ],
+          "verbalizes": [
+            "{client_collateral_account} 的折算比率是 {Decimal:collateral_haircut_rate}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "collateral_market_value",
+          "description": "担保品市值",
+          "roles": [
+            {
+              "concept": "Decimal",
+              "name": "collateral_market_value"
+            }
+          ],
+          "verbalizes": [
+            "{client_collateral_account} 的当前市场价值是 {Decimal:collateral_market_value}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "haircut_adjusted_value",
+          "description": "折后冲抵金额",
+          "roles": [
+            {
+              "concept": "Decimal",
+              "name": "haircut_adjusted_value"
+            }
+          ],
+          "verbalizes": [
+            "{client_collateral_account} 的实际可用于冲抵保证金的金额是 {Decimal:haircut_adjusted_value}"
+          ],
+          "multiplicity": "ManyToOne",
+          "derived_by": [
+            "client_collateral_account.collateral_market_value * (1 - client_collateral_account.collateral_haircut_rate)"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "comprehensive_settlement_member",
+      "type": "EntityType",
+      "description": "全面结算会员",
+      "extends": [
+        "settlement_member"
+      ]
+    },
+    {
+      "concept": "custodian_institution",
+      "type": "EntityType",
+      "description": "托管机构",
+      "identify_by": [
+        "institution_name"
+      ],
+      "relationships": [
+        {
+          "name": "institution_name",
+          "description": "托管机构名称",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "institution_name"
+            }
+          ],
+          "verbalizes": [
+            "{custodian_institution} 的机构名称是 {String:institution_name}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "dedicated_fund_account",
+      "type": "EntityType",
+      "description": "专用资金账户（实体账户）",
+      "extends": [
+        "margin_account"
+      ],
+      "identify_by": [
+        "bank_account_number"
+      ],
+      "relationships": [
+        {
+          "name": "bank_account_number",
+          "description": "银行账号",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "bank_account_number"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_fund_account} 的银行账号是 {String:bank_account_number}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "fund_account_at_bank",
+          "description": "会员专用资金账户开户行",
+          "roles": [
+            {
+              "concept": "settlement_bank"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_fund_account} 在存管银行 {settlement_bank} 开立",
+            "{settlement_bank} 是结算会员专用资金账户 {dedicated_fund_account} 的开户行"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "has_settle_account",
+          "description": "实体账户与资金明细账户映射",
+          "roles": [
+            {
+              "concept": "settle_account"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_fund_account} 映射并管理交易所端资金明细账户 {settle_account}",
+            "{settle_account} 的外部实体账户管理映射是专用资金账户 {dedicated_fund_account}"
+          ]
+        },
+        {
+          "name": "is_primary_margin_account",
+          "description": "追加保证金主账户标志",
+          "roles": [
+            {
+              "concept": "Boolean",
+              "name": "is_primary_margin_account"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_fund_account} 的追加保证金主账户标志是 {Boolean:is_primary_margin_account}",
+            "{dedicated_fund_account} 的追加保证金主账户标志 {Boolean:is_primary_margin_account} 为 true 时，交易所优先从该账户划扣"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "settles_with",
+          "description": "保证金出入金往来",
+          "roles": [
+            {
+              "concept": "dedicated_settlement_account"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_fund_account} 与交易所专用结算账户 {dedicated_settlement_account} 发生保证金出入金往来",
+            "{dedicated_settlement_account} 与会员专用资金账户 {dedicated_fund_account} 发生保证金出入金往来"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "dedicated_settlement_account",
+      "type": "EntityType",
+      "description": "专用结算账户（实体账户）",
+      "extends": [
+        "margin_account"
+      ],
+      "identify_by": [
+        "bank_account_number"
+      ],
+      "relationships": [
+        {
+          "name": "bank_account_number",
+          "description": "银行账号",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "bank_account_number"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_settlement_account} 的银行账号是 {String:bank_account_number}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "settlement_account_at_bank",
+          "description": "专用结算账户开户行",
+          "roles": [
+            {
+              "concept": "settlement_bank"
+            }
+          ],
+          "verbalizes": [
+            "{dedicated_settlement_account} 在存管银行 {settlement_bank} 开立",
+            "{settlement_bank} 是交易所专用结算账户 {dedicated_settlement_account} 的开户行"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "exchange_guarantee_fund_account",
+      "type": "EntityType",
+      "description": "结算担保金专用账户（交易所）",
+      "extends": [
+        "guarantee_fund_account"
+      ],
+      "identify_by": [
+        "bank_account_number"
+      ],
+      "relationships": [
+        {
+          "name": "bank_account_number",
+          "description": "银行账号",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "bank_account_number"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_guarantee_fund_account} 的银行账号是 {String:bank_account_number}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "exchange_guarantee_fund_account_at_bank",
+          "description": "交易所担保金账户开户行",
+          "roles": [
+            {
+              "concept": "settlement_bank"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_guarantee_fund_account} 在担保金存管银行 {settlement_bank} 开立",
+            "{settlement_bank} 是交易所结算担保金专用账户 {exchange_guarantee_fund_account} 的开户行"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "settlement_bank.bank_name IN ('中国工商银行', '中国银行', '中国农业银行', '中国建设银行', '交通银行')"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "exchange_member",
+      "type": "EntityType",
+      "description": "交易所会员",
+      "identify_by": [
+        "member_code"
+      ],
+      "relationships": [
+        {
+          "name": "has_client_collateral_account",
+          "description": "客户担保品账户申报",
+          "roles": [
+            {
+              "concept": "client_collateral_account"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_member} 接收客户担保品账户 {client_collateral_account} 的申报",
+            "{client_collateral_account} 申报给交易所会员 {exchange_member}"
+          ]
+        },
+        {
+          "name": "member_code",
+          "description": "会员代码",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "member_code"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_member} 的编码是 {String:member_code}"
+          ],
+          "multiplicity": "OneToOne",
+          "requires": [
+            "member_code MATCHES '^[0-9]{4}$'"
+          ]
+        },
+        {
+          "name": "member_name",
+          "description": "会员名称",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "member_name"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_member} 的名称是 {String:member_name}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "exchange_proprietary_fund_account",
+      "type": "EntityType",
+      "description": "交易所自有资金账户（圈外）",
+      "relationships": [
+        {
+          "name": "proprietary_fund_transfer_cycle",
+          "description": "自有资金划转周期",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "proprietary_fund_transfer_cycle"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_proprietary_fund_account} 的手续费划转周期是 {String:proprietary_fund_transfer_cycle}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "proprietary_fund_transfer_cycle == 'weekly'"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "exchange_risk_reserve_account",
+      "type": "EntityType",
+      "description": "交易所风险准备金账户",
+      "relationships": [
+        {
+          "name": "risk_reserve_extraction_ratio",
+          "description": "风险准备金提取比例",
+          "roles": [
+            {
+              "concept": "Decimal",
+              "name": "risk_reserve_extraction_ratio"
+            }
+          ],
+          "verbalizes": [
+            "{exchange_risk_reserve_account} 的提取比例是 {Decimal:risk_reserve_extraction_ratio}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "risk_reserve_extraction_ratio == 0.20"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "financial_futures_exchange",
+      "type": "EntityType",
+      "description": "金融期货交易所",
+      "identify_by": [
+        "exchange_name"
+      ],
+      "relationships": [
+        {
+          "name": "exchange_name",
+          "description": "交易所名称",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "exchange_name"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 的名称是 {String:exchange_name}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "has_dedicated_settlement_account",
+          "description": "交易所专用结算账户",
+          "roles": [
+            {
+              "concept": "dedicated_settlement_account"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 在存管银行开立并拥有专用结算账户 {dedicated_settlement_account}",
+            "{dedicated_settlement_account} 由金融期货交易所 {financial_futures_exchange} 开立"
+          ]
+        },
+        {
+          "name": "has_exchange_guarantee_fund_account",
+          "description": "交易所结算担保金账户",
+          "roles": [
+            {
+              "concept": "exchange_guarantee_fund_account"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 拥有结算担保金专用账户 {exchange_guarantee_fund_account}",
+            "{exchange_guarantee_fund_account} 归属于金融期货交易所 {financial_futures_exchange}"
+          ]
+        },
+        {
+          "name": "has_proprietary_fund_account",
+          "description": "交易所自有资金账户",
+          "roles": [
+            {
+              "concept": "exchange_proprietary_fund_account"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 拥有圈外自有资金账户 {exchange_proprietary_fund_account}",
+            "{exchange_proprietary_fund_account} 归属于金融期货交易所 {financial_futures_exchange}"
+          ]
+        },
+        {
+          "name": "has_risk_reserve_account",
+          "description": "交易所风险准备金账户",
+          "roles": [
+            {
+              "concept": "exchange_risk_reserve_account"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 拥有风险准备金专户 {exchange_risk_reserve_account}",
+            "{exchange_risk_reserve_account} 归属于金融期货交易所 {financial_futures_exchange}"
+          ]
+        },
+        {
+          "name": "has_settlement_bank",
+          "description": "指定保证金存管银行",
+          "roles": [
+            {
+              "concept": "settlement_bank"
+            }
+          ],
+          "verbalizes": [
+            "{financial_futures_exchange} 指定商业银行 {settlement_bank} 为保证金存管银行",
+            "{settlement_bank} 由金融期货交易所 {financial_futures_exchange} 指定为保证金存管银行"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "guarantee_fund_account",
+      "type": "EntityType",
+      "description": "担保金账户"
+    },
+    {
+      "concept": "guarantee_fund_sub_ledger",
+      "type": "EntityType",
+      "description": "担保金明细账户",
+      "relationships": [
+        {
+          "name": "guarantee_fund_balance",
+          "description": "担保金余额",
+          "roles": [
+            {
+              "concept": "Decimal",
+              "name": "guarantee_fund_balance"
+            }
+          ],
+          "verbalizes": [
+            "{guarantee_fund_sub_ledger} 的当前担保金余额是 {Decimal:guarantee_fund_balance}"
+          ],
+          "multiplicity": "ManyToOne"
+        },
+        {
+          "name": "guarantee_fund_type",
+          "description": "担保金类型",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "guarantee_fund_type"
+            }
+          ],
+          "verbalizes": [
+            "{guarantee_fund_sub_ledger} 的担保金类型是 {String:guarantee_fund_type}"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "guarantee_fund_type IN ('基础担保金', '变动担保金')"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "margin_account",
+      "type": "EntityType",
+      "description": "保证金账户"
+    },
+    {
+      "concept": "member_collateral_account",
+      "type": "EntityType",
+      "description": "会员担保品账户",
+      "identify_by": [
+        "securities_account_number"
+      ],
+      "relationships": [
+        {
+          "name": "has_client_collateral_account",
+          "description": "客户担保品账户",
+          "roles": [
+            {
+              "concept": "client_collateral_account"
+            }
+          ],
+          "verbalizes": [
+            "{member_collateral_account} 汇总客户担保品账户 {client_collateral_account}",
+            "{client_collateral_account} 汇总到会员担保品账户 {member_collateral_account}"
+          ]
+        },
+        {
+          "name": "securities_account_number",
+          "description": "担保品账户编号",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "securities_account_number"
+            }
+          ],
+          "verbalizes": [
+            "{member_collateral_account} 的有价证券担保品账户编号是 {String:securities_account_number}"
+          ],
+          "multiplicity": "OneToOne"
+        }
+      ]
+    },
+    {
+      "concept": "member_guarantee_fund_account",
+      "type": "EntityType",
+      "description": "结算担保金专用账户（会员）",
+      "extends": [
+        "guarantee_fund_account"
+      ],
+      "identify_by": [
+        "bank_account_number"
+      ],
+      "relationships": [
+        {
+          "name": "bank_account_number",
+          "description": "银行账号",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "bank_account_number"
+            }
+          ],
+          "verbalizes": [
+            "{member_guarantee_fund_account} 的银行账号是 {String:bank_account_number}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "member_guarantee_fund_account_at_bank",
+          "description": "会员担保金账户开户行",
+          "roles": [
+            {
+              "concept": "settlement_bank"
+            }
+          ],
+          "verbalizes": [
+            "{member_guarantee_fund_account} 在担保金存管银行 {settlement_bank} 开立",
+            "{settlement_bank} 是会员结算担保金专用账户 {member_guarantee_fund_account} 的开户行"
+          ],
+          "multiplicity": "ManyToOne",
+          "requires": [
+            "settlement_bank.bank_name IN ('中国工商银行', '中国银行', '中国农业银行', '中国建设银行', '交通银行')"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "party",
+      "type": "EntityType",
+      "description": "当事方",
+      "identify_by": [
+        "party_id"
+      ],
+      "relationships": [
+        {
+          "name": "has_client_collateral_account",
+          "description": "客户担保品账户",
+          "roles": [
+            {
+              "concept": "client_collateral_account"
+            }
+          ],
+          "verbalizes": [
+            "{party} 拥有客户担保品账户 {client_collateral_account}",
+            "{client_collateral_account} 归属的客户是 {party}"
+          ]
+        },
+        {
+          "name": "party_id",
+          "description": "当事方标识",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "party_id"
+            }
+          ],
+          "verbalizes": [
+            "{party} 的 ID 是 {String:party_id}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "party_name",
+          "description": "当事方名称",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "party_name"
+            }
+          ],
+          "verbalizes": [
+            "{party} 的名称是 {String:party_name}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "settle_account",
+      "type": "EntityType",
+      "description": "资金明细账户",
+      "identify_by": [
+        "settle_account_code"
+      ],
+      "relationships": [
+        {
+          "name": "settle_account_code",
+          "description": "资金明细账户编码",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "settle_account_code"
+            }
+          ],
+          "verbalizes": [
+            "{settle_account} 的编码是 {String:settle_account_code}"
+          ],
+          "multiplicity": "OneToOne",
+          "requires": [
+            "settle_account_code MATCHES '^[0-9]{6}$'"
+          ]
+        },
+        {
+          "name": "settle_account_type",
+          "description": "资金明细账户业务类型",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "settle_account_type"
+            }
+          ],
+          "verbalizes": [
+            "{settle_account} 的类型是 {String:settle_account_type}"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "settlement_bank",
+      "type": "EntityType",
+      "description": "存管银行",
+      "identify_by": [
+        "bank_name"
+      ],
+      "relationships": [
+        {
+          "name": "bank_name",
+          "description": "存管银行名称",
+          "roles": [
+            {
+              "concept": "String",
+              "name": "bank_name"
+            }
+          ],
+          "verbalizes": [
+            "{settlement_bank} 的名称是 {String:bank_name}"
+          ],
+          "multiplicity": "OneToOne"
+        },
+        {
+          "name": "transfers_funds_to",
+          "description": "跨行保证金调拨",
+          "roles": [
+            {
+              "concept": "settlement_bank",
+              "name": "destination_bank"
+            }
+          ],
+          "verbalizes": [
+            "{settlement_bank} 向存管银行 {settlement_bank:destination_bank} 调拨保证金",
+            "{settlement_bank:destination_bank} 接收存管银行 {settlement_bank} 调拨的保证金"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "settlement_member",
+      "type": "EntityType",
+      "description": "结算会员",
+      "extends": [
+        "exchange_member"
+      ],
+      "relationships": [
+        {
+          "name": "has_dedicated_fund_account",
+          "description": "会员专用资金账户",
+          "roles": [
+            {
+              "concept": "dedicated_fund_account"
+            }
+          ],
+          "verbalizes": [
+            "{settlement_member} 在存管银行开立实体专用资金账户 {dedicated_fund_account}",
+            "{dedicated_fund_account} 归属于结算会员 {settlement_member}"
+          ]
+        },
+        {
+          "name": "has_member_guarantee_fund_account",
+          "description": "会员担保金专用账户",
+          "roles": [
+            {
+              "concept": "member_guarantee_fund_account"
+            }
+          ],
+          "verbalizes": [
+            "{settlement_member} 在担保金存管银行开立担保金专用账户 {member_guarantee_fund_account}",
+            "{member_guarantee_fund_account} 归属于结算会员 {settlement_member}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "trading_member",
+      "type": "EntityType",
+      "description": "交易会员（非结算会员）",
+      "extends": [
+        "exchange_member"
+      ],
+      "relationships": [
+        {
+          "name": "settles_through",
+          "description": "委托全面结算会员结算",
+          "roles": [
+            {
+              "concept": "comprehensive_settlement_member"
+            }
+          ],
+          "verbalizes": [
+            "{trading_member} 委托全面结算会员 {comprehensive_settlement_member} 管理保证金结算",
+            "{comprehensive_settlement_member} 为交易会员 {trading_member} 提供保证金结算服务"
+          ],
+          "multiplicity": "ManyToOne"
+        }
+      ]
+    },
+    {
+      "concept": "trading_settlement_member",
+      "type": "EntityType",
+      "description": "交易结算会员",
+      "extends": [
+        "settlement_member"
+      ]
+    }
+  ]
+}

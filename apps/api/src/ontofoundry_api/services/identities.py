@@ -20,11 +20,24 @@ from .errors import ConflictError
 
 
 def element_kinds(snapshot: dict[str, Any]) -> dict[str, str]:
-    return {
+    kinds = {
         str(element["id"]): kind.value
         for kind, collection in COLLECTIONS.items()
         for element in snapshot.get(collection) or []
     }
+
+    if snapshot.get("schema_version") == "3":
+        from uuid import UUID, uuid5
+
+        from ontofoundry_api.domain.canonical import V3_COLLECTIONS
+        for collection in V3_COLLECTIONS - {"evidence"}:
+            for element in snapshot.get(collection, []):
+                kinds.setdefault(str(element["id"]), collection.removesuffix("s"))
+        for link in [*snapshot.get("properties", []), *snapshot.get("link_types", [])]:
+            kinds[str(uuid5(UUID(link["id"]), "role:owner"))] = "role"
+            for role in link["roles"]:
+                kinds[role["id"]] = "role"
+    return kinds
 
 
 def check_identities(db: Session, workspace_id: str, kinds: dict[str, str]) -> None:

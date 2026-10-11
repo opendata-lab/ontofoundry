@@ -11,6 +11,7 @@ from sqlalchemy.sql.dml import Update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, WorkspaceRecord, utc_now
 from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.snapshot import as_v3_dict, draft_sha256
 from ontofoundry_api.services.dataagent import (
     DataAgentClient,
     DataAgentError,
@@ -28,7 +29,8 @@ def _payload() -> dict:
 
 
 def _empty_draft() -> dict:
-    return OntologyDraft(workspace_id=DEMO_WORKSPACE_ID).model_dump(mode="json")
+    return OntologyDraft(workspace_id=DEMO_WORKSPACE_ID, schema_version="3",
+                         hash_algorithm="ontofoundry-domain-v3").model_dump(mode="json")
 
 
 def _create_model_session(client, **values) -> dict:
@@ -48,6 +50,8 @@ def _create_model_session(client, **values) -> dict:
         "result_warnings": [],
     }
     defaults.update(values)
+    defaults["draft_json"] = as_v3_dict(defaults["draft_json"], DEMO_WORKSPACE_ID)
+    defaults["draft_sha256"] = draft_sha256(defaults["draft_json"])
     with client.app.state.session_factory() as db:
         db.execute(
             update(ModelingSessionRecord)
@@ -114,7 +118,7 @@ def test_valid_result_replaces_draft_and_clears_candidates(client, monkeypatch):
     assert after.candidates_json == []
     assert len(after.draft_json["object_types"]) == 2
     assert len(after.draft_json["link_types"]) == 1
-    assert len(after.draft_json["mappings"]) == 1
+    assert len(after.draft_json["concept_mappings"]) == 1
     assert "supplier" not in {
         item["technical_name"] for item in after.draft_json["object_types"]
     }
@@ -236,7 +240,7 @@ def test_download_timeout_is_retriable_then_next_reconcile_succeeds(
                     "version": "0.2.0.dev0",
                     "name": "values_only",
                     "ontology": [
-                        {"concept": "code", "type": "ValueType", "extends": ["String"]}
+                        {"concept": "code", "type": "ValueType", "extends": ["MissingValueBase"]}
                     ],
                 },
             },

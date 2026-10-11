@@ -12,6 +12,7 @@ const ACTIVE_TASK_STATUSES = [
 ];
 import type { ModelingSession, ModelingSessionSummary } from "../api/types";
 import { usePageActive } from "./usePageTab";
+import { ONTOLOGY_SAVED, type OntologySaved } from "../lib/elementInspector";
 
 export function useModeling(
   workspaceId: string,
@@ -44,6 +45,14 @@ export function useModeling(
     [setParams],
   );
   const reload = useCallback(() => setRefresh((value) => value + 1), []);
+  useEffect(() => {
+    const saved = (event: Event) => {
+      const detail = (event as CustomEvent<OntologySaved>).detail;
+      if (detail.workspaceId === workspaceId && detail.session?.id === sessionId) setSession(detail.session);
+    };
+    window.addEventListener(ONTOLOGY_SAVED, saved);
+    return () => window.removeEventListener(ONTOLOGY_SAVED, saved);
+  }, [workspaceId, sessionId]);
   useEffect(() => {
     if (pageActive && !wasActive.current && refreshOnActivate) reload();
     wasActive.current = pageActive;

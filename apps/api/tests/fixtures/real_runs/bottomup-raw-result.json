@@ -1,0 +1,1000 @@
+{
+  "schema_version": "ontofoundry.proposals/v1",
+  "run_token": "739ab094aa9f6e2761c4d7bedb0da597",
+  "workspace_id": "3dfb86f7-76ca-4d57-b2bb-147046b71536",
+  "session_id": "7192c13e-0d22-4cfe-828c-c2c4e4d45dd2",
+  "base_version_id": "1494fba9-a6be-4b57-883f-6ff6d8910d8f",
+  "base_version_sha256": "c26c74ec83424f952583e02e472f5cf7d44b1b297bb824c837bdf46712289b5f",
+  "source_session_revision": 2,
+  "source_draft_sha256": "c26c74ec83424f952583e02e472f5cf7d44b1b297bb824c837bdf46712289b5f",
+  "items": [
+    {
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+      "expected_target_hash": "26bfe59d87c8cdf36af17212c23bd80ca5f5ec0c91e90f5b23d3a29aa0ffe068",
+      "before": {
+        "id": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+        "name": "客户编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "c999229c-300f-50f4-9998-1b4b462012f4",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "string",
+        "verbalizes": [
+          "{customer}客户编号{String}"
+        ],
+        "description": "客户的唯一标识，由系统自动分配。",
+        "multiplicity": "OneToOne",
+        "technical_name": "customer_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "after": {
+        "name": "客户编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "c999229c-300f-50f4-9998-1b4b462012f4",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "Integer",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "integer",
+        "verbalizes": [
+          "{customer}客户编号{Integer}"
+        ],
+        "description": "客户的唯一标识，由系统自动分配。",
+        "multiplicity": "OneToOne",
+        "technical_name": "customer_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 17,
+            "line_end": 17
+          },
+          "quote": "| id | BIGINT | 否 | 是 |  | 1, 2, 3 |"
+        }
+      ],
+      "reason": "映射到表主键 id（BIGINT），将编号属性值类型由文本改为整数以与字段类型一致：customer_no 客户编号"
+    },
+    {
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+      "expected_target_hash": "70dc073e263f8d3757d40afac7d92f6fb0dea917a9a406adfdabdeee29730671",
+      "before": {
+        "id": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+        "name": "订单编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "string",
+        "verbalizes": [
+          "{order}订单编号{String}"
+        ],
+        "description": "订单的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "order_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "after": {
+        "name": "订单编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "Integer",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "integer",
+        "verbalizes": [
+          "{order}订单编号{Integer}"
+        ],
+        "description": "订单的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "order_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 30,
+            "line_end": 30
+          },
+          "quote": "| id | BIGINT | 否 | 是 |  | 1, 2, 3 |"
+        }
+      ],
+      "reason": "映射到表主键 id（BIGINT），将编号属性值类型由文本改为整数以与字段类型一致：order_no 订单编号"
+    },
+    {
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+      "expected_target_hash": "8af43fa15cf7376ad10c13fbb6e2cf94d8318e19f968417e645e94bcb73f44f9",
+      "before": {
+        "id": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+        "name": "明细编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "string",
+        "verbalizes": [
+          "{order_item}明细编号{String}"
+        ],
+        "description": "订单明细的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "item_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "after": {
+        "name": "明细编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "Integer",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "integer",
+        "verbalizes": [
+          "{order_item}明细编号{Integer}"
+        ],
+        "description": "订单明细的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "item_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 47,
+            "line_end": 47
+          },
+          "quote": "| id | BIGINT | 否 | 是 |  | 1, 2, 3 |"
+        }
+      ],
+      "reason": "映射到表主键 id（BIGINT），将编号属性值类型由文本改为整数以与字段类型一致：item_no 明细编号"
+    },
+    {
+      "operation": "update",
+      "target_kind": "property",
+      "target_id": "6180f549-7c2d-5169-887f-757c7ed01859",
+      "expected_target_hash": "b8cd8bcf80f33016adfb7e4c6c55c89f481c8c016d74ce2c6c6904f462f44f42",
+      "before": {
+        "id": "6180f549-7c2d-5169-887f-757c7ed01859",
+        "name": "商品编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "String",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "string",
+        "verbalizes": [
+          "{product}商品编号{String}"
+        ],
+        "description": "商品的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "product_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "after": {
+        "name": "商品编号",
+        "tags": [],
+        "roles": [
+          {
+            "id": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "Integer",
+              "kind": "builtin"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 0,
+        "required": true,
+        "requires": [],
+        "owner_ref": {
+          "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": true,
+        "value_kind": "integer",
+        "verbalizes": [
+          "{product}商品编号{Integer}"
+        ],
+        "description": "商品的唯一标识。",
+        "multiplicity": "OneToOne",
+        "technical_name": "product_no",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": null
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 66,
+            "line_end": 66
+          },
+          "quote": "| id | BIGINT | 否 | 是 |  | 1, 2, 3 |"
+        }
+      ],
+      "reason": "映射到表主键 id（BIGINT），将编号属性值类型由文本改为整数以与字段类型一致：product_no 商品编号"
+    },
+    {
+      "operation": "update",
+      "target_kind": "link_type",
+      "target_id": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+      "expected_target_hash": "1248d2d1198a7e4c0e5d2cc9b09c08d743e3f748db77c461ffc9627965cbc73a",
+      "before": {
+        "id": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+        "name": "客户下单订单",
+        "tags": [],
+        "roles": [
+          {
+            "id": "8545b33f-faab-517a-9a21-44c96125f9f6",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 4,
+        "requires": [],
+        "owner_ref": {
+          "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order}客户下单订单{customer}"
+        ],
+        "description": "一个客户可以下多张订单，一张订单只属于一个客户。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "customer_places_order",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "reverse",
+        "legacy_multiplicity": "one_to_many"
+      },
+      "after": {
+        "name": "客户下单订单",
+        "tags": [],
+        "roles": [
+          {
+            "id": "8545b33f-faab-517a-9a21-44c96125f9f6",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 4,
+        "requires": [],
+        "owner_ref": {
+          "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order}客户下单订单{customer}"
+        ],
+        "description": "一个客户可以下多张订单，一张订单只属于一个客户。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "customer_places_order",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "reverse",
+        "legacy_multiplicity": "one_to_many",
+        "data_join": {
+          "source_column": "customer_id",
+          "target_column": "id"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 37,
+            "line_end": 37
+          },
+          "quote": "- orders.customer_id → customers.id（外键约束）"
+        }
+      ],
+      "reason": "按关联字段为关系配置数据连接：客户下单订单：orders.customer_id -> customers.id"
+    },
+    {
+      "operation": "update",
+      "target_kind": "link_type",
+      "target_id": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+      "expected_target_hash": "c53f7f66927b244ca69c442d66d10ec94b18335309deb1b748cfe6eb8973f57f",
+      "before": {
+        "id": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+        "name": "订单包含订单明细",
+        "tags": [],
+        "roles": [
+          {
+            "id": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 4,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order_item}订单包含订单明细{order}"
+        ],
+        "description": "一张订单包含一条或多条订单明细。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "order_contains_item",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "reverse",
+        "legacy_multiplicity": "one_to_many"
+      },
+      "after": {
+        "name": "订单包含订单明细",
+        "tags": [],
+        "roles": [
+          {
+            "id": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 4,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order_item}订单包含订单明细{order}"
+        ],
+        "description": "一张订单包含一条或多条订单明细。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "order_contains_item",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "reverse",
+        "legacy_multiplicity": "one_to_many",
+        "data_join": {
+          "source_column": "order_id",
+          "target_column": "id"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 55,
+            "line_end": 55
+          },
+          "quote": "- order_items.order_id → orders.id（外键约束）"
+        }
+      ],
+      "reason": "按关联字段为关系配置数据连接：订单包含订单明细：order_items.order_id -> orders.id"
+    },
+    {
+      "operation": "update",
+      "target_kind": "link_type",
+      "target_id": "c763844b-8886-572b-be79-8d1f9867aa10",
+      "expected_target_hash": "ab783807dc6b6054741b0fcb5c71e05558b9fbec2b08f8fc436c127a5fc56b6d",
+      "before": {
+        "id": "c763844b-8886-572b-be79-8d1f9867aa10",
+        "name": "订单明细对应商品",
+        "tags": [],
+        "roles": [
+          {
+            "id": "49eea332-757e-55bc-b71a-b20a4560d023",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 5,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order_item}订单明细对应商品{product}"
+        ],
+        "description": "每条订单明细对应一种商品。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "item_refers_product",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": "many_to_one"
+      },
+      "after": {
+        "name": "订单明细对应商品",
+        "tags": [],
+        "roles": [
+          {
+            "id": "49eea332-757e-55bc-b71a-b20a4560d023",
+            "name": null,
+            "origin": "migrated",
+            "concept": {
+              "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+              "kind": "object_type"
+            },
+            "position": 0,
+            "client_ref": null,
+            "native_presence": [
+              "concept"
+            ]
+          }
+        ],
+        "origin": "migrated",
+        "evidence": [],
+        "position": 5,
+        "requires": [],
+        "owner_ref": {
+          "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+          "kind": "object_type"
+        },
+        "derived_by": [],
+        "identifier": false,
+        "verbalizes": [
+          "{order_item}订单明细对应商品{product}"
+        ],
+        "description": "每条订单明细对应一种商品。",
+        "multiplicity": "ManyToOne",
+        "technical_name": "item_refers_product",
+        "native_presence": [
+          "name",
+          "description",
+          "roles",
+          "verbalizes",
+          "multiplicity"
+        ],
+        "owner_role_name": null,
+        "endpoint_direction": "forward",
+        "legacy_multiplicity": "many_to_one",
+        "data_join": {
+          "source_column": "product_id",
+          "target_column": "id"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 56,
+            "line_end": 56
+          },
+          "quote": "- order_items.product_id → products.id（外键约束）"
+        }
+      ],
+      "reason": "按关联字段为关系配置数据连接：订单明细对应商品：order_items.product_id -> products.id"
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "mapping_customer",
+      "target_id": null,
+      "expected_target_hash": null,
+      "before": null,
+      "after": {
+        "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+        "connection_alias": "销售业务库",
+        "schema_name": "demo_analytics",
+        "table_name": "customers",
+        "key_column": "id",
+        "fields": {
+          "customer_no": "id",
+          "customer_name": "customer_name",
+          "city": "city",
+          "sign_date": "signup_date"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 5,
+            "line_end": 6
+          },
+          "quote": "- 数据源（connection_alias）：销售业务库\n- 模式（schema_name）：demo_analytics"
+        },
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 9,
+            "line_end": 20
+          },
+          "quote": "## 表 customers\n\n- 表说明：（无）\n- 主键（key_column）：id\n- 行数：8\n\n| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |\n| --- | --- | --- | --- | --- | --- |\n| id | BIGINT | 否 | 是 |  | 1, 2, 3 |\n| customer_name | VARCHAR(128) | 否 |  |  | 星海贸易, 晨光零售, 远山咖啡 |\n| city | VARCHAR(64) | 否 |  |  | 上海, 杭州, 北京 |\n| signup_date | DATE | 否 |  |  | 2025-10-02, 2025-10-12, 2025-11-03 |"
+        }
+      ],
+      "reason": "为业务对象建立数据映射：customers（connection_alias=销售业务库，schema=demo_analytics）"
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "mapping_order",
+      "target_id": null,
+      "expected_target_hash": null,
+      "before": null,
+      "after": {
+        "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+        "connection_alias": "销售业务库",
+        "schema_name": "demo_analytics",
+        "table_name": "orders",
+        "key_column": "id",
+        "fields": {
+          "order_no": "id",
+          "order_time": "order_date",
+          "order_status": "order_status",
+          "order_amount": "total_amount"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 5,
+            "line_end": 6
+          },
+          "quote": "- 数据源（connection_alias）：销售业务库\n- 模式（schema_name）：demo_analytics"
+        },
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 22,
+            "line_end": 34
+          },
+          "quote": "## 表 orders\n\n- 表说明：（无）\n- 主键（key_column）：id\n- 行数：780\n\n| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |\n| --- | --- | --- | --- | --- | --- |\n| id | BIGINT | 否 | 是 |  | 1, 2, 3 |\n| customer_id | BIGINT | 否 |  |  | 1, 2, 3 |\n| order_date | DATETIME | 否 |  |  | 2026-01-15 01:00:00, 2026-01-15 03:11:00, 2026-01-15 05:22:00 |\n| order_status | VARCHAR(32) | 否 |  |  | shipped, paid, paid |\n| total_amount | DECIMAL(12, 2) | 否 |  |  | 240.00, 416.00, 58.00 |"
+        }
+      ],
+      "reason": "为业务对象建立数据映射：orders（connection_alias=销售业务库，schema=demo_analytics）"
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "mapping_order_item",
+      "target_id": null,
+      "expected_target_hash": null,
+      "before": null,
+      "after": {
+        "type_id": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+        "connection_alias": "销售业务库",
+        "schema_name": "demo_analytics",
+        "table_name": "order_items",
+        "key_column": "id",
+        "fields": {
+          "item_no": "id",
+          "quantity": "quantity",
+          "deal_price": "unit_price",
+          "item_amount": "line_amount"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 5,
+            "line_end": 6
+          },
+          "quote": "- 数据源（connection_alias）：销售业务库\n- 模式（schema_name）：demo_analytics"
+        },
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 39,
+            "line_end": 52
+          },
+          "quote": "## 表 order_items\n\n- 表说明：（无）\n- 主键（key_column）：id\n- 行数：1574\n\n| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |\n| --- | --- | --- | --- | --- | --- |\n| id | BIGINT | 否 | 是 |  | 1, 2, 3 |\n| order_id | BIGINT | 否 |  |  | 1, 1, 2 |\n| product_id | BIGINT | 否 |  |  | 1, 2, 2 |\n| quantity | INTEGER | 否 |  |  | 1, 2, 1 |\n| unit_price | DECIMAL(10, 2) | 否 |  |  | 168.00, 36.00, 36.00 |\n| line_amount | DECIMAL(12, 2) | 否 |  |  | 168.00, 72.00, 36.00 |"
+        }
+      ],
+      "reason": "为业务对象建立数据映射：order_items（connection_alias=销售业务库，schema=demo_analytics）"
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "mapping_product",
+      "target_id": null,
+      "expected_target_hash": null,
+      "before": null,
+      "after": {
+        "type_id": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+        "connection_alias": "销售业务库",
+        "schema_name": "demo_analytics",
+        "table_name": "products",
+        "key_column": "id",
+        "fields": {
+          "product_no": "id",
+          "product_name": "product_name",
+          "product_category": "category",
+          "standard_price": "unit_price"
+        }
+      },
+      "evidence": [
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 5,
+            "line_end": 6
+          },
+          "quote": "- 数据源（connection_alias）：销售业务库\n- 模式（schema_name）：demo_analytics"
+        },
+        {
+          "kind": "material",
+          "material_id": "77f15f32-0ee7-41a6-94c4-1d05b9a55998",
+          "material_sha256": "c5ece0f9fa3726277436b3cf2284ce4147e6fbdd7231e3a432cf8b8327cf022b",
+          "locator": {
+            "line_start": 58,
+            "line_end": 69
+          },
+          "quote": "## 表 products\n\n- 表说明：（无）\n- 主键（key_column）：id\n- 行数：6\n\n| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |\n| --- | --- | --- | --- | --- | --- |\n| id | BIGINT | 否 | 是 |  | 1, 2, 3 |\n| product_name | VARCHAR(128) | 否 |  |  | 经典手冲壶, 滤纸套装, 冷萃咖啡液 |\n| category | VARCHAR(64) | 否 |  |  | 咖啡器具, 耗材, 饮品 |\n| unit_price | DECIMAL(10, 2) | 否 |  |  | 168.00, 36.00, 58.00 |"
+        }
+      ],
+      "reason": "为业务对象建立数据映射：products（connection_alias=销售业务库，schema=demo_analytics）"
+    }
+  ]
+}

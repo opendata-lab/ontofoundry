@@ -5,7 +5,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Rocket,
-  Database,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -19,7 +19,9 @@ import type {
   RunChangeDetail,
 } from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
+import { TableMaterialPicker } from "../components/TableMaterialPicker";
 import { SessionPicker } from "../components/SessionPicker";
+import { TagList } from "../components/TagList";
 import { useModeling } from "../hooks/useModeling";
 import { useProposals } from "../hooks/useProposals";
 import { usePageTab } from "../hooks/usePageTab";
@@ -36,13 +38,15 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
+  const [constraintsDirty, setConstraintsDirty] = useState(false);
+  const [constraintsBusy, setConstraintsBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
-    dirty: !!scenario.trim(),
-    busy: busy || uploading,
+    dirty: !!scenario.trim() || constraintsDirty,
+    busy: busy || uploading || constraintsBusy,
   });
   // Run state comes from the element, not from a status column the page
   // polls. It knows first, and it covers the parked states — waiting_input is
@@ -80,22 +84,42 @@ export function BuilderPage() {
       setBusy(false);
     }
   };
+  // Ordinary composer messages are chat. Only this action asks DataAgent for a
+  // proposals batch: metadata.mode is what the BFF reads to pin the run and
+  // expect a result file, and it comes back on completion.
+  const startModeling = () => {
+    const el = conversation.current;
+    if (!el) return;
+    const text = el.value.trim();
+    const content =
+      (scenario.trim() && text
+        ? `业务场景：${scenario.trim()}\n本次需求：${text}`
+        : text) ||
+      scenario.trim() ||
+      "基于已选材料开始建模";
+    void el.sendMessage(content, { metadata: { mode: "model" } });
+    setScenario("");
+  };
+  const canModel =
+    !!capabilities?.agent_configured &&
+    !running &&
+    !busy &&
+    !uploading &&
+    (!!session?.material_ids.length || !!scenario.trim());
+  const attach = async (material: Material) => {
+    const current = await model.ensure();
+    setMaterials((ms) => [material, ...ms.filter((m) => m.id !== material.id)]);
+    const saved = await modelingApi.save(current, current.draft, {
+      material_ids: [...new Set([...current.material_ids, material.id])],
+    });
+    setSession(saved);
+    setMaterialMode("library");
+  };
   const upload = async (files: FileList | File[]) => {
     setUploading(true);
     await act(async () => {
-      let current = await model.ensure();
-      for (const file of Array.from(files)) {
-        const material = await modelingApi.upload(workspace.id, file);
-        setMaterials((ms) => [
-          material,
-          ...ms.filter((m) => m.id !== material.id),
-        ]);
-        current = await modelingApi.save(current, current.draft, {
-          material_ids: [...new Set([...current.material_ids, material.id])],
-        });
-      }
-      setSession(current);
-      setMaterialMode("library");
+      for (const file of Array.from(files))
+        await attach(await modelingApi.upload(workspace.id, file));
     });
     setUploading(false);
     if (input.current) input.current.value = "";
@@ -176,7 +200,7 @@ export function BuilderPage() {
   return (
     <div className="ref-builder">
       <header className="context-bar">
-        <h1>本体自动构建</h1>
+        <h1>本体构建</h1>
         <SessionPicker
           session={session}
           sessionId={sessionId}
@@ -209,7 +233,7 @@ export function BuilderPage() {
               「空间设置」本来就在主导航里。 */}
           {capabilities && !capabilities.agent_configured && (
             <span>
-              <Link to="../settings">大模型尚未配置</Link>
+              <Link to="../settings">DataAgent 未配置，查看连通性</Link>
             </span>
           )}
           <button
@@ -254,7 +278,7 @@ export function BuilderPage() {
             <div className="build-config-scroll">
               <section>
                 <h3>业务场景标签</h3>
-                <div className="context-tag">{workspace.name}</div>
+                <TagList tags={[workspace.name]} />
               </section>
               <section>
                 <h3>业务知识</h3>
@@ -346,6 +370,14 @@ export function BuilderPage() {
                 )}
               </section>
               <section>
+                <h3>业务数据</h3>
+                <TableMaterialPicker
+                  workspaceId={workspace.id}
+                  disabled={busy || running}
+                  onMaterial={(material) => act(() => attach(material))}
+                />
+              </section>
+              <section>
                 <label className="section-field">
                   <span>业务场景描述</span>
                   <textarea
@@ -355,16 +387,18 @@ export function BuilderPage() {
                     onChange={(e) => setScenario(e.target.value)}
                   />
                 </label>
-              </section>
-              <section>
-                <h3>业务数据</h3>
-                <div className="data-source-box">
-                  <strong>从数据库选择数据表</strong>
-                  <Link className="button button--text" to="../mappings">
-                    <Database size={15} />
-                    配置数据表
-                  </Link>
-                </div>
+                <button
+                  type="button"
+                  className="button button--primary start-modeling"
+                  disabled={!canModel}
+                  title={
+                    canModel ? undefined : "先上传或选择业务材料，或填写业务场景描述"
+                  }
+                  onClick={startModeling}
+                >
+                  <Sparkles size={15} />
+                  {running ? "建模中…" : "开始建模"}
+                </button>
               </section>
             </div>
           )}
@@ -384,6 +418,9 @@ export function BuilderPage() {
           proposals={proposals}
           running={running}
           onRemodel={remodel}
+          onSession={setSession}
+          onConstraintsDirty={setConstraintsDirty}
+          onConstraintsBusy={setConstraintsBusy}
         />
       </div>
     </div>

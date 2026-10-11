@@ -1,6 +1,6 @@
 """`ontofoundry.proposals/v1`: what a modeling run returns, and how it is read.
 
-The JSON Schema is generated from the v2 element models so the two can never
+The JSON Schema is generated from the versioned element models so the two can never
 drift: a proposal's `after` is an element without `id`, where every field that
 references another element accepts either a UUID of an element in the pinned
 draft or `{"client_ref": "..."}` naming a create item in the same batch.
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
@@ -22,7 +23,13 @@ from uuid import UUID, uuid5
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
-from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
+from ontofoundry_api.domain.canonical import (
+    LEGACY_HASH_ALGORITHM,
+    V3_HASH_ALGORITHM,
+    canonical,
+    domain_sha256,
+    element_sha256,
+)
 from ontofoundry_api.domain.evidence import (
     EvidenceError,
     MaterialLookup,
@@ -31,6 +38,7 @@ from ontofoundry_api.domain.evidence import (
 from ontofoundry_api.domain.models import (
     COLLECTIONS,
     ActionDefinition,
+    DataJoin,
     DataMapping,
     ElementKind,
     LinkTypeDefinition,
@@ -42,6 +50,8 @@ from ontofoundry_api.domain.models import (
     PropertyDefinition,
     RuleDefinition,
 )
+from ontofoundry_api.domain.models_v3 import V3_COLLECTION_MODELS, ValueTypeDefinition
+from ontofoundry_api.domain.role_join import RoleJoin, role_join_input
 
 SCHEMA_VERSION = "ontofoundry.proposals/v1"
 MAX_ITEMS = 500
@@ -49,6 +59,7 @@ CLIENT_REF_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,79}$"
 
 MODELS: dict[ElementKind, type] = {
     ElementKind.OBJECT_TYPE: ObjectTypeDefinition,
+    ElementKind.VALUE_TYPE: ValueTypeDefinition,
     ElementKind.PROPERTY: PropertyDefinition,
     ElementKind.LINK_TYPE: LinkTypeDefinition,
     ElementKind.RULE: RuleDefinition,
@@ -58,10 +69,18 @@ MODELS: dict[ElementKind, type] = {
     ElementKind.MAPPING: DataMapping,
 }
 
+MODELS_V3 = {kind: V3_COLLECTION_MODELS.get(collection, MODELS[kind]) for kind, collection in COLLECTIONS.items()}
+
+
+def models_for(draft_version):
+    return MODELS_V3 if draft_version == "3" else MODELS
+
+
 # Fields holding another element's id, per kind. "[]" marks a list of ids;
 # "effects[]." reaches into action effects.
 REFERENCE_FIELDS: dict[ElementKind, tuple[str, ...]] = {
     ElementKind.OBJECT_TYPE: ("extends[]",),
+    ElementKind.VALUE_TYPE: (),
     ElementKind.PROPERTY: ("owner_type_id",),
     ElementKind.LINK_TYPE: ("source_type_id", "target_type_id"),
     ElementKind.RULE: ("owner_id",),
@@ -97,12 +116,20 @@ _UUID = {"type": "string", "format": "uuid"}
 _REF = {"anyOf": [_UUID, _CLIENT_REF]}
 
 
-def _after_schema(kind: ElementKind) -> dict[str, Any]:
-    schema = MODELS[kind].model_json_schema(ref_template="#/$defs/{model}")
+def _after_schema(kind: ElementKind, draft_version="2") -> dict[str, Any]:
+    schema = models_for(draft_version)[kind].model_json_schema(ref_template="#/$defs/{model}")
     defs = schema.pop("$defs", {})
     # The server assigns ids: the element's own, and those of its sub-items.
     schema["properties"].pop("id", None)
     schema["required"] = [name for name in schema.get("required", []) if name != "id"]
+    if draft_version == "3" and "RoleRef" in defs:
+        defs["RoleRef"]["required"] = [f for f in defs["RoleRef"].get("required", []) if f != "id"]
+    if draft_version == "3" and "evidence" in schema["properties"]:
+        from ontofoundry_api.domain.models import ManualEvidence
+        for evidence_model in (MaterialEvidence, ManualEvidence):
+            definition = evidence_model.model_json_schema(ref_template="#/$defs/{model}")
+            defs.update(definition.pop("$defs", {}))
+            defs[evidence_model.__name__] = definition
     for name in ("ActionParameter", "ActionEffect", "MaterialEvidence"):
         if name in defs:
             defs[name]["required"] = [r for r in defs[name].get("required", []) if r != "id"]
@@ -116,13 +143,30 @@ def _after_schema(kind: ElementKind) -> dict[str, Any]:
                 "anyOf": [{"$ref": "#/$defs/MaterialEvidence"}, {"$ref": "#/$defs/ManualEvidence"}]
             },
         }
-    for path in REFERENCE_FIELDS[kind]:
+    for path in (REFERENCE_FIELDS[kind] if draft_version == "2" or kind not in {ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE, ElementKind.PROPERTY, ElementKind.LINK_TYPE, ElementKind.MATERIAL_LINK} else ()):
         if path.startswith("effects[]."):
             defs["ActionEffect"]["properties"][path.split(".", 1)[1]] = {"anyOf": [_REF, {"type": "null"}]}
         elif path.endswith("[]"):
             schema["properties"][path[:-2]] = {"type": "array", "items": _REF}
         else:
             schema["properties"][path] = _REF
+    if draft_version == "3":
+        if kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            from ontofoundry_api.domain.models_v3 import ConceptContext
+            defs['ConceptContext'] = ConceptContext.model_json_schema()
+            schema['properties']['concept_context'] = {'anyOf': [{'$ref': '#/$defs/ConceptContext'}, {'type': 'null'}]}
+        for key in ("requires", "derived_by"):
+            if key in schema["properties"]:
+                schema["properties"][key] = {"type": "array", "items": _REF}
+        if kind == ElementKind.LINK_TYPE:
+            schema["properties"]["data_join"] = {"anyOf": [RoleJoin.model_json_schema(), DataJoin.model_json_schema(), {"type": "null"}]}
+        if kind == ElementKind.MATERIAL_LINK:
+            schema["required"] = [key for key in schema["required"] if key != "role_values"]
+            schema["properties"]["type_id"] = _REF
+            for key in ("source_id", "target_id"):
+                schema["properties"][key] = {"anyOf": [_REF, {"type": "null"}]}
+            defs["RoleValue"]["properties"]["role_id"] = _REF
+            defs["RoleValue"]["properties"]["object_id"] = {"anyOf": [_REF, {"type": "null"}]}
     schema["additionalProperties"] = False
     # Sub-schemas of `after` differ from the stored element's (ids optional), so
     # they live under their own names and never clash with the element defs.
@@ -136,15 +180,19 @@ def _after_schema(kind: ElementKind) -> dict[str, Any]:
     }
 
 
-def result_schema() -> dict[str, Any]:
+def result_schema(draft_version="3") -> dict[str, Any]:
     """The Draft 2020-12 JSON Schema of `ontofoundry.proposals/v1`."""
     defs: dict[str, Any] = {}
     variants = []
     for kind in ElementKind:
-        after = _after_schema(kind)
+        after = _after_schema(kind, draft_version)
         defs.update(after["defs"])
-        full = MODELS[kind].model_json_schema(ref_template="#/$defs/{model}")
+        full = models_for(draft_version)[kind].model_json_schema(ref_template="#/$defs/{model}")
         defs.update(full.pop("$defs", {}))
+        if draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            from ontofoundry_api.domain.models_v3 import ConceptContext
+            defs['ConceptContext'] = ConceptContext.model_json_schema()
+            full['properties']['concept_context'] = {'anyOf': [{'$ref': '#/$defs/ConceptContext'}, {'type': 'null'}]}
         defs[f"{kind.value}_after"] = after["schema"]
         defs[f"{kind.value}_element"] = full
         variants.append(
@@ -240,7 +288,7 @@ class RunContext:
     base_version_sha256: str
     source_session_revision: int
     source_draft_sha256: str
-    draft: dict[str, Any]  # the pinned v2 session draft
+    draft: dict[str, Any]  # the pinned session draft
 
 
 @dataclass
@@ -276,16 +324,16 @@ def create_target_id(batch_id: str, client_ref: str) -> str:
     return str(uuid5(UUID(batch_id), f"create:{client_ref}"))
 
 
-def item_fingerprint(operation: str, target_kind: str, target_id: str, after: dict | None) -> str:
+def item_fingerprint(operation: str, target_kind: str, target_id: str, after: dict | None, *, hash_algorithm=LEGACY_HASH_ALGORITHM) -> str:
     """Design §T1: sha256 over {operation, target_kind, target_id, after}."""
     projection = {
         "operation": operation,
         "target_kind": target_kind,
         "target_id": target_id,
         # A single element under algorithm B; null stays null.
-        "after": json.loads(canonical(after)) if after is not None else None,
+        "after": (json.loads(canonical({COLLECTIONS[ElementKind(target_kind)]: [after]}, hash_algorithm=hash_algorithm))[COLLECTIONS[ElementKind(target_kind)]][0] if hash_algorithm == V3_HASH_ALGORITHM else json.loads(canonical(after))) if after is not None else None,
     }
-    return domain_sha256(projection)
+    return domain_sha256(projection, hash_algorithm=hash_algorithm)
 
 
 def _fail(code: str, message: str) -> ProposalContractError:
@@ -297,6 +345,66 @@ def _check_quote(evidence: dict, lookup: MaterialLookup, where: str) -> None:
         check_material_evidence(evidence, lookup, where)
     except EvidenceError as exc:
         raise _fail(exc.code, str(exc)) from exc
+
+
+def _native_binary_proposal(after: dict) -> dict:
+    """Project endpoint-shaped input for a new v3 run, without naming roles.
+
+    Native roles are authoritative. Endpoint role names are copied only when
+    explicitly supplied; concept display labels never participate in conversion.
+    """
+    if "owner_ref" in after or "roles" in after or not {"source_type_id", "target_type_id"} <= after.keys():
+        return after
+    result = deepcopy(after)
+    source, target = result.pop("source_type_id"), result.pop("target_type_id")
+    source_name, target_name = result.pop("source_role_name", None), result.pop("target_role_name", None)
+    multiplicity = result.get("multiplicity")
+    reverse = multiplicity == "one_to_many"
+    role = {"concept": {"kind": "object_type", "ref": source if reverse else target}}
+    role_name = source_name if reverse else target_name
+    if role_name is not None:
+        role["name"] = role_name
+    result["owner_ref"] = {"kind": "object_type", "ref": target if reverse else source}
+    result["roles"] = [role]
+    result["owner_role_name"] = target_name if reverse else source_name
+    result["endpoint_direction"] = "reverse" if reverse else "forward"
+    if isinstance(multiplicity, str) and multiplicity in {"one_to_one", "one_to_many", "many_to_one", "many_to_many"}:
+        result["legacy_multiplicity"] = multiplicity
+        result["multiplicity"] = "OneToOne" if multiplicity == "one_to_one" else None if multiplicity == "many_to_many" else "ManyToOne"
+    return result
+
+
+def _placeholder(role: dict | None, concept_names: dict[str, str]) -> str | None:
+    """How a reading names a role: its concept, qualified by the role name."""
+    concept = (role or {}).get("concept") or {}
+    if not concept.get("ref"):
+        return None
+    name = concept["ref"] if concept.get("kind") in ("builtin", "any") else concept_names.get(str(concept["ref"]))
+    if name is None:
+        return None
+    return name + (":" + role["name"] if role.get("name") else "")
+
+
+def _carry_placeholders(previous: dict, after: dict, concept_names: dict[str, str]) -> list[str]:
+    """Keep untouched readings pointing at their roles when a role's concept changes.
+
+    An update that retypes a role (String -> Integer) but leaves the readings as
+    they were would otherwise leave `{String}` naming a role that no longer exists.
+    """
+    renames = {}
+    old_roles = {str(role.get("id")): role for role in previous.get("roles", [])}
+    for role in after.get("roles", []):
+        old, new = _placeholder(old_roles.get(str(role.get("id"))), concept_names), _placeholder(role, concept_names)
+        if old and new and old != new:
+            renames["{" + old + "}"] = "{" + new + "}"
+    old_owner = _placeholder({"concept": previous.get("owner_ref"), "name": previous.get("owner_role_name")}, concept_names)
+    new_owner = _placeholder({"concept": after.get("owner_ref"), "name": after.get("owner_role_name")}, concept_names)
+    if old_owner and new_owner and old_owner != new_owner:
+        renames["{" + old_owner + "}"] = "{" + new_owner + "}"
+    if not renames:
+        return list(after.get("verbalizes") or [])
+    pattern = re.compile("|".join(re.escape(key) for key in renames))
+    return [pattern.sub(lambda match: renames[match.group(0)], text) for text in after.get("verbalizes") or []]
 
 
 def parse_result(
@@ -320,8 +428,15 @@ def parse_result(
         else json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
+    draft_version = context.draft.get("schema_version", "2")
+    if draft_version == "3" and isinstance(data, dict) and isinstance(data.get("items"), list):
+        for item in data["items"]:
+            if isinstance(item, dict) and item.get("target_kind") == "link_type" and isinstance(item.get("after"), dict):
+                item["after"] = _native_binary_proposal(item["after"])
+    models = models_for(draft_version)
+    algorithm = V3_HASH_ALGORITHM if draft_version == "3" else LEGACY_HASH_ALGORITHM
     errors = sorted(
-        Draft202012Validator(result_schema()).iter_errors(data), key=lambda e: list(e.path)
+        Draft202012Validator(result_schema(draft_version)).iter_errors(data), key=lambda e: list(e.path)
     )
     if errors:
         first = errors[0]
@@ -347,6 +462,10 @@ def parse_result(
         for kind, collection in COLLECTIONS.items()
         for element in draft.get(collection, [])
     }
+    if draft_version == "3":
+        from ontofoundry_api.domain.runtime_views import mappings_of
+        for mapping in mappings_of(OntologyDraft.model_validate(draft)):
+            existing[str(mapping.id)] = (ElementKind.MAPPING, mapping.model_dump(mode="json"))
     batch_id = batch_id_for(context.session_id, context.run_token)
     raw_items = data["items"]
 
@@ -377,11 +496,58 @@ def parse_result(
         if item["before"] is None or (op == "update") != (item["after"] is not None):
             raise _fail("OPERATION_SHAPE", f"{where}：{op} 的 before/after 形态不正确")
         current = existing[target][1]
-        if canonical(item["before"], None) != canonical(current, None):
+        before = deepcopy(item['before'])
+        if (draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE)
+                and 'concept_context' in before and before.pop('concept_context') != draft['extension_v4']['concept_context'].get(target)):
+            raise _fail('BEFORE_MISMATCH', f'{where}：before 的平台概念上下文与固定草稿不一致')
+        if canonical(before, None, hash_algorithm=algorithm) != canonical(current, None, hash_algorithm=algorithm):
             raise _fail("BEFORE_MISMATCH", f"{where}：before 与固定草稿中的目标不一致")
-        if item.get("expected_target_hash") != element_sha256(current):
+        if item.get("expected_target_hash") != element_sha256(current, hash_algorithm=algorithm, collection=COLLECTIONS[kind]):
             raise _fail("TARGET_HASH_MISMATCH", f"{where}：expected_target_hash 与目标不一致")
         targets[index] = target
+
+    concept_names = {
+        str(element["id"]): element["concept"]
+        for collection in ("object_types", "value_types")
+        for element in draft.get(collection, [])
+        if element.get("concept")
+    }
+    for index, item in enumerate(raw_items):
+        if item["operation"] == "create" and item["after"] and item["after"].get("concept"):
+            concept_names[targets[index]] = item["after"]["concept"]
+
+    role_refs = {}
+    existing_roles = set()
+    if draft_version == "3":
+        for link in [*draft.get("properties", []), *draft.get("link_types", [])]:
+            existing_roles.add(str(uuid5(UUID(link["id"]), "role:owner")))
+            existing_roles.update(str(r["id"]) for r in link["roles"])
+        for index, item in enumerate(raw_items):
+            if item["target_kind"] not in ("property", "link_type") or item["after"] is None:
+                continue
+            if item.get("client_ref"):
+                role_refs[item["client_ref"] + ":owner"] = (index, str(uuid5(UUID(targets[index]), "role:owner")))
+            for role in item["after"].get("roles", []):
+                ref = role.get("client_ref")
+                if ref is None:
+                    continue
+                if ref in refs or ref in role_refs:
+                    raise _fail("CLIENT_REF_DUPLICATE", f"角色 client_ref {ref} 重复")
+                role_refs[ref] = (index, role.get("id") or str(uuid5(UUID(targets[index]), "role:" + ref)))
+
+    def resolve_role(value, index, deps, where):
+        if isinstance(value, dict):
+            ref = value["client_ref"]
+            if ref not in role_refs:
+                raise _fail("CLIENT_REF_UNKNOWN", f"{where}：角色 client_ref {ref} 不存在")
+            owner_index, role_id = role_refs[ref]
+            if owner_index == index:
+                raise _fail("DEPENDENCY_CYCLE", f"{where}：角色依赖自身")
+            deps.add(owner_index)
+            return role_id
+        if str(value) not in existing_roles:
+            raise _fail("REFERENCE_UNKNOWN", f"{where}：角色不在固定草稿中")
+        return value
 
     def resolve(value: Any, index: int, deps: set[int], where: str) -> Any:
         if isinstance(value, dict) and set(value) == {"client_ref"}:
@@ -413,7 +579,51 @@ def parse_result(
             if "id" in after and str(after["id"]) != target_id:
                 raise _fail("OPERATION_SHAPE", f"{where}：after.id 必须等于目标 id")
             after["id"] = target_id
-            for path in REFERENCE_FIELDS[kind]:
+            if draft_version == "3":
+                def concept_reference(value, path, index=index, deps=deps):
+                    if value and value.get("kind") in ("object_type", "value_type"):
+                        value["ref"] = resolve(value["ref"], index, deps, path)
+                for position, role in enumerate(after.get("roles", [])):
+                    role.setdefault("id", str(uuid5(UUID(target_id), "role:" + (role.get("client_ref") or str(position)))))
+                    role.pop("client_ref", None)
+                    role["position"] = position
+                    if role.get("name") is not None:
+                        role["native_presence"] = list(dict.fromkeys([*role.get("native_presence", []), "name"]))
+                    else:
+                        role["native_presence"] = [key for key in role.get("native_presence", []) if key != "name"]
+                    concept_reference(role.get("concept"), f"{where}.roles[{position}].concept.ref")
+                concept_reference(after.get("owner_ref"), f"{where}.owner_ref.ref")
+                for position, base in enumerate(after.get("extends", [])):
+                    concept_reference(base, f"{where}.extends[{position}].ref")
+                for field in ("requires", "derived_by"):
+                    if field in after:
+                        after[field] = [resolve(v, index, set(), f"{where}.{field}") for v in after[field]]
+                if kind == ElementKind.MATERIAL_LINK:
+                    after.setdefault("role_values", [])
+                for role in after.get("role_values", []):
+                    role["role_id"] = resolve_role(role["role_id"], index, deps, f"{where}.role_values.role_id")
+                    if role.get("object_id"):
+                        role["object_id"] = resolve(role["object_id"], index, deps, f"{where}.role_values.object_id")
+            if draft_version == "3" and item["before"] is not None:
+                previous = item["before"]
+                if "verbalizes" in after and after["verbalizes"] == previous.get("verbalizes"):
+                    after["verbalizes"] = _carry_placeholders(previous, after, concept_names)
+                native_fields = ("description", "extends", "identify_by", "roles", "multiplicity", "verbalizes", "requires", "derived_by")
+                after["native_presence"] = list(after.get("native_presence", previous.get("native_presence", [])))
+                for key in native_fields:
+                    if key in after and after[key] != previous.get(key) and key not in after["native_presence"]:
+                        after["native_presence"].append(key)
+                old_roles = {role["id"]: role for role in previous.get("roles", [])}
+                for role in after.get("roles", []):
+                    old_role = old_roles.get(role["id"])
+                    if old_role and role.get("name") is not None and role.get("name") != old_role.get("name"):
+                        role["native_presence"] = list(dict.fromkeys([*role.get("native_presence", []), "name"]))
+                if "native_presence" not in models[kind].model_fields:
+                    after.pop("native_presence", None)
+            paths = REFERENCE_FIELDS[kind]
+            if draft_version == "3" and kind in {ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE, ElementKind.PROPERTY, ElementKind.LINK_TYPE}:
+                paths = ()
+            for path in paths:
                 if path.startswith("effects[]."):
                     key = path.split(".", 1)[1]
                     for effect in after.get("effects") or []:
@@ -438,7 +648,18 @@ def parse_result(
                 # The stored and fingerprinted form is the model's own dump:
                 # omitted fields take their defaults, so a sparse `after` and
                 # one spelling the defaults out are the same proposal.
-                after = MODELS[kind].model_validate(after).model_dump(mode="json")
+                has_context = draft_version == '3' and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE) and 'concept_context' in after
+                concept_context = after.pop('concept_context') if has_context else None
+                if has_context and concept_context is not None:
+                    from ontofoundry_api.domain.models_v3 import ConceptContext
+                    concept_context = ConceptContext.model_validate(concept_context).model_dump(mode='json')
+                legacy_join = after.pop("data_join", ...) if draft_version == "3" and kind == ElementKind.LINK_TYPE else ...
+                after = models[kind].model_validate(after).model_dump(mode="json")
+                if has_context:
+                    after['concept_context'] = concept_context
+                if legacy_join is not ...:
+                    normalized_join = role_join_input(legacy_join)
+                    after["data_join"] = normalized_join.model_dump(mode="json") if normalized_join else None
             except ValidationError as exc:
                 raise _fail("ELEMENT_INVALID", f"{where}：{exc.errors()[0]['msg']}") from exc
 
@@ -449,7 +670,7 @@ def parse_result(
                 return canonical(entries, "evidence")
 
             before_model = (
-                MODELS[kind].model_validate(item["before"]).model_dump(mode="json")
+                models[kind].model_validate({k: v for k, v in item["before"].items() if k != "concept_context"}).model_dump(mode="json")
                 if item["before"] is not None
                 else None
             )
@@ -468,6 +689,11 @@ def parse_result(
                 raise _fail("RESULT_SCHEMA_INVALID", f"{where}.evidence[{position}]：{exc.errors()[0]['msg']}") from exc
             _check_quote(entry, material_lookup, f"{where}.evidence[{position}]")
             evidence.append(entry)
+        stored_before = deepcopy(item['before'])
+        if draft_version == '3' and stored_before is not None and kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
+            context_change = after is not None and 'concept_context' in after
+            if context_change or (item['operation'] == 'delete' and target_id in draft['extension_v4']['concept_context']):
+                stored_before['concept_context'] = deepcopy(draft['extension_v4']['concept_context'].get(target_id))
         deps_by_index[index] = deps
         parsed.append(
             ParsedItem(
@@ -478,14 +704,34 @@ def parse_result(
                 target_kind=kind.value,
                 target_id=target_id,
                 expected_target_hash=item.get("expected_target_hash"),
-                before=item["before"],
+                before=stored_before,
                 after=after,
                 field_changes=item.get("field_changes") or [],
                 evidence=evidence,
                 reason=item.get("reason") or "",
-                fingerprint=item_fingerprint(item["operation"], kind.value, target_id, after),
+                fingerprint=item_fingerprint(item["operation"], kind.value, target_id, after, hash_algorithm=algorithm),
             )
         )
+
+    if draft_version == "3":
+        from ontofoundry_api.domain.fact_views import binary_fact_view
+
+        definitions = {i["id"]: i for i in draft.get("link_types", [])}
+        definitions.update({entry.target_id: entry.after for entry in parsed
+                            if entry.target_kind == "link_type" and entry.after is not None})
+        for entry in parsed:
+            if entry.target_kind != "material_link" or entry.after is None:
+                continue
+            definition = definitions.get(entry.after["type_id"])
+            if definition is None:
+                continue  # cross-element validation reports a missing relation
+            try:
+                entry.after = models[ElementKind.MATERIAL_LINK].model_validate(
+                    binary_fact_view(definition, entry.after)).model_dump(mode="json")
+            except ValueError as exc:
+                raise _fail("ELEMENT_INVALID", f"items[{entry.ordinal}]：{exc}") from exc
+            entry.fingerprint = item_fingerprint(entry.operation, entry.target_kind, entry.target_id,
+                                                 entry.after, hash_algorithm=algorithm)
 
     # Two items acting on the same target would make acceptance order-dependent.
     seen_targets: dict[str, int] = {}

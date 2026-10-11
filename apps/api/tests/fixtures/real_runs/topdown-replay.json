@@ -1,0 +1,5859 @@
+{
+ "session_draft": {
+  "rules": [
+   {
+    "id": "b513831e-d596-5040-8496-2be31063d8fe",
+    "name": "订单金额等于明细金额之和",
+    "origin": "migrated",
+    "evidence": [],
+    "owner_id": "da483526-b97a-529e-b627-8e936ec9809d",
+    "position": 0,
+    "rule_kind": "derivation",
+    "expression": "订单.订单金额 = SUM(订单明细.明细金额)",
+    "owner_kind": "property",
+    "verbalizes": [],
+    "description": "",
+    "technical_name": "order_amount_equals_sum",
+    "native_presence": []
+   },
+   {
+    "id": "2e74cb76-16af-5a65-840c-b8c67577ba0c",
+    "name": "明细金额等于成交单价乘以购买数量",
+    "origin": "migrated",
+    "evidence": [],
+    "owner_id": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "position": 0,
+    "rule_kind": "derivation",
+    "expression": "明细金额 = 成交单价 × 购买数量",
+    "owner_kind": "property",
+    "verbalizes": [],
+    "description": "",
+    "technical_name": "item_amount_equals_product",
+    "native_presence": []
+   },
+   {
+    "id": "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8",
+    "name": "购买数量必须大于0",
+    "origin": "migrated",
+    "evidence": [],
+    "owner_id": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "position": 0,
+    "rule_kind": "constraint",
+    "expression": "购买数量 > 0",
+    "owner_kind": "property",
+    "verbalizes": [],
+    "description": "",
+    "technical_name": "quantity_must_be_positive",
+    "native_presence": []
+   },
+   {
+    "id": "213dbf93-b20d-597e-a655-e2f17926dd3f",
+    "name": "仅已支付订单可变更为已发货",
+    "origin": "migrated",
+    "evidence": [],
+    "owner_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "position": 0,
+    "rule_kind": "constraint",
+    "expression": "订单.订单状态 变更为“已发货”时，当前状态必须为“已支付”",
+    "owner_kind": "object_type",
+    "verbalizes": [],
+    "description": "",
+    "technical_name": "only_paid_can_ship",
+    "native_presence": []
+   }
+  ],
+  "actions": [],
+  "metrics": [],
+  "datasets": [],
+  "mappings": [],
+  "ai_context": null,
+  "link_types": [
+   {
+    "id": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+    "name": "客户下单订单",
+    "tags": [],
+    "roles": [
+     {
+      "id": "8545b33f-faab-517a-9a21-44c96125f9f6",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+       "kind": "object_type"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 4,
+    "requires": [],
+    "owner_ref": {
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "verbalizes": [
+     "{order}客户下单订单{customer}"
+    ],
+    "description": "一个客户可以下多张订单，一张订单只属于一个客户。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "customer_places_order",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "reverse",
+    "legacy_multiplicity": "one_to_many"
+   },
+   {
+    "id": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+    "name": "订单包含订单明细",
+    "tags": [],
+    "roles": [
+     {
+      "id": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+       "kind": "object_type"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 4,
+    "requires": [],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "verbalizes": [
+     "{order_item}订单包含订单明细{order}"
+    ],
+    "description": "一张订单包含一条或多条订单明细。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "order_contains_item",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "reverse",
+    "legacy_multiplicity": "one_to_many"
+   },
+   {
+    "id": "c763844b-8886-572b-be79-8d1f9867aa10",
+    "name": "订单明细对应商品",
+    "tags": [],
+    "roles": [
+     {
+      "id": "49eea332-757e-55bc-b71a-b20a4560d023",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+       "kind": "object_type"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 5,
+    "requires": [],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "verbalizes": [
+     "{order_item}订单明细对应商品{product}"
+    ],
+    "description": "每条订单明细对应一种商品。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "item_refers_product",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": "many_to_one"
+   }
+  ],
+  "ossie_name": null,
+  "properties": [
+   {
+    "id": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+    "name": "客户编号",
+    "tags": [],
+    "roles": [
+     {
+      "id": "c999229c-300f-50f4-9998-1b4b462012f4",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 0,
+    "required": true,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": true,
+    "value_kind": "string",
+    "verbalizes": [
+     "{customer}客户编号{String}"
+    ],
+    "description": "客户的唯一标识，由系统自动分配。",
+    "multiplicity": "OneToOne",
+    "technical_name": "customer_no",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "d816b2ae-5ad0-562d-b9be-6e89987705c5",
+    "name": "客户名称",
+    "tags": [],
+    "roles": [
+     {
+      "id": "286f41a5-d8c7-56a2-8a6f-24986537051b",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 1,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "string",
+    "verbalizes": [
+     "{customer}客户名称{String}"
+    ],
+    "description": "签约企业的名称。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "customer_name",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "2c7336f6-7886-55d6-9c08-46b545d6b322",
+    "name": "所在城市",
+    "tags": [],
+    "roles": [
+     {
+      "id": "638d6496-9ad0-5b95-a69f-e6c8f77a9489",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 2,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "string",
+    "verbalizes": [
+     "{customer}所在城市{String}"
+    ],
+    "description": "客户主要经营所在的城市。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "city",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "5242275a-9d9b-5568-9b4c-b7011303cc55",
+    "name": "签约日期",
+    "tags": [],
+    "roles": [
+     {
+      "id": "cb8156c8-68f9-53e8-a304-6059ccb92075",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Date",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 3,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "date",
+    "verbalizes": [
+     "{customer}签约日期{Date}"
+    ],
+    "description": "客户与本公司完成签约、开始合作的日期。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "sign_date",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+    "name": "订单编号",
+    "tags": [],
+    "roles": [
+     {
+      "id": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 0,
+    "required": true,
+    "requires": [],
+    "owner_ref": {
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": true,
+    "value_kind": "string",
+    "verbalizes": [
+     "{order}订单编号{String}"
+    ],
+    "description": "订单的唯一标识。",
+    "multiplicity": "OneToOne",
+    "technical_name": "order_no",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "b51f3352-2274-515d-a9f4-0fdd157ade25",
+    "name": "下单时间",
+    "tags": [],
+    "roles": [
+     {
+      "id": "30ffde8b-d0f7-54db-9b90-fdff06c25993",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "DateTime",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 1,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "datetime",
+    "verbalizes": [
+     "{order}下单时间{DateTime}"
+    ],
+    "description": "客户提交订单的时间。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "order_time",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20",
+    "name": "订单状态",
+    "tags": [],
+    "roles": [
+     {
+      "id": "f623eff8-e964-5bf1-81ed-1ecb1a3a7d6c",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 2,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "string",
+    "verbalizes": [
+     "{order}订单状态{String}"
+    ],
+    "description": "订单当前所处的状态，取值为“已支付（paid）”或“已发货（shipped）”。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "order_status",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "da483526-b97a-529e-b627-8e936ec9809d",
+    "name": "订单金额",
+    "tags": [],
+    "roles": [
+     {
+      "id": "4286cd1e-b8f9-51f3-8024-89990e19950a",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Decimal",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 3,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "kind": "object_type"
+    },
+    "derived_by": [
+     "b513831e-d596-5040-8496-2be31063d8fe"
+    ],
+    "identifier": false,
+    "value_kind": "decimal",
+    "verbalizes": [
+     "{order}订单金额{Decimal}"
+    ],
+    "description": "订单应收总金额，单位为人民币元，等于该订单全部订单明细的明细金额之和。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "order_amount",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "derived_by",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "6180f549-7c2d-5169-887f-757c7ed01859",
+    "name": "商品编号",
+    "tags": [],
+    "roles": [
+     {
+      "id": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 0,
+    "required": true,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": true,
+    "value_kind": "string",
+    "verbalizes": [
+     "{product}商品编号{String}"
+    ],
+    "description": "商品的唯一标识。",
+    "multiplicity": "OneToOne",
+    "technical_name": "product_no",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7",
+    "name": "商品名称",
+    "tags": [],
+    "roles": [
+     {
+      "id": "0b858ff6-75d6-54ef-9245-ebde9cc4573a",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 1,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "string",
+    "verbalizes": [
+     "{product}商品名称{String}"
+    ],
+    "description": "商品名称。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "product_name",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "ebd96895-5601-503d-969a-95b5f16f0b00",
+    "name": "商品品类",
+    "tags": [],
+    "roles": [
+     {
+      "id": "04862e20-73e7-5fa8-b222-e290b8f6842d",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 2,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "string",
+    "verbalizes": [
+     "{product}商品品类{String}"
+    ],
+    "description": "商品所属的品类，例如咖啡器具、咖啡豆、饮品、耗材、周边。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "product_category",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "714d5740-ece7-52ba-b2f3-ec6a43a7437c",
+    "name": "标准单价",
+    "tags": [],
+    "roles": [
+     {
+      "id": "405ad99b-371a-567b-94f0-7fa57405ec35",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Decimal",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 3,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "decimal",
+    "verbalizes": [
+     "{product}标准单价{Decimal}"
+    ],
+    "description": "商品的标准销售单价，单位为人民币元。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "standard_price",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+    "name": "明细编号",
+    "tags": [],
+    "roles": [
+     {
+      "id": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "String",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 0,
+    "required": true,
+    "requires": [],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": true,
+    "value_kind": "string",
+    "verbalizes": [
+     "{order_item}明细编号{String}"
+    ],
+    "description": "订单明细的唯一标识。",
+    "multiplicity": "OneToOne",
+    "technical_name": "item_no",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "name": "购买数量",
+    "tags": [],
+    "roles": [
+     {
+      "id": "ca8ace49-1d7e-559c-8135-56ddd1ec8eef",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Integer",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 1,
+    "required": false,
+    "requires": [
+     "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8"
+    ],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "integer",
+    "verbalizes": [
+     "{order_item}购买数量{Integer}"
+    ],
+    "description": "该商品的购买件数，必须大于 0。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "quantity",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "requires",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4",
+    "name": "成交单价",
+    "tags": [],
+    "roles": [
+     {
+      "id": "f08e2013-186e-5471-a5dc-e3701be2a6e7",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Decimal",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 2,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [],
+    "identifier": false,
+    "value_kind": "decimal",
+    "verbalizes": [
+     "{order_item}成交单价{Decimal}"
+    ],
+    "description": "本次成交的单价，单位为人民币元。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "deal_price",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   },
+   {
+    "id": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "name": "明细金额",
+    "tags": [],
+    "roles": [
+     {
+      "id": "7ce1bee8-6d93-5a9d-b7d2-e999e7b0f429",
+      "name": null,
+      "origin": "migrated",
+      "concept": {
+       "ref": "Decimal",
+       "kind": "builtin"
+      },
+      "position": 0,
+      "client_ref": null,
+      "native_presence": [
+       "concept"
+      ]
+     }
+    ],
+    "origin": "migrated",
+    "evidence": [],
+    "position": 3,
+    "required": false,
+    "requires": [],
+    "owner_ref": {
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+     "kind": "object_type"
+    },
+    "derived_by": [
+     "2e74cb76-16af-5a65-840c-b8c67577ba0c"
+    ],
+    "identifier": false,
+    "value_kind": "decimal",
+    "verbalizes": [
+     "{order_item}明细金额{Decimal}"
+    ],
+    "description": "成交单价乘以购买数量。",
+    "multiplicity": "ManyToOne",
+    "technical_name": "item_amount",
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "derived_by",
+     "multiplicity"
+    ],
+    "owner_role_name": null,
+    "endpoint_direction": "forward",
+    "legacy_multiplicity": null
+   }
+  ],
+  "value_types": [],
+  "core_version": null,
+  "extension_v4": {
+   "ids": {
+    "/rules/213dbf93-b20d-597e-a655-e2f17926dd3f": "213dbf93-b20d-597e-a655-e2f17926dd3f",
+    "/rules/2e74cb76-16af-5a65-840c-b8c67577ba0c": "2e74cb76-16af-5a65-840c-b8c67577ba0c",
+    "/rules/b2c48dbe-7806-5d94-ab51-1dfeda5b36d8": "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8",
+    "/rules/b513831e-d596-5040-8496-2be31063d8fe": "b513831e-d596-5040-8496-2be31063d8fe",
+    "/link_types/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+    "/link_types/8d99444d-6cbe-5558-8ee4-a1c04682512a": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+    "/link_types/c763844b-8886-572b-be79-8d1f9867aa10": "c763844b-8886-572b-be79-8d1f9867aa10",
+    "/properties/2c7336f6-7886-55d6-9c08-46b545d6b322": "2c7336f6-7886-55d6-9c08-46b545d6b322",
+    "/properties/2f05569a-b571-59df-bd6d-2d7e6cb5fded": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+    "/properties/4fa445d7-6aef-5af7-9139-3a407d744d87": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+    "/properties/5242275a-9d9b-5568-9b4c-b7011303cc55": "5242275a-9d9b-5568-9b4c-b7011303cc55",
+    "/properties/6180f549-7c2d-5169-887f-757c7ed01859": "6180f549-7c2d-5169-887f-757c7ed01859",
+    "/properties/714d5740-ece7-52ba-b2f3-ec6a43a7437c": "714d5740-ece7-52ba-b2f3-ec6a43a7437c",
+    "/properties/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "/properties/b51f3352-2274-515d-a9f4-0fdd157ade25": "b51f3352-2274-515d-a9f4-0fdd157ade25",
+    "/properties/bebd191a-1931-520f-9cb4-af7b336e1e24": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "/properties/cc484c18-db4b-5f3a-b907-7e3c9cf33555": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+    "/properties/d816b2ae-5ad0-562d-b9be-6e89987705c5": "d816b2ae-5ad0-562d-b9be-6e89987705c5",
+    "/properties/da483526-b97a-529e-b627-8e936ec9809d": "da483526-b97a-529e-b627-8e936ec9809d",
+    "/properties/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20": "e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20",
+    "/properties/ebd96895-5601-503d-969a-95b5f16f0b00": "ebd96895-5601-503d-969a-95b5f16f0b00",
+    "/properties/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4": "ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4",
+    "/properties/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7": "f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7",
+    "/object_types/2436eff8-6aea-503c-b2c4-c33d7ecba0f3": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+    "/object_types/2cfd13ac-fe00-549b-a7bb-2d5817c7e298": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+    "/object_types/ca686b85-6a46-597b-8592-7e56600f4018": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "/object_types/e76942dc-a488-5a45-84de-97a0e0d2f3d9": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+    "/relationships/2c7336f6-7886-55d6-9c08-46b545d6b322/owner": "d3465853-b068-54c0-90f9-77e8efb85233",
+    "/relationships/2f05569a-b571-59df-bd6d-2d7e6cb5fded/owner": "45c5f3d8-3a8e-57f3-aece-3c66b09e1f82",
+    "/relationships/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01/owner": "c127e70e-1f8c-574c-9992-13fd244035ad",
+    "/relationships/4fa445d7-6aef-5af7-9139-3a407d744d87/owner": "383ffac9-6120-53dc-9a86-148bb22c5a05",
+    "/relationships/5242275a-9d9b-5568-9b4c-b7011303cc55/owner": "608d1839-b1d9-5d28-bccd-fa39ab88a8be",
+    "/relationships/6180f549-7c2d-5169-887f-757c7ed01859/owner": "2c7d0e99-df01-56d6-a66b-466be41bcc98",
+    "/relationships/714d5740-ece7-52ba-b2f3-ec6a43a7437c/owner": "37c58bb6-2d12-5269-902a-3224b7fb528f",
+    "/relationships/8d99444d-6cbe-5558-8ee4-a1c04682512a/owner": "e8d0edaf-7d46-57ed-bd84-03e98b23190e",
+    "/relationships/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc/owner": "d8594f54-b0c0-554c-9f8b-c68e9ad3f7b4",
+    "/relationships/b51f3352-2274-515d-a9f4-0fdd157ade25/owner": "b866702a-471b-58dc-804d-be118744c896",
+    "/relationships/bebd191a-1931-520f-9cb4-af7b336e1e24/owner": "86bec49f-d31c-5edf-8c55-dc17627011f8",
+    "/relationships/c763844b-8886-572b-be79-8d1f9867aa10/owner": "adff5a19-4f26-54a7-bc46-91e87903133d",
+    "/relationships/cc484c18-db4b-5f3a-b907-7e3c9cf33555/owner": "66a2f288-e144-5231-be2b-ad2ac16b6c97",
+    "/relationships/d816b2ae-5ad0-562d-b9be-6e89987705c5/owner": "709c4f9d-3655-553d-8c88-74921dd87471",
+    "/relationships/da483526-b97a-529e-b627-8e936ec9809d/owner": "59d5589e-8b57-5ee3-933f-a153dd8ee7da",
+    "/relationships/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20/owner": "20a0377e-40a0-5e94-b544-699b7cbd256f",
+    "/relationships/ebd96895-5601-503d-969a-95b5f16f0b00/owner": "1801e408-4052-56d2-8bdb-f55c5046509d",
+    "/relationships/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4/owner": "e4ed0f72-634f-5199-994d-a0b6c3736dac",
+    "/relationships/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7/owner": "2f79cf3a-2183-5f37-a9cb-c5185d9bd1d2",
+    "/relationships/2c7336f6-7886-55d6-9c08-46b545d6b322/roles/0": "638d6496-9ad0-5b95-a69f-e6c8f77a9489",
+    "/relationships/2f05569a-b571-59df-bd6d-2d7e6cb5fded/roles/0": "c999229c-300f-50f4-9998-1b4b462012f4",
+    "/relationships/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01/roles/0": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+    "/relationships/4fa445d7-6aef-5af7-9139-3a407d744d87/roles/0": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+    "/relationships/5242275a-9d9b-5568-9b4c-b7011303cc55/roles/0": "cb8156c8-68f9-53e8-a304-6059ccb92075",
+    "/relationships/6180f549-7c2d-5169-887f-757c7ed01859/roles/0": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+    "/relationships/714d5740-ece7-52ba-b2f3-ec6a43a7437c/roles/0": "405ad99b-371a-567b-94f0-7fa57405ec35",
+    "/relationships/8d99444d-6cbe-5558-8ee4-a1c04682512a/roles/0": "8545b33f-faab-517a-9a21-44c96125f9f6",
+    "/relationships/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc/roles/0": "7ce1bee8-6d93-5a9d-b7d2-e999e7b0f429",
+    "/relationships/b51f3352-2274-515d-a9f4-0fdd157ade25/roles/0": "30ffde8b-d0f7-54db-9b90-fdff06c25993",
+    "/relationships/bebd191a-1931-520f-9cb4-af7b336e1e24/roles/0": "ca8ace49-1d7e-559c-8135-56ddd1ec8eef",
+    "/relationships/c763844b-8886-572b-be79-8d1f9867aa10/roles/0": "49eea332-757e-55bc-b71a-b20a4560d023",
+    "/relationships/cc484c18-db4b-5f3a-b907-7e3c9cf33555/roles/0": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+    "/relationships/d816b2ae-5ad0-562d-b9be-6e89987705c5/roles/0": "286f41a5-d8c7-56a2-8a6f-24986537051b",
+    "/relationships/da483526-b97a-529e-b627-8e936ec9809d/roles/0": "4286cd1e-b8f9-51f3-8024-89990e19950a",
+    "/relationships/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20/roles/0": "f623eff8-e964-5bf1-81ed-1ecb1a3a7d6c",
+    "/relationships/ebd96895-5601-503d-969a-95b5f16f0b00/roles/0": "04862e20-73e7-5fa8-b222-e290b8f6842d",
+    "/relationships/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4/roles/0": "f08e2013-186e-5471-a5dc-e3701be2a6e7",
+    "/relationships/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7/roles/0": "0b858ff6-75d6-54ef-9245-ebde9cc4573a"
+   },
+   "tags": {},
+   "actions": [],
+   "version": "4",
+   "export_edits": [],
+   "display_names": {},
+   "rule_metadata": {},
+   "concept_context": {},
+   "legacy_mapping_ids": {},
+   "required_properties": []
+  },
+  "object_types": [
+   {
+    "id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+    "name": "客户",
+    "tags": [],
+    "origin": "migrated",
+    "concept": "customer",
+    "extends": [],
+    "evidence": [],
+    "position": 0,
+    "requires": [],
+    "derived_by": [],
+    "description": "与本公司签约、按批次采购商品的渠道企业。",
+    "identify_by": [
+     "customer_no"
+    ],
+    "technical_name": "customer",
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ]
+   },
+   {
+    "id": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "name": "订单",
+    "tags": [],
+    "origin": "migrated",
+    "concept": "order",
+    "extends": [],
+    "evidence": [],
+    "position": 1,
+    "requires": [
+     "213dbf93-b20d-597e-a655-e2f17926dd3f"
+    ],
+    "derived_by": [],
+    "description": "客户向本公司发起的一次采购。",
+    "identify_by": [
+     "order_no"
+    ],
+    "technical_name": "order",
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships",
+     "requires"
+    ]
+   },
+   {
+    "id": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+    "name": "商品",
+    "tags": [],
+    "origin": "migrated",
+    "concept": "product",
+    "extends": [],
+    "evidence": [],
+    "position": 2,
+    "requires": [],
+    "derived_by": [],
+    "description": "本公司对外销售的标准品。",
+    "identify_by": [
+     "product_no"
+    ],
+    "technical_name": "product",
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ]
+   },
+   {
+    "id": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+    "name": "订单明细",
+    "tags": [],
+    "origin": "migrated",
+    "concept": "order_item",
+    "extends": [],
+    "evidence": [],
+    "position": 3,
+    "requires": [],
+    "derived_by": [],
+    "description": "记录一张订单中某一种商品的购买情况。",
+    "identify_by": [
+     "item_no"
+    ],
+    "technical_name": "order_item",
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ]
+   }
+  ],
+  "workspace_id": "3dfb86f7-76ca-4d57-b2bb-147046b71536",
+  "core_presence": [],
+  "mapping_nodes": [],
+  "ossie_version": "0.2.0.dev0",
+  "dataset_fields": [],
+  "hash_algorithm": "ontofoundry-domain-v3",
+  "material_links": [],
+  "schema_version": "3",
+  "document_origin": "migrated",
+  "native_presence": [
+   "version",
+   "ontology",
+   "requires"
+  ],
+  "semantic_models": [],
+  "concept_mappings": [],
+  "material_objects": [],
+  "ontology_requires": [],
+  "ossie_description": null,
+  "dataset_relationships": []
+ },
+ "published_snapshot": {
+  "schema_version": "3",
+  "workspace_id": "3dfb86f7-76ca-4d57-b2bb-147046b71536",
+  "ontology_requires": [],
+  "object_types": [
+   {
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ],
+    "position": 0,
+    "origin": "migrated",
+    "id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+    "concept": "customer",
+    "description": "与本公司签约、按批次采购商品的渠道企业。",
+    "extends": [],
+    "identify_by": [
+     "customer_no"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "name": "客户",
+    "technical_name": "customer",
+    "tags": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships",
+     "requires"
+    ],
+    "position": 1,
+    "origin": "migrated",
+    "id": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "concept": "order",
+    "description": "客户向本公司发起的一次采购。",
+    "extends": [],
+    "identify_by": [
+     "order_no"
+    ],
+    "requires": [
+     "213dbf93-b20d-597e-a655-e2f17926dd3f"
+    ],
+    "derived_by": [],
+    "name": "订单",
+    "technical_name": "order",
+    "tags": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ],
+    "position": 2,
+    "origin": "migrated",
+    "id": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+    "concept": "product",
+    "description": "本公司对外销售的标准品。",
+    "extends": [],
+    "identify_by": [
+     "product_no"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "name": "商品",
+    "technical_name": "product",
+    "tags": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [
+     "concept",
+     "type",
+     "description",
+     "extends",
+     "identify_by",
+     "relationships"
+    ],
+    "position": 3,
+    "origin": "migrated",
+    "id": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+    "concept": "order_item",
+    "description": "记录一张订单中某一种商品的购买情况。",
+    "extends": [],
+    "identify_by": [
+     "item_no"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "name": "订单明细",
+    "technical_name": "order_item",
+    "tags": [],
+    "evidence": []
+   }
+  ],
+  "properties": [
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 0,
+    "origin": "migrated",
+    "id": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+    "name": "客户编号",
+    "technical_name": "customer_no",
+    "description": "客户的唯一标识，由系统自动分配。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "c999229c-300f-50f4-9998-1b4b462012f4",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Integer"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "OneToOne",
+    "verbalizes": [
+     "{customer}客户编号{Integer}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": true,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": true,
+    "value_kind": "integer"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 1,
+    "origin": "migrated",
+    "id": "d816b2ae-5ad0-562d-b9be-6e89987705c5",
+    "name": "客户名称",
+    "technical_name": "customer_name",
+    "description": "签约企业的名称。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "286f41a5-d8c7-56a2-8a6f-24986537051b",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "String"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{customer}客户名称{String}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "string"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 2,
+    "origin": "migrated",
+    "id": "2c7336f6-7886-55d6-9c08-46b545d6b322",
+    "name": "所在城市",
+    "technical_name": "city",
+    "description": "客户主要经营所在的城市。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "638d6496-9ad0-5b95-a69f-e6c8f77a9489",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "String"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{customer}所在城市{String}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "string"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 3,
+    "origin": "migrated",
+    "id": "5242275a-9d9b-5568-9b4c-b7011303cc55",
+    "name": "签约日期",
+    "technical_name": "sign_date",
+    "description": "客户与本公司完成签约、开始合作的日期。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "cb8156c8-68f9-53e8-a304-6059ccb92075",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Date"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{customer}签约日期{Date}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "date"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 0,
+    "origin": "migrated",
+    "id": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+    "name": "订单编号",
+    "technical_name": "order_no",
+    "description": "订单的唯一标识。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Integer"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "OneToOne",
+    "verbalizes": [
+     "{order}订单编号{Integer}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": true,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": true,
+    "value_kind": "integer"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 1,
+    "origin": "migrated",
+    "id": "b51f3352-2274-515d-a9f4-0fdd157ade25",
+    "name": "下单时间",
+    "technical_name": "order_time",
+    "description": "客户提交订单的时间。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "30ffde8b-d0f7-54db-9b90-fdff06c25993",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "DateTime"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order}下单时间{DateTime}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "datetime"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 2,
+    "origin": "migrated",
+    "id": "e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20",
+    "name": "订单状态",
+    "technical_name": "order_status",
+    "description": "订单当前所处的状态，取值为“已支付（paid）”或“已发货（shipped）”。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "f623eff8-e964-5bf1-81ed-1ecb1a3a7d6c",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "String"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order}订单状态{String}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "string"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "derived_by",
+     "multiplicity"
+    ],
+    "position": 3,
+    "origin": "migrated",
+    "id": "da483526-b97a-529e-b627-8e936ec9809d",
+    "name": "订单金额",
+    "technical_name": "order_amount",
+    "description": "订单应收总金额，单位为人民币元，等于该订单全部订单明细的明细金额之和。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "4286cd1e-b8f9-51f3-8024-89990e19950a",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Decimal"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order}订单金额{Decimal}"
+    ],
+    "requires": [],
+    "derived_by": [
+     "b513831e-d596-5040-8496-2be31063d8fe"
+    ],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "decimal"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 0,
+    "origin": "migrated",
+    "id": "6180f549-7c2d-5169-887f-757c7ed01859",
+    "name": "商品编号",
+    "technical_name": "product_no",
+    "description": "商品的唯一标识。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Integer"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "OneToOne",
+    "verbalizes": [
+     "{product}商品编号{Integer}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": true,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": true,
+    "value_kind": "integer"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 1,
+    "origin": "migrated",
+    "id": "f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7",
+    "name": "商品名称",
+    "technical_name": "product_name",
+    "description": "商品名称。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "0b858ff6-75d6-54ef-9245-ebde9cc4573a",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "String"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{product}商品名称{String}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "string"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 2,
+    "origin": "migrated",
+    "id": "ebd96895-5601-503d-969a-95b5f16f0b00",
+    "name": "商品品类",
+    "technical_name": "product_category",
+    "description": "商品所属的品类，例如咖啡器具、咖啡豆、饮品、耗材、周边。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "04862e20-73e7-5fa8-b222-e290b8f6842d",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "String"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{product}商品品类{String}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "string"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 3,
+    "origin": "migrated",
+    "id": "714d5740-ece7-52ba-b2f3-ec6a43a7437c",
+    "name": "标准单价",
+    "technical_name": "standard_price",
+    "description": "商品的标准销售单价，单位为人民币元。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "405ad99b-371a-567b-94f0-7fa57405ec35",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Decimal"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{product}标准单价{Decimal}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "decimal"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 0,
+    "origin": "migrated",
+    "id": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+    "name": "明细编号",
+    "technical_name": "item_no",
+    "description": "订单明细的唯一标识。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Integer"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "OneToOne",
+    "verbalizes": [
+     "{order_item}明细编号{Integer}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": true,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": true,
+    "value_kind": "integer"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "requires",
+     "multiplicity"
+    ],
+    "position": 1,
+    "origin": "migrated",
+    "id": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "name": "购买数量",
+    "technical_name": "quantity",
+    "description": "该商品的购买件数，必须大于 0。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "ca8ace49-1d7e-559c-8135-56ddd1ec8eef",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Integer"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order_item}购买数量{Integer}"
+    ],
+    "requires": [
+     "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8"
+    ],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "integer"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 2,
+    "origin": "migrated",
+    "id": "ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4",
+    "name": "成交单价",
+    "technical_name": "deal_price",
+    "description": "本次成交的单价，单位为人民币元。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "f08e2013-186e-5471-a5dc-e3701be2a6e7",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Decimal"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order_item}成交单价{Decimal}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "decimal"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "derived_by",
+     "multiplicity"
+    ],
+    "position": 3,
+    "origin": "migrated",
+    "id": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "name": "明细金额",
+    "technical_name": "item_amount",
+    "description": "成交单价乘以购买数量。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "7ce1bee8-6d93-5a9d-b7d2-e999e7b0f429",
+      "name": null,
+      "concept": {
+       "kind": "builtin",
+       "ref": "Decimal"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order_item}明细金额{Decimal}"
+    ],
+    "requires": [],
+    "derived_by": [
+     "2e74cb76-16af-5a65-840c-b8c67577ba0c"
+    ],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": null,
+    "required": false,
+    "value_kind": "decimal"
+   }
+  ],
+  "link_types": [
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 4,
+    "origin": "migrated",
+    "id": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+    "name": "客户下单订单",
+    "technical_name": "customer_places_order",
+    "description": "一个客户可以下多张订单，一张订单只属于一个客户。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "8545b33f-faab-517a-9a21-44c96125f9f6",
+      "name": null,
+      "concept": {
+       "kind": "object_type",
+       "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order}客户下单订单{customer}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "reverse",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": "one_to_many"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 4,
+    "origin": "migrated",
+    "id": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+    "name": "订单包含订单明细",
+    "technical_name": "order_contains_item",
+    "description": "一张订单包含一条或多条订单明细。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+      "name": null,
+      "concept": {
+       "kind": "object_type",
+       "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order_item}订单包含订单明细{order}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "reverse",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": "one_to_many"
+   },
+   {
+    "native_presence": [
+     "name",
+     "description",
+     "roles",
+     "verbalizes",
+     "multiplicity"
+    ],
+    "position": 5,
+    "origin": "migrated",
+    "id": "c763844b-8886-572b-be79-8d1f9867aa10",
+    "name": "订单明细对应商品",
+    "technical_name": "item_refers_product",
+    "description": "每条订单明细对应一种商品。",
+    "owner_ref": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    },
+    "roles": [
+     {
+      "native_presence": [
+       "concept"
+      ],
+      "position": 0,
+      "origin": "migrated",
+      "id": "49eea332-757e-55bc-b71a-b20a4560d023",
+      "name": null,
+      "concept": {
+       "kind": "object_type",
+       "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+      },
+      "client_ref": null
+     }
+    ],
+    "multiplicity": "ManyToOne",
+    "verbalizes": [
+     "{order_item}订单明细对应商品{product}"
+    ],
+    "requires": [],
+    "derived_by": [],
+    "tags": [],
+    "evidence": [],
+    "endpoint_direction": "forward",
+    "identifier": false,
+    "owner_role_name": null,
+    "legacy_multiplicity": "many_to_one"
+   }
+  ],
+  "rules": [
+   {
+    "native_presence": [],
+    "position": 0,
+    "origin": "migrated",
+    "id": "b513831e-d596-5040-8496-2be31063d8fe",
+    "owner_kind": "property",
+    "owner_id": "da483526-b97a-529e-b627-8e936ec9809d",
+    "rule_kind": "derivation",
+    "expression": "订单.订单金额 = SUM(订单明细.明细金额)",
+    "name": "订单金额等于明细金额之和",
+    "technical_name": "order_amount_equals_sum",
+    "description": "",
+    "verbalizes": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [],
+    "position": 0,
+    "origin": "migrated",
+    "id": "2e74cb76-16af-5a65-840c-b8c67577ba0c",
+    "owner_kind": "property",
+    "owner_id": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "rule_kind": "derivation",
+    "expression": "明细金额 = 成交单价 × 购买数量",
+    "name": "明细金额等于成交单价乘以购买数量",
+    "technical_name": "item_amount_equals_product",
+    "description": "",
+    "verbalizes": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [],
+    "position": 0,
+    "origin": "migrated",
+    "id": "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8",
+    "owner_kind": "property",
+    "owner_id": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "rule_kind": "constraint",
+    "expression": "购买数量 > 0",
+    "name": "购买数量必须大于0",
+    "technical_name": "quantity_must_be_positive",
+    "description": "",
+    "verbalizes": [],
+    "evidence": []
+   },
+   {
+    "native_presence": [],
+    "position": 0,
+    "origin": "migrated",
+    "id": "213dbf93-b20d-597e-a655-e2f17926dd3f",
+    "owner_kind": "object_type",
+    "owner_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "rule_kind": "constraint",
+    "expression": "订单.订单状态 变更为“已发货”时，当前状态必须为“已支付”",
+    "name": "仅已支付订单可变更为已发货",
+    "technical_name": "only_paid_can_ship",
+    "description": "",
+    "verbalizes": [],
+    "evidence": []
+   }
+  ],
+  "actions": [],
+  "material_objects": [],
+  "material_links": [],
+  "mappings": [],
+  "hash_algorithm": "ontofoundry-domain-v3",
+  "ossie_version": "0.2.0.dev0",
+  "ossie_name": null,
+  "ossie_description": null,
+  "ai_context": null,
+  "native_presence": [
+   "version",
+   "ontology",
+   "requires"
+  ],
+  "document_origin": "migrated",
+  "core_version": null,
+  "core_presence": [],
+  "extension_v4": {
+   "version": "4",
+   "ids": {
+    "/rules/213dbf93-b20d-597e-a655-e2f17926dd3f": "213dbf93-b20d-597e-a655-e2f17926dd3f",
+    "/rules/2e74cb76-16af-5a65-840c-b8c67577ba0c": "2e74cb76-16af-5a65-840c-b8c67577ba0c",
+    "/rules/b2c48dbe-7806-5d94-ab51-1dfeda5b36d8": "b2c48dbe-7806-5d94-ab51-1dfeda5b36d8",
+    "/rules/b513831e-d596-5040-8496-2be31063d8fe": "b513831e-d596-5040-8496-2be31063d8fe",
+    "/link_types/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01": "49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01",
+    "/link_types/8d99444d-6cbe-5558-8ee4-a1c04682512a": "8d99444d-6cbe-5558-8ee4-a1c04682512a",
+    "/link_types/c763844b-8886-572b-be79-8d1f9867aa10": "c763844b-8886-572b-be79-8d1f9867aa10",
+    "/properties/2c7336f6-7886-55d6-9c08-46b545d6b322": "2c7336f6-7886-55d6-9c08-46b545d6b322",
+    "/properties/2f05569a-b571-59df-bd6d-2d7e6cb5fded": "2f05569a-b571-59df-bd6d-2d7e6cb5fded",
+    "/properties/4fa445d7-6aef-5af7-9139-3a407d744d87": "4fa445d7-6aef-5af7-9139-3a407d744d87",
+    "/properties/5242275a-9d9b-5568-9b4c-b7011303cc55": "5242275a-9d9b-5568-9b4c-b7011303cc55",
+    "/properties/6180f549-7c2d-5169-887f-757c7ed01859": "6180f549-7c2d-5169-887f-757c7ed01859",
+    "/properties/714d5740-ece7-52ba-b2f3-ec6a43a7437c": "714d5740-ece7-52ba-b2f3-ec6a43a7437c",
+    "/properties/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc": "b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc",
+    "/properties/b51f3352-2274-515d-a9f4-0fdd157ade25": "b51f3352-2274-515d-a9f4-0fdd157ade25",
+    "/properties/bebd191a-1931-520f-9cb4-af7b336e1e24": "bebd191a-1931-520f-9cb4-af7b336e1e24",
+    "/properties/cc484c18-db4b-5f3a-b907-7e3c9cf33555": "cc484c18-db4b-5f3a-b907-7e3c9cf33555",
+    "/properties/d816b2ae-5ad0-562d-b9be-6e89987705c5": "d816b2ae-5ad0-562d-b9be-6e89987705c5",
+    "/properties/da483526-b97a-529e-b627-8e936ec9809d": "da483526-b97a-529e-b627-8e936ec9809d",
+    "/properties/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20": "e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20",
+    "/properties/ebd96895-5601-503d-969a-95b5f16f0b00": "ebd96895-5601-503d-969a-95b5f16f0b00",
+    "/properties/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4": "ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4",
+    "/properties/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7": "f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7",
+    "/object_types/2436eff8-6aea-503c-b2c4-c33d7ecba0f3": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3",
+    "/object_types/2cfd13ac-fe00-549b-a7bb-2d5817c7e298": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+    "/object_types/ca686b85-6a46-597b-8592-7e56600f4018": "ca686b85-6a46-597b-8592-7e56600f4018",
+    "/object_types/e76942dc-a488-5a45-84de-97a0e0d2f3d9": "e76942dc-a488-5a45-84de-97a0e0d2f3d9",
+    "/relationships/2c7336f6-7886-55d6-9c08-46b545d6b322/owner": "d3465853-b068-54c0-90f9-77e8efb85233",
+    "/relationships/2f05569a-b571-59df-bd6d-2d7e6cb5fded/owner": "45c5f3d8-3a8e-57f3-aece-3c66b09e1f82",
+    "/relationships/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01/owner": "c127e70e-1f8c-574c-9992-13fd244035ad",
+    "/relationships/4fa445d7-6aef-5af7-9139-3a407d744d87/owner": "383ffac9-6120-53dc-9a86-148bb22c5a05",
+    "/relationships/5242275a-9d9b-5568-9b4c-b7011303cc55/owner": "608d1839-b1d9-5d28-bccd-fa39ab88a8be",
+    "/relationships/6180f549-7c2d-5169-887f-757c7ed01859/owner": "2c7d0e99-df01-56d6-a66b-466be41bcc98",
+    "/relationships/714d5740-ece7-52ba-b2f3-ec6a43a7437c/owner": "37c58bb6-2d12-5269-902a-3224b7fb528f",
+    "/relationships/8d99444d-6cbe-5558-8ee4-a1c04682512a/owner": "e8d0edaf-7d46-57ed-bd84-03e98b23190e",
+    "/relationships/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc/owner": "d8594f54-b0c0-554c-9f8b-c68e9ad3f7b4",
+    "/relationships/b51f3352-2274-515d-a9f4-0fdd157ade25/owner": "b866702a-471b-58dc-804d-be118744c896",
+    "/relationships/bebd191a-1931-520f-9cb4-af7b336e1e24/owner": "86bec49f-d31c-5edf-8c55-dc17627011f8",
+    "/relationships/c763844b-8886-572b-be79-8d1f9867aa10/owner": "adff5a19-4f26-54a7-bc46-91e87903133d",
+    "/relationships/cc484c18-db4b-5f3a-b907-7e3c9cf33555/owner": "66a2f288-e144-5231-be2b-ad2ac16b6c97",
+    "/relationships/d816b2ae-5ad0-562d-b9be-6e89987705c5/owner": "709c4f9d-3655-553d-8c88-74921dd87471",
+    "/relationships/da483526-b97a-529e-b627-8e936ec9809d/owner": "59d5589e-8b57-5ee3-933f-a153dd8ee7da",
+    "/relationships/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20/owner": "20a0377e-40a0-5e94-b544-699b7cbd256f",
+    "/relationships/ebd96895-5601-503d-969a-95b5f16f0b00/owner": "1801e408-4052-56d2-8bdb-f55c5046509d",
+    "/relationships/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4/owner": "e4ed0f72-634f-5199-994d-a0b6c3736dac",
+    "/relationships/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7/owner": "2f79cf3a-2183-5f37-a9cb-c5185d9bd1d2",
+    "/relationships/2c7336f6-7886-55d6-9c08-46b545d6b322/roles/0": "638d6496-9ad0-5b95-a69f-e6c8f77a9489",
+    "/relationships/2f05569a-b571-59df-bd6d-2d7e6cb5fded/roles/0": "c999229c-300f-50f4-9998-1b4b462012f4",
+    "/relationships/49dfe65d-4d97-5a62-82b2-5c1d2d8f5f01/roles/0": "395bfeeb-2633-5f92-97b8-4499c4d0d7eb",
+    "/relationships/4fa445d7-6aef-5af7-9139-3a407d744d87/roles/0": "65ae8cd4-bab3-5057-8b57-15011e8ecc7a",
+    "/relationships/5242275a-9d9b-5568-9b4c-b7011303cc55/roles/0": "cb8156c8-68f9-53e8-a304-6059ccb92075",
+    "/relationships/6180f549-7c2d-5169-887f-757c7ed01859/roles/0": "b11ac8c5-8868-5814-95d6-7aa28300689e",
+    "/relationships/714d5740-ece7-52ba-b2f3-ec6a43a7437c/roles/0": "405ad99b-371a-567b-94f0-7fa57405ec35",
+    "/relationships/8d99444d-6cbe-5558-8ee4-a1c04682512a/roles/0": "8545b33f-faab-517a-9a21-44c96125f9f6",
+    "/relationships/b4f4d70d-eb25-5928-b4dc-f1494bb6c6cc/roles/0": "7ce1bee8-6d93-5a9d-b7d2-e999e7b0f429",
+    "/relationships/b51f3352-2274-515d-a9f4-0fdd157ade25/roles/0": "30ffde8b-d0f7-54db-9b90-fdff06c25993",
+    "/relationships/bebd191a-1931-520f-9cb4-af7b336e1e24/roles/0": "ca8ace49-1d7e-559c-8135-56ddd1ec8eef",
+    "/relationships/c763844b-8886-572b-be79-8d1f9867aa10/roles/0": "49eea332-757e-55bc-b71a-b20a4560d023",
+    "/relationships/cc484c18-db4b-5f3a-b907-7e3c9cf33555/roles/0": "2218f1b2-6f13-57a3-85e4-4d9d4333114f",
+    "/relationships/d816b2ae-5ad0-562d-b9be-6e89987705c5/roles/0": "286f41a5-d8c7-56a2-8a6f-24986537051b",
+    "/relationships/da483526-b97a-529e-b627-8e936ec9809d/roles/0": "4286cd1e-b8f9-51f3-8024-89990e19950a",
+    "/relationships/e7f14e1f-5280-50f8-9c8b-f6b7bcb2cf20/roles/0": "f623eff8-e964-5bf1-81ed-1ecb1a3a7d6c",
+    "/relationships/ebd96895-5601-503d-969a-95b5f16f0b00/roles/0": "04862e20-73e7-5fa8-b222-e290b8f6842d",
+    "/relationships/ede5c93f-0a4a-5189-aa8f-99e3ab21c0a4/roles/0": "f08e2013-186e-5471-a5dc-e3701be2a6e7",
+    "/relationships/f74476a6-c17d-5aa8-8b5d-c9c7e3fc3ad7/roles/0": "0b858ff6-75d6-54ef-9245-ebde9cc4573a"
+   },
+   "concept_context": {},
+   "display_names": {},
+   "tags": {},
+   "required_properties": [],
+   "rule_metadata": {},
+   "actions": [],
+   "export_edits": [],
+   "legacy_mapping_ids": {
+    "1a0425be-e0d7-5f47-846f-b8f610c2cb00": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "24a1698e-a66a-5180-9423-f15dce2e1b60": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "27112137-14c3-57ad-99c8-8ddd6e786514": "54199577-5e0a-5fac-8622-0b199420b018",
+    "b9c11d31-c8ed-59f9-87df-a89eb690589e": "169bf67a-f07e-5b54-b03b-32bb0ffe9974"
+   }
+  },
+  "value_types": [],
+  "semantic_models": [
+   {
+    "native_presence": [
+     "datasets",
+     "name",
+     "relationships",
+     "custom_extensions"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "name": "销售业务库",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [
+     {
+      "vendor_name": "ONTOFOUNDRY",
+      "data": "{\"connection_alias\": \"销售业务库\"}"
+     }
+    ],
+    "map_name": "销售业务库",
+    "map_description": "销售业务库 的数据映射",
+    "map_presence": [
+     "concept_mappings",
+     "description",
+     "name",
+     "semantic_model"
+    ],
+    "concept_mappings_position": null
+   }
+  ],
+  "datasets": [
+   {
+    "native_presence": [
+     "description",
+     "fields",
+     "name",
+     "primary_key",
+     "source"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "f34881a6-34c4-5cf0-97a4-07f2f094a7d6",
+    "name": "customer",
+    "description": "与本公司签约、按批次采购商品的渠道企业。",
+    "ai_context": null,
+    "custom_extensions": [],
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "source": "demo_analytics.customers",
+    "primary_key": [
+     "id"
+    ],
+    "unique_keys": []
+   },
+   {
+    "native_presence": [
+     "description",
+     "fields",
+     "name",
+     "primary_key",
+     "source"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "24a00aee-0edc-53df-84ff-d542a3d3c441",
+    "name": "order",
+    "description": "客户向本公司发起的一次采购。",
+    "ai_context": null,
+    "custom_extensions": [],
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "source": "demo_analytics.orders",
+    "primary_key": [
+     "id"
+    ],
+    "unique_keys": []
+   },
+   {
+    "native_presence": [
+     "description",
+     "fields",
+     "name",
+     "primary_key",
+     "source"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "887b67b0-e83e-597b-9f79-0705064514b3",
+    "name": "order_item",
+    "description": "记录一张订单中某一种商品的购买情况。",
+    "ai_context": null,
+    "custom_extensions": [],
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "source": "demo_analytics.order_items",
+    "primary_key": [
+     "id"
+    ],
+    "unique_keys": []
+   },
+   {
+    "native_presence": [
+     "description",
+     "fields",
+     "name",
+     "primary_key",
+     "source"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "edcb283f-4e7a-5166-9e40-924f15917451",
+    "name": "product",
+    "description": "本公司对外销售的标准品。",
+    "ai_context": null,
+    "custom_extensions": [],
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "source": "demo_analytics.products",
+    "primary_key": [
+     "id"
+    ],
+    "unique_keys": []
+   }
+  ],
+  "dataset_fields": [
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "d8430247-b32e-5aa6-b160-45659aacb19e",
+    "name": "city",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "f34881a6-34c4-5cf0-97a4-07f2f094a7d6",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "city"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "e1deb1e8-3eff-5020-a94a-6416a3ac4b3e",
+    "name": "customer_name",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "f34881a6-34c4-5cf0-97a4-07f2f094a7d6",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "customer_name"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "a61c130c-a06a-5170-8269-28a9ccd21a0b",
+    "name": "customer_no",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "f34881a6-34c4-5cf0-97a4-07f2f094a7d6",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "id"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "d539487a-818f-51a4-803d-aef483c582df",
+    "name": "sign_date",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "f34881a6-34c4-5cf0-97a4-07f2f094a7d6",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "signup_date"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "0b6ee6a6-4140-51a0-a690-f0517813dddf",
+    "name": "order_amount",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "24a00aee-0edc-53df-84ff-d542a3d3c441",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "total_amount"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "f025182d-2fb4-5ae4-8a30-e7de69c57089",
+    "name": "order_no",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "24a00aee-0edc-53df-84ff-d542a3d3c441",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "id"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "08103210-4fba-545f-bbae-114d22023fc0",
+    "name": "order_status",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "24a00aee-0edc-53df-84ff-d542a3d3c441",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "order_status"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "1eee1acb-a212-5ccd-8fbb-d9f31858aa0c",
+    "name": "order_time",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "24a00aee-0edc-53df-84ff-d542a3d3c441",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "order_date"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "fd61d83d-02cd-5b1f-b6a6-6c829ad5c1a3",
+    "name": "deal_price",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "887b67b0-e83e-597b-9f79-0705064514b3",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "unit_price"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "5f383d12-2933-5e24-bca5-d86018175429",
+    "name": "item_amount",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "887b67b0-e83e-597b-9f79-0705064514b3",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "line_amount"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "2bc7d13c-eb42-5b93-94a3-d1dcbfa76a58",
+    "name": "item_no",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "887b67b0-e83e-597b-9f79-0705064514b3",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "id"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "d8ae731c-e7ef-5c1c-8b26-c708aef24c3b",
+    "name": "quantity",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "887b67b0-e83e-597b-9f79-0705064514b3",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "quantity"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "c2493d1f-b13a-5a23-9a5f-441fecc2a661",
+    "name": "product_category",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "edcb283f-4e7a-5166-9e40-924f15917451",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "category"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "d632499d-0475-5ff4-87cc-ae13613fb5a5",
+    "name": "product_name",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "edcb283f-4e7a-5166-9e40-924f15917451",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "product_name"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "a395588e-301b-56e1-9144-18acd34890c3",
+    "name": "product_no",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "edcb283f-4e7a-5166-9e40-924f15917451",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "id"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   },
+   {
+    "native_presence": [
+     "expression",
+     "name"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "702df8a7-9989-5293-addf-7338d2278ea9",
+    "name": "standard_price",
+    "description": null,
+    "ai_context": null,
+    "custom_extensions": [],
+    "dataset_id": "edcb283f-4e7a-5166-9e40-924f15917451",
+    "expression": {
+     "dialects": [
+      {
+       "dialect": "ANSI_SQL",
+       "expression": "unit_price"
+      }
+     ]
+    },
+    "dimension": null,
+    "label": null,
+    "datatype": null
+   }
+  ],
+  "dataset_relationships": [
+   {
+    "native_presence": [
+     "from",
+     "from_columns",
+     "name",
+     "to",
+     "to_columns"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "ad5bcf76-d2fd-57fe-845c-590a06c10465",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "name": "customer_places_order",
+    "to": "order",
+    "from_columns": [
+     "customer_id"
+    ],
+    "to_columns": [
+     "id"
+    ],
+    "ai_context": null,
+    "custom_extensions": [],
+    "from": "customer"
+   },
+   {
+    "native_presence": [
+     "from",
+     "from_columns",
+     "name",
+     "to",
+     "to_columns"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "48239325-6835-5ffd-a3a5-d6d95eeaadc4",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "name": "item_refers_product",
+    "to": "product",
+    "from_columns": [
+     "product_id"
+    ],
+    "to_columns": [
+     "id"
+    ],
+    "ai_context": null,
+    "custom_extensions": [],
+    "from": "order_item"
+   },
+   {
+    "native_presence": [
+     "from",
+     "from_columns",
+     "name",
+     "to",
+     "to_columns"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "960c6b46-7c62-57c5-9522-2568010b7a60",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "name": "order_contains_item",
+    "to": "order_item",
+    "from_columns": [
+     "order_id"
+    ],
+    "to_columns": [
+     "id"
+    ],
+    "ai_context": null,
+    "custom_extensions": [],
+    "from": "order"
+   }
+  ],
+  "metrics": [],
+  "concept_mappings": [
+   {
+    "native_presence": [
+     "concept",
+     "link_mappings",
+     "object_mappings"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "concept_id": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    }
+   },
+   {
+    "native_presence": [
+     "concept",
+     "link_mappings",
+     "object_mappings"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "concept_id": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    }
+   },
+   {
+    "native_presence": [
+     "concept",
+     "link_mappings",
+     "object_mappings"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "concept_id": {
+     "kind": "object_type",
+     "ref": "e76942dc-a488-5a45-84de-97a0e0d2f3d9"
+    }
+   },
+   {
+    "native_presence": [
+     "concept",
+     "link_mappings",
+     "object_mappings"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "semantic_model_id": "229bf230-81d1-5da3-8833-5dc29a80e515",
+    "concept_id": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    }
+   }
+  ],
+  "mapping_nodes": [
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "1b38769d-9cbd-5806-a484-70514e6a6b78",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": null,
+    "slot": "object_mappings",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.id"
+   },
+   {
+    "native_presence": [
+     "children",
+     "object_mapping"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": null,
+    "slot": "link_mappings",
+    "kind": "link",
+    "relationship": null,
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "b99ff311-59d6-5422-a69b-69bcccac3b6a",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "50604b15-5f0b-5174-b97c-882adc247164",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "city",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "8fa2f7da-3045-598c-a23d-d0cc156cfdf4",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "50604b15-5f0b-5174-b97c-882adc247164",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.city"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "b5b1387e-d9e3-5cb5-aae4-b570cdbade78",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "customer_name",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "05f86632-d063-50ef-a4b6-0bcb696dd0a1",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "b5b1387e-d9e3-5cb5-aae4-b570cdbade78",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.customer_name"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "6c631a2d-e6fc-57ab-bdc3-c5bfddaf0429",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "customer_no",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "fceaddf6-da2c-51d8-9aa5-d232cd34716b",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "6c631a2d-e6fc-57ab-bdc3-c5bfddaf0429",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "9d6b7a94-61e5-566e-b2fb-14341fa7b641",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "5cd7e215-762a-5b82-85a6-c964aeb1c76c",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "sign_date",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "83a943fb-1b27-5bab-a51b-471a6dfcfc9a",
+    "concept_mapping_id": "54199577-5e0a-5fac-8622-0b199420b018",
+    "parent_id": "9d6b7a94-61e5-566e-b2fb-14341fa7b641",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "customer.signup_date"
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "33a29d19-d226-541e-ba04-2783211df8a6",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": null,
+    "slot": "object_mappings",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.id"
+   },
+   {
+    "native_presence": [
+     "children",
+     "object_mapping"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": null,
+    "slot": "link_mappings",
+    "kind": "link",
+    "relationship": null,
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "0c4c87ff-db5a-5f4f-add7-9d968041d8d0",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "645127da-c621-574d-81d5-6dc1e3272e03",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "order_amount",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "08b0b7f1-e431-597d-a4a7-d3781364c80d",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "645127da-c621-574d-81d5-6dc1e3272e03",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.total_amount"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "584d272b-3269-5d69-aa4f-dde793dad3cb",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "order_no",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "bb84f65c-21d1-558e-a864-f6a385e08bef",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "584d272b-3269-5d69-aa4f-dde793dad3cb",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "ce582b50-78d8-52e9-9380-b7a7a492df59",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "order_status",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "96ecb15d-e86a-5712-8cdd-043785676589",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "ce582b50-78d8-52e9-9380-b7a7a492df59",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.order_status"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "485111a3-7603-5aa2-a6c2-b57da8eb1157",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "order_time",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "f564f7f7-1850-5bb1-a1e9-9da5ddd0517b",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "485111a3-7603-5aa2-a6c2-b57da8eb1157",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order.order_date"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 4,
+    "origin": "imported",
+    "id": "b8408180-76cd-505b-9c1c-c0bceef8d179",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "d69fd36f-9ca1-536c-b44c-190e21a7e1b5",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "customer_places_order",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "concept",
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "bcbdb128-e626-5893-8939-541c63383c84",
+    "concept_mapping_id": "542a4454-05cd-5fd7-9e92-a4b216f0d660",
+    "parent_id": "b8408180-76cd-505b-9c1c-c0bceef8d179",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": {
+     "kind": "object_type",
+     "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+    },
+    "expression": "order.id"
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "e85d45a8-391d-5ed0-9866-6cfaf6286bf4",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": null,
+    "slot": "object_mappings",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.id"
+   },
+   {
+    "native_presence": [
+     "children",
+     "object_mapping"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": null,
+    "slot": "link_mappings",
+    "kind": "link",
+    "relationship": null,
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "d9f0a28e-fb3b-5d4f-a5fb-ac4c5263e366",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "82a2cfaa-6721-546e-aa87-c976e9ebca9b",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "deal_price",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "7b2ab9f6-3ff7-5fae-bac5-57abf5512926",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "82a2cfaa-6721-546e-aa87-c976e9ebca9b",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.unit_price"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "cfa276db-603b-5bcc-8b9c-4aadc6d66788",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "item_amount",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "ab0a8c3b-08bf-5725-8443-56d3d155e4f5",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "cfa276db-603b-5bcc-8b9c-4aadc6d66788",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.line_amount"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "62748f6b-645e-5c4a-b1fe-72a594824a78",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "item_no",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "dff2371f-ed32-5f47-9ec2-7817177c563d",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "62748f6b-645e-5c4a-b1fe-72a594824a78",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "05ed2e99-c167-54f1-bffe-9efdb0a4f1e1",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "quantity",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "9b763c17-4802-583c-bac5-8e8d7a78cf8b",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "05ed2e99-c167-54f1-bffe-9efdb0a4f1e1",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "order_item.quantity"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 4,
+    "origin": "imported",
+    "id": "a85a844d-3d0f-5ac0-80f1-85748bafd197",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "item_refers_product",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "concept",
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "f628cb41-fa51-5e05-8f84-14037131c74f",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "a85a844d-3d0f-5ac0-80f1-85748bafd197",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": {
+     "kind": "object_type",
+     "ref": "2436eff8-6aea-503c-b2c4-c33d7ecba0f3"
+    },
+    "expression": "order_item.product_id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 5,
+    "origin": "imported",
+    "id": "f062eff0-5fcf-59c6-b666-a4221e831ddf",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "38e19110-f39e-5d70-a133-cccbcf6c80bf",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "order_contains_item",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "concept",
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "3e1de14c-93a7-58b6-9e78-75be1173c3cf",
+    "concept_mapping_id": "a3239f6c-fa34-54c9-bfc2-1de5a5b393c0",
+    "parent_id": "f062eff0-5fcf-59c6-b666-a4221e831ddf",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": {
+     "kind": "object_type",
+     "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+    },
+    "expression": "order_item.id"
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "e837e14f-ec00-5f43-b5de-95d7afeec691",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": null,
+    "slot": "object_mappings",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.id"
+   },
+   {
+    "native_presence": [
+     "children",
+     "object_mapping"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": null,
+    "slot": "link_mappings",
+    "kind": "link",
+    "relationship": null,
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "aaaadd7e-7b18-5daf-bf56-773135be5ea7",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "db42a0f3-85a8-5406-8853-5797f538e537",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "product_category",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "21b0c9f1-8ebc-5594-9803-8753bd1c4d7a",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "db42a0f3-85a8-5406-8853-5797f538e537",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.category"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 1,
+    "origin": "imported",
+    "id": "18e6641d-f45d-509c-883f-5d74c90e435f",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "product_name",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "380e1ccd-6cc3-5e7f-9110-8e3740282c96",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "18e6641d-f45d-509c-883f-5d74c90e435f",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.product_name"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 2,
+    "origin": "imported",
+    "id": "8ea975dd-d766-508e-9e99-20ed09003245",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "product_no",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "75a70e36-b978-5a13-9d1c-af30d66ee3d6",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "8ea975dd-d766-508e-9e99-20ed09003245",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.id"
+   },
+   {
+    "native_presence": [
+     "object_mapping",
+     "relationship"
+    ],
+    "position": 3,
+    "origin": "imported",
+    "id": "a5cd3eef-6c47-5927-9fd9-c5af1e0dbf20",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "163ffcc3-aa7b-52a6-b009-4f2b3cf41259",
+    "slot": "children",
+    "kind": "link",
+    "relationship": "standard_price",
+    "concept": null,
+    "expression": null
+   },
+   {
+    "native_presence": [
+     "expression"
+    ],
+    "position": 0,
+    "origin": "imported",
+    "id": "05e324a9-1681-54dc-b121-e8c9e3746c77",
+    "concept_mapping_id": "169bf67a-f07e-5b54-b03b-32bb0ffe9974",
+    "parent_id": "a5cd3eef-6c47-5927-9fd9-c5af1e0dbf20",
+    "slot": "object_mapping",
+    "kind": "object",
+    "relationship": null,
+    "concept": null,
+    "expression": "product.unit_price"
+   }
+  ]
+ },
+ "batch": {
+  "id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+  "status": "available",
+  "created_at": "2026-10-09T03:35:57.530358+00:00",
+  "source_session_revision": 2,
+  "base_version_id": "1494fba9-a6be-4b57-883f-6ff6d8910d8f",
+  "counts": {
+   "pending": 26,
+   "accepted": 0,
+   "rejected": 0,
+   "stale": 0,
+   "conflict": 0,
+   "superseded": 0
+  },
+  "error": null,
+  "items": [
+   {
+    "id": "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 0,
+    "client_ref": "sales_return",
+    "operation": "create",
+    "target_kind": "object_type",
+    "target_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+    "display_name": "退货单",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 4,
+     "origin": "platform",
+     "id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "concept": "sales_return",
+     "description": "客户针对一张已发货订单发起的退货申请。",
+     "extends": [],
+     "identify_by": [
+      "return_no"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "name": "退货单",
+     "technical_name": "sales_return",
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 7,
+        "line_end": 7
+       },
+       "quote": "退货单是客户针对一张已发货订单发起的退货申请。",
+       "id": "03233c52-22cd-5a41-a0c3-28d4363fcdc6"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "退货单是客户针对一张已发货订单发起的退货申请。",
+      "id": "03233c52-22cd-5a41-a0c3-28d4363fcdc6",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第7行明确退货单是售后退货的核心对象，据此新建对象类型。",
+    "depends_on": [],
+    "dependency_group": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "1e913f4d-e3cc-533e-b3d3-2b065b11ccd6",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 1,
+    "client_ref": "return_no",
+    "operation": "create",
+    "target_kind": "property",
+    "target_id": "1963ee42-e526-5b7a-8b62-dd4e4c1e111d",
+    "display_name": "退货单号",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 0,
+     "origin": "platform",
+     "id": "1963ee42-e526-5b7a-8b62-dd4e4c1e111d",
+     "name": "退货单号",
+     "technical_name": "return_no",
+     "description": "退货单的唯一标识。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "1fcc1087-71ff-5ef7-ac69-82affbae25f0",
+       "name": null,
+       "concept": {
+        "kind": "builtin",
+        "ref": "String"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "OneToOne",
+     "verbalizes": [
+      "{sales_return}退货单号{String}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 9,
+        "line_end": 9
+       },
+       "quote": "- **退货单号**：退货单的唯一标识。",
+       "id": "e5dc3364-8eb0-532e-84d6-e19d497aca0f"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": true,
+     "owner_role_name": null,
+     "legacy_multiplicity": null,
+     "required": true,
+     "value_kind": "string"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 9,
+       "line_end": 9
+      },
+      "quote": "- **退货单号**：退货单的唯一标识。",
+      "id": "e5dc3364-8eb0-532e-84d6-e19d497aca0f",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第9行定义退货单号字段。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "1e913f4d-e3cc-533e-b3d3-2b065b11ccd6",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "8607e58e-ab6b-5683-b8df-9ae25f149cba",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 2,
+    "client_ref": "apply_time",
+    "operation": "create",
+    "target_kind": "property",
+    "target_id": "c06f2f4a-3e49-536e-b68d-66508bfac501",
+    "display_name": "申请时间",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 1,
+     "origin": "platform",
+     "id": "c06f2f4a-3e49-536e-b68d-66508bfac501",
+     "name": "申请时间",
+     "technical_name": "apply_time",
+     "description": "客户提交退货申请的时间。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "7d81310f-8b0e-5125-9653-5b85daa4f70b",
+       "name": null,
+       "concept": {
+        "kind": "builtin",
+        "ref": "DateTime"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}申请时间{DateTime}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 10,
+        "line_end": 10
+       },
+       "quote": "- **申请时间**：客户提交退货申请的时间。",
+       "id": "0cb10c1b-3a4d-57e3-95ac-72d2ff05483e"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": null,
+     "required": false,
+     "value_kind": "datetime"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 10,
+       "line_end": 10
+      },
+      "quote": "- **申请时间**：客户提交退货申请的时间。",
+      "id": "0cb10c1b-3a4d-57e3-95ac-72d2ff05483e",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第10行定义申请时间字段。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "8607e58e-ab6b-5683-b8df-9ae25f149cba",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "39049c01-ec0b-5df4-bc46-b871f0f582a2",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 3,
+    "client_ref": "return_reason",
+    "operation": "create",
+    "target_kind": "property",
+    "target_id": "6385c0f7-30b7-583d-bbc3-de64b3bc5aa5",
+    "display_name": "退货原因",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 2,
+     "origin": "platform",
+     "id": "6385c0f7-30b7-583d-bbc3-de64b3bc5aa5",
+     "name": "退货原因",
+     "technical_name": "return_reason",
+     "description": "退货原因，例如质量问题、发错货、运输破损。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "b9e40598-fdea-5416-b1ba-ea5e99f5d739",
+       "name": null,
+       "concept": {
+        "kind": "builtin",
+        "ref": "String"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}退货原因{String}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 11,
+        "line_end": 11
+       },
+       "quote": "- **退货原因**：例如质量问题、发错货、运输破损。",
+       "id": "47ea64da-8459-55b7-a2b2-5bec27459ab7"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": null,
+     "required": false,
+     "value_kind": "string"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 11,
+       "line_end": 11
+      },
+      "quote": "- **退货原因**：例如质量问题、发错货、运输破损。",
+      "id": "47ea64da-8459-55b7-a2b2-5bec27459ab7",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第11行定义退货原因字段。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "39049c01-ec0b-5df4-bc46-b871f0f582a2",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "62660d01-074d-55c9-a2ba-05cf7fcd130e",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 4,
+    "client_ref": "return_refund_amount",
+    "operation": "create",
+    "target_kind": "property",
+    "target_id": "3b3bcf70-46e3-5ccc-aebf-245979c175d2",
+    "display_name": "退款金额",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 3,
+     "origin": "platform",
+     "id": "3b3bcf70-46e3-5ccc-aebf-245979c175d2",
+     "name": "退款金额",
+     "technical_name": "refund_amount",
+     "description": "本次退货应退还客户的金额，单位为人民币元。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "e7733887-5d9e-5300-b5c4-b38892d1291c",
+       "name": null,
+       "concept": {
+        "kind": "builtin",
+        "ref": "Decimal"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}退款金额{Decimal}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 12,
+        "line_end": 12
+       },
+       "quote": "- **退款金额**：本次退货应退还客户的金额，单位为人民币元。",
+       "id": "6ee3a71d-7d8e-56fb-a8de-14463957a8bc"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": null,
+     "required": false,
+     "value_kind": "decimal"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 12,
+       "line_end": 12
+      },
+      "quote": "- **退款金额**：本次退货应退还客户的金额，单位为人民币元。",
+      "id": "6ee3a71d-7d8e-56fb-a8de-14463957a8bc",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第12行定义退款金额字段。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "62660d01-074d-55c9-a2ba-05cf7fcd130e",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "768d1d66-b86f-582e-8a28-ceadb5394ceb",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 5,
+    "client_ref": "return_status",
+    "operation": "create",
+    "target_kind": "property",
+    "target_id": "da7e5da2-f6ae-516c-8324-8cf4ca1ef60f",
+    "display_name": "处理状态",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 4,
+     "origin": "platform",
+     "id": "da7e5da2-f6ae-516c-8324-8cf4ca1ef60f",
+     "name": "处理状态",
+     "technical_name": "return_status",
+     "description": "处理状态，取值为“待审核”“已同意”“已拒绝”“已退款”。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "8892f89e-41e0-58f5-8020-e55e53926e24",
+       "name": null,
+       "concept": {
+        "kind": "builtin",
+        "ref": "String"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}处理状态{String}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 13,
+        "line_end": 13
+       },
+       "quote": "- **处理状态**：取值为“待审核”“已同意”“已拒绝”“已退款”。",
+       "id": "92a8f4e1-ae9b-5510-b104-a7c53d0d413c"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": null,
+     "required": false,
+     "value_kind": "string"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 13,
+       "line_end": 13
+      },
+      "quote": "- **处理状态**：取值为“待审核”“已同意”“已拒绝”“已退款”。",
+      "id": "92a8f4e1-ae9b-5510-b104-a7c53d0d413c",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第13行定义处理状态字段。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "768d1d66-b86f-582e-8a28-ceadb5394ceb",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 6,
+    "client_ref": "return_targets_order",
+    "operation": "create",
+    "target_kind": "link_type",
+    "target_id": "d27b4882-012a-54ce-9435-2c1e4ed9fb20",
+    "display_name": "退货单针对订单",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 6,
+     "origin": "platform",
+     "id": "d27b4882-012a-54ce-9435-2c1e4ed9fb20",
+     "name": "退货单针对订单",
+     "technical_name": "return_targets_order",
+     "description": "每张退货单针对一张订单；一张订单可以产生多张退货单。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "e11aca69-8745-5e9f-8452-0872f4d19507",
+       "name": null,
+       "concept": {
+        "kind": "object_type",
+        "ref": "ca686b85-6a46-597b-8592-7e56600f4018"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}退货单针对订单{order}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 17,
+        "line_end": 17
+       },
+       "quote": "- 每张退货单针对一张**订单**；一张订单可以产生多张退货单。",
+       "id": "1bc391a8-f3a7-5371-9813-e93aeab25f2e"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": "many_to_one"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 17,
+       "line_end": 17
+      },
+      "quote": "- 每张退货单针对一张**订单**；一张订单可以产生多张退货单。",
+      "id": "1bc391a8-f3a7-5371-9813-e93aeab25f2e",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第17行定义退货单与订单的关联关系。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "2706f4e4-20b5-5ce7-9e87-7383d88817a2",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 7,
+    "client_ref": "return_initiated_by_customer",
+    "operation": "create",
+    "target_kind": "link_type",
+    "target_id": "9e9eea17-150e-537e-b795-94c0fe7d5a1a",
+    "display_name": "退货单由客户发起",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 7,
+     "origin": "platform",
+     "id": "9e9eea17-150e-537e-b795-94c0fe7d5a1a",
+     "name": "退货单由客户发起",
+     "technical_name": "return_initiated_by_customer",
+     "description": "退货单由提交该订单的客户发起。",
+     "owner_ref": {
+      "kind": "object_type",
+      "ref": "39843f3d-18f8-568d-a20f-a7d24d7bc974"
+     },
+     "roles": [
+      {
+       "native_presence": [],
+       "position": 0,
+       "origin": "platform",
+       "id": "3502442e-1a52-56f1-a9ca-2ba03e7d8dd2",
+       "name": null,
+       "concept": {
+        "kind": "object_type",
+        "ref": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298"
+       },
+       "client_ref": null
+      }
+     ],
+     "multiplicity": "ManyToOne",
+     "verbalizes": [
+      "{sales_return}退货单由客户发起{customer}"
+     ],
+     "requires": [],
+     "derived_by": [],
+     "tags": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 18,
+        "line_end": 18
+       },
+       "quote": "- 退货单由提交该订单的**客户**发起。",
+       "id": "1fbaf9a7-042f-5cc9-b83e-41a82ecaa31a"
+      }
+     ],
+     "endpoint_direction": "forward",
+     "identifier": false,
+     "owner_role_name": null,
+     "legacy_multiplicity": "many_to_one"
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 18,
+       "line_end": 18
+      },
+      "quote": "- 退货单由提交该订单的**客户**发起。",
+      "id": "1fbaf9a7-042f-5cc9-b83e-41a82ecaa31a",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第18行定义退货单与客户的关联关系。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "680068c1-8eda-566b-9899-da94c44d5a2e",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 8,
+    "client_ref": "only_shipped_order_can_return",
+    "operation": "create",
+    "target_kind": "rule",
+    "target_id": "8fbd9412-b090-506e-b730-62817cb2e564",
+    "display_name": "仅已发货订单可申请退货",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 0,
+     "origin": "platform",
+     "id": "8fbd9412-b090-506e-b730-62817cb2e564",
+     "owner_kind": "object_type",
+     "owner_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "rule_kind": "constraint",
+     "expression": "退货单.订单.订单状态 = “已发货”",
+     "name": "仅已发货订单可申请退货",
+     "technical_name": "only_shipped_order_can_return",
+     "description": "只有“已发货”的订单可以申请退货。",
+     "verbalizes": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 22,
+        "line_end": 22
+       },
+       "quote": "1. 只有“已发货”的订单可以申请退货。",
+       "id": "16e87fa0-bb58-57d6-b09c-4f55ad11f38a"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 22,
+       "line_end": 22
+      },
+      "quote": "1. 只有“已发货”的订单可以申请退货。",
+      "id": "16e87fa0-bb58-57d6-b09c-4f55ad11f38a",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第22行规则第1条。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "680068c1-8eda-566b-9899-da94c44d5a2e",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "8458a2be-d634-5b43-9e02-b5047a52c7bb",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 9,
+    "client_ref": "refund_amount_not_exceed_order_amount",
+    "operation": "create",
+    "target_kind": "rule",
+    "target_id": "b54aa6f7-5af7-5a26-aab0-860dc7dd8f56",
+    "display_name": "退款金额不超过订单金额",
+    "owner_label": "退款金额",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 0,
+     "origin": "platform",
+     "id": "b54aa6f7-5af7-5a26-aab0-860dc7dd8f56",
+     "owner_kind": "property",
+     "owner_id": "3b3bcf70-46e3-5ccc-aebf-245979c175d2",
+     "rule_kind": "constraint",
+     "expression": "退款金额 ≤ 订单.订单金额",
+     "name": "退款金额不超过订单金额",
+     "technical_name": "refund_amount_not_exceed_order_amount",
+     "description": "退款金额不得超过对应订单的订单金额。",
+     "verbalizes": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 23,
+        "line_end": 23
+       },
+       "quote": "2. 退款金额不得超过对应订单的订单金额。",
+       "id": "2da43f24-8830-568e-8e4e-e19c9266c605"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 23,
+       "line_end": 23
+      },
+      "quote": "2. 退款金额不得超过对应订单的订单金额。",
+      "id": "2da43f24-8830-568e-8e4e-e19c9266c605",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第23行规则第2条，约束退款金额不超过订单金额。",
+    "depends_on": [
+     "62660d01-074d-55c9-a2ba-05cf7fcd130e"
+    ],
+    "dependency_group": [
+     "8458a2be-d634-5b43-9e02-b5047a52c7bb",
+     "62660d01-074d-55c9-a2ba-05cf7fcd130e",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "91003ce4-7062-5701-bacf-7ac7490aff81",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 10,
+    "client_ref": "must_approve_before_refund",
+    "operation": "create",
+    "target_kind": "rule",
+    "target_id": "74a4412f-e5b2-596f-bca1-1540981ed053",
+    "display_name": "退货单审核同意后方可退款",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "native_presence": [],
+     "position": 1,
+     "origin": "platform",
+     "id": "74a4412f-e5b2-596f-bca1-1540981ed053",
+     "owner_kind": "object_type",
+     "owner_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "rule_kind": "constraint",
+     "expression": "退货单.处理状态 变更为“已退款”时，当前状态必须为“已同意”",
+     "name": "退货单审核同意后方可退款",
+     "technical_name": "must_approve_before_refund",
+     "description": "退货单审核同意后才能进入“已退款”状态。",
+     "verbalizes": [],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+       "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+       "locator": {
+        "line_start": 24,
+        "line_end": 24
+       },
+       "quote": "3. 退货单审核同意后才能进入“已退款”状态。",
+       "id": "5bb23816-3fc2-5207-a7b6-d9398c07e534"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "cd122e56-5d09-43c7-b011-a8dff2c7146e",
+      "material_sha256": "a8e8c7e954b5af10d4af31811ad425b67c8b2a61580db1c34395a303c2c3447d",
+      "locator": {
+       "line_start": 24,
+       "line_end": 24
+      },
+      "quote": "3. 退货单审核同意后才能进入“已退款”状态。",
+      "id": "5bb23816-3fc2-5207-a7b6-d9398c07e534",
+      "material_name": "02-售后退货规则.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料一第24行规则第3条。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "91003ce4-7062-5701-bacf-7ac7490aff81",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "f3f26a85-7fe8-555e-a0de-e60ab1c497f7",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 11,
+    "client_ref": "mo_return_001",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "bad98b27-2e74-5f62-a3d0-fe0b7a7767a6",
+    "display_name": "RT-202601-001",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "id": "bad98b27-2e74-5f62-a3d0-fe0b7a7767a6",
+     "type_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "name": "RT-202601-001",
+     "values": {
+      "return_no": "RT-202601-001",
+      "apply_time": "2026-01-20 10:12",
+      "return_reason": "运输破损",
+      "refund_amount": 120,
+      "return_status": "已退款"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "8d3e9464-f432-5969-85fc-c7612db281e0",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 5,
+        "line_end": 12
+       },
+       "quote": "## RT-202601-001\n\n- 发起客户：星海贸易\n- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）\n- 申请时间：2026-01-20 10:12\n- 退货原因：运输破损\n- 退款金额：120 元\n- 处理状态：已退款"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "8d3e9464-f432-5969-85fc-c7612db281e0",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 5,
+       "line_end": 12
+      },
+      "quote": "## RT-202601-001\n\n- 发起客户：星海贸易\n- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）\n- 申请时间：2026-01-20 10:12\n- 退货原因：运输破损\n- 退款金额：120 元\n- 处理状态：已退款",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第5-12行登记的第一笔退货。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "f3f26a85-7fe8-555e-a0de-e60ab1c497f7",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "a47a7b7d-258a-5bfe-bf93-14daa89d389a",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 12,
+    "client_ref": "mo_return_002",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "10c0fc1d-5f6c-5898-bfad-998aca24a5e7",
+    "display_name": "RT-202601-002",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "id": "10c0fc1d-5f6c-5898-bfad-998aca24a5e7",
+     "type_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "name": "RT-202601-002",
+     "values": {
+      "return_no": "RT-202601-002",
+      "apply_time": "2026-01-24 15:40",
+      "return_reason": "发错货",
+      "refund_amount": 168,
+      "return_status": "已同意"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "b4492dd6-e134-5a83-9d74-123dbdaaf8de",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 14,
+        "line_end": 21
+       },
+       "quote": "## RT-202601-002\n\n- 发起客户：远山咖啡\n- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）\n- 申请时间：2026-01-24 15:40\n- 退货原因：发错货\n- 退款金额：168 元\n- 处理状态：已同意"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "b4492dd6-e134-5a83-9d74-123dbdaaf8de",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 14,
+       "line_end": 21
+      },
+      "quote": "## RT-202601-002\n\n- 发起客户：远山咖啡\n- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）\n- 申请时间：2026-01-24 15:40\n- 退货原因：发错货\n- 退款金额：168 元\n- 处理状态：已同意",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第14-21行登记的第二笔退货。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "a47a7b7d-258a-5bfe-bf93-14daa89d389a",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 13,
+    "client_ref": "mo_return_003",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "074e35f7-1f4f-5433-9f76-2e1b5cce3c41",
+    "display_name": "RT-202601-003",
+    "owner_label": "退货单",
+    "before": null,
+    "after": {
+     "id": "074e35f7-1f4f-5433-9f76-2e1b5cce3c41",
+     "type_id": "39843f3d-18f8-568d-a20f-a7d24d7bc974",
+     "name": "RT-202601-003",
+     "values": {
+      "return_no": "RT-202601-003",
+      "apply_time": "2026-01-27 09:05",
+      "return_reason": "质量问题",
+      "refund_amount": 88,
+      "return_status": "待审核"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "6300c6ff-bf71-54f8-a39a-45337e610e22",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 23,
+        "line_end": 30
+       },
+       "quote": "## RT-202601-003\n\n- 发起客户：木棉生活\n- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）\n- 申请时间：2026-01-27 09:05\n- 退货原因：质量问题\n- 退款金额：88 元\n- 处理状态：待审核"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "6300c6ff-bf71-54f8-a39a-45337e610e22",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 23,
+       "line_end": 30
+      },
+      "quote": "## RT-202601-003\n\n- 发起客户：木棉生活\n- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）\n- 申请时间：2026-01-27 09:05\n- 退货原因：质量问题\n- 退款金额：88 元\n- 处理状态：待审核",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第23-30行登记的第三笔退货。",
+    "depends_on": [
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "dependency_group": [
+     "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "ba387a96-683d-54d8-b862-e75aa5d8b204",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 14,
+    "client_ref": "mo_order_001",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "63f47010-3340-54a2-be48-b540a6a91d00",
+    "display_name": "订单编号 1",
+    "owner_label": "订单",
+    "before": null,
+    "after": {
+     "id": "63f47010-3340-54a2-be48-b540a6a91d00",
+     "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "name": "订单编号 1",
+     "values": {
+      "order_no": "1",
+      "order_time": "2026-01-15",
+      "order_amount": 240,
+      "order_status": "已发货"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "1db5c6fd-351b-5ed4-97cb-b7d7e56c7189",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 8,
+        "line_end": 8
+       },
+       "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "1db5c6fd-351b-5ed4-97cb-b7d7e56c7189",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 8,
+       "line_end": 8
+      },
+      "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第8行出现的订单实例，作为退货关联目标。",
+    "depends_on": [],
+    "dependency_group": [
+     "ba387a96-683d-54d8-b862-e75aa5d8b204"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "c0e9b566-5098-5de4-bd35-8c2465bf9664",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 15,
+    "client_ref": "mo_order_042",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "b0247f6f-408c-5dba-a071-bfd5b603312a",
+    "display_name": "订单编号 42",
+    "owner_label": "订单",
+    "before": null,
+    "after": {
+     "id": "b0247f6f-408c-5dba-a071-bfd5b603312a",
+     "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "name": "订单编号 42",
+     "values": {
+      "order_no": "42",
+      "order_time": "2026-01-20",
+      "order_amount": 762,
+      "order_status": "已发货"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "6e2fb9d8-c794-5d91-a7f8-2fd5accfc963",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 17,
+        "line_end": 17
+       },
+       "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "6e2fb9d8-c794-5d91-a7f8-2fd5accfc963",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 17,
+       "line_end": 17
+      },
+      "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第17行出现的订单实例。",
+    "depends_on": [],
+    "dependency_group": [
+     "c0e9b566-5098-5de4-bd35-8c2465bf9664"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "67008e30-4203-5f1f-83d6-fbb2427f2fd6",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 16,
+    "client_ref": "mo_order_031",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "6003291f-d726-5062-a5ce-976c3d1590a2",
+    "display_name": "订单编号 31",
+    "owner_label": "订单",
+    "before": null,
+    "after": {
+     "id": "6003291f-d726-5062-a5ce-976c3d1590a2",
+     "type_id": "ca686b85-6a46-597b-8592-7e56600f4018",
+     "name": "订单编号 31",
+     "values": {
+      "order_no": "31",
+      "order_time": "2026-01-19",
+      "order_amount": 550,
+      "order_status": "已发货"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "6ec03848-4530-5eb2-971e-a1226852d44b",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 26,
+        "line_end": 26
+       },
+       "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "6ec03848-4530-5eb2-971e-a1226852d44b",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 26,
+       "line_end": 26
+      },
+      "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第26行出现的订单实例。",
+    "depends_on": [],
+    "dependency_group": [
+     "67008e30-4203-5f1f-83d6-fbb2427f2fd6"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "626e2287-e510-5afe-8720-5bac997f9d6d",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 17,
+    "client_ref": "mo_customer_xinghai",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "d0338594-56e9-55c0-81c4-2467ca466d7d",
+    "display_name": "星海贸易",
+    "owner_label": "客户",
+    "before": null,
+    "after": {
+     "id": "d0338594-56e9-55c0-81c4-2467ca466d7d",
+     "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "name": "星海贸易",
+     "values": {
+      "customer_name": "星海贸易"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "9d5cd600-6896-5e66-89af-db9da420809b",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 7,
+        "line_end": 7
+       },
+       "quote": "- 发起客户：星海贸易"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "9d5cd600-6896-5e66-89af-db9da420809b",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "- 发起客户：星海贸易",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第7行出现的客户实例。",
+    "depends_on": [],
+    "dependency_group": [
+     "626e2287-e510-5afe-8720-5bac997f9d6d"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "66f14a25-aec6-55cb-a7fc-6727bf2fc766",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 18,
+    "client_ref": "mo_customer_yuanshan",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "d78b09e6-25d4-5874-bc30-188606fcb7d2",
+    "display_name": "远山咖啡",
+    "owner_label": "客户",
+    "before": null,
+    "after": {
+     "id": "d78b09e6-25d4-5874-bc30-188606fcb7d2",
+     "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "name": "远山咖啡",
+     "values": {
+      "customer_name": "远山咖啡"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "c4c76489-609f-51c0-a4d8-9edf5ba389fd",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 16,
+        "line_end": 16
+       },
+       "quote": "- 发起客户：远山咖啡"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "c4c76489-609f-51c0-a4d8-9edf5ba389fd",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 16,
+       "line_end": 16
+      },
+      "quote": "- 发起客户：远山咖啡",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第16行出现的客户实例。",
+    "depends_on": [],
+    "dependency_group": [
+     "66f14a25-aec6-55cb-a7fc-6727bf2fc766"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "af2e3051-35ee-552d-9894-69f3f34ef266",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 19,
+    "client_ref": "mo_customer_mumian",
+    "operation": "create",
+    "target_kind": "material_object",
+    "target_id": "459bdbba-10e1-5ba5-ad41-1058ad050d21",
+    "display_name": "木棉生活",
+    "owner_label": "客户",
+    "before": null,
+    "after": {
+     "id": "459bdbba-10e1-5ba5-ad41-1058ad050d21",
+     "type_id": "2cfd13ac-fe00-549b-a7bb-2d5817c7e298",
+     "name": "木棉生活",
+     "values": {
+      "customer_name": "木棉生活"
+     },
+     "evidence": [
+      {
+       "kind": "material",
+       "id": "ae6b35ea-34d4-5ea9-ac7d-8115b5876663",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "heading": null,
+        "line_start": 25,
+        "line_end": 25
+       },
+       "quote": "- 发起客户：木棉生活"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "ae6b35ea-34d4-5ea9-ac7d-8115b5876663",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "heading": null,
+       "line_start": 25,
+       "line_end": 25
+      },
+      "quote": "- 发起客户：木棉生活",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第25行出现的客户实例。",
+    "depends_on": [],
+    "dependency_group": [
+     "af2e3051-35ee-552d-9894-69f3f34ef266"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "12de4336-dd60-5f0f-8a34-67484a80a71f",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 20,
+    "client_ref": "ml_return_001_order",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "f0c2221e-776b-5180-a7ff-e8c612291f5d",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "f0c2221e-776b-5180-a7ff-e8c612291f5d",
+     "type_id": "d27b4882-012a-54ce-9435-2c1e4ed9fb20",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "1fdb27cf-6ca1-57d0-a938-a8b8cf3523bf",
+       "object_id": "bad98b27-2e74-5f62-a3d0-fe0b7a7767a6",
+       "value": null
+      },
+      {
+       "role_id": "e11aca69-8745-5e9f-8452-0872f4d19507",
+       "object_id": "63f47010-3340-54a2-be48-b540a6a91d00",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 8,
+        "line_end": 8
+       },
+       "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）",
+       "id": "2afbda6d-3b47-564d-98dc-f401a8638d85"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 8,
+       "line_end": 8
+      },
+      "quote": "- 针对订单：订单编号 1（2026-01-15 下单，订单金额 240 元，已发货）",
+      "id": "2afbda6d-3b47-564d-98dc-f401a8638d85",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第8行：退货单 RT-202601-001 针对订单编号 1。",
+    "depends_on": [
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504",
+     "ba387a96-683d-54d8-b862-e75aa5d8b204",
+     "f3f26a85-7fe8-555e-a0de-e60ab1c497f7"
+    ],
+    "dependency_group": [
+     "12de4336-dd60-5f0f-8a34-67484a80a71f",
+     "f3f26a85-7fe8-555e-a0de-e60ab1c497f7",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "ba387a96-683d-54d8-b862-e75aa5d8b204",
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "ea94ba66-cdf1-5acb-91f4-e91759e85a52",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 21,
+    "client_ref": "ml_return_002_order",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "a410ccf0-05f9-5856-9728-2b5c06e127a6",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "a410ccf0-05f9-5856-9728-2b5c06e127a6",
+     "type_id": "d27b4882-012a-54ce-9435-2c1e4ed9fb20",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "1fdb27cf-6ca1-57d0-a938-a8b8cf3523bf",
+       "object_id": "10c0fc1d-5f6c-5898-bfad-998aca24a5e7",
+       "value": null
+      },
+      {
+       "role_id": "e11aca69-8745-5e9f-8452-0872f4d19507",
+       "object_id": "b0247f6f-408c-5dba-a071-bfd5b603312a",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 17,
+        "line_end": 17
+       },
+       "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）",
+       "id": "7ae03d16-b725-5694-8f41-09d44dd982bd"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 17,
+       "line_end": 17
+      },
+      "quote": "- 针对订单：订单编号 42（2026-01-20 下单，订单金额 762 元，已发货）",
+      "id": "7ae03d16-b725-5694-8f41-09d44dd982bd",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第17行：退货单 RT-202601-002 针对订单编号 42。",
+    "depends_on": [
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504",
+     "a47a7b7d-258a-5bfe-bf93-14daa89d389a",
+     "c0e9b566-5098-5de4-bd35-8c2465bf9664"
+    ],
+    "dependency_group": [
+     "ea94ba66-cdf1-5acb-91f4-e91759e85a52",
+     "c0e9b566-5098-5de4-bd35-8c2465bf9664",
+     "a47a7b7d-258a-5bfe-bf93-14daa89d389a",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "e0459b48-3f8f-583a-8a76-565d6470e395",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 22,
+    "client_ref": "ml_return_003_order",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "b751d489-8cc4-5826-a78d-9a065077d3b2",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "b751d489-8cc4-5826-a78d-9a065077d3b2",
+     "type_id": "d27b4882-012a-54ce-9435-2c1e4ed9fb20",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "1fdb27cf-6ca1-57d0-a938-a8b8cf3523bf",
+       "object_id": "074e35f7-1f4f-5433-9f76-2e1b5cce3c41",
+       "value": null
+      },
+      {
+       "role_id": "e11aca69-8745-5e9f-8452-0872f4d19507",
+       "object_id": "6003291f-d726-5062-a5ce-976c3d1590a2",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 26,
+        "line_end": 26
+       },
+       "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）",
+       "id": "f524ef8a-922d-58e6-b678-299cb8c8eb2b"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 26,
+       "line_end": 26
+      },
+      "quote": "- 针对订单：订单编号 31（2026-01-19 下单，订单金额 550 元，已发货）",
+      "id": "f524ef8a-922d-58e6-b678-299cb8c8eb2b",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第26行：退货单 RT-202601-003 针对订单编号 31。",
+    "depends_on": [
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504",
+     "67008e30-4203-5f1f-83d6-fbb2427f2fd6",
+     "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5"
+    ],
+    "dependency_group": [
+     "e0459b48-3f8f-583a-8a76-565d6470e395",
+     "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "67008e30-4203-5f1f-83d6-fbb2427f2fd6",
+     "4e60cfbf-8433-5e31-b0b6-7dec4ea1c504"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "ff563ed5-cb89-51a8-9940-bbfe7fda1b03",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 23,
+    "client_ref": "ml_return_001_customer",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "b38cc6d1-5509-52a4-ba50-85e7a8b8b805",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "b38cc6d1-5509-52a4-ba50-85e7a8b8b805",
+     "type_id": "9e9eea17-150e-537e-b795-94c0fe7d5a1a",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "d68ac430-1285-5c3e-a61b-a3de2385760e",
+       "object_id": "bad98b27-2e74-5f62-a3d0-fe0b7a7767a6",
+       "value": null
+      },
+      {
+       "role_id": "3502442e-1a52-56f1-a9ca-2ba03e7d8dd2",
+       "object_id": "d0338594-56e9-55c0-81c4-2467ca466d7d",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 7,
+        "line_end": 7
+       },
+       "quote": "- 发起客户：星海贸易",
+       "id": "dad9a7b8-ae0d-5230-b538-f5e587c2b346"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "- 发起客户：星海贸易",
+      "id": "dad9a7b8-ae0d-5230-b538-f5e587c2b346",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第7行：退货单 RT-202601-001 由星海贸易发起。",
+    "depends_on": [
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2",
+     "626e2287-e510-5afe-8720-5bac997f9d6d",
+     "f3f26a85-7fe8-555e-a0de-e60ab1c497f7"
+    ],
+    "dependency_group": [
+     "ff563ed5-cb89-51a8-9940-bbfe7fda1b03",
+     "f3f26a85-7fe8-555e-a0de-e60ab1c497f7",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "626e2287-e510-5afe-8720-5bac997f9d6d",
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "fb6e17c4-2492-512e-9a12-e3453ee45663",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 24,
+    "client_ref": "ml_return_002_customer",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "0a5893cc-5f6c-5602-9c68-b89f1ccea5f1",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "0a5893cc-5f6c-5602-9c68-b89f1ccea5f1",
+     "type_id": "9e9eea17-150e-537e-b795-94c0fe7d5a1a",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "d68ac430-1285-5c3e-a61b-a3de2385760e",
+       "object_id": "10c0fc1d-5f6c-5898-bfad-998aca24a5e7",
+       "value": null
+      },
+      {
+       "role_id": "3502442e-1a52-56f1-a9ca-2ba03e7d8dd2",
+       "object_id": "d78b09e6-25d4-5874-bc30-188606fcb7d2",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 16,
+        "line_end": 16
+       },
+       "quote": "- 发起客户：远山咖啡",
+       "id": "82cf4169-1f86-54fe-aee4-c97e49dab14b"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 16,
+       "line_end": 16
+      },
+      "quote": "- 发起客户：远山咖啡",
+      "id": "82cf4169-1f86-54fe-aee4-c97e49dab14b",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第16行：退货单 RT-202601-002 由远山咖啡发起。",
+    "depends_on": [
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2",
+     "66f14a25-aec6-55cb-a7fc-6727bf2fc766",
+     "a47a7b7d-258a-5bfe-bf93-14daa89d389a"
+    ],
+    "dependency_group": [
+     "fb6e17c4-2492-512e-9a12-e3453ee45663",
+     "a47a7b7d-258a-5bfe-bf93-14daa89d389a",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "66f14a25-aec6-55cb-a7fc-6727bf2fc766",
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   },
+   {
+    "id": "32fc6fbc-1fad-5b82-8e4e-d3edaf5b76b1",
+    "batch_id": "c9ee94d3-a926-57b4-b1e9-ca016c71361f",
+    "ordinal": 25,
+    "client_ref": "ml_return_003_customer",
+    "operation": "create",
+    "target_kind": "material_link",
+    "target_id": "d2b96fb8-ce44-5c07-9788-fed2c190dab4",
+    "display_name": "? → ?",
+    "owner_label": null,
+    "before": null,
+    "after": {
+     "id": "d2b96fb8-ce44-5c07-9788-fed2c190dab4",
+     "type_id": "9e9eea17-150e-537e-b795-94c0fe7d5a1a",
+     "source_id": null,
+     "target_id": null,
+     "role_values": [
+      {
+       "role_id": "d68ac430-1285-5c3e-a61b-a3de2385760e",
+       "object_id": "074e35f7-1f4f-5433-9f76-2e1b5cce3c41",
+       "value": null
+      },
+      {
+       "role_id": "3502442e-1a52-56f1-a9ca-2ba03e7d8dd2",
+       "object_id": "459bdbba-10e1-5ba5-ad41-1058ad050d21",
+       "value": null
+      }
+     ],
+     "evidence": [
+      {
+       "kind": "material",
+       "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+       "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+       "locator": {
+        "line_start": 25,
+        "line_end": 25
+       },
+       "quote": "- 发起客户：木棉生活",
+       "id": "faed8eb4-5346-5443-9baa-45b98fb14149"
+      }
+     ]
+    },
+    "field_changes": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "material_id": "8c6cc6f1-888d-4fcd-b29d-a87cb721a8b1",
+      "material_sha256": "1086c60c1b267a02380b4783ec99b161d9003d58feed54428df6eaba98837a33",
+      "locator": {
+       "line_start": 25,
+       "line_end": 25
+      },
+      "quote": "- 发起客户：木棉生活",
+      "id": "faed8eb4-5346-5443-9baa-45b98fb14149",
+      "material_name": "03-2026年1月退货登记.md",
+      "material_archived": false
+     }
+    ],
+    "reason": "材料二第25行：退货单 RT-202601-003 由木棉生活发起。",
+    "depends_on": [
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2",
+     "af2e3051-35ee-552d-9894-69f3f34ef266",
+     "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5"
+    ],
+    "dependency_group": [
+     "32fc6fbc-1fad-5b82-8e4e-d3edaf5b76b1",
+     "f0e3c4d6-4bd0-5dae-97b3-37b9e776d1f5",
+     "e9df56d7-7e17-5e4d-a42b-40f6e54e47d5",
+     "af2e3051-35ee-552d-9894-69f3f34ef266",
+     "2706f4e4-20b5-5ce7-9e87-7383d88817a2"
+    ],
+    "status": "pending",
+    "stored_status": "pending",
+    "status_reason": "",
+    "accepted_revision": null,
+    "decided_at": null
+   }
+  ]
+ }
+}

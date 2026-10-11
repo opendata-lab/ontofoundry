@@ -2,12 +2,13 @@
 :root {
   color-scheme: light;
 
-  --color-canvas: #f6f7f9;
+  --color-canvas: #f5f7fb;
   --color-surface: #ffffff;
-  --color-surface-raised: #fcfcfd;
-  --color-surface-soft: #f3f5f7;
-  --color-rule-soft: #edf0f3;
-  --color-rule: #e2e6eb;
+  --color-surface-raised: #fafbfd;
+  --color-surface-soft: #f3f6fa;
+  --color-rule-soft: #edf1f6;
+  --color-rule: #e3e9f1;
+  --shadow-panel: 0 1px 2px rgb(25 45 75 / 3%), 0 6px 20px rgb(25 45 75 / 3%);
   --color-rule-strong: #b9c3d1;
   --color-ink: #20252d;
   --color-ink-2: #303842;

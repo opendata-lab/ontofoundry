@@ -1,5 +1,4 @@
 """SQL/query contracts against real SQLite tables; not external PG/MySQL/Doris integration."""
-
 from contextlib import contextmanager
 from uuid import uuid4
 
@@ -9,6 +8,8 @@ from sqlalchemy.pool import StaticPool
 
 from ontofoundry_api.api import connections, instances
 from ontofoundry_api.db_models import ConnectionRecord
+from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.runtime_views import apply_legacy_mappings, mappings_of
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
@@ -59,7 +60,7 @@ def mapped_session(client, monkeypatch):
     draft = session["draft"]
     supplier = next(t for t in draft["object_types"] if t["technical_name"] == "supplier")
     material = next(t for t in draft["object_types"] if t["technical_name"] == "material")
-    draft["mappings"] = [
+    mappings = [
         {
             "id": str(uuid4()),
             "type_id": supplier["id"],
@@ -80,9 +81,9 @@ def mapped_session(client, monkeypatch):
     relation = next(
         r
         for r in draft["link_types"]
-        if r["source_type_id"] == supplier["id"] and r["target_type_id"] == material["id"]
+        if r["owner_ref"]["ref"] == supplier["id"] and r["roles"][0]["concept"]["ref"] == material["id"]
     )
-    relation["data_join"] = {"source_column": "code", "target_column": "supplier_code"}
+    draft = apply_legacy_mappings(draft, mappings, {relation["id"]: {"source_column": "code", "target_column": "supplier_code"}})
     response = client.put(
         ROOT + "/sessions/" + session["id"],
         json={"revision": session["revision"], "draft": draft},
@@ -122,7 +123,7 @@ def test_mapping_preview_parameterizes_keys_and_reports_missing_columns(
     client, mapped_session
 ):
     session, supplier, _ = mapped_session
-    mapping = session["draft"]["mappings"][0]
+    mapping = mappings_of(OntologyDraft.model_validate(session["draft"]))[0].model_dump(mode="json")
     attack = client.post(
         ROOT + "/mapping-preview", json={"mapping": mapping, "key": "S1' OR 1=1 --"}
     )
@@ -147,7 +148,10 @@ def test_mapping_preview_parameterizes_keys_and_reports_missing_columns(
 
 def test_two_data_sources_are_not_federated(client, mapped_session):
     session, supplier, _ = mapped_session
-    session["draft"]["mappings"][1]["connection_alias"] = "另一个数据源"
+    raw_mappings = [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(session["draft"]))]
+    next(m for m in raw_mappings if m["type_id"] != supplier["id"])["connection_alias"] = "另一个数据源"
+    relation = next(r for r in session["draft"]["link_types"] if r["technical_name"] == "supplies")
+    session["draft"] = apply_legacy_mappings(session["draft"], raw_mappings, {relation["id"]: {"source_column": "code", "target_column": "supplier_code"}})
     saved = client.put(
         ROOT + "/sessions/" + session["id"],
         json={"revision": session["revision"], "draft": session["draft"]},

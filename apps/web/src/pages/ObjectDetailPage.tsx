@@ -12,6 +12,7 @@ import { modelingApi } from "../api/client";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { useSnapshot } from "../hooks/useSnapshot";
+import { TagList } from "../components/TagList";
 import { usePageTab } from "../hooks/usePageTab";
 import type { DraftView, ObjectDefinition } from "../api/types";
 
@@ -85,7 +86,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
     return (
       <div className="empty-state">
         <p>没有找到此本体</p>
-        <Link to="../objects">返回业务对象</Link>
+        <Link to="../objects">返回本体对象</Link>
       </div>
     );
   const inherited =
@@ -115,13 +116,13 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
       <header className="breadcrumb-bar">
         <Link to={"../" + (relation ? "relations" : "objects") + suffix}>
           <ArrowLeft size={14} />
-          {relation ? "本体关系" : "业务对象"}
+          {relation ? "本体关系" : "本体对象"}
         </Link>
         <span>/</span>
         <span>{type.name}</span>
         <div className="toolbar-spacer" />
         <span className="muted">
-          {sessionId ? "会话草稿" : "已发布 v" + workspace.current_version}
+          {sessionId ? "本会话的修改" : "已发布 v" + workspace.current_version}
         </span>
       </header>
       {workspace.role && mapping && (
@@ -200,7 +201,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                 </div>
                 <div>
                   <dt>标签</dt>
-                  <dd>{type.tags.join(" · ") || "—"}</dd>
+                  <dd><TagList tags={type.tags} empty="—" /></dd>
                 </div>
                 {"attributes" in type && (
                   <div>

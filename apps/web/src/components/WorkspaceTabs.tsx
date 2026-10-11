@@ -33,8 +33,10 @@ import {
   closeTab,
   openTab,
   restoreTabs,
+  tabKey,
   type PageTab,
 } from "../lib/pageTabs";
+import { preloadWorkspacePages } from "../lib/workspacePages";
 import { LoadingSurface } from "./AsyncState";
 import { WorkspaceRoutes } from "./WorkspaceRoutes";
 import "../styles/page-tabs.css";
@@ -51,13 +53,26 @@ const TabPanel = memo(function TabPanel({
   active: boolean;
   update: (id: string, meta: PageTabMeta) => void;
 }) {
+  const pageMeta = useRef<PageTabMeta>({});
+  const elementMeta = useRef<PageTabMeta>({});
+  const report = useCallback(() => update(tab.id, {
+    ...pageMeta.current,
+    dirty: !!pageMeta.current.dirty || !!elementMeta.current.dirty,
+    busy: !!pageMeta.current.busy || !!elementMeta.current.busy,
+    elementDirty: !!elementMeta.current.dirty,
+    elementBusy: !!elementMeta.current.busy,
+  }), [update, tab.id]);
   const setMeta = useCallback(
-    (meta: PageTabMeta) => update(tab.id, meta),
-    [update, tab.id],
+    (meta: PageTabMeta) => { pageMeta.current = meta; report(); },
+    [report],
+  );
+  const setElementMeta = useCallback(
+    (meta: PageTabMeta) => { elementMeta.current = meta; report(); },
+    [report],
   );
   const context = useMemo(
-    () => ({ active, update: setMeta }),
-    [active, setMeta],
+    () => ({ active, update: setMeta, updateElement: setElementMeta }),
+    [active, setMeta, setElementMeta],
   );
   const location = useMemo(
     () => ({
@@ -115,24 +130,51 @@ export function WorkspaceTabs({
     }
     return openTab(restoreTabs(raw, base), href);
   });
-  const [seen, setSeen] = useState(location.key + href);
-  if (seen !== location.key + href) {
-    const nextState = openTab(state, href, navigationType === "REPLACE");
-    setSeen(location.key + href);
-    setState(nextState);
-  }
+  // Open (or bring forward) the tab for each location. This runs in a layout
+  // effect with a functional update rather than during render: the router
+  // renders a navigation inside a transition, and a state update made during
+  // that render could be dropped when a page's synchronous title update
+  // landed alongside it, leaving the previous tab on screen.
+  const resyncTo = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    setState((current) => {
+      const next = openTab(current, href, navigationType === "REPLACE");
+      const target = next.tabs.find((t) => t.id === next.active);
+      // A bare menu link that brought an open tab forward leaves the URL short
+      // of that tab's address (its session); put the address back.
+      resyncTo.current = target && tabKey(target.href) !== tabKey(href) ? target.href : null;
+      return next;
+    });
+  }, [location.key, href, navigationType]);
+  useEffect(() => {
+    const to = resyncTo.current;
+    if (!to) return;
+    resyncTo.current = null;
+    void navigate(to, { replace: true });
+  });
+  useEffect(() => preloadWorkspacePages(), []);
   const strip = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
+  const inspectionKey = (address: string) => {
+    const url = new URL(address, "http://local");
+    return JSON.stringify([url.pathname, url.searchParams.get("inspect"),
+      url.searchParams.get("inspectSession") ?? url.searchParams.get("session"),
+      url.searchParams.get("inspectSource"), url.searchParams.get("inspectPreviewHash")]);
+  };
   // Pages stay mounted in their tabs, so switching within the workspace does
   // not interrupt a request running in another tab. Protect only navigation
   // that would unmount the entire workspace.
   const blocker = useBlocker(
-    ({ nextLocation }) =>
-      (busy || dirty) && !nextLocation.pathname.startsWith(base + "/"),
+    ({ nextLocation }) => {
+      const current = state.tabs.find((t) => t.id === state.active);
+      return ((busy || dirty) && !nextLocation.pathname.startsWith(base + "/")) ||
+        (!!(current?.elementDirty || current?.elementBusy) &&
+          inspectionKey(current.href) !== inspectionKey(createPath(nextLocation)));
+    },
   );
   const blocked = blocker.state === "blocked";
   const blockingBusy = blocked && busy && !closing;
@@ -174,7 +216,9 @@ export function WorkspaceTabs({
       if (
         title === tab.title &&
         !!meta.dirty === !!tab.dirty &&
-        !!meta.busy === !!tab.busy
+          !!meta.busy === !!tab.busy
+          && !!meta.elementDirty === !!tab.elementDirty
+          && !!meta.elementBusy === !!tab.elementBusy
       )
         return current;
       return {
@@ -331,7 +375,9 @@ export function WorkspaceTabs({
             ? "请等待当前操作完成后再离开空间。"
             : target
               ? `关闭「${target.title}」将丢失未保存的修改。`
-              : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
+              : blocker.state === "blocked" && blocker.location.pathname.startsWith(base + "/")
+                ? "离开当前内容将丢失尚未保存的修改，是否继续？"
+                : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
         </p>
         <footer className="row-actions">
           <button
