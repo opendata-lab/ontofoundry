@@ -105,6 +105,27 @@ TOOLS = [
     ),
 ]
 TOOLS += [
+    ("list_metrics", "列出已发布指标，按名称/同义词搜索；返回数据集、可执行性、分组/过滤字段与快照约束", {
+        "query": {"type": "string", "maxLength": 240},
+        "semantic_model": {"type": "string", "maxLength": 240},
+    }),
+    ("query_metric", "查询单数据集聚合指标。过滤值参数绑定，最大 1000 行；快照/滚动数据须等值过滤时间字段或提供 as_of。跨数据集仅解释，不执行", {
+        "metric_id": {"type": "string", "format": "uuid"},
+        "group_by": {"type": "array", "maxItems": 100, "uniqueItems": True,
+                     "items": {"type": "string", "maxLength": 240}},
+        "filters": {"type": "array", "maxItems": 100, "items": {
+            "type": "object", "required": ["field", "op"], "additionalProperties": False,
+            "properties": {
+                "field": {"type": "string", "maxLength": 240},
+                "op": {"enum": ["=", "!=", "<", "<=", ">", ">=", "in", "between", "is_null", "not_null"]},
+                "value": {"type": ["string", "number", "boolean", "null", "array"],
+                          "maxItems": 1000, "items": {"type": ["string", "number", "boolean"]}},
+            },
+        }},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+        "as_of": {"type": "string", "minLength": 1, "maxLength": 240,
+                  "description": "选择不晚于目标日的该数据集最新快照，不能同时过滤快照字段"},
+    }),
     ("get_ontology_manifest", "读取版本清单：两个版本哈希与各类元素数量", {}),
     (
         "list_ontology_elements",
@@ -135,7 +156,7 @@ TOOLS += [
         },
     ),
 ]
-INSTANCE_TOOLS = {"search_objects", "get_object", "expand_object_graph"}
+INSTANCE_TOOLS = {"search_objects", "get_object", "expand_object_graph", "query_metric"}
 # Element kinds that carry material quotes or table names.
 PRIVATE_KINDS = {"material_object": "instances", "material_link": "instances", "mapping": "mappings"}
 
@@ -183,7 +204,9 @@ def tool_schema(name, properties):
     return {
         "type": "object",
         "properties": {**properties, "version_id": {"type": "string"}},
-        "required": ["type_id"]
+        "required": ["metric_id"]
+        if name == "query_metric"
+        else ["type_id"]
         if name == "get_ontology_type"
         else ["ref"]
         if name in ("get_object", "expand_object_graph")
@@ -332,6 +355,7 @@ async def rpc(
                 for n, d, p in TOOLS
                 if n not in INSTANCE_TOOLS
                 or can_read_instances(db, workspace_id, principal)
+                if n != "list_metrics" or can_read_mappings(db, workspace_id, principal)
             ]
         }
     elif method == "tools/call":
@@ -342,6 +366,9 @@ async def rpc(
         try:
             validate(args, schema)
         except ValidationError as exc:
+            if name in ("list_metrics", "query_metric"):
+                return rpc_error(rid, -32602, "指标参数无效，请检查指标 ID、分组字段、结构化过滤及 limit（1–1000）",
+                                 data={"field": list(exc.path)})
             if name == "search_objects" and exc.validator == "required":
                 return rpc_error(rid, -32602, "source=database 时必须提供 type_id；先用 "
                                  "list_ontology_elements(kind=mapping) 查看有映射的业务对象")
@@ -349,6 +376,8 @@ async def rpc(
         try:
             if name in INSTANCE_TOOLS:
                 require_instances(db, workspace_id, principal)
+            if name == "list_metrics" and not can_read_mappings(db, workspace_id, principal):
+                raise HTTPException(403, "需要空间成员身份及映射读取授权")
             if principal.pinned_version_id is not None:
                 # A modeling run reads only the version its session is based on.
                 pinned = principal.pinned_version_id
@@ -362,6 +391,10 @@ async def rpc(
             version = current_version(db, workspace_id, args.get("version_id"))
             if name == "get_ontology_version":
                 value = version_summary(version)
+            elif name in ("list_metrics", "query_metric"):
+                from ontofoundry_api.services.metric_query import list_metrics, query_metric
+                arguments = {k: v for k, v in args.items() if k != "version_id"}
+                value = list_metrics(db, version, **arguments) if name == "list_metrics" else query_metric(db, version, request.app.state.settings, **arguments)
             elif name in ("get_ontology_manifest", "list_ontology_elements", "get_ontology_elements"):
                 elements = visible_elements(db, workspace_id, principal, snapshot_of(version))
                 envelope = {
@@ -462,6 +495,8 @@ async def rpc(
                 ],
                 "isError": True,
             }
+            if name in ("list_metrics", "query_metric") and isinstance(exc, ServiceError):
+                result["structuredContent"] = {"code": exc.code, "message": exc.message, **exc.details}
     else:
         return rpc_error(
             rid, -32601, "Method not found; supported protocol: " + PROTOCOL_VERSION, 404
