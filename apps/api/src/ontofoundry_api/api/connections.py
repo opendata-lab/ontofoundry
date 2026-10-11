@@ -59,7 +59,7 @@ def resolve_alias(db, wid, alias: str):
 
 
 @contextmanager
-def connect_readonly(item, settings):
+def connect_readonly(item, settings, *, timeout_ms=None):
     if not settings.connection_key:
         raise HTTPException(503, "服务器尚未配置连接加密主密钥")
     try:
@@ -70,10 +70,11 @@ def connect_readonly(item, settings):
         )
         config = item.config_json
         driver = "postgresql+psycopg" if item.kind == "postgresql" else "mysql+pymysql"
+        statement_ms = 10000 if timeout_ms is None else int(timeout_ms)
         args = (
-            {"connect_timeout": 5, "options": "-c statement_timeout=10000"}
+            {"connect_timeout": 5, "options": f"-c statement_timeout={statement_ms}"}
             if item.kind == "postgresql"
-            else {"connect_timeout": 5, "read_timeout": 10, "write_timeout": 5}
+            else {"connect_timeout": 5, "read_timeout": 10 if timeout_ms is None else (statement_ms + 999) // 1000 + 2, "write_timeout": 5}
         )
         engine = create_engine(
             URL.create(
@@ -93,9 +94,9 @@ def connect_readonly(item, settings):
                     connection.execute(text("SET TRANSACTION READ ONLY"))
                 elif item.kind == "mysql":
                     connection.execute(text("SET SESSION TRANSACTION READ ONLY"))
-                    connection.execute(text("SET SESSION MAX_EXECUTION_TIME=10000"))
+                    connection.execute(text(f"SET SESSION MAX_EXECUTION_TIME={statement_ms}"))
                 else:
-                    connection.execute(text("SET query_timeout = 10"))
+                    connection.execute(text(f"SET query_timeout = {(statement_ms + 999) // 1000}"))
                 yield connection
                 connection.rollback()
         finally:

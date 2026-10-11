@@ -243,7 +243,7 @@ export function DeliveryPage() {
             <div>
               <h3>MCP</h3>
               <p className="muted">
-                供智能体调用：8 个本体查询工具、3 个业务数据查询工具（令牌需允许查询业务数据）。兼容
+                供智能体调用：本体查询、实例查询及指标工具 list_metrics、query_metric（执行指标需允许查询业务数据）。兼容
                 MCP 2026-07-28 与 2025 系列客户端。
               </p>
               <code>{serviceRoot}/mcp</code>
