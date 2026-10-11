@@ -1,21 +1,13 @@
-export function TagList({
-  tags,
-  empty = "未设置",
-}: {
-  tags: readonly string[];
-  empty?: string;
-}) {
+// Renders nothing without tags: an empty tag row is noise, not information.
+export function TagList({ tags }: { tags: readonly string[] }) {
+  if (!tags.length) return null;
   return (
     <span className="tag-list">
-      {tags.length ? (
-        tags.map((tag, index) => (
-          <span className="tag tag--label" key={`${tag}:${index}`}>
-            {tag}
-          </span>
-        ))
-      ) : (
-        <span className="muted">{empty}</span>
-      )}
+      {tags.map((tag, index) => (
+        <span className="tag tag--label" key={`${tag}:${index}`}>
+          {tag}
+        </span>
+      ))}
     </span>
   );
 }

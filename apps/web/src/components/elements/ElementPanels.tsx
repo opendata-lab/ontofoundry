@@ -120,14 +120,16 @@ export function BasicPanel(props: PanelProps) {
             <span className="element-value">{type.technical_name}</span>
           )}
         </Field>
-        <div className="element-field">
-          <span>标签</span>
-          {nativeEditing ? (
-            <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
-          ) : (
-            <TagList tags={type.tags} />
-          )}
-        </div>
+        {(nativeEditing || type.tags.length > 0) && (
+          <div className="element-field">
+            <span>标签</span>
+            {nativeEditing ? (
+              <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
+            ) : (
+              <TagList tags={type.tags} />
+            )}
+          </div>
+        )}
         {isObject(type) && type.concept_kind !== "value_type" && (
           <div className="element-field">
             <span>继承自</span>
