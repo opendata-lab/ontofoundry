@@ -159,9 +159,11 @@ export function TypeCatalogPage({
                 </p>
               )}
             </div>
-            <div className="object-tags">
-              <TagList tags={item.tags} empty="未设置标签" />
-            </div>
+            {item.tags.length > 0 && (
+              <div className="object-tags">
+                <TagList tags={item.tags} />
+              </div>
+            )}
           </Link>
         ))}
       </div>

@@ -376,7 +376,7 @@ describe("统一本体元素", () => {
     expect(
       within(el).queryByRole("tab", { name: /属性/ }),
     ).not.toBeInTheDocument();
-    expect(within(el).queryByText("自然语言读法")).not.toBeInTheDocument();
+    expect(within(el).queryByText("语义描述")).not.toBeInTheDocument();
     expect(within(el).getAllByText("描述")).toHaveLength(1);
     fireEvent.click(within(el).getByRole("tab", { name: "端点" }));
     expect(
@@ -467,7 +467,7 @@ describe("v3 native relations", () => {
     ]);
     expect(within(el).getByRole("button", { name: "暂只读" })).toBeDisabled();
     expect(within(el).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
-    expect(within(el).getByRole("list", { name: "原生读法" }).children).toHaveLength(2);
+    expect(within(el).getByRole("list", { name: "原生语义描述" }).children).toHaveLength(2);
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
   });
   it("saves a binary native edit as v3 without endpoint compatibility fields", async () => {

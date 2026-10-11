@@ -74,7 +74,7 @@ export const FIELD_LABELS: Record<string, string> = {
   identifier: "标识",
   multiplicity: "基数",
   expression: "表达式",
-  verbalizes: "读法",
+  verbalizes: "语义描述",
   evidence: "证据",
   values: "属性值",
   table_name: "数据表",

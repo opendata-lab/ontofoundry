@@ -199,10 +199,12 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                   <dt>API 标识</dt>
                   <dd>{type.technical_name}</dd>
                 </div>
-                <div>
-                  <dt>标签</dt>
-                  <dd><TagList tags={type.tags} empty="—" /></dd>
-                </div>
+                {type.tags.length > 0 && (
+                  <div>
+                    <dt>标签</dt>
+                    <dd><TagList tags={type.tags} /></dd>
+                  </div>
+                )}
                 {"attributes" in type && (
                   <div>
                     <dt>继承自</dt>
@@ -293,7 +295,7 @@ export function ObjectDetailPage({ relation = false }: { relation?: boolean }) {
                   items={type.derived_by}
                 />
                 <ExpressionList
-                  label="自然语言读法（verbalizes）"
+                  label="语义描述（verbalizes）"
                   items={type.verbalizes}
                   empty="按标准模板生成"
                 />

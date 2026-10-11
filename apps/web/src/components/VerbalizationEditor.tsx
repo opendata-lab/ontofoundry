@@ -33,7 +33,7 @@ export function VerbalizationEditor({
       {lines.length === 0 ? (
         <>
           <p className="muted">
-            未自定义，发布时按业务名称生成标准读法。自定义后按你写的原文导出。
+            未自定义，发布时按业务名称生成标准语义描述。自定义后按你写的原文导出。
           </p>
           <button
             type="button"
@@ -41,7 +41,7 @@ export function VerbalizationEditor({
             onClick={() => onChange([""])}
           >
             <Plus size={14} />
-            自定义读法
+            自定义语义描述
           </button>
         </>
       ) : (
