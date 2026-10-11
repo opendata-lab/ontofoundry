@@ -465,7 +465,7 @@ describe("v3 native relations", () => {
     expect(within(roles).getAllByRole("listitem").map(li => li.textContent)).toEqual([
       "supplier · 所属概念（隐含角色） · 实体", "product · product · 实体", "amount · amount · 值概念", "Any · party · Any",
     ]);
-    expect(within(el).getByRole("button", { name: "暂只读" })).toBeDisabled();
+    expect(within(el).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
     expect(within(el).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
     expect(within(el).getByRole("list", { name: "原生语义描述" }).children).toHaveLength(2);
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
@@ -501,7 +501,7 @@ describe("P2 platform concept context editor", () => {
     vi.mocked(modelingApi.saveElement).mockResolvedValue({ draft: native, version: { version_id: "v2" } as never, session: null });
     show(`/workspaces/w/objects?inspect=${kind}:${concept.id}&inspectTab=basic`);
     const el = await screen.findByRole("dialog", { name: concept.name });
-    expect(within(el).getByText("平台扩展，导出到其他工具会被忽略")).toBeInTheDocument();
+    expect(within(el).getByRole("img", { name: "平台扩展，导出到其他工具会被忽略" })).toBeInTheDocument();
     expect(within(el).getByText("原同义词")).toBeInTheDocument();
     fireEvent.click(within(el).getByRole("button", { name: "编辑" }));
     fireEvent.change(within(el).getByLabelText("同义词"), { target: { value: "别名甲\n别名乙" } });

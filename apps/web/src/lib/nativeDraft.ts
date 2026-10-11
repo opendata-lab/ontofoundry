@@ -37,8 +37,8 @@ export function editorDraft(source: Draft): LegacyDraft {
       source_role_name: forward ? link.owner_role_name : link.roles[0]?.name,
       target_role_name: forward ? link.roles[0]?.name : link.owner_role_name,
       data_join: endpointJoin(draft._legacy_form?.joins[link.id], !forward),
-      role_concepts: [{ id: link.owner_role_id ?? `owner:${link.id}`, name: link.owner_role_name, concept: concepts.get(owner)?.concept ?? owner, kind: link.owner_ref.kind },
-        ...link.roles.map(r => ({ id: r.id, name: r.name, concept: concepts.get(r.concept.ref)?.concept ?? r.concept.ref, kind: r.concept.kind }))],
+      role_concepts: [{ id: link.owner_role_id ?? `owner:${link.id}`, name: link.owner_role_name, concept: concepts.get(owner)?.concept ?? owner, kind: link.owner_ref.kind, ref: owner },
+        ...link.roles.map(r => ({ id: r.id, name: r.name, concept: concepts.get(r.concept.ref)?.concept ?? r.concept.ref, kind: r.concept.kind, ref: r.concept.ref }))],
     };
   });
   return {
