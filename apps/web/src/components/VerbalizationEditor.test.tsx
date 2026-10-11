@@ -5,19 +5,19 @@ import { valueConcept } from "../lib/verbalization";
 
 afterEach(cleanup);
 
-describe("自然语言读法", () => {
+describe("语义描述", () => {
   it("treats an empty list as the generated reading, not as missing data", () => {
     const onChange = vi.fn();
     render(
       <VerbalizationEditor
-        label="读法"
+        label="语义描述"
         concepts={["supplier", "material"]}
         value={[]}
         onChange={onChange}
       />,
     );
-    expect(screen.getByText(/按业务名称生成标准读法/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "自定义读法" }));
+    expect(screen.getByText(/按业务名称生成标准语义描述/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "自定义语义描述" }));
     expect(onChange).toHaveBeenCalledWith([""]);
   });
 
@@ -25,13 +25,13 @@ describe("自然语言读法", () => {
     const onChange = vi.fn();
     const { rerender } = render(
       <VerbalizationEditor
-        label="读法"
+        label="语义描述"
         concepts={["supplier", "material"]}
         value={["{supplier}供应{material}"]}
         onChange={onChange}
       />,
     );
-    fireEvent.change(screen.getByRole("textbox", { name: "读法 1" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "语义描述 1" }), {
       target: { value: "{supplier}向本企业供应{material}" },
     });
     expect(onChange).toHaveBeenLastCalledWith([
@@ -49,13 +49,13 @@ describe("自然语言读法", () => {
 
     rerender(
       <VerbalizationEditor
-        label="读法"
+        label="语义描述"
         concepts={["supplier", "material"]}
         value={["一", "二"]}
         onChange={onChange}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "删除读法 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除语义描述 1" }));
     expect(onChange).toHaveBeenLastCalledWith(["二"]);
   });
 

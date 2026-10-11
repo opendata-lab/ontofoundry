@@ -1304,6 +1304,14 @@ small,
 .object-card h2 {
   font-size: 14px;
   margin: 12px 0 2px;
+  overflow-wrap: anywhere;
+}
+.object-card .api-name { margin: 1px 0 0; overflow-wrap: anywhere; }
+.object-card .object-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .object-card .api-name {
   font-size: 11px;
@@ -1336,7 +1344,13 @@ small,
   font-size: 10px;
   min-height: 20px;
 }
-.relation-endpoints {
+.relation-endpoints,
+.relationship-roles--compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
   font-size: 12px;
   white-space: normal;
 }
@@ -2409,5 +2423,59 @@ small,
 .relationship-roles li { padding: 3px 0; overflow-wrap: anywhere; }
 .relationship-roles code { white-space: pre-wrap; overflow-wrap: anywhere; }
 .relationship-roles small { color: var(--color-muted); }
-.relationship-roles--compact h4 { margin: 8px 0 4px; font-size: 12px; }
-.relationship-roles--compact ul { padding-left: 1rem; }
+
+.tag.tag--concept {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border: 1px solid var(--color-rule-strong);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.tag.tag--concept svg { flex: none; color: var(--color-muted); }
+.tag.tag--link { cursor: pointer; }
+.tag.tag--link:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.tag.tag--link:hover svg { color: var(--color-accent); }
+.tag.tag--link:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.relationship-roles .reading { line-height: 2; }
+.hinted-heading { display: flex; align-items: center; }
+.hinted-heading h3 { margin: 0; }
+.hint-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: var(--color-muted);
+  vertical-align: middle;
+  cursor: help;
+}
+.hint-icon:hover, .hint-icon:focus-visible { color: var(--color-accent); outline: none; }
+.hint-icon::after {
+  content: attr(data-hint);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 30;
+  width: max-content;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--color-text, #1f2933);
+  color: white;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: normal;
+  transform: translateX(-50%);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.hint-icon:hover::after, .hint-icon:focus-visible::after { visibility: visible; opacity: 1; }

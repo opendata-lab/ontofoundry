@@ -22,7 +22,7 @@ export type User = {
 
 export type ConceptRef = { kind: "object_type" | "value_type" | "builtin" | "any"; ref: string };
 export type NativeRole = { id: string; name?: string | null; concept: ConceptRef; position?: number | null; native_presence?: string[]; origin?: "platform" | "imported" | "migrated"; client_ref?: null; implicit_owner?: boolean };
-export type RoleConcept = { id: string; name?: string | null; concept: string; kind: ConceptRef["kind"] };
+export type RoleConcept = { id: string; name?: string | null; concept: string; kind: ConceptRef["kind"]; ref?: string };
 export type NativeFields = { native_presence?: string[]; position?: number | null; origin?: "platform" | "imported" | "migrated" };
 export type NativeRelationFields = NativeFields & { owner_ref?: ConceptRef; roles?: NativeRole[]; owner_role_id?: string; all_roles?: NativeRole[]; role_concepts?: RoleConcept[]; readonly?: boolean; endpoint_direction?: "forward" | "reverse"; owner_role_name?: string | null; legacy_multiplicity?: string | null };
 export type MappingStatus = { state: "queryable" | "readonly" | "unmapped"; reason: string | null; message: string | null; dataset_id: string | null };

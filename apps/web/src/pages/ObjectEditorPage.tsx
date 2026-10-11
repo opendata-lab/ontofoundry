@@ -311,7 +311,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                 </select>
               </label>
               <VerbalizationEditor
-                label="自然语言读法"
+                label="语义描述"
                 concepts={placeholders([
                   draft.object_types.find((t) => t.id === type.source_type_id)
                     ?.technical_name,
@@ -453,7 +453,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                     <th>数据类型</th>
                     <th>标识</th>
                     <th>必填</th>
-                    <th>读法</th>
+                    <th>语义描述</th>
                     <th />
                   </tr>
                 </thead>
@@ -595,7 +595,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                           />
                           <VerbalizationEditor
                             label={
-                              "「" + (a.name || a.technical_name) + "」读法"
+                              "「" + (a.name || a.technical_name) + "」语义描述"
                             }
                             concepts={placeholders([
                               type.technical_name,

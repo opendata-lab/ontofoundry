@@ -15,6 +15,7 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { EmptyModel } from "../components/EmptyModel";
 import { TagList } from "../components/TagList";
+import { ConceptTag } from "../components/ConceptTag";
 import { useSnapshot } from "../hooks/useSnapshot";
 
 export function TypeCatalogPage({
@@ -104,8 +105,14 @@ export function TypeCatalogPage({
                 )}
               </span>
             </div>
-            <h2>{item.name}</h2>
-            <p className="api-name">{item.technical_name}</p>
+            <div className="object-card-title">
+                <h2>{item.name}</h2>
+                {item.technical_name && item.technical_name !== item.name ? (
+                  <p className="api-name">{item.technical_name}</p>
+                ) : (
+                  item.description && <p className="api-name object-card-description" title={item.description}>{item.description}</p>
+                )}
+            </div>
             <div className="object-metrics">
               {"attributes" in item ? (
                 <>
@@ -144,24 +151,26 @@ export function TypeCatalogPage({
                   </span>
                 </>
               ) : relationReadOnly(item) ? (
-                <RelationshipRoles link={item} compact />
+                <RelationshipRoles link={item} compact conceptName={(id) => draft.object_types.find((t) => t.id === id)?.name} />
               ) : (
                 <p className="relation-endpoints">
-                  {
-                    draft.object_types.find((t) => t.id === item.source_type_id)
-                      ?.name
-                  }{" "}
-                  →{" "}
-                  {
-                    draft.object_types.find((t) => t.id === item.target_type_id)
-                      ?.name
-                  }
+                  <ConceptTag
+                    kind="object_type"
+                    label={draft.object_types.find((t) => t.id === item.source_type_id)?.name ?? "未指定"}
+                  />
+                  <span aria-hidden="true">→</span>
+                  <ConceptTag
+                    kind="object_type"
+                    label={draft.object_types.find((t) => t.id === item.target_type_id)?.name ?? "未指定"}
+                  />
                 </p>
               )}
             </div>
-            <div className="object-tags">
-              <TagList tags={item.tags} empty="未设置标签" />
-            </div>
+            {item.tags.length > 0 && (
+              <div className="object-tags">
+                <TagList tags={item.tags} />
+              </div>
+            )}
           </Link>
         ))}
       </div>

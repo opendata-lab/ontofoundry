@@ -1,4 +1,5 @@
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { HintedHeading } from "../HintIcon";
 import type { ActionElement } from "../../api/types";
 import {
   inheritedProperties,
@@ -62,7 +63,7 @@ export function ActionsPanel({
   return (
     <section className="element-section">
       <div className="element-section-title">
-        <h3>动作</h3>
+        <HintedHeading title="动作" hint="动作描述业务操作，当前不可执行。" />
         {canEdit && (
           <button type="button" className="element-text-button" onClick={add}>
             <Plus size={14} />
@@ -503,7 +504,6 @@ export function ActionsPanel({
         );
       })}
       {!actions.length && <p className="element-empty">暂无动作。</p>}
-      <p className="element-note">动作描述业务操作，当前不可执行。</p>
     </section>
   );
 }
