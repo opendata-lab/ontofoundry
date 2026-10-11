@@ -16,7 +16,7 @@ from ontofoundry_api.api.instances import (
     database_object,
 )
 from ontofoundry_api.domain.instance_validation import value_issues
-from ontofoundry_api.domain.runtime_views import mappings_of
+from ontofoundry_api.domain.semantic_views import SemanticViews
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.ontology_query import version_hashes
 from ontofoundry_api.services.public_projection import public_projection
@@ -75,12 +75,12 @@ def document_object(obj):
 
 
 def mapping_for(draft, type_id):
-    mapping = next((m for m in mappings_of(draft) if str(m.type_id) == str(type_id)), None)
-    if not mapping:
-        raise HTTPException(
-            422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"}
-        )
-    return mapping
+    analysis = SemanticViews(draft).analyze(type_id)
+    if analysis.reason:
+        raise HTTPException(422, {"code": "COMPLEX_MAPPING_READ_ONLY", "message": "复杂映射：暂只读", "reason": analysis.reason})
+    if not analysis.mapping:
+        raise HTTPException(422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"})
+    return analysis.mapping
 
 
 def search_objects(db, version, options: ObjectSearch, settings):

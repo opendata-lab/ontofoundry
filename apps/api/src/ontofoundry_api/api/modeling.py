@@ -24,6 +24,7 @@ from ontofoundry_api.domain.instance_validation import (
     instance_issues,
 )
 from ontofoundry_api.domain.models import DataJoin, DataMapping, OntologyDraft
+from ontofoundry_api.domain.role_join import RoleJoin, role_join_input
 from ontofoundry_api.domain.runtime_views import apply_mapping_form, legacy_mapping_form
 from ontofoundry_api.domain.snapshot import (
     as_v3_dict,
@@ -64,11 +65,11 @@ router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"]
 
 class LegacyFormRequest(BaseModel):
     legacy_mappings: list[DataMapping] | None = None
-    legacy_joins: dict[str, DataJoin | None] | None = None
+    legacy_joins: dict[str, RoleJoin | DataJoin | None] | None = None
 
     def form_values(self):
         return (None if self.legacy_mappings is None else [m.model_dump(mode="json") for m in self.legacy_mappings],
-                None if self.legacy_joins is None else {key: value.model_dump(mode="json") if value else None for key, value in self.legacy_joins.items()})
+                None if self.legacy_joins is None else {key: parsed.model_dump(mode="json") if (parsed := role_join_input(value.model_dump(mode="json") if value else None)) else None for key, value in self.legacy_joins.items()})
 
 
 class ElementSave(LegacyFormRequest):
@@ -78,6 +79,16 @@ class ElementSave(LegacyFormRequest):
     session_id: str | None = None
     expected_session_revision: int | None = None
     draft: dict
+
+
+def apply_element_mapping_form(snapshot, requested, kind, target_id):
+    """Publish only the selected mapping aggregate, preserving other draft work."""
+    form = legacy_mapping_form(snapshot)
+    if kind == "object_type":
+        form["mappings"] = [m for m in form["mappings"] if m["type_id"] != target_id] + [m for m in requested["mappings"] if m["type_id"] == target_id]
+    elif kind == "link_type":
+        form["joins"][target_id] = requested["joins"].get(target_id)
+    return apply_mapping_form(snapshot, form["mappings"], form["joins"])
 
 
 @router.post("/element-saves")
@@ -131,12 +142,14 @@ def save_element(
                              if previous_form["joins"].get(key) != requested_form["joins"].get(key)}
             if (changed_maps and (body.target_kind != "object_type" or any(m["type_id"] != body.target_id for m in changed_maps))) or (changed_joins and (body.target_kind != "link_type" or changed_joins != {body.target_id})):
                 raise ServiceError("映射表单包含其他元素的修改", code="ELEMENT_SCOPE_INVALID", status_code=422)
-            scoped = apply_mapping_form(scoped, mappings, joins)
+            scoped = apply_element_mapping_form(scoped, requested_form, body.target_kind, body.target_id)
         merge = three_way(base, latest, scoped, workspace_id)
         if merge.conflicts:
             raise ServiceError("此元素与最新内容存在冲突，请重新打开后核对", code="MERGE_CONFLICTS",
                                status_code=409, details={"conflicts": merge.conflicts})
         model = OntologyDraft.model_validate(merge.merged)
+        from ontofoundry_api.services.join_validation import validate_join_columns
+        validate_join_columns(db, workspace_id, original, model.model_dump(mode="json"), request.app.state.settings)
         version = publish_draft(db, workspace_id=workspace_id, draft=model, user_id=user.id,
                                 message="保存本体元素", commit=False)
         if item:
@@ -144,7 +157,8 @@ def save_element(
             # values of the element just saved (latest may add untouched fields).
             merged = model.model_dump(mode="json")
             updated_draft = scoped_draft(edited, merged, merged, body.target_kind, body.target_id)
-            updated_draft = apply_mapping_form(updated_draft, *body.form_values())
+            if mappings is not None or joins is not None:
+                updated_draft = apply_element_mapping_form(updated_draft, requested_form, body.target_kind, body.target_id)
             # CAS also protects SQLite and a proposal decision racing this request.
             changed = db.execute(update(ModelingSessionRecord).where(
                 ModelingSessionRecord.id == item.id,
@@ -575,6 +589,8 @@ def save_session(
         draft = apply_mapping_form(draft, *body.form_values())
     except ValueError as exc:
         raise ServiceError("映射表单无效：" + str(exc), code="MAPPING_FORM_INVALID", status_code=422) from exc
+    from ontofoundry_api.services.join_validation import validate_join_columns
+    validate_join_columns(db, workspace_id, session_draft(item), draft, request.app.state.settings)
     values = {"draft_json": draft}
     if body.title is not None:
         values["title"] = body.title
@@ -979,3 +995,18 @@ def compare_versions(
         "right": version_summary(right),
         **compare_snapshots(snapshot_of(left) if left else {}, snapshot_of(right)),
     }
+
+
+@router.get("/semantic-models")
+def semantic_models(
+    workspace_id: str,
+    session_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """Read-only semantic catalog, without internal fidelity metadata."""
+    from ontofoundry_api.domain.semantic_views import semantic_catalog
+    from ontofoundry_api.domain.snapshot import read_snapshot
+    require_member(db, workspace_id, user.id)
+    raw = get_modeling_session(db, workspace_id, session_id).draft_json if session_id else published_snapshot(workspace_id, db, user)
+    return semantic_catalog(read_snapshot(raw, workspace_id, target_version="3"))

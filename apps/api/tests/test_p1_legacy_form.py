@@ -37,14 +37,14 @@ def test_unchanged_form_never_rewrites_native_semantic_nodes(client, stem):
 def test_platform_mapping_identity_survives_export_reimport_and_retains_unrelated_native_nodes():
     document = json.loads((FIXTURES / 'REDACTED').read_text())
     draft, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode='replace')
-    target = draft['object_types'][0]
+    target = next(t for t in draft['object_types'] if t['concept'] == 'REDACTED')
     # B's complex source nodes are retained even when a new simple table path is added.
     old_models = deepcopy(draft['semantic_models'])
     old_nodes = deepcopy(draft['mapping_nodes'])
     mapping = dict(id=str(uuid4()), type_id=target['id'], connection_alias='platform_new', schema_name=None,
                    table_name='governance', key_column='id', fields={})
     existing = legacy_mapping_form(draft)
-    updated = apply_mapping_form(draft, [mapping], {key: None for key in existing['joins']})
+    updated = apply_mapping_form(draft, [*existing['mappings'], mapping], {key: None for key in existing['joins']})
     assert updated['mappings'] == []
     assert all(model in updated['semantic_models'] for model in old_models)
     assert all(node in updated['mapping_nodes'] for node in old_nodes)

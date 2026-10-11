@@ -135,8 +135,18 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     snapshot = snapshot_of(version)
     objects = snapshot["material_objects"]
     links = snapshot["material_links"]
-    from ontofoundry_api.domain.runtime_views import query_compat
-    mappings = query_compat(snapshot).get("mappings", [])
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.domain.semantic_views import SemanticViews
+    model = OntologyDraft.model_validate(snapshot)
+    views = SemanticViews(model)
+    # A read-only native mapping still belongs in the member's overview. Counts
+    # describe native mappings; queryability comes from the same instance view.
+    mappings = []
+    for cm in model.concept_mappings:
+        analysis = views.analyze(cm.concept_id.ref)
+        mappings.append({"id": str(cm.id), "type_id": str(cm.concept_id.ref),
+                         "table_name": analysis.mapping.table_name if analysis.mapping else "复杂映射：暂只读",
+                         "state": analysis.public(cm.concept_id.ref)["state"], "reason": analysis.reason})
     sample_objects = [
         {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]
     ]
@@ -159,7 +169,7 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
             if item["source_id"] in sample_ids and item["target_id"] in sample_ids
         ][:48],
         "mappings": [
-            {key: item[key] for key in ("id", "type_id", "table_name")}
+            {key: item[key] for key in ("id", "type_id", "table_name", "state", "reason")}
             for item in mappings[:24]
         ],
     }

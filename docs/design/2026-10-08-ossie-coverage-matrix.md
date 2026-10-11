@@ -158,3 +158,13 @@ A = `REDACTED`；B = `REDACTED`。次数按 schema 引用作用域计数，统�
 ## 待后续阶段决定的实现细节
 
 没有阻塞 P0 的数据形状未决点。P1/M6 按产品修订清理非 v3 会话，保留版本纯读迁移与新会话 revision CAS，落实角色顺序合并与端点只读保护；P2 已接入 v4 例外注册表与紧凑命名空间、可逆扩展覆盖/字符串上下文、概念上下文编辑/提案与 MCP 同义词来源；新增导出省略冗余显示名、默认规则元数据与空集合，已有扩展覆盖仍可逆。MCP/REST 查询使用独立对外投影，过滤保真位置/来源等内部字段（原生开放上下文与实例属性保留原意），完整编辑草稿保留保真字段；碰撞以导入说明及非阻断预览警告展示。概念上下文仅存 extension_v4.concept_context，编辑/提案的同名字段是输入投影；不改变原生节点或旧元素哈希，另固定并验证上下文 before 防止并发覆盖。MCP 文档级同义词只命中文档候选，语义层 field/dataset/metric 别名只属于对应节点，歧义保留全部候选。P3 实现 mapping_view/join_view、复杂映射只读交互与 schema 全构造无损往返。这些不能改变本文冻结的数据形状和哈希算法。
+
+### P3 M6：关系连接输入的角色合同（2026-10-10）
+
+v3 提案 `link_type.after.data_join`、编辑表单 `legacy_joins` 及其读取投影使用 `{owner_columns: [...], role_columns: [...]}`：owner_columns 属于 owner_ref 所属概念的物理表，role_columns 属于 roles[0].concept 的物理表；两数组非空、等长，按位置逐列等值。仅两个实体角色的二元关系支持此输入，多元/复杂/跨连接仍按 P3 只读边界处理。例：订单 owner=order、roles=[customer] 时为 `[customer_id]` / `[id]`；明细 owner=order_item、roles=[order] 时为 `[order_id]` / `[id]`。
+
+旧 v3 `source_column`/`target_column` 拼写继续接受，但 source **始终表示 owner**，target 表示附加角色，不按 source_type_id/target_type_id 或 endpoint_direction 猜测。不得同时提供两组拼写。解析后规范为 owner_columns/role_columns；它是平台瞬时写入 DTO，持久化仍只有原生 dataset field/relationship/mapping tree，不改变冻结 v3 形状或 canonical。SQL join_view 是内部端点投影，reverse 时交换 owner/role 列以执行旧双向端点查询；前端转换明确输入/输出此角色 DTO，二元关系现有端点界面继续工作。
+
+v1/v2 **已存快照**继续按其原版本 source_type_id/target_type_id 解释旧 data_join，读时迁移不得重解释历史数据。原生 Ossie 的 from/to/from_columns/to_columns 保持原文，不从平台兼容方向推断。
+
+接受/保存的连接发生变化时，在同一写事务内检查已有数据资产快照（优先）或可获取的连接元数据；对应物理列缺失返回 422 `JOIN_COLUMN_NOT_FOUND`，包含 link_id、owner/role 侧、表、缺失 columns，草稿 revision 与提案决定均不推进。无已知表结构的离线连接仍可建模，查询时保留具体缺失字段诊断。瞬时 data_join 不参加原生元素 expected_target_hash，避免派生结构使待处理原生提案被错误标记 stale；原生元素哈希合同不变。

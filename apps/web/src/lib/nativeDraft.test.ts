@@ -112,3 +112,33 @@ it("keeps public value concept context in the catalog projection", () => {
   expect(view.value_types?.[0]).toMatchObject({ id: value.id, concept_kind: "value_type", concept_context: context });
   expect(view.object_types).toEqual([]);
 });
+
+describe("P3 owner join form contract", () => {
+  it.each([false, true])("converts explicit owner columns to endpoint UI and back (reverse=%s)", (reverse) => {
+    const original = nativeFixture();
+    const link = original.link_types[0];
+    link.endpoint_direction = reverse ? "reverse" : "forward";
+    link.legacy_multiplicity = reverse ? "one_to_many" : "many_to_one";
+    original._legacy_form = { mappings: [], joins: { [link.id]: { owner_columns: ["customer_id"], role_columns: ["id"] } } };
+    const edited = editorDraft(original);
+    expect(edited.link_types[0].data_join).toEqual(reverse
+      ? { source_column: "id", target_column: "customer_id" }
+      : { source_column: "customer_id", target_column: "id" });
+    const saved = nativeFromEditor(original, edited) as NativeDraft;
+    expect(saved._legacy_form?.joins[link.id]).toEqual({ owner_columns: ["customer_id"], role_columns: ["id"] });
+    expect(saved.link_types[0]).toEqual(original.link_types[0]);
+  });
+  it("retains every owner/role composite key while displaying the reversed endpoint pairs", () => {
+    const original = nativeFixture();
+    const link = original.link_types[0];
+    link.endpoint_direction = "reverse";
+    link.legacy_multiplicity = "one_to_many";
+    const join = { owner_columns: ["customer_id", "tenant"], role_columns: ["id", "tenant_id"] };
+    original._legacy_form = { mappings: [], joins: { [link.id]: join } };
+    const edited = editorDraft(original);
+    expect(edited.link_types[0].data_join?.source_columns).toEqual(["id", "tenant_id"]);
+    expect(edited.link_types[0].data_join?.target_columns).toEqual(["customer_id", "tenant"]);
+    const saved = nativeFromEditor(original, edited) as NativeDraft;
+    expect(saved._legacy_form?.joins[link.id]).toEqual(join);
+  });
+});

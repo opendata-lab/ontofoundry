@@ -3,7 +3,7 @@
 import { materialLinkEndpoints } from "./instanceGraph";
 import type {
   ConceptRef, Draft, DraftView, LegacyDraft, NativeConcept,
-  NativeDraft, NativeLink, NativeProperty, NativeRole, RuleElement,
+  NativeDraft, NativeLink, NativeProperty, NativeRole, RuleElement, JoinView, RoleJoin,
 } from "../api/types";
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -11,6 +11,13 @@ const bases: Record<string, string> = { string: "String", integer: "Integer", de
 
 export function relationReadOnly(link: { owner_ref?: ConceptRef; roles?: NativeRole[]; readonly?: boolean }) {
   return link.readonly || (!!link.owner_ref && (link.owner_ref.kind !== "object_type" || link.roles?.length !== 1 || link.roles[0].concept.kind !== "object_type"));
+}
+
+function endpointJoin(join: RoleJoin | JoinView | null | undefined, reverse: boolean): JoinView | null {
+  if (!join) return null;
+  if (!("owner_columns" in join)) return join;
+  const [source, target] = reverse ? [join.role_columns, join.owner_columns] : [join.owner_columns, join.role_columns];
+  return { source_column: source[0], target_column: target[0], ...(source.length > 1 ? { source_columns: source, target_columns: target } : {}) };
 }
 
 export function editorDraft(source: Draft): LegacyDraft {
@@ -29,7 +36,7 @@ export function editorDraft(source: Draft): LegacyDraft {
       multiplicity: link.legacy_multiplicity ?? (link.multiplicity === "OneToOne" ? "one_to_one" : link.multiplicity === "ManyToOne" ? "many_to_one" : ""),
       source_role_name: forward ? link.owner_role_name : link.roles[0]?.name,
       target_role_name: forward ? link.roles[0]?.name : link.owner_role_name,
-      data_join: draft._legacy_form?.joins[link.id] ?? null,
+      data_join: endpointJoin(draft._legacy_form?.joins[link.id], !forward),
       role_concepts: [{ id: link.owner_role_id ?? `owner:${link.id}`, name: link.owner_role_name, concept: concepts.get(owner)?.concept ?? owner, kind: link.owner_ref.kind },
         ...link.roles.map(r => ({ id: r.id, name: r.name, concept: concepts.get(r.concept.ref)?.concept ?? r.concept.ref, kind: r.concept.kind }))],
     };
@@ -42,6 +49,7 @@ export function editorDraft(source: Draft): LegacyDraft {
     link_types: links, rules: structuredClone(draft.rules), actions: structuredClone(draft.actions),
     material_objects: structuredClone(draft.material_objects), material_links: draft.material_links.map(fact => ({ ...structuredClone(fact), ...materialLinkEndpoints(fact, draft.link_types.find(r => r.id === fact.type_id)) })),
     mappings: structuredClone(draft._legacy_form?.mappings ?? []),
+    mapping_status: structuredClone(draft._legacy_form?.mapping_status),
   };
 }
 
@@ -177,7 +185,13 @@ export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
   result.material_objects = structuredClone(edited.material_objects);
   result.material_links = structuredClone(edited.material_links);
   result.ontology_requires = [...edited.ontology_requires];
-  result._legacy_form = { mappings: structuredClone(edited.mappings), joins: Object.fromEntries(edited.link_types.filter(l => !relationReadOnly(l)).map(l => [l.id, l.data_join ?? null])) };
+  result._legacy_form = { mapping_status: original._legacy_form?.mapping_status, mappings: structuredClone(edited.mappings), joins: Object.fromEntries(edited.link_types.filter(l => !relationReadOnly(l)).map(l => {
+    if (!l.data_join) return [l.id, null];
+    const source = l.data_join.source_columns ?? [l.data_join.source_column];
+    const target = l.data_join.target_columns ?? [l.data_join.target_column];
+    const reverse = result.link_types.find(r => r.id === l.id)?.endpoint_direction === "reverse";
+    return [l.id, { owner_columns: reverse ? target : source, role_columns: reverse ? source : target }];
+  })) };
   return result;
 }
 
