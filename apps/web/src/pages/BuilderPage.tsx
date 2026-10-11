@@ -54,6 +54,7 @@ export function BuilderPage() {
   const [running, setRunning] = useState(false);
   const proposals = useProposals(session, setSession, model.reload);
   const reloadProposals = proposals.reload;
+  const reloadModel = model.reload;
   // A stale proposal is re-modelled by the user, not automatically: fill the
   // composer and focus it, never send.
   const remodel = (text: string) => {
@@ -142,7 +143,7 @@ export function BuilderPage() {
       // The BFF bumps the session revision when it accepts a run. Without
       // resyncing, every later save and publish would carry a stale
       // revision and be rejected.
-      if (active) model.reload();
+      if (active) reloadModel();
     };
 
     const onComplete = (event: Event) => {
@@ -150,7 +151,7 @@ export function BuilderPage() {
       // Reload on any terminal state: a modeling result is stored (a new
       // proposal batch, or a replaced draft for a legacy run) before
       // completion is reported.
-      model.reload();
+      reloadModel();
       reloadProposals();
       const { metadata } = (event as CustomEvent<CompleteDetail>).detail;
       if (metadata?.mode === "model") setError("");
@@ -162,7 +163,7 @@ export function BuilderPage() {
       // POST /messages claims the run and advances the revision before any
       // remote call. Even a reported transport/configuration failure can
       // therefore leave this page's session snapshot one revision behind.
-      model.reload();
+      reloadModel();
     };
 
     el.addEventListener("dataagent-run-change", onRun);
@@ -173,10 +174,17 @@ export function BuilderPage() {
       el.removeEventListener("dataagent-complete", onComplete);
       el.removeEventListener("dataagent-error", onError);
     };
-  }, [model, setError, reloadProposals]);
+  }, [reloadModel, setError, reloadProposals]);
 
   // A session that does not exist yet is created on first send, so opening the
   // page never mints an empty conversation.
+  // `model` is a new object on every render. Every property assigned to the
+  // element makes it re-render its whole conversation, so assign each one only
+  // when its value really changes and read the latest `ensure` through a ref.
+  const ensure = useRef(model.ensure);
+  useLayoutEffect(() => {
+    ensure.current = model.ensure;
+  });
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
@@ -191,11 +199,15 @@ export function BuilderPage() {
     // the user as a file.
     el.showAttachments = false;
     el.endpointResolver = async () =>
-      `/api/v1/workspaces/${workspace.id}/sessions/${(await model.ensure()).id}/agent-conversation`;
+      `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current()).id}/agent-conversation`;
+  }, [workspace.id]);
+  useLayoutEffect(() => {
+    const el = conversation.current;
+    if (!el) return;
     el.endpoint = sessionId
       ? `/api/v1/workspaces/${workspace.id}/sessions/${sessionId}/agent-conversation`
       : "";
-  }, [model, sessionId, workspace.id]);
+  }, [sessionId, workspace.id]);
 
   return (
     <div className="ref-builder">
