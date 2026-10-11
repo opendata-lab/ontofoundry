@@ -587,15 +587,14 @@ function Inspector({
                   <LinkIcon size={14} />
                   复制链接
                 </button>
-                {workspace.role && !previewHash && (
+                {workspace.role && !previewHash && type && !readOnly && (
                   <button
                     className="button button--primary"
                     type="button"
                     onClick={beginEdit}
-                    disabled={!type || loading || readOnly}
-                    title={readOnly ? "暂只读" : undefined}
+                    disabled={!type || loading}
                   >
-                    {readOnly ? "暂只读" : "编辑"}
+                    编辑
                   </button>
                 )}
               </>
