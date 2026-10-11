@@ -10,6 +10,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { HintIcon, HintedHeading } from "../HintIcon";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import type {
@@ -75,14 +76,19 @@ export function EvidenceSection({
 }
 export function Field({
   label,
+  hint,
   children,
 }: {
   label: string;
+  hint?: string;
   children: ReactNode;
 }) {
   return (
     <label className="element-field">
-      <span>{label}</span>
+      <span>
+        {label}
+        {hint && <HintIcon text={hint} />}
+      </span>
       {children}
     </label>
   );
@@ -120,14 +126,16 @@ export function BasicPanel(props: PanelProps) {
             <span className="element-value">{type.technical_name}</span>
           )}
         </Field>
-        <div className="element-field">
-          <span>标签</span>
-          {nativeEditing ? (
-            <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
-          ) : (
-            <TagList tags={type.tags} />
-          )}
-        </div>
+        {(nativeEditing || type.tags.length > 0) && (
+          <div className="element-field">
+            <span>标签</span>
+            {nativeEditing ? (
+              <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
+            ) : (
+              <TagList tags={type.tags} />
+            )}
+          </div>
+        )}
         {isObject(type) && type.concept_kind !== "value_type" && (
           <div className="element-field">
             <span>继承自</span>
@@ -184,8 +192,7 @@ export function BasicPanel(props: PanelProps) {
         </div>
         {context && (
           <div className="element-field-wide">
-            <p className="element-note">平台扩展，导出到其他工具会被忽略</p>
-            <Field label="同义词">
+            <Field label="同义词" hint="平台扩展，导出到其他工具会被忽略">
               {editing ? <textarea rows={3} placeholder="每行一个同义词" value={context.synonyms.join("\n")}
                 onChange={e => update({ concept_context: { ...context, synonyms: e.target.value.split("\n").filter(value => value !== "") } })} />
                 : <span className="element-value">{context.synonyms.join("、") || "尚未填写同义词"}</span>}
@@ -471,10 +478,13 @@ export function PropertiesPanel(props: PanelProps) {
 export function EndpointsPanel(props: PanelProps) {
   const { type, draft, editing, open } = props;
   if (isObject(type)) return null;
-  if (relationReadOnly(type)) return <section className="element-section"><RelationshipRoles link={type} /><p className="muted">暂只读</p></section>;
+  if (relationReadOnly(type)) {
+    const names = new Map<string, string>(draft.object_types.map((t) => [t.id, t.name]));
+    return <section className="element-section"><RelationshipRoles link={type} open={open} conceptName={(id) => names.get(id)} /></section>;
+  }
   return (
     <section className="element-section">
-      <h3>关系端点</h3>
+      <HintedHeading title="关系端点" hint="修改端点会影响关系映射与实例引用。" />
       <div className="element-endpoints">
         {(["source_type_id", "target_type_id"] as const).map((key, i) => (
           <div className="element-endpoint-group" key={key}>
@@ -556,10 +566,6 @@ export function EndpointsPanel(props: PanelProps) {
         />
         此关系用作标识
       </label>
-      <p className="element-note">
-        <Info size={15} />
-        修改端点会影响关系映射与实例引用。
-      </p>
     </section>
   );
 }
@@ -653,10 +659,7 @@ export function MappingPanel(
   return (
     <>
       <section className="element-section">
-        <h3>关系映射</h3>
-        <p className="element-note">
-          根据两端对象的数据映射，按字段相等查找关系。
-        </p>
+        <HintedHeading title="关系映射" hint="根据两端对象的数据映射，按字段相等查找关系。两端数据须来自同一数据源，跨数据源关系暂不可查询。" />
         <label className="element-checkbox">
           <input
             type="checkbox"
@@ -718,10 +721,6 @@ export function MappingPanel(
         ) : (
           <p className="element-empty">尚未配置关系映射。</p>
         )}
-        <p className="element-note">
-          <Info size={15} />
-          两端数据须来自同一数据源，跨数据源关系暂不可查询。
-        </p>
       </section>
       <MappingPreview draft={draft} type={type} />
     </>
@@ -823,7 +822,7 @@ function MappingPreview({
   if (!mappings.length) return null;
   return (
     <section className="element-section">
-      <h3>{isObject(type) ? "数据预览" : "端点数据预览"}</h3>
+      <HintedHeading title={isObject(type) ? "数据预览" : "端点数据预览"} hint="按需读取最多 10 条映射结果；查看全部实例请切换到“实例”。" />
       {mappings.map((m) => (
         <DataSample
           key={JSON.stringify(m)}
@@ -832,9 +831,6 @@ function MappingPreview({
           showSource={showSource}
         />
       ))}
-      <p className="element-note">
-        按需读取最多 10 条映射结果；查看全部实例请切换到“实例”。
-      </p>
     </section>
   );
 }
@@ -904,7 +900,7 @@ export function RulesPanel({ draft, type, editing, change }: PanelProps) {
   return (
     <section className="element-section">
       <div className="element-section-title">
-        <h3>规则</h3>
+        <HintedHeading title="规则" hint="规则用于模型校验与定义，当前不执行推理。" />
         {editing && (
           <button
             className="element-text-button"
@@ -1031,7 +1027,6 @@ export function RulesPanel({ draft, type, editing, change }: PanelProps) {
         </div>
       ))}
       {!rules.length && <p className="element-empty">暂无规则。</p>}
-      <p className="element-note">规则用于模型校验与定义，当前不执行推理。</p>
     </section>
   );
 }

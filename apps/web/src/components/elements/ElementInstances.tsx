@@ -1,6 +1,7 @@
 import { materialLinkEndpoints } from "../../lib/instanceGraph";
 import { databaseTypeHints, documentGapHints } from "../../lib/instanceHints";
 import { ArrowLeft, ArrowRight, Database, Search } from "lucide-react";
+import { HintedHeading } from "../HintIcon";
 import { useEffect, useState } from "react";
 import type { Draft, MaterialObject } from "../../api/types";
 import { workspaceRequest } from "../../api/client";
@@ -209,7 +210,7 @@ export function ElementInstances({
     );
     return (
       <section className="element-section">
-        <h3>关系实例</h3>
+        <HintedHeading title="关系实例" hint="查看数据库关系时，从源对象或目标对象的实例进入。" />
         <table className="element-table">
           <thead>
             <tr>
@@ -237,9 +238,6 @@ export function ElementInstances({
         {!materialLinks.length && (
           <p className="element-empty">暂无材料关系实例。</p>
         )}
-        <p className="element-note">
-          查看数据库关系时，从源对象或目标对象的实例进入。
-        </p>
         <button
           type="button"
           className="element-text-button"
