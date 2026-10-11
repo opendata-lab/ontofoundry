@@ -15,7 +15,7 @@ import {
 } from "react-router-dom";
 import { workspaceRequest } from "../api/client";
 import type { MaterialObject, MaterialLink } from "../api/types";
-import { instanceNeighborhood } from "../lib/instanceGraph";
+import { instanceCanvas, instanceNeighborhood } from "../lib/instanceGraph";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { usePageTab } from "../hooks/usePageTab";
@@ -175,7 +175,7 @@ export function InstancesPage() {
       <header className="breadcrumb-bar">
         <Link to={"../objects" + suffix}>
           <ArrowLeft size={14} />
-          业务对象
+          本体对象
         </Link>
         <span>/</span>
         <Link to={"../objects/" + type.id + suffix}>{type.name}</Link>
@@ -357,28 +357,7 @@ export function InstancesPage() {
               workspace_id: workspace.id,
               version_id: "instances",
               version_sha256: "",
-              nodes: neighborhoodGraph.objects
-                .filter((o, i, a) => a.findIndex((x) => x.id === o.id) === i)
-                .map((o) => ({
-                  id: o.id,
-                  kind: "object_type",
-                  label: o.name,
-                  technical_name:
-                    draft.object_types.find((t) => t.id === o.type_id)?.name ??
-                    "",
-                  description: databaseDetail ? "数据库实例" : "文档实例",
-                  tags: [],
-                })),
-              edges: neighborhoodGraph.links.map((l) => ({
-                id: l.id,
-                kind: "link_type",
-                label:
-                  draft.link_types.find((t) => t.id === l.type_id)?.name ??
-                  "关系",
-                technical_name: "document",
-                source: l.source_id,
-                target: l.target_id,
-              })),
+              ...instanceCanvas(neighborhoodGraph.objects.filter((o, i, a) => a.findIndex(x => x.id === o.id) === i), neighborhoodGraph.links, draft.object_types, draft.link_types),
             }}
             onSelect={(selected) => {
               if (selected?.category === "node") {

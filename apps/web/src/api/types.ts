@@ -20,6 +20,22 @@ export type User = {
   email: string | null;
 };
 
+export type ConceptRef = { kind: "object_type" | "value_type" | "builtin" | "any"; ref: string };
+export type NativeRole = { id: string; name?: string | null; concept: ConceptRef; position?: number | null; native_presence?: string[]; origin?: "platform" | "imported" | "migrated"; client_ref?: null; implicit_owner?: boolean };
+export type RoleConcept = { id: string; name?: string | null; concept: string; kind: ConceptRef["kind"] };
+export type NativeFields = { native_presence?: string[]; position?: number | null; origin?: "platform" | "imported" | "migrated" };
+export type NativeRelationFields = NativeFields & { owner_ref?: ConceptRef; roles?: NativeRole[]; owner_role_id?: string; all_roles?: NativeRole[]; role_concepts?: RoleConcept[]; readonly?: boolean; endpoint_direction?: "forward" | "reverse"; owner_role_name?: string | null; legacy_multiplicity?: string | null };
+export type MappingStatus = { state: "queryable" | "readonly" | "unmapped"; reason: string | null; message: string | null; dataset_id: string | null };
+export type JoinView = { source_column: string; target_column: string; source_columns?: string[]; target_columns?: string[] };
+export type RoleJoin = { owner_columns: string[]; role_columns: string[] };
+export type LegacyMappingForm = { mappings: DataMapping[]; joins: Record<string, RoleJoin | JoinView | null>; mapping_status?: Record<string, MappingStatus> };
+export type SemanticExpression = { dialects: { dialect: string; expression: string }[] };
+export type SemanticInfo = { id: string; name: string; description?: string | null; ai_context?: unknown };
+export type SemanticField = SemanticInfo & { expression: SemanticExpression; datatype?: string | null; dimension?: { is_time?: boolean | null } | null };
+export type SemanticDataset = SemanticInfo & { source: string; primary_key: string[]; unique_keys: string[][]; fields: SemanticField[] };
+export type SemanticMetric = SemanticInfo & { expression: SemanticExpression; datatype?: string | null; ambiguous?: boolean; concepts: { id: string; name: string; technical_name: string }[] };
+export type SemanticCatalog = { items: (SemanticInfo & { connection_alias: string | null; datasets: SemanticDataset[]; relationships: { id: string; name: string; from: string; to: string; from_columns: string[]; to_columns: string[] }[]; metrics: SemanticMetric[] })[]; mapping_status: Record<string, MappingStatus> };
+
 export type AttributeDefinition = {
   id: string;
   name: string;
@@ -39,6 +55,7 @@ export type AttributeDefinition = {
 };
 
 export type ObjectType = {
+  concept_context?: ConceptContext;
   id: string;
   kind: "object_type";
   name: string;
@@ -54,7 +71,7 @@ export type ObjectType = {
   inherited_attributes?: AttributeDefinition[];
 };
 
-export type LinkType = {
+export type LinkType = NativeRelationFields & {
   id: string;
   kind: "link_type";
   name: string;
@@ -63,16 +80,21 @@ export type LinkType = {
   tags: string[];
   source_type_id: string;
   target_type_id: string;
+  source_role_name?: string | null;
+  target_role_name?: string | null;
   multiplicity: string;
   attribute_count: 0;
   identifier?: boolean;
   requires?: string[];
   derived_by?: string[];
   verbalizes?: string[];
-  data_join?: { source_column: string; target_column: string } | null;
+  data_join?: JoinView | null;
 };
 
-export type OntologyType = ObjectType | LinkType;
+export type ValueType = Omit<ObjectType, "kind" | "extends" | "description" | "attributes" | "attribute_count"> & {
+  kind: "value_type"; concept: string; extends: ConceptRef[]; description: string | null;
+};
+export type OntologyType = ObjectType | LinkType | ValueType;
 
 export type VersionSummary = {
   workspace_id: string;
@@ -99,11 +121,15 @@ export type VersionSummary = {
 
 export type GraphNode = {
   id: string;
-  kind: "object_type" | "value_type";
+  kind: "object_type" | "value_type" | "link_type";
   label: string;
   technical_name: string;
   description: string;
   tags: string[];
+  roles?: NativeRole[];
+  all_roles?: NativeRole[];
+  verbalizes?: string[];
+  owner_ref?: ConceptRef;
   attribute_count?: number;
   value_kind?: string;
   identifier?: boolean;
@@ -111,11 +137,13 @@ export type GraphNode = {
 
 export type GraphEdge = {
   id: string;
-  kind: "attribute" | "link_type" | "extends";
+  kind: "attribute" | "link_type" | "extends" | "role";
   label: string;
   technical_name: string;
   source: string;
   target: string;
+  link_type_id?: string;
+  role_id?: string;
   multiplicity?: string;
   description?: string;
   tags?: string[];
@@ -187,11 +215,12 @@ export type MaterialObject = {
   values: Record<string, string | number | boolean | null>;
   evidence: Evidence[];
 };
-export type MaterialLink = {
+export type MaterialLink = NativeRelationFields & {
   id: string;
   type_id: string;
-  source_id: string;
-  target_id: string;
+  source_id: string | null;
+  target_id: string | null;
+  role_values?: { role_id: string; object_id?: string | null; value?: unknown }[];
   evidence: Evidence[];
 };
 export type DataMapping = {
@@ -209,14 +238,21 @@ export type DraftView = {
   workspace_id: string;
   requires: string[];
   object_types: ObjectDefinition[];
+  value_types?: ObjectTypeElement[];
   link_types: LinkDefinition[];
   objects: MaterialObject[];
   links: MaterialLink[];
   mappings: DataMapping[];
+  mapping_status?: Record<string, MappingStatus>;
 };
 
 // --- Stored draft (schema v2) ------------------------------------------------
-export type ObjectTypeElement = {
+export type ConceptContext = { synonyms: string[]; instructions: string | null };
+
+export type ObjectTypeElement = NativeFields & {
+  /** Read/edit projection; persisted only in extension_v4.concept_context. */
+  concept_context?: ConceptContext;
+  concept_kind?: "object_type" | "value_type";
   id: string;
   name: string;
   technical_name: string;
@@ -228,7 +264,7 @@ export type ObjectTypeElement = {
 export type PropertyElement = Omit<
   AttributeDefinition,
   "requires" | "derived_by" | "declared_by"
-> & { owner_type_id: string; evidence: Evidence[] };
+> & NativeRelationFields & { owner_type_id: string; evidence: Evidence[] };
 export type LinkTypeElement = Omit<LinkDefinition, "requires" | "derived_by"> & {
   evidence: Evidence[];
 };
@@ -237,7 +273,7 @@ export type RuleElement = {
   name: string;
   technical_name: string;
   description: string;
-  owner_kind: "object_type" | "property" | "link_type" | "action";
+  owner_kind: "object_type" | "value_type" | "property" | "link_type" | "action";
   owner_id: string;
   rule_kind: "constraint" | "derivation";
   expression: string;
@@ -267,11 +303,12 @@ export type ActionElement = {
   }[];
   evidence: Evidence[];
 };
-export type Draft = {
+export type LegacyDraft = {
   schema_version: "2";
   workspace_id: string;
   ontology_requires: string[];
   object_types: ObjectTypeElement[];
+  value_types?: ObjectTypeElement[];
   properties: PropertyElement[];
   link_types: LinkTypeElement[];
   rules: RuleElement[];
@@ -279,9 +316,29 @@ export type Draft = {
   material_objects: MaterialObject[];
   material_links: MaterialLink[];
   mappings: DataMapping[];
+  mapping_status?: Record<string, MappingStatus>;
 };
+export type NativeConcept = Omit<ObjectTypeElement, "extends" | "description" | "concept_context" | "concept_kind"> & { concept: string; description: string | null; extends: ConceptRef[]; identify_by: string[]; requires: string[]; derived_by: string[] };
+export type NativeLink = Omit<LinkTypeElement, "source_type_id" | "target_type_id" | "multiplicity" | "description" | "data_join"> & { owner_ref: ConceptRef; roles: NativeRole[]; multiplicity: "ManyToOne" | "OneToOne" | null; description: string | null; requires: string[]; derived_by: string[] };
+export type NativeProperty = NativeLink & { value_kind: string; required: boolean; identifier: boolean; owner_type_id?: never };
+export type NativeDraft = Omit<LegacyDraft, "schema_version" | "object_types" | "value_types" | "properties" | "link_types"> & {
+  schema_version: "3"; hash_algorithm: "ontofoundry-domain-v3";
+  object_types: NativeConcept[]; value_types: NativeConcept[];
+  properties: NativeProperty[]; link_types: NativeLink[];
+  document_origin: "platform" | "imported" | "migrated"; native_presence: string[];
+  ossie_version: string; ossie_name: string | null; ossie_description: string | null; ai_context: unknown;
+  semantic_models: { id: string; [key: string]: unknown }[];
+  datasets: unknown[]; dataset_fields: unknown[]; dataset_relationships: unknown[]; metrics: unknown[];
+  concept_mappings: unknown[]; mapping_nodes: unknown[];
+  core_version?: string | null; core_presence?: string[]; extension_v4: Record<string, unknown> & { concept_context?: Record<string, ConceptContext> };
+  /** Client-only copy of the existing mapping form; excluded from draft JSON. */
+  _legacy_form?: LegacyMappingForm;
+};
+export type Draft = LegacyDraft | NativeDraft;
+
 // --- Proposals (frontend contract §4) ---------------------------------------
 export type TargetKind =
+  | "value_type"
   | "object_type"
   | "property"
   | "link_type"
@@ -379,13 +436,21 @@ export type Impact = {
 export type PublishPreview = {
   session_revision: number;
   base_version_id: string | null;
+  /** The version the session started from; null for a blank start. */
+  base_version_number: number | null;
   current_version_id: string | null;
   current_version_number: number | null;
   next_version_number: number;
   current_version_sha256: string;
   merged_snapshot_sha256: string;
+  /** Actual merged v2 snapshot, including changes from other sessions. */
+  merged_model?: Draft;
   validation: VersionSummary["validation"];
   changes: ElementChange[];
+  /** Workspace constraints publishing changes; null when unchanged. */
+  requires_change: { before: string[]; after: string[] } | null;
+  /** Display labels by element id, across the current version and the merge. */
+  labels: Record<string, string>;
   impacts: Impact[];
   auto_merged: (ElementChange & { side: "latest" | "both" })[];
   ossie: Record<string, unknown> | null;
@@ -453,6 +518,7 @@ export type OssieImportReport = {
     links_updated: number;
     attributes_added: number;
     attributes_updated: number;
+    mappings_added?: number;
   };
   skipped: { path: string; reason: string }[];
   notes: string[];

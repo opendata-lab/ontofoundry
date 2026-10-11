@@ -4,6 +4,7 @@ import {
   Database,
   FileText,
   GitBranch,
+  ListChecks,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -13,13 +14,16 @@ import type {
   DraftView,
   ElementChange,
   ModelingSession,
+  TargetKind,
   TypeGraph,
 } from "../api/types";
 import type { ProposalsState } from "../hooks/useProposals";
 import { toView } from "../lib/draftView";
 import { EmptyModel } from "./EmptyModel";
+import { WorkspaceConstraints } from "./ReleaseReview";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
+import { useElementInspector } from "../hooks/useElementInspector";
 
 function draftGraph(draft: DraftView): TypeGraph {
   return {
@@ -70,13 +74,21 @@ export function ModelResults({
   proposals,
   running = false,
   onRemodel = () => undefined,
+  onSession,
+  onConstraintsDirty,
+  onConstraintsBusy,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
   running?: boolean;
   onRemodel?: (text: string) => void;
+  /** Saves edits made here (workspace constraints) back into the page's session. */
+  onSession?: (value: ModelingSession) => void;
+  onConstraintsDirty?: (dirty: boolean) => void;
+  onConstraintsBusy?: (busy: boolean) => void;
 }) {
   const [params, setParams] = useSearchParams();
+  const inspector = useElementInspector();
   const pending = session?.pending_proposal_count ?? 0;
   const requested = params.get("panel") as Panel | null;
   const [tab, setTabState] = useState<Panel>(
@@ -182,6 +194,13 @@ export function ModelResults({
     { key: "action", text: "Action", icon: Zap, count: actions.length, cls: "action" },
     { key: "instance", text: "材料实例", icon: FileText, count: model?.objects.length ?? 0, cls: "instance" },
     { key: "mapping", text: "映射", icon: Database, count: model?.mappings.length ?? 0, cls: "mapping" },
+    {
+      key: "constraint",
+      text: "空间约束",
+      icon: ListChecks,
+      count: session?.draft.ontology_requires?.length ?? 0,
+      cls: "rule",
+    },
   ];
   const warnings = session?.result_warnings ?? [];
   const visibleRows = rows.filter((r) =>
@@ -230,6 +249,21 @@ export function ModelResults({
               </button>
             ))}
           </div>
+          {kind === "constraint" ? (
+            session && onSession ? (
+              <WorkspaceConstraints
+                key={session.id}
+                session={session}
+                onSaved={onSession}
+                disabled={running}
+                onDirtyChange={onConstraintsDirty}
+                onBusyChange={onConstraintsBusy}
+              />
+            ) : (
+              <EmptyModel text="暂无构建结果" />
+            )
+          ) : (
+          <>
           <label className="ref-search results-search">
             <input
               aria-label="搜索模型"
@@ -269,9 +303,9 @@ export function ModelResults({
                         </tbody>
                       </table>
                     )}
-                    {session && kind === "object_type" && !r.deleted && (
-                      <Link className="button button--text" to={"../objects/" + r.id + "/edit?session=" + session.id}>
-                        编辑本体
+                    {session && !r.deleted && (
+                      <Link className="button button--text" to={inspector.href({ kind: (kind === "attribute" ? "property" : kind === "instance" ? "material_object" : kind) as TargetKind, id: r.id, sessionId: session.id })}>
+                        查看元素
                       </Link>
                     )}
                   </div>
@@ -282,17 +316,24 @@ export function ModelResults({
               <EmptyModel text={query ? "没有匹配的模型" : model ? "暂无此类模型" : "暂无构建结果"} />
             )}
           </div>
+          </>
+          )}
           {session && (
             <footer className="result-footnote">
-              会话草稿 · 基于 {session.base_version_id ? "已发布版本" : "空白模型"} · r{session.revision} ·
-              发布前需预览合并结果
+              本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
             </footer>
           )}
         </>
       ) : (
         <div className="result-graph">
           {model?.object_types.length ? (
-            <OntologyGraph graph={draftGraph(model)} query="" onSelect={() => undefined} />
+            <OntologyGraph graph={session?.graph ?? draftGraph(model)} query="" onSelect={(selected) => {
+              if (selected && session) {
+                if (selected.category === "node" && selected.item.kind === "value_type") return;
+                const object = selected.category === "node" && selected.item.kind === "object_type";
+                inspector.open({ kind: object ? "object_type" : "link_type", id: selected.category === "edge" ? selected.item.link_type_id ?? selected.item.id : selected.item.id, sessionId: session.id, tab: object ? "properties" : "endpoints" });
+              }
+            }} />
           ) : (
             <EmptyModel />
           )}

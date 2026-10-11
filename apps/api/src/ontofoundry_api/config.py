@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="ONTOFOUNDRY_",
         env_file=".env",
+        env_file_encoding="utf-8",
         extra="ignore",
     )
 
@@ -52,6 +53,7 @@ class Settings(BaseSettings):
     # "the URL the browser used", which is right when both share a network.
     public_base_url: str = ""
     connection_key: str = ""
+    metric_query_timeout_seconds: int = Field(default=15, ge=1, le=300)
     max_file_mb: int = 256
 
     @property

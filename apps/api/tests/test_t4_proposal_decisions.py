@@ -44,6 +44,15 @@ def seed_batch(client, session: dict, items: list[dict], run_token: str | None =
 
 
 def create(ref, kind, after):
+    after = dict(after)
+    if kind == "object_type":
+        after.setdefault("concept", after["technical_name"])
+    elif kind == "property":
+        after["owner_ref"] = {"kind": "object_type", "ref": after.pop("owner_type_id")}
+        after["roles"] = [{"concept": {"kind": "builtin", "ref": "String"}}]
+    elif kind == "link_type":
+        after["owner_ref"] = {"kind": "object_type", "ref": after.pop("source_type_id")}
+        after["roles"] = [{"concept": {"kind": "object_type", "ref": after.pop("target_type_id")}}]
     return {
         "client_ref": ref,
         "operation": "create",
@@ -60,7 +69,7 @@ def update(kind, element, **changes):
         "operation": "update",
         "target_kind": kind,
         "target_id": element["id"],
-        "expected_target_hash": element_sha256(element),
+        "expected_target_hash": element_sha256(element, hash_algorithm="ontofoundry-domain-v3", collection=kind + "s" if kind != "property" else "properties"),
         "before": element,
         "after": {**{k: v for k, v in element.items() if k != "id"}, **changes},
     }

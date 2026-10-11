@@ -1,6 +1,5 @@
 """Local API/SQLite contracts; no source database or LLM integration is claimed."""
 
-from copy import deepcopy
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
@@ -28,57 +27,36 @@ def test_overview_uses_one_published_snapshot_and_ignores_session_drafts(client)
 
 
 def add_private_test_snapshot(client):
-    # Only the disposable fixture database is changed; exercise response projection,
-    # including totals larger than the preview, independently of publishing fixtures.
+    """A valid native snapshot with bounded private previews, in fixture DB only."""
+    from uuid import UUID, uuid4, uuid5
+
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.domain.snapshot import as_v3_dict
+    from ontofoundry_api.ossie.native import compile_native, parse_native
+
     with client.app.state.session_factory() as db:
         version = current_version(db, str(DEMO_WORKSPACE_ID))
-        snapshot = deepcopy(version.snapshot_json)
-        type_id = snapshot["object_types"][0]["id"]
-        relation_id = snapshot["link_types"][0]["id"]
-        evidence = [
-            {
-                "kind": "material",
-                "id": "e0",
-                "material_id": "private-material",
-                "locator": {"line_start": 1, "line_end": 1},
-                "quote": "private-quote",
-            }
-        ]
-        snapshot["material_objects"] = [
-            {
-                "id": f"o{i}",
-                "name": f"private-object-{i}",
-                "type_id": type_id,
-                "values": {"secret": "private-value"},
-                "evidence": evidence,
-            }
-            for i in range(30)
-        ]
-        snapshot["material_links"] = [
-            {
-                "id": f"l{i}",
-                "type_id": relation_id,
-                "source_id": "o0",
-                "target_id": f"o{i % 30}",
-                "evidence": evidence,
-            }
-            for i in range(90)
-        ]
-        snapshot["mappings"] = [
-            {
-                "id": f"m{i}",
-                "type_id": type_id,
-                "table_name": f"private-table-{i}",
-                "connection_alias": "private-connection",
-                "fields": {"name": "private-column"},
-            }
-            for i in range(30)
-        ]
-        snapshot["link_types"][0]["data_join"] = {
-            "source_column": "private-column",
-            "target_column": "private-column",
-        }
-        version.snapshot_json = snapshot
+        original = OntologyDraft.model_validate(as_v3_dict(version.snapshot_json))
+        document = compile_native(original, 'overview', '')
+        document['ontology_mappings'] = [dict(name=f'private-connection-{i}', semantic_model={
+            'name': f'model_{i}', 'datasets': [{'name': 'supplier_rows', 'source': f'private-table-{i}',
+                                             'primary_key': ['key'], 'fields': []}],
+        }, concept_mappings=[{'concept': 'supplier', 'object_mappings': [{'expression': 'supplier_rows.key'}]}]) for i in range(30)]
+        snapshot = parse_native(document, str(DEMO_WORKSPACE_ID)).model_dump(mode='json')
+        source = next(t for t in snapshot['object_types'] if t['concept'] == 'supplier')
+        target = next(t for t in snapshot['object_types'] if t['concept'] == 'material')
+        relation = next(r for r in snapshot['link_types'] if r['technical_name'] == 'supplies')
+        evidence = [{'kind': 'material', 'id': str(uuid4()), 'material_id': 'private-material',
+                     'material_sha256': 'a' * 64, 'locator': {'line_start': 1, 'line_end': 1}, 'quote': 'private-quote'}]
+        objects = [dict(id=str(uuid4()), name=f'private-object-{i}', type_id=source['id'] if i == 0 else target['id'],
+                        values={'supplier_name' if i == 0 else 'material_name': 'private-value'}, evidence=evidence) for i in range(30)]
+        snapshot['material_objects'] = objects
+        owner_role = str(uuid5(UUID(relation['id']), 'role:owner'))
+        snapshot['material_links'] = [dict(id=str(uuid4()), type_id=relation['id'], source_id=objects[0]['id'],
+                                         target_id=objects[i % 29 + 1]['id'], evidence=evidence,
+                                         role_values=[{'role_id': owner_role, 'object_id': objects[0]['id']},
+                                                      {'role_id': relation['roles'][0]['id'], 'object_id': objects[i % 29 + 1]['id']}]) for i in range(90)]
+        version.snapshot_json = OntologyDraft.model_validate(snapshot).model_dump(mode='json')
         db.commit()
 
 
@@ -92,6 +70,7 @@ def test_member_overview_bounds_previews_and_omits_raw_evidence_and_configuratio
     assert details["evidence_material_count"] == 1
     assert details["mapping_count"] == 30
     assert len(details["objects"]) == len(details["mappings"]) == 24
+    assert all(m["state"] == "readonly" and m["reason"] == "multiple_concept_mappings" for m in details["mappings"])
     assert len(details["links"]) == 48
     ids = {o["id"] for o in details["objects"]}
     assert all(

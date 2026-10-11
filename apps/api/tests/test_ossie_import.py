@@ -16,7 +16,8 @@ from ontofoundry_api.domain.legacy_v1 import (
 from ontofoundry_api.domain.models import OntologyDraft, RuleKind
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.ossie.compiler import EXTENSION_VERSION, compile_ossie, validate_ossie
-from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
+from ontofoundry_api.ossie.importer import OssieImportError
+from ontofoundry_api.ossie.importer import import_ossie_v2 as import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
@@ -717,8 +718,24 @@ def test_merge_updates_matching_types_without_renaming_them():
     assert material.name == "物料"  # local business name wins on update
     assert material.description == "导入后的新说明"
     assert [a.technical_name for a in attrs(merged, material)][-1] == "shelf_life_days"
-    assert report["counts"]["objects_updated"] == 5
+    # Only 物料 changed; the other matched types are counted as unchanged.
+    assert report["counts"]["objects_updated"] == 1
     assert report["counts"]["attributes_added"] == 1
+
+
+def test_importing_the_same_file_twice_reports_nothing_updated():
+    draft = build_demo_draft()
+    document = demo_document()
+    first, _ = import_ossie(
+        document, workspace_id=str(draft.workspace_id),
+        base=draft.model_dump(mode="json"), mode="merge",
+    )
+    _, report = import_ossie(
+        document, workspace_id=str(draft.workspace_id), base=first, mode="merge",
+    )
+    counts = report["counts"]
+    assert counts["objects_added"] == counts["links_added"] == counts["attributes_added"] == 0
+    assert counts["objects_updated"] == counts["links_updated"] == counts["attributes_updated"] == 0
 
 
 def test_import_refuses_documents_that_are_not_valid_ossie():
@@ -855,7 +872,7 @@ def test_import_endpoint_rejects_invalid_files(client):
     assert "导入失败" in response.json()["detail"]
 
 
-def test_import_endpoint_accepts_v1_and_reports_unknown_extension_versions(client):
+def test_import_endpoint_accepts_v1_and_preserves_unknown_vendor_extension(client):
     draft = mapped_draft()
     response = client.post(
         ROOT + "/imports/ossie",
@@ -869,8 +886,12 @@ def test_import_endpoint_accepts_v1_and_reports_unknown_extension_versions(clien
         ROOT + "/imports/ossie",
         json={"document": unknown, "mode": "replace"},
     )
-    assert response.status_code == 422
-    assert "ONTOFOUNDRY_EXTENSION_VERSION_UNSUPPORTED" in response.json()["detail"]
+    assert response.status_code == 201, response.text
+    assert response.json()['draft']['ai_context'] == unknown['ai_context']
+    from ontofoundry_api.ossie.extensions import reverse_export_edits
+    exported = compile_ossie(OntologyDraft.model_validate(response.json()['draft']), ontology_name='ignored', ontology_description='ignored')
+    assert reverse_export_edits(exported) == unknown
+
 
 
 def test_relation_join_is_skipped_when_an_endpoint_has_no_data_mapping():
@@ -992,10 +1013,10 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
     key = next(
         item
         for item in snapshot["properties"]
-        if item["owner_type_id"] == issue["id"] and item["technical_name"] == "REDACTED"
+        if item["owner_ref"]["ref"] == issue["id"] and item["technical_name"] == "REDACTED"
     )
-    assert key["target_role_name"] == "key_role"
-    assert key["multiplicity"] == "many_to_one"
+    assert key["roles"][0]["name"] == "key_role"
+    assert key["multiplicity"] == "ManyToOne"
 
     exported = client.get(
         f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}/versions/{version_id}/export"

@@ -72,10 +72,12 @@ async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, A
                 ]
             )
         else:
+            # A gateway error or an unexpected answer says nothing about the
+            # site allow-list, so do not blame it.
             checks.extend(
                 [
-                    _check("连通性", True, "已连接 DataAgent"),
-                    _check("站点放行", False, str(exc), exc.hint),
+                    _check("连通性", False, str(exc), exc.hint),
+                    _skipped("站点放行", "DataAgent 请求失败", exc.hint),
                     _skipped("Agent 存在性", "DataAgent 请求失败", exc.hint),
                 ]
             )

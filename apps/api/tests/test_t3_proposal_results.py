@@ -88,7 +88,7 @@ def some_items(draft: dict) -> list[dict]:
             "target_id": None,
             "expected_target_hash": None,
             "before": None,
-            "after": {"name": "采购订单", "technical_name": "purchase_order"},
+            "after": {"name": "采购订单", "technical_name": "purchase_order", "concept": "purchase_order"},
         },
         {
             "client_ref": "po-no",
@@ -98,7 +98,8 @@ def some_items(draft: dict) -> list[dict]:
             "expected_target_hash": None,
             "before": None,
             "after": {
-                "owner_type_id": {"client_ref": "po"},
+                "owner_ref": {"kind": "object_type", "ref": {"client_ref": "po"}},
+                "roles": [{"concept": {"kind": "builtin", "ref": "String"}}],
                 "name": "订单号",
                 "technical_name": "order_no",
             },
@@ -107,7 +108,7 @@ def some_items(draft: dict) -> list[dict]:
             "operation": "update",
             "target_kind": "object_type",
             "target_id": target["id"],
-            "expected_target_hash": element_sha256(target),
+            "expected_target_hash": element_sha256(target, hash_algorithm="ontofoundry-domain-v3", collection="object_types"),
             "before": target,
             "after": {**{k: v for k, v in target.items() if k != "id"}, "description": "提案修改"},
         },
@@ -291,7 +292,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
 
     context = json.loads(next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-")))
     first = session["draft"]["object_types"][0]
-    assert context["element_hashes"][first["id"]] == element_sha256(first)
+    assert context["element_hashes"][first["id"]] == element_sha256(first, hash_algorithm="ontofoundry-domain-v3", collection="object_types")
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt

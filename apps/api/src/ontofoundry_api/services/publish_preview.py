@@ -8,19 +8,20 @@ are exactly what the user previewed.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
 from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
-from ontofoundry_api.domain.snapshot import empty_snapshot
+from ontofoundry_api.domain.snapshot import as_v3_dict
 
 from .element_diff import element_changes, element_label
 from .merge import merge_snapshots
 
 COLLECTION_KIND = {collection: kind.value for kind, collection in COLLECTIONS.items()}
 # Fields whose values are sets: both sides' additions can be kept together.
-SET_FIELDS = {"tags", "extends", "precondition_rule_ids", "ontology_requires"}
+SET_FIELDS = {"tags", "precondition_rule_ids"}
 
 
 @dataclass
@@ -43,8 +44,9 @@ def three_way(
     workspace_id: str,
     resolutions: dict[str, Any] | None = None,
 ) -> Merge:
-    base = base or empty_snapshot(workspace_id)
-    latest = latest or empty_snapshot(workspace_id)
+    base = as_v3_dict(base, workspace_id)
+    latest = as_v3_dict(latest, workspace_id)
+    draft = deepcopy(draft) if draft.get("schema_version") == "3" else as_v3_dict(draft, workspace_id)
     merged, raw = merge_snapshots(base, latest, draft, resolutions)
     elements = {
         str(e["id"]): (COLLECTION_KIND[c], e)
@@ -92,6 +94,29 @@ def auto_merged(merge: Merge) -> list[dict[str, Any]]:
     theirs = element_changes(merge.base, merge.latest)
     mine = {c["element_id"] for c in element_changes(merge.base, merge.draft)}
     return [{**c, "side": "both" if c["element_id"] in mine else "latest"} for c in theirs]
+
+
+def requires_change(merge: Merge) -> dict[str, list[str]] | None:
+    """The workspace constraints publishing changes, or None. They are a set:
+    reordering alone changes nothing."""
+    before = list(merge.latest.get("ontology_requires") or [])
+    after = list(merge.merged.get("ontology_requires") or [])
+    return None if before == after else {"before": before, "after": after}
+
+
+def element_labels(*snapshots: dict[str, Any]) -> dict[str, str]:
+    """Display labels by element id, so the preview names references in any
+    of the snapshots, including ones only the latest version or the merge has."""
+    labels: dict[str, str] = {}
+    for snapshot in snapshots:
+        elements = {
+            str(e["id"]): (kind.value, e)
+            for kind, collection in COLLECTIONS.items()
+            for e in snapshot.get(collection) or []
+        }
+        for element_id, (kind, element) in elements.items():
+            labels[element_id] = element_label(kind, element, elements)
+    return labels
 
 
 def impacts(changes: list[dict[str, Any]], merged: dict[str, Any]) -> list[dict[str, Any]]:

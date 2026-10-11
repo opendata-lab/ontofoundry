@@ -21,6 +21,7 @@ import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useModeling } from "../hooks/useModeling";
 import { MappingForm } from "../components/MappingForm";
 import { VerbalizationEditor } from "../components/VerbalizationEditor";
+import { TagList } from "../components/TagList";
 import { placeholders, valueConcept } from "../lib/verbalization";
 import { usePageTab } from "../hooks/usePageTab";
 
@@ -175,7 +176,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
           }
         >
           <ArrowLeft size={14} />
-          {relation ? "本体关系" : "业务对象"}
+          {relation ? "本体关系" : "本体对象"}
         </Link>
         <span>/</span>
         <span>编辑本体 {type.name && "【" + type.name + "】"}</span>
@@ -264,6 +265,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                     })
                   }
                 />
+                <TagList tags={type.tags} />
               </label>
               <label className="section-field">
                 <span>描述</span>
@@ -666,7 +668,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
             ? issues.length
               ? "草稿已保存，请修正校验问题后发布"
               : "草稿已保存"
-            : "修改保存在会话草稿中"}
+            : "修改保存在本会话中"}
         </span>
         <div className="toolbar-spacer" />
         {step > 0 && (

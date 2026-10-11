@@ -16,8 +16,10 @@ from ontofoundry_api.api.instances import (
     database_object,
 )
 from ontofoundry_api.domain.instance_validation import value_issues
+from ontofoundry_api.domain.semantic_views import SemanticViews
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.ontology_query import version_hashes
+from ontofoundry_api.services.public_projection import public_projection
 
 
 class ObjectSearch(BaseModel):
@@ -73,16 +75,16 @@ def document_object(obj):
 
 
 def mapping_for(draft, type_id):
-    mapping = next((m for m in draft.mappings if str(m.type_id) == str(type_id)), None)
-    if not mapping:
-        raise HTTPException(
-            422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"}
-        )
-    return mapping
+    analysis = SemanticViews(draft).analyze(type_id)
+    if analysis.reason:
+        raise HTTPException(422, {"code": "COMPLEX_MAPPING_READ_ONLY", "message": "复杂映射：暂只读", "reason": analysis.reason})
+    if not analysis.mapping:
+        raise HTTPException(422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"})
+    return analysis.mapping
 
 
 def search_objects(db, version, options: ObjectSearch, settings):
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
     if options.type_id and options.type_id not in {t.id for t in draft.object_types}:
         raise HTTPException(404, "业务对象类型不存在")
     context = [
@@ -166,7 +168,7 @@ def search_objects(db, version, options: ObjectSearch, settings):
 
 def get_object(db, version, ref, settings):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
     if source == "document":
         obj = next((obj for obj in draft.material_objects if str(obj.id) == identity), None)
         if not obj:
@@ -195,7 +197,7 @@ def get_object(db, version, ref, settings):
 
 def object_neighborhood(db, version, ref, depth, settings):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
     if source == "database":
         result = database_neighborhood(
             db,
@@ -213,7 +215,7 @@ def object_neighborhood(db, version, ref, depth, settings):
         for _ in range(depth):
             following = set()
             for link in draft.material_links:
-                ends = {str(link.source_id), str(link.target_id)}
+                ends = {str(v.object_id) for v in link.role_values if v.object_id is not None}
                 if not frontier.intersection(ends):
                     continue
                 if len(visible | ends) > 100 or (
@@ -236,7 +238,24 @@ def object_neighborhood(db, version, ref, depth, settings):
             "source": source,
             "depth": depth,
         }
-    return {
+    from ontofoundry_api.domain.runtime_views import all_roles_of
+    definitions = {str(link.id): link for link in draft.link_types}
+    names = {obj["id"]: obj["name"] for obj in result["objects"]}
+    for fact in result["links"]:
+        link = definitions.get(str(fact["type_id"]))
+        if link is None:
+            continue
+        definition = link.model_dump(mode="json")
+        fact.update(owner_ref=definition["owner_ref"], roles=definition["roles"],
+                    owner_role_id=str(link.owner_role_id), all_roles=all_roles_of(definition))
+        if source == "database":
+            owner, extra = (fact["source_id"], fact["target_id"]) if link.endpoint_direction == "forward" else (fact["target_id"], fact["source_id"])
+            fact["role_values"] = [{"role_id": str(link.owner_role_id), "object_id": owner},
+                                   {"role_id": str(link.roles[0].id), "object_id": extra}]
+        if fact.get("source_id") is not None:
+            fact["source_name"] = names.get(fact["source_id"], fact["source_id"])
+            fact["target_name"] = names.get(fact["target_id"], fact["target_id"])
+    return public_projection({
         **envelope(version),
         **result,
         "data_mode": "live" if source == "database" else "snapshot",
@@ -247,4 +266,4 @@ def object_neighborhood(db, version, ref, depth, settings):
                 draft, UUID(item["type_id"]), item["values"], item["ref"]
             )
         ],
-    }
+    })

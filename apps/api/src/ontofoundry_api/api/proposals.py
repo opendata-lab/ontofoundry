@@ -8,7 +8,7 @@ from copy import deepcopy
 from typing import Any, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
@@ -35,7 +35,7 @@ from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraf
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
 from ontofoundry_api.services.errors import ConflictError, ServiceError
-from ontofoundry_api.services.identities import check_identities
+from ontofoundry_api.services.identities import check_identities, element_kinds
 from ontofoundry_api.services.proposals import batch_items as _batch_items
 from ontofoundry_api.services.proposals import (
     dependency_group,
@@ -132,6 +132,8 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
 
 
 def _session_elements(draft: dict) -> dict[str, tuple[str, dict]]:
+    from ontofoundry_api.domain.runtime_views import proposal_snapshot
+    draft = proposal_snapshot(draft)
     return {
         str(element["id"]): (kind.value, element)
         for kind, collection in COLLECTIONS.items()
@@ -177,7 +179,7 @@ def list_batches(
     ids = [b.id for b in page]
     items = _batch_items(db, ids, workspace_id, session_id)
     statuses = effective_statuses(
-        items, dependency_map(db, ids, workspace_id, session_id), session_draft(session)
+        items, dependency_map(db, ids, workspace_id, session_id), session.draft_json
     )
     by_batch: dict[str, list] = {}
     for item in items:
@@ -204,7 +206,7 @@ def read_batch(
     draft = session_draft(session)
     items = _batch_items(db, [batch.id], workspace_id, session_id)
     dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
-    statuses = effective_statuses(items, dependencies, draft)
+    statuses = effective_statuses(items, dependencies, session.draft_json)
     elements = _session_elements(draft)
     for item in items:
         for element in (item.after_json, item.before_json):
@@ -241,14 +243,36 @@ def _request_sha256(body: DecisionRequest) -> str:
 def _apply(draft: dict, item: ProposalItemRecord) -> None:
     collection = COLLECTIONS[ElementKind(item.target_kind)]
     elements = draft.setdefault(collection, [])
+    after = deepcopy(item.after_json)
+    if draft.get('schema_version') == '3' and item.target_kind in ('object_type', 'value_type'):
+        contexts = draft['extension_v4']['concept_context']
+        if item.operation == 'delete':
+            contexts.pop(item.target_id, None)
+        elif 'concept_context' in after:
+            context = after.pop('concept_context')
+            if context is None:
+                contexts.pop(item.target_id, None)
+            else:
+                contexts[item.target_id] = context
     if item.operation == "create":
-        elements.append(deepcopy(item.after_json))
+        elements.append(after)
     elif item.operation == "update":
         draft[collection] = [
-            deepcopy(item.after_json) if str(e["id"]) == item.target_id else e for e in elements
+            after if str(e["id"]) == item.target_id else e for e in elements
         ]
     else:
         draft[collection] = [e for e in elements if str(e["id"]) != item.target_id]
+    if draft.get("schema_version") == "3" and item.target_kind == "rule":
+        for owner_collection in ("object_types", "value_types", "properties", "link_types"):
+            for owner in draft[owner_collection]:
+                for key, kind in (("requires", "constraint"), ("derived_by", "derivation")):
+                    belongs = item.after_json and item.after_json["owner_id"] == owner["id"] and item.after_json["rule_kind"] == kind
+                    refs = owner.get(key, [])
+                    if belongs and item.target_id not in refs:
+                        owner[key] = [*refs, item.target_id]
+                        owner["native_presence"] = list(dict.fromkeys([*owner.get("native_presence", []), key]))
+                    elif not belongs and item.target_id in refs:
+                        owner[key] = [ref for ref in refs if ref != item.target_id]
 
 
 def _topological(items: list[ProposalItemRecord], dependencies: dict[str, list[str]]):
@@ -273,6 +297,7 @@ def decide(
     workspace_id: str,
     session_id: str,
     body: DecisionRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -372,9 +397,32 @@ def decide(
                 )
 
     # Apply accepted items in dependency order and validate the whole draft.
+    before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
+    from ontofoundry_api.domain.runtime_views import (
+        apply_legacy_mappings,
+        legacy_mapping_form,
+    )
+    compatibility = legacy_mapping_form(draft)
+    joins = compatibility["joins"]
+    compatibility_changed = False
     for item in accepted_items:
+        if item.target_kind == "mapping":
+            _apply(compatibility, item)
+            compatibility_changed = True
+            continue
         _apply(draft, item)
+        if item.target_kind == "link_type" and item.after_json and "data_join" in item.after_json:
+            joins[item.target_id] = item.after_json["data_join"]
+            for link in draft["link_types"]:
+                if link["id"] == item.target_id:
+                    link.pop("data_join", None)
+            compatibility_changed = True
+    if compatibility_changed:
+        try:
+            draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
+        except ValueError as exc:
+            raise _fail(422, "VALIDATION_FAILED", "映射提案无效：" + str(exc)) from exc
     if accepted_items:
         try:
             model = OntologyDraft.model_validate(draft)
@@ -386,6 +434,8 @@ def decide(
                 f"接受后草稿校验未通过：{message}",
                 items=[{"proposal_id": i.id, "reason": message} for i in accepted_items],
             ) from exc
+        from ontofoundry_api.services.join_validation import validate_join_columns
+        validate_join_columns(db, workspace_id, before_mapping_write, model.model_dump(mode="json"), request.app.state.settings)
         check_identities(
             db,
             workspace_id,
@@ -396,6 +446,7 @@ def decide(
             },
         )
         draft = model.model_dump(mode="json")
+        check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
     new_revision = session.revision + 1 if accepted_items else session.revision
@@ -416,7 +467,7 @@ def decide(
         item.decided_by, item.decided_at = user.id, now
     db.flush()
     after_statuses = effective_statuses(
-        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session_draft(session)
+        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session.draft_json
     )
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]

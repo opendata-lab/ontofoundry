@@ -31,6 +31,16 @@ def merge_snapshots(
             isinstance(x, dict) and "id" in x for values in (b, c, d) for x in values
         ):
             maps = [{x["id"]: x for x in values} for values in (b, c, d)]
+            if path.endswith("/roles"):
+                # Content and order are independent. Position follows the merged
+                # order and is not a second, spurious content conflict.
+                maps = [{key: {k: v for k, v in value.items() if k != "position"}
+                         for key, value in entries.items()} for entries in maps]
+                content = merge(*maps, path)
+                order = merge(*[[x["id"] for x in values] for values in (b, c, d)], path + "/order")
+                order = [key for key in order if key in content]
+                order += [key for key in content if key not in order]
+                return [{**content[key], "position": i} for i, key in enumerate(order)]
             return list(merge(*maps, path).values())
         side = (resolutions or {}).get(path)
         # Legacy form: "current" | "draft". Current form:

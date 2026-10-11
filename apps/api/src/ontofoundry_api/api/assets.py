@@ -142,7 +142,8 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
         if version_id or space.current_version_id
         else None
     )
-    snapshot = snapshot_of(version) if version else {}
+    from ontofoundry_api.domain.runtime_views import query_compat
+    snapshot = query_compat(snapshot_of(version)) if version else {}
     types = {t["id"]: t for t in snapshot.get("object_types", [])}
     schema = record.schema_name if record else schema_name
     mappings = [
@@ -166,10 +167,16 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
                 join = relation.get("data_join")
                 if not join:
                     continue
-                if relation["source_type_id"] == mapping["type_id"]:
-                    used_columns.add(join["source_column"])
-                if relation["target_type_id"] == mapping["type_id"]:
-                    used_columns.add(join["target_column"])
+                if "owner_columns" in join:
+                    if relation["owner_ref"]["ref"] == mapping["type_id"]:
+                        used_columns.update(join["owner_columns"])
+                    if relation["roles"][0]["concept"]["ref"] == mapping["type_id"]:
+                        used_columns.update(join["role_columns"])
+                else:
+                    if relation["source_type_id"] == mapping["type_id"]:
+                        used_columns.update(join.get("source_columns", [join["source_column"]]))
+                    if relation["target_type_id"] == mapping["type_id"]:
+                        used_columns.update(join.get("target_columns", [join["target_column"]]))
             missing = sorted(used_columns - columns)
             changed = [
                 change

@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 import jsonschema
@@ -23,16 +23,18 @@ from ontofoundry_api.domain.instance_validation import (
     include_instance_validation,
     instance_issues,
 )
-from ontofoundry_api.domain.models import OntologyDraft
+from ontofoundry_api.domain.models import DataJoin, DataMapping, OntologyDraft
+from ontofoundry_api.domain.role_join import RoleJoin, role_join_input
+from ontofoundry_api.domain.runtime_views import apply_mapping_form, legacy_mapping_form
 from ontofoundry_api.domain.snapshot import (
-    as_v2_dict,
+    as_v3_dict,
     draft_sha256,
-    empty_snapshot,
     read_snapshot_json,
 )
 from ontofoundry_api.ossie.compiler import compile_ossie, validate_ossie
 from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
 from ontofoundry_api.services.element_diff import element_changes
+from ontofoundry_api.services.element_save import scoped_draft
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.ontology_query import (
@@ -43,7 +45,13 @@ from ontofoundry_api.services.ontology_query import (
     version_summary,
 )
 from ontofoundry_api.services.proposals import pending_summary
-from ontofoundry_api.services.publish_preview import auto_merged, impacts, three_way
+from ontofoundry_api.services.publish_preview import (
+    auto_merged,
+    element_labels,
+    impacts,
+    requires_change,
+    three_way,
+)
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -55,6 +63,131 @@ from ontofoundry_api.services.workspaces import (
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"])
 
 
+class LegacyFormRequest(BaseModel):
+    legacy_mappings: list[DataMapping] | None = None
+    legacy_joins: dict[str, RoleJoin | DataJoin | None] | None = None
+
+    def form_values(self):
+        return (None if self.legacy_mappings is None else [m.model_dump(mode="json") for m in self.legacy_mappings],
+                None if self.legacy_joins is None else {key: parsed.model_dump(mode="json") if (parsed := role_join_input(value.model_dump(mode="json") if value else None)) else None for key, value in self.legacy_joins.items()})
+
+
+class ElementSave(LegacyFormRequest):
+    target_kind: Literal["object_type", "value_type", "link_type"]
+    target_id: str
+    expected_current_version_id: str | None
+    session_id: str | None = None
+    expected_session_revision: int | None = None
+    draft: dict
+
+
+def apply_element_mapping_form(snapshot, requested, kind, target_id):
+    """Publish only the selected mapping aggregate, preserving other draft work."""
+    form = legacy_mapping_form(snapshot)
+    if kind == "object_type":
+        form["mappings"] = [m for m in form["mappings"] if m["type_id"] != target_id] + [m for m in requested["mappings"] if m["type_id"] == target_id]
+    elif kind == "link_type":
+        form["joins"][target_id] = requested["joins"].get(target_id)
+    return apply_mapping_form(snapshot, form["mappings"], form["joins"])
+
+
+@router.post("/element-saves")
+def save_element(
+    workspace_id: str, body: ElementSave, request: Request,
+    db: Session = Depends(get_db), user: Principal = Depends(current_principal),
+):
+    """One Save action validates and commits an immutable, immediately active version."""
+    require_member(db, workspace_id, user.id)
+    space = db.scalar(select(WorkspaceRecord).where(
+        WorkspaceRecord.id == workspace_id).with_for_update())
+    if space.current_version_id != body.expected_current_version_id:
+        raise ServiceError("内容已被其他人更新，请重新打开后再保存", code="VERSION_CHANGED",
+                           status_code=409)
+    latest = version_snapshot(db, workspace_id, space.current_version_id)
+    item = None
+    if body.session_id:
+        item = db.scalar(select(ModelingSessionRecord).where(
+            ModelingSessionRecord.id == body.session_id,
+            ModelingSessionRecord.workspace_id == workspace_id).with_for_update())
+        if not item:
+            raise HTTPException(404, "建模会话不存在")
+        if item.revision != body.expected_session_revision or blocks_edits(item):
+            raise ServiceError("内容已变化，请重新打开后再保存", code="SESSION_REVISION_CHANGED",
+                               status_code=409)
+    write_revision = item.revision if item else None
+    original = session_draft(item) if item else latest
+    if body.target_kind == "link_type":
+        selected = next((link for link in original["link_types"] if link["id"] == body.target_id), None)
+        if selected and (len(selected.get("roles", [])) != 1 or selected.get("owner_ref", {}).get("kind") != "object_type" or selected["roles"][0]["concept"]["kind"] != "object_type"):
+            raise ServiceError("该关系暂只读", status_code=409, code="ELEMENT_READ_ONLY")
+    try:
+        jsonschema.validate(body.draft, OntologyDraft.model_json_schema(draft_version="3" if body.draft.get("schema_version") == "3" else "2"))
+        edited = reconcile_draft_evidence(
+            original, deepcopy(body.draft) if body.draft.get("schema_version") == "3" else as_v3_dict(body.draft, workspace_id),
+            lookup=material_lookup(db, request.app.state.settings, workspace_id),
+            actor_id=user.id, now=utc_now(),
+        )
+        base = version_snapshot(db, workspace_id, item.base_version_id) if item else latest
+        scoped = scoped_draft(base, original, edited, body.target_kind, body.target_id)
+        mappings, joins = body.form_values()
+        if mappings is not None or joins is not None:
+            previous_form = legacy_mapping_form(original)
+            requested_form = {"mappings": previous_form["mappings"] if mappings is None else mappings,
+                              "joins": previous_form["joins"] if joins is None else joins}
+            before_maps = {m["id"]: m for m in previous_form["mappings"]}
+            after_maps = {m["id"]: m for m in requested_form["mappings"]}
+            changed_maps = [m for key in before_maps.keys() | after_maps.keys() if before_maps.get(key) != after_maps.get(key)
+                            for m in (before_maps.get(key), after_maps.get(key)) if m]
+            changed_joins = {key for key in previous_form["joins"].keys() | requested_form["joins"].keys()
+                             if previous_form["joins"].get(key) != requested_form["joins"].get(key)}
+            if (changed_maps and (body.target_kind != "object_type" or any(m["type_id"] != body.target_id for m in changed_maps))) or (changed_joins and (body.target_kind != "link_type" or changed_joins != {body.target_id})):
+                raise ServiceError("映射表单包含其他元素的修改", code="ELEMENT_SCOPE_INVALID", status_code=422)
+            scoped = apply_element_mapping_form(scoped, requested_form, body.target_kind, body.target_id)
+        merge = three_way(base, latest, scoped, workspace_id)
+        if merge.conflicts:
+            raise ServiceError("此元素与最新内容存在冲突，请重新打开后核对", code="MERGE_CONFLICTS",
+                               status_code=409, details={"conflicts": merge.conflicts})
+        model = OntologyDraft.model_validate(merge.merged)
+        from ontofoundry_api.services.join_validation import validate_join_columns
+        validate_join_columns(db, workspace_id, original, model.model_dump(mode="json"), request.app.state.settings)
+        version = publish_draft(db, workspace_id=workspace_id, draft=model, user_id=user.id,
+                                message="保存本体元素", commit=False)
+        if item:
+            # Keep unrelated draft changes, while displaying the actual merged
+            # values of the element just saved (latest may add untouched fields).
+            merged = model.model_dump(mode="json")
+            updated_draft = scoped_draft(edited, merged, merged, body.target_kind, body.target_id)
+            if mappings is not None or joins is not None:
+                updated_draft = apply_element_mapping_form(updated_draft, requested_form, body.target_kind, body.target_id)
+            # CAS also protects SQLite and a proposal decision racing this request.
+            changed = db.execute(update(ModelingSessionRecord).where(
+                ModelingSessionRecord.id == item.id,
+                ModelingSessionRecord.revision == write_revision,
+            ).values(draft_json=updated_draft, draft_sha256=snapshot_sha256(updated_draft),
+                     revision=item.revision + 1, updated_at=utc_now()))
+            if changed.rowcount != 1:
+                db.rollback()
+                raise ServiceError("内容已变化，请重新打开后再保存", code="SESSION_REVISION_CHANGED",
+                                   status_code=409)
+        db.commit()
+        if item:
+            db.refresh(item)
+    except (jsonschema.ValidationError, ValidationError, ValueError) as exc:
+        db.rollback()
+        raise ServiceError("内容校验失败：" + str(exc), code="ELEMENT_VALIDATION_FAILED",
+                           status_code=422) from exc
+    except EvidenceError as exc:
+        db.rollback()
+        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise ServiceError("内容已被其他人更新，请重新打开后再保存", code="VERSION_CHANGED",
+                           status_code=409) from exc
+    return {"version": version_summary(version), "draft": model.model_dump(mode="json"),
+            "legacy_mapping_form": legacy_mapping_form(model.model_dump(mode="json")),
+            "session": session_response(db, item) if item else None}
+
+
 def require_member(db: Session, workspace_id: str, user_id: str, admin=False):
     role = membership_role(db, workspace_id, user_id)
     if not role or (admin and role != "admin"):
@@ -63,15 +196,16 @@ def require_member(db: Session, workspace_id: str, user_id: str, admin=False):
 
 def get_modeling_session(db: Session, workspace_id: str, session_id: str):
     item = db.get(ModelingSessionRecord, session_id)
-    if not item or item.workspace_id != workspace_id:
+    if not item or item.workspace_id != workspace_id or item.draft_json.get("schema_version") != "3":
         raise HTTPException(404, "建模会话不存在")
     return item
 
 
 def session_draft(item) -> dict:
-    """The session draft as v2 JSON. A session created before v2 still holds a
-    v1 draft until its next write; readers never see that difference."""
-    return as_v2_dict(item.draft_json, item.workspace_id)
+    """Sessions are v3-only; historical versions still migrate on pure reads."""
+    if item.draft_json.get("schema_version") != "3":
+        raise HTTPException(404, "旧建模会话已停用，请新建会话")
+    return deepcopy(item.draft_json)
 
 
 def version_snapshot_sha256(db, workspace_id: str, version_id: str | None) -> str:
@@ -81,7 +215,7 @@ def version_snapshot_sha256(db, workspace_id: str, version_id: str | None) -> st
 
 def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
     version = db.get(OntologyVersionRecord, version_id) if version_id else None
-    return snapshot_of(version) if version else empty_snapshot(workspace_id)
+    return snapshot_of(version) if version else as_v3_dict(None, workspace_id)
 
 
 def session_response(db, item) -> dict:
@@ -96,7 +230,7 @@ def session_response(db, item) -> dict:
         base_diff = []
     return {
         **session_data(item),
-        **pending_summary(db, item.workspace_id, item.id, draft),
+        **pending_summary(db, item.workspace_id, item.id, item.draft_json),
         "base_diff": base_diff,
     }
 
@@ -104,7 +238,11 @@ def session_response(db, item) -> dict:
 def session_data(item):
     draft = session_draft(item)
     try:
-        nodes, edges = _all_graph(_query_view(read_snapshot_json(draft)))
+        form = legacy_mapping_form(draft)
+    except ValueError:
+        form = None
+    try:
+        nodes, edges = _all_graph(_query_view(read_snapshot_json(draft, target_version="3")))
     except (ValidationError, ValueError):
         # A draft may be invalid while being edited; the graph is best effort.
         nodes, edges = [], []
@@ -117,6 +255,7 @@ def session_data(item):
         "base_version_sha256": item.base_version_sha256,
         "draft_sha256": item.draft_sha256 or draft_sha256(draft),
         "draft": draft,
+        "legacy_mapping_form": form,
         "candidates": item.candidates_json,
         "material_ids": item.material_ids,
         "task_status": item.task_status,
@@ -162,6 +301,8 @@ def blocks_edits(item) -> bool:
 
 def revise(db, item, revision, **values):
     if "draft_json" in values:
+        if values["draft_json"].get("schema_version") != "3":
+            values["draft_json"] = as_v3_dict(values["draft_json"], item.workspace_id)
         values["draft_sha256"] = draft_sha256(values["draft_json"], item.workspace_id)
     if "base_version_id" in values:
         values["base_version_sha256"] = version_snapshot_sha256(
@@ -187,7 +328,7 @@ def revise(db, item, revision, **values):
 
 def validate_draft(draft, workspace):
     try:
-        model = OntologyDraft.model_validate(as_v2_dict(draft, workspace.id))
+        model = OntologyDraft.model_validate(as_v3_dict(draft, workspace.id))
         if str(model.workspace_id) != workspace.id:
             raise ValueError("草稿空间不匹配")
         return include_instance_validation(
@@ -214,7 +355,7 @@ class SessionCreate(BaseModel):
     title: str = Field(default="新的建模会话", min_length=1, max_length=240)
 
 
-class DraftSave(BaseModel):
+class DraftSave(LegacyFormRequest):
     revision: int
     draft: dict
     title: str | None = Field(default=None, min_length=1, max_length=240)
@@ -330,7 +471,7 @@ def resolve_merge(
     check_resolutions(three_way(base, latest, draft, workspace_id).conflicts, body.resolutions)
     merge = three_way(base, latest, draft, workspace_id, body.resolutions)
     try:
-        jsonschema.validate(merge.merged, OntologyDraft.model_json_schema())
+        jsonschema.validate(merge.merged, OntologyDraft.model_json_schema(draft_version="3"))
     except jsonschema.ValidationError as exc:
         raise ServiceError(
             "合并结果结构无效：" + exc.message, code="RESOLUTION_INVALID", status_code=422
@@ -388,7 +529,7 @@ def create_session(
         if space.current_version_id
         else None
     )
-    draft = snapshot_of(version) if version else empty_snapshot(workspace_id)
+    draft = snapshot_of(version) if version else as_v3_dict(None, workspace_id)
     item = ModelingSessionRecord(
         id=str(uuid4()),
         workspace_id=workspace_id,
@@ -431,7 +572,7 @@ def save_session(
     # Structural schema permits duplicate names/references during editing; publication
     # applies the domain validators as well. UI readers always get a traversable shape.
     try:
-        jsonschema.validate(body.draft, OntologyDraft.model_json_schema())
+        jsonschema.validate(body.draft, OntologyDraft.model_json_schema(draft_version="3" if body.draft.get("schema_version") == "3" else "2"))
     except jsonschema.ValidationError as exc:
         raise HTTPException(422, "草稿结构无效：" + exc.message) from exc
     try:
@@ -444,6 +585,12 @@ def save_session(
         )
     except EvidenceError as exc:
         raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
+    try:
+        draft = apply_mapping_form(draft, *body.form_values())
+    except ValueError as exc:
+        raise ServiceError("映射表单无效：" + str(exc), code="MAPPING_FORM_INVALID", status_code=422) from exc
+    from ontofoundry_api.services.join_validation import validate_join_columns
+    validate_join_columns(db, workspace_id, session_draft(item), draft, request.app.state.settings)
     values = {"draft_json": draft}
     if body.title is not None:
         values["title"] = body.title
@@ -655,7 +802,14 @@ def published_snapshot(
         if space.current_version_id
         else None
     )
-    return snapshot_of(version) if version else empty_snapshot(workspace_id)
+    return snapshot_of(version) if version else as_v3_dict(None, workspace_id)
+
+
+@router.get("/published-legacy-form")
+def published_legacy_form(workspace_id: str, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_member(db, workspace_id, user.id)
+    space = get_workspace(db, workspace_id)
+    return legacy_mapping_form(version_snapshot(db, workspace_id, space.current_version_id))
 
 
 class OssieImport(BaseModel):
@@ -745,7 +899,11 @@ def presentation(
             item["evidence"] = []
         for link in model.get("link_types", []):
             link.pop("data_join", None)
-    return {"version": version_summary(version), "model": model}
+    form = legacy_mapping_form(model) if membership_role(db, workspace_id, user.id) else None
+    if form is None:
+        for collection in ("semantic_models", "datasets", "dataset_fields", "dataset_relationships", "metrics", "concept_mappings", "mapping_nodes"):
+            model[collection] = []
+    return {"version": version_summary(version), "model": model, "legacy_mapping_form": form}
 
 
 @router.post("/sessions/{session_id}/preview")
@@ -779,10 +937,12 @@ def preview_definition(
     report = validate_draft(merge.merged, space)
     current = current_version(db, workspace_id) if space.current_version_id else None
     changes = element_changes(merge.latest, merge.merged)
+    base = db.get(OntologyVersionRecord, item.base_version_id) if item.base_version_id else None
     return {
         "revision": item.revision,
         "session_revision": item.revision,
         "base_version_id": item.base_version_id,
+        "base_version_number": base.version_number if base else None,
         "current_version_id": space.current_version_id,
         "current_version_number": current.version_number if current else None,
         "next_version_number": (
@@ -796,8 +956,12 @@ def preview_definition(
         + 1,
         "current_version_sha256": snapshot_sha256(merge.latest),
         "merged_snapshot_sha256": merge.merged_sha256,
+        "merged_model": merge.merged,
+        "legacy_mapping_form": legacy_mapping_form(merge.merged) if report["publishable"] else None,
         "validation": report,
         "changes": changes,
+        "requires_change": requires_change(merge),
+        "labels": element_labels(merge.latest, merge.merged),
         "impacts": impacts(changes, merge.merged),
         "auto_merged": auto_merged(merge),
         "ossie": compile_ossie(
@@ -808,6 +972,7 @@ def preview_definition(
         if report["publishable"]
         else None,
     }
+
 
 
 @router.get("/version-comparison")
@@ -830,3 +995,18 @@ def compare_versions(
         "right": version_summary(right),
         **compare_snapshots(snapshot_of(left) if left else {}, snapshot_of(right)),
     }
+
+
+@router.get("/semantic-models")
+def semantic_models(
+    workspace_id: str,
+    session_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """Read-only semantic catalog, without internal fidelity metadata."""
+    from ontofoundry_api.domain.semantic_views import semantic_catalog
+    from ontofoundry_api.domain.snapshot import read_snapshot
+    require_member(db, workspace_id, user.id)
+    raw = get_modeling_session(db, workspace_id, session_id).draft_json if session_id else published_snapshot(workspace_id, db, user)
+    return semantic_catalog(read_snapshot(raw, workspace_id, target_version="3"))

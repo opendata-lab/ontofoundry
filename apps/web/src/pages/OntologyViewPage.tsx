@@ -1,9 +1,7 @@
-import { OntologyReading } from "../components/OntologyReading";
 import {
   Download,
   Search,
   Upload,
-  X,
   Plus,
   Rocket,
   Box,
@@ -19,6 +17,7 @@ import {
   OntologyGraph,
   type SelectedGraphItem,
 } from "../components/OntologyGraph";
+import { useElementInspector } from "../hooks/useElementInspector";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { EmptyModel } from "../components/EmptyModel";
 import { OntologyOverview } from "../components/OntologyOverview";
@@ -29,24 +28,29 @@ export function OntologyViewPage() {
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"global" | "semantic">("global");
-  const [readingMode, setReadingMode] = useState<
-    "graph" | "business" | "technical"
-  >("graph");
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState("");
   const [tag, setTag] = useState("");
-  const [selected, setSelected] = useState<SelectedGraphItem>(null);
+  const inspector = useElementInspector();
+  const inspect = (selected: SelectedGraphItem) => {
+    if (selected?.category === "node" && selected.item.kind === "object_type")
+      inspector.open({ kind: "object_type", id: selected.item.id, tab: "properties", sessionId: null });
+    else if (selected?.category === "node" && selected.item.kind === "link_type")
+      inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
+    else if (selected?.category === "edge" && selected.item.kind === "role")
+      inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.source, tab: "endpoints", sessionId: null });
+    else if (selected?.category === "edge" && selected.item.kind === "link_type")
+      inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
+  };
   const [importing, setImporting] = useState(false);
   const load = () => setAttempt((value) => value + 1);
   const switchMode = (value: "global" | "semantic") => {
     setMode(value);
-    setSelected(null);
   };
   useEffect(() => {
     let active = true;
     setError("");
     setOverview(null);
-    setSelected(null);
     if (!workspace.current_version) return;
     api
       .overview(workspace.id)
@@ -65,8 +69,9 @@ export function OntologyViewPage() {
   // carries object types and the edges between them and nothing else.
   const visible = useMemo(() => {
     if (!graph) return null;
+    const roleTargets = new Set(graph.edges.filter(e => e.kind === "role").map(e => e.target));
     const nodes = graph.nodes.filter(
-      (n) => n.kind === "object_type" && (!tag || n.tags.includes(tag)),
+      (n) => (n.kind === "object_type" || n.kind === "link_type" || roleTargets.has(n.id)) && (!tag || n.tags.includes(tag)),
     );
     const ids = new Set(nodes.map((n) => n.id));
     return {
@@ -134,26 +139,6 @@ export function OntologyViewPage() {
       </div>
       {mode === "semantic" && (
         <div className="view-toolbar">
-          <div className="reading-switch">
-            {(
-              [
-                ["graph", "图谱"],
-                ["business", "业务"],
-                ["technical", "技术"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                aria-pressed={readingMode === key}
-                onClick={() => {
-                  setReadingMode(key);
-                  setSelected(null);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <span className="view-kind">实体</span>
           <label className="ref-search">
             <input
@@ -215,28 +200,18 @@ export function OntologyViewPage() {
         role="tabpanel"
         aria-labelledby={"view-tab-" + mode}
       >
-        {overview && mode === "semantic" && readingMode !== "graph" && graph ? (
-          <OntologyReading
-            workspaceId={workspace.id}
-            versionId={overview.version.version_id}
-            mode={readingMode}
-            graph={visible ?? graph}
-            query={query}
-            tag={tag}
-            member={!!workspace.role}
-          />
-        ) : overview && objects.length && mode === "global" ? (
+        {overview && objects.length && mode === "global" ? (
           <OntologyOverview
             overview={overview}
             onSemantic={() => switchMode("semantic")}
-            onSelect={setSelected}
+            onSelect={inspect}
           />
         ) : visible?.nodes.length ? (
           <OntologyGraph
             key={tag}
             graph={visible}
             query={query}
-            onSelect={setSelected}
+            onSelect={inspect}
           />
         ) : (
           <div className="view-empty">
@@ -254,7 +229,7 @@ export function OntologyViewPage() {
             )}
           </div>
         )}
-        {mode === "semantic" && readingMode === "graph" && graph && (
+        {mode === "semantic" && graph && (
           <div className="view-legend">
             <span>
               <Box size={12} />
@@ -262,7 +237,7 @@ export function OntologyViewPage() {
             </span>
             <span>
               <GitBranch size={12} />
-              关系 {graph.edges.filter((e) => e.kind === "link_type").length}
+              关系 {graph.edges.filter((e) => e.kind === "link_type").length + graph.nodes.filter(n => n.kind === "link_type").length}
             </span>
             <span>
               <Braces size={12} />
@@ -270,43 +245,7 @@ export function OntologyViewPage() {
             </span>
           </div>
         )}
-        {selected && (
-          <aside className="view-inspector">
-            <header>
-              <h2>{selected.item.label}</h2>
-              <button
-                className="icon-button"
-                onClick={() => setSelected(null)}
-                aria-label="关闭详情"
-              >
-                <X size={16} />
-              </button>
-            </header>
-            <code>{selected.item.technical_name}</code>
-            <p>{selected.item.description || "尚未填写描述"}</p>
-            {selected.category === "node" &&
-              selected.item.kind === "object_type" && (
-                <>
-                  <p>属性：{selected.item.attribute_count ?? 0} 项</p>
-                  <Link
-                    className="button button--primary"
-                    to={"../objects/" + selected.item.id}
-                  >
-                    打开本体详情
-                  </Link>
-                </>
-              )}
-            {selected.category === "edge" &&
-              selected.item.kind === "link_type" && (
-                <Link
-                  className="button button--primary"
-                  to={"../relations/" + selected.item.id}
-                >
-                  打开关系详情
-                </Link>
-              )}
-          </aside>
-        )}
+
       </div>
       {importing && (
         <OssieImportDialog

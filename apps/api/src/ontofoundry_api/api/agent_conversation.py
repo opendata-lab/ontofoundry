@@ -99,9 +99,95 @@ def redact_credentials(text: str) -> str:
     return _RUN_CREDENTIAL.sub("ofrun.***", text)
 
 
+# A modeling run reads whole context files and writes the result JSON through
+# tools, and the model thinks at length. Rendered in full that is hundreds of
+# KB of Markdown, enough to freeze the page for seconds. The chat only needs
+# to show what happened; DataAgent keeps the full record. Answers are never cut.
+TOOL_TEXT_LIMIT = 600
+REASONING_LIMIT = 1500
+
+
+def _shorten(text: str, limit: int, what: str) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n…（{what}较长，已省略 {len(text) - limit} 字）"
+
+
+def _compact_tool_io(item: dict[str, Any]) -> dict[str, Any]:
+    item = dict(item)
+    output = item.get("output")
+    if isinstance(output, str):
+        item["output"] = _shorten(output, TOOL_TEXT_LIMIT, "工具输出")
+    elif isinstance(output, list):
+        item["output"] = [
+            {**part, "text": _shorten(part["text"], TOOL_TEXT_LIMIT, "工具输出")}
+            if isinstance(part, dict) and isinstance(part.get("text"), str) else part
+            for part in output
+        ]
+    if isinstance(item.get("input"), dict):
+        item["input"] = {
+            key: _shorten(value, TOOL_TEXT_LIMIT, "工具输入") if isinstance(value, str) else value
+            for key, value in item["input"].items()
+        }
+    return item
+
+
+def compact_event(event: dict[str, Any]) -> dict[str, Any]:
+    """One agent event or stored record, with tool I/O and reasoning bounded."""
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return event
+    kind = str(event.get("event_type") or "")
+    if kind.startswith("tool."):
+        data = _compact_tool_io(data)
+    elif data.get("kind") == "reasoning" and isinstance(data.get("text"), str):
+        data = {**data, "text": _shorten(data["text"], REASONING_LIMIT, "思考过程")}
+    return {**event, "data": data}
+
+
+def compact_message(message: dict[str, Any]) -> dict[str, Any]:
+    blocks = message.get("blocks")
+    records = message.get("records")
+    if not isinstance(blocks, list) and not isinstance(records, list):
+        return message
+    message = dict(message)
+    if isinstance(records, list) and records and isinstance(blocks, list):
+        # The SDK renders from records when there are any; blocks would be a
+        # second copy of the same run that only costs parsing and reactivity.
+        message["blocks"] = []
+        blocks = None
+    if isinstance(blocks, list):
+        message["blocks"] = [
+            _compact_tool_io(block) if isinstance(block, dict) and block.get("type") == "tool_use"
+            else {**block, "text": _shorten(block["text"], REASONING_LIMIT, "思考过程")}
+            if isinstance(block, dict) and block.get("type") == "thinking"
+            and isinstance(block.get("text"), str)
+            else block
+            for block in blocks
+        ]
+    if isinstance(records, list):
+        message["records"] = [
+            compact_event(record) if isinstance(record, dict) else record for record in records
+        ]
+    return message
+
+
+def _compact_payload(payload: str) -> str:
+    try:
+        event = json.loads(payload)
+    except ValueError:
+        return payload
+    if not isinstance(event, dict):
+        return payload
+    compacted = compact_event(event)
+    # Untouched events go through byte for byte.
+    return payload if compacted == event else json.dumps(compacted, ensure_ascii=False)
+
+
 def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     shown = []
     for message in messages:
+        message = compact_message(message)
         content = message.get("content")
         if (
             message.get("sender_type") == "user"
@@ -279,6 +365,39 @@ def _persist_task_projection(
     return status if changed.rowcount == 1 else None
 
 
+def replacement_task_id(messages: list[dict[str, Any]], task_id: str) -> str | None:
+    """The task DataAgent started to continue `task_id`'s turn, if any: the
+    latest assistant message after it that belongs to another task."""
+    seen = False
+    found = None
+    for message in messages:
+        current = str(message.get("task_id") or "")
+        if current == task_id:
+            seen = True
+        elif seen and current and message.get("sender_type") == "assistant":
+            found = current
+    return found
+
+
+def _adopt_replacement(session_factory, session_id: str, old: str, new: str) -> bool:
+    with session_factory() as db:
+        changed = db.execute(
+            update(ModelingSessionRecord)
+            .where(
+                ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == old,
+            )
+            .values(
+                dataagent_task_id=new,
+                task_status="running",
+                task_detail="DataAgent 恢复了中断的任务，继续处理",
+                updated_at=utc_now(),
+            )
+        )
+        db.commit()
+    return changed.rowcount == 1
+
+
 def _current_run_projection(
     session_factory,
     session_id: str,
@@ -415,6 +534,19 @@ async def snapshot(
 
         if task_id and task is None and not ownership_lost:
             task = await dataagent.task(task_id)
+            # DataAgent suspends a task it believes stalled (for example after a
+            # clock jump) and continues the turn in a replacement task. Follow
+            # it, rather than reporting a run the user never cancelled as cancelled.
+            if (
+                str(task.get("task_status") or "") == "suspended"
+                and not task.get("cancel_requested_at")
+                and (replacement := replacement_task_id(messages, task_id))
+                and _adopt_replacement(
+                    request.app.state.session_factory, item.id, task_id, replacement
+                )
+            ):
+                task_id = replacement
+                task = await dataagent.task(replacement)
 
         if task is not None:
             upstream_status = str(task.get("task_status") or "")
@@ -496,7 +628,7 @@ async def send_message(
         if item.title in {"新的建模会话", "未命名建模会话"}
         else item.title
     )
-    # The agent reads the draft as v2, even from a session saved before v2.
+    # Modeling sessions and new runs use v3.
     draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
     # Where earlier runs put material in this topic, read before the claim
@@ -511,6 +643,8 @@ async def send_message(
     # so the run's source revision is the one after it.
     manifest = {
         "run_token": run_token,
+        "draft_schema_version": "3",
+        "hash_algorithm": draft["hash_algorithm"],
         "workspace_id": workspace_id,
         "session_id": session_id,
         "base_version_id": item.base_version_id,
@@ -807,7 +941,7 @@ async def events(
                     with suppress(ValueError, TypeError):
                         event = json.loads(payload)
                         cursor = max(cursor, int(event.get("seq_id") or cursor))
-                    yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
+                    yield f"event: agent-event\ndata: {redact_credentials(_compact_payload(payload))}\n\n"
 
             payload = _data_payload(buffer)
             if payload is not None:
@@ -815,7 +949,7 @@ async def events(
                 with suppress(ValueError, TypeError):
                     event = json.loads(payload)
                     cursor = max(cursor, int(event.get("seq_id") or cursor))
-                yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
+                yield f"event: agent-event\ndata: {redact_credentials(_compact_payload(payload))}\n\n"
 
             yield ": ping\n\n"
             task = await dataagent.task(task_id)
