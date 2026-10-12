@@ -30,6 +30,7 @@ type ErrorBody = {
     message?: string;
     items?: { proposal_id: string; reason: string }[];
     conflicts?: unknown[];
+    references?: { name: string; field: string }[];
     current_version_id?: string | null;
   };
   detail?: unknown;
@@ -43,6 +44,7 @@ export class ApiError extends Error {
   items: { proposal_id: string; reason: string }[];
   conflicts: unknown[];
   currentVersionId: string | null;
+  references: { name: string; field: string }[];
 
   constructor(
     message: string,
@@ -58,6 +60,7 @@ export class ApiError extends Error {
     this.detail = detail;
     this.items = error?.items ?? [];
     this.conflicts = error?.conflicts ?? [];
+    this.references = error?.references ?? [];
     this.currentVersionId = error?.current_version_id ?? null;
   }
 }
@@ -244,6 +247,7 @@ export const modelingApi = {
     session_id: string | null;
     expected_session_revision: number | null;
     draft: Draft;
+    semantic_changes?: import("./types").SemanticChange[];
   }) => workspaceRequest<{ version: VersionSummary; draft: Draft; session: ModelingSession | null }>(
     id, "/element-saves", { ...payload, ...draftRequest(payload.draft) },
   ),

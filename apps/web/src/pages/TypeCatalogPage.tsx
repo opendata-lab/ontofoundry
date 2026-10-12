@@ -1,5 +1,5 @@
 import { RelationshipRoles } from "../components/RelationshipRoles";
-import { relationReadOnly } from "../lib/nativeDraft";
+import { isBinaryObjectRelation } from "../lib/nativeDraft";
 import {
   Box,
   GitBranch,
@@ -150,7 +150,7 @@ export function TypeCatalogPage({
                     </b>
                   </span>
                 </>
-              ) : relationReadOnly(item) ? (
+              ) : !isBinaryObjectRelation(item) ? (
                 <RelationshipRoles link={item} compact conceptName={(id) => draft.object_types.find((t) => t.id === id)?.name} />
               ) : (
                 <p className="relation-endpoints">

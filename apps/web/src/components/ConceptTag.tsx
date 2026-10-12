@@ -8,15 +8,32 @@ export function ConceptTag({
   kind,
   id,
   open,
+  onSelect,
 }: {
   label: string;
   kind: ConceptRef["kind"];
   id?: string;
   open?: (request: ElementRequest) => void;
+  onSelect?: () => void;
 }) {
-  const icon = kind === "object_type"
-    ? <Box size={11} aria-hidden="true" />
-    : <Hash size={11} aria-hidden="true" />;
+  const icon =
+    kind === "object_type" ? (
+      <Box size={11} aria-hidden="true" />
+    ) : (
+      <Hash size={11} aria-hidden="true" />
+    );
+  if (onSelect)
+    return (
+      <button
+        type="button"
+        className="tag tag--concept tag--link"
+        title={`插入「${label}」`}
+        onClick={onSelect}
+      >
+        {icon}
+        {label}
+      </button>
+    );
   if (open && id && (kind === "object_type" || kind === "value_type")) {
     return (
       <button
@@ -30,5 +47,10 @@ export function ConceptTag({
       </button>
     );
   }
-  return <span className="tag tag--concept">{icon}{label}</span>;
+  return (
+    <span className="tag tag--concept">
+      {icon}
+      {label}
+    </span>
+  );
 }

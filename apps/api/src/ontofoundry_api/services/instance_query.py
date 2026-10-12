@@ -77,7 +77,7 @@ def document_object(obj):
 def mapping_for(draft, type_id):
     analysis = SemanticViews(draft).analyze(type_id)
     if analysis.reason:
-        raise HTTPException(422, {"code": "COMPLEX_MAPPING_READ_ONLY", "message": "复杂映射：暂只读", "reason": analysis.reason})
+        raise HTTPException(422, {"code": "COMPLEX_MAPPING_READ_ONLY", "message": "复杂映射暂不支持实例查询", "reason": analysis.reason})
     if not analysis.mapping:
         raise HTTPException(422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"})
     return analysis.mapping

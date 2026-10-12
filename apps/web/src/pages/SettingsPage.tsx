@@ -176,7 +176,7 @@ export function SettingsPage() {
         <section className="detail-section">
           <h2>DataAgent 连通性</h2>
           <p className="muted">
-            只读检查。地址、站点与凭据均由部署环境和 DataAgent 管理端配置。
+            配置检查。地址、站点与凭据均由部署环境和 DataAgent 管理端配置。
           </p>
           {dataagentHealth ? (
             <table className="ref-table dataagent-health-table">

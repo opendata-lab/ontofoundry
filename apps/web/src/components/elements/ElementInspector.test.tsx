@@ -378,7 +378,7 @@ describe("统一本体元素", () => {
     ).not.toBeInTheDocument();
     expect(within(el).queryByText("语义描述")).not.toBeInTheDocument();
     expect(within(el).getAllByText("描述")).toHaveLength(1);
-    fireEvent.click(within(el).getByRole("tab", { name: "端点" }));
+    fireEvent.click(within(el).getByRole("tab", { name: "角色与语义描述" }));
     expect(
       within(el).getByRole("button", { name: /供应商/ }),
     ).toBeInTheDocument();
@@ -454,21 +454,22 @@ describe("统一本体元素", () => {
 
 
 describe("v3 native relations", () => {
-  it("shows ordered roles/readings and disables direct edit links for n-ary relationships", async () => {
+  it("edits ordered native roles in a direct n-ary edit link", async () => {
     const native = structuredClone(nativeJson) as NativeDraft;
     const nary = native.link_types.find(l => l.technical_name === "sale")!;
     vi.mocked(workspaceRequest).mockResolvedValue({ model: native });
     vi.mocked(modelingApi.snapshot).mockResolvedValue(native);
+    vi.mocked(modelingApi.saveElement).mockResolvedValue({ draft: native, version: { version_id: "v2" } as never, session: null });
     show(`/workspaces/w/relations?inspect=link_type:${nary.id}&inspectTab=endpoints&inspectMode=edit`);
     const el = await screen.findByRole("dialog", { name: "sale" });
-    const roles = within(el).getByRole("list", { name: "有序角色列表" });
-    expect(within(roles).getAllByRole("listitem").map(li => li.textContent)).toEqual([
-      "supplier · 所属概念（隐含角色） · 实体", "product · product · 实体", "amount · amount · 值概念", "Any · party · Any",
-    ]);
-    expect(within(el).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
-    expect(within(el).queryByRole("button", { name: "保存" })).not.toBeInTheDocument();
-    expect(within(el).getByRole("list", { name: "原生语义描述" }).children).toHaveLength(2);
-    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    expect(within(el).getByLabelText("角色 1 名称")).toHaveValue("product");
+    fireEvent.click(within(el).getByRole("button", { name: "下移角色 1" }));
+    fireEvent.click(within(el).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const payload = vi.mocked(modelingApi.saveElement).mock.calls[0][1].draft as NativeDraft;
+    expect(payload.link_types.find(l => l.id === nary.id)!.roles.map(r => r.id)).toEqual([nary.roles[1].id, nary.roles[0].id, nary.roles[2].id]);
+    expect(payload.link_types.find(l => l.id === nary.id)!.verbalizes).toEqual(nary.verbalizes);
+    expect(payload.semantic_models).toEqual(native.semantic_models);
   });
   it("saves a binary native edit as v3 without endpoint compatibility fields", async () => {
     const native = structuredClone(nativeJson) as NativeDraft;

@@ -16,14 +16,14 @@ def element_scope(draft: dict, kind: str, element_id: str) -> dict[str, set[str]
     scope[collection].add(element_id)
     if kind == "link_type" and draft.get("schema_version") == "3":
         link = next((link for link in draft["link_types"] if link["id"] == element_id), None)
-        if link and link["owner_ref"]["kind"] == "object_type":
-            scope["object_types"].add(link["owner_ref"]["ref"])
-    if kind == "object_type":
+        if link and link["owner_ref"]["kind"] in ("object_type", "value_type"):
+            scope["object_types" if link["owner_ref"]["kind"] == "object_type" else "value_types"].add(link["owner_ref"]["ref"])
+    if kind in {"object_type", "value_type"}:
         scope["properties"] = {
             p["id"] for p in draft["properties"] if p.get("owner_type_id", p.get("owner_ref", {}).get("ref")) == element_id
         }
         if draft.get("schema_version") == "3":
-            scope["value_types"] = {r["concept"]["ref"] for p in draft["properties"] if p["id"] in scope["properties"]
+            scope["value_types"] |= {r["concept"]["ref"] for p in draft["properties"] if p["id"] in scope["properties"]
                                     for r in p["roles"] if r["concept"]["kind"] == "value_type"}
         scope["actions"] = {
             a["id"] for a in draft["actions"] if a["input_type_id"] == element_id
@@ -76,7 +76,7 @@ def scoped_draft(base: dict, original: dict, edited: dict, kind: str, element_id
         old = {e["id"]: e for e in original[key]}
         new = {e["id"]: e for e in edited[key]}
         changed = {i for i in old.keys() | new.keys() if old.get(i) != new.get(i)}
-        if kind == "link_type" and original.get("schema_version") == "3" and key == "object_types":
+        if kind == "link_type" and original.get("schema_version") == "3" and key in {"object_types", "value_types"}:
             for item_id in changed:
                 if item_id not in allowed or item_id not in old or item_id not in new:
                     raise ServiceError("关系保存不能新增或删除对象", status_code=422, code="ELEMENT_SCOPE_INVALID")
@@ -85,7 +85,7 @@ def scoped_draft(base: dict, original: dict, edited: dict, kind: str, element_id
                     raise ServiceError("关系保存只能更新所属概念的标识引用", status_code=422, code="ELEMENT_SCOPE_INVALID")
         # Existing elements outside this aggregate cannot be pulled into it
         # by changing their owner in a crafted request.
-        if changed - allowed or ((changed & old.keys()) - before[key] and not (kind == "link_type" and key == "object_types" and original.get("schema_version") == "3")):
+        if changed - allowed or ((changed & old.keys()) - before[key] and not (kind == "link_type" and key in {"object_types", "value_types"} and original.get("schema_version") == "3")):
             raise ServiceError("保存包含其他元素的修改，请重新打开当前元素", status_code=422,
                                code="ELEMENT_SCOPE_INVALID")
         replacements = {i: new[i] for i in allowed if i in new}

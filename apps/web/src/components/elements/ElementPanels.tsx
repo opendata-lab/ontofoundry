@@ -1,5 +1,5 @@
-import { RelationshipRoles } from "../RelationshipRoles";
-import { relationReadOnly } from "../../lib/nativeDraft";
+import { NativeRolesEditor } from "./NativeRolesEditor";
+import { NativeMappingEditor } from "./NativeMappingEditor";
 import {
   ArrowRight,
   Box,
@@ -96,8 +96,10 @@ export function Field({
 export function BasicPanel(props: PanelProps) {
   const { type, draft, editing, open } = props;
   const update = (patch: Partial<ElementType>) => changeType(props, patch);
-  const nativeEditing = editing && !(isObject(type) && type.concept_kind === "value_type");
-  const context = isObject(type) ? type.concept_context ?? { synonyms: [], instructions: null } : null;
+  const nativeEditing = editing;
+  const context = isObject(type)
+    ? (type.concept_context ?? { synonyms: [], instructions: null })
+    : null;
   return (
     <section className="element-section">
       <h3>基本信息</h3>
@@ -130,7 +132,11 @@ export function BasicPanel(props: PanelProps) {
           <div className="element-field">
             <span>标签</span>
             {nativeEditing ? (
-              <TagEditor key={type.id} tags={type.tags} onChange={(tags) => update({ tags })} />
+              <TagEditor
+                key={type.id}
+                tags={type.tags}
+                onChange={(tags) => update({ tags })}
+              />
             ) : (
               <TagList tags={type.tags} />
             )}
@@ -143,7 +149,9 @@ export function BasicPanel(props: PanelProps) {
               <select
                 aria-label="继承自"
                 value={type.extends[0] ?? ""}
-                onChange={(e) => update({ extends: e.target.value ? [e.target.value] : [] })}
+                onChange={(e) =>
+                  update({ extends: e.target.value ? [e.target.value] : [] })
+                }
               >
                 <option value="">无</option>
                 {draft.object_types
@@ -193,14 +201,48 @@ export function BasicPanel(props: PanelProps) {
         {context && (
           <div className="element-field-wide">
             <Field label="同义词" hint="平台扩展，导出到其他工具会被忽略">
-              {editing ? <textarea rows={3} placeholder="每行一个同义词" value={context.synonyms.join("\n")}
-                onChange={e => update({ concept_context: { ...context, synonyms: e.target.value.split("\n").filter(value => value !== "") } })} />
-                : <span className="element-value">{context.synonyms.join("、") || "尚未填写同义词"}</span>}
+              {editing ? (
+                <textarea
+                  rows={3}
+                  placeholder="每行一个同义词"
+                  value={context.synonyms.join("\n")}
+                  onChange={(e) =>
+                    update({
+                      concept_context: {
+                        ...context,
+                        synonyms: e.target.value
+                          .split("\n")
+                          .filter((value) => value !== ""),
+                      },
+                    })
+                  }
+                />
+              ) : (
+                <span className="element-value">
+                  {context.synonyms.join("、") || "尚未填写同义词"}
+                </span>
+              )}
             </Field>
             <Field label="上下文说明">
-              {editing ? <textarea rows={3} value={context.instructions ?? ""} placeholder="帮助智能体理解此概念的业务口径"
-                onChange={e => update({ concept_context: { ...context, instructions: e.target.value } })} />
-                : <span className="element-value">{context.instructions || "尚未填写上下文说明"}</span>}
+              {editing ? (
+                <textarea
+                  rows={3}
+                  value={context.instructions ?? ""}
+                  placeholder="帮助智能体理解此概念的业务口径"
+                  onChange={(e) =>
+                    update({
+                      concept_context: {
+                        ...context,
+                        instructions: e.target.value,
+                      },
+                    })
+                  }
+                />
+              ) : (
+                <span className="element-value">
+                  {context.instructions || "尚未填写上下文说明"}
+                </span>
+              )}
             </Field>
           </div>
         )}
@@ -478,13 +520,13 @@ export function PropertiesPanel(props: PanelProps) {
 export function EndpointsPanel(props: PanelProps) {
   const { type, draft, editing, open } = props;
   if (isObject(type)) return null;
-  if (relationReadOnly(type)) {
-    const names = new Map<string, string>(draft.object_types.map((t) => [t.id, t.name]));
-    return <section className="element-section"><RelationshipRoles link={type} open={open} conceptName={(id) => names.get(id)} /></section>;
-  }
+  if (type.owner_ref) return <NativeRolesEditor {...props} />;
   return (
     <section className="element-section">
-      <HintedHeading title="关系端点" hint="修改端点会影响关系映射与实例引用。" />
+      <HintedHeading
+        title="关系端点"
+        hint="修改端点会影响关系映射与实例引用。"
+      />
       <div className="element-endpoints">
         {(["source_type_id", "target_type_id"] as const).map((key, i) => (
           <div className="element-endpoint-group" key={key}>
@@ -582,7 +624,11 @@ export function MappingPanel(
   const mapping = draft.mappings.find((m) => m.type_id === type.id);
   if (isObject(type)) {
     const status = draft.mapping_status?.[type.id];
-    if (status?.state === "readonly") return <section className="element-section"><h3>数据映射</h3><p role="status">{status.message ?? "复杂映射：暂只读"}</p><p className="muted">请在数据映射的“语义模型”页签查看原生映射。</p></section>;
+    if (
+      (status?.state === "readonly" || type.concept_kind === "value_type") &&
+      props.nativeDraft
+    )
+      return <NativeMappingEditor {...props} />;
     const object = toView(draft).object_types.find((t) => t.id === type.id)!;
     if (editing)
       return (
@@ -602,6 +648,12 @@ export function MappingPanel(
               })
             }
           />
+          {props.nativeDraft && (
+            <details>
+              <summary>原生映射树</summary>
+              <NativeMappingEditor {...props} />
+            </details>
+          )}
           <MappingPreview draft={draft} type={type} showSource={false} />
         </>
       );
@@ -655,11 +707,15 @@ export function MappingPanel(
       </>
     );
   }
-  if (type.data_join?.source_columns) return <section className="element-section"><h3>关系映射</h3><p>复合键连接：暂只读</p><ul>{type.data_join.source_columns.map((column, i) => <li key={i}>{column} = {type.data_join?.target_columns?.[i]}</li>)}</ul></section>;
+  if (props.nativeDraft && (!type.source_type_id || type.roles?.length !== 1))
+    return <NativeMappingEditor {...props} />;
   return (
     <>
       <section className="element-section">
-        <HintedHeading title="关系映射" hint="根据两端对象的数据映射，按字段相等查找关系。两端数据须来自同一数据源，跨数据源关系暂不可查询。" />
+        <HintedHeading
+          title="关系映射"
+          hint="根据两端对象的数据映射，按字段相等查找关系。两端数据须来自同一数据源，跨数据源关系暂不可查询。"
+        />
         <label className="element-checkbox">
           <input
             type="checkbox"
@@ -676,47 +732,104 @@ export function MappingPanel(
           配置字段关联
         </label>
         {type.data_join ? (
-          <div className="element-basic-grid">
-            {(["source", "target"] as const).map((side) => {
-              const m = draft.mappings.find(
-                (m) => m.type_id === type[`${side}_type_id`],
-              );
-              return (
-                <Field
-                  key={side}
-                  label={`${side === "source" ? "源" : "目标"}字段 · ${m?.table_name ?? "尚未配置对象映射"}`}
-                >
-                  {editing ? (
-                    <input
-                      required
-                      list={`element-join-${side}`}
-                      value={type.data_join![`${side}_column`]}
-                      onChange={(e) =>
-                        changeType(props, {
-                          data_join: {
-                            ...type.data_join!,
-                            [`${side}_column`]: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  ) : (
-                    <span className="element-value">
-                      {type.data_join![`${side}_column`]}
-                    </span>
-                  )}
-                  <datalist id={`element-join-${side}`}>
-                    {[
-                      ...new Set(
-                        m ? [m.key_column, ...Object.values(m.fields)] : [],
-                      ),
-                    ].map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </Field>
-              );
-            })}
+          <div className="join-editor">
+            {(
+              type.data_join.source_columns ?? [type.data_join.source_column]
+            ).map((source, index) => (
+              <div className="join-pair" key={index}>
+                {(["source", "target"] as const).map((side) => {
+                  const columns = type.data_join![`${side}_columns`] ?? [
+                    type.data_join![`${side}_column`],
+                  ];
+                  const owner =
+                    (side === "source") !==
+                    (type.endpoint_direction === "reverse");
+                  return (
+                    <Field
+                      key={side}
+                      label={`${owner ? "所属概念" : "附加角色"}连接字段 ${index + 1}`}
+                    >
+                      {editing ? (
+                        <input
+                          required
+                          value={columns[index] ?? ""}
+                          onChange={(e) => {
+                            const next = columns.map((c, i) =>
+                              i === index ? e.target.value : c,
+                            );
+                            changeType(props, {
+                              data_join: {
+                                ...type.data_join!,
+                                [`${side}_column`]: next[0],
+                                [`${side}_columns`]: next,
+                              },
+                            });
+                          }}
+                        />
+                      ) : (
+                        <code>
+                          {side === "source" ? source : columns[index]}
+                        </code>
+                      )}
+                    </Field>
+                  );
+                })}
+                {editing && (
+                  <button
+                    type="button"
+                    aria-label={`删除连接键 ${index + 1}`}
+                    disabled={(type.data_join?.source_columns?.length ?? 1) < 2}
+                    onClick={() => {
+                      const source = type.data_join!.source_columns!.filter(
+                          (_, i) => i !== index,
+                        ),
+                        target = (
+                          type.data_join!.target_columns ?? [
+                            type.data_join!.target_column,
+                          ]
+                        ).filter((_, i) => i !== index);
+                      changeType(props, {
+                        data_join: {
+                          source_column: source[0],
+                          target_column: target[0],
+                          source_columns: source,
+                          target_columns: target,
+                        },
+                      });
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {editing && (
+              <button
+                type="button"
+                onClick={() =>
+                  changeType(props, {
+                    data_join: {
+                      ...type.data_join!,
+                      source_columns: [
+                        ...(type.data_join!.source_columns ?? [
+                          type.data_join!.source_column,
+                        ]),
+                        "",
+                      ],
+                      target_columns: [
+                        ...(type.data_join!.target_columns ?? [
+                          type.data_join!.target_column,
+                        ]),
+                        "",
+                      ],
+                    },
+                  })
+                }
+              >
+                <Plus size={12} />
+                添加连接键
+              </button>
+            )}
           </div>
         ) : (
           <p className="element-empty">尚未配置关系映射。</p>
@@ -822,7 +935,10 @@ function MappingPreview({
   if (!mappings.length) return null;
   return (
     <section className="element-section">
-      <HintedHeading title={isObject(type) ? "数据预览" : "端点数据预览"} hint="按需读取最多 10 条映射结果；查看全部实例请切换到“实例”。" />
+      <HintedHeading
+        title={isObject(type) ? "数据预览" : "端点数据预览"}
+        hint="按需读取最多 10 条映射结果；查看全部实例请切换到“实例”。"
+      />
       {mappings.map((m) => (
         <DataSample
           key={JSON.stringify(m)}
@@ -900,7 +1016,10 @@ export function RulesPanel({ draft, type, editing, change }: PanelProps) {
   return (
     <section className="element-section">
       <div className="element-section-title">
-        <HintedHeading title="规则" hint="规则用于模型校验与定义，当前不执行推理。" />
+        <HintedHeading
+          title="规则"
+          hint="规则用于模型校验与定义，当前不执行推理。"
+        />
         {editing && (
           <button
             className="element-text-button"

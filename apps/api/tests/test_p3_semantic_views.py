@@ -83,11 +83,11 @@ def test_b_coverage_and_unused_computed_fields():
         mapping_for(draft, component.id)
     assert error.value.detail == {
         "code": "COMPLEX_MAPPING_READ_ONLY",
-        "message": "复杂映射：暂只读",
+        "message": "复杂映射暂不支持实例查询",
         "reason": "multiple_roots",
     }
     form = legacy_mapping_form(draft.model_dump(mode="json"))
-    with pytest.raises(ValueError, match="复杂映射：暂只读"):
+    with pytest.raises(ValueError, match="复杂映射请在语义模型中编辑"):
         apply_mapping_form(
             draft.model_dump(mode="json"),
             [

@@ -39,7 +39,7 @@ export function DataConnections({
   return (
     <section className="detail-section">
       <p className="muted">
-        使用只读数据库账号。实例按需查询，不全量同步源数据。
+        使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。
       </p>
 
       {error && <div className="inline-error">{error}</div>}
@@ -118,7 +118,7 @@ export function DataConnections({
           }}
         >
           <header>
-            <h2>添加只读数据连接</h2>
+            <h2>添加数据连接</h2>
             <button
               type="button"
               className="icon-button"
@@ -164,7 +164,7 @@ export function DataConnections({
           </label>
           <div className="form-columns">
             <label className="section-field">
-              <span>只读用户名</span>
+              <span>查询用户名</span>
               <input name="username" required autoComplete="off" />
             </label>
             <label className="section-field">

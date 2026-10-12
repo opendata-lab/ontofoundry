@@ -369,7 +369,7 @@ export function InstancesPage() {
             }}
           />
           <div className="graph-caption">
-            {databaseDetail ? "数据库只读 Join" : "文档原生实例"} ·{" "}
+            {databaseDetail ? "数据库关联" : "文档原生实例"} ·{" "}
             <label>
               展开范围{" "}
               <select
