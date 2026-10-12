@@ -145,7 +145,7 @@ def workspace_overview(version: OntologyVersionRecord, *, include_private: bool)
     for cm in model.concept_mappings:
         analysis = views.analyze(cm.concept_id.ref)
         mappings.append({"id": str(cm.id), "type_id": str(cm.concept_id.ref),
-                         "table_name": analysis.mapping.table_name if analysis.mapping else "复杂映射：暂只读",
+                         "table_name": analysis.mapping.table_name if analysis.mapping else "复杂映射",
                          "state": analysis.public(cm.concept_id.ref)["state"], "reason": analysis.reason})
     sample_objects = [
         {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]

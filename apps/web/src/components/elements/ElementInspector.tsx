@@ -29,7 +29,7 @@ import {
   publishApi,
   workspaceRequest,
 } from "../../api/client";
-import { editorDraft, nativeFromEditor, relationReadOnly } from "../../lib/nativeDraft";
+import { editorDraft, nativeFromEditor } from "../../lib/nativeDraft";
 import type {
   Draft,
   LegacyDraft,
@@ -328,8 +328,7 @@ function Inspector({
   const resolved = draft ? resolve(draft, kind, effectiveId) : null;
   const type = resolved?.type;
   const object = type ? isObject(type) : kind !== "link_type";
-  const readOnly = !!type && !isObject(type) && relationReadOnly(type);
-  const editing = editingIntent && !readOnly;
+  const editing = editingIntent;
   const properties =
     draft?.properties.filter((p) => p.owner_type_id === type?.id) ?? [];
   const mappings = draft?.mappings.filter((m) => m.type_id === type?.id) ?? [];
@@ -357,7 +356,7 @@ function Inspector({
     { id: "basic", name: "基本信息" },
     object
       ? { id: "properties", name: "属性", count: properties.length }
-      : { id: "endpoints", name: "端点" },
+      : { id: "endpoints", name: "角色与语义描述" },
     {
       id: "mapping",
       name: "映射",
@@ -423,7 +422,7 @@ function Inspector({
     );
   };
   const save = async () => {
-    if (!draft || !type || !loaded || busy || readOnly) return;
+    if (!draft || !type || !loaded || busy) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -436,6 +435,7 @@ function Inspector({
         session_id: source.session?.id ?? null,
         expected_session_revision: source.session?.revision ?? null,
         draft: nativeFromEditor(source.draft, draft),
+        semantic_changes: draft._semantic_changes ?? [],
       });
       const next: Loaded = {
         draft: result.session?.draft ?? result.draft,
@@ -476,7 +476,7 @@ function Inspector({
     }
   };
   const beginEdit = () => {
-    if (!loaded || !draft || loading || readOnly) return;
+    if (!loaded || !draft || loading) return;
     setEditing(true);
     setNotice("");
   };
@@ -508,6 +508,7 @@ function Inspector({
     draft && type
       ? {
           draft,
+          nativeDraft: loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
           type,
           editing,
           change: (next) => {
@@ -587,7 +588,7 @@ function Inspector({
                   <LinkIcon size={14} />
                   复制链接
                 </button>
-                {workspace.role && !previewHash && type && !readOnly && (
+                {workspace.role && !previewHash && type && (
                   <button
                     className="button button--primary"
                     type="button"

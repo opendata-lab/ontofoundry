@@ -254,7 +254,7 @@ export function DeliveryPage() {
           </div>
           {workspace.role === "admin" && (
             <>
-              <h3>只读访问令牌</h3>
+              <h3>访问令牌</h3>
               <form
                 className="row-actions"
                 onSubmit={(e) => {

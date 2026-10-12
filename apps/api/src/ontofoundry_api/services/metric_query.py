@@ -469,8 +469,7 @@ def target_dialect(connection):
     return DIALECTS.get(connection.kind.upper(), "") if connection else ""
 
 
-def list_metrics(db, version, *, query="", semantic_model=None):
-    draft = OntologyDraft.model_validate(snapshot_of(version))
+def metrics_for_draft(db, workspace_id, draft, *, version_id=None, query="", semantic_model=None):
     items = []
     for metric in draft.metrics:
         model = next(m for m in draft.semantic_models if m.id == metric.semantic_model_id)
@@ -481,7 +480,7 @@ def list_metrics(db, version, *, query="", semantic_model=None):
         ):
             continue
         aliases = synonyms(metric.ai_context)
-        display = draft.extension_v4.display_names.get(str(metric.id)) or next(
+        display = draft.extension_v4.display_names.get(metric.id) or next(
             iter(aliases), metric.name
         )
         if (
@@ -507,7 +506,7 @@ def list_metrics(db, version, *, query="", semantic_model=None):
             filter_fields=[],
         )
         try:
-            connection = connection_for(db, version.workspace_id, model)
+            connection = connection_for(db, workspace_id, model)
             declared = expression_for(metric.expression, target_dialect(connection))
             names = {c.table for c in declared.find_all(exp.Column) if len(c.parts) == 2}
             item["datasets"] = [
@@ -547,7 +546,11 @@ def list_metrics(db, version, *, query="", semantic_model=None):
         except ServiceError as exc:
             item.update(reason=exc.message, reason_code=exc.code)
         items.append(item)
-    return {"version_id": version.id, "items": items}
+    return {"version_id": version_id, "items": items}
+
+
+def list_metrics(db, version, *, query="", semantic_model=None):
+    return metrics_for_draft(db, version.workspace_id, OntologyDraft.model_validate(snapshot_of(version)), version_id=version.id, query=query, semantic_model=semantic_model)
 
 
 def query_metric(db, version, settings, metric_id, **arguments):

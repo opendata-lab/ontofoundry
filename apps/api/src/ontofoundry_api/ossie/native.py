@@ -137,7 +137,8 @@ def parse_native(document, workspace_id):
                 for ni, node in enumerate(cm.get(slot, [])):
                     flatten(node, cid, f'{cpath}/{slot}/{ni}', slot, ni)
     if ext.get('version') == '4':
-        result['extension_v4'] = {'version': '4', 'concept_context': deepcopy(ext.get('concept_context', {})), 'legacy_mapping_ids': deepcopy(ext.get('legacy_mapping_ids', {}))}
+        semantic_ids = {item['id'] for key in ('semantic_models', 'datasets', 'dataset_fields', 'dataset_relationships', 'metrics') for item in result[key]}
+        result['extension_v4'] = {'version': '4', 'concept_context': deepcopy(ext.get('concept_context', {})), 'legacy_mapping_ids': deepcopy(ext.get('legacy_mapping_ids', {})), 'display_names': {key: value for key, value in labels.items() if key in semantic_ids}}
         result['actions'] = deepcopy(ext.get('actions', []))
         for rid, metadata in ext.get('rule_metadata', {}).items():
             if metadata.get('owner_kind') == 'action':
@@ -325,7 +326,7 @@ def compile_native(draft, ontology_name, ontology_description):
     extension = dict(version='4', id_namespace=str(namespace), ids=registry,
                      concept_context={str(key): value.model_dump(mode='json', exclude_defaults=True) for key, value in draft.extension_v4.concept_context.items()},
                      display_names={str(i.id): i.name for i in [*concepts.values(), *draft.properties, *draft.link_types]
-                                    if i.name != (i.concept if hasattr(i, 'concept') else i.technical_name or i.name)},
+                                    if i.name != (i.concept if hasattr(i, 'concept') else i.technical_name or i.name)} | {str(item.id): draft.extension_v4.display_names[item.id] for collection in (draft.semantic_models, draft.datasets, draft.dataset_fields, draft.dataset_relationships, draft.metrics) for item in collection if item.id in draft.extension_v4.display_names and draft.extension_v4.display_names[item.id] != item.name},
                      tags={str(i.id): i.tags for i in [*concepts.values(), *draft.properties, *draft.link_types] if i.tags},
                      required_properties=[str(i.id) for i in draft.properties if i.required],
                      rule_metadata=metadata,

@@ -26,6 +26,12 @@ from ontofoundry_api.domain.instance_validation import (
 from ontofoundry_api.domain.models import DataJoin, DataMapping, OntologyDraft
 from ontofoundry_api.domain.role_join import RoleJoin, role_join_input
 from ontofoundry_api.domain.runtime_views import apply_mapping_form, legacy_mapping_form
+from ontofoundry_api.domain.semantic_authoring import (
+    SemanticChange,
+    apply_changes,
+    copy_scope,
+    edit_scope,
+)
 from ontofoundry_api.domain.snapshot import (
     as_v3_dict,
     draft_sha256,
@@ -79,6 +85,7 @@ class ElementSave(LegacyFormRequest):
     session_id: str | None = None
     expected_session_revision: int | None = None
     draft: dict
+    semantic_changes: list[SemanticChange] = Field(default_factory=list, max_length=100)
 
 
 def apply_element_mapping_form(snapshot, requested, kind, target_id):
@@ -116,10 +123,6 @@ def save_element(
                                status_code=409)
     write_revision = item.revision if item else None
     original = session_draft(item) if item else latest
-    if body.target_kind == "link_type":
-        selected = next((link for link in original["link_types"] if link["id"] == body.target_id), None)
-        if selected and (len(selected.get("roles", [])) != 1 or selected.get("owner_ref", {}).get("kind") != "object_type" or selected["roles"][0]["concept"]["kind"] != "object_type"):
-            raise ServiceError("该关系暂只读", status_code=409, code="ELEMENT_READ_ONLY")
     try:
         jsonschema.validate(body.draft, OntologyDraft.model_json_schema(draft_version="3" if body.draft.get("schema_version") == "3" else "2"))
         edited = reconcile_draft_evidence(
@@ -129,6 +132,29 @@ def save_element(
         )
         base = version_snapshot(db, workspace_id, item.base_version_id) if item else latest
         scoped = scoped_draft(base, original, edited, body.target_kind, body.target_id)
+        semantic_scope = None
+        if body.semantic_changes:
+            selected = next(n for n in edited["link_types" if body.target_kind == "link_type" else "value_types" if body.target_kind == "value_type" else "object_types"] if n["id"] == body.target_id)
+            concept_id = selected["owner_ref"]["ref"] if body.target_kind == "link_type" else body.target_id
+            allowed_models = {cm["semantic_model_id"] for cm in original["concept_mappings"] if cm["concept_id"]["ref"] == concept_id}
+            allowed_models.update(str(change.parent_id) for change in body.semantic_changes if change.kind == "concept_mapping" and change.operation == "create" and change.values.get("concept_id", {}).get("ref") == concept_id)
+            for change in body.semantic_changes:
+                if change.kind == "concept_mapping":
+                    cm = next((c for c in original["concept_mappings"] if c["id"] == str(change.id)), None)
+                    ref = change.values.get("concept_id", (cm or {}).get("concept_id", {})).get("ref")
+                    if ref != concept_id:
+                        raise ServiceError("映射不属于当前概念", code="ELEMENT_SCOPE_INVALID", status_code=422)
+                elif change.kind == "dataset_relationship" and body.target_kind == "link_type":
+                    rel = next((r for r in original["dataset_relationships"] if r["id"] == str(change.id)), None)
+                    mid = (rel or {}).get("semantic_model_id") or str(change.parent_id)
+                    if mid not in allowed_models:
+                        raise ServiceError("连接不属于当前概念的语义模型", code="ELEMENT_SCOPE_INVALID", status_code=422)
+                else:
+                    raise ServiceError("请在语义模型页编辑此对象", code="ELEMENT_SCOPE_INVALID", status_code=422)
+            semantic_edited = apply_changes(edited, body.semantic_changes)
+            semantic_scope = edit_scope(edited, semantic_edited, body.semantic_changes)
+            scoped = copy_scope(scoped, semantic_edited, semantic_scope)
+            edited = semantic_edited
         mappings, joins = body.form_values()
         if mappings is not None or joins is not None:
             previous_form = legacy_mapping_form(original)
@@ -157,6 +183,8 @@ def save_element(
             # values of the element just saved (latest may add untouched fields).
             merged = model.model_dump(mode="json")
             updated_draft = scoped_draft(edited, merged, merged, body.target_kind, body.target_id)
+            if semantic_scope:
+                updated_draft = copy_scope(updated_draft, merged, semantic_scope)
             if mappings is not None or joins is not None:
                 updated_draft = apply_element_mapping_form(updated_draft, requested_form, body.target_kind, body.target_id)
             # CAS also protects SQLite and a proposal decision racing this request.
@@ -1009,4 +1037,14 @@ def semantic_models(
     from ontofoundry_api.domain.snapshot import read_snapshot
     require_member(db, workspace_id, user.id)
     raw = get_modeling_session(db, workspace_id, session_id).draft_json if session_id else published_snapshot(workspace_id, db, user)
-    return semantic_catalog(read_snapshot(raw, workspace_id, target_version="3"))
+    from ontofoundry_api.services.metric_query import metrics_for_draft
+    draft = OntologyDraft.model_validate(read_snapshot(raw, workspace_id, target_version="3"))
+    catalog = semantic_catalog(draft)
+    metric_info = {m["id"]: m for m in metrics_for_draft(db, workspace_id, draft)["items"]}
+    for model in catalog["items"]:
+        for metric in model["metrics"]:
+            info = metric_info.get(metric["id"], {})
+            metric["query"] = {k: v for k, v in info.items() if k not in {"id", "name", "technical_name", "display_name", "description", "synonyms"}}
+    space = db.get(WorkspaceRecord, workspace_id)
+    catalog.update(current_version_id=space.current_version_id, session_revision=get_modeling_session(db, workspace_id, session_id).revision if session_id else None)
+    return catalog

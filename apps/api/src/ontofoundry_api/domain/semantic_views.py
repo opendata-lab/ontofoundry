@@ -80,7 +80,7 @@ class MappingAnalysis:
             if self.reason
             else "unmapped",
             reason=self.reason,
-            message="复杂映射：暂只读（"
+            message="复杂映射暂不支持实例查询（"
             + READONLY_REASONS.get(self.reason, self.reason)
             + "）"
             if self.reason
@@ -152,7 +152,7 @@ class SemanticViews:
             return None, f"数据集字段不存在：{dataset.name}.{name}"
         column = self.physical(dataset, '"' + name.replace('"', '""') + '"')
         if column is None:
-            return None, f"复杂连接字段：暂只读（{dataset.name}.{name}）"
+            return None, f"复杂连接字段暂不支持实例查询（{dataset.name}.{name}）"
         return column, None
 
     def analyze(self, type_id):
@@ -363,12 +363,25 @@ def join_view(draft, link_id):
 
 
 def semantic_catalog(draft):
-    """Clean read-only structure, with metric attribution as a derived view."""
+    """Clean native structure, with metric attribution as a derived view."""
     from ontofoundry_api.services.public_projection import public_projection
 
     views = SemanticViews(draft)
     concepts = {c.id: c for c in [*draft.object_types, *draft.value_types]}
+    from ontofoundry_api.domain.semantic_authoring import identifier_edits
+    from ontofoundry_api.services.errors import ServiceError
+
+    def uses_dataset(text, name, dialect=""):
+        try:
+            return identifier_edits(text, dataset=name, replacement=name, dialect=dialect)[1]
+        except ServiceError:
+            # Catalogs also carry non-SQL expressions; do not reject native
+            # models merely because a dialect has no SQL tokenizer.
+            return bool(re.search(r"(?<!\w)[`\"]?" + re.escape(name) + r"[`\"]?\s*\.", text))
+
     models = []
+    def display(node):
+        return draft.extension_v4.display_names.get(node.id, node.name)
     for model in draft.semantic_models:
         datasets = [d for d in draft.datasets if d.semantic_model_id == model.id]
         dataset_concepts = {}
@@ -380,9 +393,7 @@ def semantic_catalog(draft):
                 if not node.expression:
                     continue
                 for dataset in datasets:
-                    if re.search(
-                        r"(?<!\w)" + re.escape(dataset.name) + r"\.", node.expression
-                    ):
+                    if uses_dataset(node.expression, dataset.name):
                         dataset_concepts.setdefault(dataset.name, set()).add(
                             cm.concept_id.ref
                         )
@@ -396,16 +407,16 @@ def semantic_catalog(draft):
             if metric.semantic_model_id != model.id:
                 continue
             ids = set(metric_concepts.get(metric.id, set()))
-            expressions = " ".join(e.expression for e in metric.expression.dialects)
             for name, concept_ids in dataset_concepts.items():
-                if re.search(r"(?<!\w)" + re.escape(name) + r"\.", expressions):
+                if any(uses_dataset(e.expression, name, e.dialect) for e in metric.expression.dialects):
                     ids.update(concept_ids)
             metrics.append(
                 {
                     **metric.model_dump(mode="json"),
+                    "display_name": display(metric),
                     "ambiguous": len(ids) > 1,
                     "concepts": [
-                        dict(id=str(c.id), name=c.name, technical_name=c.technical_name)
+                        dict(id=str(c.id), kind="object_type" if c in draft.object_types else "value_type", name=c.name, technical_name=c.technical_name)
                         for c in concepts.values()
                         if c.id in ids
                     ],
@@ -414,12 +425,17 @@ def semantic_catalog(draft):
         models.append(
             {
                 **model.model_dump(mode="json"),
+                "display_name": display(model),
+                "concept_mappings": [{**cm.model_dump(mode="json"), "concept": {"id": str(concepts[cm.concept_id.ref].id), "kind": cm.concept_id.kind, "name": concepts[cm.concept_id.ref].name, "technical_name": concepts[cm.concept_id.ref].concept}, "nodes": [n.model_dump(mode="json") for n in sorted(views.nodes.get(cm.id, []), key=lambda n: (str(n.parent_id or ""), n.slot, n.position if n.position is not None else 0))]} for cm in draft.concept_mappings if cm.semantic_model_id == model.id and cm.concept_id.ref in concepts],
                 "connection_alias": connection_alias(model),
                 "datasets": [
                     {
                         **d.model_dump(mode="json"),
+                        "display_name": display(d),
+                        "concepts": [dict(id=str(c.id), kind="object_type" if c in draft.object_types else "value_type", name=c.name, technical_name=c.concept) for c in concepts.values() if c.id in dataset_concepts.get(d.name, set())],
+                        "metrics": [str(m.id) for m in draft.metrics if m.semantic_model_id == model.id and any(uses_dataset(e.expression, d.name, e.dialect) for e in m.expression.dialects)],
                         "fields": [
-                            f.model_dump(mode="json")
+                            {**f.model_dump(mode="json"), "display_name": display(f)}
                             for f in draft.dataset_fields
                             if f.dataset_id == d.id
                         ],
@@ -427,7 +443,7 @@ def semantic_catalog(draft):
                     for d in datasets
                 ],
                 "relationships": [
-                    r.model_dump(mode="json")
+                    r.model_dump(mode="json", by_alias=True)
                     for r in draft.dataset_relationships
                     if r.semantic_model_id == model.id
                 ],
@@ -437,6 +453,7 @@ def semantic_catalog(draft):
     return public_projection(
         {
             "items": models,
+            "concepts": [dict(id=str(c.id), kind="object_type" if c in draft.object_types else "value_type", name=c.name, technical_name=c.concept) for c in concepts.values()],
             "mapping_status": {
                 str(c.id): views.analyze(c.id).public(c.id) for c in draft.object_types
             },

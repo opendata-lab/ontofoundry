@@ -32,7 +32,7 @@ export function MappingsPage() {
       .catch((e: Error) => setError(e.message));
   }, [workspace.id]);
   return (
-    <div className="ref-catalog">
+    <div className={`ref-catalog${view === "semantic" ? " ref-catalog--semantic" : ""}`}>
       <header className="catalog-toolbar">
         <h1>数据映射</h1>
         <div className="toolbar-spacer" />
@@ -75,7 +75,7 @@ export function MappingsPage() {
             draft={snapshot.draft}
             sessionId={snapshot.sessionId}
           />
-        ) : view === "semantic" ? <SemanticModels workspaceId={workspace.id} sessionId={snapshot.sessionId} /> : (
+        ) : view === "semantic" ? <SemanticModels workspaceId={workspace.id} sessionId={snapshot.sessionId} canEdit={!!workspace.role} onBusyChange={setAssetBusy} /> : (
           <section className="detail-section">
             <h2>本体与数据集</h2>
             <div className="management-table-scroll">
@@ -101,7 +101,7 @@ export function MappingsPage() {
                         {t.name}
                         <small>{t.technical_name}</small>
                       </td>
-                      <td>{m?.table_name ?? (mappingStatus?.state === "readonly" ? "复杂映射：暂只读" : "未映射")}</td>
+                      <td>{m?.table_name ?? (mappingStatus?.state === "readonly" ? "复杂映射" : "未映射")}</td>
                       <td>{m?.key_column ?? "—"}</td>
                       <td>
                         {Object.keys(m?.fields ?? {}).length}/
