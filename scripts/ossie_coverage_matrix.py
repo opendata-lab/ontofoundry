@@ -1,18 +1,17 @@
 """Generate/recheck P0 matrix from pinned schemas and A/B fixture JSON.
 
-Run: python3 scripts/ossie_coverage_matrix.py [--check]
+Run: python3 scripts/ossie_coverage_matrix.py SAMPLE_A SAMPLE_B [--check]
 No network, services, database or input fixture mutation.
 """
 from __future__ import annotations
 
 import json
-import sys
+import argparse
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 VENDOR = ROOT / "apps/api/src/ontofoundry_api/ossie/assets/vendor/apache-ossie"
-FIXTURES = ROOT / "apps/api/tests/fixtures/ossie_real"
 OUTPUT = ROOT / "docs/design/2026-10-08-ossie-coverage-matrix.md"
 SCHEMAS = {"ontology": json.loads((VENDOR / "ontology/ontology.json").read_text()),
            "core": json.loads((VENDOR / "core-spec/osi-schema.json").read_text())}
@@ -140,13 +139,15 @@ SCALAR_LANDINGS = {
 }
 
 
-def render():
-    counts = [occurrences(json.loads((FIXTURES / f"{name}.ossie.json").read_text())) for name in ("account-model-v2", "architecture-governance")]
+def render(paths):
+    counts = [occurrences(json.loads(Path(path).read_text(encoding="utf-8"))) for path in paths]
+    if len(counts) != 2:
+        raise ValueError("提供两个样例文件路径")
     rows = list(catalog())
     property_count = sum(row[2] != "$value" for row in rows)
     lines = ["# Ossie v3 覆盖矩阵（P0 合同冻结）", "", "日期：2026-10-08。规范与范围以已评审方案第 1、3、5 节为准。", "",
-             "由 `python3 scripts/ossie_coverage_matrix.py` 从仓库固定 schema 与真实样例生成；`--check` 校验字段集合、计数与文档一致。", "",
-             "A = `account-model-v2.ossie.json`；B = `architecture-governance.ossie.json`。次数按 schema 引用作用域计数，统计字段是否出现，空字符串/空数组也算一次；递归映射按每个实例计数。", "",
+             "由 `python3 scripts/ossie_coverage_matrix.py` 从仓库固定 schema 与显式指定的样例生成；`--check` 校验字段集合、计数与文档一致。", "",
+             f"A = `{Path(paths[0]).name}`；B = `{Path(paths[1]).name}`。次数按 schema 引用作用域计数，统计字段是否出现，空字符串/空数组也算一次；递归映射按每个实例计数。", "",
              "路径为 schema JSON Pointer（ontology = ontology/ontology.json；core = core-spec/osi-schema.json）。根属性使用 `#/properties/...`。Core 顶层独立文档属性在 A/B 中为零，嵌入的 SemanticModel 不算独立文档。", "",
              f"统计：**原生属性 {property_count} 行，原生标量 $defs {len(rows) - property_count} 行，平台扩展 7 行，不支持 0 行**。两份 schema 全部 $defs 都有条目（无属性的标量另列）；开放 AIContext 附加键原样保留。", "",
              "这里的“原生”指 v3 合同有无损落点，不表示 P0 已替换 v2 导入器。A/B 的现有往返差异测试保留，接入分别在 P1/P2/P3；P0 不宣称已完成无损往返。所有 schema 原生构造可承载，无“不支持”理由需要例外。", "",
@@ -233,11 +234,16 @@ v1/v2 **已存快照**继续按其原版本 source_type_id/target_type_id 解释
 '''
 
 if __name__ == "__main__":
-    content = render()
-    if "--check" in sys.argv:
-        if OUTPUT.read_text() != content:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("files", nargs=2, type=Path)
+    parser.add_argument("--check", action="store_true")
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    args = parser.parse_args()
+    content = render(args.files)
+    if args.check:
+        if args.output.read_text(encoding="utf-8") != content:
             raise SystemExit("覆盖矩阵与固定 schema/样例/冻结落点不同")
-        print("coverage matrix matches pinned schemas and A/B fixtures")
+        print("coverage matrix matches pinned schemas and explicit fixtures")
     else:
-        OUTPUT.write_text(content)
-        print(f"wrote {OUTPUT.relative_to(ROOT)}")
+        args.output.write_text(content, encoding="utf-8")
+        print(f"wrote {args.output}")

@@ -144,22 +144,21 @@ def test_b_simple_native_mappings_query_all_ten_complex_readonly_and_clean_catal
                 ]
                 == obj["values"]
             )
-        component = next(t for t in draft.object_types if t.concept == "component")
+        fable_volume = next(t for t in draft.object_types if t.concept == "fable_volume")
         response = client.get(
             f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}/objects",
-            params={"type_id": str(component.id), "source": "database"},
+            params={"type_id": str(fable_volume.id), "source": "database"},
         )
         assert response.status_code == 422
         assert response.json()["detail"]["code"] == "COMPLEX_MAPPING_READ_ONLY"
         catalog = client.get(ROOT + "/semantic-models").json()
         model = catalog["items"][0]
-        assert (
-            len(model["datasets"]) == 41
-            and sum(len(d["fields"]) for d in model["datasets"]) == 371
-        )
-        assert len(model["metrics"]) == 27
+        # Every native dataset, field and metric of the fixture reaches the catalog.
+        assert len(model["datasets"]) == len(draft.datasets)
+        assert sum(len(d["fields"]) for d in model["datasets"]) == len(draft.dataset_fields)
+        assert len(model["metrics"]) == len(draft.metrics)
         assert any(
-            m["name"] == "core_service_count" and m["concepts"] for m in model["metrics"]
+            m["name"] == "spotlight_folio_total" and m["concepts"] for m in model["metrics"]
         )
         assert all(
             key not in json.dumps(catalog)

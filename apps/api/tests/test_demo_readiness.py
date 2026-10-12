@@ -77,17 +77,17 @@ def test_object_without_properties_is_a_warning(client):
 def test_abstract_parents_are_not_flagged(client):
     draft = client.post(ROOT + "/sessions", json={}).json()["draft"]
     kind = draft["object_types"][0]
-    parent = {**kind, "id": str(uuid4()), "name": "保证金账户", "technical_name": "margin_account",
-              "extends": [], "concept": "margin_account", "position": None}
-    child = {**kind, "id": str(uuid4()), "name": "专用资金账户", "technical_name": "fund_account",
-             "extends": [{"kind": "object_type", "ref": parent["id"]}], "concept": "fund_account", "position": None}
+    parent = {**kind, "id": str(uuid4()), "name": "故事页柜", "technical_name": "storybook_cabinet",
+              "extends": [], "concept": "storybook_cabinet", "position": None}
+    child = {**kind, "id": str(uuid4()), "name": "虚构阅览柜", "technical_name": "storybook_reading_cabinet",
+             "extends": [{"kind": "object_type", "ref": parent["id"]}], "concept": "storybook_reading_cabinet", "position": None}
     draft["object_types"] += [parent, child]
     report = include_instance_validation(
         {"errors": [], "warnings": [], "publishable": True},
         OntologyDraft.model_validate(draft),
     )
     flagged = " ".join(w["message"] for w in report["warnings"])
-    assert "保证金账户" not in flagged and "专用资金账户" in flagged
+    assert "故事页柜" not in flagged and "虚构阅览柜" in flagged
 
 
 def test_follows_the_task_dataagent_started_to_replace_a_suspended_one():

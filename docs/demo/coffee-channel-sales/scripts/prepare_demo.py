@@ -381,46 +381,49 @@ def stage_check() -> None:
     print("Q4 订单邻域:", json.dumps(graph, ensure_ascii=False)[:600])
 
 
-# Second scenario: real hand-built Ossie models. 架构治理 stays empty for a live
-# import; 中金所账户模型 is imported ahead so incremental modeling can run on it.
-OSSIE_ROOT = Path("/Users/guoruping/project/bigdata/onedata/skills")
-ACCOUNT_FILE = OSSIE_ROOT / "account-ossie-skill/assets/account-model-v2.ossie.json"
-FREEZE_MATERIAL = CASE.parent / "ossie-import" / "materials" / "保证金账户冻结管理办法.md"
-FREEZE_TITLE = "账户冻结（备用）"
-FREEZE_PROMPT = (
-    "目标范围：保证金账户冻结。基于已发布的账户模型增量建模：复用已有的金融期货交易所、"
-    "结算会员和专用资金账户，补充冻结相关的对象、属性、关系和规则，并抽取冻结登记中的记录。"
-)
-OSSIE_SPACES = [
-    ("account-model", "中金所账户模型",
-     "手工建模的 Apache Ossie 账户模型 v2：会员、账户、结算与担保关系。"),
-    ("architecture-governance", "架构治理",
-     "手工建模的 Apache Ossie 架构治理本体，含逻辑语义模型与标准映射。"),
-]
-
-
+# Optional local validation materials live outside the repository.
 def space(slug: str) -> dict | None:
     return next((w for w in call("GET", "/api/v1/workspaces")["items"] if w["slug"] == slug), None)
 
 
 def stage_ossie() -> None:
-    for slug, name, description in OSSIE_SPACES:
-        if not space(slug):
-            call("POST", "/api/v1/workspaces", {"name": name, "slug": slug, "description": description})
-            print("创建空间", name)
-    account = space("account-model")
-    if not account.get("current_version"):
-        session = call("POST", ws_path(account, "/imports/ossie"),
-                       {"document": json.loads(ACCOUNT_FILE.read_text()), "mode": "replace",
-                        "title": "导入 account_model_v2"})
-        publish_session(account, session, "导入手工模型 account_model_v2")
+    private_dir = os.environ.get("ONTOFOUNDRY_PRIVATE_DIR")
+    if not private_dir:
+        print("未设置 ONTOFOUNDRY_PRIVATE_DIR，跳过本地验证素材阶段。")
+        return
+    root = Path(private_dir).expanduser().resolve()
+    configuration = root / "demo/scenarios.json"
+    if not configuration.is_file():
+        print("私有目录缺少 demo/scenarios.json，跳过本地验证素材阶段。")
+        return
+    scenarios = json.loads(configuration.read_text(encoding="utf-8"))["scenarios"]
+
+    def local_file(relative: str) -> Path:
+        path = (root / relative).resolve()
+        if not path.is_relative_to(root):
+            raise ValueError("素材路径必须位于私有目录内")
+        return path
+
     global workspace
-    keep = workspace
-    workspace = lambda: space("account-model")  # noqa: E731 - reuse run_modeling for this space
-    try:
-        run_modeling([material(account, FREEZE_MATERIAL)], FREEZE_TITLE, FREEZE_PROMPT)
-    finally:
-        workspace = keep
+    for scenario in scenarios:
+        slug = scenario["slug"]
+        if not space(slug):
+            call("POST", "/api/v1/workspaces", {key: scenario[key] for key in ("name", "slug", "description")})
+            print("创建空间", scenario["name"])
+        target = space(slug)
+        if scenario.get("document") and not target.get("current_version"):
+            document = json.loads(local_file(scenario["document"]).read_text(encoding="utf-8"))
+            session = call("POST", ws_path(target, "/imports/ossie"),
+                           {"document": document, "mode": "replace", "title": scenario["title"]})
+            publish_session(target, session, scenario["title"])
+        if scenario.get("material"):
+            keep = workspace
+            workspace = lambda target=target: target
+            try:
+                run_modeling([material(target, local_file(scenario["material"]))],
+                             scenario["modeling_title"], scenario["prompt"])
+            finally:
+                workspace = keep
 
 STAGES = {"model": stage_model, "publish": stage_publish, "data": stage_data,
           "connect": stage_connect,

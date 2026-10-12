@@ -12,7 +12,7 @@ from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.workspaces import publish_draft
 
-FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_real'
+FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_synthetic'
 USER = '00000000-0000-0000-0000-000000000001'
 
 
@@ -38,44 +38,44 @@ def candidate(result, element_id):
 
 def test_all_eight_real_document_synonyms_are_searchable_with_document_scope(synonym_client):
     client = synonym_client
-    source, draft, version_id = publish(client, 'account-model-v2')
+    source, draft, version_id = publish(client, 'storybook-lending')
     doc_id = 'document:' + str(DEMO_WORKSPACE_ID)
     assert len(source['ai_context']['synonyms']) == 8
     for alias in source['ai_context']['synonyms']:
         result = call(client, 'search_ontology_types', query=alias)
         document = candidate(result, doc_id)
-        assert document['kind'] == 'document' and document['synonyms'] == source['ai_context']['synonyms']
+        assert document['kind'] == 'document' and document['synonyms'] == {key: value for key, value in source['ai_context'].items() if key != 'ontofoundry'}['synonyms']
         assert {'source': 'document.ai_context.synonyms', 'value': alias, 'scope_id': doc_id, 'standard': True} in document['matches']
         assert all(not item['synonyms'] for item in result['items'] if item['kind'] in ('object_type', 'value_type'))
-    assert call(client, 'get_ontology_type', type_id=doc_id)['item']['synonyms'] == source['ai_context']['synonyms']
-    assert call(client, 'list_ontology_elements', kind='document')['items'][0]['ai_context'] == source['ai_context']
+    assert call(client, 'get_ontology_type', type_id=doc_id)['item']['synonyms'] == {key: value for key, value in source['ai_context'].items() if key != 'ontofoundry'}['synonyms']
+    assert call(client, 'list_ontology_elements', kind='document')['items'][0]['ai_context'] == {key: value for key, value in source['ai_context'].items() if key != 'ontofoundry'}
     with client.app.state.session_factory() as db:
         assert db.get(OntologyVersionRecord, version_id).snapshot_json == draft  # pure reads
 
 
-def test_real_metric_and_field_synonyms_return_complete_nodes_and_all_ambiguous_candidates(synonym_client):
+def test_synthetic_metric_and_field_synonyms_return_complete_nodes_and_all_ambiguous_candidates(synonym_client):
     client = synonym_client
-    _, draft, _ = publish(client, 'architecture-governance')
-    metric = next(item for item in draft['metrics'] if item['name'] == 'core_service_count')
-    result = call(client, 'search_ontology_types', query='核心服务数')
+    _, draft, _ = publish(client, 'library-lending')
+    metric = next(item for item in draft['metrics'] if item['name'] == 'spotlight_folio_total')
+    result = call(client, 'search_ontology_types', query='精选卷册数')
     found = candidate(result, metric['id'])
     assert found['kind'] == 'metric' and found['expression'] == metric['expression']
-    assert found['matches'] == [{'source': 'metric.ai_context.synonyms', 'value': '核心服务数', 'scope_id': metric['id'], 'standard': True}]
+    assert found['matches'] == [{'source': 'metric.ai_context.synonyms', 'value': '精选卷册数', 'scope_id': metric['id'], 'standard': True}]
     assert call(client, 'get_ontology_type', type_id=metric['id'])['item']['synonyms'] == metric['ai_context']['synonyms']
     listing = call(client, 'list_ontology_elements', kind='metric', limit=200)
-    assert len(listing['items']) == 27 and candidate(listing, metric['id'])['ai_context'] == metric['ai_context']
-    field = next(item for item in draft['dataset_fields'] if item['name'] == 'env_name')
-    result = call(client, 'search_ontology_types', query='运行环境')
+    assert len(listing['items']) == 8 and candidate(listing, metric['id'])['ai_context'] == metric['ai_context']
+    field = next(item for item in draft['dataset_fields'] if item['name'] == 'library_site')
+    result = call(client, 'search_ontology_types', query='借阅场所')
     found = candidate(result, field['id'])
     assert found['dataset_id'] == field['dataset_id'] and found['ai_context'] == field['ai_context']
-    assert any(match['source'] == 'field.ai_context.synonyms' and match['value'] == '运行环境' for match in found['matches'])
-    ambiguous = call(client, 'search_ontology_types', query='分保等级')
+    assert any(match['source'] == 'field.ai_context.synonyms' and match['value'] == '借阅场所' for match in found['matches'])
+    ambiguous = call(client, 'search_ontology_types', query='童话阅龄')
     fields = [item for item in ambiguous['items'] if item['kind'] == 'dataset_field']
     assert ambiguous['ambiguous'] and len(fields) >= 2 and len({item['dataset_id'] for item in fields}) >= 2
     fetched = call(client, 'get_ontology_elements', element_ids=[field['id'], metric['id']])
     assert fetched['missing'] == [] and {item['kind'] for item in fetched['items']} == {'dataset_field', 'metric'}
     assert all(item['element']['synonyms'] for item in fetched['items'])
-    by_name = call(client, 'get_ontology_type', type_id='system_level')
+    by_name = call(client, 'get_ontology_type', type_id='reading_tier')
     assert by_name['ambiguous'] and by_name['item'] is None and len(by_name['candidates']) >= 2
 
 
@@ -94,7 +94,7 @@ def test_concept_aliases_and_dataset_context_do_not_leak_across_scopes(synonym_c
         dataset = draft['datasets'][0]
         dataset['ai_context'] = {'synonyms': ['数据集别名', '数据集别名'], 'instructions': '原生数据集口径'}
         dataset['native_presence'].append('ai_context')
-    _, draft, _ = publish(client, 'architecture-governance', mutate)
+    _, draft, _ = publish(client, 'library-lending', mutate)
     a, b = draft['object_types'][:2]
     result = call(client, 'search_ontology_types', query='共享别名')
     assert result['ambiguous'] and {item['id'] for item in result['items']} == {a['id'], b['id']}
@@ -115,13 +115,13 @@ def test_concept_aliases_and_dataset_context_do_not_leak_across_scopes(synonym_c
 
 def test_context_search_and_get_respect_existing_semantic_metadata_scopes(synonym_client):
     client = synonym_client
-    source, _, _ = publish(client, 'architecture-governance')
+    source, _, _ = publish(client, 'library-lending')
     root = '/api/v1/workspaces/' + str(DEMO_WORKSPACE_ID)
     token = client.post(root + '/service-tokens', json={'name': 'ontology-reader', 'scopes': ['ontology:read']}).json()['token']
     headers = {'Authorization': 'Bearer ' + token}
     manifest = call(client, 'get_ontology_manifest', headers=headers)
     assert 'metric' not in manifest['counts'] and manifest['counts']['document'] == 1
-    result = call(client, 'search_ontology_types', headers=headers, query='核心服务数')
+    result = call(client, 'search_ontology_types', headers=headers, query='精选卷册数')
     assert all(item['kind'] != 'metric' for item in result['items'])
     result = call(client, 'search_ontology_types', headers=headers, query=source['ai_context']['synonyms'][0])
     assert any(item['kind'] == 'document' for item in result['items'])

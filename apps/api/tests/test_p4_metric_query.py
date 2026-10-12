@@ -1,4 +1,4 @@
-"""Metric compilation uses real B expressions and adversarial native payloads."""
+"""Metric compilation uses synthetic lending expressions and adversarial native payloads."""
 
 import json
 from pathlib import Path
@@ -14,18 +14,18 @@ from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.metric_query import MetricCompiler
 
-FIXTURES = Path(__file__).parent / "fixtures" / "ossie_real"
-DATE = [{"field": "snapshot_date", "op": "=", "value": "2026-10-01"}]
+FIXTURES = Path(__file__).parent / "fixtures" / "ossie_synthetic"
+DATE = [{"field": "inventory_day", "op": "=", "value": "2026-10-01"}]
 
 
 @pytest.fixture(scope="module")
 def b_draft():
-    document = json.loads((FIXTURES / "architecture-governance.ossie.json").read_text())
+    document = json.loads((FIXTURES / "library-lending.ossie.json").read_text())
     draft, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     return OntologyDraft.model_validate(draft)
 
 
-def compiler(draft, name="core_service_count", dialect="postgres", expression=None):
+def compiler(draft, name="spotlight_folio_total", dialect="postgres", expression=None):
     metric = next(m for m in draft.metrics if m.name == name).model_copy(deep=True)
     if expression is not None:
         metric.expression.dialects[0].expression = expression
@@ -33,27 +33,27 @@ def compiler(draft, name="core_service_count", dialect="postgres", expression=No
 
 
 @pytest.mark.parametrize("dialect", ["postgres", "mysql"])
-def test_real_rewrite_derived_field_and_bound_filters(b_draft, dialect):
+def test_synthetic_rewrite_derived_field_and_bound_filters(b_draft, dialect):
     c = compiler(b_draft, dialect=dialect)
     p = c.compile(
-        group_by=["env_name"],
+        group_by=["library_site"],
         filters=[
             *DATE,
-            {"field": "env_name", "op": "=", "value": "x'; DROP TABLE secret;--"},
+            {"field": "library_site", "op": "=", "value": "x'; DROP TABLE secret;--"},
         ],
     )
-    assert "prop_com_importance_type" in p.sql and "LOWER(TRIM(" in p.sql
-    assert "prop_com_arch_type" in p.sql and "is_core" not in p.sql
+    assert "raw_promo_tag" in p.sql and "LOWER(TRIM(" in p.sql
+    assert "raw_genre_tag" in p.sql and "spotlight_mark" not in p.sql
     assert "GROUP BY" in p.sql and "LIMIT 101" in p.sql
     assert "DROP" not in p.sql and p.parameters["p1"] == "x'; DROP TABLE secret;--"
     assert '"public"' in p.sql if dialect == "postgres" else "`public`" in p.sql
-    assert p.columns == ["env_name", "core_service_count"]
+    assert p.columns == ["library_site", "spotlight_folio_total"]
 
 
 def test_mysql_concat_and_postgres_decimal_division(b_draft):
-    p = compiler(b_draft, "interface_count", "mysql").compile(filters=DATE)
+    p = compiler(b_draft, "loan_signature_total", "mysql").compile(filters=DATE)
     assert "CONCAT(" in p.sql and "||" not in p.sql
-    p = compiler(b_draft, "interface_error_rate").compile(filters=DATE)
+    p = compiler(b_draft, "loan_late_fraction").compile(filters=DATE)
     assert "CAST(SUM(" in p.sql and "DOUBLE PRECISION" in p.sql
 
 
@@ -63,7 +63,7 @@ def test_prefers_target_dialect_before_ansi(b_draft):
     d = metric.expression.dialects[0].model_copy(
         update={
             "dialect": "POSTGRESQL",
-            "expression": "SUM(component_snapshot.component_type)",
+            "expression": "SUM(fable_inventory_snapshot.shelf_grade)",
         }
     )
     metric.expression.dialects.append(d)
@@ -75,21 +75,21 @@ def test_prefers_target_dialect_before_ansi(b_draft):
 @pytest.mark.parametrize(
     "expression",
     [
-        "SUM(component_snapshot.component_name); DROP TABLE public.secret",
+        "SUM(fable_inventory_snapshot.folio_key); DROP TABLE public.secret",
         "DROP TABLE public.secret",
-        "SELECT SUM(component_snapshot.component_name)",
+        "SELECT SUM(fable_inventory_snapshot.folio_key)",
         "SUM((SELECT secret FROM public.secret))",
         "SUM(pg_sleep(1))",
-        "SUM(public.evil(component_snapshot.component_name))",
-        "SUM(component_snapshot.component_name) OVER ()",
-        "SUM(component_snapshot.component_name) FILTER (WHERE TRUE)",
-        "SUM(component_snapshot.component_name) + component_snapshot.component_name",
-        "SUM(SUM(component_snapshot.component_name))",
-        "COUNT(component_snapshot.*)",
-        "SUM(CAST(component_snapshot.component_name AS malicious_type))",
-        "SUM(unknown.component_name)",
-        "SUM(component_snapshot.secret)",
-        "SUM(component_name)",
+        "SUM(public.evil(fable_inventory_snapshot.folio_key))",
+        "SUM(fable_inventory_snapshot.folio_key) OVER ()",
+        "SUM(fable_inventory_snapshot.folio_key) FILTER (WHERE TRUE)",
+        "SUM(fable_inventory_snapshot.folio_key) + fable_inventory_snapshot.folio_key",
+        "SUM(SUM(fable_inventory_snapshot.folio_key))",
+        "COUNT(fable_inventory_snapshot.*)",
+        "SUM(CAST(fable_inventory_snapshot.folio_key AS malicious_type))",
+        "SUM(unknown.folio_key)",
+        "SUM(fable_inventory_snapshot.secret)",
+        "SUM(folio_key)",
     ],
 )
 def test_ast_rejects_unsafe_or_out_of_scope_expressions(b_draft, expression):
@@ -104,16 +104,16 @@ def test_ast_rejects_unsafe_or_out_of_scope_expressions(b_draft, expression):
         "pg_sleep(1)",
         "name;DROP TABLE x",
         "other_table.secret",
-        "SUM(cmp_name)",
+        "SUM(raw_folio_code)",
     ],
 )
 def test_field_expression_is_also_validated(b_draft, expression):
     draft = b_draft.model_copy(deep=True)
-    ds = next(d for d in draft.datasets if d.name == "component_snapshot")
+    ds = next(d for d in draft.datasets if d.name == "fable_inventory_snapshot")
     field = next(
         f
         for f in draft.dataset_fields
-        if f.dataset_id == ds.id and f.name == "component_name"
+        if f.dataset_id == ds.id and f.name == "folio_key"
     )
     field.expression.dialects[0].expression = expression
     with pytest.raises(ServiceError):
@@ -122,30 +122,30 @@ def test_field_expression_is_also_validated(b_draft, expression):
 
 def test_unused_complex_field_does_not_block_metric(b_draft):
     draft = b_draft.model_copy(deep=True)
-    next(f for f in draft.dataset_fields if f.name == "zone").expression.dialects[
+    next(f for f in draft.dataset_fields if f.name == "aisle_key").expression.dialects[
         0
-    ].expression = "unknown(zone)"
+    ].expression = "unknown(raw_aisle_tag)"
     c = compiler(draft)
     assert c.compile(filters=DATE).sql
     with pytest.raises(ServiceError):
-        c.compile(group_by=["zone"], filters=DATE)
+        c.compile(group_by=["aisle_key"], filters=DATE)
 
 
 @pytest.mark.parametrize(
     "arguments",
     [
         {},
-        {"filters": [{"field": "snapshot_date", "op": "in", "value": ["2026-10-01"]}]},
+        {"filters": [{"field": "inventory_day", "op": "in", "value": ["2026-10-01"]}]},
         {
             "filters": [
                 {
-                    "field": "snapshot_date",
+                    "field": "inventory_day",
                     "op": "between",
                     "value": ["2026-10-01", "2026-10-02"],
                 }
             ]
         },
-        {"group_by": ["snapshot_date"]},
+        {"group_by": ["inventory_day"]},
         {"as_of": "2026-10-02", "filters": DATE},
         {"filters": DATE * 2},
     ],
@@ -157,21 +157,21 @@ def test_snapshot_requires_single_date_even_with_time_group(b_draft, arguments):
 
 
 def test_as_of_is_controlled_latest_snapshot_subquery(b_draft):
-    p = compiler(b_draft).compile(as_of="2026-10-03", group_by=["env_name"])
+    p = compiler(b_draft).compile(as_of="2026-10-03", group_by=["library_site"])
     assert "SELECT MAX(" in p.sql and "<= %(p0)s" in p.sql
     assert p.parameters == {"p0": "2026-10-03"}
-    assert "ds" in p.sql and "snapshot_date" not in p.sql
+    assert "raw_daystamp" in p.sql and "inventory_day" not in p.sql
 
 
 def test_event_override_and_rolling_extension(b_draft):
-    c = compiler(b_draft, "interface_error_rate")
+    c = compiler(b_draft, "loan_late_fraction")
     metric = c.metric.model_copy(deep=True)
     from ontofoundry_api.domain.models_v3 import CustomExtension
 
     metric.custom_extensions = [
         CustomExtension(
             vendor_name="ONTOFOUNDRY",
-            data=json.dumps({"time_semantics": "event", "time_field": "snapshot_date"}),
+            data=json.dumps({"time_semantics": "event", "time_field": "inventory_day"}),
         )
     ]
     event = MetricCompiler(b_draft, metric, "postgres")
@@ -180,7 +180,7 @@ def test_event_override_and_rolling_extension(b_draft):
         in event.compile(
             filters=[
                 {
-                    "field": "snapshot_date",
+                    "field": "inventory_day",
                     "op": "between",
                     "value": ["2026-10-01", "2026-10-02"],
                 }
@@ -190,7 +190,7 @@ def test_event_override_and_rolling_extension(b_draft):
     with pytest.raises(ServiceError):
         event.compile(as_of="2026-10-02")
     metric.custom_extensions[0].data = json.dumps(
-        {"time_semantics": "rolling", "time_field": "snapshot_date"}
+        {"time_semantics": "rolling", "time_field": "inventory_day"}
     )
     with pytest.raises(ServiceError):
         MetricCompiler(b_draft, metric, "postgres").compile()
@@ -214,7 +214,7 @@ def test_event_override_and_rolling_extension(b_draft):
 )
 def test_all_structured_filter_operators(b_draft, op, value):
     p = compiler(b_draft).compile(
-        filters=[*DATE, {"field": "env_name", "op": op, "value": value}]
+        filters=[*DATE, {"field": "library_site", "op": op, "value": value}]
     )
     assert p.parameters["p0"] == "2026-10-01"
     assert len(p.parameters) == (
@@ -225,13 +225,13 @@ def test_all_structured_filter_operators(b_draft, op, value):
 @pytest.mark.parametrize(
     "arguments",
     [
-        {"group_by": ["other.env_name"]},
-        {"group_by": ["env_name", "env_name"]},
+        {"group_by": ["other.library_site"]},
+        {"group_by": ["library_site", "library_site"]},
         {"filters": [{"field": "secret", "op": "=", "value": 1}]},
-        {"filters": [{"field": "env_name", "op": "like", "value": "%"}]},
-        {"filters": [{"field": "env_name", "op": "=", "value": {"sql": "evil"}}]},
-        {"filters": [{"field": "env_name", "op": "in", "value": []}]},
-        {"filters": [{"field": "env_name", "op": "between", "value": [1]}]},
+        {"filters": [{"field": "library_site", "op": "like", "value": "%"}]},
+        {"filters": [{"field": "library_site", "op": "=", "value": {"sql": "evil"}}]},
+        {"filters": [{"field": "library_site", "op": "in", "value": []}]},
+        {"filters": [{"field": "library_site", "op": "between", "value": [1]}]},
         {"limit": 0},
         {"limit": 1001},
         {"limit": True},
@@ -244,34 +244,34 @@ def test_bad_request_fields_values_and_bounds(b_draft, arguments):
 
 def test_multi_dataset_only_explains_connections(b_draft, client, monkeypatch):
     def mutate(d):
-        metric = next(m for m in d["metrics"] if m["name"] == "core_service_count")
+        metric = next(m for m in d["metrics"] if m["name"] == "spotlight_folio_total")
         metric["expression"]["dialects"][0]["expression"] = (
-            "SUM(component_snapshot.component_name) + SUM(api_interface_daily.call_count)"
+            "SUM(fable_inventory_snapshot.folio_key) + SUM(fable_loan_daily.checkout_ticks)"
         )
 
-    _, draft, _ = publish(client, "architecture-governance", mutate)
+    _, draft, _ = publish(client, "library-lending", mutate)
     from ontofoundry_api.api import connections
 
     monkeypatch.setattr(
         connections, "connect_readonly", lambda *a, **k: pytest.fail("must not execute")
     )
-    metric = next(m for m in draft["metrics"] if m["name"] == "core_service_count")
+    metric = next(m for m in draft["metrics"] if m["name"] == "spotlight_folio_total")
     result = call(client, "query_metric", metric_id=metric["id"])
     assert result["executable"] is False and result["sql"] is None
     assert {d["name"] for d in result["datasets"]} == {
-        "component_snapshot",
-        "api_interface_daily",
+        "fable_inventory_snapshot",
+        "fable_loan_daily",
     }
     assert result["dataset_relationships"] and "多个数据集" in result["reason"]
 
 
 def test_mcp_catalog_no_connection_sql_only_and_clean_projection(client):
-    _, _, _ = publish(client, "architecture-governance")
-    catalog = call(client, "list_metrics", query="核心服务数")
+    _, _, _ = publish(client, "library-lending")
+    catalog = call(client, "list_metrics", query="精选卷册数")
     metric = catalog["items"][0]
-    assert metric["name"] == "core_service_count" and metric["display_name"] == "核心服务数"
+    assert metric["name"] == "spotlight_folio_total" and metric["display_name"] == "精选卷册数"
     assert not metric["executable"] and metric["requires_snapshot_filter"]
-    assert any(f["name"] == "is_core" for f in metric["group_by_fields"])
+    assert any(f["name"] == "spotlight_mark" for f in metric["group_by_fields"])
     assert not any(
         k in json.dumps(metric) for k in ("native_presence", '"position"', '"origin"')
     )
@@ -292,7 +292,7 @@ def test_mcp_catalog_no_connection_sql_only_and_clean_projection(client):
 
 
 def test_metric_tools_reuse_existing_scopes(client):
-    publish(client, "architecture-governance")
+    publish(client, "library-lending")
     for scopes, available in (
         (["ontology:read"], set()),
         (["ontology:read", "mappings:read"], {"list_metrics"}),
@@ -323,10 +323,10 @@ def test_metric_tools_reuse_existing_scopes(client):
 def test_percent_and_colon_literals_are_not_bound_or_replaced(b_draft):
     p = compiler(
         b_draft,
-        expression="COUNT(DISTINCT CASE WHEN component_snapshot.component_type <> 'DB' THEN ':p0%s' END)",
+        expression="COUNT(DISTINCT CASE WHEN fable_inventory_snapshot.shelf_grade <> 'DAMAGED' THEN ':p0%s' END)",
     ).compile(filters=DATE)
     assert "':p0%%s'" in p.sql and p.parameters == {"p0": "2026-10-01"}
-    p = compiler(b_draft, expression="SUM(component_snapshot.component_type % 2)").compile(
+    p = compiler(b_draft, expression="SUM(fable_inventory_snapshot.shelf_grade % 2)").compile(
         filters=DATE
     )
     assert " %% 2" in p.sql
@@ -343,7 +343,7 @@ def test_percent_and_colon_literals_are_not_bound_or_replaced(b_draft):
 )
 def test_dataset_source_must_be_one_physical_table(b_draft, source):
     draft = b_draft.model_copy(deep=True)
-    next(d for d in draft.datasets if d.name == "component_snapshot").source = source
+    next(d for d in draft.datasets if d.name == "fable_inventory_snapshot").source = source
     with pytest.raises(ServiceError):
         compiler(draft)
 
@@ -381,8 +381,8 @@ def test_driver_failures_and_timeout_mapping_without_external_pg(
     from ontofoundry_api.api import connections
     from ontofoundry_api.services import metric_query
 
-    _, draft, _ = publish(client, "architecture-governance")
-    metric = next(m for m in draft["metrics"] if m["name"] == "component_count")
+    _, draft, _ = publish(client, "library-lending")
+    metric = next(m for m in draft["metrics"] if m["name"] == "folio_distinct_total")
     monkeypatch.setattr(
         metric_query, "connection_for", lambda *a: SimpleNamespace(kind="postgresql")
     )
@@ -423,15 +423,15 @@ def test_dataset_time_params_and_metric_override(b_draft):
     from ontofoundry_api.domain.models_v3 import CustomExtension
 
     draft = b_draft.model_copy(deep=True)
-    dataset = next(d for d in draft.datasets if d.name == "component_snapshot")
+    dataset = next(d for d in draft.datasets if d.name == "fable_inventory_snapshot")
     dataset.custom_extensions = [
         CustomExtension(
             vendor_name="ONTOFOUNDRY",
-            data=json.dumps({"time_semantics": "event", "time_field": "snapshot_date"}),
+            data=json.dumps({"time_semantics": "event", "time_field": "inventory_day"}),
         )
     ]
     c = compiler(draft)
-    assert c.compile(group_by=["snapshot_date"]).sql
+    assert c.compile(group_by=["inventory_day"]).sql
     c.metric.custom_extensions = [
         CustomExtension(
             vendor_name="ONTOFOUNDRY", data=json.dumps({"time_semantics": "snapshot"})
@@ -462,9 +462,9 @@ def test_conflicting_extension_keys_and_unrelated_vendors(b_draft, vendor, confl
 @pytest.mark.parametrize(
     "expression",
     [
-        "COALESCE(SUM(component_snapshot.component_type),0)",
-        "CASE WHEN SUM(component_snapshot.component_type)>0 THEN CAST(SUM(component_snapshot.component_type) AS DECIMAL(10,2)) ELSE NULL END",
-        "AVG(component_snapshot.component_type) + MIN(component_snapshot.component_type) + MAX(component_snapshot.component_type)",
+        "COALESCE(SUM(fable_inventory_snapshot.shelf_grade),0)",
+        "CASE WHEN SUM(fable_inventory_snapshot.shelf_grade)>0 THEN CAST(SUM(fable_inventory_snapshot.shelf_grade) AS DECIMAL(10,2)) ELSE NULL END",
+        "AVG(fable_inventory_snapshot.shelf_grade) + MIN(fable_inventory_snapshot.shelf_grade) + MAX(fable_inventory_snapshot.shelf_grade)",
     ],
 )
 def test_allowed_aggregate_scalar_combinations_and_max_limit(b_draft, expression):

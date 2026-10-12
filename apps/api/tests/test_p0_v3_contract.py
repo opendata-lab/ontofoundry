@@ -372,14 +372,14 @@ def test_matrix_covers_all_pinned_properties_and_fixture_occurrences():
     assert sum(r[2] != "$value" for r in rows) == 87
     for source, schema in script["SCHEMAS"].items():
         assert set(schema["$defs"]) <= {r[1] for r in rows if r[0] == source}
-    assert script["OUTPUT"].read_text() == script["render"]()
-    fixture = ROOT / "apps/api/tests/fixtures/ossie_real/architecture-governance.ossie.json"
+    assert script["OUTPUT"].read_text() == script["render"]([ROOT / "apps/api/tests/fixtures/ossie_synthetic" / (stem + ".ossie.json") for stem in ("storybook-lending", "library-lending")])
+    fixture = ROOT / "apps/api/tests/fixtures/ossie_synthetic/library-lending.ossie.json"
     document = json.loads(fixture.read_text())
     counts = script["occurrences"](document)
-    assert counts["core", "Dataset", "name"] == 41
-    assert counts["core", "Field", "name"] == 371
-    assert counts["core", "Relationship", "name"] == 14
-    assert counts["core", "Metric", "name"] == 27
+    assert counts["core", "Dataset", "name"] == 8
+    assert counts["core", "Field", "name"] == 41
+    assert counts["core", "Relationship", "name"] == 5
+    assert counts["core", "Metric", "name"] == 8
     assert counts["core", "$root", "semantic_model"] == 0
     # Empty fields count as present, not as zero population.
     minimal = {"ontology": [{"concept": "", "relationships": [{"roles": [], "verbalizes": []}]}]}

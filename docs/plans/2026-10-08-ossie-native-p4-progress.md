@@ -18,7 +18,7 @@
 
 过滤绑定通过 SQLGlot AST 生成驱动参数模板，执行使用 exec_driver_sql；原生字符串里的冒号、百分号不作为用户参数或拼接 SQL。默认只读连接超时不变（旧路径 10s），指标显式传入配置的 15s；PG statement_timeout/MySQL MAX_EXECUTION_TIME/Doris query_timeout 同步。目录沿用映射读取授权，执行沿用实例读取授权，无新权限模型。MCP 交付页只补工具名，不做指标 UI。
 
-首轮单元 **57 passed**；增加 source 全文与时间参数验证时发现 parse API 参数选择错误，已改用 Dialect.parse_into，修复后扩展单元 **64 passed**（29.94s）。隔离 PostgreSQL 首轮测试连接名错误（语义模型名不同于 map_name），已统一复用 connection_alias；实际 SQL 随后已通过组件数/核心服务数/接口错误率、as_of、limit、绑定、只读和 1s 超时断言，剩余 4 个失败是测试导出辅助调用缺少 ontology_name/description，已补全，正在重新验证。新增不依赖外部 PG 的超时/查询失败映射及中文参数错误测试。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 Web 首轮 **134 passed / 1 failed**，ElementInspector 的异步 dialog 等待超时（同时运行 API 专项）；尚未修改该组件，待 API 专项结束后独立复跑。ruff 与 git diff --check 已通过。下一步 PostgreSQL/无损专项完整通过后，按 M4 全量验证。
 
@@ -26,13 +26,9 @@ Web 首轮 **134 passed / 1 failed**，ElementInspector 的异步 dialog 等待�
 
 隔离 PostgreSQL 专项最终 **7 passed**（84.30s），使用现有 pg_client 自动创建/强制清理 `of_t0_*` 独立库，源表同样在该库。未访问 ontofoundry / ontofoundry_ossie。导入 B 原文件，用真实只读连接与加密配置执行 MCP：
 
-| 指标（snapshot_date=2026-10-01，group_by=env_name） | PROD | TEST |
 | --- | --- | --- |
-| component_count | 3 | 1 |
-| core_service_count | 2 | 1 |
-| interface_error_rate | 0.1 | null（分母 0） |
 
-全部与独立手写 SQL 一致。core_service_count 展开原始 is_core CASE；interface_error_rate 转译到 PG 时保留分数语义（避免整数除法）。as_of=2026-10-02 返回 10-01 快照，as_of=10-03 返回更新的单个快照，早于所有日期返回空分组；limit=1 返回 1 行并标记截断。绑定恶意过滤字符串不执行任何 DML；原生 `:p0%s` 字符串按原意执行，避免 SQL 文本绑定污染。SHOW 验证只读事务/超时，DELETE 被数据库拒绝；自建慢视图触发真实 1s statement_timeout 并返回 METRIC_QUERY_TIMEOUT，随后源表仍为 7 行。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 时间 event 参数只追加到指标 ONTOFOUNDRY custom_extensions；跨日期错误率为 540/1400，导出再导入稳定。查询不修改 published snapshot；原生无损比较沿用 P1–P3 reverse_export_edits 可逆平台扩展合同，逐字段原文等价。首轮未逆除新增的可逆平台扩展导致 3 个测试断言失败，现已统一与既有无损测试方法，未修改导入/导出实现。另完成参数冲突、dataset 时间参数/metric 覆盖、最大 limit 以及常见聚合组合复核。
 
@@ -42,6 +38,6 @@ Web 重新运行完整命令链：**28 files / 135 passed**（23.36s），npm ru
 
 最终编译/安全/MCP 单元专项 **73 passed**（27.49s），PostgreSQL 实际执行专项 **7 passed**；新增合计 **80 个回归变体**。ruff 全量通过。最终 API 全量启用隔离 PostgreSQL 测试入口运行，输出 `apps/api/.pytest_cache/p4-api-final.log`；Web 完整输出 `apps/api/.pytest_cache/p4-web-final.log`，均在本 worktree 忽略目录，便于中断恢复。已知边界：跨数据集不执行；外部 MySQL 只有方言编译单测，本地未配置真实 MySQL 执行环境；目录 executable 表示结构与连接配置具备，网络/物理类型/实时权限在执行时验证。
 
-调用示例：先 `list_metrics(query="核心服务数")` 获得 metric id；再 `query_metric(metric_id=..., group_by=["env_name"], filters=[{"field":"snapshot_date","op":"=","value":"2026-10-01"}])`，或用 `as_of="2026-10-02"` 替代时间过滤。filters.field/group_by 接受逻辑字段名或当前 dataset.field，不允许其他数据集。返回 SQL 是目标驱动的命名参数模板（PG/MySQL 为 `%(p0)s`，literal 百分号使用驱动要求的 `%%`），parameters 单独提供绑定值；不插入用户值。原生时间表达式决定物理日期类型/格式，过滤/as_of 值应与该表达式结果兼容。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 全量首轮检测出 2 个旧 MCP 协议测试固定工具数量为 11；新增两个工具后已更新为 13，并验证现代/旧版协议均返回新工具。属于测试合同更新，指标专项和实际查询无此失败。首轮继续检查其他回归，尚不标记 M4 完成；测试收集总数为 674。

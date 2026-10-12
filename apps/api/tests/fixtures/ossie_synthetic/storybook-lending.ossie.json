@@ -1,0 +1,237 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "fictional_storybook",
+  "description": "从零编写的纸页借阅样本。",
+  "requires": [],
+  "ontology": [
+    {
+      "concept": "storybook_page",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "page_token",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_page} page_token {String}"
+          ]
+        },
+        {
+          "name": "page_is_open",
+          "verbalizes": [
+            "{storybook_page} page_is_open "
+          ]
+        },
+        {
+          "name": "page_checkout",
+          "roles": [
+            {
+              "concept": "storybook_reader"
+            },
+            {
+              "concept": "storybook_library"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_page} 借给 {storybook_reader} 于 {storybook_library}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "storybook_reader",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "storybook_visit_0",
+          "roles": [
+            {
+              "concept": "storybook_cabinet",
+              "name": "story_slot_0"
+            },
+            {
+              "concept": "storybook_score"
+            },
+            {
+              "concept": "Date"
+            },
+            {
+              "concept": "Any",
+              "name": "memo_slot_0"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_reader} 在 {storybook_cabinet:story_slot_0} 获得 {storybook_score} 于 {Date}，附 {Any:memo_slot_0}"
+          ],
+          "description": "虚构阅读日志。",
+          "requires": [
+            "true",
+            "true"
+          ],
+          "derived_by": []
+        },
+        {
+          "name": "storybook_visit_1",
+          "roles": [
+            {
+              "concept": "storybook_cabinet",
+              "name": "story_slot_1"
+            },
+            {
+              "concept": "storybook_score"
+            },
+            {
+              "concept": "Date"
+            },
+            {
+              "concept": "Any",
+              "name": "memo_slot_1"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_reader} 在 {storybook_cabinet:story_slot_1} 获得 {storybook_score} 于 {Date}，附 {Any:memo_slot_1}"
+          ],
+          "description": "虚构阅读日志。",
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "storybook_visit_2",
+          "roles": [
+            {
+              "concept": "storybook_cabinet",
+              "name": "story_slot_2"
+            },
+            {
+              "concept": "storybook_score"
+            },
+            {
+              "concept": "Date"
+            },
+            {
+              "concept": "Any",
+              "name": "memo_slot_2"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_reader} 在 {storybook_cabinet:story_slot_2} 获得 {storybook_score} 于 {Date}，附 {Any:memo_slot_2}"
+          ],
+          "description": "虚构阅读日志。",
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "storybook_visit_3",
+          "roles": [
+            {
+              "concept": "storybook_cabinet",
+              "name": "story_slot_3"
+            },
+            {
+              "concept": "storybook_score"
+            },
+            {
+              "concept": "Date"
+            },
+            {
+              "concept": "Any",
+              "name": "memo_slot_3"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_reader} 在 {storybook_cabinet:story_slot_3} 获得 {storybook_score} 于 {Date}，附 {Any:memo_slot_3}"
+          ],
+          "description": "虚构阅读日志。",
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "storybook_visit_4",
+          "roles": [
+            {
+              "concept": "storybook_cabinet",
+              "name": "story_slot_4"
+            },
+            {
+              "concept": "storybook_score"
+            },
+            {
+              "concept": "Date"
+            },
+            {
+              "concept": "Any",
+              "name": "memo_slot_4"
+            }
+          ],
+          "verbalizes": [
+            "{storybook_reader} 在 {storybook_cabinet:story_slot_4} 获得 {storybook_score} 于 {Date}，附 {Any:memo_slot_4}"
+          ],
+          "description": "虚构阅读日志。",
+          "requires": [],
+          "derived_by": []
+        }
+      ]
+    },
+    {
+      "concept": "storybook_library",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "storybook_cabinet",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "storybook_keeper",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "storybook_score",
+      "type": "ValueType",
+      "extends": [
+        "Integer"
+      ],
+      "identify_by": [],
+      "description": "虚构纸页评分。",
+      "requires": [
+        " true ",
+        " true "
+      ],
+      "relationships": [
+        {
+          "name": "score_is_valid",
+          "verbalizes": [
+            "{storybook_score} 满足虚构规则"
+          ]
+        }
+      ]
+    }
+  ],
+  "ai_context": {
+    "instructions": "只使用虚构故事与卷册。",
+    "synonyms": [
+      "纸页借阅语义",
+      "童话纸页问数",
+      "虚构读者模型",
+      "童话卷册契约",
+      "故事纸页场景",
+      "纸页流转样例",
+      "虚构阅览协议",
+      "故事阅读测试"
+    ],
+    "extra_hint": {
+      "steps": [
+        "later",
+        "earlier"
+      ]
+    },
+    "ontofoundry": {
+      "fictional_marker": "keep-this"
+    }
+  }
+}

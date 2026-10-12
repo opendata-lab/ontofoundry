@@ -53,58 +53,58 @@ def change(kind, target, values=None, **kwargs):
     return dict(kind=kind, id=target["id"], values=values or {}, **kwargs)
 
 
-@pytest.mark.parametrize("stem", ["account-model-v2", "architecture-governance"])
+@pytest.mark.parametrize("stem", ["storybook-lending", "library-lending"])
 def test_catalog_and_no_edit_export_are_lossless(editing_client, stem):
     source, _, _ = publish(editing_client, stem)
     catalog = current(editing_client)
     assert exported(editing_client)[0] == source
     assert "native_presence" not in str(catalog) and "origin" not in catalog
-    if stem == "architecture-governance":
+    if stem == "library-lending":
         model = catalog["items"][0]
-        assert len(model["concept_mappings"]) == 21
-        assert model["relationships"][0]["from"] == "component_deployment_snapshot"
+        assert len(model["concept_mappings"]) == 9
+        assert model["relationships"][0]["from"] == "fable_shelf_snapshot"
         assert "from_" not in model["relationships"][0]
-        assert sum(len(d["fields"]) for d in model["datasets"]) == 371
-        metric = next(m for m in model["metrics"] if m["name"] == "core_service_count")
+        assert sum(len(d["fields"]) for d in model["datasets"]) == 41
+        metric = next(m for m in model["metrics"] if m["name"] == "spotlight_folio_total")
         assert metric["query"]["requires_snapshot_filter"]
         assert metric["display_name"] == metric["name"]  # no alias/description guess
 
 
 def test_field_rename_updates_only_identifier_references(editing_client):
     client = editing_client
-    source, draft, _ = publish(client, "architecture-governance")
-    ds = next(d for d in draft["datasets"] if d["name"] == "component_snapshot")
+    source, draft, _ = publish(client, "library-lending")
+    ds = next(d for d in draft["datasets"] if d["name"] == "fable_inventory_snapshot")
     field = next(
         f
         for f in draft["dataset_fields"]
-        if f["dataset_id"] == ds["id"] and f["name"] == "component_name"
+        if f["dataset_id"] == ds["id"] and f["name"] == "folio_key"
     )
     result = write(client, [change("dataset_field", field, {"name": "service_key"})])
     assert result.status_code == 200, result.text
     output, latest = exported(client)
     model = output["ontology_mappings"][0]["semantic_model"]
-    metric = next(m for m in model["metrics"] if m["name"] == "core_service_count")
+    metric = next(m for m in model["metrics"] if m["name"] == "spotlight_folio_total")
     assert (
-        "component_snapshot.service_key"
+        "fable_inventory_snapshot.service_key"
         in metric["expression"]["dialects"][0]["expression"]
     )
-    rel = next(r for r in model["relationships"] if r["name"] == "deployment_to_component")
-    assert rel["to_columns"] == ["env_name", "service_key"]
+    rel = next(r for r in model["relationships"] if r["name"] == "shelf_to_folio")
+    assert rel["to_columns"] == ["library_site", "service_key"]
     assert latest["dataset_fields"][0]["id"] == draft["dataset_fields"][0]["id"]
     assert output["ontology"] == source["ontology"]
     original = next(
         d
         for d in source["ontology_mappings"][0]["semantic_model"]["datasets"]
-        if d["name"] == "component_snapshot"
+        if d["name"] == "fable_inventory_snapshot"
     )
-    updated = next(d for d in model["datasets"] if d["name"] == "component_snapshot")
+    updated = next(d for d in model["datasets"] if d["name"] == "fable_inventory_snapshot")
     assert updated["fields"][0] == {**original["fields"][0], "name": "service_key"}
     assert updated["fields"][1:] == original["fields"][1:]
 
 
 def test_dataset_rename_updates_connections_and_mapping_trees(editing_client):
     client = editing_client
-    _, draft, _ = publish(client, "architecture-governance")
+    _, draft, _ = publish(client, "library-lending")
     ds = draft["datasets"][0]
     result = write(client, [change("dataset", ds, {"name": "component_current"})])
     assert result.status_code == 200, result.text
@@ -120,7 +120,7 @@ def test_dataset_rename_updates_connections_and_mapping_trees(editing_client):
 
 def test_create_edit_delete_field_and_unreferenced_dataset(editing_client):
     client = editing_client
-    _, draft, _ = publish(client, "architecture-governance")
+    _, draft, _ = publish(client, "library-lending")
     ds_id, field_id = str(uuid4()), str(uuid4())
     create = [
         {
@@ -169,7 +169,7 @@ def test_create_edit_delete_field_and_unreferenced_dataset(editing_client):
 
 def test_reference_protection_and_atomic_errors(editing_client):
     client = editing_client
-    _, draft, version = publish(client, "architecture-governance")
+    _, draft, version = publish(client, "library-lending")
     target = draft["datasets"][0]
     result = write(client, [change("dataset", target, operation="delete")])
     assert (
@@ -190,7 +190,7 @@ def test_reference_protection_and_atomic_errors(editing_client):
 
 def test_mapping_tree_edit_preserves_untouched_roots_and_arrays(editing_client):
     client = editing_client
-    source, draft, _ = publish(client, "architecture-governance")
+    source, draft, _ = publish(client, "library-lending")
     cm = current(client)["items"][0]["concept_mappings"][0]
     nodes = [{k: v for k, v in n.items() if k != "concept_mapping_id"} for n in cm["nodes"]]
     result = write(client, [change("concept_mapping", cm, nodes=nodes)])
@@ -202,7 +202,7 @@ def test_mapping_tree_edit_preserves_untouched_roots_and_arrays(editing_client):
             "parent_id": None,
             "slot": "object_mappings",
             "kind": "object",
-            "expression": "component_snapshot.component_name_cn",
+            "expression": "fable_inventory_snapshot.folio_title",
         }
     )
     result = write(client, [change("concept_mapping", cm, nodes=nodes)])
@@ -222,7 +222,7 @@ def test_mapping_tree_edit_preserves_untouched_roots_and_arrays(editing_client):
 
 def test_session_cas_preserves_other_pending_semantic_and_concept_changes(editing_client):
     client = editing_client
-    _, _, _ = publish(client, "architecture-governance")
+    _, _, _ = publish(client, "library-lending")
     session = create_session(client)
     draft = deepcopy(session["draft"])
     draft["object_types"][0]["description"] = "未保存的本体修改"
@@ -251,10 +251,10 @@ def test_session_cas_preserves_other_pending_semantic_and_concept_changes(editin
 
 def test_compile_only_draft_preview_never_executes(editing_client, monkeypatch):
     client = editing_client
-    _, _, _ = publish(client, "architecture-governance")
+    _, _, _ = publish(client, "library-lending")
     session = create_session(client)
     metric = next(
-        m for m in session["draft"]["metrics"] if m["name"] == "core_service_count"
+        m for m in session["draft"]["metrics"] if m["name"] == "spotlight_folio_total"
     )
 
     def forbidden(*args, **kwargs):
@@ -265,7 +265,7 @@ def test_compile_only_draft_preview_never_executes(editing_client, monkeypatch):
         "session_id": session["id"],
         "expected_session_revision": session["revision"],
         "expected_current_version_id": current(client)["current_version_id"],
-        "group_by": ["env_name"],
+        "group_by": ["library_site"],
         "as_of": "2026-10-08",
         "dialect": "MYSQL",
         "changes": [
@@ -277,7 +277,7 @@ def test_compile_only_draft_preview_never_executes(editing_client, monkeypatch):
                         "dialects": [
                             {
                                 "dialect": "ANSI_SQL",
-                                "expression": "COUNT(component_snapshot.component_name)",
+                                "expression": "COUNT(fable_inventory_snapshot.folio_key)",
                             }
                         ]
                     }
@@ -319,7 +319,7 @@ def test_token_rename_retains_literals_comments_and_whitespace():
 
 
 def test_cyclic_mapping_edit_is_rejected(client):
-    _, draft, _ = publish(client, "architecture-governance")
+    _, draft, _ = publish(client, "library-lending")
     cm = draft["concept_mappings"][0]
     nid = str(uuid4())
     with pytest.raises(ValueError):
@@ -339,7 +339,7 @@ def test_cyclic_mapping_edit_is_rejected(client):
 
 def test_metric_and_composite_relationship_crud(editing_client):
     client = editing_client
-    _, draft, _ = publish(client, "architecture-governance")
+    _, draft, _ = publish(client, "library-lending")
     mid = draft["semantic_models"][0]["id"]
     metric_id, rel_id = str(uuid4()), str(uuid4())
     create = [
@@ -354,11 +354,11 @@ def test_metric_and_composite_relationship_crud(editing_client):
                     "dialects": [
                         {
                             "dialect": "ANSI_SQL",
-                            "expression": "COUNT(component_snapshot.component_name)",
+                            "expression": "COUNT(fable_inventory_snapshot.folio_key)",
                         }
                     ]
                 },
-                "ai_context": {"synonyms": ["自定义组件数"]},
+                "ai_context": {"synonyms": ["自定义卷册总数"]},
             },
             display_name="组件总数",
         ),
@@ -369,10 +369,10 @@ def test_metric_and_composite_relationship_crud(editing_client):
             parent_id=mid,
             values={
                 "name": "custom_composite",
-                "from": "component_snapshot",
-                "to": "component_snapshot",
-                "from_columns": ["env_name", "component_name"],
-                "to_columns": ["env_name", "component_name"],
+                "from": "fable_inventory_snapshot",
+                "to": "fable_inventory_snapshot",
+                "from_columns": ["library_site", "folio_key"],
+                "to_columns": ["library_site", "folio_key"],
             },
         ),
     ]
@@ -381,7 +381,7 @@ def test_metric_and_composite_relationship_crud(editing_client):
     model = current(client)["items"][0]
     metric = next(m for m in model["metrics"] if m["id"] == metric_id)
     assert metric["display_name"] == "组件总数" and metric["ai_context"]["synonyms"] == [
-        "自定义组件数"
+        "自定义卷册总数"
     ]
     from ontofoundry_api.ossie.importer import import_ossie
 
@@ -474,7 +474,7 @@ def test_nary_roles_order_names_and_verbalization_save(editing_client):
     from test_element_save import submit
 
     client = editing_client
-    source, draft, _ = publish(client, "account-model-v2")
+    source, draft, _ = publish(client, "storybook-lending")
     link = next(relation for relation in draft["link_types"] if len(relation["roles"]) >= 2)
     original = deepcopy(link)
     link["roles"].reverse()
@@ -517,7 +517,7 @@ def test_nary_roles_order_names_and_verbalization_save(editing_client):
 
 def test_element_native_mapping_edit_is_scoped(editing_client):
     client = editing_client
-    source, draft, _ = publish(client, "architecture-governance")
+    source, draft, _ = publish(client, "library-lending")
     cm = current(client)["items"][0]["concept_mappings"][0]
     nodes = [{k: v for k, v in n.items() if k != "concept_mapping_id"} for n in cm["nodes"]]
     nodes.append(
@@ -526,7 +526,7 @@ def test_element_native_mapping_edit_is_scoped(editing_client):
             parent_id=None,
             slot="object_mappings",
             kind="object",
-            expression="component_snapshot.component_name_cn",
+            expression="fable_inventory_snapshot.folio_title",
         )
     )
     session = create_session(client)
@@ -571,7 +571,7 @@ def test_element_native_mapping_edit_is_scoped(editing_client):
 
 def test_preview_uses_same_scope_as_save_and_is_pure(editing_client):
     client = editing_client
-    _, _, version = publish(client, "architecture-governance")
+    _, _, version = publish(client, "library-lending")
     session = create_session(client)
     pending = deepcopy(session["draft"])
     pending["object_types"][0]["description"] = "另一个元素的未处理修改"
@@ -602,7 +602,7 @@ def test_element_save_supports_unary_and_optional_role_names(editing_client):
     from test_element_save import submit
 
     client = editing_client
-    _, draft, _ = publish(client, "account-model-v2")
+    _, draft, _ = publish(client, "storybook-lending")
     template = deepcopy(
         next(relation for relation in draft["link_types"] if len(relation["roles"]) >= 2)
     )
@@ -638,7 +638,7 @@ def test_configured_preview_reason_and_quoted_dataset_references(
     from ontofoundry_api.db_models import ConnectionRecord
 
     client = editing_client
-    _, draft, _ = publish(client, "architecture-governance")
+    _, draft, _ = publish(client, "library-lending")
     model = current(client)["items"][0]
     with client.app.state.session_factory() as db:
         db.add(
@@ -657,7 +657,7 @@ def test_configured_preview_reason_and_quoted_dataset_references(
         pytest.fail("compile-only preview must never open the configured connection")
 
     monkeypatch.setattr("ontofoundry_api.api.connections.connect_readonly", forbidden)
-    metric = next(m for m in draft["metrics"] if m["name"] == "core_service_count")
+    metric = next(m for m in draft["metrics"] if m["name"] == "spotlight_folio_total")
     result = write(
         client,
         [
@@ -669,7 +669,7 @@ def test_configured_preview_reason_and_quoted_dataset_references(
                         "dialects": [
                             {
                                 "dialect": "ANSI_SQL",
-                                "expression": 'COUNT("component_snapshot"."component_name")',
+                                "expression": 'COUNT("fable_inventory_snapshot"."folio_key")',
                             }
                         ]
                     }
@@ -680,7 +680,7 @@ def test_configured_preview_reason_and_quoted_dataset_references(
     assert result.status_code == 200, result.text
     model = current(client)["items"][0]
     item = next(m for m in model["metrics"] if m["id"] == metric["id"])
-    dataset = next(d for d in model["datasets"] if d["name"] == "component_snapshot")
+    dataset = next(d for d in model["datasets"] if d["name"] == "fable_inventory_snapshot")
     assert metric["id"] in dataset["metrics"] and item["concepts"]
     result = client.post(
         ROOT + f"/metrics/{metric['id']}/sql-preview",
@@ -712,8 +712,8 @@ def test_value_concept_owned_property_is_editable(editing_client):
             )
         )
 
-    _, draft, _ = publish(client, "account-model-v2", mutate=add_value)
-    value = draft["value_types"][0]
+    _, draft, _ = publish(client, "storybook-lending", mutate=add_value)
+    value = next(v for v in draft["value_types"] if v["concept"] == "UnitValue")
     prop = dict(
         id=str(uuid4()),
         name="unit",

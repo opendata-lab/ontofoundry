@@ -10,10 +10,10 @@ from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.ossie.compiler import compile_ossie
 from ontofoundry_api.ossie.importer import import_ossie
 
-FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_real'
+FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_synthetic'
 
 
-@pytest.mark.parametrize('stem', ['account-model-v2', 'architecture-governance'])
+@pytest.mark.parametrize('stem', ['storybook-lending', 'library-lending'])
 @pytest.mark.parametrize('mode', ['merge', 'replace'])
 def test_export_reimport_reports_zero_actual_additions(stem, mode):
     original = json.loads((FIXTURES / f'{stem}.ossie.json').read_text())
@@ -30,7 +30,7 @@ def test_export_reimport_reports_zero_actual_additions(stem, mode):
 
 
 def test_partial_import_counts_only_one_new_concept_and_mapping_and_real_updates():
-    original = json.loads((FIXTURES / 'architecture-governance.ossie.json').read_text())
+    original = json.loads((FIXTURES / 'library-lending.ossie.json').read_text())
     workspace = uuid4()
     base, _ = import_ossie(original, workspace_id=workspace, mode='replace')
     changed = deepcopy(original)

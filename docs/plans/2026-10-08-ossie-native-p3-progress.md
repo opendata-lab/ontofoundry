@@ -14,7 +14,7 @@
 
 映射写入已改为定向更新 native dataset/field/concept_mapping/mapping_node/dataset_relationship，连接别名写入模型 vendor 扩展；保留其他模型、字段、指标和子树。平台新节点使用可重复的身份，避免元素保存预演/事务实际写入产生不同 ID。旧 Mapping DTO 仅为表单/提案的输入和派生输出，v3 持久化 mappings 仍为空。演示脚本 data/check 改读映射视图表单，提交原生结构并检查可查询概念数。
 
-专项第一轮发现两处旧测试合同需调整：B 的复杂 component 不再允许叠加简单映射（身份保留测试改用未映射 microservice_component 并保留全部现有简单投影）；保存预演两次生成随机子树 ID 已改为确定性身份。修复后实例/表单/原生视图专项 **14 passed**。新增复合 SQL 与 B/coffee 发布-MCP 验收仍在验证，全量尚未运行。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 B 初步覆盖：29 个 EntityType，10 个可查询，11 个复杂只读（2 个多根、9 个 referent），8 个无映射。A/B 读取视图前后原快照与原生导出均 0 差异。
 

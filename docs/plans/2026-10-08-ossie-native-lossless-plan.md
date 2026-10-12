@@ -19,7 +19,7 @@
 | G1 | 导出覆盖文档级 `ai_context`（instructions 写死、synonyms 换成空间描述）→ 原同义词丢失 | 违反原则 |
 | G2 | 发布时以工作空间 name/description 覆盖 Ossie 文档的 name/description | 违反原则 |
 | G3 | 只支持二元关系；`roles` ≥ 2 的关系被跳过（A 6 条、B 8 条） | 能力缺失 |
-| G4 | 语义模型被精简重建：dataset 描述/ai_context/字段 datatype、计算字段、复合键连接、未绑定对象的 dataset、metrics、模型级 ai_context 丢失（B：41 dataset、371 field、14 join 其中 13 复合键、27 metric） | 能力缺失 |
+| G4 | 语义模型精简重建导致数据集、字段、复合键、指标和映射树信息丢失 | 能力缺失 |
 | G5 | 概念映射只支持"单表 + 单键 + 属性→列"；referent mapping、多根、递归树、SQL 表达式丢失 | 能力缺失 |
 | G6 | Ossie 中出现了但平台未建模的构造被静默跳过（导入报告只是告知） | 违反原则 |
 
@@ -143,5 +143,4 @@
 
 单写者：按阶段由 Codex 实施，Claude 评审每阶段 diff 并运行验收（全量测试 + A/B 往返 + 演示链路冒烟）。
 阶段间不并行修改同一文件。完成后用
-`/Users/guoruping/project/bigdata/onedata/skills/account-ossie-skill/assets/account-model-v2.ossie.json` 与
-`/Users/guoruping/project/bigdata/onedata/skills/arch-ossie-semantics/assets/architecture-governance.ossie.json` 做最终验证。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。

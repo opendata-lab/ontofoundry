@@ -1,8 +1,8 @@
-"""Real external Ossie files: persisted API round trips and explicit loss ledger.
+"""Synthetic Ossie files: persisted API round trips and explicit loss ledger.
 
 The known losses are asserted, not xfailed or hidden by a schema-only check.
-Set OSSIE_REAL_ARTIFACT_DIR to save both exports and the complete audit JSON.
-Original files are never opened by tests; fixtures are byte-for-byte copies.
+Set OSSIE_SYNTHETIC_ARTIFACT_DIR to save both exports and the complete audit JSON.
+Fixtures are fictional and authored in this repository.
 """
 
 from __future__ import annotations
@@ -26,12 +26,12 @@ from ontofoundry_api.ossie.mappings import _column, _dataset_fields
 from ontofoundry_api.ossie.validator import validate_schema
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
-FIXTURES = Path(__file__).parent / "fixtures" / "ossie_real"
+FIXTURES = Path(__file__).parent / "fixtures" / "ossie_synthetic"
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
 ONTOLOGY = f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}"
 FILES = {
-    "account-model-v2": "10f581699485142c8c0b87feac904fe57c944d2c94253fa8ea20be6503f0cc57",
-    "architecture-governance": "bda8c581b10fdb0692d561eae73c0d2500e960041a1bcd1c72094653e4662c16",
+    "storybook-lending": "839c217d8143a1c54441237c89b8ece6ab13391fd653f61b485dad7c72ea6c6f",
+    "library-lending": "e8032e460b7609c001bce1dadc6e3f1a84188a95fc822b03c90904fa38112999",
 }
 MISSING = {"$missing": True}
 
@@ -98,12 +98,12 @@ def semantic_differences(original, exported):
             owner = re.search(r"concept_mappings\[concept=([^\]]+)\]", path)
             relation = re.search(r"children\[relationship=([^\]]+)\]", path)
             if owner and relation:
-                component = next(
+                fable_volume = next(
                     c for c in original["ontology"] if c["concept"] == owner[1]
                 )
                 roles = next(
                     r["roles"]
-                    for r in component["relationships"]
+                    for r in fable_volume["relationships"]
                     if r["name"] == relation[1]
                 )
                 if len(roles) == 1 and roles[0]["concept"] == before:
@@ -180,7 +180,7 @@ def publish_export(client, document):
             "expected_session_revision": imported["revision"],
             "expected_current_version_id": body["current_version_id"],
             "expected_merged_snapshot_sha256": body["merged_snapshot_sha256"],
-            "message": "真实 Ossie 往返验证",
+            "message": "合成 Ossie 往返验证",
         },
     )
     assert response.status_code == 200, response.text
@@ -201,7 +201,7 @@ def publish_export(client, document):
 
 
 @pytest.mark.parametrize("stem", FILES)
-def test_real_ossie_roundtrip(client, tmp_path, stem):
+def test_synthetic_ossie_roundtrip(client, tmp_path, stem):
     document = load_document(stem)
     assert validate_schema(document) == []
     assert validate_ossie(document)["publishable"]
@@ -228,12 +228,12 @@ def test_real_ossie_roundtrip(client, tmp_path, stem):
     assert losses == []
     assert reverse_export_edits(first) == document
     assert report["skipped"] == []
-    expected_nary = 6 if stem == "account-model-v2" else 8
+    expected_nary = 6 if stem == "storybook-lending" else 8
     relationships = [(c["concept"], r) for c in document["ontology"] for r in c.get("relationships", []) if len(r.get("roles", [])) >= 2]
     exported_relationships = [(c["concept"], r) for c in first["ontology"] for r in c.get("relationships", []) if len(r.get("roles", [])) >= 2]
     assert len(relationships) == expected_nary
     assert exported_relationships == relationships
-    directory = Path(os.environ.get("OSSIE_REAL_ARTIFACT_DIR", tmp_path))
+    directory = Path(os.environ.get("OSSIE_SYNTHETIC_ARTIFACT_DIR", tmp_path))
     directory.mkdir(parents=True, exist_ok=True)
     for suffix, payload in (
         ("export.json", first),
@@ -257,11 +257,11 @@ def test_real_ossie_roundtrip(client, tmp_path, stem):
 
 @pytest.mark.parametrize("column", ["key", "order", "MixedCase", "column name", 'a"b'])
 def test_ansi_quoted_column_mapping_roundtrip(column):
-    document = load_document("architecture-governance")
+    document = load_document("library-lending")
     mapping = document["ontology_mappings"][0]
-    rule = next(c for c in mapping["concept_mappings"] if c["concept"] == "arch_rule")
+    rule = next(c for c in mapping["concept_mappings"] if c["concept"] == "fable_loan_policy")
     dataset = next(
-        d for d in mapping["semantic_model"]["datasets"] if d["name"] == "arch_rule"
+        d for d in mapping["semantic_model"]["datasets"] if d["name"] == "fable_loan_policy"
     )
     dataset["fields"][0]["expression"]["dialects"][0]["expression"] = (
         '"' + column.replace('"', '""') + '"'
@@ -287,10 +287,10 @@ def test_ansi_quoted_column_mapping_roundtrip(column):
 
 
 @pytest.mark.parametrize(
-    "expression", ["key + 1", '"key" + 1', "COUNT(key)", "arch_rule.key\n + 1"]
+    "expression", ["key + 1", '"key" + 1', "COUNT(key)", "fable_loan_policy.key\n + 1"]
 )
 def test_column_parser_does_not_treat_computed_sql_as_a_column(expression):
-    assert _column(expression, "arch_rule") is None
+    assert _column(expression, "fable_loan_policy") is None
 
 
 @pytest.mark.parametrize("stem", FILES)

@@ -31,7 +31,7 @@ const catalog: SemanticCatalog = {
         source: `public.table_${i}`,
         primary_key: ["id"],
         unique_keys: [],
-        ai_context: { synonyms: ["组件"] },
+        ai_context: { synonyms: ["虚构卷册"] },
         fields: Array.from({ length: i === 0 ? 35 : 8 }, (_, j) => ({
           id: `f${i}_${j}`,
           name: `field_${i}_${j}`,
@@ -63,14 +63,14 @@ const catalog: SemanticCatalog = {
             { dialect: "ANSI_SQL", expression: "COUNT(dataset_0.id)" },
           ],
         },
-        ai_context: { synonyms: ["核心服务数"] },
+        ai_context: { synonyms: ["精选卷册数"] },
         query: {
           executable: false,
           reason: "未配置连接",
           requires_snapshot_filter: true,
           time_semantics: "snapshot",
-          time_field: "snapshot_date",
-          group_by_fields: [{ name: "env_name" }],
+          time_field: "inventory_day",
+          group_by_fields: [{ name: "library_site" }],
         },
         concepts:
           i === 0
@@ -84,8 +84,8 @@ const catalog: SemanticCatalog = {
                 {
                   id: "c2",
                   kind: "object_type",
-                  name: "组件",
-                  technical_name: "component",
+                  name: "虚构卷册",
+                  technical_name: "fable_volume",
                 },
               ]
             : [],
@@ -119,14 +119,14 @@ describe("语义模型工作台", () => {
     render(<SemanticCatalogView catalog={catalog} open={open} />);
     fireEvent.click(screen.getByRole("button", { name: /^指标/ }));
     fireEvent.change(screen.getByLabelText("搜索语义对象"), {
-      target: { value: "核心服务数" },
+      target: { value: "精选卷册数" },
     });
     expect(screen.getByText("COUNT(dataset_0.id)")).toBeInTheDocument();
     const tag = screen.getByRole("button", { name: "系统" });
     expect(tag).toHaveClass("tag--concept");
     fireEvent.click(tag);
     expect(open).toHaveBeenCalledWith({ kind: "object_type", id: "c1" });
-    expect(screen.getByText("核心服务数")).toHaveClass("tag--label");
+    expect(screen.getByText("精选卷册数")).toHaveClass("tag--label");
     expect(screen.queryByText(/只读|暂只读|读法/)).not.toBeInTheDocument();
   });
   it("shows all composite keys and follows a dataset reference", () => {
@@ -204,14 +204,14 @@ describe("语义模型工作台", () => {
     fireEvent.input(screen.getByLabelText("截至日期"), {
       target: { value: "2026-10-08" },
     });
-    fireEvent.click(screen.getByLabelText("env_name"));
+    fireEvent.click(screen.getByLabelText("library_site"));
     fireEvent.click(screen.getByRole("button", { name: "生成 SQL" }));
     expect(
       await screen.findByText("SELECT COUNT(id) FROM data"),
     ).toBeInTheDocument();
     expect(sql.mock.calls[0][1]).toEqual({
       dialect: "POSTGRESQL",
-      group_by: ["env_name"],
+      group_by: ["library_site"],
       as_of: "2026-10-08",
       changes: [],
     });
@@ -293,7 +293,7 @@ describe("语义模型工作台", () => {
 
 it("reviews reference impact before publishing a rename", async () => {
   const review = vi.fn().mockResolvedValue({
-    references: [{ name: "core_service_count", field: "expression" }],
+    references: [{ name: "spotlight_folio_total", field: "expression" }],
   });
   const save = vi.fn().mockResolvedValue(undefined);
   render(
@@ -314,7 +314,7 @@ it("reviews reference impact before publishing a rename", async () => {
   });
   fireEvent.click(screen.getByRole("button", { name: "保存并发布" }));
   expect(
-    await screen.findByText("core_service_count · expression"),
+    await screen.findByText("spotlight_folio_total · expression"),
   ).toBeInTheDocument();
   expect(save).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "确认修改并发布" }));
@@ -335,7 +335,7 @@ it("sends snapshot equality and structured field filters", async () => {
   fireEvent.click(screen.getByText("字段筛选"));
   fireEvent.click(screen.getByRole("button", { name: "添加筛选" }));
   fireEvent.change(screen.getByLabelText("筛选字段 1"), {
-    target: { value: "env_name" },
+    target: { value: "library_site" },
   });
   fireEvent.change(screen.getByLabelText("筛选值 1"), {
     target: { value: "PROD" },
@@ -345,8 +345,8 @@ it("sends snapshot equality and structured field filters", async () => {
   expect(sql.mock.calls[0][1]).toMatchObject({
     as_of: null,
     filters: [
-      { field: "env_name", op: "=", value: "PROD" },
-      { field: "snapshot_date", op: "=", value: "2026-10-08" },
+      { field: "library_site", op: "=", value: "PROD" },
+      { field: "inventory_day", op: "=", value: "2026-10-08" },
     ],
   });
 });
