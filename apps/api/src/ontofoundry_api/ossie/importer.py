@@ -225,7 +225,7 @@ def parse_ossie(
     if not isinstance(components, list) or not components:
         raise OssieImportError("文件缺少 ontology 组件列表")
     if len(components) > MAX_COMPONENTS:
-        raise OssieImportError(f"组件数量超过 {MAX_COMPONENTS} 个上限")
+        raise OssieImportError(f"概念数量超过 {MAX_COMPONENTS} 个上限")
 
     report = Report()
     context = document.get("ai_context") or {}

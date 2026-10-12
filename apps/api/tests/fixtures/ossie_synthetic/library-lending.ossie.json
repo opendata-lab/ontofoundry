@@ -1,0 +1,1453 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "fictional_lending",
+  "description": "从零编写的虚构图书馆模型。",
+  "ai_context": {
+    "instructions": "合成验证，无私有业务资料。",
+    "synonyms": [
+      "童话借阅模型",
+      "虚构卷册问数"
+    ],
+    "fictional_key": {
+      "ordered": [
+        "beta",
+        "alpha"
+      ]
+    },
+    "ontofoundry": {
+      "fictional_marker": "preserve-me"
+    }
+  },
+  "ontology": [
+    {
+      "concept": "fable_volume",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "folio_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} folio_key {String}"
+          ]
+        },
+        {
+          "name": "folio_title",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} folio_title {String}"
+          ]
+        },
+        {
+          "name": "folio_genre",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} folio_genre {String}"
+          ]
+        },
+        {
+          "name": "shelf_grade",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} shelf_grade {String}"
+          ]
+        },
+        {
+          "name": "promo_label",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} promo_label {String}"
+          ]
+        },
+        {
+          "name": "spotlight_mark",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} spotlight_mark {String}"
+          ]
+        },
+        {
+          "name": "reading_tier",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} reading_tier {String}"
+          ]
+        },
+        {
+          "name": "catalogs_into",
+          "roles": [
+            {
+              "concept": "fable_catalog"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} catalogs_into {fable_catalog}"
+          ]
+        },
+        {
+          "name": "curated_by",
+          "roles": [
+            {
+              "concept": "fable_curator"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} curated_by {fable_curator}"
+          ]
+        },
+        {
+          "name": "stored_at",
+          "roles": [
+            {
+              "concept": "fable_reading_room"
+            }
+          ],
+          "verbalizes": [
+            "{fable_volume} stored_at {fable_reading_room}"
+          ]
+        },
+        {
+          "name": "folio_dispatch_0",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_0"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_0"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_0"
+            }
+          ],
+          "description": "虚构借阅组合事实 0。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_0} 在 {fable_reading_room} 于 {Date:loan_day_0} 借阅，评分 {fable_rating}，数量 {Integer:copies_0}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_1",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_1"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_1"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_1"
+            }
+          ],
+          "description": "虚构借阅组合事实 1。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_1} 在 {fable_reading_room} 于 {Date:loan_day_1} 借阅，评分 {fable_rating}，数量 {Integer:copies_1}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_2",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_2"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_2"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_2"
+            }
+          ],
+          "description": "虚构借阅组合事实 2。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_2} 在 {fable_reading_room} 于 {Date:loan_day_2} 借阅，评分 {fable_rating}，数量 {Integer:copies_2}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_3",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_3"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_3"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_3"
+            }
+          ],
+          "description": "虚构借阅组合事实 3。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_3} 在 {fable_reading_room} 于 {Date:loan_day_3} 借阅，评分 {fable_rating}，数量 {Integer:copies_3}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_4",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_4"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_4"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_4"
+            }
+          ],
+          "description": "虚构借阅组合事实 4。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_4} 在 {fable_reading_room} 于 {Date:loan_day_4} 借阅，评分 {fable_rating}，数量 {Integer:copies_4}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_5",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_5"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_5"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_5"
+            }
+          ],
+          "description": "虚构借阅组合事实 5。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_5} 在 {fable_reading_room} 于 {Date:loan_day_5} 借阅，评分 {fable_rating}，数量 {Integer:copies_5}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_6",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_6"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_6"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_6"
+            }
+          ],
+          "description": "虚构借阅组合事实 6。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_6} 在 {fable_reading_room} 于 {Date:loan_day_6} 借阅，评分 {fable_rating}，数量 {Integer:copies_6}"
+          ],
+          "requires": [],
+          "derived_by": []
+        },
+        {
+          "name": "folio_dispatch_7",
+          "roles": [
+            {
+              "concept": "fable_reader",
+              "name": "borrower_7"
+            },
+            {
+              "concept": "fable_reading_room"
+            },
+            {
+              "concept": "Date",
+              "name": "loan_day_7"
+            },
+            {
+              "concept": "fable_rating"
+            },
+            {
+              "concept": "Integer",
+              "name": "copies_7"
+            }
+          ],
+          "description": "虚构借阅组合事实 7。",
+          "verbalizes": [
+            "{fable_volume} 由 {fable_reader:borrower_7} 在 {fable_reading_room} 于 {Date:loan_day_7} 借阅，评分 {fable_rating}，数量 {Integer:copies_7}"
+          ],
+          "requires": [],
+          "derived_by": []
+        }
+      ]
+    },
+    {
+      "concept": "fable_reference_volume",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_catalog",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_curator",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "curator_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_curator} curator_key {String}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "fable_reading_room",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_aisle",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_loan_policy",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_shelf",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_lending_desk",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_series",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_reader",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "curator_key",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "verbalizes": [
+            "{fable_reader} 的虚构指导员键为 {String}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "fable_loan_ticket",
+      "type": "EntityType",
+      "relationships": []
+    },
+    {
+      "concept": "fable_rating",
+      "type": "ValueType",
+      "extends": [
+        "Integer"
+      ],
+      "relationships": [
+        {
+          "name": "rating_is_valid",
+          "verbalizes": [
+            "{fable_rating} 为虚构评分"
+          ]
+        }
+      ],
+      "description": "虚构星级值。"
+    }
+  ],
+  "ontology_mappings": [
+    {
+      "name": "fable_native_map",
+      "description": "虚构映射",
+      "semantic_model": {
+        "name": "fable_lending_semantics",
+        "description": "完全虚构的馆藏与借阅查询样本。",
+        "ai_context": {
+          "instructions": "快照须选择单个盘点日期；借出事件按事件时间筛选。",
+          "fiction_revision": 7
+        },
+        "custom_extensions": [
+          {
+            "vendor_name": "ONTOFOUNDRY",
+            "data": "{\"connection_alias\":\"fictional_catalog\"}"
+          },
+          {
+            "vendor_name": "OTHER",
+            "data": "{\"palette\":\"violet\", \"preserve_space\": true}"
+          }
+        ],
+        "datasets": [
+          {
+            "name": "fable_inventory_snapshot",
+            "source": "public.fiction_folios_daily",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "folio_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_folio_code"
+                    }
+                  ]
+                },
+                "datatype": "String",
+                "ai_context": {
+                  "synonyms": [
+                    "虚构卷册键"
+                  ],
+                  "instructions": "虚构馆藏样本字段。",
+                  "test_key": [
+                    "one",
+                    "two"
+                  ]
+                }
+              },
+              {
+                "name": "folio_title",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_folio_title"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "library_site",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_site_code"
+                    }
+                  ]
+                },
+                "datatype": "String",
+                "ai_context": {
+                  "synonyms": [
+                    "童话馆址",
+                    "借阅场所"
+                  ],
+                  "instructions": "虚构馆藏样本字段。",
+                  "test_key": [
+                    "one",
+                    "two"
+                  ]
+                }
+              },
+              {
+                "name": "shelf_grade",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_shelf_grade"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "folio_genre",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_genre_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "promo_label",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_promo_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "spotlight_mark",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "CASE WHEN LOWER(TRIM(raw_promo_tag)) IN ('spotlight', 'staff_pick') THEN 'Y' WHEN raw_promo_tag IS NULL OR TRIM(raw_promo_tag) = '' OR LOWER(TRIM(raw_promo_tag)) IN ('plain', 'archived') THEN NULL ELSE 'N' END"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "reading_tier",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_tier_code"
+                    }
+                  ]
+                },
+                "datatype": "String",
+                "ai_context": {
+                  "synonyms": [
+                    "童话阅龄"
+                  ],
+                  "instructions": "虚构馆藏样本字段。",
+                  "test_key": [
+                    "one",
+                    "two"
+                  ]
+                }
+              },
+              {
+                "name": "catalog_group",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_catalog_bucket"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "curator_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_curator_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "aisle_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_aisle_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "inventory_day",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_daystamp"
+                    }
+                  ]
+                },
+                "datatype": "Date",
+                "dimension": {
+                  "is_time": true
+                }
+              }
+            ],
+            "custom_extensions": [
+              {
+                "vendor_name": "ONTOFOUNDRY",
+                "data": "{\"time_semantics\": \"snapshot\", \"time_field\": \"inventory_day\"}"
+              }
+            ]
+          },
+          {
+            "name": "fable_catalog_snapshot",
+            "source": "public.fiction_catalog_daily",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "catalog_group",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_catalog_bucket"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "catalog_title",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_catalog_caption"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "inventory_day",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_daystamp"
+                    }
+                  ]
+                },
+                "datatype": "Date"
+              }
+            ],
+            "custom_extensions": [
+              {
+                "vendor_name": "ONTOFOUNDRY",
+                "data": "{\"time_semantics\": \"snapshot\", \"time_field\": \"inventory_day\"}"
+              }
+            ]
+          },
+          {
+            "name": "fable_shelf_snapshot",
+            "source": "public.fiction_shelves_daily",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "library_site",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_site_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "folio_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_folio_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "shelf_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_shelf_token"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              }
+            ]
+          },
+          {
+            "name": "fable_loan_daily",
+            "source": "fiction.fiction_loans_daily",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "library_site",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_site_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "folio_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_folio_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "curator_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_curator_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "catalog_group",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_catalog_bucket"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "loan_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_loan_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "checkout_ticks",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_checkout_qty"
+                    }
+                  ]
+                },
+                "datatype": "Integer"
+              },
+              {
+                "name": "overdue_ticks",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_overdue_qty"
+                    }
+                  ]
+                },
+                "datatype": "Integer"
+              },
+              {
+                "name": "late_fraction",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_late_pct"
+                    }
+                  ]
+                },
+                "datatype": "Decimal"
+              },
+              {
+                "name": "loan_minutes_avg",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_minutes_mean"
+                    }
+                  ]
+                },
+                "datatype": "Decimal"
+              },
+              {
+                "name": "loan_minutes_p99",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_minutes_tail"
+                    }
+                  ]
+                },
+                "datatype": "Decimal"
+              },
+              {
+                "name": "last_checkout_at",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_checkout_clock"
+                    }
+                  ]
+                },
+                "datatype": "DateTime"
+              },
+              {
+                "name": "inventory_day",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_daystamp"
+                    }
+                  ]
+                },
+                "datatype": "Date"
+              }
+            ],
+            "custom_extensions": [
+              {
+                "vendor_name": "ONTOFOUNDRY",
+                "data": "{\"time_semantics\": \"snapshot\", \"time_field\": \"inventory_day\"}"
+              }
+            ]
+          },
+          {
+            "name": "fable_loan_policy",
+            "source": "fiction.fiction_loan_policies",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "policy_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_policy_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "policy_caption",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_policy_caption"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              }
+            ]
+          },
+          {
+            "name": "fable_checkout_events",
+            "source": "fiction.fiction_checkout_events",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "checkout_moment",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_event_clock"
+                    }
+                  ]
+                },
+                "datatype": "DateTime"
+              },
+              {
+                "name": "checkout_duration",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_duration"
+                    }
+                  ]
+                },
+                "datatype": "Integer"
+              },
+              {
+                "name": "library_site",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_site_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              }
+            ],
+            "custom_extensions": [
+              {
+                "vendor_name": "ONTOFOUNDRY",
+                "data": "{\"time_semantics\": \"event\", \"time_field\": \"checkout_moment\"}"
+              }
+            ]
+          },
+          {
+            "name": "fable_curator_snapshot",
+            "source": "fiction.fiction_curators_daily",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "curator_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_curator_tag"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "reading_tier",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_tier_code"
+                    }
+                  ]
+                },
+                "datatype": "String",
+                "ai_context": {
+                  "synonyms": [
+                    "童话阅龄"
+                  ],
+                  "instructions": "虚构馆藏样本字段。",
+                  "test_key": [
+                    "one",
+                    "two"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "fable_season_rollup",
+            "source": "fiction.fiction_seasons",
+            "description": "完全虚构的图书馆测试数据。",
+            "fields": [
+              {
+                "name": "folio_key",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_folio_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "checkout_ticks",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_checkout_qty"
+                    }
+                  ]
+                },
+                "datatype": "Integer"
+              },
+              {
+                "name": "library_site",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_site_code"
+                    }
+                  ]
+                },
+                "datatype": "String"
+              },
+              {
+                "name": "inventory_day",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "raw_daystamp"
+                    }
+                  ]
+                },
+                "datatype": "Date"
+              }
+            ],
+            "custom_extensions": [
+              {
+                "vendor_name": "ONTOFOUNDRY",
+                "data": "{\"time_semantics\": \"rolling\", \"time_field\": \"inventory_day\"}"
+              }
+            ]
+          }
+        ],
+        "relationships": [
+          {
+            "name": "shelf_to_folio",
+            "from": "fable_shelf_snapshot",
+            "to": "fable_inventory_snapshot",
+            "from_columns": [
+              "library_site",
+              "folio_key"
+            ],
+            "to_columns": [
+              "library_site",
+              "folio_key"
+            ]
+          },
+          {
+            "name": "loan_to_folio",
+            "from": "fable_loan_daily",
+            "to": "fable_inventory_snapshot",
+            "from_columns": [
+              "library_site",
+              "folio_key"
+            ],
+            "to_columns": [
+              "library_site",
+              "folio_key"
+            ]
+          },
+          {
+            "name": "catalog_to_inventory",
+            "from": "fable_catalog_snapshot",
+            "to": "fable_inventory_snapshot",
+            "from_columns": [
+              "catalog_group"
+            ],
+            "to_columns": [
+              "catalog_group"
+            ]
+          },
+          {
+            "name": "curator_to_inventory",
+            "from": "fable_curator_snapshot",
+            "to": "fable_inventory_snapshot",
+            "from_columns": [
+              "curator_key"
+            ],
+            "to_columns": [
+              "curator_key"
+            ]
+          },
+          {
+            "name": "season_to_inventory",
+            "from": "fable_season_rollup",
+            "to": "fable_inventory_snapshot",
+            "from_columns": [
+              "folio_key"
+            ],
+            "to_columns": [
+              "folio_key"
+            ]
+          }
+        ],
+        "metrics": [
+          {
+            "name": "folio_distinct_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "COUNT(DISTINCT CASE WHEN fable_inventory_snapshot.shelf_grade <> 'DAMAGED' THEN fable_inventory_snapshot.folio_key END)"
+                },
+                {
+                  "dialect": "SNOWFLAKE",
+                  "expression": "COUNT(DISTINCT CASE WHEN fable_inventory_snapshot.shelf_grade <> 'DAMAGED' THEN fable_inventory_snapshot.folio_key END)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "童话卷册数"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "spotlight_folio_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "COUNT(DISTINCT CASE WHEN fable_inventory_snapshot.shelf_grade <> 'DAMAGED' AND fable_inventory_snapshot.folio_genre = 'fantasy' AND fable_inventory_snapshot.spotlight_mark = 'Y' THEN fable_inventory_snapshot.folio_key END)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "精选卷册数"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "loan_signature_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "COUNT(DISTINCT fable_loan_daily.library_site || ':' || fable_loan_daily.folio_key || ':' || fable_loan_daily.loan_key)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "借阅签名数"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "loan_late_fraction",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "SUM(fable_loan_daily.overdue_ticks) / NULLIF(SUM(fable_loan_daily.checkout_ticks),0)"
+                }
+              ]
+            },
+            "datatype": "Decimal",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "逾期虚构比例"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "checkout_ticks_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "SUM(fable_loan_daily.checkout_ticks)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "借出虚构次数"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "overdue_ticks_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "SUM(fable_loan_daily.overdue_ticks)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "逾期虚构次数"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "multi_shelf_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "COUNT(fable_inventory_snapshot.folio_key) + SUM(fable_loan_daily.checkout_ticks)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "跨馆虚构统计"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          },
+          {
+            "name": "event_duration_total",
+            "expression": {
+              "dialects": [
+                {
+                  "dialect": "ANSI_SQL",
+                  "expression": "SUM(fable_checkout_events.checkout_duration)"
+                }
+              ]
+            },
+            "datatype": "Integer",
+            "description": "合成图书馆测试统计。",
+            "ai_context": {
+              "synonyms": [
+                "借阅虚构时长"
+              ],
+              "instructions": "合成口径，不代表现实行业规则。"
+            }
+          }
+        ]
+      },
+      "concept_mappings": [
+        {
+          "concept": "fable_volume",
+          "object_mappings": [
+            {
+              "expression": "fable_inventory_snapshot.folio_key"
+            }
+          ],
+          "link_mappings": [
+            {
+              "object_mapping": {
+                "expression": "fable_inventory_snapshot.folio_key"
+              },
+              "children": [
+                {
+                  "relationship": "folio_key",
+                  "object_mapping": {
+                    "expression": "fable_inventory_snapshot.folio_key",
+                    "concept": "String"
+                  }
+                },
+                {
+                  "relationship": "folio_title",
+                  "object_mapping": {
+                    "expression": "fable_inventory_snapshot.folio_title",
+                    "concept": "String"
+                  }
+                }
+              ]
+            },
+            {
+              "object_mapping": {
+                "expression": "fable_loan_daily.folio_key"
+              },
+              "children": [
+                {
+                  "relationship": "catalogs_into",
+                  "object_mapping": {
+                    "expression": "fable_inventory_snapshot.catalog_group",
+                    "concept": "fable_catalog"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "fable_catalog",
+          "object_mappings": [
+            {
+              "expression": "fable_catalog_snapshot.catalog_group"
+            }
+          ]
+        },
+        {
+          "concept": "fable_curator",
+          "object_mappings": [
+            {
+              "expression": "fable_inventory_snapshot.curator_key"
+            }
+          ]
+        },
+        {
+          "concept": "fable_reading_room",
+          "object_mappings": [
+            {
+              "expression": "fable_inventory_snapshot.library_site"
+            }
+          ]
+        },
+        {
+          "concept": "fable_aisle",
+          "object_mappings": [
+            {
+              "expression": "fable_inventory_snapshot.aisle_key"
+            }
+          ]
+        },
+        {
+          "concept": "fable_loan_policy",
+          "object_mappings": [
+            {
+              "expression": "fable_loan_policy.policy_key"
+            }
+          ]
+        },
+        {
+          "concept": "fable_shelf",
+          "object_mappings": [
+            {
+              "expression": "fable_shelf_snapshot.shelf_key"
+            }
+          ]
+        },
+        {
+          "concept": "fable_reader",
+          "object_mappings": [
+            {
+              "expression": "fable_inventory_snapshot.folio_title",
+              "referent_mappings": [
+                {
+                  "relationship": "curator_key",
+                  "expression": "fable_inventory_snapshot.curator_key"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "concept": "fable_loan_ticket",
+          "object_mappings": [
+            {
+              "expression": "fable_loan_daily.loan_key"
+            },
+            {
+              "expression": "fable_loan_daily.folio_key"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

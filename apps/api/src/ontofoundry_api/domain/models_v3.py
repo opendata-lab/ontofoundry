@@ -635,13 +635,13 @@ def validate_v3_graph(draft) -> None:
             if link.multiplicity == "OneToOne" and key in inverse and inverse[key] != owner_value:
                 raise ValueError("实例角色值违反 OneToOne 基数")
             inverse[key] = owner_value
-    # The extension envelope is an export projection of these same elements,
-    # never an independently editable second truth for display data/actions.
+    # Concept/relation labels mirror their platform name. SemanticNode.name is
+    # native, so its optional display label lives only in the extension.
     by_id = {i.id: i for i in items}
     ext = draft.extension_v4
     for element_id, label in ext.display_names.items():
         item = by_id.get(element_id)
-        if item is None or getattr(item, "name", None) != label:
+        if item is None or (not isinstance(item, SemanticNode) and getattr(item, "name", None) != label):
             raise ValueError("扩展显示名必须与元素集合一致")
     for element_id, tags in ext.tags.items():
         item = by_id.get(element_id)

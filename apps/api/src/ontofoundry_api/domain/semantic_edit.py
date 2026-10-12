@@ -110,7 +110,7 @@ def apply_semantic_form(snapshot, mappings, joins):
             raise ValueError("映射引用了未定义或保留的属性")
         analysis = views.analyze(mapping.type_id)
         if analysis.reason:
-            raise ValueError("复杂映射：暂只读（" + analysis.reason + "）")
+            raise ValueError("复杂映射请在语义模型中编辑（" + analysis.reason + "）")
         if analysis.mapping and mapping == analysis.mapping:
             continue
         model = next(
@@ -444,7 +444,7 @@ def apply_semantic_form(snapshot, mappings, joins):
             model_id = str(src.semantic_model_id)
         else:
             if value:
-                raise ValueError("两端语义模型不同，关系暂只读")
+                raise ValueError("两端语义模型不同，请在语义模型中编辑该关系")
             continue
         names = {
             link.technical_name,

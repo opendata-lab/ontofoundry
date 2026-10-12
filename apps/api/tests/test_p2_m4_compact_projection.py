@@ -121,15 +121,15 @@ def test_new_relationship_without_technical_name_registers_its_exported_path():
 @pytest.mark.parametrize('backend', ['client', 'pg_client'])
 def test_mcp_and_rest_project_nested_elements_and_leave_snapshot_intact(request, backend):
     client = request.getfixturevalue(backend)
-    _, draft, version_id = publish(client, 'REDACTED')
+    _, draft, version_id = publish(client, 'library-lending')
     original = deepcopy(draft)
-    result = call(client, 'search_ontology_types', query='REDACTED')
+    result = call(client, 'search_ontology_types', query='精选卷册数')
     clean(result)
-    metric = next(item for item in result['items'] if item['name'] == 'REDACTED')
+    metric = next(item for item in result['items'] if item['name'] == 'spotlight_folio_total')
     assert metric['matches'][0]['source'] == 'metric.ai_context.synonyms'
     assert metric['expression'] == next(item['expression'] for item in draft['metrics'] if item['id'] == metric['id'])
     clean(call(client, 'get_ontology_type', type_id=metric['id']))
-    clean(call(client, 'get_ontology_type', type_id='REDACTED'))  # ambiguity candidates
+    clean(call(client, 'get_ontology_type', type_id='reading_tier'))  # ambiguity candidates
     clean(call(client, 'get_ontology_elements', element_ids=[metric['id'], draft['link_types'][0]['id']]))
     for kind in ('metric', 'object_type', 'value_type', 'property', 'link_type', 'dataset_field'):
         listing = call(client, 'list_ontology_elements', kind=kind, limit=200)
@@ -144,7 +144,7 @@ def test_mcp_and_rest_project_nested_elements_and_leave_snapshot_intact(request,
         response = client.get(root + route)
         assert response.status_code == 200, response.text
         clean(response.json())
-    response = client.get(root + '/types', params={'q': 'REDACTED', 'kind': 'metric'})
+    response = client.get(root + '/types', params={'q': '精选卷册数', 'kind': 'metric'})
     assert response.status_code == 200
     clean(response.json())
     assert response.json()['items'][0]['id'] == metric['id']
@@ -155,7 +155,7 @@ def test_mcp_and_rest_project_nested_elements_and_leave_snapshot_intact(request,
     token = client.post('/api/v1/workspaces/' + str(DEMO_WORKSPACE_ID) + '/service-tokens',
                         json={'name': 'M4 ontology reader', 'scopes': ['ontology:read']}).json()['token']
     headers = {'Authorization': 'Bearer ' + token}
-    assert client.get(root + '/types', params={'q': 'REDACTED', 'kind': 'metric'}, headers=headers).json()['items'] == []
+    assert client.get(root + '/types', params={'q': '精选卷册数', 'kind': 'metric'}, headers=headers).json()['items'] == []
     assert client.get(root + '/types/' + metric['id'], headers=headers).status_code == 404
     with client.app.state.session_factory() as db:
         assert db.get(OntologyVersionRecord, version_id).snapshot_json == original

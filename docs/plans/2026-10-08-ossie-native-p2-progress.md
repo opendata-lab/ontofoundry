@@ -53,13 +53,12 @@ P1 已完成：文档 ai_context 原样保存（字符串/开放对象）；导�
 
 问数系统提示词补充“优先按同义词定位概念/指标”，说明来源、作用域与歧义候选；建模提示词允许 after.concept_context.synonyms/instructions 的平台字段（null 清除、遗漏保留），不替换原生概念 name/description，不改变证据规则。MCP 仅查询原生语义层元数据，不提前实现 P3 派生视图或 P4 指标执行。
 
-新增 MCP API **10 项**（SQLite/PostgreSQL 双后端）：A 的 **8/8** 文档同义词命中并标注 document.ai_context.synonyms；B 的“REDACTED”命中 REDACTED（metric.ai_context.synonyms），原始表达式完整，27 个指标可列举；“REDACTED”命中 REDACTED（field.ai_context.synonyms）；“REDACTED”返回多个字段/数据集候选；同名 REDACTED 返回歧义详情；实体和值概念别名、重复数据集别名、权限和纯读取均通过。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 MCP 示例（实际测试断言结果的字段摘录）：
 
 ```json
-{"query":"REDACTED","item":{"kind":"document","name":"account_model_v2","matches":[{"source":"document.ai_context.synonyms","value":"REDACTED","standard":true}]}}
-{"query":"REDACTED","item":{"kind":"metric","name":"REDACTED","matches":[{"source":"metric.ai_context.synonyms","value":"REDACTED","standard":true}]}}
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 ```
 
 扩展复核补充 **2 项**：不解释输入已有的 opaque vendor export_edits；新导出的 Action/规则元数据不包含平台 evidence（输入已有扩展原文仍保留），Action 所属规则也进入稳定 ID 注册表。前端再补 **1 项**值概念公开读取投影，避免丢失平台上下文。
@@ -94,6 +93,6 @@ A/B 验收：导入→持久化→发布→导出，仅逆转换本次平台新�
 
 最终全量：`cd apps/api && uv run --python 3.13 pytest -q`（已有 PostgreSQL 上仅创建/删除隔离临时测试库）→ **557 passed, 1 skipped, 0 failures**（596.64s）；`uv run --python 3.13 ruff check src tests` **通过**。Web `npx vitest run` → **27 files / 129 tests passed**（13.88s）；`npm run lint`、`npx tsc -b` **通过**。覆盖矩阵生成检查与 `git diff --check` **通过**。
 
-最终体积沿用上方相同 UTF-8 紧凑 JSON 口径：A 导出 **69,774 → 18,840 bytes**，扩展 **51,171 → 237 bytes**；B 导出 **495,932 → 163,344 bytes**，扩展 **332,825 → 237 bytes**。默认 ID 例外数均 0（原 175/1,460）；包含逆转换审计的缩进扩展均 322 bytes。A/B 原生 JSON 0 差异、A 6/6 与 B 8/8 多元关系保持，二次导入/未改动导出稳定。“REDACTED”在 MCP 与 REST `types?kind=metric&q=REDACTED` 均返回 REDACTED，无 native_presence/position/origin；指标原始表达式、同义词来源和作用域保留。
+两份手工模型已在本地完成无损及编辑验证；原始素材与具体审计数据保存在仓库外。
 
 下一步：M4 实施和验收完成，待评审方提交。边界：已发布版本的冻结产物与原哈希不改写，新发布产物使用精简扩展；输入已有大扩展的原文仍按 G1 保留在审计中，不能因体积删除。完整编辑草稿/固定建模上下文保持冻结合同，查询接口采用干净投影。未决：MySQL 外部测试因缺少隔离环境跳过，M4 无其他已知未完成验收项。已清理本次临时脚本与日志；未提交、未启动/重启服务、未 make build、未访问演示目录或业务数据库。

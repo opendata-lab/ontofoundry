@@ -1,5 +1,6 @@
 import type {
   LegacyDraft,
+  NativeDraft,
   LinkTypeElement,
   ObjectTypeElement,
   PropertyElement,
@@ -9,6 +10,7 @@ import type { ElementRequest } from "./elementInspector";
 export type ElementType = ObjectTypeElement | LinkTypeElement;
 export type PanelProps = {
   draft: LegacyDraft;
+  nativeDraft?: NativeDraft;
   type: ElementType;
   editing: boolean;
   change: (next: LegacyDraft) => void;
