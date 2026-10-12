@@ -1,4 +1,4 @@
-"""P1 native nodes: real relationship arrays and exact presence/order/text."""
+"""P1 native nodes: synthetic relationship arrays and exact presence/order/text."""
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -14,11 +14,11 @@ from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.workspaces import publish_draft
 
-FIXTURES = Path(__file__).parent / 'fixtures' / 'REDACTED_PRIVATE_PATH'
+FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_synthetic'
 
 
-@pytest.mark.parametrize(('stem', 'count'), [('REDACTED', 6), ('REDACTED', 8)])
-def test_real_nary_import_persist_publish_export(client, stem, count):
+@pytest.mark.parametrize(('stem', 'count'), [('storybook-lending', 6), ('library-lending', 8)])
+def test_synthetic_nary_import_persist_publish_export(client, stem, count):
     original = json.loads((FIXTURES / f'{stem}.ossie.json').read_text())
     payload, report = import_ossie(original, workspace_id=DEMO_WORKSPACE_ID, mode='replace', target_version='3')
     assert not report['skipped']

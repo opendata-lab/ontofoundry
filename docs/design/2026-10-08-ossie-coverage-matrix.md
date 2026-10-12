@@ -2,9 +2,9 @@
 
 日期：2026-10-08。规范与范围以已评审方案第 1、3、5 节为准。
 
-由 `python3 scripts/ossie_coverage_matrix.py` 从仓库固定 schema 与真实样例生成；`--check` 校验字段集合、计数与文档一致。
+由 `python3 scripts/ossie_coverage_matrix.py` 从仓库固定 schema 与显式指定的样例生成；`--check` 校验字段集合、计数与文档一致。
 
-A = `REDACTED`；B = `REDACTED`。次数按 schema 引用作用域计数，统计字段是否出现，空字符串/空数组也算一次；递归映射按每个实例计数。
+A = `storybook-lending.ossie.json`；B = `library-lending.ossie.json`。次数按 schema 引用作用域计数，统计字段是否出现，空字符串/空数组也算一次；递归映射按每个实例计数。
 
 路径为 schema JSON Pointer（ontology = ontology/ontology.json；core = core-spec/osi-schema.json）。根属性使用 `#/properties/...`。Core 顶层独立文档属性在 A/B 中为零，嵌入的 SemanticModel 不算独立文档。
 
@@ -20,81 +20,81 @@ A = `REDACTED`；B = `REDACTED`。次数按 schema 引用作用域计数，统�
 | `ontology#/properties/name` | 原生名称，保留空字符串 | ossie_name | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/properties/description` | 原生描述文本 | ossie_description | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/properties/ai_context` | 字符串或开放对象的 AI 上下文 | ai_context | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
-| `ontology#/properties/requires` | 约束表达式有序列表 | ontology_requires | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/properties/requires` | 约束表达式有序列表 | ontology_requires | 原生 | 1 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/properties/ontology` | 实体和值概念定义 | object_types + value_types（position 共同排序） | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/properties/ontology_mappings` | 逻辑模型到本体的映射组 | semantic_models（每个 OntologyMap 一项） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/concept` | 概念名称或引用 | object_types.concept / value_types.concept | 原生 | 21 | 29 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
-| `ontology#/$defs/OntologyComponent/properties/type` | EntityType / ValueType | object_types / value_types 集合归属 | 原生 | 21 | 29 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/description` | 原生描述文本 | object_types.description / value_types.description | 原生 | 21 | 29 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/extends` | 有序父概念引用 | object_types.extends / value_types.extends（有序 ConceptRef） | 原生 | 8 | 9 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
-| `ontology#/$defs/OntologyComponent/properties/derived_by` | 派生表达式有序列表 | 概念.derived_by → rules.expression（有序 ID） | 原生 | 0 | 7 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/identify_by` | 首选标识关系名有序列表 | object_types.identify_by / value_types.identify_by | 原生 | 11 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/requires` | 约束表达式有序列表 | 概念.requires → rules.expression（有序 ID） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/relationships` | 所属作用域的关系集合 | properties + link_types（同 owner 下 position 共同排序） | 原生 | 17 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/Relationship/properties/name` | 原生名称，保留空字符串 | properties.technical_name / link_types.technical_name（原生关系名） | 原生 | 46 | 96 | 字段出现状态独立记录；原生数组保持顺序及重复项；name 为平台显示名，technical_name 存原生名，均不清洗原文 |
-| `ontology#/$defs/Relationship/properties/description` | 原生描述文本 | properties.description / link_types.description | 原生 | 46 | 51 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/Relationship/properties/roles` | 所属概念以外的有序角色，可为空 | properties.roles / link_types.roles（有序附加角色） | 原生 | 46 | 96 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/Relationship/properties/multiplicity` | ManyToOne / OneToOne，允许缺省 | properties.multiplicity / link_types.multiplicity | 原生 | 31 | 85 | 字段出现状态独立记录；原生数组保持顺序及重复项；不推断缺省，不补基数 |
-| `ontology#/$defs/Relationship/properties/derived_by` | 派生表达式有序列表 | 关系.derived_by → rules.expression（有序 ID） | 原生 | 1 | 3 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/Relationship/properties/requires` | 约束表达式有序列表 | 关系.requires → rules.expression（有序 ID） | 原生 | 9 | 18 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/Relationship/properties/verbalizes` | 原文读法，包括 {concept:role} | properties.verbalizes / link_types.verbalizes | 原生 | 46 | 96 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/ConceptMapping/properties/concept` | 概念名称或引用 | concept_mappings.concept_id（ConceptRef） | 原生 | 0 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
-| `ontology#/$defs/ConceptMapping/properties/object_mappings` | 对象映射根数组 | mapping_nodes（slot=object_mappings） | 原生 | 0 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/ConceptMapping/properties/link_mappings` | 关系映射根数组 | mapping_nodes（slot=link_mappings） | 原生 | 0 | 12 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/ReferentMapping/properties/relationship` | 关系名引用 | mapping_nodes.relationship（必填） | 原生 | 0 | 112 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/ReferentMapping/properties/expression` | 表达式原文，不限制长度或改写 | mapping_nodes.expression | 原生 | 0 | 97 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/ReferentMapping/properties/referent_mappings` | 递归引用映射数组 | mapping_nodes（slot=referent_mappings，递归） | 原生 | 0 | 15 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/Role/properties/concept` | 概念名称或引用 | roles.concept（ConceptRef） | 原生 | 52 | 131 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
-| `ontology#/$defs/Role/properties/name` | 原生名称，保留空字符串 | roles.name | 原生 | 23 | 76 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/ObjectMapping/properties/concept` | 概念名称或引用 | mapping_nodes.concept | 原生 | 0 | 214 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/ObjectMapping/properties/referent_mappings` | 递归引用映射数组 | mapping_nodes（slot=referent_mappings） | 原生 | 0 | 32 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/ObjectMapping/properties/expression` | 表达式原文，不限制长度或改写 | mapping_nodes.expression | 原生 | 0 | 224 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/LinkMapping/properties/relationship` | 关系名引用 | mapping_nodes.relationship | 原生 | 0 | 82 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/LinkMapping/properties/object_mapping` | 单个对象子映射 | mapping_nodes（slot=object_mapping，恰一个 object 子节点） | 原生 | 0 | 235 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
-| `ontology#/$defs/LinkMapping/properties/children` | 有序下一级关系映射 | mapping_nodes（slot=children） | 原生 | 0 | 153 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/OntologyComponent/properties/concept` | 概念名称或引用 | object_types.concept / value_types.concept | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
+| `ontology#/$defs/OntologyComponent/properties/type` | EntityType / ValueType | object_types / value_types 集合归属 | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/description` | 原生描述文本 | object_types.description / value_types.description | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/extends` | 有序父概念引用 | object_types.extends / value_types.extends（有序 ConceptRef） | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
+| `ontology#/$defs/OntologyComponent/properties/derived_by` | 派生表达式有序列表 | 概念.derived_by → rules.expression（有序 ID） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/identify_by` | 首选标识关系名有序列表 | object_types.identify_by / value_types.identify_by | 原生 | 1 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/requires` | 约束表达式有序列表 | 概念.requires → rules.expression（有序 ID） | 原生 | 1 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/relationships` | 所属作用域的关系集合 | properties + link_types（同 owner 下 position 共同排序） | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/name` | 原生名称，保留空字符串 | properties.technical_name / link_types.technical_name（原生关系名） | 原生 | 9 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项；name 为平台显示名，technical_name 存原生名，均不清洗原文 |
+| `ontology#/$defs/Relationship/properties/description` | 原生描述文本 | properties.description / link_types.description | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/roles` | 所属概念以外的有序角色，可为空 | properties.roles / link_types.roles（有序附加角色） | 原生 | 7 | 20 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/multiplicity` | ManyToOne / OneToOne，允许缺省 | properties.multiplicity / link_types.multiplicity | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；不推断缺省，不补基数 |
+| `ontology#/$defs/Relationship/properties/derived_by` | 派生表达式有序列表 | 关系.derived_by → rules.expression（有序 ID） | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/requires` | 约束表达式有序列表 | 关系.requires → rules.expression（有序 ID） | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/verbalizes` | 原文读法，包括 {concept:role} | properties.verbalizes / link_types.verbalizes | 原生 | 9 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/ConceptMapping/properties/concept` | 概念名称或引用 | concept_mappings.concept_id（ConceptRef） | 原生 | 0 | 9 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
+| `ontology#/$defs/ConceptMapping/properties/object_mappings` | 对象映射根数组 | mapping_nodes（slot=object_mappings） | 原生 | 0 | 9 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/ConceptMapping/properties/link_mappings` | 关系映射根数组 | mapping_nodes（slot=link_mappings） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/ReferentMapping/properties/relationship` | 关系名引用 | mapping_nodes.relationship（必填） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/ReferentMapping/properties/expression` | 表达式原文，不限制长度或改写 | mapping_nodes.expression | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/ReferentMapping/properties/referent_mappings` | 递归引用映射数组 | mapping_nodes（slot=referent_mappings，递归） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/Role/properties/concept` | 概念名称或引用 | roles.concept（ConceptRef） | 原生 | 23 | 52 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
+| `ontology#/$defs/Role/properties/name` | 原生名称，保留空字符串 | roles.name | 原生 | 10 | 24 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/ObjectMapping/properties/concept` | 概念名称或引用 | mapping_nodes.concept | 原生 | 0 | 3 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/ObjectMapping/properties/referent_mappings` | 递归引用映射数组 | mapping_nodes（slot=referent_mappings） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/ObjectMapping/properties/expression` | 表达式原文，不限制长度或改写 | mapping_nodes.expression | 原生 | 0 | 15 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/LinkMapping/properties/relationship` | 关系名引用 | mapping_nodes.relationship | 原生 | 0 | 3 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/LinkMapping/properties/object_mapping` | 单个对象子映射 | mapping_nodes（slot=object_mapping，恰一个 object 子节点） | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
+| `ontology#/$defs/LinkMapping/properties/children` | 有序下一级关系映射 | mapping_nodes（slot=children） | 原生 | 0 | 2 | 字段出现状态独立记录；原生数组保持顺序及重复项；parent_id + slot + position 恢复任意深度树及多根 |
 | `ontology#/$defs/OntologyMap/properties/name` | 原生名称，保留空字符串 | semantic_models.map_name | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyMap/properties/description` | 原生描述文本 | semantic_models.map_description | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyMap/properties/semantic_model` | 语义模型定义容器 | semantic_models（native_presence 与 map_presence 分离） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyMap/properties/concept_mappings` | 概念映射集合 | concept_mappings（父 semantic_model_id） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/properties/version` | 固定规范版本 | core_version | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/properties/semantic_model` | 语义模型定义容器 | semantic_models（独立 OSI 文档数组） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/AIContext/oneOf/1/properties/instructions` | AI 使用说明 | 各作用域 ai_context.instructions（原始 JSON） | 原生 | 0 | 20 | 字段出现状态独立记录；原生数组保持顺序及重复项；同时支持字符串形及任意附加键，null 仅在原生 JSON 允许处保留 |
-| `core#/$defs/AIContext/oneOf/1/properties/synonyms` | 作用域内同义词原始列表 | 各作用域 ai_context.synonyms（原始 JSON） | 原生 | 1 | 45 | 字段出现状态独立记录；原生数组保持顺序及重复项；同时支持字符串形及任意附加键，null 仅在原生 JSON 允许处保留 |
+| `core#/$defs/AIContext/oneOf/1/properties/instructions` | AI 使用说明 | 各作用域 ai_context.instructions（原始 JSON） | 原生 | 1 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项；同时支持字符串形及任意附加键，null 仅在原生 JSON 允许处保留 |
+| `core#/$defs/AIContext/oneOf/1/properties/synonyms` | 作用域内同义词原始列表 | 各作用域 ai_context.synonyms（原始 JSON） | 原生 | 1 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项；同时支持字符串形及任意附加键，null 仅在原生 JSON 允许处保留 |
 | `core#/$defs/AIContext/oneOf/1/properties/examples` | AI 示例问题原始列表 | 各作用域 ai_context.examples（原始 JSON） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；同时支持字符串形及任意附加键，null 仅在原生 JSON 允许处保留 |
-| `core#/$defs/CustomExtension/properties/vendor_name` | 扩展厂商名，任意字符串 | custom_extensions[].vendor_name | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/CustomExtension/properties/data` | 厂商 JSON 数据字符串原文 | custom_extensions[].data（JSON 字符串原文） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/DialectExpression/properties/dialect` | 规范表达式方言枚举 | expression.dialects[].dialect | 原生 | 0 | 398 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/DialectExpression/properties/expression` | 表达式原文，不限制长度或改写 | expression.dialects[].expression | 原生 | 0 | 398 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Expression/properties/dialects` | 有序方言表达式数组，保留重复项 | dataset_fields.expression / metrics.expression.dialects | 原生 | 0 | 398 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Dimension/properties/is_time` | 时间维度标记，缺省与 false 不等价 | dataset_fields.dimension.is_time（缺省不推断） | 原生 | 0 | 53 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/name` | 原生名称，保留空字符串 | dataset_fields.name | 原生 | 0 | 371 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/expression` | 表达式原文，不限制长度或改写 | dataset_fields.expression | 原生 | 0 | 371 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/dimension` | 维度元数据 | dataset_fields.dimension | 原生 | 0 | 53 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/CustomExtension/properties/vendor_name` | 扩展厂商名，任意字符串 | custom_extensions[].vendor_name | 原生 | 0 | 7 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/CustomExtension/properties/data` | 厂商 JSON 数据字符串原文 | custom_extensions[].data（JSON 字符串原文） | 原生 | 0 | 7 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/DialectExpression/properties/dialect` | 规范表达式方言枚举 | expression.dialects[].dialect | 原生 | 0 | 50 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/DialectExpression/properties/expression` | 表达式原文，不限制长度或改写 | expression.dialects[].expression | 原生 | 0 | 50 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Expression/properties/dialects` | 有序方言表达式数组，保留重复项 | dataset_fields.expression / metrics.expression.dialects | 原生 | 0 | 49 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dimension/properties/is_time` | 时间维度标记，缺省与 false 不等价 | dataset_fields.dimension.is_time（缺省不推断） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Field/properties/name` | 原生名称，保留空字符串 | dataset_fields.name | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Field/properties/expression` | 表达式原文，不限制长度或改写 | dataset_fields.expression | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Field/properties/dimension` | 维度元数据 | dataset_fields.dimension | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/Field/properties/label` | 分类标签 | dataset_fields.label | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/description` | 原生描述文本 | dataset_fields.description | 原生 | 0 | 290 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/datatype` | 规范逻辑数据类型，未知时缺省 | dataset_fields.datatype | 原生 | 0 | 371 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Field/properties/ai_context` | 字符串或开放对象的 AI 上下文 | dataset_fields.ai_context | 原生 | 0 | 18 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
+| `core#/$defs/Field/properties/description` | 原生描述文本 | dataset_fields.description | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Field/properties/datatype` | 规范逻辑数据类型，未知时缺省 | dataset_fields.datatype | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Field/properties/ai_context` | 字符串或开放对象的 AI 上下文 | dataset_fields.ai_context | 原生 | 0 | 4 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
 | `core#/$defs/Field/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | dataset_fields.custom_extensions | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
-| `core#/$defs/Dataset/properties/name` | 原生名称，保留空字符串 | datasets.name | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Dataset/properties/source` | 物理表、视图或查询引用原文 | datasets.source | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dataset/properties/name` | 原生名称，保留空字符串 | datasets.name | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dataset/properties/source` | 物理表、视图或查询引用原文 | datasets.source | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/Dataset/properties/primary_key` | 有序主键列数组 | datasets.primary_key | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/Dataset/properties/unique_keys` | 有序候选键数组及其有序列 | datasets.unique_keys | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Dataset/properties/description` | 原生描述文本 | datasets.description | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Dataset/properties/ai_context` | 字符串或开放对象的 AI 上下文 | datasets.ai_context | 原生 | 0 | 2 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
-| `core#/$defs/Dataset/properties/fields` | 数据集字段定义 | dataset_fields（父 dataset_id） | 原生 | 0 | 41 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Dataset/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | datasets.custom_extensions | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
-| `core#/$defs/Relationship/properties/name` | 原生名称，保留空字符串 | dataset_relationships.name | 原生 | 0 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Relationship/properties/from` | 连接的多端 dataset 名 | dataset_relationships.from | 原生 | 0 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Relationship/properties/to` | 连接的一端 dataset 名 | dataset_relationships.to | 原生 | 0 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Relationship/properties/from_columns` | 有序外键列 | dataset_relationships.from_columns | 原生 | 0 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Relationship/properties/to_columns` | 有序目标键列，与 from_columns 配对 | dataset_relationships.to_columns | 原生 | 0 | 14 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dataset/properties/description` | 原生描述文本 | datasets.description | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dataset/properties/ai_context` | 字符串或开放对象的 AI 上下文 | datasets.ai_context | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
+| `core#/$defs/Dataset/properties/fields` | 数据集字段定义 | dataset_fields（父 dataset_id） | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Dataset/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | datasets.custom_extensions | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
+| `core#/$defs/Relationship/properties/name` | 原生名称，保留空字符串 | dataset_relationships.name | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Relationship/properties/from` | 连接的多端 dataset 名 | dataset_relationships.from | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Relationship/properties/to` | 连接的一端 dataset 名 | dataset_relationships.to | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Relationship/properties/from_columns` | 有序外键列 | dataset_relationships.from_columns | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Relationship/properties/to_columns` | 有序目标键列，与 from_columns 配对 | dataset_relationships.to_columns | 原生 | 0 | 5 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/Relationship/properties/ai_context` | 字符串或开放对象的 AI 上下文 | dataset_relationships.ai_context | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
 | `core#/$defs/Relationship/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | dataset_relationships.custom_extensions | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
-| `core#/$defs/Metric/properties/name` | 原生名称，保留空字符串 | metrics.name | 原生 | 0 | 27 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Metric/properties/expression` | 表达式原文，不限制长度或改写 | metrics.expression | 原生 | 0 | 27 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Metric/properties/description` | 原生描述文本 | metrics.description | 原生 | 0 | 27 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Metric/properties/datatype` | 规范逻辑数据类型，未知时缺省 | metrics.datatype | 原生 | 0 | 27 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/Metric/properties/ai_context` | 字符串或开放对象的 AI 上下文 | metrics.ai_context | 原生 | 0 | 27 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
+| `core#/$defs/Metric/properties/name` | 原生名称，保留空字符串 | metrics.name | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Metric/properties/expression` | 表达式原文，不限制长度或改写 | metrics.expression | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Metric/properties/description` | 原生描述文本 | metrics.description | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Metric/properties/datatype` | 规范逻辑数据类型，未知时缺省 | metrics.datatype | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `core#/$defs/Metric/properties/ai_context` | 字符串或开放对象的 AI 上下文 | metrics.ai_context | 原生 | 0 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
 | `core#/$defs/Metric/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | metrics.custom_extensions | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
 | `core#/$defs/SemanticModel/properties/name` | 原生名称，保留空字符串 | semantic_models.name | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/SemanticModel/properties/description` | 原生描述文本 | semantic_models.description | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
@@ -102,18 +102,18 @@ A = `REDACTED`；B = `REDACTED`。次数按 schema 引用作用域计数，统�
 | `core#/$defs/SemanticModel/properties/datasets` | 逻辑数据集集合，可不绑定概念 | datasets（父 semantic_model_id） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/SemanticModel/properties/relationships` | 所属作用域的关系集合 | dataset_relationships（父 semantic_model_id） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `core#/$defs/SemanticModel/properties/metrics` | 模型级指标集合 | metrics（父 semantic_model_id） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `core#/$defs/SemanticModel/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | semantic_models.custom_extensions | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
+| `core#/$defs/SemanticModel/properties/custom_extensions` | 厂商扩展有序数组，不解析再序列化原文 | semantic_models.custom_extensions | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；原输入扩展独立保留，本次新增部分可逆撤销 |
 
 ## 无属性 $defs 的值合同
 
 | Ossie 路径 | 语义 | v3 落点（字段/集合） | 原生/扩展/不支持 | A 出现次数 | B 出现次数 | 说明 |
 | --- | --- | --- | --- | ---: | ---: | --- |
-| `ontology#/$defs/Expression` | ANSI SQL expression | rules.expression / ontology_requires[] / mapping_nodes.expression | 原生 | 10 | 351 | 无属性标量；保留原文/遵守固定枚举 |
-| `ontology#/$defs/ConceptType` | A concept is either an entity type or a value type | object_types / value_types 集合归属 | 原生 | 21 | 29 | 无属性标量；保留原文/遵守固定枚举 |
-| `ontology#/$defs/Multiplicity` | Relationship multiplicity | properties.multiplicity / link_types.multiplicity | 原生 | 31 | 85 | 无属性标量；保留原文/遵守固定枚举 |
-| `core#/$defs/Dialect` | Supported SQL and expression language dialects | expression.dialects[].dialect | 原生 | 0 | 398 | 无属性标量；保留原文/遵守固定枚举 |
-| `core#/$defs/Vendor` | Vendor name for custom extensions. Any string value is accepted. | custom_extensions[].vendor_name | 原生 | 0 | 0 | 无属性标量；保留原文/遵守固定枚举 |
-| `core#/$defs/DataType` | Logical data type for fields and metrics, independent of role (e.g. dimension vs fact) and physical representation. `Decimal` is exact base-10 with unspecified precision and scale; `Float` is approximate. `DateTime` has no timezone or offset, while `DateTimeTz` identifies an instant using offset or timezone context but does not guarantee preservation of a named timezone. Omit `datatype` when unknown; use `Opaque` plus `custom_extensions` for a known type outside the portable vocabulary. | dataset_fields.datatype / metrics.datatype | 原生 | 0 | 398 | 无属性标量；保留原文/遵守固定枚举 |
+| `ontology#/$defs/Expression` | ANSI SQL expression | rules.expression / ontology_requires[] / mapping_nodes.expression | 原生 | 4 | 16 | 无属性标量；保留原文/遵守固定枚举 |
+| `ontology#/$defs/ConceptType` | A concept is either an entity type or a value type | object_types / value_types 集合归属 | 原生 | 6 | 13 | 无属性标量；保留原文/遵守固定枚举 |
+| `ontology#/$defs/Multiplicity` | Relationship multiplicity | properties.multiplicity / link_types.multiplicity | 原生 | 0 | 0 | 无属性标量；保留原文/遵守固定枚举 |
+| `core#/$defs/Dialect` | Supported SQL and expression language dialects | expression.dialects[].dialect | 原生 | 0 | 50 | 无属性标量；保留原文/遵守固定枚举 |
+| `core#/$defs/Vendor` | Vendor name for custom extensions. Any string value is accepted. | custom_extensions[].vendor_name | 原生 | 0 | 7 | 无属性标量；保留原文/遵守固定枚举 |
+| `core#/$defs/DataType` | Logical data type for fields and metrics, independent of role (e.g. dimension vs fact) and physical representation. `Decimal` is exact base-10 with unspecified precision and scale; `Float` is approximate. `DateTime` has no timezone or offset, while `DateTimeTz` identifies an instant using offset or timezone context but does not guarantee preservation of a named timezone. Omit `datatype` when unknown; use `Opaque` plus `custom_extensions` for a known type outside the portable vocabulary. | dataset_fields.datatype / metrics.datatype | 原生 | 0 | 49 | 无属性标量；保留原文/遵守固定枚举 |
 
 ## 平台扩展合同
 

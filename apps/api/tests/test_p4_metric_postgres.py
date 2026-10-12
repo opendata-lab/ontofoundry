@@ -31,7 +31,7 @@ def metric_pg(pg_client):
     # other database even when running this fixture with custom test settings.
     assert url.database.startswith("of_t0_")
     settings.connection_key = Fernet.generate_key().decode()
-    source, draft, version_id = publish(client, "REDACTED")
+    source, draft, version_id = publish(client, "library-lending")
     alias = connection_alias(OntologyDraft.model_validate(draft).semantic_models[0])
     secret = (
         Fernet(settings.connection_key.encode())
@@ -56,31 +56,31 @@ def metric_pg(pg_client):
         db.commit()
     engine = create_engine(settings.database_url)
     with engine.begin() as sql:
-        sql.execute(text("CREATE SCHEMA tech"))
+        sql.execute(text("CREATE SCHEMA fiction"))
         sql.execute(
             text(
-                "CREATE TABLE REDACTED (cmp_name TEXT, cn_cmp_name TEXT, REDACTED TEXT, REDACTED TEXT, prop_com_arch_type TEXT, prop_com_importance_type TEXT, REDACTED TEXT, REDACTED TEXT, REDACTED TEXT, zone TEXT, ds DATE)"
+                "CREATE TABLE public.fiction_folios_daily (raw_folio_code TEXT, raw_folio_title TEXT, raw_site_code TEXT, raw_shelf_grade TEXT, raw_genre_tag TEXT, raw_promo_tag TEXT, raw_tier_code TEXT, raw_catalog_bucket TEXT, raw_curator_tag TEXT, raw_aisle_tag TEXT, raw_daystamp DATE)"
             )
         )
         sql.execute(
-            text("""INSERT INTO REDACTED
-            (cmp_name, REDACTED, REDACTED, prop_com_arch_type, prop_com_importance_type, ds) VALUES
-            ('svc-a','PROD','service','microservice',' Core ','2026-10-01'),
-            ('svc-a','PROD','service','microservice',' Core ','2026-10-01'),
-            ('svc-b','PROD','service','microservice','opt','2026-10-01'),
-            ('svc-c','PROD','service','microservice','other','2026-10-01'),
-            ('db','PROD','DB','database','core','2026-10-01'),
-            ('svc-d','TEST','service','microservice','core','2026-10-01'),
-            ('new','PROD','service','microservice','core','2026-10-03')""")
+            text("""INSERT INTO public.fiction_folios_daily
+            (raw_folio_code, raw_site_code, raw_shelf_grade, raw_genre_tag, raw_promo_tag, raw_daystamp) VALUES
+            ('svc-a','PROD','service','fantasy',' spotlight ','2026-10-01'),
+            ('svc-a','PROD','service','fantasy',' spotlight ','2026-10-01'),
+            ('svc-b','PROD','service','fantasy','staff_pick','2026-10-01'),
+            ('svc-c','PROD','service','fantasy','other','2026-10-01'),
+            ('db','PROD','DAMAGED','database','spotlight','2026-10-01'),
+            ('svc-d','TEST','service','fantasy','spotlight','2026-10-01'),
+            ('new','PROD','service','fantasy','spotlight','2026-10-03')""")
         )
         sql.execute(
             text(
-                "CREATE TABLE REDACTED (REDACTED TEXT, cmp_name TEXT, REDACTED TEXT, REDACTED TEXT, interface TEXT, REDACTED BIGINT, REDACTED BIGINT, REDACTED NUMERIC, total_time_avg NUMERIC, total_time_p99 NUMERIC, latest_invoke_time TIMESTAMP, ds DATE)"
+                "CREATE TABLE fiction.fiction_loans_daily (raw_site_code TEXT, raw_folio_code TEXT, raw_curator_tag TEXT, raw_catalog_bucket TEXT, raw_loan_code TEXT, raw_checkout_qty BIGINT, raw_overdue_qty BIGINT, raw_late_pct NUMERIC, raw_minutes_mean NUMERIC, raw_minutes_tail NUMERIC, raw_checkout_clock TIMESTAMP, raw_daystamp DATE)"
             )
         )
         sql.execute(
-            text("""INSERT INTO REDACTED
-            (REDACTED, cmp_name, interface, REDACTED, REDACTED, ds) VALUES
+            text("""INSERT INTO fiction.fiction_loans_daily
+            (raw_site_code, raw_folio_code, raw_loan_code, raw_checkout_qty, raw_overdue_qty, raw_daystamp) VALUES
             ('PROD','svc-a','/a',100,10,'2026-10-01'),
             ('PROD','svc-b','/b',300,30,'2026-10-01'),
             ('TEST','svc-c','/a',0,0,'2026-10-01'),
@@ -96,44 +96,44 @@ def metric_pg(pg_client):
     "name,manual,expected",
     [
         (
-            "REDACTED",
-            "COUNT(DISTINCT CASE WHEN REDACTED <> 'DB' THEN cmp_name END)",
+            "folio_distinct_total",
+            "COUNT(DISTINCT CASE WHEN raw_shelf_grade <> 'DAMAGED' THEN raw_folio_code END)",
             [("PROD", 3), ("TEST", 1)],
         ),
         (
-            "REDACTED",
-            "COUNT(DISTINCT CASE WHEN REDACTED <> 'DB' AND prop_com_arch_type = 'microservice' AND CASE WHEN LOWER(TRIM(prop_com_importance_type)) IN ('core','opt') THEN 'Y' WHEN prop_com_importance_type IS NULL OR TRIM(prop_com_importance_type) = '' OR LOWER(TRIM(prop_com_importance_type)) IN ('base','external') THEN NULL ELSE 'N' END = 'Y' THEN cmp_name END)",
+            "spotlight_folio_total",
+            "COUNT(DISTINCT CASE WHEN raw_shelf_grade <> 'DAMAGED' AND raw_genre_tag = 'fantasy' AND CASE WHEN LOWER(TRIM(raw_promo_tag)) IN ('spotlight','staff_pick') THEN 'Y' WHEN raw_promo_tag IS NULL OR TRIM(raw_promo_tag) = '' OR LOWER(TRIM(raw_promo_tag)) IN ('plain','archived') THEN NULL ELSE 'N' END = 'Y' THEN raw_folio_code END)",
             [("PROD", 2), ("TEST", 1)],
         ),
         (
-            "REDACTED",
-            "SUM(REDACTED)::double precision / NULLIF(SUM(REDACTED),0)",
+            "loan_late_fraction",
+            "SUM(raw_overdue_qty)::double precision / NULLIF(SUM(raw_checkout_qty),0)",
             [("PROD", 0.1), ("TEST", None)],
         ),
     ],
 )
-def test_real_b_metrics_equal_handwritten_sql_and_roundtrip(
+def test_synthetic_b_metrics_equal_handwritten_sql_and_roundtrip(
     metric_pg, name, manual, expected
 ):
     client, engine, _, original, draft, version_id = metric_pg
     metric = next(m for m in draft["metrics"] if m["name"] == name)
     result = call(
-        client, "query_metric", metric_id=metric["id"], group_by=["REDACTED"], filters=DATE
+        client, "query_metric", metric_id=metric["id"], group_by=["library_site"], filters=DATE
     )
     assert result["executable"] and not result["warnings"] and not result["truncated"]
     table = (
-        "REDACTED"
-        if name == "REDACTED"
-        else "REDACTED"
+        "fiction.fiction_loans_daily"
+        if name == "loan_late_fraction"
+        else "public.fiction_folios_daily"
     )
     with engine.connect() as sql:
         manual_rows = sql.execute(
             text(
-                f"SELECT REDACTED, {manual} FROM {table} WHERE ds = :date GROUP BY REDACTED ORDER BY REDACTED"
+                f"SELECT raw_site_code, {manual} FROM {table} WHERE raw_daystamp = :date GROUP BY raw_site_code ORDER BY raw_site_code"
             ),
             {"date": "2026-10-01"},
         ).all()
-    actual = [(r["REDACTED"], r[name]) for r in result["rows"]]
+    actual = [(r["library_site"], r[name]) for r in result["rows"]]
     assert actual == list(manual_rows) == expected
     listed = next(
         m for m in call(client, "list_metrics")["items"] if m["id"] == metric["id"]
@@ -155,25 +155,25 @@ def test_real_b_metrics_equal_handwritten_sql_and_roundtrip(
 
 def test_snapshot_as_of_latest_global_and_bound_values_and_limit(metric_pg):
     client, _, _, _, draft, _ = metric_pg
-    metric = next(m for m in draft["metrics"] if m["name"] == "REDACTED")
-    args = dict(metric_id=metric["id"], group_by=["REDACTED"])
+    metric = next(m for m in draft["metrics"] if m["name"] == "folio_distinct_total")
+    args = dict(metric_id=metric["id"], group_by=["library_site"])
     old = call(client, "query_metric", **args, as_of="2026-10-02")
     assert old["rows"] == [
-        {"REDACTED": "PROD", "REDACTED": 3},
-        {"REDACTED": "TEST", "REDACTED": 1},
+        {"library_site": "PROD", "folio_distinct_total": 3},
+        {"library_site": "TEST", "folio_distinct_total": 1},
     ]
     latest = call(client, "query_metric", **args, as_of="2026-10-03")
-    assert latest["rows"] == [{"REDACTED": "PROD", "REDACTED": 1}]
+    assert latest["rows"] == [{"library_site": "PROD", "folio_distinct_total": 1}]
     early = call(client, "query_metric", **args, as_of="2026-09-30")
     assert early["rows"] == []
     limited = call(client, "query_metric", **args, filters=DATE, limit=1)
     assert len(limited["rows"]) == 1 and limited["truncated"] and limited["warnings"]
-    malicious = "PROD'; DELETE FROM REDACTED;--"
+    malicious = "PROD'; DELETE FROM public.fiction_folios_daily;--"
     empty = call(
         client,
         "query_metric",
         **args,
-        filters=[*DATE, {"field": "REDACTED", "op": "=", "value": malicious}],
+        filters=[*DATE, {"field": "library_site", "op": "=", "value": malicious}],
     )
     assert empty["rows"] == [] and malicious not in empty["sql"]
 
@@ -185,14 +185,14 @@ def test_actual_statement_timeout_and_readonly_transaction(metric_pg):
         assert sql.exec_driver_sql("SHOW transaction_read_only").scalar() == "on"
         assert sql.exec_driver_sql("SHOW statement_timeout").scalar() == "1s"
         with pytest.raises(SQLAlchemyError):
-            sql.exec_driver_sql("DELETE FROM REDACTED")
+            sql.exec_driver_sql("DELETE FROM public.fiction_folios_daily")
     with engine.begin() as sql:
         sql.execute(
             text(
-                "CREATE VIEW public.p4_slow_snapshot AS SELECT 'service'::text AS REDACTED, 'slow'::text AS cmp_name, 'PROD'::text AS REDACTED, DATE '2026-10-01' AS ds FROM pg_sleep(2)"
+                "CREATE VIEW public.p4_slow_snapshot AS SELECT 'service'::text AS raw_shelf_grade, 'slow'::text AS raw_folio_code, 'PROD'::text AS raw_site_code, DATE '2026-10-01' AS raw_daystamp FROM pg_sleep(2)"
             )
         )
-    dataset = next(d for d in draft["datasets"] if d["name"] == "REDACTED")
+    dataset = next(d for d in draft["datasets"] if d["name"] == "fable_inventory_snapshot")
     dataset["source"] = "public.p4_slow_snapshot"
     with client.app.state.session_factory() as db:
         publish_draft(
@@ -203,7 +203,7 @@ def test_actual_statement_timeout_and_readonly_transaction(metric_pg):
             message="timeout fixture",
         )
     settings.metric_query_timeout_seconds = 1
-    metric = next(m for m in draft["metrics"] if m["name"] == "REDACTED")
+    metric = next(m for m in draft["metrics"] if m["name"] == "folio_distinct_total")
     response = mcp_request(
         client,
         "tools/call",
@@ -216,7 +216,7 @@ def test_actual_statement_timeout_and_readonly_transaction(metric_pg):
     with engine.connect() as sql:
         assert (
             sql.execute(
-                text("SELECT count(*) FROM REDACTED")
+                text("SELECT count(*) FROM public.fiction_folios_daily")
             ).scalar()
             == 7
         )
@@ -224,9 +224,9 @@ def test_actual_statement_timeout_and_readonly_transaction(metric_pg):
 
 def test_native_percent_and_colon_literals_execute_without_bind_confusion(metric_pg):
     client, _, _, _, draft, _ = metric_pg
-    metric = next(m for m in draft["metrics"] if m["name"] == "REDACTED")
+    metric = next(m for m in draft["metrics"] if m["name"] == "folio_distinct_total")
     metric["expression"]["dialects"][0]["expression"] = (
-        "COUNT(DISTINCT CASE WHEN REDACTED.REDACTED <> 'DB' THEN ':p0%s' END)"
+        "COUNT(DISTINCT CASE WHEN fable_inventory_snapshot.shelf_grade <> 'DAMAGED' THEN ':p0%s' END)"
     )
     with client.app.state.session_factory() as db:
         publish_draft(
@@ -237,16 +237,16 @@ def test_native_percent_and_colon_literals_execute_without_bind_confusion(metric
             message="literal bind fixture",
         )
     result = call(client, "query_metric", metric_id=metric["id"], filters=DATE)
-    assert result["rows"] == [{"REDACTED": 1}], result
+    assert result["rows"] == [{"folio_distinct_total": 1}], result
 
 
 def test_explicit_event_parameters_are_extensions_and_roundtrip(metric_pg):
     client, _, _, _, draft, _ = metric_pg
-    metric = next(m for m in draft["metrics"] if m["name"] == "REDACTED")
+    metric = next(m for m in draft["metrics"] if m["name"] == "loan_late_fraction")
     metric["custom_extensions"] = [
         {
             "vendor_name": "ONTOFOUNDRY",
-            "data": json.dumps({"time_semantics": "event", "time_field": "snapshot_date"}),
+            "data": json.dumps({"time_semantics": "event", "time_field": "inventory_day"}),
         }
     ]
     metric["native_presence"].append("custom_extensions")
@@ -262,16 +262,16 @@ def test_explicit_event_parameters_are_extensions_and_roundtrip(metric_pg):
         client,
         "query_metric",
         metric_id=metric["id"],
-        group_by=["REDACTED"],
+        group_by=["library_site"],
         filters=[
             {
-                "field": "snapshot_date",
+                "field": "inventory_day",
                 "op": "between",
                 "value": ["2026-10-01", "2026-10-03"],
             }
         ],
     )
-    assert result["rows"][0]["REDACTED"] == pytest.approx(540 / 1400)
+    assert result["rows"][0]["loan_late_fraction"] == pytest.approx(540 / 1400)
     from ontofoundry_api.ossie.importer import import_ossie
 
     restored, _ = import_ossie(

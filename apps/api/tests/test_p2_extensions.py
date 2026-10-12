@@ -16,7 +16,7 @@ from ontofoundry_api.ossie.extensions import (
 from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.ossie.validator import validate_schema
 
-FIXTURES = Path(__file__).parent / 'fixtures' / 'REDACTED_PRIVATE_PATH'
+FIXTURES = Path(__file__).parent / 'fixtures' / 'ossie_synthetic'
 
 
 def export(payload):
@@ -31,8 +31,8 @@ def identities(payload):
     return result
 
 
-@pytest.mark.parametrize('stem', ['REDACTED', 'REDACTED'])
-def test_real_registry_cross_workspace_reimport_and_zero_native_differences(stem):
+@pytest.mark.parametrize('stem', ['storybook-lending', 'library-lending'])
+def test_synthetic_registry_cross_workspace_reimport_and_zero_native_differences(stem):
     source = json.loads((FIXTURES / f'{stem}.ossie.json').read_text(encoding='utf-8'))
     first, _ = import_ossie(source, workspace_id=uuid4(), mode='replace')
     emitted = export(first)

@@ -26,13 +26,13 @@ from ontofoundry_api.services.instance_query import mapping_for
 mapped_session = sql_session
 
 
-def imported(stem="REDACTED"):
+def imported(stem="library-lending"):
     original = json.loads((FIXTURES / (stem + ".ossie.json")).read_text())
     raw, _ = import_ossie(original, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     return original, OntologyDraft.model_validate(raw)
 
 
-@pytest.mark.parametrize("stem", ["REDACTED", "REDACTED"])
+@pytest.mark.parametrize("stem", ["storybook-lending", "library-lending"])
 def test_views_never_mutate_native_or_export(stem):
     original, draft = imported(stem)
     before = draft.model_dump(mode="json")
@@ -54,33 +54,29 @@ def test_b_coverage_and_unused_computed_fields():
     views = SemanticViews(draft)
     queryable = {c.concept for c in draft.object_types if views.analyze(c.id).mapping}
     assert queryable == {
-        "system",
-        "REDACTED",
-        "environment",
-        "zone",
-        "REDACTED",
-        "host",
-        "REDACTED",
-        "REDACTED",
-        "REDACTED",
-        "REDACTED",
+        "fable_catalog",
+        "fable_curator",
+        "fable_reading_room",
+        "fable_aisle",
+        "fable_loan_policy",
+        "fable_shelf",
     }
     reasons = [views.analyze(c.id).reason for c in draft.object_types]
     assert reasons.count("multiple_roots") == 2
-    assert reasons.count("referent_mapping") == 9
+    assert reasons.count("referent_mapping") == 1
     assert (
         sum(
             not views.analyze(c.id).mapping and not views.analyze(c.id).reason
             for c in draft.object_types
         )
-        == 8
+        == 3
     )
-    REDACTED = next(c for c in draft.object_types if c.concept == "REDACTED")
-    # REDACTED is a CASE expression in the same dataset, unrelated to this query.
-    assert mapping_view(draft, REDACTED.id).key_column == "REDACTED"
-    component = next(c for c in draft.object_types if c.concept == "component")
+    fable_curator = next(c for c in draft.object_types if c.concept == "fable_curator")
+    # spotlight_mark is a CASE expression in the same dataset, unrelated to this query.
+    assert mapping_view(draft, fable_curator.id).key_column == "raw_curator_tag"
+    fable_volume = next(c for c in draft.object_types if c.concept == "fable_volume")
     with pytest.raises(Exception) as error:
-        mapping_for(draft, component.id)
+        mapping_for(draft, fable_volume.id)
     assert error.value.detail == {
         "code": "COMPLEX_MAPPING_READ_ONLY",
         "message": "复杂映射暂不支持实例查询",
@@ -94,7 +90,7 @@ def test_b_coverage_and_unused_computed_fields():
                 *form["mappings"],
                 dict(
                     id=str(uuid4()),
-                    type_id=str(component.id),
+                    type_id=str(fable_volume.id),
                     connection_alias="new",
                     table_name="t",
                     key_column="id",

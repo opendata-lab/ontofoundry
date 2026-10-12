@@ -17,7 +17,7 @@ from ontofoundry_api.ossie.importer import import_ossie
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 
-@pytest.mark.parametrize('stem', ['REDACTED', 'REDACTED'])
+@pytest.mark.parametrize('stem', ['storybook-lending', 'library-lending'])
 def test_unchanged_form_never_rewrites_native_semantic_nodes(client, stem):
     original = json.loads((FIXTURES / f'{stem}.ossie.json').read_text())
     draft, _ = import_ossie(original, workspace_id=DEMO_WORKSPACE_ID, mode='replace')
@@ -35,9 +35,9 @@ def test_unchanged_form_never_rewrites_native_semantic_nodes(client, stem):
 
 
 def test_platform_mapping_identity_survives_export_reimport_and_retains_unrelated_native_nodes():
-    document = json.loads((FIXTURES / 'REDACTED').read_text())
+    document = json.loads((FIXTURES / 'library-lending.ossie.json').read_text())
     draft, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode='replace')
-    target = next(t for t in draft['object_types'] if t['concept'] == 'REDACTED')
+    target = next(t for t in draft['object_types'] if t['concept'] == 'fable_reference_volume')
     # B's complex source nodes are retained even when a new simple table path is added.
     old_models = deepcopy(draft['semantic_models'])
     old_nodes = deepcopy(draft['mapping_nodes'])

@@ -14,7 +14,7 @@
 | 数据 | MySQL `demo_analytics`：8 个客户、6 个商品、780 张订单、1,574 条明细；只读账号 `of_readonly` |
 | 起点 | v1 = 文档建模结果（4 个对象及属性、3 条关系、规则），**尚无映射**；两个备用会话提案待处理 |
 | 现场演示 | [演示手册](演示手册.md)，约 20 分钟 |
-| 场景二 | [导入真实手工 Ossie 模型](REDACTED_PRIVATE_PATH演示手册.md)，单独演示 |
+| 本地验证 | 手工 Ossie 模型与说明保存在仓库外，通过 `ONTOFOUNDRY_PRIVATE_DIR` 指定验证目录 |
 
 ## 环境与地址
 
@@ -35,10 +35,12 @@ python3 prepare_demo.py publish   # 接受全部提案，发布 v1
 python3 prepare_demo.py connect   # 只读数据连接「销售业务库」
 python3 prepare_demo.py standby   # 两个备用会话：售后退货（自上而下）、销售业务库映射（自下而上），提案待处理
 python3 prepare_demo.py token     # 问数令牌，生成 generated/mcp-config.json（不入库）
-python3 prepare_demo.py ossie     # 场景二的两个空空间
+ONTOFOUNDRY_PRIVATE_DIR=/path/to/local-validation python3 prepare_demo.py ossie  # 可选的本地验证场景
 python3 dataagent_agent.py        # 导入 MCP、创建/更新问数助手；需在 v2/v3 发布后跑，五个问题全对才发布
 ./reset_demo.sh snapshot          # 保存演示起点
 ```
+
+可选的本地验证场景读取私有目录中的 `demo/scenarios.json`；未设置 `ONTOFOUNDRY_PRIVATE_DIR` 或缺少配置时会跳过。模型、说明与业务素材均不随源码提交。
 
 重建前清掉旧空间：`cd apps/api && uv run --python 3.13 python ../../docs/demo/coffee-channel-sales/scripts/purge_workspace.py coffee-channel-sales`。
 兜底：自下而上现场和备用都失败时，`prepare_demo.py data` 用脚本直接配置映射（依赖建模结果的属性技术名，用前核对）。

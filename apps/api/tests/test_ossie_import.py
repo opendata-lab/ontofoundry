@@ -931,21 +931,21 @@ def named_value_roles_document():
         "description": "治理",
         "ontology": [
             {
-                "concept": "REDACTED",
+                "concept": "fiction_ticket",
                 "type": "EntityType",
-                "identify_by": ["REDACTED"],
+                "identify_by": ["ticket_token"],
                 "relationships": [
                     {
-                        "name": "REDACTED",
+                        "name": "ticket_token",
                         "roles": [{"concept": "String", "name": "key_role"}],
                         "multiplicity": "ManyToOne",
-                        "verbalizes": ["{REDACTED} 的编号是 {String:key_role}"],
+                        "verbalizes": ["{fiction_ticket} 的编号是 {String:key_role}"],
                     },
                     {
-                        "name": "REDACTED",
+                        "name": "ticket_options",
                         "roles": [{"concept": "String", "name": "args_role"}],
                         "multiplicity": "ManyToOne",
-                        "verbalizes": ["{REDACTED} 的参数是 {String:args_role}"],
+                        "verbalizes": ["{fiction_ticket} 的参数是 {String:args_role}"],
                     },
                 ],
             }
@@ -960,10 +960,10 @@ def test_named_value_roles_and_stated_multiplicity_survive_round_trip():
     by_name = {item.technical_name: item for item in attrs(model, model.object_types[0])}
 
     assert report["skipped"] == []
-    assert by_name["REDACTED"].value_concept == "String"
-    assert by_name["REDACTED"].multiplicity == Multiplicity.MANY_TO_ONE
-    assert by_name["REDACTED"].target_role_name == "key_role"
-    assert by_name["REDACTED"].target_role_name == "args_role"
+    assert by_name["ticket_token"].value_concept == "String"
+    assert by_name["ticket_token"].multiplicity == Multiplicity.MANY_TO_ONE
+    assert by_name["ticket_token"].target_role_name == "key_role"
+    assert by_name["ticket_options"].target_role_name == "args_role"
     assert all(item.description == "" for item in by_name.values())
 
     rewritten = compile_ossie(
@@ -979,7 +979,7 @@ def test_named_value_roles_and_stated_multiplicity_survive_round_trip():
     assert "description" not in rewritten["ontology"][0]
 
     # Removing an imported reading regenerates one with the named placeholder.
-    by_name["REDACTED"].verbalizes = []
+    by_name["ticket_options"].verbalizes = []
     generated = compile_ossie(
         model, ontology_name="governance", ontology_description="治理"
     )
@@ -987,7 +987,7 @@ def test_named_value_roles_and_stated_multiplicity_survive_round_trip():
     args = next(
         item
         for item in generated["ontology"][0]["relationships"]
-        if item["name"] == "REDACTED"
+        if item["name"] == "ticket_options"
     )
     assert "{String:args_role}" in args["verbalizes"][0]
 
@@ -1008,12 +1008,12 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
 
     snapshot = client.get(ROOT + "/published-snapshot").json()
     issue = next(
-        item for item in snapshot["object_types"] if item["technical_name"] == "REDACTED"
+        item for item in snapshot["object_types"] if item["technical_name"] == "fiction_ticket"
     )
     key = next(
         item
         for item in snapshot["properties"]
-        if item["owner_ref"]["ref"] == issue["id"] and item["technical_name"] == "REDACTED"
+        if item["owner_ref"]["ref"] == issue["id"] and item["technical_name"] == "ticket_token"
     )
     assert key["roles"][0]["name"] == "key_role"
     assert key["multiplicity"] == "ManyToOne"
@@ -1023,10 +1023,10 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
     )
     assert exported.status_code == 200
     component = next(
-        item for item in exported.json()["ontology"] if item["concept"] == "REDACTED"
+        item for item in exported.json()["ontology"] if item["concept"] == "fiction_ticket"
     )
     key_relationship = next(
-        item for item in component["relationships"] if item["name"] == "REDACTED"
+        item for item in component["relationships"] if item["name"] == "ticket_token"
     )
     assert key_relationship["roles"] == [{"concept": "String", "name": "key_role"}]
     assert key_relationship["multiplicity"] == "ManyToOne"
@@ -1034,8 +1034,8 @@ def test_imported_role_and_multiplicity_survive_publish_and_export(client):
 
 def test_description_is_not_invented_or_removed_when_it_equals_a_name():
     document = named_value_roles_document()
-    document["ontology"][0]["description"] = "REDACTED"
-    document["ontology"][0]["relationships"][1]["description"] = "REDACTED"
+    document["ontology"][0]["description"] = "fiction_ticket"
+    document["ontology"][0]["relationships"][1]["description"] = "ticket_options"
     payload, _ = import_ossie(document, workspace_id=DEMO_WORKSPACE_ID, mode="replace")
     rewritten = compile_ossie(
         OntologyDraft.model_validate(payload),
@@ -1044,11 +1044,11 @@ def test_description_is_not_invented_or_removed_when_it_equals_a_name():
     )
 
     component = rewritten["ontology"][0]
-    assert component["description"] == "REDACTED"
-    args = next(item for item in component["relationships"] if item["name"] == "REDACTED")
-    assert args["description"] == "REDACTED"
+    assert component["description"] == "fiction_ticket"
+    args = next(item for item in component["relationships"] if item["name"] == "ticket_options")
+    assert args["description"] == "ticket_options"
     assert "description" not in next(
-        item for item in component["relationships"] if item["name"] == "REDACTED"
+        item for item in component["relationships"] if item["name"] == "ticket_token"
     )
 
 
@@ -1064,7 +1064,7 @@ def test_editor_created_attribute_still_infers_identifier_multiplicity():
     key = next(
         item
         for item in rewritten["ontology"][0]["relationships"]
-        if item["name"] == "REDACTED"
+        if item["name"] == "ticket_token"
     )
     assert key["multiplicity"] == "OneToOne"
 
