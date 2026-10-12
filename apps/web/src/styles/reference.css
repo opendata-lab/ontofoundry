@@ -2391,29 +2391,47 @@ small,
   justify-content: center;
   margin-top: 12px;
 }
-.table-material-picker select {
-  width: 100%;
-}
-.table-choice-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 168px;
-  overflow: auto;
-}
-.table-choice-list label {
+.table-material-trigger { display: flex; align-items: center; }
+.table-material-dialog { width: min(720px, calc(100vw - 48px)); padding: 20px 22px; font-size: 13px; }
+.table-material-dialog > header { margin-bottom: 14px; }
+.table-material-toolbar { display: flex; gap: 8px; }
+.table-material-toolbar select { flex: 0 0 200px; }
+.table-material-search {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  color: var(--color-muted);
+}
+.table-material-dialog .table-material-search input { flex: 1; min-width: 0; border: 0; box-shadow: none; outline: none; padding: 6px 0; background: transparent; }
+.table-material-search:focus-within { border-color: var(--color-accent); }
+.table-material-summary { display: flex; align-items: center; gap: 4px; margin: 10px 0 6px; }
+.table-material-summary .muted { margin-right: auto; }
+.table-choice-list {
+  display: flex;
+  flex-direction: column;
+  height: min(46vh, 420px);
+  overflow: auto;
+  border: 1px solid var(--color-rule);
+  border-radius: 8px;
+  padding: 4px;
+}
+.table-choice-list > .muted { padding: 10px; }
+.table-choice-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
 }
-.table-material-picker > .button {
-  align-self: flex-start;
-}
-.table-material-picker > .muted {
-  font-size: 11px;
-  line-height: 1.5;
-}
+.table-choice-list label:hover { background: var(--color-surface-soft); }
+.table-choice-list label > svg { flex: none; color: var(--color-muted); }
+.table-choice-name { font-family: var(--font-mono, ui-monospace, monospace); overflow-wrap: anywhere; }
+.table-choice-list small { margin-left: auto; white-space: nowrap; font-size: 11px; }
 
 /* Native multi-role relationships use a compact incidence node. */
 .ontology-node--hyperedge { width: 70px; min-width: 70px; height: 62px; padding: 3px; display: flex; flex-direction: column; gap: 3px; border: 0; background: transparent; box-shadow: none; text-align: center; }
