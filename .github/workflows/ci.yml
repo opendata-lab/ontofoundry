@@ -18,34 +18,19 @@ concurrency:
 
 jobs:
   python:
-    name: Python (${{ matrix.postgres && 'with PostgreSQL' || 'no database' }})
+    name: Python
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # 两种都跑：集成测试在缺少 DATAAGENT_TEST_POSTGRES_URL 时会整体 skip，
-        # 只跑带库的那次就看不出「没有库时是否仍然全绿」，只跑不带库的那次则
-        # 等于从不验证真实 SQL 方言与事务边界。
-        postgres: [true, false]
     services:
-      # 合并之后 create_app() 会启动 DataAgent 的任务协调器，它需要 Redis。
-      # 这是真实的运行依赖，不是测试脚手架：没有 Redis，提交的任务永远不会被
-      # 取走执行。CI 第一次运行就是靠这一点暴露出来的——本地机器上恰好有一个
-      # Redis 在跑，20 个 OntoFoundry 测试因此从未失败过。
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      # A disposable server for the PostgreSQL integration tests: each one
+      # creates and drops its own database, so the user needs CREATE DATABASE.
+      # Without ONTOFOUNDRY_TEST_POSTGRES_URL those tests skip silently, which
+      # is how CI ran them under a stale variable name for weeks.
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-          POSTGRES_DB: dataagent_ci
+          POSTGRES_DB: ontofoundry_ci
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready
@@ -63,8 +48,9 @@ jobs:
       - name: Run tests
         working-directory: apps/api
         env:
-          DATAAGENT_TEST_POSTGRES_URL: ${{ matrix.postgres && 'postgresql://test:test@127.0.0.1:5432/dataagent_ci' || '' }}
-        run: uv run --python 3.13 pytest -q
+          ONTOFOUNDRY_TEST_POSTGRES_URL: postgresql+psycopg://test:test@127.0.0.1:5432/ontofoundry_ci
+        # -rs lists every skip, so a PostgreSQL test that stops running shows up.
+        run: uv run --python 3.13 pytest -q -rs
 
   node:
     name: Node (runtime + web)
