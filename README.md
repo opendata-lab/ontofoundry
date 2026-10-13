@@ -160,11 +160,18 @@ ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432
 ./scripts/create-offline-package.sh
 ```
 
-默认输出到 `dist/offline/`。也可直接下载 [latest 离线安装包](https://github.com/opendata-lab/ontofoundry/releases/tag/latest)，包含安装文件和 SHA-256 校验和。
+默认输出到 `dist/offline/`。也可下载 [latest 安装包](https://github.com/opendata-lab/ontofoundry/releases/tag/latest)，或从 [Releases](https://github.com/opendata-lab/ontofoundry/releases) 选择固定版本。`latest` 是 main 的最新构建。
 
-GitHub Actions 在 main 更新、版本标签和手动运行时生成安装包。main 的测试和构建通过后，更新 `latest` Release 及 `of-backend:latest`、`of-frontend:latest` 镜像标签；`latest` 随 main 更新，需要固定版本时使用 `v*` Release 或镜像版本/SHA 标签。
+下载安装包及对应的 `.sha256` 文件后，先校验，再解压安装：
 
-新包上传成功后清理旧的同名 Actions artifact，仅保留最新一份。正式版本的包及校验和附到对应 GitHub Release，Release 附件不随 artifact 轮换删除。
+```sh
+shasum -a 256 -c ontofoundry-offline-latest.tar.gz.sha256
+tar -xzf ontofoundry-offline-latest.tar.gz
+cd offline
+cp .env.example .env
+# 填写 .env 中的连接加密密钥后执行。
+./install.sh
+```
 
 ## 仓库结构
 
