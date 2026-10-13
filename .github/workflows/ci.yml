@@ -140,11 +140,18 @@ jobs:
 
   offline-package:
     name: Offline package
+    # main、版本标签和手动运行照常打包；PR 只验证代码和镜像。
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    # 不同分支/标签的安装包串行更新，避免互相删除刚上传的产物。
+    concurrency:
+      group: offline-package
+      cancel-in-progress: false
     # 默认的 GITHUB_TOKEN 是只读的，创建 release 会 403。只有这个 job 需要写，
     # 所以在 job 级别声明而不是放到 workflow 顶层。
     permissions:
       contents: write
+      actions: write
     # 依赖镜像 job：包里装的就是它们，镜像构建不过就没有打包的意义。
     needs: images
     steps:
@@ -178,11 +185,46 @@ jobs:
       - name: Compress
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/ontofoundry-offline.tar.gz" offline
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload the package
+        id: offline-upload
+        uses: actions/upload-artifact@v4
         with:
           name: ontofoundry-offline
           path: ${{ runner.temp }}/ontofoundry-offline.tar.gz
           retention-days: 14
+          if-no-files-found: error
+
+      # 上传成功后才轮换；构建或上传失败时，旧包仍可下载。
+      - name: Remove previous offline packages
+        uses: actions/github-script@v7
+        env:
+          KEEP_ARTIFACT_ID: ${{ steps.offline-upload.outputs.artifact-id }}
+        with:
+          script: |
+            const keepId = Number(process.env.KEEP_ARTIFACT_ID);
+            if (!Number.isSafeInteger(keepId) || keepId <= 0) {
+              throw new Error('Missing uploaded artifact ID; refusing cleanup');
+            }
+            const repo = context.repo;
+            const { data: current } = await github.rest.actions.getArtifact({
+              ...repo, artifact_id: keepId,
+            });
+            if (current.name !== 'ontofoundry-offline' || current.expired) {
+              throw new Error('Uploaded package unavailable; refusing cleanup');
+            }
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { ...repo, per_page: 100 },
+            );
+            for (const artifact of artifacts) {
+              if (artifact.name !== current.name || artifact.id === keepId) continue;
+              try {
+                await github.rest.actions.deleteArtifact({ ...repo, artifact_id: artifact.id });
+                core.info(`Deleted previous package ${artifact.id}`);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
 
       - name: Publish the release
         if: startsWith(github.ref, 'refs/tags/v')
