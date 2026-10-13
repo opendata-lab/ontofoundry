@@ -188,4 +188,6 @@ ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432
 
 ## 许可证
 
-仓库根目录目前尚未提供项目级 `LICENSE`。Apache Ossie 及 `md2ossie` 等第三方内容保留各自的 `LICENSE`、`NOTICE` 和来源说明，具体见各目录。
+OntoFoundry 采用 [Apache License 2.0](LICENSE)。允许商业使用、修改和分发，具体授权与义务以许可证正文为准。
+
+第三方依赖和内置资源保留各自的许可证。Apache Ossie 及 `md2ossie` 的 `LICENSE`、`NOTICE` 和来源说明位于各自目录。
