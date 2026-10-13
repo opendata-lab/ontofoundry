@@ -3,6 +3,7 @@ import type { NativeDraft } from "../api/types";
 import fixture from "./nativeDraft.fixture.json";
 import { fromView, toView, viewFromTypes } from "./draftView";
 import { editorDraft, nativeFromEditor } from "./nativeDraft";
+import { newId } from "./id";
 
 export const nativeFixture = () => structuredClone(fixture) as NativeDraft;
 
@@ -61,7 +62,7 @@ describe("v3 editor adapter", () => {
       const targetName = named ? "recipient" : undefined;
       edited.link_types.push({
         ...edited.link_types[0],
-        id: crypto.randomUUID(),
+        id: newId(),
         name: "客户发起",
         technical_name: "initiated_by",
         source_type_id: original.object_types[0].id,
@@ -234,7 +235,7 @@ it("keeps value concept owners for newly edited properties", () => {
     edited = editorDraft(original);
   edited.properties.push({
     ...edited.properties[0],
-    id: crypto.randomUUID(),
+    id: newId(),
     owner_type_id: original.value_types[0].id,
     technical_name: "unit",
     name: "unit",

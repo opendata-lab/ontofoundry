@@ -1,3 +1,4 @@
+import { newId } from "./id";
 export type PageTab = {
   id: string;
   href: string;
@@ -99,7 +100,7 @@ export function openTab(
       : undefined;
   const tab = found ??
     promoted ?? {
-      id: crypto.randomUUID(),
+      id: newId(),
       href,
       title: tabTitle(href),
       visited: true,

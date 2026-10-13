@@ -9,6 +9,7 @@ import type {
   OntologyType,
   RuleElement,
 } from "../api/types";
+import { newId } from "./id";
 
 /**
  * The one place that knows how a stored v2 Draft maps onto the view the UI
@@ -140,7 +141,7 @@ export function fromView(original: Draft, view: DraftView): Draft {
           rules.push({ ...edited, expression });
           return;
         }
-        const id = crypto.randomUUID();
+        const id = newId();
         rules.push({
           id,
           name: `${label}·${kind === "constraint" ? "约束" : "派生"}${index + 1}`,

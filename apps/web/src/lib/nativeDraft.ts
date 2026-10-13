@@ -15,6 +15,7 @@ import type {
   JoinView,
   RoleJoin,
 } from "../api/types";
+import { newId } from "./id";
 
 const same = (a: unknown, b: unknown) =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -269,7 +270,7 @@ export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
           },
           roles: [
             {
-              id: crypto.randomUUID(),
+              id: newId(),
               concept: {
                 kind: "builtin",
                 ref: bases[p.value_kind] ?? "String",
@@ -318,7 +319,7 @@ export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
       );
       if (!concept && !Object.values(bases).includes(p.value_concept)) {
         concept = {
-          id: crypto.randomUUID(),
+          id: newId(),
           name: p.value_concept,
           technical_name: p.value_concept,
           concept: p.value_concept,
@@ -376,7 +377,7 @@ export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
           },
           roles: [
             {
-              id: crypto.randomUUID(),
+              id: newId(),
               concept: {
                 kind: "object_type",
                 ref: reverse ? l.source_type_id : l.target_type_id,
@@ -682,13 +683,13 @@ export function nativeFromView(
         const kept = index >= 0 ? unused.splice(index, 1)[0] : undefined;
         edited.rules.push(
           kept ?? {
-            id: crypto.randomUUID(),
+            id: newId(),
             owner_id: owner.id,
             owner_kind: ownerKind,
             rule_kind: kind,
             expression,
             name: owner.name,
-            technical_name: `rule_${crypto.randomUUID().replaceAll("-", "")}`,
+            technical_name: `rule_${newId().replaceAll("-", "")}`,
             description: "",
             verbalizes: [],
             evidence: [],

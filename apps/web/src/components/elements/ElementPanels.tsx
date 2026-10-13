@@ -34,6 +34,7 @@ import {
   type ElementType,
   type PanelProps,
 } from "../../lib/elementModel";
+import { newId } from "../../lib/id";
 
 export function EvidenceSection({
   workspaceId,
@@ -290,7 +291,7 @@ export function PropertiesPanel(props: PanelProps) {
                   properties: [
                     ...draft.properties,
                     {
-                      id: crypto.randomUUID(),
+                      id: newId(),
                       owner_type_id: type.id,
                       name: "",
                       technical_name: "",
@@ -1025,7 +1026,7 @@ export function RulesPanel({ draft, type, editing, change }: PanelProps) {
             className="element-text-button"
             type="button"
             onClick={() => {
-              const id = crypto.randomUUID();
+              const id = newId();
               change({
                 ...draft,
                 rules: [

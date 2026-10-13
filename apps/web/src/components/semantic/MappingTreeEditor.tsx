@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import type { ConceptRef, MappingNode, SemanticConcept } from "../../api/types";
 import { ConceptTag } from "../ConceptTag";
 import { HintIcon } from "../HintIcon";
+import { newId } from "../../lib/id";
 
 export function MappingTreeEditor({
   nodes,
@@ -26,7 +27,7 @@ export function MappingTreeEditor({
     onChange([
       ...nodes,
       {
-        id: crypto.randomUUID(),
+        id: newId(),
         parent_id: parent?.id ?? null,
         slot,
         kind,

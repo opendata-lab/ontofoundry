@@ -39,6 +39,7 @@ import {
 } from "./semantic/SemanticObjectForm";
 import "../styles/semantic.css";
 import { contextSynonyms, semanticLabel } from "../lib/semanticEditing";
+import { newId } from "../lib/id";
 
 function Expression({ value }: { value: SemanticExpression }) {
   const [selected, setSelected] = useState(0);
@@ -260,7 +261,7 @@ export function SemanticCatalogView({
     parent_id = model.id,
   ): SemanticFormTarget => ({
     kind,
-    id: item?.id ?? crypto.randomUUID(),
+    id: item?.id ?? newId(),
     parent_id: kind === "semantic_model" ? undefined : parent_id,
     operation: item ? "update" : "create",
     original: item
@@ -300,7 +301,7 @@ export function SemanticCatalogView({
         changes.push({
           kind: "dataset",
           operation: "create",
-          id: crypto.randomUUID(),
+          id: newId(),
           parent_id: change.id,
           values: firstDataset,
         });

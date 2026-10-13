@@ -8,6 +8,7 @@ import type {
   ObjectDefinition,
 } from "../api/types";
 import { DatasetPicker } from "./DatasetPicker";
+import { newId } from "../lib/id";
 
 export function MappingForm({
   workspaceId,
@@ -114,7 +115,7 @@ export function MappingForm({
             className="button button--secondary"
             onClick={() => {
               onChange({
-                id: mapping?.id ?? crypto.randomUUID(),
+                id: mapping?.id ?? newId(),
                 type_id: type.id,
                 ...suggestedSource,
                 key_column: "",
@@ -307,7 +308,7 @@ export function MappingForm({
         onClose={() => setPicker(false)}
         onSelect={(c, t) =>
           onChange({
-            id: mapping?.id ?? crypto.randomUUID(),
+            id: mapping?.id ?? newId(),
             type_id: type.id,
             connection_alias: c.name,
             table_name: t.name,

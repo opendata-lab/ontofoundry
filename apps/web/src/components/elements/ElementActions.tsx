@@ -8,6 +8,7 @@ import {
   type PanelProps,
 } from "../../lib/elementModel";
 import { EvidenceSection, Field } from "./ElementPanels";
+import { newId } from "../../lib/id";
 
 const EFFECT_NAMES = {
   set_property: "设置属性",
@@ -41,7 +42,7 @@ export function ActionsPanel({
       actions: draft.actions.map((a) => (a.id === id ? { ...a, ...patch } : a)),
     });
   const add = () => {
-    const id = crypto.randomUUID();
+    const id = newId();
     change({
       ...draft,
       actions: [
@@ -195,7 +196,7 @@ export function ActionsPanel({
                       parameters: [
                         ...action.parameters,
                         {
-                          id: crypto.randomUUID(),
+                          id: newId(),
                           name: "",
                           technical_name: "",
                           value_kind: "string",
@@ -380,7 +381,7 @@ export function ActionsPanel({
                       effects: [
                         ...action.effects,
                         {
-                          id: crypto.randomUUID(),
+                          id: newId(),
                           kind: "set_property",
                           property_id: properties[0]?.id ?? null,
                           link_type_id: null,

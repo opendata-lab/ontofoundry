@@ -14,6 +14,7 @@ import {
 import { ConceptTag } from "../ConceptTag";
 import "../../styles/semantic.css";
 import { nativeSemanticModels, semanticLabel } from "../../lib/semanticEditing";
+import { newId } from "../../lib/id";
 
 export function NativeMappingEditor(props: PanelProps) {
   const { nativeDraft, draft, type, editing, change, open } = props;
@@ -97,7 +98,7 @@ export function NativeMappingEditor(props: PanelProps) {
               setForm({
                 kind: "concept_mapping",
                 operation: "create",
-                id: crypto.randomUUID(),
+                id: newId(),
                 parent_id: model.id,
                 original: {
                   concept_id: {
@@ -246,7 +247,7 @@ export function NativeMappingEditor(props: PanelProps) {
                 setForm({
                   kind: "dataset_relationship",
                   operation: "create",
-                  id: crypto.randomUUID(),
+                  id: newId(),
                   parent_id: model.id,
                   original: {
                     name:

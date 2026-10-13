@@ -63,6 +63,7 @@ import {
 } from "../../lib/elementModel";
 import { ActionsPanel } from "./ElementActions";
 import { ElementInstances } from "./ElementInstances";
+import { newId as generateId } from "../../lib/id";
 import "../../styles/element-inspector.css";
 
 type Loaded = {
@@ -202,7 +203,7 @@ function Inspector({
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const newId = useRef(crypto.randomUUID());
+  const newId = useRef(generateId());
   const effectiveId = id === "new" ? newId.current : id;
   useEffect(() => {
     let live = true;

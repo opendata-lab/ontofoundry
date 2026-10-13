@@ -4,7 +4,7 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import { lazy, Suspense } from "react";
-import { LoadingSurface } from "./components/AsyncState";
+import { LoadingSurface, RouteErrorSurface } from "./components/AsyncState";
 import { AppShell } from "./components/AppShell";
 
 const WorkspaceDirectoryPage = lazy(() =>
@@ -14,15 +14,20 @@ const WorkspaceDirectoryPage = lazy(() =>
 );
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: (
-      <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
-        <WorkspaceDirectoryPage />
-      </Suspense>
-    ),
+    errorElement: <RouteErrorSurface />,
+    children: [
+      {
+        path: "/",
+        element: (
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <WorkspaceDirectoryPage />
+          </Suspense>
+        ),
+      },
+      { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
   },
-  { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
-  { path: "*", element: <Navigate to="/" replace /> },
 ]);
 export function App() {
   return <RouterProvider router={router} />;

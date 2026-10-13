@@ -24,6 +24,7 @@ import { VerbalizationEditor } from "../components/VerbalizationEditor";
 import { TagList } from "../components/TagList";
 import { placeholders, valueConcept } from "../lib/verbalization";
 import { usePageTab } from "../hooks/usePageTab";
+import { newId } from "../lib/id";
 
 // A reading the writer left blank is not a reading; keeping it would fail the
 // model's non-empty rule at save time.
@@ -89,7 +90,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
       setType(
         relation
           ? {
-              id: crypto.randomUUID(),
+              id: newId(),
               name: "",
               technical_name: "",
               description: "",
@@ -99,7 +100,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
               multiplicity: "many_to_many",
             }
           : {
-              id: crypto.randomUUID(),
+              id: newId(),
               name: "",
               technical_name: "",
               description: "",
@@ -429,7 +430,7 @@ export function ObjectEditorPage({ relation = false }: { relation?: boolean }) {
                       attributes: [
                         ...type.attributes,
                         {
-                          id: crypto.randomUUID(),
+                          id: newId(),
                           name: "",
                           technical_name: "",
                           description: "",

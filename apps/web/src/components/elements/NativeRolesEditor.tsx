@@ -5,6 +5,7 @@ import { changeType, isObject, type PanelProps } from "../../lib/elementModel";
 import { ConceptTag } from "../ConceptTag";
 import { HintIcon } from "../HintIcon";
 import { RelationshipRoles } from "../RelationshipRoles";
+import { newId } from "../../lib/id";
 import "../../styles/semantic.css";
 
 const builtins = [
@@ -143,7 +144,7 @@ export function NativeRolesEditor(props: PanelProps) {
             setRoles([
               ...roles,
               {
-                id: crypto.randomUUID(),
+                id: newId(),
                 concept: { kind: "builtin", ref: "String" },
                 name: null,
                 native_presence: [],

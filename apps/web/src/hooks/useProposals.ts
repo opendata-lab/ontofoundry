@@ -5,6 +5,7 @@ import type {
   ProposalBatch,
   ProposalBatchDetail,
 } from "../api/types";
+import { newId } from "../lib/id";
 
 type Decision = {
   proposal_id: string;
@@ -94,7 +95,7 @@ export function useProposals(
     if (!current) return false;
     const body = JSON.stringify(decisions);
     if (pendingKey.current?.body !== body)
-      pendingKey.current = { body, key: crypto.randomUUID() };
+      pendingKey.current = { body, key: newId() };
     setBusy(true);
     setError("");
     setItemErrors({});
