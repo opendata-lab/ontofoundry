@@ -19,3 +19,5 @@ apps/web/test-results/
 .playwright-cli/
 .playwright-mcp/
 .local-runtime/
+# Local screenshots and acceptance output; tracked historical images stay tracked.
+/output/

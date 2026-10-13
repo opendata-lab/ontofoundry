@@ -41,7 +41,7 @@ services:
     ports:
       - "127.0.0.1:8900:8900"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/api/v1/health').read()"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/healthz').read()"]
       interval: 10s
       timeout: 5s
       retries: 20

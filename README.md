@@ -1,92 +1,191 @@
 # OntoFoundry
 
-OntoFoundry 是面向企业业务人员的本体工程平台。V0.1 聚焦 Markdown 与数据库映射驱动的 Object、Link、Object Type、Link Type 建模、可视化编辑、实例浏览、版本发布、Apache Ossie JSON 校验，以及面向应用和 Agent 的 REST API / MCP 本体服务。
+OntoFoundry 是企业本体建模与发布平台。它将业务文档、数据库结构和人工编辑组织为可审阅的建模草稿，帮助团队定义业务对象、属性、关系及数据映射，再通过版本化的 REST API 和 MCP 服务供应用与 Agent 使用。
 
-当前已进入正式代码实现：React + TypeScript 前端、FastAPI 后端，保留 HTML 原型作为历史参考。只维护一份权威设计：
+前端使用 React 和 TypeScript，后端使用 FastAPI，平台数据存储在 PostgreSQL。AI 建模通过外部 OpenDataWorks DataAgent 接入；未配置 DataAgent 时，仍可使用人工编辑、Ossie 导入导出、版本发布和查询服务。
 
-- [平台完整设计](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md)
-- [Proposal-first 本体生命周期实施设计](./docs/design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md)：供实施智能体执行的稳定元素 ID、提案状态机、Rule/Action、材料与映射实例、版本固定、三方合并、迁移和验收合同。
-- [原型参考与分阶段产品补充](./docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md#prototype-supplement)：七张参考图、与现有实现的对应关系，以及基线补齐 → 业务 Skill → 探索与智能体的需求。阶段 A 的实施与验收记录见同一文档第 17.12 节，阶段 B/C/D 仍为后续设计。
-- [接入 DataAgent Conversation SDK](./docs/design/2026-09-21-dataagent-conversation-sdk-integration-design.md)：三方边界、BFF 会话协议、建模结果回写、迁移与发布顺序。
-- [DataAgent 集成包](./integrations/dataagent/README.md)：在外部 DataAgent 上安装 Skill、创建 Agent、配置站点密钥的步骤。
-- [DataAgent + Pi 集成设计](./docs/design/2026-09-12-dataagent-pi-integration.md)（历史）：内置运行时形态的设计，已被上面的 SDK 接入取代。
+## 功能
 
-已迁入的内置建模资产：
+- **本体建模**：定义对象、值类型、属性、关系、继承、约束和 Action，支持目录、详情及图谱查看。
+- **AI 辅助建模**：从 Markdown 材料或数据库结构生成变更提案，经用户审阅接受后写入草稿。
+- **语义模型与数据映射**：查看和编辑语义模型、数据集、字段、关系、指标及本体映射，展示数据资产结构和映射状态。
+- **版本发布**：预览草稿与当前版本的变化，处理合并冲突，发布后保留可查询、可比较的历史版本。
+- **Apache Ossie 导入导出**：使用固定版本的官方 Schema 校验，支持原生构造及平台扩展的往返转换。
+- **实例与服务**：浏览文档实例，按已发布映射只读查询数据库实例及关系邻域，通过 REST API 和 MCP 读取本体与业务数据。
 
-- [md2ossie Skill](./integrations/dataagent/skills/md2ossie/SKILL.md)：将 Markdown 转换为 Apache Ossie 0.2.0.dev0 Ontology JSON，并执行离线官方 Schema 校验和 semantic lint。
+规则与 Action 的定义可以编辑和发布，通用规则执行与物化、跨数据源查询仍未实现。模型版本固定不会冻结源数据库中的实时数据。
 
-所有范围变化直接修订该文档，不另建精益版或平行方案。
+## 快速开始
 
-## 本地运行
+### 使用 Docker Compose
 
-需要 Node.js 22.19+、Python 3.13 和 uv。默认仅监听本机，开发身份是 `admin`，不可直接用于生产。
-
-前端由根目录的 npm workspaces 统一安装，`make install` 在仓库根执行 `npm ci`，不再单独进入 `apps/web`。
+需要 Docker 和 Docker Compose。以下配置用于本地体验：
 
 ```sh
+git clone https://github.com/opendata-lab/ontofoundry.git
+cd ontofoundry
+cp .env.example apps/api/.env
+make compose-up
+```
+
+启动后访问：
+
+| 服务 | 地址 |
+| --- | --- |
+| Web 应用 | http://127.0.0.1:8080 |
+| API 文档 | http://127.0.0.1:8900/docs |
+| 健康检查 | http://127.0.0.1:8900/healthz |
+
+后端容器启动时自动执行 Alembic 数据库迁移。首次启动会创建制造供应链示例，开发身份为 `admin`。停止应用使用 `make compose-down`，数据库保存在 Compose volume 中。
+
+### 从源码运行
+
+需要 Node.js **22.19+**、Python **3.13**、uv 和可用的 PostgreSQL。安装与前端构建均从仓库根目录执行，npm 依赖由 workspaces 统一管理。
+
+```sh
+cp .env.example apps/api/.env
 make install
+
+# 使用仓库提供的本地 PostgreSQL，也可在 apps/api/.env 配置已有数据库。
+docker compose up -d postgres
+
+# 首次运行和升级时执行数据库迁移。
+(cd apps/api && uv run --python 3.13 alembic -c src/ontofoundry_api/alembic.ini upgrade head)
+
 make api-dev
-# 另一个终端
+```
+
+另开一个终端：
+
+```sh
 make web-dev
 ```
 
-前端 http://127.0.0.1:5174，API http://127.0.0.1:8000/docs。首次启动创建明确标注的制造供应链示例。平台内部统一使用 PostgreSQL；SQLite 只保留给隔离单元测试，不属于部署技术栈。
+访问 http://127.0.0.1:5174，API 文档位于 http://127.0.0.1:8000/docs。Vite 将 `/api` 等请求代理到本地 API。
 
-先将根目录 `.env.example` 复制到 `apps/api/.env` 再配置。从本版本起需要一个可达的外部 OpenDataWorks DataAgent，并配置六个 `ONTOFOUNDRY_DATAAGENT_*` 接入变量；Agent 运行时不再内置于本仓库——会话、任务、Skill 与沙箱全部由外部 DataAgent 提供，接入步骤见 [集成包说明](./integrations/dataagent/README.md)。未配置 `ONTOFOUNDRY_DATAAGENT_BASE_URL` 时应用照常启动，本体的查看、编辑、发布与 MCP 都不依赖它。PostgreSQL 数据保存在 Compose volume，材料文件位于 `apps/api/.data/files`，均不纳入 Git。
-
-## 已接通的流程
-
-- 本体视图、对象/关系目录、详情和人工编辑；对象五步编辑，关系字段映射。语义图谱只画业务对象和它们之间的关系与继承，属性是对象的字段，由卡片计数和详情面板呈现，不画成节点。
-- 建模工作台三栏布局：Markdown 材料、DataAgent 通用对话、新版本草稿/语义图谱。明确点击“开始建模”后才抽取；回答通过 AgentEvent SSE 增量展示并安全渲染 Markdown。
-- Proposal-first 建模：新的建模运行输出 `ontofoundry.proposals/v1` 提案批次，不直接改草稿；用户在“提案”页签逐条、按依赖组或“接受全部无冲突项”接受，接受才写入会话草稿（幂等、带 revision 与目标哈希乐观锁）。运行固定基线版本、草稿哈希与材料清单，并获得只读、只能读取固定版本的 MCP 运行凭据。切换前已开始的完整结果运行仍按旧路径完成。
-- 发布页展示服务端 B/L/D 三方合并后的实际待发布内容；冲突按元素和字段逐项解决（最新/草稿/自定义/都保留）；发布同时校验会话 revision、空间当前版本与合并结果哈希，预览后任何变化都要求重新预览。
-- 草稿与快照统一为 schema v2：对象类型、属性、关系、规则、Action、材料实例与映射都是带稳定 id 的顶层元素；历史 v1 版本读取时规范化、不改写；Ossie 扩展 v3 携带规则 id 与 Action，导入兼容 v1/v2/v3。
-- Apache Ossie JSON 导入导出：内置模型已按 Ossie 扩展（继承、标识关系、requires/derived_by、verbalizes），本平台导出的文件重新导入得到同一个模型，外部文件导入后仍可编译回合法 Ossie。导入先过官方 Schema，可合并或替换，生成建模草稿并逐条报告仍装不下的构造（一元/n 元关系、指向 Any 的关系、计算列映射），发布仍是单独操作。完整对照见设计文档第 9.1、9.2 节。
-- 文档实例详情与 1–3 跳关系；数据库只读预览、实例详情及同连接等值 Join 邻域。数据库行不全量同步。
-- 本体视图增加业务/技术阅读与同版本 Ossie JSON；对象、属性、关系和空间约束可编辑，发布前可查看标准定义与结构化 Diff，历史版本按 UUID 对齐比较。
-- 数据资产目录保留结构快照，展示表/字段到已发布本体的反向映射、缺失字段和结构漂移。源表可以带入草稿映射编辑器，明确选择标识字段并保存后生效。
-- REST 类型与实例服务、MCP 均支持固定已发布 `version_id`；MCP 另有按元素读取的 `get_ontology_manifest`、`list_ontology_elements`、`get_ontology_elements`（v2 稳定 id，按权限裁剪实例、映射与证据）；实例搜索、详情与邻域共用查询和授权。服务令牌默认只有本体读取权限，实例需要额外 `instances:read` 及签发人的有效成员身份。数据库事实仍为实时读取，固定模型版本不等于固定源库数据。
-- 文档实例在保存和发布时检查必填、标识属性、继承属性及值类型：值类型错误不能发布；文档没有给出的必填或标识值（文档里通常没有系统编号）标记为「待补全」警告，不阻止发布。从业务记录类文档中抽取的事实成为文档实例，带原文证据；对象只在文档中被提到、没有属性时给出完善提示，可从数据表补全（自下而上）或人工添加。
-- 自下而上建模：在构建页「业务数据」选择数据连接和数据表，系统读取字段、主键、样例值和关联字段生成结构说明材料，建模结果包含业务对象、属性、数据映射和关系的字段连接提案。源库质量问题随只读结果报告，无效标识和非有限数值返回明确错误。
-
-界面按给定参考图的头部、侧栏、三栏工作台、卡片目录、步骤条和表格布局实现。小于 1100px 时整体缩放，不改成另一套移动布局。右侧为“提案 / 本体草稿 / 语义图谱”三个页签；发布与服务页分为“发布 / 版本历史 / 服务接入”。所有值来自 API，没有把原型的模拟结果当作模型输出。
-
-## 配置与部署边界
-
-正式发布只产出 `of-frontend` 和 `of-backend` 两个业务镜像。不包含 Agent runtime 或独立的 Portal MCP 代理；平台 MCP 由后端原生提供，Agent 执行由外部 OpenDataWorks DataAgent 承担。
-
-- Agent 后端：`ONTOFOUNDRY_DATAAGENT_BASE_URL`、`ONTOFOUNDRY_DATAAGENT_API_PREFIX`、`ONTOFOUNDRY_DATAAGENT_WEBSITE_ID`、`ONTOFOUNDRY_DATAAGENT_ACCESS_KEY`、`ONTOFOUNDRY_DATAAGENT_AGENT_ID`、`ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS`；任务执行模式沿用 `ONTOFOUNDRY_DATAAGENT_EXECUTION_MODE`。
-- 模型供应商：在外部 DataAgent 自己的部署中配置，不通过 OntoFoundry Compose 注入。
-- 数据库连接密码：配置固定的 Fernet `ONTOFOUNDRY_CONNECTION_KEY` 后才能新增连接。部署时用源库只读账号，不将密码写入本体版本。
-- OAuth：配置服务端地址、client ID/secret、回调 URI；启用 `AUTH_MODE=oauth`。生产启用 HTTPS 安全 Cookie、随机 session secret，关闭 demo seed。
-
-构建后可由同一个 API 进程托管前端，无需生产 Vite：
+如需由同一个 API 进程托管前端，先停止 `make api-dev`，然后执行：
 
 ```sh
 make build
 make serve
 ```
 
-`make serve` 用 `ONTOFOUNDRY_WEB_DIST=../web/dist` 托管 SPA 与 API。同域 HTTPS 入口由部署环境的反向代理提供。Agent 任务通过 BFF 进入外部 DataAgent；双方分别管理数据库、迁移、调度和运行时，OntoFoundry 不要求访问 DataAgent 的 PostgreSQL、Redis 或沙箱。正式上线前仍需完成真实模型、OAuth、外部 MCP、并发与大文件测试。
+此时应用和 API 共用 http://127.0.0.1:8000。
 
-暂未完成的设计项：规则执行与物化、业务 Skill、探索问数和智能体应用、通用中间表关系映射、跨源查询、文档/数据库事实的同屏混合浏览。表达式可编辑、保存和发布，当前没有执行引擎。
+## 配置
 
-OntoFoundry 平台表由自己的 Alembic migration 管理，部署配置不使用 API 启动时 `create_all`。升级曾经包含内置 Agent runtime 的旧数据库时，迁移链会删除已废弃的运行表和历史；执行前必须备份并验证恢复能力。外部 DataAgent 的数据库和迁移不在本仓库控制范围内。
+配置模板见 [`.env.example`](.env.example)，完整定义见 [`config.py`](apps/api/src/ontofoundry_api/config.py)。源码启动时读取 `apps/api/.env`，其中相对路径以 `apps/api` 为基准。
+
+| 变量 | 用途 |
+| --- | --- |
+| `ONTOFOUNDRY_DATABASE_URL` | 平台 PostgreSQL 连接地址 |
+| `ONTOFOUNDRY_DATA_DIR` | 上传材料的本地存储目录 |
+| `ONTOFOUNDRY_CONNECTION_KEY` | 加密业务数据库连接凭据的固定 Fernet 密钥，新增数据连接前必须配置 |
+| `ONTOFOUNDRY_SEED_DEMO` | 是否初始化示例，正式部署设为 `false` |
+| `ONTOFOUNDRY_AUTH_MODE` | 本地开发使用 `dev`，正式部署使用 `oauth` |
+| `ONTOFOUNDRY_SESSION_SECRET` | 会话签名密钥 |
+| `ONTOFOUNDRY_COOKIE_SECURE` | 是否只通过 HTTPS 发送会话 Cookie |
+| `ONTOFOUNDRY_PUBLIC_BASE_URL` | 外部 Agent 访问本平台 MCP 时使用的可达地址 |
+
+可用以下命令生成连接加密密钥，并将输出填入 `apps/api/.env`：
+
+```sh
+(cd apps/api && uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
+```
+
+业务数据库使用只读账号。连接密钥应固定保存并单独备份，更换它会影响已有连接凭据的解密。
+
+### 接入 DataAgent
+
+[`integrations/dataagent/`](integrations/dataagent/README.md) 提供建模和问数 Agent 定义、`md2ossie` Skill 及安装说明。该目录需要保留在版本控制中，DataAgent 服务本身由外部环境部署。
+
+启用 AI 建模需要配置：
+
+```dotenv
+ONTOFOUNDRY_DATAAGENT_BASE_URL=http://your-dataagent-host:port
+ONTOFOUNDRY_DATAAGENT_API_PREFIX=/api/v1/nl2sql
+ONTOFOUNDRY_DATAAGENT_WEBSITE_ID=ontofoundry
+ONTOFOUNDRY_DATAAGENT_ACCESS_KEY=your-server-access-key
+ONTOFOUNDRY_DATAAGENT_AGENT_ID=your-created-agent-id
+ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS=30
+```
+
+Agent ID 使用 DataAgent 创建接口实际返回的值。模型供应商、Skill、任务调度和沙箱由 DataAgent 配置与管理。按[接入指南](integrations/dataagent/README.md)完成安装后，可在空间设置页检查连通性。
+
+### 正式部署
+
+仓库提供的 Compose 是本地部署参考。正式部署需为后端显式注入生产配置；Compose 当前只映射其中的数据库、DataAgent 和连接密钥变量，不能仅靠修改 `apps/api/.env` 启用所有生产设置。
+
+生产配置要求：
+
+- `ONTOFOUNDRY_ENVIRONMENT=production`，`ONTOFOUNDRY_AUTH_MODE=oauth`，并填写模板中的 OAuth 地址及客户端配置。
+- 使用至少 32 字符的随机会话密钥，设置 `ONTOFOUNDRY_COOKIE_SECURE=true`、`ONTOFOUNDRY_SEED_DEMO=false`，由 HTTPS 入口提供访问。
+- 升级前备份 PostgreSQL、上传材料和连接加密密钥，按 Alembic 迁移链升级数据库。
+
+## API 与 MCP
+
+REST API 的路由、请求和响应可在运行实例的 `/docs` 中查看。查询本体和实例时可指定已发布的 `version_id`。
+
+每个空间的 MCP 地址为：
+
+```text
+POST /api/v1/ontology/workspaces/{workspace_id}/mcp
+```
+
+使用平台签发的 Bearer 服务令牌访问。令牌默认只读本体；映射和实例读取还需相应权限及有效的空间成员身份。当前实现包含 `server/discover`、`tools/list`、`tools/call`，以及旧版客户端的 `initialize` 兼容协商；尚未提供 MCP OAuth 动态发现。
+
+## 开发与验证
+
+```sh
+make test       # API 和前端测试
+make lint       # Python 和前端静态检查
+make build      # TypeScript 检查与前端构建
+```
+
+默认 API 测试使用隔离 SQLite，外部 DataAgent 请求由受控响应替代。验证 PostgreSQL 事务、迁移和并发行为时，提供可创建临时数据库的 PostgreSQL 账号：
 
 ```sh
 cd apps/api
-ONTOFOUNDRY_DATABASE_URL=postgresql+psycopg://... \
-  uv run alembic -c src/ontofoundry_api/alembic.ini upgrade head
+ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://user:password@127.0.0.1:5432/test_db' \
+  uv run --python 3.13 pytest -q
 ```
 
-MCP 当前实现 2026-07-28 的 `server/discover`、`tools/list`、`tools/call`，使用本平台签发的只读 Bearer 令牌；尚未实现 MCP OAuth 动态发现或兼容旧版 `initialize` 客户端。上线前需与实际消费端核对版本。
+真实 DataAgent 端到端测试需另外配置服务、Agent 与材料，不能由单元测试替代。
 
-## 验证
+## 离线安装包
+
+本地生成包含前后端镜像、PostgreSQL 镜像及安装脚本的离线部署包：
 
 ```sh
-make test
-make lint
-make build
+./scripts/create-offline-package.sh
 ```
 
-默认单元测试使用临时 SQLite 和受控 DataAgent 协议响应；部署与迁移验证必须使用 PostgreSQL。外部 DataAgent 的连通性、站点放行和 Agent 可见性通过空间设置页的只读诊断检查验证。浏览器验收截图在 `output/playwright/`，实际结果持续记录在设计文档中。
+默认输出到 `dist/offline/`。GitHub Actions 在 main 更新、版本标签和手动运行时生成安装包；新包上传成功后清理旧的同名 artifact，仅保留最新一份。版本标签生成的包同时附到对应 GitHub Release，Release 附件不随 artifact 轮换删除。
+
+## 仓库结构
+
+| 路径 | 内容 |
+| --- | --- |
+| `apps/api/` | FastAPI 服务、领域模型、数据库迁移和 API 测试 |
+| `apps/web/` | React 应用、前端测试和本地 Conversation SDK 依赖包 |
+| `integrations/dataagent/` | 外部 DataAgent 的 Agent 定义、Skill 和接入说明 |
+| `docs/` | 产品设计、接口合同、示例演示和文档图片 |
+| `scripts/` | 离线部署打包和 Ossie 覆盖矩阵生成脚本 |
+| `prototype/` | 已归档的 HTML 设计原型，供历史参考，正式应用不依赖它 |
+| `output/` | 本地截图和验收产物，不再新增提交；历史已跟踪图片保留供文档引用 |
+
+`.env`、数据库、上传材料、构建输出和集成包 ZIP 不提交到 Git。文档需要长期引用的公开图片应放入 `docs/assets/`。
+
+## 文档与参与贡献
+
+- [产品与架构设计](docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md)
+- [提案、草稿与版本发布合同](docs/design/2026-09-26-proposal-first-ontology-lifecycle-implementation-design.md)
+- [Ossie 字段覆盖矩阵](docs/design/2026-10-08-ossie-coverage-matrix.md)
+- [DataAgent 接入指南](integrations/dataagent/README.md)
+- [渠道销售示例](docs/demo/coffee-channel-sales/README.md)
+
+问题和功能建议通过 [GitHub Issues](https://github.com/opendata-lab/ontofoundry/issues) 提交。Bug 报告请包含复现步骤、预期与实际行为，以及去除凭据和私有业务数据的日志。提交 Pull Request 时说明变更范围与验证结果；涉及接口、映射或发布行为的修改应同步更新相关文档和测试。
+
+## 许可证
+
+仓库根目录目前尚未提供项目级 `LICENSE`。Apache Ossie 及 `md2ossie` 等第三方内容保留各自的 `LICENSE`、`NOTICE` 和来源说明，具体见各目录。
