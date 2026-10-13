@@ -3,7 +3,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import jsonschema
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -558,9 +558,21 @@ def resolve_merge(
     )
 
 
+def schedule_run_sync(request: Request, background: BackgroundTasks, items) -> None:
+    """Let reads converge a run nobody is watching: after the response, sync
+    each session whose stored run state may lag DataAgent."""
+    from ontofoundry_api.api.agent_conversation import needs_run_sync, sync_session_run
+
+    for item in items:
+        if needs_run_sync(request.app, item):
+            background.add_task(sync_session_run, request.app, item.workspace_id, item.id)
+
+
 @router.get("/sessions")
 def sessions(
     workspace_id: str,
+    request: Request,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -570,6 +582,7 @@ def sessions(
         .where(ModelingSessionRecord.workspace_id == workspace_id)
         .order_by(ModelingSessionRecord.updated_at.desc())
     ).all()
+    schedule_run_sync(request, background, rows)
     return {
         "items": [
             {
@@ -617,11 +630,15 @@ def create_session(
 def read_session(
     workspace_id: str,
     session_id: str,
+    request: Request,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    return session_response(db, get_modeling_session(db, workspace_id, session_id))
+    item = get_modeling_session(db, workspace_id, session_id)
+    schedule_run_sync(request, background, [item])
+    return session_response(db, item)
 
 
 @router.put("/sessions/{session_id}")
