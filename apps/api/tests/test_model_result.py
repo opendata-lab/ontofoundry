@@ -550,9 +550,10 @@ def test_model_prompt_contains_complete_versioned_result_contract():
         workspace_id="workspace-1",
         session_id="session-1",
         context_file="uploads/context.json",
-        material_files=["uploads/material.md"],
+        material_files=[{"path": "uploads/material.md", "bytes": 2048}],
         run_token=RUN_TOKEN,
     )
+    assert "- uploads/material.md（2 KB）" in prompt
     assert "ontofoundry.model-result/v1" in prompt
     assert '"run_token"' in prompt
     assert RUN_TOKEN in prompt
@@ -567,6 +568,43 @@ def test_model_prompt_contains_complete_versioned_result_contract():
     assert "link_mappings 必须使用树形结构" in prompt
     assert '"customer":"客户"' in prompt
     assert "预览差异后发布" in prompt
+
+
+def test_prompt_lists_sizes_and_asks_to_read_large_files_selectively():
+    prompt = build_turn_prompt(
+        "build it",
+        mode="chat",
+        workspace_id="workspace-1",
+        session_id="session-1",
+        context_file="uploads/context.json",
+        material_files=[
+            {"path": "uploads/orders.json", "bytes": 128 * 1024},
+            {"path": "uploads/big.csv", "bytes": 3 * 1024 * 1024},
+            {"path": "uploads/note.md", "bytes": 300},
+        ],
+        context_bytes=570 * 1024,
+    )
+    assert "当前本体快照: uploads/context.json（570 KB）" in prompt
+    assert "- uploads/orders.json（128 KB）" in prompt
+    assert "- uploads/big.csv（3.0 MB）" in prompt
+    assert "- uploads/note.md（300 B）" in prompt
+    assert "超过 50 KB 的材料或本体快照不要整份读入" in prompt
+    assert "grep、jq 或 python" in prompt
+    # The selective-reading rule comes before the task, which may be long.
+    assert prompt.index("不要整份读入") < prompt.index("[用户消息]")
+
+
+def test_proposal_material_list_carries_sizes():
+    from ontofoundry_api.services.dataagent import proposal_instructions
+
+    text = proposal_instructions(
+        run_token=RUN_TOKEN,
+        header={},
+        materials=[{"id": "m1", "sha256": "a" * 64, "path": "uploads/m1.json", "bytes": 131072}],
+        schema_file="schema.json",
+        mcp=None,
+    )
+    assert f"- material_id=m1 material_sha256={'a' * 64} 文件=uploads/m1.json 大小=128 KB" in text
 
 
 @pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])

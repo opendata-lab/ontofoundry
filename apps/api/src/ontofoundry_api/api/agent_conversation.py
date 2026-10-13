@@ -838,8 +838,9 @@ async def send_message(
                     "会话已在创建 Topic 期间被其他请求接管，请刷新后重试",
                 )
 
-        material_paths: list[str] = []
+        material_paths: list[dict[str, Any]] = []
         material_path_by_id: dict[str, str] = dict(known_paths)
+        material_bytes = {material.id: material.byte_size for material in materials}
         for material in materials:
             if material.id in uploaded_ids and material.id in material_path_by_id:
                 continue
@@ -856,16 +857,20 @@ async def send_message(
                 path.read_bytes(),
                 material_media_type(material.name),
             )
-            material_paths.append(str(uploaded.get("rel_path") or material.name))
-            material_path_by_id[material.id] = material_paths[-1]
+            path_in_topic = str(uploaded.get("rel_path") or material.name)
+            material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
+            material_path_by_id[material.id] = path_in_topic
             newly_uploaded.append(material.id)
 
         proposal_prompt = None
         if proposals:
+            context_body = json.dumps(
+                proposal_context(manifest, draft), ensure_ascii=False, indent=2
+            ).encode()
             context = await dataagent.upload(
                 topic_id,
                 f"ontofoundry-context-{run_token}.json",
-                json.dumps(proposal_context(manifest, draft), ensure_ascii=False, indent=2).encode(),
+                context_body,
                 "application/json",
             )
             schema = await dataagent.upload(
@@ -892,17 +897,22 @@ async def send_message(
                 run_token=run_token,
                 header=proposal_header(manifest),
                 materials=[
-                    {**m, "path": material_path_by_id.get(m["id"], "")}
+                    {
+                        **m,
+                        "path": material_path_by_id.get(m["id"], ""),
+                        "bytes": material_bytes.get(m["id"]),
+                    }
                     for m in manifest["materials"]
                 ],
                 schema_file=str(schema.get("rel_path") or ""),
                 mcp=mcp,
             )
         else:
+            context_body = json.dumps(draft, ensure_ascii=False, indent=2).encode()
             context = await dataagent.upload(
                 topic_id,
                 f"ontofoundry-context-r{expected_revision}.json",
-                json.dumps(draft, ensure_ascii=False, indent=2).encode(),
+                context_body,
                 "application/json",
             )
         prompt = build_turn_prompt(
@@ -914,6 +924,7 @@ async def send_message(
             material_files=material_paths,
             run_token=run_token,
             proposal_prompt=proposal_prompt,
+            context_bytes=len(context_body),
         )
         delivery_started = True
         submitted = await dataagent.deliver(
