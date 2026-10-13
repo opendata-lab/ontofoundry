@@ -63,9 +63,13 @@ cat > "$OUT_DIR/.env.example" <<'ENV'
 OF_BACKEND_IMAGE=of-backend:local
 OF_FRONTEND_IMAGE=of-frontend:local
 
-# 创建数据连接时必填。生成 Fernet key：
-# python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())'
-ONTOFOUNDRY_CONNECTION_KEY=
+# 前端对外端口，浏览器访问 http://<服务器IP>:<端口>。
+OF_HTTP_PORT=8080
+
+# 一般不用填：直接用 IP / 域名访问上面的端口都是同源，后端自动放行。
+# 只有外层再套一层反代 / HTTPS 终止，浏览器地址与前端容器看到的不一致时，
+# 才把浏览器地址栏里的源（协议+主机+端口）填进来，逗号分隔。
+# ONTOFOUNDRY_CORS_ORIGINS=https://ontofoundry.example.com
 ENV
 
 cat > "$OUT_DIR/install.sh" <<'INSTALL'
@@ -75,7 +79,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOCKER="${DOCKER:-docker}"
 
 [ -f "$HERE/.env" ] || {
-  echo "先把 .env.example 复制成 .env 并填好模型接入信息" >&2
+  echo "先把 .env.example 复制成 .env（默认值即可直接启动）" >&2
   exit 1
 }
 
@@ -86,7 +90,8 @@ echo "==> 加载镜像"
 echo "==> 启动"
 "$DOCKER" compose --env-file "$HERE/.env" -f "$HERE/compose.yaml" up -d
 
-echo "前端: http://127.0.0.1:8080"
+PORT="$(sed -n 's/^OF_HTTP_PORT=//p' "$HERE/.env" | tail -1)"
+echo "前端: http://<服务器IP>:${PORT:-8080}"
 INSTALL
 chmod +x "$OUT_DIR/install.sh"
 
@@ -106,7 +111,7 @@ nginx、node、python 已经烘在自有镜像的层里，不需要单独提供�
 ## 部署
 
 ```sh
-cp .env.example .env    # 填写模型接入信息
+cp .env.example .env    # 默认值即可直接启动
 ./install.sh
 ```
 

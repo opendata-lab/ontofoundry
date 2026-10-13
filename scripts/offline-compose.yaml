@@ -19,7 +19,7 @@ services:
     image: ${OF_BACKEND_IMAGE:-of-backend:local}
     environment:
       ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
-      ONTOFOUNDRY_CONNECTION_KEY: ${ONTOFOUNDRY_CONNECTION_KEY:-}
+      ONTOFOUNDRY_CORS_ORIGINS: ${ONTOFOUNDRY_CORS_ORIGINS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -37,7 +37,8 @@ services:
       of-backend:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:80"
+      # 对外只开放前端：浏览器通过 http://<服务器IP>:8080 访问，API 走同源 /api 反代。
+      - "${OF_HTTP_PORT:-8080}:80"
 
 volumes:
   ontofoundry-postgres:
