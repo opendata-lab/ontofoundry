@@ -50,7 +50,7 @@ from ontofoundry_api.services.ontology_query import (
     snapshot_of,
     version_summary,
 )
-from ontofoundry_api.services.proposals import pending_summary
+from ontofoundry_api.services.proposals import pending_summary, proposal_state
 from ontofoundry_api.services.publish_preview import (
     auto_merged,
     element_labels,
@@ -58,6 +58,7 @@ from ontofoundry_api.services.publish_preview import (
     requires_change,
     three_way,
 )
+from ontofoundry_api.services.read_cache import session_reads, version_snapshots
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -249,22 +250,51 @@ def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
 def session_response(db, item) -> dict:
     """A session as the API returns it: data plus proposal summary and the
     element-level changes relative to its base version."""
-    draft = session_draft(item)
-    try:
-        base_diff = element_changes(
-            version_snapshot(db, item.workspace_id, item.base_version_id), draft
-        )
-    except ValueError:  # an invalid draft field never blocks reading the session
-        base_diff = []
+    data = session_data(item)
+    key = _read_key(item)
+
+    def base_diff():
+        try:
+            return element_changes(
+                _base_snapshot(db, item), session_draft(item)
+            )
+        except ValueError:  # an invalid draft field never blocks reading the session
+            return []
+
+    def summary():
+        return pending_summary(db, item.workspace_id, item.id, item.draft_json)
+
+    if key is None:
+        return {**data, **summary(), "base_diff": base_diff()}
     return {
-        **session_data(item),
-        **pending_summary(db, item.workspace_id, item.id, item.draft_json),
-        "base_diff": base_diff,
+        **data,
+        **session_reads.get(
+            (*key, "pending", proposal_state(db, item.workspace_id, item.id)), summary
+        ),
+        "base_diff": session_reads.get(
+            (*key, "base_diff", item.base_version_id, item.base_version_sha256), base_diff
+        ),
     }
 
 
-def session_data(item):
-    draft = session_draft(item)
+def _read_key(item) -> tuple | None:
+    """Derived parts of a session only change with its revision and draft hash."""
+    if not item.draft_sha256:
+        return None
+    return ("session", item.id, item.revision, item.draft_sha256)
+
+
+def _base_snapshot(db, item) -> dict:
+    """The base version's snapshot; published versions never change."""
+    if not item.base_version_id or not item.base_version_sha256:
+        return version_snapshot(db, item.workspace_id, item.base_version_id)
+    return version_snapshots.get(
+        (item.base_version_id, item.base_version_sha256),
+        lambda: version_snapshot(db, item.workspace_id, item.base_version_id),
+    )
+
+
+def _derived_views(draft) -> tuple:
     try:
         form = legacy_mapping_form(draft)
     except ValueError:
@@ -274,6 +304,16 @@ def session_data(item):
     except (ValidationError, ValueError):
         # A draft may be invalid while being edited; the graph is best effort.
         nodes, edges = [], []
+    return form, nodes, edges
+
+
+def session_data(item):
+    draft = session_draft(item)
+    key = _read_key(item)
+    if key is None:
+        form, nodes, edges = _derived_views(draft)
+    else:
+        form, nodes, edges = session_reads.get((*key, "views"), lambda: _derived_views(draft))
     return {
         "id": item.id,
         "title": item.title,
