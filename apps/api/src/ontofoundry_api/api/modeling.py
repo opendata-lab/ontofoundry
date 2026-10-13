@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.database import get_db
@@ -577,8 +577,12 @@ def sessions(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
+    # Polled while a run is live: never load the drafts.
     rows = db.scalars(
         select(ModelingSessionRecord)
+        .options(defer(ModelingSessionRecord.draft_json),
+                 defer(ModelingSessionRecord.candidates_json),
+                 defer(ModelingSessionRecord.run_manifest_json))
         .where(ModelingSessionRecord.workspace_id == workspace_id)
         .order_by(ModelingSessionRecord.updated_at.desc())
     ).all()
@@ -590,6 +594,12 @@ def sessions(
                 "title": r.title,
                 "updated_at": r.updated_at,
                 "task_status": r.task_status,
+                "base_version_id": r.base_version_id,
+                # Both hashes are stored on every write, so this costs no
+                # draft read: the draft differs from the version it started from.
+                "has_unpublished_changes": bool(
+                    r.draft_sha256 and r.draft_sha256 != r.base_version_sha256
+                ),
             }
             for r in rows
         ]

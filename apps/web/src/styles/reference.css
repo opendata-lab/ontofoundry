@@ -2262,6 +2262,9 @@ small,
   font-size: 10px;
   margin-left: auto;
 }
+.view-tabs-bar > .muted a {
+  color: var(--color-accent);
+}
 .view-toolbar {
   display: flex;
   align-items: center;

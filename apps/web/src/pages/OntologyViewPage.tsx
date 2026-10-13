@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api/client";
+import { api, modelingApi } from "../api/client";
 import type { WorkspaceOverview } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import {
@@ -64,6 +64,25 @@ export function OntologyViewPage() {
       active = false;
     };
   }, [workspace.id, workspace.current_version, attempt]);
+  // Accepted proposals live in a session until someone publishes it. Point at
+  // the most recent session whose draft moved away from its base version, so
+  // its changes do not look lost. Best effort: the hint never blocks the view.
+  const [draftSession, setDraftSession] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setDraftSession(null);
+    if (!workspace.role) return;
+    modelingApi
+      .sessions(workspace.id)
+      .then(({ items }) => {
+        if (active)
+          setDraftSession(items.find((item) => item.has_unpublished_changes)?.id ?? null);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [workspace.id, workspace.role, workspace.current_version]);
   const graph = overview?.graph;
   // Attributes are entity fields rather than nodes of their own, so the canvas
   // carries object types and the edges between them and nothing else.
@@ -135,6 +154,14 @@ export function OntologyViewPage() {
         </div>
         <span className="muted">
           {overview ? "v" + overview.version.version + " · 已发布" : "尚未发布"}
+          {draftSession && (
+            <>
+              {" · "}
+              <Link to={"../delivery?session=" + draftSession}>
+                有未发布的草稿修改 · 去发布
+              </Link>
+            </>
+          )}
         </span>
       </div>
       {mode === "semantic" && (

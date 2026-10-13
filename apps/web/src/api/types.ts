@@ -744,7 +744,11 @@ export type ModelingSession = {
 export type ModelingSessionSummary = Pick<
   ModelingSession,
   "id" | "title" | "task_status" | "updated_at"
->;
+> & {
+  base_version_id?: string | null;
+  /** The draft differs from the version the session started from. */
+  has_unpublished_changes?: boolean;
+};
 export type OssieImportReport = {
   name: string;
   description: string;
