@@ -57,8 +57,8 @@ def _dataagent_client(
             502,
             "DataAgent 拒绝了服务端接入密钥",
             (
-                "在管理端重新生成密钥并更新 "
-                "ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
+                "该站点开启了服务端接入校验：把 access-key 接口生成的密钥"
+                "填入 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
             ),
         ),
         (
@@ -70,15 +70,9 @@ def _dataagent_client(
                 "并确认其可见性允许 Widget 访问"
             ),
         ),
-        (
-            "access_key_missing",
-            503,
-            "未配置服务端接入密钥",
-            "设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY",
-        ),
     ],
 )
-async def test_six_failures_have_stable_http_status_message_and_hint(
+async def test_five_failures_have_stable_http_status_message_and_hint(
     monkeypatch,
     case,
     expected_status,
@@ -100,7 +94,6 @@ async def test_six_failures_have_stable_http_status_message_and_hint(
         monkeypatch,
         handler,
         base_url="" if case == "base_url_missing" else "https://dataagent.example",
-        access_key="" if case == "access_key_missing" else "server-secret",
     )
 
     with pytest.raises(DataAgentError) as caught:

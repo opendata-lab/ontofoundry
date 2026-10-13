@@ -20,9 +20,7 @@ def _skipped(name: str, reason: str, hint: str) -> dict[str, Any]:
 
 async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, Any]:
     try:
-        require_dataagent_configuration(
-            settings.dataagent_base_url, settings.dataagent_access_key
-        )
+        require_dataagent_configuration(settings.dataagent_base_url)
     except DataAgentError as exc:
         checks = [
             _check("配置完整性", False, str(exc), exc.hint),
@@ -32,7 +30,7 @@ async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, A
         ]
         return {"ok": False, "checks": checks}
 
-    checks = [_check("配置完整性", True, "服务端地址与接入密钥已配置")]
+    checks = [_check("配置完整性", True, "服务端地址已配置")]
     client = DataAgentClient(
         settings.dataagent_base_url,
         prefix=settings.dataagent_api_prefix,
@@ -67,7 +65,7 @@ async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, A
             checks.extend(
                 [
                     _check("连通性", True, "已连接 DataAgent"),
-                    _check("站点放行", True, "站点与接入密钥校验通过"),
+                    _check("站点放行", True, "站点校验通过"),
                     _check("Agent 存在性", False, str(exc), exc.hint),
                 ]
             )
@@ -86,7 +84,7 @@ async def dataagent_health(settings: Settings, workspace_id: str) -> dict[str, A
     checks.extend(
         [
             _check("连通性", True, "已连接 DataAgent"),
-            _check("站点放行", True, "站点与接入密钥校验通过"),
+            _check("站点放行", True, "站点校验通过"),
             _check(
                 "Agent 存在性",
                 True,

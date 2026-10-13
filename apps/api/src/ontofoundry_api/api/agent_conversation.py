@@ -227,9 +227,7 @@ def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentCl
 
 def _require_configured(request: Request) -> None:
     settings = request.app.state.settings
-    require_dataagent_configuration(
-        settings.dataagent_base_url, settings.dataagent_access_key
-    )
+    require_dataagent_configuration(settings.dataagent_base_url)
 
 
 def _mode(value: object) -> str:

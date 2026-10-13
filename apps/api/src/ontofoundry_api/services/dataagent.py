@@ -34,18 +34,14 @@ class DataAgentError(RuntimeError):
         self.hint = hint
 
 
-def require_dataagent_configuration(base_url: str, access_key: str) -> None:
+def require_dataagent_configuration(base_url: str) -> None:
+    # The access key is optional: DataAgent only checks it on sites whose
+    # server-side access was switched on, and its admin UI has no switch for that.
     if not base_url.strip():
         raise DataAgentError(
             "DataAgent 未配置",
             status_code=503,
             hint="设置 ONTOFOUNDRY_DATAAGENT_BASE_URL 后重启",
-        )
-    if not access_key.strip():
-        raise DataAgentError(
-            "未配置服务端接入密钥",
-            status_code=503,
-            hint="设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY",
         )
 
 
@@ -95,7 +91,7 @@ class DataAgentClient:
         files: dict[str, tuple[str, bytes, str]] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        require_dataagent_configuration(self.base_url, self.access_key)
+        require_dataagent_configuration(self.base_url)
         try:
             async with httpx.AsyncClient(
                 base_url=self.base_url, timeout=self.timeout
@@ -137,8 +133,8 @@ class DataAgentClient:
                     "DataAgent 拒绝了服务端接入密钥",
                     status_code=502,
                     hint=(
-                        "在管理端重新生成密钥并更新 "
-                        "ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
+                        "该站点开启了服务端接入校验：把 access-key 接口生成的密钥"
+                        "填入 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
                     ),
                 )
             raise DataAgentError(
@@ -193,7 +189,7 @@ class DataAgentClient:
         )
 
     async def download(self, topic_id: str, rel_path: str) -> tuple[bytes, str]:
-        require_dataagent_configuration(self.base_url, self.access_key)
+        require_dataagent_configuration(self.base_url)
         path = f"{self.prefix}/topics/{topic_id}/files/{rel_path.lstrip('/')}"
         try:
             async with httpx.AsyncClient(
@@ -280,7 +276,7 @@ class DataAgentClient:
             ) from exc
 
     async def stream(self, task_id: str, after_id: int = 0) -> AsyncIterator[bytes]:
-        require_dataagent_configuration(self.base_url, self.access_key)
+        require_dataagent_configuration(self.base_url)
         timeout = httpx.Timeout(
             connect=self.timeout.connect,
             read=None,

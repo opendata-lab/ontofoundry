@@ -94,18 +94,19 @@ async def test_runtime_paths_and_auth_headers(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_empty_access_key_fails_before_request(monkeypatch):
-    def handler(_: httpx.Request) -> httpx.Response:
-        raise AssertionError("missing access key must fail before the request")
+async def test_empty_access_key_calls_without_the_header(monkeypatch):
+    # DataAgent sites check the key only when server-side access is switched on.
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={"topic_id": "topic-1"})
 
     client = _client(monkeypatch, handler, access_key="")
 
-    with pytest.raises(DataAgentError) as caught:
-        await client.create_topic("Topic", "agent-1")
+    await client.create_topic("Topic", "agent-1")
 
-    assert caught.value.status_code == 503
-    assert str(caught.value) == "未配置服务端接入密钥"
-    assert caught.value.hint == "设置 ONTOFOUNDRY_DATAAGENT_ACCESS_KEY"
+    _assert_auth_headers(requests[0], access_key=False)
 
 
 @pytest.mark.asyncio

@@ -66,6 +66,21 @@ OF_FRONTEND_IMAGE=of-frontend:local
 # 前端对外端口，浏览器访问 http://<服务器IP>:<端口>。
 OF_HTTP_PORT=8080
 
+# ---- DataAgent（建模/问数 Agent）。不填则平台可用，只是 Agent 功能不可用。----
+# DataAgent 后端地址：只写 协议://主机:端口，不带路径。这是从 of-backend 容器里
+# 访问的地址，不能写 127.0.0.1 / localhost（那指容器自己），要写服务器 IP 或域名。
+ONTOFOUNDRY_DATAAGENT_BASE_URL=
+# 可选，一般留空。只有 DataAgent 上用接口为该站点开启了服务端接入校验时才填。
+ONTOFOUNDRY_DATAAGENT_ACCESS_KEY=
+# 管理端创建 Agent 后返回的 agent_id，形如 agent_7895f271d13c40f9bc2fabf7。
+ONTOFOUNDRY_DATAAGENT_AGENT_ID=
+# 一般不用改：站点 ID 与接口前缀。
+ONTOFOUNDRY_DATAAGENT_WEBSITE_ID=ontofoundry
+ONTOFOUNDRY_DATAAGENT_API_PREFIX=/api/v1/nl2sql
+# DataAgent 回调本平台 MCP 用的地址。留空即用浏览器访问的地址
+# （http://<服务器IP>:8080），DataAgent 能访问到它就不用填。
+# ONTOFOUNDRY_PUBLIC_BASE_URL=http://<服务器IP>:8080
+
 # 一般不用填：直接用 IP / 域名访问上面的端口都是同源，后端自动放行。
 # 只有外层再套一层反代 / HTTPS 终止，浏览器地址与前端容器看到的不一致时，
 # 才把浏览器地址栏里的源（协议+主机+端口）填进来，逗号分隔。

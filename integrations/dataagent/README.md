@@ -20,7 +20,7 @@ integrations/dataagent/
 
 按顺序执行。每一步都有对应的失败现象，照着排查即可。
 
-### 1. 建站点并生成服务端接入密钥
+### 1. 建站点
 
 DataAgent 管理端 → Widget 接入设置 → 新建站点：
 
@@ -28,16 +28,21 @@ DataAgent 管理端 → Widget 接入设置 → 新建站点：
 | --- | --- |
 | `website_id` | `ontofoundry` |
 | `allowed_origins` | **留空** |
-| 服务端接入 | **开启**，并生成 access key |
 
 `allowed_origins` 留空是对的：OntoFoundry 从服务端发起调用，不带 `Origin`。
-恰恰因此必须开启服务端接入——否则任何能连到 DataAgent 的进程只要知道
-`website_id` 就能创建会话。
 
-**access key 的明文只显示一次**，当场复制。
+> 失败现象：站点没建 → OntoFoundry 报 "DataAgent 拒绝了本站点"。
 
-> 失败现象：站点没建 → OntoFoundry 报 "DataAgent 拒绝了本站点"；密钥没配或不匹配
-> → "DataAgent 拒绝了服务端接入密钥"。
+**服务端接入密钥（可选）。** 不配也能用。管理界面没有入口，需要更严格的校验时
+用接口开启——调用后 DataAgent 会要求该站点的每个请求都带这个密钥：
+
+```sh
+curl -X POST http://<dataagent>/api/v1/nl2sql-admin/widget-sites/ontofoundry/access-key
+```
+
+返回的 `access_key` 明文只出现这一次，填进 `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY`；
+再调一次会换新密钥并让旧的失效。DataAgent 开启了登录认证时需要带管理员凭据。
+关闭用同一路径的 `DELETE`。开启后没配或配错密钥 → "DataAgent 拒绝了服务端接入密钥"。
 
 ### 2. 安装 md2ossie Skill
 
@@ -90,14 +95,16 @@ curl -s http://<dataagent>/api/v1/dataagent/agents/capabilities \
 | `ONTOFOUNDRY_DATAAGENT_BASE_URL` | 外部 DataAgent 地址 |
 | `ONTOFOUNDRY_DATAAGENT_API_PREFIX` | `/api/v1/nl2sql`（默认值，一般不用改） |
 | `ONTOFOUNDRY_DATAAGENT_WEBSITE_ID` | `ontofoundry` |
-| `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` | 第 1 步生成的明文 |
+| `ONTOFOUNDRY_DATAAGENT_ACCESS_KEY` | 可选，留空；仅当第 1 步用接口开启了服务端接入时填 |
 | `ONTOFOUNDRY_DATAAGENT_AGENT_ID` | 第 3 步创建接口返回的 ID，如 `agent_7895f271d13c40f9bc2fabf7` |
 | `ONTOFOUNDRY_DATAAGENT_REQUEST_TIMEOUT_SECONDS` | `30` |
 
 凭据只经部署环境注入，**不进数据库、不经浏览器**。设置页只读展示连通性，不提供
 密钥输入框。
 
-DataAgent 必须只暴露在可信内网。access key 是纵深防御的一层，不是把它放到公网的许可。
+DataAgent 必须只暴露在可信内网。不开 access key 时，能访问 DataAgent 且知道
+`website_id` 的进程都能以本站点身份创建会话；access key 也只是纵深防御的一层，
+不是把它放到公网的许可。
 
 ### 5. 验证
 
