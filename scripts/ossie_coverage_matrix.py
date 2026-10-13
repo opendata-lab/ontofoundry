@@ -25,7 +25,7 @@ LANDINGS = {
     },
     ("ontology", "OntologyComponent"): {
         "concept": "object_types.concept / value_types.concept", "type": "object_types / value_types 集合归属",
-        "description": "object_types.description / value_types.description", "extends": "object_types.extends / value_types.extends（有序 ConceptRef）",
+        "description": "object_types.name + description / value_types.name + description", "extends": "object_types.extends / value_types.extends（有序 ConceptRef）",
         "identify_by": "object_types.identify_by / value_types.identify_by", "requires": "概念.requires → rules.expression（有序 ID）",
         "derived_by": "概念.derived_by → rules.expression（有序 ID）", "relationships": "properties + link_types（同 owner 下 position 共同排序）",
     },
@@ -161,7 +161,13 @@ def render(paths):
         if definition == "AIContext":
             pointer = f"{source}#/$defs/AIContext/oneOf/1/properties/{field}"
         landing = LANDINGS[source, definition][field]
+        semantic = SEMANTICS[field]
         note = "字段出现状态独立记录；原生数组保持顺序及重复项"
+        if source == "ontology" and definition == "OntologyComponent" and field == "description":
+            semantic = "业务名称和描述"
+            note = "导入时非空 description 同时写入名称和描述；导出取名称，concept 与引用保持英文标识。空描述不从技术名补全"
+        if source == "ontology" and definition == "Relationship" and field == "description":
+            note += "；描述不用于替换属性或关系名称"
         if field == "concept" or field == "extends":
             note += "；ConceptRef 支持实体、值、builtin、Any，导出还原名称"
         if definition == "Relationship" and source == "ontology" and field == "name":
@@ -174,13 +180,13 @@ def render(paths):
             note += "；parent_id + slot + position 恢复任意深度树及多根"
         if field == "multiplicity":
             note += "；不推断缺省，不补基数"
-        lines.append(f"| `{pointer}` | {SEMANTICS[field]} | {landing} | 原生 | {counts[0][source,definition,field]} | {counts[1][source,definition,field]} | {note} |")
+        lines.append(f"| `{pointer}` | {semantic} | {landing} | 原生 | {counts[0][source,definition,field]} | {counts[1][source,definition,field]} | {note} |")
     lines += ["", "## 无属性 $defs 的值合同", "", "| Ossie 路径 | 语义 | v3 落点（字段/集合） | 原生/扩展/不支持 | A 出现次数 | B 出现次数 | 说明 |", "| --- | --- | --- | --- | ---: | ---: | --- |"]
     for source, definition, field, spec in scalars:
         lines.append(f"| `{source}#/$defs/{definition}` | {spec.get('description', definition)} | {SCALAR_LANDINGS[source,definition]} | 原生 | {counts[0][source,definition,field]} | {counts[1][source,definition,field]} | 无属性标量；保留原文/遵守固定枚举 |")
     lines += ["", "## 平台扩展合同", "", "下列是平台新增内容，不替代上表的原生字段；A/B 次数统计输入中已有的平台路径，不按未来导出量计数。", "", "| Ossie 路径 | 语义 | v3 落点（字段/集合） | 原生/扩展/不支持 | A 出现次数 | B 出现次数 | 说明 |", "| --- | --- | --- | --- | ---: | ---: | --- |",
               "| `ai_context.ontofoundry.ids` | 稳定 ID 注册表 | extension_v4.ids | 扩展 | 0 | 0 | version=4；id_namespace 保存 UUID 派生命名空间，ids 只记录无法按作用域路径推导的例外；owner 由关系 ID 派生，Action 内显式 ID 不重复登记 |",
-              "| `ai_context.ontofoundry`（显示信息） | 中文显示名、tags、required | extension_v4.display_names/tags/required_properties | 扩展 | 0 | 0 | 原生 name 不被显示名替换 |",
+              "| `ai_context.ontofoundry`（显示信息） | 属性、关系及语义集合显示名、tags、required | extension_v4.display_names/tags/required_properties | 扩展 | 0 | 0 | 概念名称通过标准 description 导出；属性、关系、语义模型、数据集、字段及指标的自定义显示名仍保存在 display_names，原生 name 不被替换 |",
               "| `ai_context.ontofoundry.rule_metadata` | 规则 ID、名称 | extension_v4.rule_metadata | 扩展 | 0 | 0 | 原生约束/派生表达式保留原文、顺序、重复项 |",
               "| `ai_context.ontofoundry.actions` | Action 定义 | extension_v4.actions + actions | 扩展 | 0 | 0 | 平台定义，Ossie 无对应构造 |",
               "| `ai_context.ontofoundry.concept_context` | 非标准概念同义词、说明 | extension_v4.concept_context（稳定 ID 键） | 扩展 | 0 | 0 | 不挪用文档/语义模型同义词；输入同名键原文保留 |",

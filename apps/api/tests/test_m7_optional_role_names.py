@@ -66,9 +66,10 @@ def test_binary_proposals_accept_preview_publish_export_optional_names(role_clie
         role = relationship['roles'][0]
         assert role == {'concept': relationship['name'].removeprefix('for_'), **({'name': 'initiator'} if named else {})}
         assert relationship['verbalizes'] == next(i['after']['verbalizes'] for i in original if i['after'].get('technical_name') == relationship['name'])
-    # Chinese display names belong to the platform extension, never roles[].name.
-    assert '客户' in exported['ai_context']['ontofoundry']['display_names'].values()
+    # Concept display names use description, never roles[].name.
+    assert next(c for c in exported['ontology'] if c['concept'] == 'customer')['description'] == '客户'
     reloaded, _ = import_ossie(exported, workspace_id=session['workspace_id'], mode='replace')
+    assert next(c for c in reloaded['object_types'] if c['concept'] == 'customer')['name'] == '客户'
     assert all(r['roles'][0]['name'] == ('initiator' if named else None)
                for r in reloaded['link_types'] if r['technical_name'] in ('for_customer', 'for_order'))
 

@@ -59,11 +59,13 @@ def test_create_rename_move_reorder_register_only_exceptions_and_keep_all_identi
     assert '/ontology/Other' not in registry and '/ontology/Third' not in registry
     assert not any(path.endswith('/owner') for path in registry)
     assert all(UUID(value) != uuid5(workspace, 'ossie:' + path) for path, value in registry.items())
-    assert extension['display_names'] == {draft['object_types'][0]['id']: '中文名'}
+    assert 'display_names' not in extension
+    assert next(c for c in emitted['ontology'] if c['concept'] == 'Renamed~/Thing')['description'] == '中文名'
     assert 'tags' not in extension and 'actions' not in extension and 'required_properties' not in extension
     for destination in (workspace, uuid4()):
         restored, _ = import_ossie(emitted, workspace_id=destination, mode='replace')
         assert identities(restored) == identities(draft)
+        assert restored['object_types'][0]['name'] == '中文名'
         assert restored['extension_v4']['concept_context'] == draft['extension_v4']['concept_context']
         assert restored['rules'][0]['name'] == '业务约束'
         assert export(restored) == emitted
