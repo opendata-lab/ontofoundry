@@ -25,6 +25,18 @@ function setup() {
 }
 
 describe("useProposals", () => {
+  it("uses the returned session revision for sequential undo decisions before parent props catch up", async () => {
+    const { hook } = setup();
+    const updated = { ...session, revision: 4 };
+    const decide = vi.spyOn(proposalsApi, "decide")
+      .mockResolvedValueOnce({ session: updated, results: [], validation: {} as never })
+      .mockResolvedValue({ session: updated, results: [], validation: {} as never });
+    await act(() => hook.result.current.decide([{ proposal_id: "p", decision: "reject" }]));
+    await act(() => hook.result.current.decide([{ proposal_id: "p", decision: "restore" }]));
+    expect(decide.mock.calls[1][0]).toEqual(updated);
+    expect(decide.mock.calls[0][2]).not.toBe(decide.mock.calls[1][2]);
+  });
+
   it("replays a failed transport with the same key, and uses a new key next time", async () => {
     const { hook, onSession } = setup();
     const decide = vi

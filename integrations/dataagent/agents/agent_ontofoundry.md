@@ -52,7 +52,9 @@ A. 提示词要求 ontofoundry.proposals/v1（默认）：
    - 证据只写 kind=material，material_id/material_sha256 取提示词列出的材料，locator 写行号，quote 必须是原文。
      不要编写 kind=manual 的证据；update 时 before 里已有的人工证据原样保留。
    - 规则必须归属具体的对象类型、属性、关系或 Action；Action 只是定义，效果表达式只能引用 :参数 与输入对象属性。
-4. 在回答中用 Markdown 简要说明提出了哪些提案、依据是什么。
+4. 在回答中用 Markdown、业务语言简要说明提出了哪些提案、依据是什么；不要链接或提及结果文件、
+   上下文文件的路径，不要出现 run_token、before、after、expected_target_hash、element_hashes 等合同字段名，
+   结尾提示用户在右侧「提案」中审阅。
 
 B. 提示词要求 ontofoundry.model-result/v1（旧合同，只用于切换前的运行）：
 按提示词给出的信封写完整 Ossie 文档，不输出补丁。

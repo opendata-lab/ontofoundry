@@ -142,3 +142,18 @@ def test_value_concept_synonyms_are_searchable_without_changing_native_fields(sy
     assert found['kind'] == 'value_type' and found['extends'] == original['value_types'][0]['extends']
     assert call(client, 'list_ontology_elements', kind='value_type')['items'][0]['concept_context'] == CONTEXT
     assert call(client, 'get_ontology_type', type_id=value_id)['item']['synonyms'] == CONTEXT['synonyms']
+
+
+def test_exact_name_ranks_first_ahead_of_elements_that_only_mention_it(synonym_client):
+    # A caller searching for a concept by its name must get that concept first,
+    # not every relation whose description happens to mention it.
+    client = synonym_client
+    _, draft, _ = publish(client, 'library-lending')
+    for object_type in draft['object_types']:
+        for query in (object_type['name'], object_type['technical_name']):
+            items = call(client, 'search_ontology_types', query=query)['items']
+            assert items[0]['id'] == object_type['id'], (query, [i['name'] for i in items[:3]])
+    for link in draft['link_types']:
+        items = call(client, 'search_ontology_types', query=link['technical_name'])['items']
+        exact = [i for i in items if i['technical_name'].casefold() == link['technical_name'].casefold()]
+        assert exact and items[:len(exact)] == exact

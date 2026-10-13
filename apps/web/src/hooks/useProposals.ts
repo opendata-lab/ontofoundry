@@ -34,7 +34,9 @@ export function useProposals(
   const [refresh, setRefresh] = useState(0);
   const pendingKey = useRef<{ body: string; key: string } | null>(null);
   const sessionRef = useRef(session);
-  sessionRef.current = session;
+  // Preserve a just-returned session while its parent prop catches up.
+  if (sessionRef.current?.id !== session?.id || !sessionRef.current ||
+    (session && session.revision >= sessionRef.current.revision)) sessionRef.current = session;
   const sessionId = session?.id;
   const workspaceId = session?.workspace_id;
   const latest = session?.latest_batch_id;
@@ -106,6 +108,9 @@ export function useProposals(
         pendingKey.current.key,
       );
       pendingKey.current = null;
+      // A server-backed undo can issue another decision before React renders
+      // the returned session. Its expected revision must already be current.
+      sessionRef.current = result.session;
       onSession(result.session);
       reload();
       return true;

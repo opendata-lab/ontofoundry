@@ -237,6 +237,29 @@ def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
     return {key: item[key] for key in ("id", "name", "technical_name")}
 
 
+# Among equally relevant hits, business concepts come before the semantic-layer
+# nodes that implement them (a dataset may share its concept's name).
+_KIND_PRIORITY = {'object_type': 0, 'value_type': 1, 'link_type': 2, 'document': 9}
+
+
+def _relevance(item: dict, query: str) -> int:
+    """Rank a hit so the element a caller named comes first: exact name, then
+    exact alias, then a name or alias containing the query, then any other
+    field. Without this, hits sorted by kind put every relation whose
+    description mentions "组件" ahead of the object named 组件."""
+    names = [(item.get(field) or '').casefold() for field in ('name', 'technical_name')]
+    aliases = [m['value'].casefold() for m in item['matches'] if not m['source'].startswith('element.')]
+    if query in names:
+        return 0
+    if query in aliases:
+        return 1
+    if any(query in name for name in names):
+        return 2
+    if aliases:
+        return 3
+    return 4
+
+
 def search_types(
     version: OntologyVersionRecord,
     *, query: str = '', kind: str | None = None, include_context_elements: bool = False, include_document_context: bool = False,
@@ -253,7 +276,11 @@ def search_types(
     if normalized_query:
         items = [{**item, 'matches': matches(item, normalized_query)} for item in items]
         items = [item for item in items if item['matches']]
-    items.sort(key=lambda item: (item['kind'], item['technical_name'].casefold(), item['id']))
+    items.sort(key=lambda item: (
+        _relevance(item, normalized_query) if normalized_query else 0,
+        _KIND_PRIORITY.get(item['kind'], 5) if normalized_query else 0,
+        item['kind'], item['technical_name'].casefold(), item['id'],
+    ))
     return {
         'workspace_id': version.workspace_id, 'version_id': version.id, **version_hashes(version),
         'items': public_projection(items), 'next_cursor': None, 'ambiguous': bool(normalized_query) and len(items) > 1,
