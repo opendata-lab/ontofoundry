@@ -29,6 +29,10 @@ export function useModeling(
   const pending = useRef<Promise<ModelingSession> | null>(null);
   const [refresh, setRefresh] = useState(0);
   const taskStatus = session?.task_status;
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
   const select = useCallback(
     (id: string, created = false) =>
       setParams(
@@ -57,10 +61,18 @@ export function useModeling(
     if (pageActive && !wasActive.current && refreshOnActivate) reload();
     wasActive.current = pageActive;
   }, [pageActive, refreshOnActivate, reload]);
+  const loadedKey = useRef("");
   useEffect(() => {
-    setSession(null);
+    // Only a different workspace or session starts from blank. A reload of
+    // the same session keeps showing it while the new copy loads; blanking it
+    // made the page flip to "正在加载会话…/尚未开始" on every run event.
+    const key = `${workspaceId}:${sessionId ?? ""}:${enabled}`;
+    if (loadedKey.current !== key) {
+      loadedKey.current = key;
+      setSession(null);
+      setSessions([]);
+    }
     setError("");
-    setSessions([]);
     if (!enabled) return;
     let active = true;
     if (sessionId)
@@ -103,20 +115,41 @@ export function useModeling(
       !ACTIVE_TASK_STATUSES.includes(taskStatus)
     )
       return;
+    // The full session (draft, graph, diff) takes seconds to build on a large
+    // ontology, and a fixed interval stacked those requests until none came
+    // back. Poll the cheap summary list one request at a time and fetch the
+    // full session only when its status or timestamp moved, plus every 10th
+    // tick for detail text that changes without either.
     let active = true;
-    const timer = window.setInterval(() => {
-      modelingApi
-        .get(workspaceId, sessionId)
-        .then((value) => {
+    let timer = 0;
+    let ticks = 0;
+    const tick = async () => {
+      try {
+        const { items } = await modelingApi.sessions(workspaceId);
+        if (!active) return;
+        setSessions(items);
+        const summary = items.find((item) => item.id === sessionId);
+        const current = sessionRef.current;
+        ticks += 1;
+        if (
+          !summary ||
+          !current ||
+          summary.task_status !== current.task_status ||
+          summary.updated_at !== current.updated_at ||
+          ticks % 10 === 0
+        ) {
+          const value = await modelingApi.get(workspaceId, sessionId);
           if (active) setSession(value);
-        })
-        .catch((e: Error) => {
-          if (active) setError(e.message);
-        });
-    }, 1500);
+        }
+      } catch (e) {
+        if (active) setError((e as Error).message);
+      }
+      if (active) timer = window.setTimeout(tick, 1500);
+    };
+    timer = window.setTimeout(tick, 1500);
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, [workspaceId, sessionId, taskStatus, pageActive]);
   const create = async (title = "新的建模会话") => {

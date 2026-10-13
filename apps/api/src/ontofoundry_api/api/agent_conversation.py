@@ -34,6 +34,7 @@ from ontofoundry_api.services.dataagent import (
     proposal_instructions,
     require_dataagent_configuration,
 )
+from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.model_result import (
     exhaust_retriable_result,
     reconcile_run,
@@ -742,7 +743,7 @@ async def send_message(
                 topic_id,
                 f"{material.id}-{material.name}",
                 path.read_bytes(),
-                "text/markdown",
+                material_media_type(material.name),
             )
             material_paths.append(str(uploaded.get("rel_path") or material.name))
             material_path_by_id[material.id] = material_paths[-1]

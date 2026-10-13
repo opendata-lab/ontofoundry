@@ -53,6 +53,7 @@ export function BuilderPage() {
   // polls. It knows first, and it covers the parked states — waiting_input is
   // still a live run, and treating it as idle would unlock editing mid-run.
   const [running, setRunning] = useState(false);
+  const wasRunning = useRef(false);
   const proposals = useProposals(session, setSession, model.reload);
   const reloadProposals = proposals.reload;
   const reloadModel = model.reload;
@@ -143,12 +144,15 @@ export function BuilderPage() {
       setRunning(active);
       // The BFF bumps the session revision when it accepts a run. Without
       // resyncing, every later save and publish would carry a stale
-      // revision and be rejected.
-      if (active) reloadModel();
+      // revision and be rejected. Once per run start is enough: the element
+      // reports run changes repeatedly while a run is live.
+      if (active && !wasRunning.current) reloadModel();
+      wasRunning.current = active;
     };
 
     const onComplete = (event: Event) => {
       setRunning(false);
+      wasRunning.current = false;
       // Reload on any terminal state: a modeling result is stored (a new
       // proposal batch, or a replaced draft for a legacy run) before
       // completion is reported.
@@ -318,7 +322,7 @@ export function BuilderPage() {
                 {materialMode === "upload" && (
                   <button
                     className="ref-upload"
-                    aria-label="上传 Markdown 材料"
+                    aria-label="上传业务知识材料"
                     disabled={uploading || running}
                     onClick={() => input.current?.click()}
                     onDragOver={(e) => e.preventDefault()}
@@ -332,7 +336,7 @@ export function BuilderPage() {
                       {uploading ? "正在上传…" : "点击或拖拽文件至此上传"}
                     </strong>
                     <small>
-                      支持 Markdown · UTF-8
+                      支持 Markdown、TXT、JSON、YAML、CSV · UTF-8
                       <br />
                       单文件不超过 {capabilities?.max_file_mb ?? 256} MB
                     </small>
@@ -341,7 +345,7 @@ export function BuilderPage() {
                 <input
                   ref={input}
                   type="file"
-                  accept=".md,.markdown"
+                  accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"
                   multiple
                   hidden
                   onChange={(e) =>
@@ -352,7 +356,7 @@ export function BuilderPage() {
                   <div className="material-list">
                     {!materials.length && (
                       <p className="muted">
-                        尚未上传材料，请先上传 Markdown 文件。
+                        尚未上传材料，请先上传业务知识文件。
                       </p>
                     )}
                     {materials.map((m) => (

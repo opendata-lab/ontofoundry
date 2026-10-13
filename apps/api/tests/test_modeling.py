@@ -112,6 +112,20 @@ def test_markdown_upload_dedup_download_and_encoding(client):
     assert client.post(ROOT + "/materials?name=x.md", content=b"\xff").status_code == 422
 
 
+def test_text_materials_other_than_markdown_upload_with_their_type(client):
+    content = json.dumps({"object_types": [{"id": "component", "name_zh": "组件"}]}, ensure_ascii=False, indent=2).encode()
+    uploaded = client.post(ROOT + "/materials?name=ontology.json", content=content)
+    assert uploaded.status_code == 201, uploaded.text
+    assert uploaded.json()["name"] == "ontology.json"
+    downloaded = client.get(ROOT + "/materials/" + uploaded.json()["id"])
+    assert downloaded.content == content
+    assert downloaded.headers["content-type"].startswith("application/json")
+    for name in ("notes.txt", "terms.yaml", "terms.yml", "rows.csv"):
+        response = client.post(ROOT + f"/materials?name={name}", content=f"{name}\n".encode())
+        assert response.status_code == 201, (name, response.text)
+    assert client.post(ROOT + "/materials?name=x.docx", content=b"doc").status_code == 422
+
+
 def test_non_member_cannot_read_materials_drafts_connections_or_instances(client):
     s = create_session(client)
     client.app.dependency_overrides[current_principal] = lambda: Principal(

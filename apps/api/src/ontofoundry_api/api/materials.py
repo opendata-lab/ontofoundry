@@ -23,6 +23,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.services.errors import ConflictError
+from ontofoundry_api.services.material_types import is_material_name, material_media_type
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/materials", tags=["materials"])
 
@@ -157,8 +158,10 @@ async def upload(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    if Path(name).suffix.lower() not in (".md", ".markdown"):
-        raise HTTPException(422, "当前仅支持 UTF-8 Markdown 文件")
+    if not is_material_name(name):
+        raise HTTPException(
+            422, "仅支持 UTF-8 文本材料：Markdown、TXT、JSON、YAML、CSV"
+        )
     root = request.app.state.settings.data_dir.resolve()
     root.mkdir(parents=True, exist_ok=True)
     digest, size = hashlib.sha256(), 0
@@ -237,7 +240,7 @@ def download(
     path = request.app.state.settings.data_dir / workspace_id / (item.sha256 + ".md")
     if not path.is_file():
         raise HTTPException(404, "源文件缺失，请联系管理员恢复备份")
-    return FileResponse(path, filename=item.name, media_type="text/markdown")
+    return FileResponse(path, filename=item.name, media_type=material_media_type(item.name))
 
 
 def _material(db: Session, workspace_id: str, material_id: str) -> MaterialRecord:
