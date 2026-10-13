@@ -271,6 +271,13 @@ export function BuilderPage() {
           </button>
         </div>
       )}
+      {/* A modeling run that ended with questions instead of a result. The
+          conversation's own run label only says the turn finished. */}
+      {!running && session?.result_state === "awaiting_reply" && (
+        <div className="inline-notice" role="status">
+          {session.task_detail}
+        </div>
+      )}
       <div
         className={
           "ref-builder-columns" + (collapsed ? " config-collapsed" : "")

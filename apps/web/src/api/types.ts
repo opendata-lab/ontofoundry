@@ -736,6 +736,8 @@ export type ModelingSession = {
    * Non-blocking import notes from the complete model produced by the last run.
    */
   result_warnings?: string[];
+  /** Last run's result: "done", "awaiting_reply" (the agent asked a question), … */
+  result_state?: string;
   dataagent_topic_id?: string | null;
   dataagent_task_id?: string | null;
   updated_at: string;

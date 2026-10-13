@@ -160,12 +160,30 @@ def test_run_token_path_isolation_does_not_consume_previous_round_file(
     )
     before = _row(client, session["id"])
 
-    assert _reconcile(client, session["id"]) == "failed_permanent"
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
     after = _row(client, session["id"])
     assert paths == ["output/ontofoundry-result-new-token.json"]
     assert after.draft_json == before.draft_json
     assert after.candidates_json == before.candidates_json
-    assert "new-token" in after.task_detail
+
+
+def test_run_without_result_file_waits_for_the_users_reply(client, monkeypatch):
+    """A model run whose agent only asked questions is not a failure: it says
+    the agent needs an answer, and is never downloaded again."""
+    session = _create_model_session(client)
+    paths = _install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+    before = _row(client, session["id"])
+
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
+    after = _row(client, session["id"])
+    assert after.task_status == "finished"
+    assert after.result_state == "awaiting_reply"
+    assert after.task_detail == "智能体需要你确认后才能生成建模结果，请在对话中回复"
+    assert after.draft_json == before.draft_json
+    assert after.revision == before.revision
+
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
+    assert len(paths) == 1
 
 
 def test_file_run_token_mismatch_is_permanent_and_preserves_model(
@@ -223,7 +241,6 @@ def test_download_timeout_is_retriable_then_next_reconcile_succeeds(
 @pytest.mark.parametrize(
     ("download_value", "detail"),
     [
-        (DataAgentError("not found", status_code=404), "没有产出"),
         (b"not-json", "JSON"),
         ({**_payload(), "schema_version": "wrong"}, "schema_version"),
         (
