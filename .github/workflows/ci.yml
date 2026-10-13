@@ -161,8 +161,11 @@ jobs:
           test -f compose.yaml
           test -f install.sh
           test ! -e integrations
-          if grep -i dataagent compose.yaml .env.example README.md install.sh; then
-            echo "离线包元数据不应包含 DataAgent 配置或说明"
+          # The package connects to an external DataAgent (ONTOFOUNDRY_DATAAGENT_*
+          # settings are expected) but must never bundle one: no agent service
+          # or image in compose.
+          if grep -nEi '^[[:space:]]*image:.*(dataagent|of-agent)|^  [a-z0-9_-]*agent[a-z0-9_-]*:[[:space:]]*$' compose.yaml; then
+            echo "离线包不应内置 DataAgent 运行时，只连接外部 DataAgent"
             exit 1
           fi
           # 镜像 tar 应当是有内容的：save 失败也可能留下一个空文件。
