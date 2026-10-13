@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 from uuid import uuid4
 
-from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import (
@@ -60,14 +59,8 @@ def resolve_alias(db, wid, alias: str):
 
 @contextmanager
 def connect_readonly(item, settings, *, timeout_ms=None):
-    if not settings.connection_key:
-        raise HTTPException(503, "服务器尚未配置连接加密主密钥")
     try:
-        password = (
-            Fernet(settings.connection_key.encode())
-            .decrypt(item.secret_encrypted.encode())
-            .decode()
-        )
+        password = item.secret_encrypted
         config = item.config_json
         driver = "postgresql+psycopg" if item.kind == "postgresql" else "mysql+pymysql"
         statement_ms = 10000 if timeout_ms is None else int(timeout_ms)
@@ -101,7 +94,7 @@ def connect_readonly(item, settings, *, timeout_ms=None):
                 connection.rollback()
         finally:
             engine.dispose()
-    except (SQLAlchemyError, InvalidToken, ValueError) as exc:
+    except (SQLAlchemyError, ValueError) as exc:
         raise HTTPException(
             422, "连接或只读查询失败，请检查只读账号、网络、字段和服务器配置"
         ) from exc
@@ -145,13 +138,6 @@ def create_connection(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id, admin=True)
-    key = request.app.state.settings.connection_key
-    if not key:
-        raise HTTPException(503, "请先在服务器设置 ONTOFOUNDRY_CONNECTION_KEY 加密主密钥")
-    try:
-        encrypted = Fernet(key.encode()).encrypt(body.password.encode()).decode()
-    except ValueError as exc:
-        raise HTTPException(503, "连接加密主密钥格式无效") from exc
     # Mappings name their data source, so the name has to identify one connection.
     if db.scalar(
         select(ConnectionRecord).where(
@@ -166,7 +152,7 @@ def create_connection(
         name=body.name,
         kind=body.kind,
         config_json=body.model_dump(exclude={"name", "kind", "password"}),
-        secret_encrypted=encrypted,
+        secret_encrypted=body.password,
     )
     with connect_readonly(item, request.app.state.settings) as conn:
         conn.execute(text("SELECT 1"))

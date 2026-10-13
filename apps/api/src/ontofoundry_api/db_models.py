@@ -171,6 +171,8 @@ class ConnectionRecord(Base):
     name: Mapped[str] = mapped_column(String(120))
     kind: Mapped[str] = mapped_column(String(16))
     config_json: Mapped[dict] = mapped_column(JSON)
+    # Stored as entered (intranet tool, no key management). The column keeps its
+    # historical name to avoid a migration.
     secret_encrypted: Mapped[str] = mapped_column(Text)
 
 

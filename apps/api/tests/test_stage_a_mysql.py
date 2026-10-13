@@ -12,7 +12,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from cryptography.fernet import Fernet
 from fastapi import HTTPException
 from sqlalchemy import text
 from test_modeling import mcp_request
@@ -29,7 +28,6 @@ from ontofoundry_api.db_models import ConnectionRecord
 def test_mysql_metadata_mapping_instance_service_and_readonly_account(client):
     config = json.loads(Path(os.environ["ONTOFOUNDRY_TEST_MYSQL_CONFIG"]).read_text())
     assert config["kind"] == "mysql"
-    client.app.state.settings.connection_key = Fernet.generate_key().decode()
     created = client.post(ROOT + "/connections", json=config)
     assert created.status_code == 201, created.text
     cid = created.json()["id"]

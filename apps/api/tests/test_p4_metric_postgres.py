@@ -3,7 +3,6 @@
 import json
 
 import pytest
-from cryptography.fernet import Fernet
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,14 +29,8 @@ def metric_pg(pg_client):
     # pg_client creates and drops its own database. Reject accidental use of any
     # other database even when running this fixture with custom test settings.
     assert url.database.startswith("of_t0_")
-    settings.connection_key = Fernet.generate_key().decode()
     source, draft, version_id = publish(client, "library-lending")
     alias = connection_alias(OntologyDraft.model_validate(draft).semantic_models[0])
-    secret = (
-        Fernet(settings.connection_key.encode())
-        .encrypt((url.password or "").encode())
-        .decode()
-    )
     item = ConnectionRecord(
         id="p4-source",
         workspace_id=str(DEMO_WORKSPACE_ID),
@@ -49,7 +42,7 @@ def metric_pg(pg_client):
             username=url.username,
             database=url.database,
         ),
-        secret_encrypted=secret,
+        secret_encrypted=url.password or "",
     )
     with client.app.state.session_factory() as db:
         db.add(item)

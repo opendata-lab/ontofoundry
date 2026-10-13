@@ -902,7 +902,7 @@ def capabilities(
         "agent_configured": configured,
         "model": f"DataAgent · {config.dataagent_agent_id}" if configured else "",
         "max_file_mb": config.max_file_mb,
-        "connections_configured": bool(config.connection_key),
+        "connections_configured": True,
         "skills": ["md2ossie"],
     }
 

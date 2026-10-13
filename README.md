@@ -80,20 +80,13 @@ make serve
 | --- | --- |
 | `ONTOFOUNDRY_DATABASE_URL` | 平台 PostgreSQL 连接地址 |
 | `ONTOFOUNDRY_DATA_DIR` | 上传材料的本地存储目录 |
-| `ONTOFOUNDRY_CONNECTION_KEY` | 加密业务数据库连接凭据的固定 Fernet 密钥，新增数据连接前必须配置 |
 | `ONTOFOUNDRY_SEED_DEMO` | 是否初始化示例，正式部署设为 `false` |
 | `ONTOFOUNDRY_AUTH_MODE` | 本地开发使用 `dev`，正式部署使用 `oauth` |
 | `ONTOFOUNDRY_SESSION_SECRET` | 会话签名密钥 |
 | `ONTOFOUNDRY_COOKIE_SECURE` | 是否只通过 HTTPS 发送会话 Cookie |
 | `ONTOFOUNDRY_PUBLIC_BASE_URL` | 外部 Agent 访问本平台 MCP 时使用的可达地址 |
 
-可用以下命令生成连接加密密钥，并将输出填入 `apps/api/.env`：
-
-```sh
-(cd apps/api && uv run python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')
-```
-
-业务数据库使用只读账号。连接密钥应固定保存并单独备份，更换它会影响已有连接凭据的解密。
+数据连接只需填写业务数据库的地址、账号和密码，密码按原样保存在平台数据库中。业务数据库请使用只读账号。
 
 ### 接入 DataAgent
 
