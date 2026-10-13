@@ -7,13 +7,14 @@ import { ProposalDetail } from "./ProposalDetail";
 import { useElementInspector } from "../../hooks/useElementInspector";
 import { acceptableIds, itemTitle } from "./elementMeta";
 
-type Filter = "all" | "blocked" | "update" | "delete" | "create";
+type Filter = "all" | "blocked" | "update" | "delete" | "create" | "accepted";
 
 const GROUPS: { key: string; title: string; match: (i: ProposalItem) => boolean }[] = [
   { key: "blocked", title: "冲突 / 已过期", match: (i) => i.status === "stale" || i.status === "conflict" },
   { key: "update", title: "修改", match: (i) => i.status === "pending" && i.operation === "update" },
   { key: "delete", title: "删除", match: (i) => i.status === "pending" && i.operation === "delete" },
   { key: "create", title: "新增", match: (i) => i.status === "pending" && i.operation === "create" },
+  { key: "accepted", title: "已接受", match: (i) => i.status === "accepted" },
 ];
 
 export function ProposalPanel({
@@ -42,10 +43,24 @@ export function ProposalPanel({
     );
 
   const decideGroup = (item: ProposalItem, decision: "accept" | "reject" | "restore") => {
-    const ids =
+    let ids =
       decision === "accept"
         ? item.dependency_group.filter((id) => byId.get(id)?.status === "pending")
         : [item.id];
+    if (decision === "reject" && item.status === "accepted") {
+      const group = new Set([item.id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const candidate of items) {
+          if (candidate.status === "accepted" && !group.has(candidate.id) && candidate.depends_on.some((id) => group.has(id))) {
+            group.add(candidate.id);
+            changed = true;
+          }
+        }
+      }
+      ids = [...group];
+    }
     return proposals.decide(ids.map((proposal_id) => ({ proposal_id, decision })));
   };
   const actions: CardActions = {
@@ -70,11 +85,12 @@ export function ProposalPanel({
     update: items.filter(GROUPS[1].match).length,
     delete: items.filter(GROUPS[2].match).length,
     create: items.filter(GROUPS[3].match).length,
+    accepted: items.filter(GROUPS[4].match).length,
   };
   const pending = items.filter((i) => i.status === "pending").length;
   const acceptable = acceptableIds(items);
   const rejectable = items.filter((i) => ["pending", "stale", "conflict"].includes(i.status));
-  const history = items.filter((i) => ["accepted", "rejected", "superseded"].includes(i.status));
+  const history = items.filter((i) => ["rejected", "superseded"].includes(i.status));
   const visible = GROUPS.filter((g) => filter === "all" || filter === g.key);
   const drifted =
     detail && detail.source_session_revision !== session.revision && counts.blocked > 0;
@@ -158,6 +174,7 @@ export function ProposalPanel({
               ["update", "修改", counts.update],
               ["delete", "删除", counts.delete],
               ["create", "新增", counts.create],
+              ["accepted", "已接受", counts.accepted],
             ] as [Filter, string, number][]
           ).map(([key, label, count]) => (
             <button

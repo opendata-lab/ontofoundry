@@ -97,6 +97,11 @@ export function ProposalCard({
             </button>
           </>
         )}
+        {item.status === "accepted" && (
+          <button type="button" className="button button--secondary" disabled={busy} title="撤销此提案对草稿的修改，并一并拒绝依赖它的已接受提案" onClick={() => actions.reject(item)}>
+            拒绝
+          </button>
+        )}
         {item.status === "rejected" && (
           <button type="button" className="button button--text" disabled={busy} onClick={() => actions.restore(item)}>
             恢复

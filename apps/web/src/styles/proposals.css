@@ -73,6 +73,7 @@
 .proposal-group--update > h3 { border-color: var(--proposal-warn); }
 .proposal-group--delete > h3 { border-color: var(--color-danger); }
 .proposal-group--create > h3 { border-color: var(--color-success); }
+.proposal-group--accepted > h3 { border-color: var(--color-success); }
 .proposal-group--history > summary { cursor: pointer; }
 .proposal-group small {
   margin-left: 4px;

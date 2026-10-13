@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
+from types import SimpleNamespace
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -31,6 +32,7 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
+from ontofoundry_api.domain.canonical import LEGACY_HASH_ALGORITHM, element_sha256
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
@@ -40,6 +42,7 @@ from ontofoundry_api.services.proposals import batch_items as _batch_items
 from ontofoundry_api.services.proposals import (
     dependency_group,
     dependency_map,
+    dependent_group,
     effective_statuses,
 )
 
@@ -240,7 +243,7 @@ def _request_sha256(body: DecisionRequest) -> str:
     ).hexdigest()
 
 
-def _apply(draft: dict, item: ProposalItemRecord) -> None:
+def _apply(draft: dict, item: ProposalItemRecord | SimpleNamespace) -> None:
     collection = COLLECTIONS[ElementKind(item.target_kind)]
     elements = draft.setdefault(collection, [])
     after = deepcopy(item.after_json)
@@ -292,6 +295,114 @@ def _topological(items: list[ProposalItemRecord], dependencies: dict[str, list[s
     return ordered
 
 
+def _decision_response(record: ProposalDecisionRequestRecord) -> dict:
+    # Side-effect history lives in the decision record, never in the API DTO.
+    return {key: value for key, value in record.response_json.items() if key != "_undo"}
+
+
+def _undo_context(db: Session, item: ProposalItemRecord) -> dict:
+    record = db.scalar(
+        select(ProposalDecisionRequestRecord)
+        .join(
+            ProposalDecisionItemRecord,
+            ProposalDecisionItemRecord.request_id == ProposalDecisionRequestRecord.id,
+        )
+        .where(
+            ProposalDecisionItemRecord.workspace_id == item.workspace_id,
+            ProposalDecisionItemRecord.session_id == item.session_id,
+            ProposalDecisionItemRecord.item_id == item.id,
+            ProposalDecisionItemRecord.decision == "accept",
+            ProposalDecisionRequestRecord.result_session_revision == item.accepted_revision,
+        )
+    )
+    if record is None:
+        return {}
+    context = deepcopy(record.response_json.get("_undo", {}).get(item.id, {}))
+    accepted_draft = record.response_json["session"]["draft"]
+    if accepted_draft.get("schema_version") == "3":
+        if item.target_kind in ("object_type", "value_type"):
+            context.setdefault(
+                "produced_context",
+                accepted_draft["extension_v4"]["concept_context"].get(item.target_id),
+            )
+        if item.target_kind == "link_type" and "produced_join" not in context:
+            from ontofoundry_api.domain.runtime_views import legacy_mapping_form
+            context.setdefault("produced_join", legacy_mapping_form(accepted_draft)["joins"].get(item.target_id))
+    return context
+
+
+def _check_undo(
+    draft: dict, item: ProposalItemRecord, compatibility: dict, undo_context: dict,
+) -> None:
+    if item.target_kind == "mapping":
+        element = next((e for e in compatibility["mappings"] if str(e["id"]) == item.target_id), None)
+        found = ("mapping", element) if element else _session_elements(draft).get(item.target_id)
+    else:
+        found = _session_elements(draft).get(item.target_id)
+    unchanged = found is None if item.operation == "delete" else False
+    if item.operation != "delete" and found and found[0] == item.target_kind:
+        after = deepcopy(item.after_json)
+        context = after.pop("concept_context", ...) if draft.get("schema_version") == "3" else ...
+        join = after.pop("data_join", ...) if item.target_kind == "link_type" and draft.get("schema_version") == "3" else ...
+        algorithm = draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM
+        collection = COLLECTIONS[ElementKind(item.target_kind)]
+        unchanged = element_sha256(
+            found[1], hash_algorithm=algorithm, collection=collection,
+        ) == element_sha256(after, hash_algorithm=algorithm, collection=collection)
+        if context is not ...:
+            unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == context
+        if join is not ...:
+            unchanged = unchanged and compatibility["joins"].get(item.target_id) == join
+    if "produced_context" in undo_context:
+        unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == undo_context["produced_context"]
+    elif item.operation == "create" and draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
+        unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == item.after_json.get("concept_context")
+    if "produced_join" in undo_context:
+        unchanged = unchanged and compatibility["joins"].get(item.target_id) == undo_context["produced_join"]
+    if draft.get("schema_version") == "3" and item.target_kind == "rule":
+        for collection in ("object_types", "value_types", "properties", "link_types"):
+            for owner in draft[collection]:
+                for key, kind in (("requires", "constraint"), ("derived_by", "derivation")):
+                    belongs = bool(item.after_json and item.after_json["owner_id"] == owner["id"] and item.after_json["rule_kind"] == kind)
+                    unchanged = unchanged and (item.target_id in owner.get(key, [])) == belongs
+    if item.operation == "delete" and draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
+        unchanged = unchanged and item.target_id not in draft["extension_v4"]["concept_context"]
+    if not unchanged:
+        raise _fail(
+            409,
+            "PROPOSAL_UNDO_CONFLICT",
+            "该元素在接受后又被修改，不能直接撤销",
+            items=[{"proposal_id": item.id, "reason": "该元素在接受后又被修改，不能直接撤销"}],
+        )
+
+
+def _inverse(item: ProposalItemRecord, context: dict) -> SimpleNamespace:
+    after = deepcopy(item.before_json)
+    if after is not None and item.target_kind == "link_type" and "data_join" in context:
+        after["data_join"] = context["data_join"]
+    return SimpleNamespace(
+        operation={"create": "delete", "update": "update", "delete": "create"}[item.operation],
+        target_kind=item.target_kind,
+        target_id=item.target_id,
+        after_json=after,
+    )
+
+
+def _restore_rule_refs(draft: dict, item: ProposalItemRecord, context: dict) -> None:
+    for before in context.get("rule_owners", []):
+        owner = next((e for e in draft[before["collection"]] if e["id"] == before["id"]), None)
+        if owner is None:
+            continue
+        for key in ("requires", "derived_by"):
+            refs = owner.get(key, [])
+            if item.target_id in before[key] and item.target_id in refs:
+                refs.remove(item.target_id)
+                position = before[key].index(item.target_id)
+                refs.insert(min(position, len(refs)), item.target_id)
+            if key not in before["native_presence"] and not refs:
+                owner["native_presence"] = [p for p in owner.get("native_presence", []) if p != key]
+
+
 @router.post("/proposal-decisions")
 def decide(
     workspace_id: str,
@@ -325,7 +436,7 @@ def decide(
     if previous is not None:
         if previous.request_sha256 != request_hash:
             raise _fail(409, "IDEMPOTENCY_MISMATCH", "同一幂等键已用于不同的请求")
-        return previous.response_json
+        return _decision_response(previous)
     # 2a. Revision.
     if session.revision != body.expected_session_revision:
         raise _fail(409, "SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重新确认")
@@ -360,6 +471,10 @@ def decide(
     by_id = {item.id: item for item in batch_items}
 
     accepts = [d.proposal_id for d in body.decisions if d.decision == "accept"]
+    undoes = [
+        d.proposal_id for d in body.decisions
+        if d.decision == "reject" and items[d.proposal_id].status == "accepted"
+    ]
     problems = []
     for decision in body.decisions:
         status, reason = statuses[decision.proposal_id]
@@ -368,7 +483,7 @@ def decide(
                 status, "PROPOSAL_NOT_DECIDABLE"
             )
             problems.append((409, code, decision.proposal_id, reason or f"提案当前为 {status}"))
-        elif decision.decision == "reject" and status not in ("pending", "stale", "conflict"):
+        elif decision.decision == "reject" and status not in ("pending", "stale", "conflict", "accepted"):
             problems.append((409, "PROPOSAL_NOT_DECIDABLE", decision.proposal_id, f"提案当前为 {status}"))
         elif decision.decision == "restore" and items[decision.proposal_id].status != "rejected":
             problems.append((409, "PROPOSAL_NOT_RESTORABLE", decision.proposal_id, "只有已拒绝的提案可以恢复"))
@@ -386,7 +501,7 @@ def decide(
         for dep in dependency_group(proposal_id, dependencies):
             if dep == proposal_id:
                 continue
-            if by_id[dep].status == "accepted":
+            if by_id[dep].status == "accepted" and dep not in undoes:
                 continue
             if dep not in accepts:
                 raise _fail(
@@ -396,7 +511,20 @@ def decide(
                     items=[{"proposal_id": proposal_id, "reason": f"缺少依赖 {dep}"}],
                 )
 
-    # Apply accepted items in dependency order and validate the whole draft.
+    for proposal_id in undoes:
+        missing_dependents = [
+            dep for dep in dependent_group(proposal_id, dependencies)
+            if by_id[dep].status == "accepted" and dep not in undoes
+        ]
+        if missing_dependents:
+            raise _fail(
+                422,
+                "DEPENDENCY_INCOMPLETE",
+                "撤销已接受提案时必须一并拒绝依赖它的已接受提案",
+                items=[{"proposal_id": proposal_id, "reason": "缺少已接受的依赖提案：" + "、".join(missing_dependents)}],
+            )
+
+    # Undo dependents first, then accept prerequisites first; validate once.
     before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
     from ontofoundry_api.domain.runtime_views import (
@@ -406,7 +534,80 @@ def decide(
     compatibility = legacy_mapping_form(draft)
     joins = compatibility["joins"]
     compatibility_changed = False
+    undo_contexts = {}
+    undone_items = list(reversed(_topological([items[i] for i in undoes], dependencies)))
+    for item in undone_items:
+        context = _undo_context(db, item)
+        _check_undo(draft, item, compatibility, context)
+        if item.target_kind == "rule" and "rule_owners" not in context and (item.after_json or item.before_json)["owner_kind"] != "action":
+            raise _fail(
+                409, "PROPOSAL_UNDO_CONFLICT",
+                "该提案缺少接受前的规则引用记录，不能直接撤销",
+                items=[{"proposal_id": item.id, "reason": "该提案缺少接受前的规则引用记录，不能直接撤销"}],
+            )
+        if item.target_kind == "link_type" and draft.get("schema_version") == "3" and "data_join" not in context:
+            before = item.before_json or {}
+            if item.operation == "update" and "data_join" in (item.after_json or {}) and "data_join" not in before:
+                raise _fail(
+                    409, "PROPOSAL_UNDO_CONFLICT",
+                    "该提案缺少接受前的关系映射记录，不能直接撤销",
+                    items=[{"proposal_id": item.id, "reason": "该提案缺少接受前的关系映射记录，不能直接撤销"}],
+                )
+            if item.operation == "delete":
+                restored = deepcopy(draft)
+                _apply(restored, _inverse(item, {}))
+                context["data_join"] = legacy_mapping_form(restored)["joins"].get(item.target_id)
+            else:
+                context["data_join"] = before.get("data_join", compatibility["joins"].get(item.target_id))
+        inverse = _inverse(item, context)
+        if item.target_kind == "mapping":
+            _apply(compatibility, inverse)
+            if inverse.operation == "delete":
+                # Remove native mapping references before undoing their concept.
+                try:
+                    draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
+                except ValueError as exc:
+                    raise _fail(422, "VALIDATION_FAILED", "映射撤销无效：" + str(exc)) from exc
+            compatibility_changed = True
+            continue
+        if inverse.operation == "delete" and item.target_kind == "link_type" and joins.get(item.target_id):
+            joins[item.target_id] = None
+            try:
+                draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
+            except ValueError as exc:
+                raise _fail(422, "VALIDATION_FAILED", "映射撤销无效：" + str(exc)) from exc
+        _apply(draft, inverse)
+        _restore_rule_refs(draft, item, context)
+        if item.target_kind == "link_type" and "data_join" in context:
+            joins[item.target_id] = context["data_join"] if inverse.after_json else None
+            for link in draft["link_types"]:
+                if link["id"] == item.target_id:
+                    link.pop("data_join", None)
+            compatibility_changed = True
     for item in accepted_items:
+        context = {}
+        if draft.get("schema_version") == "3" and item.target_kind == "rule":
+            owner_ids = {e["owner_id"] for e in (item.before_json, item.after_json) if e}
+            context["rule_owners"] = [
+                {"collection": collection, "id": owner["id"],
+                 "requires": deepcopy(owner.get("requires", [])),
+                 "derived_by": deepcopy(owner.get("derived_by", [])),
+                 "native_presence": deepcopy(owner.get("native_presence", []))}
+                for collection in ("object_types", "value_types", "properties", "link_types")
+                for owner in draft[collection] if owner["id"] in owner_ids
+            ]
+        if draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
+            context["produced_context"] = (
+                (item.after_json or {}).get("concept_context", draft["extension_v4"]["concept_context"].get(item.target_id))
+                if item.operation != "delete" else None
+            )
+        if draft.get("schema_version") == "3" and item.target_kind == "link_type":
+            context["data_join"] = deepcopy(joins.get(item.target_id))
+            context["produced_join"] = (
+                deepcopy((item.after_json or {}).get("data_join", joins.get(item.target_id)))
+                if item.operation != "delete" else None
+            )
+        undo_contexts[item.id] = context
         if item.target_kind == "mapping":
             _apply(compatibility, item)
             compatibility_changed = True
@@ -422,8 +623,10 @@ def decide(
         try:
             draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
         except ValueError as exc:
-            raise _fail(422, "VALIDATION_FAILED", "映射提案无效：" + str(exc)) from exc
-    if accepted_items:
+            message = "映射撤销无效：" if undone_items else "映射提案无效："
+            raise _fail(422, "VALIDATION_FAILED", message + str(exc)) from exc
+    changed_items = [*undone_items, *accepted_items]
+    if changed_items:
         try:
             model = OntologyDraft.model_validate(draft)
         except ValidationError as exc:
@@ -431,8 +634,8 @@ def decide(
             raise _fail(
                 422,
                 "VALIDATION_FAILED",
-                f"接受后草稿校验未通过：{message}",
-                items=[{"proposal_id": i.id, "reason": message} for i in accepted_items],
+                f"{'撤销' if undone_items else '接受'}后草稿校验未通过：{message}",
+                items=[{"proposal_id": i.id, "reason": message} for i in changed_items],
             ) from exc
         from ontofoundry_api.services.join_validation import validate_join_columns
         validate_join_columns(db, workspace_id, before_mapping_write, model.model_dump(mode="json"), request.app.state.settings)
@@ -449,8 +652,8 @@ def decide(
         check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
-    new_revision = session.revision + 1 if accepted_items else session.revision
-    if accepted_items:
+    new_revision = session.revision + 1 if changed_items else session.revision
+    if changed_items:
         session.draft_json = draft
         session.draft_sha256 = draft_sha256(draft, workspace_id)
         session.revision = new_revision
@@ -462,6 +665,7 @@ def decide(
             item.status, item.accepted_revision = "accepted", new_revision
         elif decision.decision == "reject":
             item.status = "rejected"
+            item.accepted_revision = None
         else:
             item.status = "pending"
         item.decided_by, item.decided_at = user.id, now
@@ -488,7 +692,7 @@ def decide(
         request_sha256=request_hash,
         expected_session_revision=body.expected_session_revision,
         result_session_revision=new_revision,
-        response_json=response,
+        response_json={**response, "_undo": undo_contexts},
         actor_id=user.id,
         created_at=now,
     )
@@ -517,7 +721,7 @@ def decide(
             )
         )
         if winner is not None and winner.request_sha256 == request_hash:
-            return winner.response_json
+            return _decision_response(winner)
         raise ConflictError("决策提交冲突，请刷新后重试") from exc
     return response
 

@@ -111,7 +111,8 @@ export function ProposalDetail({
             <button
               type="button"
               className="button button--secondary"
-              disabled={busy || !["pending", "stale", "conflict"].includes(item.status)}
+              disabled={busy || !["pending", "stale", "conflict", "accepted"].includes(item.status)}
+              title={item.status === "accepted" ? "撤销此提案对草稿的修改，并一并拒绝依赖它的已接受提案" : undefined}
               onClick={() => actions.reject(item)}
             >
               拒绝

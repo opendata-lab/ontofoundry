@@ -150,6 +150,74 @@ describe("proposal panel", () => {
     ]);
   });
 
+  it("keeps accepted items visible and offers undo from the card and drawer", () => {
+    const accepted = item({ id: "accepted", display_name: "已审实体", status: "accepted", stored_status: "accepted", accepted_revision: 8 });
+    const proposals = state({ detail: batch({ items: [accepted] }) });
+    panel(proposals);
+    const card = screen.getByRole("article", { name: /新增 实体 · 已审实体/ });
+    expect(card.closest("details")).toBeNull();
+    expect(within(card).getByText("已接受 → r8")).toBeVisible();
+    expect(screen.getByRole("radio", { name: "全部 1" })).toBeInTheDocument();
+    fireEvent.click(within(card).getByRole("button", { name: "拒绝" }));
+    expect(proposals.decide).toHaveBeenCalledWith([{ proposal_id: "accepted", decision: "reject" }]);
+    fireEvent.click(within(card).getByRole("button", { name: /新增 实体 · 已审实体/ }));
+    const drawer = screen.getByRole("dialog", { hidden: true });
+    const reject = within(drawer).getByRole("button", { name: "拒绝", hidden: true });
+    expect(reject).toBeEnabled();
+    fireEvent.click(reject);
+    expect(proposals.decide).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a proposal in the list when its decision changes to accepted", () => {
+    const pending = item({ id: "changing", display_name: "待审实体" });
+    const proposals = state({ detail: batch({ items: [pending] }) });
+    const view = panel(proposals);
+    fireEvent.click(screen.getByRole("button", { name: "接受" }));
+    const accepted = { ...pending, status: "accepted" as const, stored_status: "accepted" as const, accepted_revision: 8 };
+    view.rerender(
+      <MemoryRouter>
+        <ProposalPanel session={session({ revision: 8, pending_proposal_count: 0 })} proposals={state({ detail: batch({ items: [accepted] }) })} running={false} onRemodel={vi.fn()} />
+      </MemoryRouter>,
+    );
+    const card = screen.getByRole("article", { name: /待审实体/ });
+    expect(within(card).getByText("已接受 → r8")).toBeVisible();
+    expect(within(card).getByRole("button", { name: "拒绝" })).toBeEnabled();
+  });
+
+  it("rejects accepted dependents transitively, while keeping unrelated proposals", () => {
+    const root = item({ id: "root", display_name: "根实体", status: "accepted", stored_status: "accepted" });
+    const child = item({ id: "child", depends_on: ["root"], status: "accepted", stored_status: "accepted" });
+    const grandchild = item({ id: "grandchild", depends_on: ["child"], status: "accepted", stored_status: "accepted" });
+    const other = item({ id: "other", status: "accepted", stored_status: "accepted" });
+    const pending = item({ id: "pending", depends_on: ["root"] });
+    const proposals = state({ detail: batch({ items: [grandchild, child, root, other, pending] }) });
+    panel(proposals);
+    const card = screen.getByRole("article", { name: /新增 实体 · 根实体/ });
+    fireEvent.click(within(card).getByRole("button", { name: "拒绝" }));
+    expect(proposals.decide).toHaveBeenCalledWith([
+      { proposal_id: "root", decision: "reject" },
+      { proposal_id: "child", decision: "reject" },
+      { proposal_id: "grandchild", decision: "reject" },
+    ]);
+  });
+
+  it("shows backend undo refusals on the accepted card", () => {
+    const accepted = item({ id: "accepted", display_name: "已审实体", status: "accepted", stored_status: "accepted" });
+    panel(state({ detail: batch({ items: [accepted] }), itemErrors: { accepted: "该元素在接受后又被修改，不能直接撤销" } }));
+    const card = screen.getByRole("article", { name: /新增 实体 · 已审实体/ });
+    expect(within(card).getByRole("alert")).toHaveTextContent("该元素在接受后又被修改，不能直接撤销");
+    expect(within(card).getByRole("button", { name: "拒绝" })).toBeEnabled();
+  });
+
+  it("filters accepted proposals and disables undo while submitting", () => {
+    const accepted = item({ id: "accepted", display_name: "已审实体", status: "accepted", stored_status: "accepted" });
+    panel(state({ detail: batch({ items: [...items, accepted] }), busy: true }));
+    fireEvent.click(screen.getByRole("radio", { name: "已接受 1" }));
+    expect(screen.queryByRole("article", { name: /新增 实体 · 采购订单/ })).not.toBeInTheDocument();
+    const card = screen.getByRole("article", { name: /新增 实体 · 已审实体/ });
+    expect(within(card).getByRole("button", { name: "拒绝" })).toBeDisabled();
+  });
+
   it("never offers accept on a stale item, only reject and re-modelling", () => {
     const onRemodel = vi.fn();
     panel(state(), session(), onRemodel);
@@ -210,6 +278,23 @@ describe("proposal panel", () => {
 });
 
 describe("result tabs", () => {
+  it("keeps accepted proposals visible after inspecting the session draft and returning", () => {
+    const accepted = item({ id: "accepted", display_name: "已审实体", status: "accepted", stored_status: "accepted" });
+    const proposals = state({ detail: batch({ items: [accepted] }) });
+    render(
+      <MemoryRouter>
+        <ModelResults session={session({ pending_proposal_count: 0 })} proposals={proposals} />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /提案/ }));
+    expect(screen.getByRole("article", { name: /已审实体/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: /本体草稿/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /提案/ }));
+    const card = screen.getByRole("article", { name: /已审实体/ });
+    fireEvent.click(within(card).getByRole("button", { name: "拒绝" }));
+    expect(proposals.decide).toHaveBeenCalledWith([{ proposal_id: "accepted", decision: "reject" }]);
+  });
+
   it("opens on proposals when some are pending, and marks draft changes", () => {
     const s = session({
       base_diff: [

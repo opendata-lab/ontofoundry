@@ -303,6 +303,15 @@ def dependency_group(item_id: str, dependencies: dict[str, list[str]]) -> list[s
     return seen
 
 
+def dependent_group(item_id: str, dependencies: dict[str, list[str]]) -> list[str]:
+    """The item and everything that transitively depends on it."""
+    reverse: dict[str, list[str]] = {}
+    for child, parents in dependencies.items():
+        for parent in parents:
+            reverse.setdefault(parent, []).append(child)
+    return dependency_group(item_id, reverse)
+
+
 KIND_LABELS = {
     ElementKind.OBJECT_TYPE.value: "实体",
     ElementKind.VALUE_TYPE.value: "值概念",

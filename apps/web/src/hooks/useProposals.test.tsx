@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, proposalsApi } from "../api/client";
-import type { ModelingSession } from "../api/types";
+import type { ModelingSession, ProposalBatchDetail } from "../api/types";
 import { emptyDraft } from "../lib/draftView";
 import { useProposals } from "./useProposals";
 
@@ -50,5 +50,36 @@ describe("useProposals", () => {
     await act(() => hook.result.current.decide([{ proposal_id: "p", decision: "accept" }]));
     await waitFor(() => expect(hook.result.current.itemErrors).toEqual({ p: "目标已修改" }));
     expect(onStale).toHaveBeenCalled();
+  });
+
+  it("refreshes the draft, proposal items and counts after undo", async () => {
+    const { hook, onSession } = setup();
+    await waitFor(() => expect(proposalsApi.batches).toHaveBeenCalled());
+    const batches = vi.mocked(proposalsApi.batches);
+    const detail: ProposalBatchDetail = {
+      id: "b", status: "available", created_at: "", source_session_revision: 3, base_version_id: null,
+      counts: { pending: 0, accepted: 1, rejected: 0, stale: 0, conflict: 0, superseded: 0 },
+      items: [],
+    };
+    batches.mockResolvedValue({ items: [detail], next_cursor: null });
+    const batch = vi.mocked(proposalsApi.batch).mockResolvedValue(detail);
+    act(() => hook.result.current.reload());
+    await waitFor(() => expect(hook.result.current.detail).toEqual(detail));
+    batches.mockClear();
+    batch.mockClear();
+    const rejected = { ...detail, counts: { ...detail.counts, accepted: 0, rejected: 1 } };
+    batches.mockResolvedValue({ items: [rejected], next_cursor: null });
+    batch.mockResolvedValue(rejected);
+    const updated = { ...session, revision: 4, pending_proposal_count: 0 };
+    vi.spyOn(proposalsApi, "decide").mockResolvedValue({
+      session: updated,
+      results: [{ proposal_id: "p", status: "rejected", reason: "" }],
+      validation: {} as never,
+    });
+    await act(() => hook.result.current.decide([{ proposal_id: "p", decision: "reject" }]));
+    expect(onSession).toHaveBeenCalledWith(updated);
+    await waitFor(() => expect(batches).toHaveBeenCalled());
+    await waitFor(() => expect(hook.result.current.detail?.counts).toEqual(rejected.counts));
+    expect(batch).toHaveBeenCalledWith(expect.objectContaining({ id: "s" }), "b");
   });
 });
