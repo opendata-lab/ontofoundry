@@ -81,6 +81,7 @@ jobs:
 
   images:
     name: Image (${{ matrix.image.name }})
+    needs: [python, node]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -111,11 +112,14 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKER_USERNAME }}/${{ matrix.image.name }}
+          # latest 跟随 main；正式版本标签不覆盖这个滚动入口。
+          flavor: latest=false
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/login-action@v3
         if: steps.gate.outputs.publish == 'true'
@@ -183,7 +187,31 @@ jobs:
           tar -tf images/ontofoundry.tar >/dev/null
 
       - name: Compress
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/ontofoundry-offline.tar.gz" offline
+        run: |
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/ontofoundry-offline.tar.gz" offline
+          cd "$RUNNER_TEMP"
+          sha256sum ontofoundry-offline.tar.gz > ontofoundry-offline.tar.gz.sha256
+
+      # Release 附件不占 Actions artifact 额度；新包先发布到长期下载入口。
+      - name: Publish latest package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+        run: ./scripts/publish-latest-release.sh "$RUNNER_TEMP/ontofoundry-offline.tar.gz"
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" \
+                 --title "$GITHUB_REF_NAME" \
+                 --generate-notes
+          gh release upload "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/ontofoundry-offline.tar.gz" \
+            "$RUNNER_TEMP/ontofoundry-offline.tar.gz.sha256" --clobber
 
       - name: Upload the package
         id: offline-upload
@@ -225,17 +253,3 @@ jobs:
                 if (error.status !== 404) throw error;
               }
             }
-
-      - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # 先确保 release 存在再上传。此前这里只有 upload——而 `gh release
-          # upload` 对不存在的 release 直接失败，所以即便打了 tag 也传不上去。
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" \
-                 --title "$GITHUB_REF_NAME" \
-                 --generate-notes
-          gh release upload "$GITHUB_REF_NAME" \
-            "$RUNNER_TEMP/ontofoundry-offline.tar.gz" --clobber
