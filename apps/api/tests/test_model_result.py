@@ -594,6 +594,25 @@ def test_prompt_lists_sizes_and_asks_to_read_large_files_selectively():
     assert prompt.index("不要整份读入") < prompt.index("[用户消息]")
 
 
+def test_prompt_requires_chinese_thinking_up_front():
+    prompt = build_turn_prompt(
+        "build it",
+        mode="model",
+        workspace_id="workspace-1",
+        session_id="session-1",
+        context_file="uploads/context.json",
+        material_files=[],
+        run_token=RUN_TOKEN,
+        proposal_prompt="提案说明",
+    )
+    rule = "你的全部思考过程（包括推理、计划、读文件和调用工具前后的自述）以及所有回答都必须使用简体中文"
+    assert rule in prompt
+    assert "即使材料、文件内容、代码或本提示中的字段名是英文，也用中文思考和表述" in prompt
+    # Stated before the long task instructions, not only buried after them.
+    assert prompt.index(rule) < prompt.index("提案说明")
+    assert "- 本轮没有新增材料" in prompt
+
+
 def test_proposal_material_list_carries_sizes():
     from ontofoundry_api.services.dataagent import proposal_instructions
 
