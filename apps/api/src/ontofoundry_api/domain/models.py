@@ -94,6 +94,7 @@ NonEmptyText = Annotated[str, Field(min_length=1, max_length=240)]
 # them through the official lint; it never executes them.
 Expression = Annotated[str, Field(min_length=1, max_length=480)]
 Expressions = Annotated[list[Expression], Field(default_factory=list, max_length=20)]
+_EXPRESSIONS = TypeAdapter(Expressions)
 Verbalizations = Annotated[
     list[Annotated[str, Field(min_length=1, max_length=480)]],
     Field(default_factory=list, max_length=8),
@@ -201,6 +202,8 @@ EvidenceList = Annotated[
     Field(default_factory=list, max_length=50),
     AfterValidator(_unique_evidence),
 ]
+# Built once: a TypeAdapter per element dominated every draft validation.
+_EVIDENCE_LIST = TypeAdapter(EvidenceList)
 
 
 # --- definitions ------------------------------------------------------------
@@ -509,12 +512,12 @@ class OntologyDraft(Strict):
                 entries = [model.model_validate(item) for item in data.get(collection, [])]
                 for entry in entries:
                     if hasattr(entry, "evidence"):
-                        TypeAdapter(EvidenceList).validate_python(entry.evidence)
+                        _EVIDENCE_LIST.validate_python(entry.evidence)
                 data[collection] = entries
         elif version == "2":
             if V3_ONLY_FIELDS.intersection(data):
                 raise ValueError("schema_version 2 不能包含 v3 字段")
-            TypeAdapter(Expressions).validate_python(data.get("ontology_requires", []))
+            _EXPRESSIONS.validate_python(data.get("ontology_requires", []))
         return data
 
     @classmethod

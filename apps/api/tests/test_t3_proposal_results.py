@@ -362,3 +362,17 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
     assert f"inputs/{material['id']}-a.md" in prompts[1]  # still named in the second run
     manifest = row(client, session["id"]).run_manifest_json
     assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
+
+
+def test_proposals_run_without_result_file_asks_for_a_reply(client, monkeypatch):
+    session, _ = proposals_run(client)
+    install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+
+    assert reconcile(client, session["id"]) == "awaiting_reply"
+    current = row(client, session["id"])
+    assert current.task_status == "finished"
+    assert current.task_detail == "智能体需要你确认后才能生成提案，请在对话中回复"
+    assert stored(client, session["id"])[0] == []
+    detail = client.get(ROOT + "/sessions/" + session["id"]).json()
+    assert detail["result_state"] == "awaiting_reply"
+    assert detail["task_detail"] == current.task_detail

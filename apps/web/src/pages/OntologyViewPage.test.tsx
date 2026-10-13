@@ -18,7 +18,7 @@ vi.mock("../hooks/useWorkspaceContext", () => ({
 }));
 vi.mock("../api/client", () => ({
   api: { overview: vi.fn(), exportUrl: vi.fn(() => "/export") },
-  modelingApi: { importOssie: vi.fn() },
+  modelingApi: { importOssie: vi.fn(), sessions: vi.fn() },
   publishApi: { preview: vi.fn(), publish: vi.fn() },
 }));
 vi.mock("../components/OntologyGraph", () => ({
@@ -141,6 +141,7 @@ beforeEach(() => {
     updated_at: "",
   };
   vi.mocked(api.overview).mockResolvedValue(overview());
+  vi.mocked(modelingApi.sessions).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
@@ -380,5 +381,37 @@ describe("本体视图", () => {
       ).toBeInTheDocument(),
     );
     expect(api.overview).toHaveBeenCalledTimes(2);
+  });
+
+  it("points at a session whose accepted changes are not published yet", async () => {
+    vi.mocked(modelingApi.sessions).mockResolvedValue({
+      items: [
+        { id: "clean", title: "已发布", task_status: "idle", updated_at: "", has_unpublished_changes: false },
+        { id: "draft", title: "草稿", task_status: "finished", updated_at: "", has_unpublished_changes: true },
+      ],
+    });
+    show();
+    expect(await screen.findByRole("link", { name: "有未发布的草稿修改 · 去发布" })).toHaveAttribute(
+      "href",
+      "/delivery?session=draft",
+    );
+    expect(screen.getByText(/v2 · 已发布/)).toBeInTheDocument();
+  });
+
+  it("shows no draft hint when every session matches its published base", async () => {
+    vi.mocked(modelingApi.sessions).mockResolvedValue({
+      items: [{ id: "clean", title: "已发布", task_status: "idle", updated_at: "", has_unpublished_changes: false }],
+    });
+    show();
+    await screen.findByText(/v2 · 已发布/);
+    await waitFor(() => expect(modelingApi.sessions).toHaveBeenCalledWith("w"));
+    expect(screen.queryByText(/有未发布的草稿修改/)).not.toBeInTheDocument();
+  });
+
+  it("never asks for sessions on behalf of a reader", async () => {
+    context.workspace.role = null;
+    show();
+    await screen.findByText(/v2 · 已发布/);
+    expect(modelingApi.sessions).not.toHaveBeenCalled();
   });
 });

@@ -179,3 +179,31 @@ it("keeps 开始建模 disabled without material or a scenario", async () => {
   );
   expect(await screen.findByRole("button", { name: "开始建模" })).toBeDisabled();
 });
+
+it("says when the last modeling run is waiting for the user's reply", async () => {
+  context.model.session = {
+    ...session(),
+    task_status: "finished",
+    result_state: "awaiting_reply",
+    task_detail: "智能体需要你确认后才能生成提案，请在对话中回复",
+  };
+  render(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByRole("status")).toHaveTextContent(
+    "智能体需要你确认后才能生成提案，请在对话中回复",
+  );
+});
+
+it("shows no reply hint for a run that produced its result", async () => {
+  context.model.session = { ...session(), task_status: "finished", result_state: "done" };
+  render(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await screen.findByRole("button", { name: "开始建模" });
+  expect(screen.queryByText(/请在对话中回复/)).toBeNull();
+});

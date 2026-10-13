@@ -160,12 +160,30 @@ def test_run_token_path_isolation_does_not_consume_previous_round_file(
     )
     before = _row(client, session["id"])
 
-    assert _reconcile(client, session["id"]) == "failed_permanent"
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
     after = _row(client, session["id"])
     assert paths == ["output/ontofoundry-result-new-token.json"]
     assert after.draft_json == before.draft_json
     assert after.candidates_json == before.candidates_json
-    assert "new-token" in after.task_detail
+
+
+def test_run_without_result_file_waits_for_the_users_reply(client, monkeypatch):
+    """A model run whose agent only asked questions is not a failure: it says
+    the agent needs an answer, and is never downloaded again."""
+    session = _create_model_session(client)
+    paths = _install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+    before = _row(client, session["id"])
+
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
+    after = _row(client, session["id"])
+    assert after.task_status == "finished"
+    assert after.result_state == "awaiting_reply"
+    assert after.task_detail == "智能体需要你确认后才能生成建模结果，请在对话中回复"
+    assert after.draft_json == before.draft_json
+    assert after.revision == before.revision
+
+    assert _reconcile(client, session["id"]) == "awaiting_reply"
+    assert len(paths) == 1
 
 
 def test_file_run_token_mismatch_is_permanent_and_preserves_model(
@@ -223,7 +241,6 @@ def test_download_timeout_is_retriable_then_next_reconcile_succeeds(
 @pytest.mark.parametrize(
     ("download_value", "detail"),
     [
-        (DataAgentError("not found", status_code=404), "没有产出"),
         (b"not-json", "JSON"),
         ({**_payload(), "schema_version": "wrong"}, "schema_version"),
         (
@@ -533,9 +550,10 @@ def test_model_prompt_contains_complete_versioned_result_contract():
         workspace_id="workspace-1",
         session_id="session-1",
         context_file="uploads/context.json",
-        material_files=["uploads/material.md"],
+        material_files=[{"path": "uploads/material.md", "bytes": 2048}],
         run_token=RUN_TOKEN,
     )
+    assert "- uploads/material.md（2 KB）" in prompt
     assert "ontofoundry.model-result/v1" in prompt
     assert '"run_token"' in prompt
     assert RUN_TOKEN in prompt
@@ -550,6 +568,62 @@ def test_model_prompt_contains_complete_versioned_result_contract():
     assert "link_mappings 必须使用树形结构" in prompt
     assert '"customer":"客户"' in prompt
     assert "预览差异后发布" in prompt
+
+
+def test_prompt_lists_sizes_and_asks_to_read_large_files_selectively():
+    prompt = build_turn_prompt(
+        "build it",
+        mode="chat",
+        workspace_id="workspace-1",
+        session_id="session-1",
+        context_file="uploads/context.json",
+        material_files=[
+            {"path": "uploads/orders.json", "bytes": 128 * 1024},
+            {"path": "uploads/big.csv", "bytes": 3 * 1024 * 1024},
+            {"path": "uploads/note.md", "bytes": 300},
+        ],
+        context_bytes=570 * 1024,
+    )
+    assert "当前本体快照: uploads/context.json（570 KB）" in prompt
+    assert "- uploads/orders.json（128 KB）" in prompt
+    assert "- uploads/big.csv（3.0 MB）" in prompt
+    assert "- uploads/note.md（300 B）" in prompt
+    assert "超过 50 KB 的材料或本体快照不要整份读入" in prompt
+    assert "grep、jq 或 python" in prompt
+    # The selective-reading rule comes before the task, which may be long.
+    assert prompt.index("不要整份读入") < prompt.index("[用户消息]")
+
+
+def test_prompt_requires_chinese_thinking_up_front():
+    prompt = build_turn_prompt(
+        "build it",
+        mode="model",
+        workspace_id="workspace-1",
+        session_id="session-1",
+        context_file="uploads/context.json",
+        material_files=[],
+        run_token=RUN_TOKEN,
+        proposal_prompt="提案说明",
+    )
+    rule = "你的全部思考过程（包括推理、计划、读文件和调用工具前后的自述）以及所有回答都必须使用简体中文"
+    assert rule in prompt
+    assert "即使材料、文件内容、代码或本提示中的字段名是英文，也用中文思考和表述" in prompt
+    # Stated before the long task instructions, not only buried after them.
+    assert prompt.index(rule) < prompt.index("提案说明")
+    assert "- 本轮没有新增材料" in prompt
+
+
+def test_proposal_material_list_carries_sizes():
+    from ontofoundry_api.services.dataagent import proposal_instructions
+
+    text = proposal_instructions(
+        run_token=RUN_TOKEN,
+        header={},
+        materials=[{"id": "m1", "sha256": "a" * 64, "path": "uploads/m1.json", "bytes": 131072}],
+        schema_file="schema.json",
+        mcp=None,
+    )
+    assert f"- material_id=m1 material_sha256={'a' * 64} 文件=uploads/m1.json 大小=128 KB" in text
 
 
 @pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])

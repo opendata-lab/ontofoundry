@@ -3,11 +3,11 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import jsonschema
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.database import get_db
@@ -50,7 +50,7 @@ from ontofoundry_api.services.ontology_query import (
     snapshot_of,
     version_summary,
 )
-from ontofoundry_api.services.proposals import pending_summary
+from ontofoundry_api.services.proposals import pending_summary, proposal_state
 from ontofoundry_api.services.publish_preview import (
     auto_merged,
     element_labels,
@@ -58,6 +58,7 @@ from ontofoundry_api.services.publish_preview import (
     requires_change,
     three_way,
 )
+from ontofoundry_api.services.read_cache import session_reads, version_snapshots
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
@@ -249,22 +250,51 @@ def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
 def session_response(db, item) -> dict:
     """A session as the API returns it: data plus proposal summary and the
     element-level changes relative to its base version."""
-    draft = session_draft(item)
-    try:
-        base_diff = element_changes(
-            version_snapshot(db, item.workspace_id, item.base_version_id), draft
-        )
-    except ValueError:  # an invalid draft field never blocks reading the session
-        base_diff = []
+    data = session_data(item)
+    key = _read_key(item)
+
+    def base_diff():
+        try:
+            return element_changes(
+                _base_snapshot(db, item), session_draft(item)
+            )
+        except ValueError:  # an invalid draft field never blocks reading the session
+            return []
+
+    def summary():
+        return pending_summary(db, item.workspace_id, item.id, item.draft_json)
+
+    if key is None:
+        return {**data, **summary(), "base_diff": base_diff()}
     return {
-        **session_data(item),
-        **pending_summary(db, item.workspace_id, item.id, item.draft_json),
-        "base_diff": base_diff,
+        **data,
+        **session_reads.get(
+            (*key, "pending", proposal_state(db, item.workspace_id, item.id)), summary
+        ),
+        "base_diff": session_reads.get(
+            (*key, "base_diff", item.base_version_id, item.base_version_sha256), base_diff
+        ),
     }
 
 
-def session_data(item):
-    draft = session_draft(item)
+def _read_key(item) -> tuple | None:
+    """Derived parts of a session only change with its revision and draft hash."""
+    if not item.draft_sha256:
+        return None
+    return ("session", item.id, item.revision, item.draft_sha256)
+
+
+def _base_snapshot(db, item) -> dict:
+    """The base version's snapshot; published versions never change."""
+    if not item.base_version_id or not item.base_version_sha256:
+        return version_snapshot(db, item.workspace_id, item.base_version_id)
+    return version_snapshots.get(
+        (item.base_version_id, item.base_version_sha256),
+        lambda: version_snapshot(db, item.workspace_id, item.base_version_id),
+    )
+
+
+def _derived_views(draft) -> tuple:
     try:
         form = legacy_mapping_form(draft)
     except ValueError:
@@ -274,6 +304,16 @@ def session_data(item):
     except (ValidationError, ValueError):
         # A draft may be invalid while being edited; the graph is best effort.
         nodes, edges = [], []
+    return form, nodes, edges
+
+
+def session_data(item):
+    draft = session_draft(item)
+    key = _read_key(item)
+    if key is None:
+        form, nodes, edges = _derived_views(draft)
+    else:
+        form, nodes, edges = session_reads.get((*key, "views"), lambda: _derived_views(draft))
     return {
         "id": item.id,
         "title": item.title,
@@ -518,18 +558,35 @@ def resolve_merge(
     )
 
 
+def schedule_run_sync(request: Request, background: BackgroundTasks, items) -> None:
+    """Let reads converge a run nobody is watching: after the response, sync
+    each session whose stored run state may lag DataAgent."""
+    from ontofoundry_api.api.agent_conversation import needs_run_sync, sync_session_run
+
+    for item in items:
+        if needs_run_sync(request.app, item):
+            background.add_task(sync_session_run, request.app, item.workspace_id, item.id)
+
+
 @router.get("/sessions")
 def sessions(
     workspace_id: str,
+    request: Request,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
+    # Polled while a run is live: never load the drafts.
     rows = db.scalars(
         select(ModelingSessionRecord)
+        .options(defer(ModelingSessionRecord.draft_json),
+                 defer(ModelingSessionRecord.candidates_json),
+                 defer(ModelingSessionRecord.run_manifest_json))
         .where(ModelingSessionRecord.workspace_id == workspace_id)
         .order_by(ModelingSessionRecord.updated_at.desc())
     ).all()
+    schedule_run_sync(request, background, rows)
     return {
         "items": [
             {
@@ -537,6 +594,12 @@ def sessions(
                 "title": r.title,
                 "updated_at": r.updated_at,
                 "task_status": r.task_status,
+                "base_version_id": r.base_version_id,
+                # Both hashes are stored on every write, so this costs no
+                # draft read: the draft differs from the version it started from.
+                "has_unpublished_changes": bool(
+                    r.draft_sha256 and r.draft_sha256 != r.base_version_sha256
+                ),
             }
             for r in rows
         ]
@@ -577,11 +640,15 @@ def create_session(
 def read_session(
     workspace_id: str,
     session_id: str,
+    request: Request,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    return session_response(db, get_modeling_session(db, workspace_id, session_id))
+    item = get_modeling_session(db, workspace_id, session_id)
+    schedule_run_sync(request, background, [item])
+    return session_response(db, item)
 
 
 @router.put("/sessions/{session_id}")

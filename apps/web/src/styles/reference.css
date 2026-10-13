@@ -1659,6 +1659,13 @@ small,
   border: 0;
   color: inherit;
 }
+.inline-notice {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 12px;
+  padding: 10px 16px;
+  flex: none;
+}
 .ref-dialog {
   background: var(--color-surface);
   color: var(--color-ink-2);
@@ -2261,6 +2268,9 @@ small,
 .view-tabs-bar > .muted {
   font-size: 10px;
   margin-left: auto;
+}
+.view-tabs-bar > .muted a {
+  color: var(--color-accent);
 }
 .view-toolbar {
   display: flex;

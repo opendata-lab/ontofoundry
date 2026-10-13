@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import secrets
+import threading
+import time
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
@@ -47,6 +50,8 @@ from ontofoundry_api.services.run_status import (
     TERMINAL_RUN_STATUSES,
     to_run_status,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix=("/api/v1/workspaces/{workspace_id}/sessions/{session_id}/agent-conversation"),
@@ -215,7 +220,11 @@ def mcp_access_file(access: dict[str, Any]) -> dict[str, Any]:
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
-    settings = request.app.state.settings
+    return _app_client(request.app, workspace_id, session_id)
+
+
+def _app_client(app, workspace_id: str, session_id: str) -> DataAgentClient:
+    settings = app.state.settings
     return DataAgentClient(
         settings.dataagent_base_url,
         prefix=settings.dataagent_api_prefix,
@@ -462,6 +471,108 @@ async def _reconcile_stale_submission(
         detail="未找到上次提交对应的 DataAgent 任务，请重试",
     )
     return None, None
+
+
+# Statuses a session read may sync from DataAgent. `submitting` is left to the
+# conversation view: reconciling it needs the topic's message history.
+SYNCABLE_RUN_STATUSES = ACTIVE_RUN_STATUSES - {"submitting"}
+_SYNC_INTERVAL_SECONDS = 3.0
+_sync_lock = threading.Lock()
+_syncing: set[str] = set()
+_last_sync: dict[str, float] = {}
+
+
+def needs_run_sync(app, item: ModelingSessionRecord) -> bool:
+    """Whether a session's stored run state may lag DataAgent: a live task, or a
+    finished model run whose result has not been claimed (or awaits a retry)."""
+    if not app.state.settings.dataagent_base_url or not item.dataagent_task_id:
+        return False
+    if item.task_status in SYNCABLE_RUN_STATUSES:
+        return True
+    return (
+        item.task_status == "finished"
+        and item.dataagent_task_mode == "model"
+        and (
+            item.last_result_task_id != item.dataagent_task_id
+            or item.result_state in {"failed_retriable", "processing"}
+        )
+    )
+
+
+async def sync_session_run(app, workspace_id: str, session_id: str) -> None:
+    """Bring one session's run up to date without a conversation view open.
+
+    Session reads schedule this after responding, so a run that finished while
+    nobody watched still gets its status and its proposal batch. It reuses the
+    view's guarded writes: a projection only lands on the task that still owns
+    the session, and results are claimed under the result lease, so concurrent
+    reads, views and workers converge on one outcome. Throttled per session.
+    """
+    now = time.monotonic()
+    with _sync_lock:
+        if session_id in _syncing or now - _last_sync.get(session_id, -1e9) < _SYNC_INTERVAL_SECONDS:
+            return
+        if len(_last_sync) > 1024:  # forget sessions no longer throttled
+            for key in [k for k, at in _last_sync.items() if now - at >= _SYNC_INTERVAL_SECONDS]:
+                del _last_sync[key]
+        _syncing.add(session_id)
+        _last_sync[session_id] = now
+    try:
+        await _sync_session_run(app, workspace_id, session_id)
+    except DataAgentError as exc:
+        logger.warning("同步会话 %s 的 DataAgent 任务失败：%s", session_id, exc)
+    finally:
+        with _sync_lock:
+            _syncing.discard(session_id)
+
+
+async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
+    with app.state.session_factory() as db:
+        item = db.get(ModelingSessionRecord, session_id)
+        if item is None or item.workspace_id != workspace_id or not needs_run_sync(app, item):
+            return
+        task_id = str(item.dataagent_task_id)
+        topic_id = str(item.dataagent_topic_id or "")
+        status = str(item.task_status or "")
+
+    if status in SYNCABLE_RUN_STATUSES:
+        dataagent = _app_client(app, workspace_id, session_id)
+        task = await dataagent.task(task_id)
+        if (
+            str(task.get("task_status") or "") == "suspended"
+            and not task.get("cancel_requested_at")
+            and topic_id
+            and (replacement := replacement_task_id(await dataagent.messages(topic_id), task_id))
+            and _adopt_replacement(app.state.session_factory, session_id, task_id, replacement)
+        ):
+            task_id = replacement
+            task = await dataagent.task(replacement)
+        upstream_status = str(task.get("task_status") or "")
+        projected = _persist_task_projection(
+            app.state.session_factory,
+            session_id,
+            task_id=task_id,
+            upstream_status=upstream_status,
+            detail=_detail(upstream_status, task.get("error")),
+        )
+        if projected is None or projected not in TERMINAL_RUN_STATUSES:
+            return
+    await settle_result(app, workspace_id, session_id, task_id)
+
+
+async def settle_result(app, workspace_id: str, session_id: str, task_id: str) -> str:
+    """Claim a finished run's result, retrying a transient download failure
+    with backoff and failing visibly once the retries are spent."""
+    result_state = await reconcile_run(app, workspace_id, session_id, task_id)
+    if result_state in {"failed_retriable", "processing"}:
+        for delay in (2, 4, 8):
+            await asyncio.sleep(delay)
+            result_state = await reconcile_run(app, workspace_id, session_id, task_id)
+            if result_state not in {"failed_retriable", "processing"}:
+                break
+        if result_state == "failed_retriable":
+            result_state = exhaust_retriable_result(app, session_id, task_id)
+    return result_state
 
 
 @router.get("")
@@ -727,8 +838,9 @@ async def send_message(
                     "会话已在创建 Topic 期间被其他请求接管，请刷新后重试",
                 )
 
-        material_paths: list[str] = []
+        material_paths: list[dict[str, Any]] = []
         material_path_by_id: dict[str, str] = dict(known_paths)
+        material_bytes = {material.id: material.byte_size for material in materials}
         for material in materials:
             if material.id in uploaded_ids and material.id in material_path_by_id:
                 continue
@@ -745,16 +857,20 @@ async def send_message(
                 path.read_bytes(),
                 material_media_type(material.name),
             )
-            material_paths.append(str(uploaded.get("rel_path") or material.name))
-            material_path_by_id[material.id] = material_paths[-1]
+            path_in_topic = str(uploaded.get("rel_path") or material.name)
+            material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
+            material_path_by_id[material.id] = path_in_topic
             newly_uploaded.append(material.id)
 
         proposal_prompt = None
         if proposals:
+            context_body = json.dumps(
+                proposal_context(manifest, draft), ensure_ascii=False, indent=2
+            ).encode()
             context = await dataagent.upload(
                 topic_id,
                 f"ontofoundry-context-{run_token}.json",
-                json.dumps(proposal_context(manifest, draft), ensure_ascii=False, indent=2).encode(),
+                context_body,
                 "application/json",
             )
             schema = await dataagent.upload(
@@ -781,17 +897,22 @@ async def send_message(
                 run_token=run_token,
                 header=proposal_header(manifest),
                 materials=[
-                    {**m, "path": material_path_by_id.get(m["id"], "")}
+                    {
+                        **m,
+                        "path": material_path_by_id.get(m["id"], ""),
+                        "bytes": material_bytes.get(m["id"]),
+                    }
                     for m in manifest["materials"]
                 ],
                 schema_file=str(schema.get("rel_path") or ""),
                 mcp=mcp,
             )
         else:
+            context_body = json.dumps(draft, ensure_ascii=False, indent=2).encode()
             context = await dataagent.upload(
                 topic_id,
                 f"ontofoundry-context-r{expected_revision}.json",
-                json.dumps(draft, ensure_ascii=False, indent=2).encode(),
+                context_body,
                 "application/json",
             )
         prompt = build_turn_prompt(
@@ -803,6 +924,7 @@ async def send_message(
             material_files=material_paths,
             run_token=run_token,
             proposal_prompt=proposal_prompt,
+            context_bytes=len(context_body),
         )
         delivery_started = True
         submitted = await dataagent.deliver(
@@ -971,26 +1093,14 @@ async def events(
                 reconnect_delay = 0.25 if saw_event else min(delay * 2, 5.0)
                 continue
 
-            result_state = await reconcile_run(
+            result_state = await settle_result(
                 request.app, workspace_id, session_id, task_id
             )
-            if result_state in {"failed_retriable", "processing"}:
-                for delay in (2, 4, 8):
-                    await asyncio.sleep(delay)
-                    result_state = await reconcile_run(
-                        request.app, workspace_id, session_id, task_id
-                    )
-                    if result_state not in {"failed_retriable", "processing"}:
-                        break
-                if result_state == "failed_retriable":
-                    result_state = exhaust_retriable_result(
-                        request.app, session_id, task_id
-                    )
-                if result_state == "processing":
-                    # Another request still owns a valid lease. It must be the
-                    # one to commit or fail the result before any terminal SDK
-                    # event is emitted.
-                    continue
+            if result_state == "processing":
+                # Another request still owns a valid lease. It must be the
+                # one to commit or fail the result before any terminal SDK
+                # event is emitted.
+                continue
 
             with request.app.state.session_factory() as current_db:
                 current = current_db.get(ModelingSessionRecord, session_id)

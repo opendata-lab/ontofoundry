@@ -344,6 +344,24 @@ def batch_items(
     return items
 
 
+def proposal_state(db: Session, workspace_id: str, session_id: str) -> tuple:
+    """Every batch and item status of a session: a cheap fingerprint that
+    changes whenever a decision or a new batch could change the summary."""
+    batches = db.execute(
+        select(ProposalBatchRecord.id, ProposalBatchRecord.status).where(
+            ProposalBatchRecord.workspace_id == workspace_id,
+            ProposalBatchRecord.session_id == session_id,
+        )
+    ).all()
+    items = db.execute(
+        select(ProposalItemRecord.id, ProposalItemRecord.status).where(
+            ProposalItemRecord.workspace_id == workspace_id,
+            ProposalItemRecord.session_id == session_id,
+        )
+    ).all()
+    return tuple(sorted(map(tuple, batches))), tuple(sorted(map(tuple, items)))
+
+
 def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict) -> dict[str, Any]:
     """`pending_proposal_count` and `latest_batch_id` for session responses."""
     batches = db.execute(

@@ -199,9 +199,7 @@ async def _request_repair(
     return ""
 
 
-def _permanent_detail(exc: DataAgentError, result_path: str) -> str:
-    if exc.status_code == 404:
-        return f"建模任务没有产出 `{result_path}`"
+def _permanent_detail(exc: DataAgentError) -> str:
     return f"建模结果下载失败：{exc}"
 
 
@@ -276,6 +274,21 @@ async def reconcile_run(
             app, workspace_id, session_id
         ).download(topic_id, result_path)
     except DataAgentError as exc:
+        if exc.status_code == 404:
+            # The agent ended its turn without a result file. In practice it
+            # asked clarifying questions, so the run is waiting for a reply,
+            # not broken. Say so instead of reporting a finished run.
+            what = "提案" if manifest.get("result_contract") == "proposals" else "建模结果"
+            if _guarded_result_values(
+                app,
+                session_id,
+                task_id,
+                claimed_at,
+                result_state="awaiting_reply",
+                task_detail=f"智能体需要你确认后才能生成{what}，请在对话中回复",
+            ):
+                return "awaiting_reply"
+            return _current_result_state(app, session_id)
         if _is_retriable_download(exc.status_code):
             return _finish_failure(
                 app,
@@ -291,7 +304,7 @@ async def reconcile_run(
             task_id,
             claimed_at,
             state="failed_permanent",
-            detail=_permanent_detail(exc, result_path),
+            detail=_permanent_detail(exc),
         )
 
     if manifest.get("result_contract") == "proposals":

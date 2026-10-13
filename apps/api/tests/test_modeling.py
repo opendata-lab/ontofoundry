@@ -383,3 +383,21 @@ def test_candidate_cannot_overwrite_later_manual_edit(client):
     assert result.status_code == 200
     assert result.json()["draft"]["object_types"][0]["description"] == "人工修改"
     assert result.json()["candidates"][0]["conflict"]
+
+
+def test_session_list_says_which_sessions_have_unpublished_changes(client):
+    def listed(session_id):
+        items = client.get(ROOT + "/sessions").json()["items"]
+        return next(item for item in items if item["id"] == session_id)
+
+    s = create_session(client)
+    assert listed(s["id"])["has_unpublished_changes"] is False
+    assert listed(s["id"])["base_version_id"] == s["base_version_id"]
+
+    s["draft"]["object_types"][0]["description"] = "未发布的修改"
+    s = save(client, s, s["draft"]).json()
+    assert listed(s["id"])["has_unpublished_changes"] is True
+
+    published = publish(client, s).json()["session"]
+    assert listed(s["id"])["has_unpublished_changes"] is False
+    assert listed(s["id"])["base_version_id"] == published["base_version_id"]

@@ -1,3 +1,4 @@
+import { LoadingSurface } from "../components/AsyncState";
 import { HistoryComparison } from "../components/ReleaseReview";
 import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
@@ -139,11 +140,16 @@ export function DeliveryPage() {
               const picker = (
                 <SessionPicker
                   session={session}
-                  sessionId={session?.id ?? null}
+                  sessionId={model.sessionId}
                   sessions={model.sessions}
                   onSelect={model.select}
                 />
               );
+              // A session named in the address (?session=) is being loaded,
+              // which takes a while on a large draft: say so instead of
+              // offering the chooser as if none had been asked for.
+              if (!session && model.sessionId && !model.error)
+                return <LoadingSurface label="正在加载会话…" />;
               if (!session)
                 return (
                   <div className="publish-context publish-context--empty">

@@ -325,6 +325,7 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
         db.commit()
 
     uploaded_names: list[str] = []
+    prompts: list[str] = []
     task_number = 0
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -337,6 +338,7 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
             uploaded_names.append(disposition)
             return httpx.Response(200, json={"rel_path": "uploads/file"})
         if path.endswith("/deliver-message"):
+            prompts.append(_json_request(request)["content"])
             task_number += 1
             return httpx.Response(
                 200,
@@ -361,6 +363,10 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
     assert len(material_uploads) == 1
     assert len(context_uploads) == 2
     assert _session_row(client, session["id"]).uploaded_material_ids == [material_id]
+    # The agent sees each new material's size, and the snapshot's, before reading.
+    assert "- uploads/file（8 B）" in prompts[0]
+    assert "当前本体快照: uploads/file（" in prompts[0]
+    assert "- 本轮没有新增材料" in prompts[1]
 
 
 def test_concurrent_posts_cas_before_remote_and_deliver_only_once(client, monkeypatch):
