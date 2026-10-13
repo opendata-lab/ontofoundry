@@ -605,6 +605,9 @@ small,
   background: var(--color-surface);
 }
 .ref-chat > dataagent-conversation {
+  --dac-font-family: var(--font-body);
+  --dac-text-color: var(--color-ink);
+  --dac-text-muted: var(--color-muted);
   --dac-content-max-width: 760px;
   --dac-content-padding-inline: clamp(16px, 2vw, 24px);
   --dac-content-padding-block: 24px;
@@ -625,6 +628,46 @@ small,
 }
 .ref-chat > dataagent-conversation::part(run-detail) {
   display: none;
+}
+.ref-chat > dataagent-conversation::part(root) {
+  justify-content: flex-start;
+}
+.ref-chat > dataagent-conversation::part(messages) {
+  flex: 1 1 0;
+  overflow: auto;
+}
+.builder-chat-empty {
+  max-width: 360px;
+  min-width: 0;
+  margin: clamp(32px, 8vh, 80px) 0 32px;
+  font-family: var(--font-body);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.builder-chat-empty > svg {
+  display: block;
+  color: var(--color-accent);
+  margin-bottom: 20px;
+}
+.builder-chat-empty h2 {
+  margin: 0 0 12px;
+  color: var(--color-ink);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-style: normal;
+}
+.builder-chat-empty p {
+  margin: 0;
+  color: var(--color-ink-2);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.builder-chat-empty .builder-chat-empty-help {
+  margin-top: 20px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.9;
 }
 .chat-scroll {
   padding: 24px;

@@ -19,6 +19,7 @@ import type {
   RunChangeDetail,
 } from "../types/agent-conversation";
 import { ModelResults } from "../components/ModelResults";
+import { BuilderConversationEmpty } from "../components/BuilderConversationEmpty";
 import { TableMaterialPicker } from "../components/TableMaterialPicker";
 import { SessionPicker } from "../components/SessionPicker";
 import { TagList } from "../components/TagList";
@@ -423,7 +424,9 @@ export function BuilderPage() {
           <dataagent-conversation
             ref={conversation}
             placeholder="向智能体提问以辅助本体构建…"
-          />
+          >
+            <BuilderConversationEmpty />
+          </dataagent-conversation>
         </section>
         <ModelResults
           session={session}

@@ -1,17 +1,19 @@
 {
-  "date": "2026-09-04",
+  "date": "2026-10-13",
+  "scope": "component",
+  "component": "conversation empty state",
   "codebaseScan": {
-    "designDocs": [],
-    "frontendFramework": null,
-    "existingTokens": null,
-    "hallmarkStamp": null
+    "frontendFramework": "React 19 + Vite 6",
+    "existingTokens": "apps/web/src/styles/tokens.css",
+    "fontStack": "existing --font-body / --font-display",
+    "motion": "CSS only",
+    "spacing": "existing compact application controls and CSS tokens"
   },
-  "decision": "No pre-flight signals — proceeding with full Hallmark stack.",
+  "decision": "Preserve existing Cobalt workbench tokens and layout; replace only the conversation empty slot and align its composer.",
   "filesPlanned": [
-    "tokens.css",
-    "prototype/ontofoundry-prototype.html",
-    "docs/design/2026-09-01-enterprise-ontology-intelligence-platform-design.md",
-    ".hallmark/log.json"
+    "apps/web/src/components/BuilderConversationEmpty.tsx",
+    "apps/web/src/pages/BuilderPage.tsx",
+    "apps/web/src/styles/reference.css"
   ],
   "deletions": []
 }
