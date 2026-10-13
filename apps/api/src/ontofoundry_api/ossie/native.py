@@ -18,6 +18,12 @@ def parse_native(document, workspace_id):
     labels = ext.get('display_names', {})
     tags = ext.get('tags', {})
 
+    def display_name(node, element_id, path, technical_name):
+        description = node.get('description')
+        if isinstance(description, str) and description.strip():
+            return description
+        return labels.get(element_id, labels.get(path, technical_name))
+
     def identity(path):
         # P1 exports used a singular object_mapping path without its /0 index.
         legacy_path = path.replace('/object_mapping/0', '/object_mapping')
@@ -62,7 +68,7 @@ def parse_native(document, workspace_id):
         name = node['concept']
         path = '/ontology/' + pointer_part(name)
         kind = refs[name]['kind']
-        item = dict(id=refs[name]['ref'], concept=name, name=labels.get(refs[name]['ref'], labels.get(name, name)),
+        item = dict(id=refs[name]['ref'], concept=name, name=display_name(node, refs[name]['ref'], name, name),
                     technical_name=name, tags=tags.get(refs[name]['ref'], tags.get(name, [])), **meta(node, ci))
         for field in ('description', 'identify_by'):
             if field in node:
@@ -173,6 +179,12 @@ def compile_native(draft, ontology_name, ontology_description):
         return {key: deepcopy(getattr(item, key)) for key in fields
                 if key in item.native_presence or (item.origin == 'platform' and getattr(item, key) not in (None, [], ''))}
 
+    def describe(item, node, technical_name):
+        # Names are the standard description. Preserve an untouched imported
+        # empty/missing description when its name only falls back to the key.
+        if item.name and (item.name != technical_name or (item.description and item.description.strip()) or item.origin == 'platform'):
+            node['description'] = item.name
+
     def attach(item, node):
         for key in ('requires', 'derived_by'):
             entries = getattr(item, key)
@@ -183,6 +195,7 @@ def compile_native(draft, ontology_name, ontology_description):
     for item in ordered(concepts.values()):
         node = dict(concept=item.concept, type='EntityType' if item in draft.object_types else 'ValueType')
         node.update(native(item, ('description', 'identify_by')))
+        describe(item, node, item.concept)
         if 'extends' in item.native_presence or item.extends:
             node['extends'] = [ref(r) for r in item.extends]
         attach(item, node)
@@ -325,8 +338,8 @@ def compile_native(draft, ontology_name, ontology_description):
                      for r in draft.rules if r.owner_kind == 'action'})
     extension = dict(version='4', id_namespace=str(namespace), ids=registry,
                      concept_context={str(key): value.model_dump(mode='json', exclude_defaults=True) for key, value in draft.extension_v4.concept_context.items()},
-                     display_names={str(i.id): i.name for i in [*concepts.values(), *draft.properties, *draft.link_types]
-                                    if i.name != (i.concept if hasattr(i, 'concept') else i.technical_name or i.name)} | {str(item.id): draft.extension_v4.display_names[item.id] for collection in (draft.semantic_models, draft.datasets, draft.dataset_fields, draft.dataset_relationships, draft.metrics) for item in collection if item.id in draft.extension_v4.display_names and draft.extension_v4.display_names[item.id] != item.name},
+                     display_names={str(i.id): i.name for i in [*draft.properties, *draft.link_types]
+                                    if i.name != (i.technical_name or i.name)} | {str(item.id): draft.extension_v4.display_names[item.id] for collection in (draft.semantic_models, draft.datasets, draft.dataset_fields, draft.dataset_relationships, draft.metrics) for item in collection if item.id in draft.extension_v4.display_names and draft.extension_v4.display_names[item.id] != item.name},
                      tags={str(i.id): i.tags for i in [*concepts.values(), *draft.properties, *draft.link_types] if i.tags},
                      required_properties=[str(i.id) for i in draft.properties if i.required],
                      rule_metadata=metadata,

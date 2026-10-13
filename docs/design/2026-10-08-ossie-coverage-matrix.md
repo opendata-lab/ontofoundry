@@ -25,14 +25,14 @@ A = `storybook-lending.ossie.json`；B = `library-lending.ossie.json`。次数�
 | `ontology#/properties/ontology_mappings` | 逻辑模型到本体的映射组 | semantic_models（每个 OntologyMap 一项） | 原生 | 0 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyComponent/properties/concept` | 概念名称或引用 | object_types.concept / value_types.concept | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
 | `ontology#/$defs/OntologyComponent/properties/type` | EntityType / ValueType | object_types / value_types 集合归属 | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
-| `ontology#/$defs/OntologyComponent/properties/description` | 原生描述文本 | object_types.description / value_types.description | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/OntologyComponent/properties/description` | 业务名称和描述 | object_types.name + description / value_types.name + description | 原生 | 1 | 1 | 导入时非空 description 同时写入名称和描述；导出取名称，concept 与引用保持英文标识。空描述不从技术名补全 |
 | `ontology#/$defs/OntologyComponent/properties/extends` | 有序父概念引用 | object_types.extends / value_types.extends（有序 ConceptRef） | 原生 | 1 | 1 | 字段出现状态独立记录；原生数组保持顺序及重复项；ConceptRef 支持实体、值、builtin、Any，导出还原名称 |
 | `ontology#/$defs/OntologyComponent/properties/derived_by` | 派生表达式有序列表 | 概念.derived_by → rules.expression（有序 ID） | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyComponent/properties/identify_by` | 首选标识关系名有序列表 | object_types.identify_by / value_types.identify_by | 原生 | 1 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyComponent/properties/requires` | 约束表达式有序列表 | 概念.requires → rules.expression（有序 ID） | 原生 | 1 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/OntologyComponent/properties/relationships` | 所属作用域的关系集合 | properties + link_types（同 owner 下 position 共同排序） | 原生 | 6 | 13 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/Relationship/properties/name` | 原生名称，保留空字符串 | properties.technical_name / link_types.technical_name（原生关系名） | 原生 | 9 | 21 | 字段出现状态独立记录；原生数组保持顺序及重复项；name 为平台显示名，technical_name 存原生名，均不清洗原文 |
-| `ontology#/$defs/Relationship/properties/description` | 原生描述文本 | properties.description / link_types.description | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
+| `ontology#/$defs/Relationship/properties/description` | 原生描述文本 | properties.description / link_types.description | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项；描述不用于替换属性或关系名称 |
 | `ontology#/$defs/Relationship/properties/roles` | 所属概念以外的有序角色，可为空 | properties.roles / link_types.roles（有序附加角色） | 原生 | 7 | 20 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
 | `ontology#/$defs/Relationship/properties/multiplicity` | ManyToOne / OneToOne，允许缺省 | properties.multiplicity / link_types.multiplicity | 原生 | 0 | 0 | 字段出现状态独立记录；原生数组保持顺序及重复项；不推断缺省，不补基数 |
 | `ontology#/$defs/Relationship/properties/derived_by` | 派生表达式有序列表 | 关系.derived_by → rules.expression（有序 ID） | 原生 | 5 | 8 | 字段出现状态独立记录；原生数组保持顺序及重复项 |
@@ -122,7 +122,7 @@ A = `storybook-lending.ossie.json`；B = `library-lending.ossie.json`。次数�
 | Ossie 路径 | 语义 | v3 落点（字段/集合） | 原生/扩展/不支持 | A 出现次数 | B 出现次数 | 说明 |
 | --- | --- | --- | --- | ---: | ---: | --- |
 | `ai_context.ontofoundry.ids` | 稳定 ID 注册表 | extension_v4.ids | 扩展 | 0 | 0 | version=4；id_namespace 保存 UUID 派生命名空间，ids 只记录无法按作用域路径推导的例外；owner 由关系 ID 派生，Action 内显式 ID 不重复登记 |
-| `ai_context.ontofoundry`（显示信息） | 中文显示名、tags、required | extension_v4.display_names/tags/required_properties | 扩展 | 0 | 0 | 原生 name 不被显示名替换 |
+| `ai_context.ontofoundry`（显示信息） | 属性、关系及语义集合显示名、tags、required | extension_v4.display_names/tags/required_properties | 扩展 | 0 | 0 | 概念名称通过标准 description 导出；属性、关系、语义模型、数据集、字段及指标的自定义显示名仍保存在 display_names，原生 name 不被替换 |
 | `ai_context.ontofoundry.rule_metadata` | 规则 ID、名称 | extension_v4.rule_metadata | 扩展 | 0 | 0 | 原生约束/派生表达式保留原文、顺序、重复项 |
 | `ai_context.ontofoundry.actions` | Action 定义 | extension_v4.actions + actions | 扩展 | 0 | 0 | 平台定义，Ossie 无对应构造 |
 | `ai_context.ontofoundry.concept_context` | 非标准概念同义词、说明 | extension_v4.concept_context（稳定 ID 键） | 扩展 | 0 | 0 | 不挪用文档/语义模型同义词；输入同名键原文保留 |

@@ -70,7 +70,10 @@ def test_source_context_collision_string_or_missing_is_reversible(context):
     first, _ = import_ossie(source, workspace_id=uuid4(), mode='replace')
     assert first['ai_context'] == source.get('ai_context')
     emitted = export(first)
-    assert reverse_export_edits(emitted) == source
+    expected = deepcopy(source)
+    if isinstance(context, dict) and isinstance(context.get('ontofoundry'), dict) and context['ontofoundry'].get('display_names'):
+        expected['ontology'][0]['description'] = '事物'
+    assert reverse_export_edits(emitted) == expected
     assert source == unchanged
     assert validate_schema(emitted) == []
     second, _ = import_ossie(emitted, workspace_id=uuid4(), mode='replace')
