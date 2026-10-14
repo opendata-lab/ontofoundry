@@ -831,6 +831,7 @@ dataset 的 `source` 和主键、物理列名。
 | 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
 | 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
+| 3+ | 问数：`get_sql_context`、`compile_metric_sql`、连接配置 DataAgent 数据源、问数 agent 提示词（§14） | 演示空间示例问题全部答对，聚合在一次 SQL 内完成 |
 | 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为由结构化指标生成 SQL（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
@@ -854,6 +855,8 @@ dataset 的 `source` 和主键、物理列名。
 | 13 | 与原文件对比的界面 | 不做；导入报告逐项说明，对比只用于测试（§7.2） |
 | 14 | 规则表达式写法 | SQL 文本，用与指标相同含义的文字路径引用（§3.5） |
 | 15 | 同义词 | 对象、属性、关系、指标都有 `synonyms` |
+| 16 | 数据集 | 不在核心模型里单独建；问数时由 MCP 从映射和元数据快照推导出表、列、JOIN 条件交给 agent（§14） |
+| 17 | 问数取数 | MCP 只提供语义和 SQL，agent 用 DataAgent 的数据查询工具执行；MCP 的数据库执行工具下线（§14） |
 
 ---
 
@@ -1013,3 +1016,88 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 - 第 3 阶段：技能改名改写、提示词精简、提案合同的 `target_kind` 调整、删除旧合同 B。
 - 第 3 阶段之后：导入补全（依赖第 2 阶段的导入报告和原文件材料）。
 - 验收：用样例 A/B 导入后跑一次 AI 补全，提案全部能通过平台校验；技能和提示词里不出现 §13.3 列出的旧概念。
+
+---
+
+## 14. 问数：MCP 提供语义，agent 拼 SQL 查数据
+
+### 14.1 分工
+
+| 谁 | 负责 |
+|---|---|
+| OntoFoundry MCP | 提供**语义**：业务对象、属性、关系、指标、规则；以及它们的**物理绑定**：表、列、列类型、JOIN 条件；把结构化指标编译成 SQL |
+| 问数 agent（DataAgent） | 理解问题，用 MCP 给的语义拼 SQL，用 DataAgent 自己的**数据查询工具**连数据源执行，再用业务语言回答 |
+
+这和 Fabric Data Agent 接 Lakehouse 的方式相同：先选定可用的表结构，加上业务说明和示例查询，再由 agent 生成 SQL
+（[Microsoft Learn – Data agent data sources](https://learn.microsoft.com/fabric/data-science/data-agent-add-datasources)）。
+我们的 MCP 就是那份“表结构 + 业务说明”。
+
+**数据集不需要在核心模型里单独建**：MCP 返回的表和列描述是**推导出来的**，来自核心模型的映射（`DataMapping`、`data_join`）
+加上数据资产层的元数据快照（列类型、注释），不需要用户另外维护一份。
+
+### 14.2 MCP 工具
+
+| 工具 | 作用 |
+|---|---|
+| `get_ontology_version`、`search_ontology_types`、`get_ontology_type`、`get_ontology_graph` | 保留：定位业务对象、按同义词搜索 |
+| **`get_sql_context`**（新增） | 给定一组对象（或一个关键词），返回拼 SQL 需要的全部语义，见 §14.3 |
+| **`compile_metric_sql`**（新增） | 给定指标、分组路径、附加条件、行数上限，返回编译好的 SQL、方言和数据源；agent 直接拿去执行 |
+| `search_objects(source=document)`、`get_object`、`expand_object_graph` | 保留，只用于**文档实例**（材料中抽取的事实，存在平台里） |
+| `search_objects(source=database)`、`query_metric` 的执行 | **下线**：数据库查询统一由 DataAgent 的数据查询工具执行，平台不再替 agent 跑业务 SQL。平台界面里的实例浏览仍保留自己的查询服务 |
+| `list_ontology_elements(kind=dataset / dataset_field)` 等 v3 语义层类型 | 删除 |
+
+### 14.3 `get_sql_context` 返回什么
+
+```json
+{
+  "datasource": { "alias": "sales_db", "dialect": "mysql", "dataagent_datasource": "销售库" },
+  "objects": [
+    {
+      "name": "订单", "technical_name": "sales_order", "synonyms": ["销售单"], "description": "…",
+      "table": "dw.orders", "key_columns": ["order_id"],
+      "columns": [
+        { "property": "金额", "technical_name": "amount", "column": "amount", "type": "decimal(12,2)",
+          "description": "含税金额，单位元", "synonyms": ["销售额"], "unique": false }
+      ]
+    }
+  ],
+  "joins": [
+    { "link": "订单 属于 客户", "from": "dw.orders", "to": "dw.customers",
+      "on": "dw.orders.customer_id = dw.customers.customer_id", "multiplicity": "many_to_one",
+      "note": "从订单连到客户，订单行数不变；反方向连接会让客户行变多，聚合客户属性前需去重" }
+  ],
+  "metrics": [
+    { "name": "华东区订单金额", "grain": "订单",
+      "sql": "SELECT SUM(o.amount) FROM dw.orders o JOIN dw.customers c ON o.customer_id = c.customer_id WHERE c.region = '华东'" }
+  ],
+  "rules": [
+    { "element": "订单.状态", "description": "取值只能是 待支付 / 已完成 / 已取消", "expression": "sales_order.status IN ('待支付','已完成','已取消')" }
+  ]
+}
+```
+
+- **`datasource`**：连接别名、SQL 方言（来自连接类型），以及 DataAgent 里对应的数据源名称，agent 据此选择用哪个数据源执行。
+  对应关系在工作空间的数据连接设置里配置：每个连接多一个“DataAgent 数据源”字段。
+- **`objects`**：只列已映射的对象和已映射的列；列类型和注释取自元数据快照，业务名称、描述、同义词取自核心模型。
+- **`joins`**：由关系的 `data_join` 生成 JOIN 条件；多对多关系给出经过关系源表的两段 JOIN。附带基数和防重复计算的提示
+  （与指标的“只沿指向一的方向走”同一条规则，§3.6）。
+- **`metrics`**：结构化指标编译出的 SQL，作为口径和示例查询；带分组和附加条件的版本用 `compile_metric_sql` 现编。
+- **`rules`**：约束和派生规则的说明与表达式，帮助 agent 理解取值范围和口径，不由平台执行。
+
+范围控制：参数给定对象时，返回这些对象以及与它们直接相连的对象和关系；给关键词时先按名称和同义词定位。
+返回内容只包含本次固定版本（`version_id`）里的元素。
+
+### 14.4 问数 agent 的工作流程（替换 `agents/agent_ontofoundry_qa.md` 的系统提示词）
+
+1. `get_ontology_version` 固定版本；`search_ontology_types` 按名称和同义词找到问题涉及的对象、属性、指标。
+2. `get_sql_context` 取这些对象的语义和物理绑定。
+3. 问题对应已有指标时，用 `compile_metric_sql` 取 SQL（可加分组和条件），不要自己改写口径。
+4. 否则自己拼 SQL：只用上下文里出现的表和列；JOIN 只用 `joins` 给出的条件；聚合时遵守基数提示，沿“对多”方向连接后要去重。
+5. 用 DataAgent 的数据查询工具在 `dataagent_datasource` 上执行；统计在数据库里完成，不要拉回全部明细再自己算。
+6. 用业务名称回答，给出口径（用了哪个指标、哪些条件）；不要把表名、列名当作业务概念讲给用户。
+
+### 14.5 实施
+
+- 第 3 阶段之后（与 §13 并行）：`get_sql_context`、`compile_metric_sql`；数据连接增加“DataAgent 数据源”字段；更新问数 agent 定义；
+  下线 MCP 中的数据库执行工具和 v3 语义层类型。
+- 验收：演示空间“咖啡渠道销售”的示例问题全部通过“MCP 语义 + DataAgent 执行 SQL”答对，其中“销售额最高的客户”一次 SQL 完成，不翻页。
