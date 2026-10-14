@@ -136,10 +136,10 @@ v3 中概念上重复存储的 `requires: list[UUID]`、`derived_by: list[UUID]`
 （属性、关系上的规则，第一段是其所属对象）。平台不执行规则，只检查路径中的对象、关系、属性都存在。例：
 
 ```sql
--- 属性 order.amount 上的约束
-order.amount > 0
--- 对象 order 上的约束：华东客户的订单必须有销售员
-order.customer.region <> '华东' OR order.salesperson.id IS NOT NULL
+-- 属性 sales_order.amount 上的约束
+sales_order.amount > 0
+-- 对象 sales_order 上的约束：华东客户的订单必须有销售员
+sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no IS NOT NULL
 ```
 
 不使用 Ossie 的角色写法（如 `Person.parent_of(descendant)`）。
@@ -157,20 +157,28 @@ order.customer.region <> '华东' OR order.salesperson.id IS NOT NULL
 | `synonyms` | list[str] | 如“营收” |
 | `evidence` | | |
 
-**路径写法**：`粒度对象.属性`，或经由关系跳到其他对象：`粒度对象.关系.属性`、`粒度对象.关系.关系.属性`。例：
+**路径写法**：`粒度对象.属性`，或经由关系跳到其他对象：`粒度对象.关系.属性`、`粒度对象.关系.关系.属性`。
+第一段必须是粒度对象的技术名；中间各段是**关系的技术名**，不是对象名；最后一段是落脚对象上的属性。
 
-```sql
--- 粒度：订单
-SUM(order.amount)
-SUM(CASE WHEN order.customer.region = '华东' THEN order.amount END)
-COUNT(DISTINCT order.customer.id)
-```
+例：对象 `sales_order`（订单，标识属性 `order_no`，属性 `amount`），对象 `customer`（客户，标识属性 `customer_no`，属性 `region`），
+关系 `sales_order.customer`（订单 → 客户，多对一）。
 
+| 指标 | 粒度 | 表达式 |
+|---|---|---|
+| 订单金额 | 订单 | `SUM(sales_order.amount)` |
+| 订单数 | 订单 | `COUNT(*)` |
+| 华东区订单金额 | 订单 | `SUM(CASE WHEN sales_order.customer.region = '华东' THEN sales_order.amount END)` |
+| 下单客户数 | 订单 | `COUNT(DISTINCT sales_order.customer.customer_no)` |
+| 客户数 | 客户 | `COUNT(*)` |
+| 每个下单客户的平均订单数 | 订单 | `COUNT(*) / COUNT(DISTINCT sales_order.customer.customer_no)` |
+
+- **`COUNT(*)` 数的就是粒度对象**：每一跳都只走向“一”的一侧，JOIN 后仍是一行一个粒度对象，所以 `COUNT(*)` 等于粒度对象的个数。
+  模型里没有隐含的 `id` 属性，数“有多少个某对象”要么用 `COUNT(*)`，要么用 `COUNT(DISTINCT …标识属性)`。
 - 路径中每一跳都必须是**指向“一”的一侧**：从源沿多对一 / 一对一关系走，或从目标反向沿一对一关系走，
   这样 JOIN 不会让粒度对象的行变多，聚合结果不会重复计算。
-- 走关系名而不是对象名，所以同一个对象有两条关系时不会有歧义（例如 `order.buyer.level` 和 `order.seller.level`）。
-- 需要“对多”方向的指标，换一个粒度对象来写。例如“每个客户的平均订单数”用订单做粒度：
-  `COUNT(order.id) / COUNT(DISTINCT order.customer.id)`。
+- 走关系名而不是对象名，所以同一个对象有两条关系时不会有歧义（例如 `sales_order.buyer.level` 和 `sales_order.seller.level`）。
+- 需要“对多”方向的指标，换一个粒度对象来写，例如上表最后一行。
+- 技术名不能是 SQL 保留字（如 `order`、`user`、`group`），否则路径写进 SQL 会被解析错。这条对所有元素的技术名都适用（§3.9）。
 
 指标面向业务对象和属性，不面向表和列。查询时通过 `mappings` 和关系的 `data_join` 翻译到物理表列。
 取代 v3 的 `semantic_models / datasets / dataset_fields / dataset_relationships / metrics` 五个集合。
@@ -213,6 +221,7 @@ metrics, mappings, material_objects, material_links
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
 - 对象只有一个标识属性时，该属性 `unique` 必须为 true。
+- 技术名不能是 ANSI SQL 保留字（大小写不敏感），因为规则和指标的路径不加引号写进 SQL。
 
 ---
 
@@ -582,10 +591,11 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 - 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条（`from_columns` / `to_columns` 为多列时照列），
   外加所属对象 `link_mappings` 中的一个子节点。
 - 多对多 join 表 → 第 4 阶段；之前报 `dropped`。
-- 指标 → `semantic_model.metrics`。dataset 名 = 对象技术名、字段名 = 属性技术名，所以路径的最后两段直接对应 `dataset.字段`：
-  `order.amount` → `order.amount`，`order.customer.region` → `customer.region`，再包上
+- 指标 → `semantic_model.metrics`。dataset 名 = 对象技术名、字段名 = 属性技术名，每条路径改写为“**落脚对象的技术名**.属性”：
+  `sales_order.amount` → `sales_order.amount`；`sales_order.customer.region` 落脚在客户对象，→ `customer.region`；
+  `sales_order.buyer.level` 中 `buyer` 是关系名，落脚对象是客户，同样 → `customer.level`。再包上
   `{"dialects": [{"dialect": "ANSI_SQL", "expression": ...}]}`。
-  两条不同路径落到同一个 dataset（例如 `order.buyer.level` 和 `order.seller.level`）时，OSI 表达式无法区分，该指标报 `dropped`；
+  两条不同路径落到同一个 dataset（例如同时用了 `sales_order.buyer.level` 和 `sales_order.seller.level`）时，OSI 表达式无法区分，该指标报 `dropped`；
   引用未映射对象的指标也报 `dropped`。
 
 ### 6.6 平台扩展块
@@ -715,14 +725,14 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 | 编号 | 差异 | 原文件 | 再导出 |
 |---|---|---|---|
-| RT-40 | dataset 改名为对象技术名，field 改名为属性技术名 | `"datasets": [{"name": "ORD_T", "fields": [{"name": "AMT", ...}]}]` | `"datasets": [{"name": "order", "fields": [{"name": "amount", ...}]}]`，`source` 和物理列不变 |
+| RT-40 | dataset 改名为对象技术名，field 改名为属性技术名 | `"datasets": [{"name": "ORD_T", "fields": [{"name": "AMT", ...}]}]` | `"datasets": [{"name": "sales_order", "fields": [{"name": "amount", ...}]}]`，`source` 和物理列不变 |
 | RT-41 | OntologyMap 按 `connection_alias` 重组，描述换成生成文字 | 原 `name` / `description` | `name` 不变，`"description": "<别名> 的数据映射"` |
 | RT-42 | dataset 描述换成对象描述 | dataset 自己的 `description` | 对象的 `description` |
 | RT-43 | 不支持的映射消失（§5.5 不支持清单） | 嵌套 `referent_mappings`、计算表达式等 | 不出现 |
 | RT-44 | 没有映射到任何概念的 dataset 消失（第 4 阶段前 join 表也在此列） | | 不出现 |
 | RT-45 | 字段和指标只保留 ANSI_SQL 方言 | `"dialects": [{"dialect": "ANSI_SQL", ...}, {"dialect": "SNOWFLAKE", ...}]` | 只有 `ANSI_SQL` |
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
-| RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(order.amount)` |
+| RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(sales_order.amount)` |
 | RT-48 | 语义层各处的 `ai_context`、`custom_extensions` 丢失 | | 不出现 |
 | RT-49 | 跨多个 dataset 的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
 
@@ -888,7 +898,7 @@ integrations/dataagent/skills/ontofoundry-modeling/
 | 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
 | 指标 | 指定粒度对象，表达式用从粒度对象出发的路径，只沿“指向一”的方向走 |
 | 同义词 | 业务别名写进 `synonyms`（对象、属性、关系、指标都有），不写进名称或描述 |
-| 规则 | 挂在具体元素上，表达式用路径写法（`order.customer.region`），不用 Ossie 角色写法 |
+| 规则 | 挂在具体元素上，表达式用路径写法（`sales_order.customer.region`），不用 Ossie 角色写法 |
 
 技能里**不再出现**：`roles`、`owner_ref`、`verbalizes`、`ValueType`、`ConceptRef`、`concept_context`、`role_values`、
 `owner_columns / role_columns`、`OneToMany` 相关的坑。
