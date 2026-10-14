@@ -35,7 +35,7 @@
 | P2 | 适配器隔离 | `domain/` 不得 import 任何适配器；适配器只依赖核心模型的公开类型。外部格式的概念（角色、presence、方言……）不出现在适配器之外。 |
 | P3 | 有损可见 | 导入、导出都产出转换报告，逐项列出“结构改写 / 丢弃 / 占位 / 错误”。 |
 | P4 | 不猜测 | 无法确定含义的构造（例如任意 SQL 里的列）一律报告并跳过，不半读、不推断。 |
-| P5 | 自身往返稳定 | 核心模型 → 外部格式 → 核心模型，对核心模型里有落点的内容应当稳定（靠技术名匹配和平台扩展块）。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并能对具体文件列出（§7.2）。 |
+| P5 | 无损只靠原生格式 | 平台自己的完整备份和搬迁用 OntoFoundry 原生格式（§4.6），完全无损。外部格式只保证业务结构和命名：核心模型 → 外部格式 → 核心模型时，规则名、动作、实例、证据等可能丢失。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并在导入报告里逐项列出。 |
 | P6 | 导出必须合法 | 导出的文档必须通过目标格式的官方校验。缺的信息优先省略或由模型推导，不往受校验的字段里塞占位字符串（见 §4.4）。 |
 
 ---
@@ -81,20 +81,21 @@
 | `value_kind` | enum | `string / integer / decimal / float / boolean / date / datetime` |
 | `required` | bool | |
 | `identifier` | bool | 是否参与对象标识 |
-| `multiplicity` | `one_to_one` / `many_to_one` / null | null 表示交给导出时推导 |
-| `value_concept` | str / null | 仅用于导出时沿用外部文件里的值概念名，平台内部不使用 |
+| `unique` | bool | 值在所有对象中是否唯一（如身份证号）。对象只有一个标识属性时，它必须是 `unique` |
+| `synonyms` | list[str] | **新增**，业务别名，如“金额”的“销售额” |
 | `evidence` | | |
 
-**删除**：`verbalizes`、`target_role_name`。
+**删除**：`verbalizes`、`target_role_name`、`multiplicity`（由 `unique` 取代）、`value_concept`。
 
 ### 3.4 关系 `LinkType`
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id`、`name`、`technical_name`、`description` | | `name` 就是正向读法里的动词，例如“下单” |
-| `inverse_name` | str / null | **新增**，反向读法里的动词，例如“属于”；可空 |
+| `id`、`name`、`technical_name`、`description` | | `name` 就是正向读法里的动词，例如“属于” |
+| `inverse_name` | str / null | **新增**，反向读法里的动词，例如“拥有”；可空 |
+| `synonyms` | list[str] | **新增** |
 | `source_type_id`、`target_type_id` | UUID | 允许相同（自关联，例如 员工 汇报给 员工） |
-| `multiplicity` | enum | `one_to_one / many_to_one / one_to_many / many_to_many` |
+| `multiplicity` | enum | `one_to_one / many_to_one / many_to_many`。没有一对多：一对多关系一律从“多”的一端建成多对一，例如“订单 → 客户，多对一，名称‘属于’，反向名称‘拥有’”；界面上从客户一侧也能看到“拥有 订单” |
 | `identifier` | bool | 源对象是否通过本关系被标识，要求多对一或一对一 |
 | `tags` | list[str] | |
 | `data_join` | DataJoin / null | 关系的数据绑定，见下 |
@@ -117,7 +118,7 @@
 例子：
 
 - 订单 属于 客户（多对一，外键在订单表）：`table_name=null`（即订单表），`source_columns=[order_id]`，`target_columns=[customer_id]`。
-- 客户 拥有 订单（一对多，外键在订单表）：`table_name=orders`，`source_columns=[customer_id]`，`target_columns=[order_id]`。
+- 员工 汇报给 员工（自关联，多对一，外键在员工表）：`table_name=null`，`source_columns=[employee_id]`，`target_columns=[manager_id]`。
 - 学生 选修 课程（多对多）：`table_name=enrollments`，`source_columns=[student_id]`，`target_columns=[course_id]`。
 - 发货 对应 订单明细（订单明细主键为 `order_id + line_no`）：`table_name=null`（发货表），`source_columns=[shipment_id]`，
   `target_columns=[order_id, line_no]`。
@@ -131,6 +132,18 @@
 `owner_kind` 为 `object_type / property / link_type / action`。**删除** `verbalizes`，自然语言说明写在 `description`。
 v3 中概念上重复存储的 `requires: list[UUID]`、`derived_by: list[UUID]` 不再存在，规则只存在 `rules` 集合。
 
+**表达式写法**：与指标相同（§3.6），ANSI SQL 中用路径引用：`对象.属性`、`对象.关系.属性`，第一段是规则所属的对象
+（属性、关系上的规则，第一段是其所属对象）。平台不执行规则，只检查路径中的对象、关系、属性都存在。例：
+
+```sql
+-- 属性 order.amount 上的约束
+order.amount > 0
+-- 对象 order 上的约束：华东客户的订单必须有销售员
+order.customer.region <> '华东' OR order.salesperson.id IS NOT NULL
+```
+
+不使用 Ossie 的角色写法（如 `Person.parent_of(descendant)`）。
+
 ### 3.6 指标 `Metric`（新增）
 
 指标是独立的顶层元素，不挂在某个对象下面，因为一个指标经常要跨多个对象（例如“华东区客户的订单金额”同时用到订单和客户）。
@@ -141,6 +154,7 @@ v3 中概念上重复存储的 `requires: list[UUID]`、`derived_by: list[UUID]`
 | `base_type_id` | UUID | 指标的粒度对象，即“按什么来数”。例如订单金额的粒度是订单，客户数的粒度是客户 |
 | `expression` | str | ANSI SQL 聚合表达式，引用**从粒度对象出发的路径**，见下 |
 | `value_kind` | enum / null | |
+| `synonyms` | list[str] | 如“营收” |
 | `evidence` | | |
 
 **路径写法**：`粒度对象.属性`，或经由关系跳到其他对象：`粒度对象.关系.属性`、`粒度对象.关系.关系.属性`。例：
@@ -152,7 +166,7 @@ SUM(CASE WHEN order.customer.region = '华东' THEN order.amount END)
 COUNT(DISTINCT order.customer.id)
 ```
 
-- 路径中每一跳都必须是**指向“一”的一侧**（从源走多对一 / 一对一关系，或从目标反向走一对多关系），
+- 路径中每一跳都必须是**指向“一”的一侧**：从源沿多对一 / 一对一关系走，或从目标反向沿一对一关系走，
   这样 JOIN 不会让粒度对象的行变多，聚合结果不会重复计算。
 - 走关系名而不是对象名，所以同一个对象有两条关系时不会有歧义（例如 `order.buyer.level` 和 `order.seller.level`）。
 - 需要“对多”方向的指标，换一个粒度对象来写。例如“每个客户的平均订单数”用订单做粒度：
@@ -197,6 +211,8 @@ metrics, mappings, material_objects, material_links
 - `data_join` 的 `source_columns` / `target_columns` 长度分别等于两端对象 `key_columns` 的长度。
 - `metrics.expression` 中的路径必须从 `base_type_id` 出发，每一跳都指向“一”的一侧，最后落在一个存在的属性上。
 - `inverse_name` 非空时不得与 `name` 相同。
+- `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
+- 对象只有一个标识属性时，该属性 `unique` 必须为 true。
 
 ---
 
@@ -214,7 +230,7 @@ class FormatAdapter(Protocol):
     def import_document(self, raw: bytes, ctx: ImportContext) -> ImportResult: ...
     def export_document(self, model: CoreDraft, ctx: ExportContext) -> ExportResult: ...
     def validate_document(self, document: bytes) -> list[TranslationIssue]: ...  # 目标格式自己的官方校验
-    def diff_roundtrip(self, original: bytes, exported: bytes) -> list[RoundTripDiff]: ...  # 每处差异带规则编号，见 §7.2
+    def diff_roundtrip(self, original: bytes, exported: bytes) -> list[RoundTripDiff]: ...  # 仅测试使用，每处差异带规则编号，见 §7.2
 
 @dataclass
 class ImportContext:
@@ -282,6 +298,7 @@ ontofoundry_api/
       extension.py         ai_context.ontofoundry 扩展块读写
       validator.py         官方 schema + 语义校验（沿用现有 ossie/validator.py）
       assets/vendor/       固定版本的 Ossie schema（沿用）
+    native/                OntoFoundry 原生格式（§4.6）
 ```
 
 API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/exports/{adapter_id}`，
@@ -330,6 +347,18 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 空工作空间也走同一流程，此时全部是 create 提案，“全部接受”后发布即可。
 这样导入不需要自己的合并、冲突处理和发布逻辑，全部复用提案机制；现有导入弹窗里的“直接发布 / 跳转发布页三方合并”逻辑删除。
 
+### 4.6 OntoFoundry 原生格式
+
+一个最简单的适配器，`id = ontofoundry-core-1`，用于完整备份、在环境之间搬迁、平台之间交换：
+
+```json
+{ "format": "ontofoundry", "schema_version": "core-1", "exported_at": "...", "draft": { ...核心模型原样... } }
+```
+
+- 导出：核心模型原样写出，包括规则名、动作、指标、映射、实例、证据。
+- 导入：校验 `schema_version`，同样走提案（§4.5）。证据引用的材料在目标工作空间不存在时，丢弃该证据并报 `dropped`。
+- 这是唯一保证无损的格式；Ossie 等外部格式只承载业务结构和命名。
+
 ---
 
 ## 5. Ossie 适配器：导入
@@ -364,10 +393,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 
 **值概念折叠**：属性的 `value_kind` 沿值概念的 `extends` 链找到第一个内置类型
 （`String / Integer / Decimal / Float / Boolean / Date / DateTime`）；找不到则用 `string` 并报 `converted`。
-属性角色引用的概念名（值概念名或内置类型名）只要与导出时会自动生成的名字不同，就写入属性的 `value_concept`
-（导出规则：标识属性生成 `{对象}_{属性}_value`，普通属性直接用内置类型名），从而再导出时角色引用的名字不变。
-值概念自身只保留名字和最终的内置类型，`extends` 链被拉平：`A extends B extends Integer` 再导出为 `A extends Integer`。
-值概念自己的 `description`、`requires`、`derived_by`、`identify_by`、`relationships` 全部 `dropped`。
+值概念本身不保留：名字、`description`、`extends` 链、`requires`、`derived_by`、`identify_by`、`relationships` 全部 `dropped`（RT-23、RT-24）。
 
 ### 5.3 关系分类
 
@@ -403,7 +429,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 | 情况 | `ManyToOne` | `OneToOne` | 缺省 |
 |---|---|---|---|
-| a. 属性 | `many_to_one` | `one_to_one` | null（导出时推导） |
+| a. 属性 | `unique=false` | `unique=true` | `unique=false` |
 | b. 二元关系 | `many_to_one` | `one_to_one` | `many_to_many` |
 | c. 多元关系 | `dropped`（Ossie 对多元基数的含义不明确） | 同左 | — |
 
@@ -440,7 +466,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 ### 5.4 工作空间级约束和规则
 
 - 文档 `requires`：`dropped`（RT-04）。
-- 各元素的 `requires` / `derived_by` → `rules`，规则名、技术名、描述优先取扩展块（§5.7），表达式原文不改。
+- 各元素的 `requires` / `derived_by` → `rules`，规则名按 `{元素名}·约束1` / `{元素名}·派生1` 生成，技术名按 `constraint_1` 等生成。
+- 表达式里的引用能按 §3.5 的路径写法解析的，原文导入；解析不了的（如 Ossie 角色写法 `Person.parent_of(descendant)`），规则 `dropped`，原文留在报告里，交给 AI 补全改写（RT-31）。
 - 归属元素被 `dropped` 时，其规则一并 `dropped`。
 
 ### 5.5 数据映射
@@ -485,13 +512,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
-平台导出时写入（§6.6），导入时读取，用来让“平台 → Ossie → 平台”尽量稳定。其他工具可以忽略它。
-
-| 扩展版本 | 读取的内容 |
-|---|---|
-| `core-1`（本设计） | 全部，见 §6.6 |
-| `1`–`3`（v2 编译器写出） | `display_names`、`tags`、`required_attributes`、`rules`（名称 / 技术名 / 描述）、`actions` |
-| `4`（v3 写出） | `display_names`、`tags`、`required_properties`、`concept_context.synonyms`、`actions`；按路径或 id 能对上的才读，`ids`、`export_edits`、`legacy_mapping_ids` 忽略 |
+平台导出时写入（§6.6），导入时读取，只承载**命名类信息**：显示名、反向名称、同义词、标签、必填。其他工具可以忽略它。
+只读 `version = "core-1"`；旧版本（`1`–`4`）及其他内容一律不读，整块报 `dropped`（RT-03）。
 
 ### 5.8 id
 
@@ -522,10 +544,11 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `identifier=true` 的属性和关系 | 所属组件的 `identify_by` |
 | 对象上的规则 | 组件的 `requires` / `derived_by` |
 | `Property` | 所属组件下的关系：`name = technical_name`，`roles = [{concept: 值概念}]` |
-| 值概念 | `value_concept` 有值就用它；否则标识属性生成 `{对象}_{属性}_value`（`ValueType`，`extends` 内置类型）；普通属性直接用内置类型名。沿用现有编译器行为 |
-| 属性 `multiplicity` | 有值照写；null 时，唯一的标识属性写 `OneToOne`，其余写 `ManyToOne` |
+| 值概念 | 标识属性生成 `{对象}_{属性}_value`（`ValueType`，`extends` 内置类型）；普通属性直接用内置类型名。沿用现有编译器行为 |
+| 属性 `unique` | true 写 `OneToOne`，false 写 `ManyToOne` |
 | 属性读法 | 生成 `{对象}的{属性名}是{值概念}` |
 | `required`、`name`（显示名）、`synonyms`、`tags` | 只写入扩展块 |
+| 属性上的规则 | 关系的 `requires` / `derived_by` |
 
 ### 6.3 关系
 
@@ -533,18 +556,18 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 |---|---|---|---|
 | `many_to_one` | 源对象 | `[{concept: 目标}]` | `ManyToOne` |
 | `one_to_one` | 源对象 | `[{concept: 目标}]` | `OneToOne` |
-| `one_to_many` | **目标对象**（从“多”的一端写） | `[{concept: 源}]` | `ManyToOne` |
 | `many_to_many` | 源对象 | `[{concept: 目标}]` | 不写（Ossie 中缺省即无唯一性约束） |
 
 - 自关联：角色名固定写 `related`，以便读法区分两个占位符。
-- 读法：`[{源}name{目标}]`，有 `inverse_name` 时再加 `{目标}inverse_name{源}`；`one_to_many` 按实际所属方向书写。
+- 读法：`[{源}name{目标}]`，有 `inverse_name` 时再加 `{目标}inverse_name{源}`。
   至少一条，满足 Ossie 必填。
 - 关系上的规则 → 关系的 `requires` / `derived_by`。
 
 ### 6.4 规则和动作
 
-- `object_type / property / link_type` 规则 → 对应 Ossie 元素的 `requires` / `derived_by`；名称、技术名、描述写入扩展块。
-- `action` 规则、`actions`：Ossie 没有对应构造，只写入扩展块。
+- `object_type / property / link_type` 规则 → 对应 Ossie 元素的 `requires` / `derived_by`，表达式原文写出。规则名、技术名、描述不导出。
+- 导出后用 Ossie 官方 lint 检查表达式，不通过的规则从文件中去掉，导出报告 `dropped`。
+- `action` 规则、`actions`：Ossie 没有对应构造，不导出，报 `dropped`。
 
 ### 6.5 数据映射和指标
 
@@ -576,14 +599,13 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
     "synonyms": { "order": ["订单", "销售单"] },
     "tags": { "order": ["核心"] },
     "required": ["order.amount"],
-    "rules": { "order.amount": [{ "technical_name": "positive", "name": "金额为正", "description": "", "rule_kind": "constraint", "expression": "..." }] },
-    "actions": [ ... ],
     "unsupported": [ { "path": "material_objects", "message": "Ossie 没有实例数据" } ]
   }
 }
 ```
 
-键一律用技术名路径（`对象`、`对象.属性`、`对象.关系`），不用 UUID：文件可读，重新导入时靠技术名匹配就能沿用 id。
+键一律用技术名路径（`对象`、`对象.属性`、`对象.关系`、`metric:指标`），不用 UUID：文件可读，重新导入时靠技术名匹配就能沿用 id。
+规则名、动作、实例、证据不放进扩展块，需要完整保留时用原生格式（§4.6）。
 
 ### 6.7 不导出
 
@@ -591,6 +613,9 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 |---|---|---|
 | `evidence` | Ossie 无对应构造，且引用平台内部材料 | 不逐项报告，文档级说明一次 |
 | `material_objects` / `material_links` | Ossie 没有实例数据 | `dropped` |
+| `actions`、动作上的规则 | Ossie 没有动作 | `dropped` |
+| 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
+| 过不了官方 lint 的规则表达式 | | `dropped` |
 | 多对多 join 表映射（第 4 阶段之前） | | `dropped` |
 | 引用未映射对象的指标 | | `dropped` |
 
@@ -611,20 +636,20 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | 文档 `requires` | ❌ dropped | — |
 | 文档 `ai_context` | 只读 `ontofoundry` 键 | 只写 `ontofoundry` 键 |
 | EntityType | ✅ | ✅ |
-| ValueType | 折叠进属性 `value_kind` | 只为标识属性或 `value_concept` 生成 |
+| ValueType | 折叠进属性 `value_kind`，值概念本身丢弃 | 只为标识属性生成 |
 | `extends`（实体 → 实体） | ✅ | ✅ |
 | `extends`（实体 → 值） | ❌ dropped | — |
 | `identify_by` | ✅（属性、二元关系） | ✅ |
-| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules | ✅ |
+| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（过不了 lint 的 dropped） |
 | 属性型关系（实体 → 值） | ✅ | ✅ |
-| 二元关系（实体 → 实体） | ✅ | ✅（四种基数） |
+| 二元关系（实体 → 实体） | ✅ | ✅（三种基数） |
 | 自关联 | ✅ | ✅（角色名 `related`） |
 | 一元关系 | 🔁 布尔属性 | 不还原 |
 | 多元关系 | 🔁 中间对象 | 不还原 |
 | 值概念上的关系 | ❌ dropped | — |
 | `roles[].name` | ❌ dropped | 只在自关联时生成 |
 | `verbalizes` | 提取动词，其余 dropped | 由名称生成 |
-| `multiplicity` | ✅（多元关系 dropped） | ✅ |
+| `multiplicity` | ✅（属性 → `unique`；多元关系 dropped） | ✅ |
 | OntologyMap / SemanticModel | ✅ → `connection_alias` | ✅ |
 | Dataset（单列主键） | ✅ | ✅ |
 | Dataset 复合主键 | ✅（经一层 `referent_mappings`） | ✅ |
@@ -640,7 +665,8 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | Metric（ANSI，只引用一个已映射 dataset） | ✅ | ✅ |
 | Metric（引用多个 dataset） | ❌ dropped（原文留在导入报告） | ✅（路径无歧义时） |
 | 各处 `ai_context`、`custom_extensions` | ❌ dropped | — |
-| （平台）显示名、同义词、标签、必填、规则名、动作 | 从扩展块读 | 写入扩展块 |
+| （平台）显示名、反向名称、同义词、标签、必填 | 从扩展块读 | 写入扩展块 |
+| （平台）规则名、动作 | — | ❌ 不导出（用原生格式） |
 | （平台）证据、实例数据 | — | ❌ 不导出 |
 
 ✅ 支持　🔁 结构改写（报 `converted`）　❌ 不支持（报 `dropped`）
@@ -648,7 +674,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 ### 7.1 导入再导出的差异
 
 Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同都必须能归到下表的某条规则**。
-规则编号 `RT-xx` 是固定的：转换报告和往返差异报告（§7.2）都引用这些编号。
+规则编号 `RT-xx` 是固定的：导入报告的每个条目都引用这些编号，测试也按编号检查（§7.2）。
 
 **文档层**
 
@@ -656,7 +682,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 |---|---|---|---|
 | RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间名称>", "description": "<工作空间描述>"` |
 | RT-02 | 文档 `ai_context` 只剩平台扩展块 | `{"synonyms": [...], "instructions": "...", "acme": {...}}` | `{"ontofoundry": {"version": "core-1", ...}}` |
-| RT-03 | 旧版本平台扩展块升级为 core-1 格式 | `"ontofoundry": {"version": "3", ...}` | `"ontofoundry": {"version": "core-1", ...}` |
+| RT-03 | 旧版本平台扩展块不读；规则名、动作等非命名信息不再写入扩展块 | `"ontofoundry": {"version": "3", "rules": ..., "actions": ...}` | `"ontofoundry": {"version": "core-1", "display_names": ...}` |
 | RT-04 | 文档级 `requires` 消失 | `"requires": ["COUNT(Customer) > 0"]` | 不出现 |
 
 **格式规范化**（不改变含义）
@@ -674,15 +700,16 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 |---|---|---|---|
 | RT-20 | 读法重新生成 | `["{order}由{customer}下单", "{order}属于{customer}", "{customer}拥有{order}"]` | `["{order}属于{customer}", "{customer}拥有{order}"]`（取自 `name` / `inverse_name`，见 §5.3 读法提取） |
 | RT-21 | 角色名丢失；自关联统一为 `related` | `"roles": [{"concept": "employee", "name": "manager"}]` | `"roles": [{"concept": "employee", "name": "related"}]` |
-| RT-22 | 没写基数的属性补上推导出的基数 | 属性关系无 `multiplicity` | `"multiplicity": "ManyToOne"`（唯一标识属性为 `OneToOne`） |
-| RT-23 | 值概念的 `extends` 链被拉平 | `A extends B`，`B extends Integer` | `A extends Integer`；`B` 若没有属性引用则消失 |
-| RT-24 | 值概念的描述、规则、`identify_by`、关系丢失 | `{"concept": "money", "type": "ValueType", "requires": [...]}` | `{"concept": "money", "type": "ValueType", "extends": ["Decimal"]}` |
-| RT-25 | 没有属性引用的值概念消失 | 孤立的 ValueType | 不出现 |
+| RT-22 | 没写基数的属性补上基数 | 属性关系无 `multiplicity` | `"multiplicity": "ManyToOne"` |
+| RT-23 | 值概念被替换：属性改为引用内置类型，标识属性改为引用生成的 `{对象}_{属性}_value` | `"roles": [{"concept": "money"}]`，`money extends Decimal` | `"roles": [{"concept": "Decimal"}]`，`money` 不再出现 |
+| RT-24 | 值概念上的描述、规则、`identify_by`、关系随值概念一起丢失 | `{"concept": "money", "type": "ValueType", "requires": [...]}` | 不出现 |
+| RT-25 | （已并入 RT-23，编号保留不用） | | |
 | RT-26 | 一元关系变成布尔属性 | `{"name": "is_vip", "verbalizes": ["{customer}是VIP"]}` | `{"name": "is_vip", "roles": [{"concept": "Boolean"}], "multiplicity": "ManyToOne", "verbalizes": ["{customer}的是VIP是{Boolean}"]}` |
 | RT-27 | 多元关系变成中间实体 | `supplier` 下的 `supplies`（3 个角色） | `supplier` 下不再有 `supplies`；新增实体 `supplier_supplies`，带 3 条关系和 `identify_by` |
 | RT-28 | 多元关系的基数、读法丢失，规则移到中间实体 | `supplies` 上的 `requires` | 同一表达式出现在 `supplier_supplies` 组件上 |
 | RT-29 | 不支持的构造消失：值概念上的关系、实体继承值概念、引用 `Any` 的关系 | | 不出现 |
 | RT-30 | `identify_by` 中引用了已消失元素的项被删除 | `"identify_by": ["supplies", "code"]` | `"identify_by": ["code"]` |
+| RT-31 | 引用无法按路径写法解析的规则消失 | `"derived_by": ["Person.parent_of(descendant)"]` | 不出现 |
 
 **数据映射和指标**
 
@@ -703,23 +730,16 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 `identify_by`（RT-30 除外）、概念和关系上的 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
 dataset 的 `source` 和主键、物理列名。
 
-### 7.2 往返差异报告
+### 7.2 让用户知道自己的文件哪里变了
 
-光有规则表不够，用户还需要知道**自己这份文件**具体哪里变了。为此：
+不做“与原文件对比”的界面。用户看到的是：
 
-1. **保存原文件**：每次导入把原始文件和导入报告一起存进导入记录。
-2. **差异报告**：对一个从 Ossie 导入过的工作空间，导出对话框提供“与导入原文件对比”。
-   适配器把原文件和本次导出做结构对比（RT-10 的排序差异不计），每一处差异标注对应的 `RT-xx` 编号，按编号分组展示，例如：
+1. **导入报告**：按文件逐项列出每个被改写、被丢弃的条目，标注 `RT-xx` 编号、原文路径和行号，原文件作为材料保存（§13.4）。
+2. **规则表**（§7.1）：说明格式规范化这类全局差异（排序、空字段、读法重新生成等），不逐项列出。
 
-   ```text
-   RT-20 读法重新生成      12 处   order.customer, order.items, …
-   RT-27 多元关系→中间实体  1 处   supplier.supplies → supplier_supplies
-   RT-40 dataset 改名      3 处   ORD_T → order, CUST_T → customer, …
-   ```
-
-   导入后被用户修改过的元素，差异标注为“导入后已修改”，与 RT 规则区分开。
-3. **测试兜底**：对每份样例文件（含 A/B），测试执行“导入 → 导出 → 差异报告”，断言**每一处差异都有 RT 编号**。
-   出现无法归类的差异就是适配器 bug，测试失败。新增 RT 规则必须同时更新本节表格。
+**测试兜底**：适配器提供 `diff_roundtrip`，只在测试里使用。对每份样例文件（含 A/B）执行“导入 → 导出 → 对比”，
+断言**每一处差异都有 RT 编号**（RT-10 的排序差异不计）。出现无法归类的差异就是适配器 bug，测试失败。
+新增 RT 规则必须同时更新 §7.1 的表格。
 
 ---
 
@@ -741,7 +761,7 @@ dataset 的 `source` 和主键、物理列名。
 | 阶段 | 内容 | 完成标准 |
 |---|---|---|
 | 1 | 核心模型 core-1（含复合主键、新 `data_join`、指标）；清空数据的迁移；适配器框架；Ossie 导出（以现有 v2 编译器为基础改造）；删除 v1 / v2 / v3 模型与转换代码 | 每份导出都通过官方校验；`domain/` 不 import `adapters/` 的测试通过 |
-| 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；往返差异报告（§7.2）；前端导入、导出对话框展示报告 | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
+| 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
 | 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
 | 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为按路径翻译（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
@@ -760,6 +780,13 @@ dataset 的 `source` 和主键、物理列名。
 | 6 | 材料实例 | 保留，用于后续实例图谱 |
 | 7 | 工作空间级约束 `ontology_requires` | 删除；Ossie 文档级 `requires` 导入时丢弃（RT-04） |
 | 8 | 导入到工作空间 | 生成提案，复用本体构建的会话、提案面板、草稿和发布面板；空工作空间同样走提案（§4.5） |
+| 9 | 关系基数 | 去掉一对多，只留一对一、多对一、多对多（§3.4） |
+| 10 | 属性基数 | 改为 `unique` 开关（§3.3） |
+| 11 | `value_concept` | 删除；值概念名的变化见 RT-23 |
+| 12 | 平台信息的承载 | Ossie 扩展块只放命名类信息；完整保留用原生格式（§4.6） |
+| 13 | 与原文件对比的界面 | 不做；导入报告逐项说明，对比只用于测试（§7.2） |
+| 14 | 规则表达式写法 | 与指标统一为路径写法（§3.5） |
+| 15 | 同义词 | 对象、属性、关系、指标都有 `synonyms` |
 
 ---
 
@@ -772,7 +799,7 @@ dataset 的 `source` 和主键、物理列名。
 - `ossie/importer.py` 中 v3 路径（第 2 阶段整体重写）
 - `services/element_save.py`、`api/proposals.py`、`contracts/proposals.py`（含 `_carry_placeholders`）、`api/mcp.py`、`api/modeling.py`、`services/publish_preview.py` 中的 `schema_version` 分支
 - `services/dataagent.py` 中关于 owner_ref、roles、verbalizes、endpoint_direction 的 prompt
-- `ossie/compiler.py` 中的 `_resolve_readings` 及别名逻辑
+- `ossie/compiler.py` 中的 `_resolve_readings` 及别名逻辑；导入器中读取旧版本扩展块（1–4）的代码
 - `scripts/ossie_coverage_matrix.py`，由 §7 总表对应的支持矩阵测试取代
 - `integrations/dataagent/skills/md2ossie`：改名改写为 `ontofoundry-modeling`（§13.3），删除 `validate_ossie.py` 及其测试；agent 系统提示词中的旧合同 B
 - 只针对 v1 / v2 / v3 兼容的测试（`test_p0_v3_contract.py`、`test_p1_*`、`test_t2_postgres_migration.py` 等），逐个确认后删除或改写
@@ -796,7 +823,7 @@ dataset 的 `source` 和主键、物理列名。
 | ObjectType | Object type | Entity type |
 | Property | Property | Property |
 | LinkType（二元） | Link type（两个 object type） | Relationship type（source / target） |
-| `multiplicity` | 一对一 / 多对一 / 多对多 | 第三方资料提到有基数提示，未在官方文档核实 |
+| `multiplicity`（三种） | 一对一 / 多对一 / 多对多 | 第三方资料提到有基数提示，未在官方文档核实 |
 | `data_join`（`table_name` 为空 = 外键） | 外键 | 关系源表即某一端的表 |
 | `data_join`（`table_name` 为 join 表） | join table 数据集 | 单独的关系源表 |
 | 中间对象 | object-backed link | 中间实体类型 |
@@ -860,7 +887,8 @@ integrations/dataagent/skills/ontofoundry-modeling/
 | 继承 | 子对象 `extends` 父对象，只写自己新增的属性和关系 |
 | 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
 | 指标 | 指定粒度对象，表达式用从粒度对象出发的路径，只沿“指向一”的方向走 |
-| 同义词 | 业务别名写进 `synonyms`，不写进名称或描述 |
+| 同义词 | 业务别名写进 `synonyms`（对象、属性、关系、指标都有），不写进名称或描述 |
+| 规则 | 挂在具体元素上，表达式用路径写法（`order.customer.region`），不用 Ossie 角色写法 |
 
 技能里**不再出现**：`roles`、`owner_ref`、`verbalizes`、`ValueType`、`ConceptRef`、`concept_context`、`role_values`、
 `owner_columns / role_columns`、`OneToMany` 相关的坑。
@@ -899,7 +927,8 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 一元关系转成布尔属性 | RT-26 | 起业务名称（如“是否VIP”）、写描述 | update 属性 |
 | 读法里的其他说法被丢弃 | RT-20 | 提取成关系或对象的同义词；正向 / 反向名称不贴切时改写 | update 关系、对象 |
 | 角色名被丢弃 | RT-21 | 自关联或中间对象的关系名不清楚时，参考角色名改名（如“汇报给”→“上级”） | update 关系 |
-| 值概念的描述、约束被丢弃 | RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
+| 值概念及其描述、约束被丢弃 | RT-23 / RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
+| 引用无法解析的规则被丢弃 | RT-31 | 按路径写法改写表达式，挂到对应元素上 | create 规则 |
 | 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
 | 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
@@ -907,11 +936,10 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 计算表达式、嵌套 referent 等映射被丢弃 | RT-43 | 只在能确定对应列时提出映射修改；其余在回答中列出，交给人工 | update 映射，或说明 |
 | 字段的 `label`、`dimension` 等被丢弃 | RT-46 | `label` 可作为属性显示名或同义词 | update 属性 |
 
-不交给 AI 的条目：纯格式规范化（RT-10 至 RT-13）、文档名称和描述（RT-01）、扩展块升级（RT-03）、方言丢弃（RT-45）。
+不交给 AI 的条目：纯格式规范化（RT-10 至 RT-13）、文档名称和描述（RT-01）、旧扩展块（RT-03）、方言丢弃（RT-45）。
 这些不影响业务含义，报告里说明即可。
 
-**和 §7.2 的关系**：保存原文件现在有了明确用途（AI 补全的材料和证据来源），所以第 2 阶段保留“导入时保存原文件”；
-导入后“与原文件对比”的用户界面仍按需再做。
+**原文件的用途**：作为 AI 补全的材料和证据来源，也是导入报告行号的依据；不提供“与原文件对比”的界面（§7.2）。
 
 ### 13.5 实施
 
