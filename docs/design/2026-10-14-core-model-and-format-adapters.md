@@ -711,6 +711,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | 1 | 核心模型 core-1（含复合主键、新 `data_join`、指标）；清空数据的迁移；适配器框架；Ossie 导出（以现有 v2 编译器为基础改造）；删除 v1 / v2 / v3 模型与转换代码 | 每份导出都通过官方校验；`domain/` 不 import `adapters/` 的测试通过 |
 | 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；往返差异报告（§7.2）；前端导入、导出对话框展示报告 | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
+| 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
 | 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为按路径翻译（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
@@ -738,6 +739,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 - `services/dataagent.py` 中关于 owner_ref、roles、verbalizes、endpoint_direction 的 prompt
 - `ossie/compiler.py` 中的 `_resolve_readings` 及别名逻辑
 - `scripts/ossie_coverage_matrix.py`，由 §7 总表对应的支持矩阵测试取代
+- `integrations/dataagent/skills/md2ossie`：改名改写为 `ontofoundry-modeling`（§13.3），删除 `validate_ossie.py` 及其测试；agent 系统提示词中的旧合同 B
 - 只针对 v1 / v2 / v3 兼容的测试（`test_p0_v3_contract.py`、`test_p1_*`、`test_t2_postgres_migration.py` 等），逐个确认后删除或改写
 
 前端：
@@ -766,3 +768,116 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | Rule、Action、Metric | Action / Function 等，另行设计 | 无直接对应 |
 
 两家都只有二元关系，这也是核心模型只保留二元关系的依据之一。
+
+---
+
+## 13. AI 建模技能与导入补全
+
+### 13.1 现状问题
+
+建模 agent 使用的 `integrations/dataagent/skills/md2ossie` 技能，以及平台每轮发给 agent 的提示词（`services/dataagent.py`），
+都是按“产出 Ossie”来写的：
+
+- 技能教的是 Ossie 建模：ValueType 取舍、隐式首角色、`roles`、`verbalizes`、`OneToMany` 不合法等，校验器也是 Ossie 校验器。
+- 轮次提示词要求 agent 按 v3 写提案：`owner_ref`、有序 `roles`、`ConceptRef`、`concept_context`、`role_values`、
+  `owner_columns / role_columns` 等，光关系部分就有十几行说明。
+- 同样的建模规则在技能、agent 系统提示词、轮次提示词三处重复。
+- 还保留着旧合同 `ontofoundry.model-result/v1`（agent 直接写完整 Ossie 文档）。
+
+核心模型改完以后，这些内容都要换成面向核心模型。
+
+### 13.2 目标
+
+1. **AI 直接产出核心模型的提案**，不再产出 Ossie。需要 Ossie 文件时，走“AI 建模 → 核心模型 → Ossie 适配器导出”。
+2. **AI 负责导入时机械规则做不好、或者直接丢掉的部分**（§13.4）。适配器只做确定性转换、不推断（P4），需要理解业务含义的工作交给 AI，
+   并且一律以**提案**形式交给用户确认。
+3. 建模规则只写在技能里一处；系统提示词只定工作方式，轮次提示词只给本轮的合同、文件路径和材料清单。
+
+### 13.3 技能改造：`md2ossie` → `ontofoundry-modeling`
+
+技能改名，因为它的产出不再是 Ossie。目录结构：
+
+```text
+integrations/dataagent/skills/ontofoundry-modeling/
+  SKILL.md                         工作流程、提案合同要点、交付要求
+  references/
+    core-model.md                  核心模型元素与字段（与本文 §3 同步）
+    modeling-patterns.md           建模模式与例子，见下表
+    import-completion.md           导入补全的处理方法，见 §13.4
+    reading-ossie.md               材料是 Ossie 文件时怎么读懂它（角色、读法、值概念的含义）
+  assets/vendor/apache-ossie/      保留 ontology.md 作参考；删除校验器和 schema 校验依赖
+  scripts/check_result.py          用轮次给出的 JSON Schema 校验结果文件，并检查 client_ref 唯一、引用存在
+  tests/
+```
+
+`modeling-patterns.md` 覆盖的建模模式：
+
+| 模式 | 写法 |
+|---|---|
+| 多方参与的事实（n 元关系） | 建中间对象，例如“供货记录”，到各参与方各一条多对一关系，参与方关系都设为标识；事实上的数量、日期等作为中间对象的属性 |
+| 是 / 否型事实（一元关系） | 布尔属性，例如“是否VIP” |
+| 一对多 | 从“多”的一端建多对一关系，`name` 写正向动词、`inverse_name` 写反向动词 |
+| 多对多（无附加信息） | `many_to_many` 关系，`data_join.table_name` 填中间表 |
+| 多对多（配对本身有信息） | 建中间对象，同 n 元关系 |
+| 复合标识 | 多个属性或关系同时设为标识，映射的 `key_columns` 按顺序列出 |
+| 自关联 | 源和目标是同一对象，例如“员工 汇报给 员工” |
+| 继承 | 子对象 `extends` 父对象，只写自己新增的属性和关系 |
+| 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
+| 指标 | 指定粒度对象，表达式用从粒度对象出发的路径，只沿“指向一”的方向走 |
+| 同义词 | 业务别名写进 `synonyms`，不写进名称或描述 |
+
+技能里**不再出现**：`roles`、`owner_ref`、`verbalizes`、`ValueType`、`ConceptRef`、`concept_context`、`role_values`、
+`owner_columns / role_columns`、`OneToMany` 相关的坑。
+
+提示词同步改造：
+
+- 轮次提示词（`services/dataagent.py`）只保留：结果合同（头部值、Schema 文件、create/update/delete 的写法、证据规则）、
+  材料清单、MCP 连接、结果文件路径。所有建模规则移到技能。
+- agent 系统提示词（`agents/agent_ontofoundry.md`）删除旧合同 B（`ontofoundry.model-result/v1`），技能名改为 `ontofoundry-modeling`。
+- 提案合同 `ontofoundry.proposals/v1` 的 `target_kind` 改为：`object_type / property / link_type / rule / action / metric /
+  mapping / material_object / material_link`（去掉 `value_type`，新增 `metric`）。
+
+部署注意：技能目录改名后，DataAgent 管理员要重新安装技能、更新 agent 的技能配置并重启 DataAgent（见 `integrations/dataagent/README.md`）。
+
+### 13.4 导入补全
+
+导入时适配器按规则做了机械转换或丢弃，其中不少内容需要理解业务含义才能处理好。导入完成后，平台提供“**AI 补全**”，
+把这些条目交给建模 agent，由它产出提案。
+
+**流程**：
+
+1. 导入时，原文件按确定的格式化方式（缩进 2 空格、键序不变）保存为工作空间的一份**材料**。
+   导入报告中每个条目记下它在这份材料里的行号范围。这样 AI 的提案可以照常用材料证据（行号 + 原文）引用它。
+2. 导入对话框在报告下方显示“用 AI 补全 N 项”。用户点击后，平台发起一次建模运行，材料是导入原文件，
+   附带一份“补全清单”（报告中可补全的条目：规则编号、原文路径、行号、导入后对应的核心元素 id）。
+3. agent 按技能 `import-completion.md` 逐条处理，产出提案；不能处理的条目在回答里说明原因。
+4. 用户在提案面板逐条审阅接受，和普通建模运行完全一样。
+
+AI 补全只发生在用户点击之后，导入本身始终是确定性的。
+
+**各类条目的处理**：
+
+| 导入时发生了什么 | 规则 | AI 补全做什么 | 提案 |
+|---|---|---|---|
+| 多元关系机械转成中间对象，名字是 `supplier_supplies` 这类拼接名 | RT-27 / RT-28 | 起业务名称（如“供货记录”）、写描述；给中间对象的各条关系起名和反向名；检查搬过来的规则表达式，按核心模型写法改写 | update 中间对象、关系、规则 |
+| 一元关系转成布尔属性 | RT-26 | 起业务名称（如“是否VIP”）、写描述 | update 属性 |
+| 读法里的其他说法被丢弃 | RT-20 | 提取成关系或对象的同义词；正向 / 反向名称不贴切时改写 | update 关系、对象 |
+| 角色名被丢弃 | RT-21 | 自关联或中间对象的关系名不清楚时，参考角色名改名（如“汇报给”→“上级”） | update 关系 |
+| 值概念的描述、约束被丢弃 | RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
+| 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
+| 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
+| 跨多个 dataset 的指标被丢弃（原文在报告里） | RT-49 | 按核心模型写法重写：选粒度对象、写路径表达式 | create 指标 |
+| 计算表达式、嵌套 referent 等映射被丢弃 | RT-43 | 只在能确定对应列时提出映射修改；其余在回答中列出，交给人工 | update 映射，或说明 |
+| 字段的 `label`、`dimension` 等被丢弃 | RT-46 | `label` 可作为属性显示名或同义词 | update 属性 |
+
+不交给 AI 的条目：纯格式规范化（RT-10 至 RT-13）、文档名称和描述（RT-01）、扩展块升级（RT-03）、方言丢弃（RT-45）。
+这些不影响业务含义，报告里说明即可。
+
+**和 §7.2 的关系**：保存原文件现在有了明确用途（AI 补全的材料和证据来源），所以第 2 阶段保留“导入时保存原文件”；
+导入后“与原文件对比”的用户界面仍按需再做。
+
+### 13.5 实施
+
+- 第 3 阶段：技能改名改写、提示词精简、提案合同的 `target_kind` 调整、删除旧合同 B。
+- 第 3 阶段之后：导入补全（依赖第 2 阶段的导入报告和原文件材料）。
+- 验收：用样例 A/B 导入后跑一次 AI 补全，提案全部能通过平台校验；技能和提示词里不出现 §13.3 列出的旧概念。
