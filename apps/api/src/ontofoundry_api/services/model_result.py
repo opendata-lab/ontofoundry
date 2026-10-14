@@ -275,10 +275,54 @@ async def reconcile_run(
         ).download(topic_id, result_path)
     except DataAgentError as exc:
         if exc.status_code == 404:
-            # The agent ended its turn without a result file. In practice it
-            # asked clarifying questions, so the run is waiting for a reply,
-            # not broken. Say so instead of reporting a finished run.
+            # Only an explicit marker for this run means the agent is waiting.
+            needs_input_path = f"output/ontofoundry-needs-input-{run_token}.json"
+            marker = None
+            try:
+                marker_content, _ = await _client(
+                    app, workspace_id, session_id
+                ).download(topic_id, needs_input_path)
+            except DataAgentError as marker_exc:
+                if _is_retriable_download(marker_exc.status_code):
+                    return _finish_failure(
+                        app,
+                        session_id,
+                        task_id,
+                        claimed_at,
+                        state="failed_retriable",
+                        detail=f"建模结果下载暂时失败，等待重试：{marker_exc}",
+                    )
+                if marker_exc.status_code != 404:
+                    return _finish_failure(
+                        app,
+                        session_id,
+                        task_id,
+                        claimed_at,
+                        state="failed_permanent",
+                        detail=_permanent_detail(marker_exc),
+                    )
+            else:
+                try:
+                    marker = json.loads(marker_content)
+                except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
+                    pass
+
             what = "提案" if manifest.get("result_contract") == "proposals" else "建模结果"
+            if not (
+                isinstance(marker, dict)
+                and marker.get("run_token") == run_token
+                and isinstance(marker.get("questions"), list)
+                and marker["questions"]
+                and all(isinstance(question, str) for question in marker["questions"])
+            ):
+                return _finish_failure(
+                    app,
+                    session_id,
+                    task_id,
+                    claimed_at,
+                    state="failed_permanent",
+                    detail=f"建模没有产出{what}：智能体结束时没有写入结果文件，请重试或换个说法描述需求",
+                )
             if _guarded_result_values(
                 app,
                 session_id,

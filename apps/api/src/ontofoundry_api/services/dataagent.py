@@ -460,6 +460,14 @@ def build_turn_prompt(
         if mode == "model"
         else "这是普通对话或概念澄清。除非用户明确要求修改，否则不要生成或覆盖本体文件。"
     )
+    if mode == "model":
+        action += (
+            "\n如必须先向用户提问确认才能产出结果，用 Bash 写入 "
+            f"output/ontofoundry-needs-input-{run_token}.json，内容为 "
+            f'{{"run_token": "{run_token}", "questions": ["待确认问题"]}}；'
+            "questions 必须是非空的中文问题列表，与回答中询问用户的问题一致，此时不要写结果文件。"
+            "否则必须写入结果文件。"
+        )
     files = "\n".join(
         f"- {item['path']}（{file_size(item['bytes'])}）" for item in material_files
     ) or "- 本轮没有新增材料"

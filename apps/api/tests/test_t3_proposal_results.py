@@ -6,6 +6,7 @@ import json
 from copy import deepcopy
 from urllib.parse import urlsplit
 
+import pytest
 from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row
 from sqlalchemy import select, update
 from test_modeling import ROOT, create_session, save
@@ -296,6 +297,11 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt
+    token = manifest["run_token"]
+    assert f"output/ontofoundry-needs-input-{token}.json" in prompt
+    assert f'{{"run_token": "{token}", "questions": ["待确认问题"]}}' in prompt
+    assert "questions 必须是非空的中文问题列表，与回答中询问用户的问题一致，此时不要写结果文件" in prompt
+    assert "否则必须写入结果文件" in prompt
     assert session["base_version_id"] in prompt
     # The prompt is shown as the user's chat message: the credential lives in a file.
     assert "ofrun." not in prompt
@@ -364,9 +370,15 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
     assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
 
 
-def test_proposals_run_without_result_file_asks_for_a_reply(client, monkeypatch):
+def test_proposals_run_with_needs_input_marker_asks_for_a_reply(client, monkeypatch):
     session, _ = proposals_run(client)
-    install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+    paths = install_download(
+        monkeypatch,
+        [
+            DataAgentError("missing", status_code=404),
+            {"run_token": RUN_TOKEN, "questions": ["需要包含哪些业务对象？"]},
+        ],
+    )
 
     assert reconcile(client, session["id"]) == "awaiting_reply"
     current = row(client, session["id"])
@@ -376,3 +388,82 @@ def test_proposals_run_without_result_file_asks_for_a_reply(client, monkeypatch)
     detail = client.get(ROOT + "/sessions/" + session["id"]).json()
     assert detail["result_state"] == "awaiting_reply"
     assert detail["task_detail"] == current.task_detail
+
+    assert reconcile(client, session["id"]) == "awaiting_reply"
+    assert paths == [
+        f"output/ontofoundry-result-{RUN_TOKEN}.json",
+        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
+    ]
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        pytest.param(DataAgentError("missing marker", status_code=404), id="missing"),
+        pytest.param(b"not json", id="invalid-json"),
+        pytest.param(
+            {"run_token": "previous-round", "questions": ["是否继续？"]},
+            id="wrong-token",
+        ),
+        pytest.param({"run_token": RUN_TOKEN, "questions": []}, id="empty-questions"),
+        pytest.param({"run_token": RUN_TOKEN, "questions": [1]}, id="non-string-question"),
+    ],
+)
+def test_proposals_run_without_valid_marker_fails_permanently(
+    client, monkeypatch, marker
+):
+    session, _ = proposals_run(client)
+    before = row(client, session["id"])
+    paths = install_download(
+        monkeypatch, [DataAgentError("missing", status_code=404), marker]
+    )
+
+    assert reconcile(client, session["id"]) == "failed_permanent"
+    current = row(client, session["id"])
+    assert current.result_state == "failed_permanent"
+    assert current.task_status == "failed"
+    assert current.task_detail == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
+    assert current.draft_json == before.draft_json
+    assert current.candidates_json == before.candidates_json
+    assert current.revision == before.revision
+    assert stored(client, session["id"])[0] == []
+    detail = client.get(ROOT + "/sessions/" + session["id"]).json()
+    assert detail["result_state"] == "failed_permanent"
+    assert detail["task_detail"] == current.task_detail
+
+    assert reconcile(client, session["id"]) == "failed_permanent"
+    assert len(paths) == 2
+
+
+@pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
+def test_proposals_marker_download_error_is_retriable(
+    client, monkeypatch, status_code
+):
+    session, _ = proposals_run(client)
+    before = row(client, session["id"])
+    paths = install_download(
+        monkeypatch,
+        [
+            DataAgentError("missing", status_code=404),
+            DataAgentError("marker unavailable", status_code=status_code),
+            result(before.run_manifest_json, []),
+        ],
+    )
+
+    assert reconcile(client, session["id"]) == "failed_retriable"
+    current = row(client, session["id"])
+    assert current.result_state == "failed_retriable"
+    assert current.task_status == "finished"
+    assert current.task_detail == "建模结果下载暂时失败，等待重试：marker unavailable"
+    assert current.draft_json == before.draft_json
+    assert current.candidates_json == before.candidates_json
+    assert current.revision == before.revision
+    assert stored(client, session["id"])[0] == []
+
+    assert reconcile(client, session["id"]) == "done"
+    assert reconcile(client, session["id"]) == "done"
+    assert paths == [
+        f"output/ontofoundry-result-{RUN_TOKEN}.json",
+        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
+        f"output/ontofoundry-result-{RUN_TOKEN}.json",
+    ]
