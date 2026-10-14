@@ -439,14 +439,17 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.6 指标
 
-`semantic_model.metrics[]`：取 `ANSI_SQL` 方言表达式，按 §5.5 的映射把 `dataset.字段` 换成对象和属性，再确定粒度对象并改写成路径：
+**不做任何推断**，只导入一眼就能确定含义的指标：
 
-1. 只引用一个 dataset：该 dataset 对应的对象就是 `base_type_id`，`ds.f` 改写为 `对象.属性`。
-2. 引用多个 dataset：在这些对象中找一个对象，使其余对象都能从它出发、只经由“指向一”的关系**唯一**到达；它就是粒度对象，
-   其余引用改写为 `粒度对象.关系….属性`。找不到或路径不唯一：整个指标 `dropped`。
+| 情况 | 导入 |
+|---|---|
+| `ANSI_SQL` 表达式只引用**一个** dataset，且该 dataset 和所引用的字段都已映射到对象和属性 | ✅ `base_type_id` = 该 dataset 对应的对象，`dataset.字段` 改写为 `对象.属性`；`description` 照写；`datatype` 能对应 `value_kind` 就写入 |
+| 引用多个 dataset | ❌ `dropped` |
+| 引用未映射的 dataset 或字段 | ❌ `dropped` |
+| 只有非 ANSI 方言 | ❌ `dropped` |
 
-`datatype` 能对应 `value_kind` 就写入，`Time / DateTimeTz / Opaque` 报 `dropped`。
-引用了未映射 dataset 或未映射字段的指标、只有非 ANSI 方言的指标：整个 `dropped`。
+丢弃的指标在导入报告里**保留原文**（名称、描述、各方言表达式）。以后可以把这些原文当作材料，
+由平台的自动构建按核心模型的指标写法（粒度对象 + 路径）重新生成，经提案确认后再加入模型。
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
@@ -603,7 +606,8 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `link_mappings`（一层 children） | ✅ | ✅ |
 | 一层 `referent_mappings`（对应 `identify_by`） | ✅ → 复合主键 | ✅ |
 | 嵌套 `referent_mappings`、多层 children、多个 object_mappings | ❌ dropped | — |
-| Metric（ANSI，引用已映射字段） | ✅ | ✅ |
+| Metric（ANSI，只引用一个已映射 dataset） | ✅ | ✅ |
+| Metric（引用多个 dataset） | ❌ dropped（原文留在导入报告） | ✅（路径无歧义时） |
 | 各处 `ai_context`、`custom_extensions` | ❌ dropped | — |
 | （平台）显示名、同义词、标签、必填、规则名、动作 | 从扩展块读 | 写入扩展块 |
 | （平台）证据、实例数据 | — | ❌ 不导出 |
@@ -661,7 +665,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
 | RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(order.amount)` |
 | RT-48 | 语义层各处的 `ai_context`、`custom_extensions` 丢失 | | 不出现 |
-| RT-49 | 无法确定粒度对象（§5.6）或导出时路径有歧义（§6.5）的指标消失 | 引用多个互不相连 dataset 的指标 | 不出现 |
+| RT-49 | 跨多个 dataset 的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
 
 **保持不变的部分**：实体概念名（RT-12 除外）、实体继承、实体描述、属性和二元关系的名字与指向、二元关系的基数、
 `identify_by`（RT-30 除外）、所有 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
