@@ -108,18 +108,21 @@
 |---|---|---|
 | `table_name` | str / null | 关系源表。null 表示使用**源对象**映射的那张表 |
 | `schema_name` | str / null | 关系源表的 schema；同源对象映射所在的 `connection_alias` |
-| `source_column` | str | 关系源表中，值等于源对象主键的列 |
-| `target_column` | str | 关系源表中，值等于目标对象主键的列 |
+| `source_columns` | list[str] | 关系源表中，与源对象主键列（`key_columns`）按位置一一相等的列 |
+| `target_columns` | list[str] | 关系源表中，与目标对象主键列按位置一一相等的列 |
+
+列表长度必须分别等于两端对象的主键列数，复合主键因此自然支持。
 
 例子：
 
-- 订单 属于 客户（多对一，外键在订单表）：`table_name=null`（即订单表），`source_column=order_id`，`target_column=customer_id`。
-- 客户 拥有 订单（一对多，外键在订单表）：`table_name=orders`，`source_column=customer_id`，`target_column=order_id`。
-- 学生 选修 课程（多对多）：`table_name=enrollments`，`source_column=student_id`，`target_column=course_id`。
+- 订单 属于 客户（多对一，外键在订单表）：`table_name=null`（即订单表），`source_columns=[order_id]`，`target_columns=[customer_id]`。
+- 客户 拥有 订单（一对多，外键在订单表）：`table_name=orders`，`source_columns=[customer_id]`，`target_columns=[order_id]`。
+- 学生 选修 课程（多对多）：`table_name=enrollments`，`source_columns=[student_id]`，`target_columns=[course_id]`。
+- 发货 对应 订单明细（订单明细主键为 `order_id + line_no`）：`table_name=null`（发货表），`source_columns=[shipment_id]`，
+  `target_columns=[order_id, line_no]`。
 
-查询统一为：关系源表 JOIN 源对象表 ON 源列 = 源主键 JOIN 目标对象表 ON 目标列 = 目标主键；
+查询统一为：关系源表 JOIN 源对象表 ON 源列 = 源主键 JOIN 目标对象表 ON 目标列 = 目标主键（多列时逐列 AND）；
 关系源表与某一端是同一张表时省掉那次 JOIN。
-复合主键暂不支持（`source_column` / `target_column` 为单列），见 §10。
 
 ### 3.5 规则 `Rule`
 
@@ -127,21 +130,48 @@
 `owner_kind` 为 `object_type / property / link_type / action`。**删除** `verbalizes`，自然语言说明写在 `description`。
 v3 中概念上重复存储的 `requires: list[UUID]`、`derived_by: list[UUID]` 不再存在，规则只存在 `rules` 集合。
 
-### 3.6 指标 `Metric`（新增，待确认，见 §10）
+### 3.6 指标 `Metric`（新增）
+
+指标是独立的顶层元素，不挂在某个对象下面，因为一个指标经常要跨多个对象（例如“华东区客户的订单金额”同时用到订单和客户）。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `id`、`name`、`technical_name`、`description` | | |
-| `expression` | str | ANSI SQL 聚合表达式，引用 `对象技术名.属性技术名`，例如 `SUM(order.amount)` |
+| `base_type_id` | UUID | 指标的粒度对象，即“按什么来数”。例如订单金额的粒度是订单，客户数的粒度是客户 |
+| `expression` | str | ANSI SQL 聚合表达式，引用**从粒度对象出发的路径**，见下 |
 | `value_kind` | enum / null | |
 | `evidence` | | |
 
-指标面向业务对象和属性，不面向表和列。查询时通过 `mappings` 翻译到物理表列。
+**路径写法**：`粒度对象.属性`，或经由关系跳到其他对象：`粒度对象.关系.属性`、`粒度对象.关系.关系.属性`。例：
+
+```sql
+-- 粒度：订单
+SUM(order.amount)
+SUM(CASE WHEN order.customer.region = '华东' THEN order.amount END)
+COUNT(DISTINCT order.customer.id)
+```
+
+- 路径中每一跳都必须是**指向“一”的一侧**（从源走多对一 / 一对一关系，或从目标反向走一对多关系），
+  这样 JOIN 不会让粒度对象的行变多，聚合结果不会重复计算。
+- 走关系名而不是对象名，所以同一个对象有两条关系时不会有歧义（例如 `order.buyer.level` 和 `order.seller.level`）。
+- 需要“对多”方向的指标，换一个粒度对象来写。例如“每个客户的平均订单数”用订单做粒度：
+  `COUNT(order.id) / COUNT(DISTINCT order.customer.id)`。
+
+指标面向业务对象和属性，不面向表和列。查询时通过 `mappings` 和关系的 `data_join` 翻译到物理表列。
 取代 v3 的 `semantic_models / datasets / dataset_fields / dataset_relationships / metrics` 五个集合。
+
+**为什么不做成函数（Function）**：Palantir 的 Function 是 TypeScript / Python 代码，能力更强，但平台要提供代码运行环境，
+agent 也难以理解和生成。指标是声明式 SQL，平台能校验、能翻译成查询，agent 也能直接读懂。
+以后真需要带参数的计算，可以另加 Function 元素，指标保持不变。
 
 ### 3.7 数据映射 `DataMapping`
 
-同 v2：`id, type_id, connection_alias, table_name, schema_name, key_column, fields: {属性技术名: 列名}`。
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id`、`type_id`、`connection_alias`、`table_name`、`schema_name` | | 同 v2 |
+| `key_columns` | list[str] | 主键列，至少一列；复合主键按顺序列出（取代 v2 的单列 `key_column`） |
+| `fields` | {属性技术名: 列名} | 同 v2 |
+
 `concept_mappings`、`mapping_nodes` 递归树取消。
 
 ### 3.8 草稿顶层
@@ -163,7 +193,8 @@ metrics, mappings, material_objects, material_links
 新增：
 
 - `data_join` 引用的表：`table_name` 为 null 时源对象必须已映射；目标对象必须已映射。
-- `metrics.expression` 中的 `对象.属性` 引用必须存在。
+- `data_join` 的 `source_columns` / `target_columns` 长度分别等于两端对象 `key_columns` 的长度。
+- `metrics.expression` 中的路径必须从 `base_type_id` 出发，每一跳都指向“一”的一侧，最后落在一个存在的属性上。
 - `inverse_name` 非空时不得与 `name` 相同。
 
 ---
@@ -241,7 +272,7 @@ class TranslationReport(BaseModel):
 
 ```text
 ontofoundry_api/
-  domain/                  核心模型、校验、合并、存量迁移（不 import adapters）
+  domain/                  核心模型、校验、合并（不 import adapters）
   adapters/
     base.py                FormatAdapter、TranslationReport、注册表
     ossie/
@@ -386,7 +417,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 | 模式 | Ossie 形状 | 导入为 |
 |---|---|---|
-| 对象映射 | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，表达式为 `dataset.字段`（或单列），该 dataset 有单列 `primary_key` 且与之对应 | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`，`key_column` 为主键列 |
+| 对象映射（单列主键） | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，`expression` 为 `dataset.字段`（或单列），与该 dataset 的 `primary_key` 对应 | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`，`key_columns = [主键列]` |
+| 对象映射（复合主键） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `key_columns` 按 `identify_by` 顺序列出这些列；`relationship` 是属性时同时写入 `fields`；是标识关系时，该列同时作为这条关系 `data_join` 的目标列 |
 | 属性列 | `link_mappings` 根节点的 `object_mapping` 指向主键，`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式 |
 | 外键关系 | `children[].relationship` 为二元关系名，`object_mapping.concept` 为另一端；或 `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset | `data_join`：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端主键对应 |
 | 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别指向两端 | 第 4 阶段支持（§9）；之前报 `dropped` |
@@ -395,11 +427,10 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 明确不支持（`dropped`）：
 
-- `referent_mappings`
+- 嵌套的 `referent_mappings`（`referent_mappings` 里再套 `referent_mappings`），以及不对应 `identify_by` 的 `referent_mappings`
 - 一个概念多个 `object_mappings`
 - 嵌套超过一层的 `children`
 - 计算表达式（函数、运算、CASE 等）
-- 复合 `primary_key`
 - 只有非 ANSI 方言的字段表达式
 - 值概念的 `concept_mappings`
 - `unique_keys`
@@ -408,7 +439,12 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.6 指标
 
-`semantic_model.metrics[]`：取 `ANSI_SQL` 方言表达式，把其中的 `dataset.字段` 按 §5.5 的映射改写成 `对象.属性`，生成 `Metric`；
+`semantic_model.metrics[]`：取 `ANSI_SQL` 方言表达式，按 §5.5 的映射把 `dataset.字段` 换成对象和属性，再确定粒度对象并改写成路径：
+
+1. 只引用一个 dataset：该 dataset 对应的对象就是 `base_type_id`，`ds.f` 改写为 `对象.属性`。
+2. 引用多个 dataset：在这些对象中找一个对象，使其余对象都能从它出发、只经由“指向一”的关系**唯一**到达；它就是粒度对象，
+   其余引用改写为 `粒度对象.关系….属性`。找不到或路径不唯一：整个指标 `dropped`。
+
 `datatype` 能对应 `value_kind` 就写入，`Time / DateTimeTz / Opaque` 报 `dropped`。
 引用了未映射 dataset 或未映射字段的指标、只有非 ANSI 方言的指标：整个 `dropped`。
 
@@ -437,7 +473,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | Ossie 字段 | 来源 |
 |---|---|
 | `version` | 固定 `0.2.0.dev0` |
-| `name` | 工作空间 slug |
+| `name` | 工作空间名称 |
 | `description` | 工作空间描述，空则不写 |
 | `requires` | `ontology_requires`，空则不写 |
 | `ai_context` | 只写 `{ "ontofoundry": {...} }`，见 §6.6 |
@@ -479,13 +515,21 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 ### 6.5 数据映射和指标
 
 - 每个 `connection_alias` 生成一个 `OntologyMap`，`name` 和 `semantic_model.name` 都是该别名。
-- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key = [key_column]`，
+- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key = key_columns`，
   `fields` = 每个已映射属性一个字段（字段名 = 属性技术名，表达式为 `ANSI_SQL` 方言下的列名）。
-- `concept_mappings`：对象的 `object_mappings` 指向主键；`link_mappings` 根节点指向主键，`children` 列出属性列。
-- 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条，外加所属对象 `link_mappings` 中的一个子节点。
+- `concept_mappings`：
+  - 单列主键：`object_mappings` 为 `[{"expression": "dataset.主键列"}]`。
+  - 复合主键：`object_mappings` 为 `[{"referent_mappings": [...]}]`，每个主键列一项，`relationship` 为映射到该列的标识属性，
+    或 `data_join` 目标列包含该列的标识关系。有主键列对不上任何标识属性或标识关系时，该对象的映射报 `dropped`。
+  - `link_mappings` 根节点指向主键，`children` 列出属性列。
+- 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条（`from_columns` / `to_columns` 为多列时照列），
+  外加所属对象 `link_mappings` 中的一个子节点。
 - 多对多 join 表 → 第 4 阶段；之前报 `dropped`。
-- 指标 → `semantic_model.metrics`。因为 dataset 名 = 对象技术名、字段名 = 属性技术名，`对象.属性` 原样就是 `dataset.字段`，
-  只需包上 `{"dialects": [{"dialect": "ANSI_SQL", "expression": ...}]}`。引用未映射对象的指标报 `dropped`。
+- 指标 → `semantic_model.metrics`。dataset 名 = 对象技术名、字段名 = 属性技术名，所以路径的最后两段直接对应 `dataset.字段`：
+  `order.amount` → `order.amount`，`order.customer.region` → `customer.region`，再包上
+  `{"dialects": [{"dialect": "ANSI_SQL", "expression": ...}]}`。
+  两条不同路径落到同一个 dataset（例如 `order.buyer.level` 和 `order.seller.level`）时，OSI 表达式无法区分，该指标报 `dropped`；
+  引用未映射对象的指标也报 `dropped`。
 
 ### 6.6 平台扩展块
 
@@ -529,7 +573,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 
 | Ossie 构造 | 导入 | 导出 |
 |---|---|---|
-| 文档 `version` / `name` / `description` | 校验 / 不读 / 不读 | 固定值 / 工作空间 slug / 工作空间描述 |
+| 文档 `version` / `name` / `description` | 校验 / 不读 / 不读 | 固定值 / 工作空间名称 / 工作空间描述 |
 | 文档 `requires` | ✅ | ✅ |
 | 文档 `ai_context` | 只读 `ontofoundry` 键 | 只写 `ontofoundry` 键 |
 | EntityType | ✅ | ✅ |
@@ -549,14 +593,16 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `multiplicity` | ✅（多元关系 dropped） | ✅ |
 | OntologyMap / SemanticModel | ✅ → `connection_alias` | ✅ |
 | Dataset（单列主键） | ✅ | ✅ |
-| Dataset 复合主键、`unique_keys` | ❌ dropped | — |
+| Dataset 复合主键 | ✅（经一层 `referent_mappings`） | ✅ |
+| Dataset `unique_keys` | ❌ dropped | — |
 | Field（单列 ANSI 表达式） | ✅ | ✅ |
 | Field 计算表达式、其他方言、`dimension`、`label`、`datatype` | ❌ dropped | — |
 | OSI Relationship（外键） | ✅ → `data_join` | ✅ |
 | 多对多 join 表 | 第 4 阶段 | 第 4 阶段 |
 | `object_mappings`（单个、单列） | ✅ | ✅ |
 | `link_mappings`（一层 children） | ✅ | ✅ |
-| `referent_mappings`、多层 children、多个 object_mappings | ❌ dropped | — |
+| 一层 `referent_mappings`（对应 `identify_by`） | ✅ → 复合主键 | ✅ |
+| 嵌套 `referent_mappings`、多层 children、多个 object_mappings | ❌ dropped | — |
 | Metric（ANSI，引用已映射字段） | ✅ | ✅ |
 | 各处 `ai_context`、`custom_extensions` | ❌ dropped | — |
 | （平台）显示名、同义词、标签、必填、规则名、动作 | 从扩展块读 | 写入扩展块 |
@@ -573,7 +619,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 | 编号 | 差异 | 原文件 | 再导出 |
 |---|---|---|---|
-| RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间 slug>", "description": "<工作空间描述>"` |
+| RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间名称>", "description": "<工作空间描述>"` |
 | RT-02 | 文档 `ai_context` 只剩平台扩展块 | `{"synonyms": [...], "instructions": "...", "acme": {...}}` | `{"ontofoundry": {"version": "core-1", ...}}` |
 | RT-03 | 旧版本平台扩展块升级为 core-1 格式 | `"ontofoundry": {"version": "3", ...}` | `"ontofoundry": {"version": "core-1", ...}` |
 
@@ -609,12 +655,13 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-40 | dataset 改名为对象技术名，field 改名为属性技术名 | `"datasets": [{"name": "ORD_T", "fields": [{"name": "AMT", ...}]}]` | `"datasets": [{"name": "order", "fields": [{"name": "amount", ...}]}]`，`source` 和物理列不变 |
 | RT-41 | OntologyMap 按 `connection_alias` 重组，描述换成生成文字 | 原 `name` / `description` | `name` 不变，`"description": "<别名> 的数据映射"` |
 | RT-42 | dataset 描述换成对象描述 | dataset 自己的 `description` | 对象的 `description` |
-| RT-43 | 不支持的映射消失（§5.5 不支持清单） | `referent_mappings`、计算表达式、复合主键 dataset 等 | 不出现 |
+| RT-43 | 不支持的映射消失（§5.5 不支持清单） | 嵌套 `referent_mappings`、计算表达式等 | 不出现 |
 | RT-44 | 没有映射到任何概念的 dataset 消失（第 4 阶段前 join 表也在此列） | | 不出现 |
 | RT-45 | 字段和指标只保留 ANSI_SQL 方言 | `"dialects": [{"dialect": "ANSI_SQL", ...}, {"dialect": "SNOWFLAKE", ...}]` | 只有 `ANSI_SQL` |
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
 | RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(order.amount)` |
 | RT-48 | 语义层各处的 `ai_context`、`custom_extensions` 丢失 | | 不出现 |
+| RT-49 | 无法确定粒度对象（§5.6）或导出时路径有歧义（§6.5）的指标消失 | 引用多个互不相连 dataset 的指标 | 不出现 |
 
 **保持不变的部分**：实体概念名（RT-12 除外）、实体继承、实体描述、属性和二元关系的名字与指向、二元关系的基数、
 `identify_by`（RT-30 除外）、所有 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
@@ -640,33 +687,16 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 ---
 
-## 8. 存量数据迁移
+## 8. 存量数据：清空，不迁移
 
-### 8.1 读取时转换
+平台尚未正式就绪，现有的工作空间本体数据都是测试和演示数据，**不做迁移**：
 
-在 `domain/snapshot.py` 的读取入口统一转换成 core-1，历史行不改写，版本哈希仍按原存储 JSON 计算。
+- 上线 core-1 时用一个数据库迁移清空本体相关数据：草稿、已发布版本、提案、导入记录、元素身份表、建模会话中引用旧草稿的部分。
+  工作空间、成员、材料、连接配置保留。
+- 只读 core-1，不保留 v1 / v2 / v3 的任何读取或转换代码。
+- 演示需要的数据，用新的 Ossie 适配器从样例文件重新导入。
 
-**v1 / v2 → core-1**（确定性、无需外部信息）：
-
-- 删除 `verbalizes`、`source_role_name`、`target_role_name`。
-- `data_join` 旧语义是“源表某列 = 目标表某列”，按外键在哪一端转换：
-  - 旧 `target_column` 等于目标对象的 `key_column`（外键在源表）：`table_name = null`，`source_column = 源对象 key_column`，`target_column = 旧 source_column`。
-  - 旧 `source_column` 等于源对象的 `key_column`（外键在目标表）：`table_name = 目标对象的表`，`source_column = 旧 target_column`，`target_column = 目标对象 key_column`。
-  - 两者都不满足：丢弃 `data_join`，在读取诊断里记录。
-- 其余字段原样。
-
-**v3 → core-1**：
-
-- 一一对应的元素（实体、属性、二元关系、规则、动作、实例、映射）**保留原 id**。
-- `value_types` 按 §5.2 折叠；n 元 / 一元关系按 §5.3 转换，新元素 id 为 `uuid5(原关系 id, 角色键)`。
-- 语义层按 §5.5–5.6 的模式转换成 `mappings`、`data_join`、`metrics`，不匹配的丢弃。
-- `extension_v4`：`display_names` → `name`，`concept_context.synonyms` → `synonyms`，`tags` → `tags`，`required_properties` → `required`。
-- v3 的读取代码冻结到 `domain/legacy/`，只供迁移使用，不再演进。
-
-### 8.2 草稿
-
-上线时一次性把所有未发布草稿转成 core-1 并写回，原 JSON 备份到单独的表。
-已发布版本保持只读，按 §8.1 读取时转换，因此仍可作为提案合并的基线。
+这样第 1 阶段不需要写任何兼容代码，`domain/legacy_v1.py`、`domain/snapshot.py` 中的版本转换、`models_v3.py` 可以直接删除。
 
 ---
 
@@ -674,34 +704,37 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 | 阶段 | 内容 | 完成标准 |
 |---|---|---|
-| 1 | 核心模型 core-1、v1/v2/v3 读取转换、适配器框架、Ossie 导出（以现有 v2 编译器为基础改造） | 现有样例 A/B 和全部已发布版本都能读成 core-1；每份导出都通过官方校验 |
-| 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键映射、扩展块、转换报告；导入时保存原文件；往返差异报告（§7.2）；前端导入、导出对话框展示报告 | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
-| 3 | 写入切换：草稿迁移、提案 / 编辑 / MCP / agent prompt 只用 core-1；删除 v3 代码（见 §11） | v3 相关测试删除或改写；agent prompt 中不再出现 owner_ref / roles / verbalizes |
-| 4 | 多对多 join 表的映射、查询、导入导出；指标改为面向对象属性，改写 `metric_query.py` | 多对多关系能查到实例；指标查询走 `mappings` |
+| 1 | 核心模型 core-1（含复合主键、新 `data_join`、指标）；清空数据的迁移；适配器框架；Ossie 导出（以现有 v2 编译器为基础改造）；删除 v1 / v2 / v3 模型与转换代码 | 每份导出都通过官方校验；`domain/` 不 import `adapters/` 的测试通过 |
+| 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；往返差异报告（§7.2）；前端导入、导出对话框展示报告 | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
+| 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
+| 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为按路径翻译（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
 
-## 10. 待确认问题
+## 10. 已确认的决定
 
-1. **指标**：是否保留扁平的 `Metric`（推荐保留，问答需要）？还是这一轮先不做？
-2. **`inverse_name`**：推荐保留。若不保留，导出只生成正向读法。
-3. **复合主键**：本设计暂不支持，Ossie 中的复合主键 dataset 报 `dropped`。真实数据里常见的话，`key_column` 和 `DataJoin` 的列要改成列表。
-4. **导出文档 `name`**：用工作空间 slug（推荐，Ossie 要求是唯一标识）还是工作空间名称？
-5. **v3 草稿迁移**：一次性写回（推荐）还是一直读时转换？
+| # | 问题 | 决定 |
+|---|---|---|
+| 1 | 指标 | **保留，作为独立顶层元素**，带粒度对象，可跨对象（§3.6）。Palantir 用 Function（代码）计算指标，Fabric 的指标（DAX 度量值）放在 Power BI 语义模型里而非本体中；两家都把指标放在对象之外，我们选声明式 SQL，不做 Function |
+| 2 | `inverse_name` | 保留（§3.4） |
+| 3 | 复合主键 | **支持**：`key_columns`、`source_columns`、`target_columns` 都是列表（§3.4、§3.7）；Ossie 中经一层 `referent_mappings` 导入导出（§5.5、§6.5） |
+| 4 | 导出文档 `name` | 工作空间名称（§6.1） |
+| 5 | 存量数据 | 清空，不迁移（§8） |
 
 ---
 
-## 11. 删除清单（第 3 阶段）
+## 11. 删除清单
 
 后端：
 
-- `domain/models_v3.py`：冻结移入 `domain/legacy/`，仅供迁移
+- `domain/models_v3.py`、`domain/legacy_v1.py`，`domain/snapshot.py` 中的版本转换
 - `ossie/native.py`、`ossie/extensions.py`
-- `ossie/importer.py` 中 v3 路径
-- `services/element_save.py`、`api/proposals.py`、`contracts/proposals.py`（含 `_carry_placeholders`）、`api/mcp.py`、`api/modeling.py`、`services/publish_preview.py` 中的 `schema_version == "3"` 分支
+- `ossie/importer.py` 中 v3 路径（第 2 阶段整体重写）
+- `services/element_save.py`、`api/proposals.py`、`contracts/proposals.py`（含 `_carry_placeholders`）、`api/mcp.py`、`api/modeling.py`、`services/publish_preview.py` 中的 `schema_version` 分支
 - `services/dataagent.py` 中关于 owner_ref、roles、verbalizes、endpoint_direction 的 prompt
 - `ossie/compiler.py` 中的 `_resolve_readings` 及别名逻辑
 - `scripts/ossie_coverage_matrix.py`，由 §7 总表对应的支持矩阵测试取代
+- 只针对 v1 / v2 / v3 兼容的测试（`test_p0_v3_contract.py`、`test_p1_*`、`test_t2_postgres_migration.py` 等），逐个确认后删除或改写
 
 前端：
 
