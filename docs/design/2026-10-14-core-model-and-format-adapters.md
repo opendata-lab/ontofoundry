@@ -831,7 +831,7 @@ dataset 的 `source` 和主键、物理列名。
 | 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
 | 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
-| 3+ | 问数：`get_sql_context`、`compile_metric_sql`、连接配置 DataAgent 数据源、问数 agent 提示词（§14） | 演示空间示例问题全部答对，聚合在一次 SQL 内完成 |
+| 3+ | 问数：`get_sql_context`、`compile_metric_sql`、连接配置 DataAgent 数据源名称、问数 agent 提示词（§14） | 演示空间示例问题全部答对，聚合在一次 SQL 内完成 |
 | 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为由结构化指标生成 SQL（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
@@ -1077,7 +1077,9 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 ```
 
 - **`datasource`**：连接别名、SQL 方言（来自连接类型），以及 DataAgent 里对应的数据源名称，agent 据此选择用哪个数据源执行。
-  对应关系在工作空间的数据连接设置里配置：每个连接多一个“DataAgent 数据源”字段。
+  对应关系在工作空间的数据连接设置里配置：每个连接多一个“DataAgent 数据源名称”字段（DataAgent 的数据查询工具按名称选择数据源），
+  填写 DataAgent 中该数据库对应数据源的名称；未填写时 MCP 在 `datasource` 中返回 `dataagent_datasource: null`，
+  并提示“该连接尚未关联 DataAgent 数据源”，agent 应如实告知用户而不是猜测数据源。
 - **`objects`**：只列已映射的对象和已映射的列；列类型和注释取自元数据快照，业务名称、描述、同义词取自核心模型。
 - **`joins`**：由关系的 `data_join` 生成 JOIN 条件；多对多关系给出经过关系源表的两段 JOIN。附带基数和防重复计算的提示
   （与指标的“只沿指向一的方向走”同一条规则，§3.6）。
@@ -1098,6 +1100,6 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 ### 14.5 实施
 
-- 第 3 阶段之后（与 §13 并行）：`get_sql_context`、`compile_metric_sql`；数据连接增加“DataAgent 数据源”字段；更新问数 agent 定义；
+- 第 3 阶段之后（与 §13 并行）：`get_sql_context`、`compile_metric_sql`；数据连接增加“DataAgent 数据源名称”字段；更新问数 agent 定义；
   下线 MCP 中的数据库执行工具和 v3 语义层类型。
 - 验收：演示空间“咖啡渠道销售”的示例问题全部通过“MCP 语义 + DataAgent 执行 SQL”答对，其中“销售额最高的客户”一次 SQL 完成，不翻页。
