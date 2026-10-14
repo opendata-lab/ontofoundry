@@ -1,0 +1,290 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001501",
+        "name": "当事人",
+        "technical_name": "party",
+        "description": "合同的签约方，个人或机构",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001502",
+        "name": "个人",
+        "technical_name": "person",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [
+          "00000000-0000-4000-8000-000000001501"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001503",
+        "name": "机构",
+        "technical_name": "organization",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [
+          "00000000-0000-4000-8000-000000001501"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001504",
+        "name": "合同",
+        "technical_name": "contract",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002501",
+        "owner_type_id": "00000000-0000-4000-8000-000000001501",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002502",
+        "owner_type_id": "00000000-0000-4000-8000-000000001501",
+        "name": "联系电话",
+        "technical_name": "phone",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002511",
+        "owner_type_id": "00000000-0000-4000-8000-000000001502",
+        "name": "身份证号",
+        "technical_name": "id_card_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002521",
+        "owner_type_id": "00000000-0000-4000-8000-000000001503",
+        "name": "统一社会信用代码",
+        "technical_name": "credit_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002531",
+        "owner_type_id": "00000000-0000-4000-8000-000000001504",
+        "name": "合同编号",
+        "technical_name": "contract_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002532",
+        "owner_type_id": "00000000-0000-4000-8000-000000001504",
+        "name": "金额",
+        "technical_name": "amount",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003501",
+        "name": "签约方",
+        "technical_name": "signer",
+        "description": "",
+        "inverse_name": "签署的合同",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001504",
+        "target_type_id": "00000000-0000-4000-8000-000000001501",
+        "multiplicity": "many_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": null,
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "actions": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006501",
+        "name": "合同金额",
+        "technical_name": "contract_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001504",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002532"
+        },
+        "filters": [],
+        "evidence": []
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007501",
+        "type_id": "00000000-0000-4000-8000-000000001502",
+        "connection_alias": "crm",
+        "table_name": "persons",
+        "schema_name": "crm",
+        "key_columns": [
+          "person_id"
+        ],
+        "fields": {
+          "id_card_no": "id_card_no",
+          "name": "full_name",
+          "phone": "mobile"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007502",
+        "type_id": "00000000-0000-4000-8000-000000001503",
+        "connection_alias": "crm",
+        "table_name": "organizations",
+        "schema_name": "crm",
+        "key_columns": [
+          "org_id"
+        ],
+        "fields": {
+          "credit_code": "credit_code",
+          "name": "org_name",
+          "phone": "tel"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007503",
+        "type_id": "00000000-0000-4000-8000-000000001504",
+        "connection_alias": "crm",
+        "table_name": "contracts",
+        "schema_name": "crm",
+        "key_columns": [
+          "contract_id"
+        ],
+        "fields": {
+          "contract_no": "contract_id",
+          "amount": "amount"
+        }
+      }
+    ],
+    "material_objects": [
+      {
+        "id": "00000000-0000-4000-8000-000000008501",
+        "type_id": "00000000-0000-4000-8000-000000001502",
+        "name": "张三",
+        "values": {
+          "name": "张三",
+          "id_card_no": null,
+          "phone": "13800000000"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009501",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 12,
+              "line_end": 12
+            },
+            "quote": "甲方：张三，联系电话 13800000000"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008502",
+        "type_id": "00000000-0000-4000-8000-000000001504",
+        "name": "HT-2026-001",
+        "values": {
+          "contract_no": "HT-2026-001",
+          "amount": 120000
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009502",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 10,
+              "line_end": 11
+            },
+            "quote": "合同编号 HT-2026-001，金额 12 万元"
+          }
+        ]
+      }
+    ],
+    "material_links": [
+      {
+        "id": "00000000-0000-4000-8000-000000008551",
+        "type_id": "00000000-0000-4000-8000-000000003501",
+        "source_id": "00000000-0000-4000-8000-000000008502",
+        "target_id": "00000000-0000-4000-8000-000000008501",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009503",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 12,
+              "line_end": 12
+            },
+            "quote": "甲方：张三"
+          }
+        ]
+      }
+    ]
+  }
+}

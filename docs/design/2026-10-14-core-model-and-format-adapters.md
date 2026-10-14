@@ -171,8 +171,9 @@ sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no I
 { "links": [<关系 id>, ...], "property_id": <属性 id> }
 ```
 
-- `links` 为空表示粒度对象自己的属性；每一跳都必须走向“一”的一侧（从源沿多对一 / 一对一关系走，或从目标反向沿一对一关系走），
-  这样连表后仍是一行一个粒度对象，聚合不会重复计算。
+- `links` 为空表示粒度对象自己的属性；每一跳都必须**沿关系正向**（从源到目标）走一条多对一或一对一关系，
+  这样连表后仍是一行一个粒度对象，聚合不会重复计算。不允许反向走：反向走一对一的自关联时分不清方向，
+  需要时以另一端为粒度，或者把关系建在另一个方向。
 - 用 id 引用，对象、关系、属性改名后指标不受影响。界面和导出时显示为 `sales_order.customer.region` 这样的文字路径。
 
 **Condition（条件）**：
@@ -416,6 +417,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 - 导出：核心模型原样写出，包括规则名、动作、指标、映射、实例、证据。
 - 导入：校验 `schema_version`，同样走提案（§4.5）。证据引用的材料在目标工作空间不存在时，丢弃该证据并报 `dropped`。
 - 这是唯一保证无损的格式；Ossie 等外部格式只承载业务结构和命名。
+- 各种场景和边界情况的完整示例见 [`core-1-examples/`](core-1-examples/README.md)。
 
 ---
 

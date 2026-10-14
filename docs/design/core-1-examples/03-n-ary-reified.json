@@ -1,0 +1,379 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001201",
+        "name": "供应商",
+        "technical_name": "supplier",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001202",
+        "name": "零件",
+        "technical_name": "part",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001203",
+        "name": "项目",
+        "technical_name": "project",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001204",
+        "name": "供货记录",
+        "technical_name": "supply",
+        "description": "供应商向项目供应零件的一条记录（由 Ossie 多元关系 supplier.supplies 转换）",
+        "synonyms": [
+          "供货"
+        ],
+        "tags": [],
+        "extends": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009201",
+            "material_id": "mat_ossie_import_01",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 88,
+              "line_end": 104
+            },
+            "quote": "\"name\": \"supplies\""
+          }
+        ]
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002201",
+        "owner_type_id": "00000000-0000-4000-8000-000000001201",
+        "name": "供应商编码",
+        "technical_name": "supplier_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002202",
+        "owner_type_id": "00000000-0000-4000-8000-000000001201",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002211",
+        "owner_type_id": "00000000-0000-4000-8000-000000001202",
+        "name": "零件号",
+        "technical_name": "part_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002212",
+        "owner_type_id": "00000000-0000-4000-8000-000000001202",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002221",
+        "owner_type_id": "00000000-0000-4000-8000-000000001203",
+        "name": "项目编码",
+        "technical_name": "project_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002222",
+        "owner_type_id": "00000000-0000-4000-8000-000000001203",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002231",
+        "owner_type_id": "00000000-0000-4000-8000-000000001204",
+        "name": "数量",
+        "technical_name": "quantity",
+        "description": "",
+        "value_kind": "integer",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002232",
+        "owner_type_id": "00000000-0000-4000-8000-000000001204",
+        "name": "供货日期",
+        "technical_name": "supplied_on",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003201",
+        "name": "供货方",
+        "technical_name": "supplier",
+        "description": "",
+        "inverse_name": "供货记录",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001204",
+        "target_type_id": "00000000-0000-4000-8000-000000001201",
+        "multiplicity": "many_to_one",
+        "identifier": true,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "supplier_id",
+            "part_id",
+            "project_id"
+          ],
+          "target_columns": [
+            "supplier_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003202",
+        "name": "所供零件",
+        "technical_name": "part",
+        "description": "",
+        "inverse_name": "供货记录",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001204",
+        "target_type_id": "00000000-0000-4000-8000-000000001202",
+        "multiplicity": "many_to_one",
+        "identifier": true,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "supplier_id",
+            "part_id",
+            "project_id"
+          ],
+          "target_columns": [
+            "part_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003203",
+        "name": "供货项目",
+        "technical_name": "project",
+        "description": "",
+        "inverse_name": "供货记录",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001204",
+        "target_type_id": "00000000-0000-4000-8000-000000001203",
+        "multiplicity": "many_to_one",
+        "identifier": true,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "supplier_id",
+            "part_id",
+            "project_id"
+          ],
+          "target_columns": [
+            "project_id"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [
+      {
+        "id": "00000000-0000-4000-8000-000000004201",
+        "name": "数量为正",
+        "technical_name": "positive_quantity",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002231",
+        "rule_kind": "constraint",
+        "expression": "supply.quantity > 0",
+        "evidence": []
+      }
+    ],
+    "actions": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006201",
+        "name": "深圳机场项目供货量",
+        "technical_name": "szx_supply_quantity",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001204",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002231"
+        },
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003203"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002222"
+            },
+            "operator": "eq",
+            "values": [
+              "深圳机场项目"
+            ]
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006202",
+        "name": "供货供应商数",
+        "technical_name": "active_supplier_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001204",
+        "aggregation": "count_distinct",
+        "measure": {
+          "links": [
+            "00000000-0000-4000-8000-000000003201"
+          ],
+          "property_id": "00000000-0000-4000-8000-000000002201"
+        },
+        "filters": [],
+        "evidence": []
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007201",
+        "type_id": "00000000-0000-4000-8000-000000001201",
+        "connection_alias": "erp",
+        "table_name": "suppliers",
+        "schema_name": "scm",
+        "key_columns": [
+          "supplier_id"
+        ],
+        "fields": {
+          "supplier_code": "supplier_id",
+          "name": "name"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007202",
+        "type_id": "00000000-0000-4000-8000-000000001202",
+        "connection_alias": "erp",
+        "table_name": "parts",
+        "schema_name": "scm",
+        "key_columns": [
+          "part_id"
+        ],
+        "fields": {
+          "part_no": "part_id",
+          "name": "name"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007203",
+        "type_id": "00000000-0000-4000-8000-000000001203",
+        "connection_alias": "erp",
+        "table_name": "projects",
+        "schema_name": "scm",
+        "key_columns": [
+          "project_id"
+        ],
+        "fields": {
+          "project_code": "project_id",
+          "name": "name"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007204",
+        "type_id": "00000000-0000-4000-8000-000000001204",
+        "connection_alias": "erp",
+        "table_name": "supplies",
+        "schema_name": "scm",
+        "key_columns": [
+          "supplier_id",
+          "part_id",
+          "project_id"
+        ],
+        "fields": {
+          "quantity": "qty",
+          "supplied_on": "supplied_on"
+        }
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

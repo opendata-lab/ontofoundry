@@ -1,0 +1,320 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001101",
+        "name": "学生",
+        "technical_name": "student",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001102",
+        "name": "课程",
+        "technical_name": "course",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001103",
+        "name": "选课记录",
+        "technical_name": "enrollment",
+        "description": "学生选修课程的一条记录，带成绩",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002101",
+        "owner_type_id": "00000000-0000-4000-8000-000000001101",
+        "name": "学号",
+        "technical_name": "student_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002102",
+        "owner_type_id": "00000000-0000-4000-8000-000000001101",
+        "name": "姓名",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002111",
+        "owner_type_id": "00000000-0000-4000-8000-000000001102",
+        "name": "课程编号",
+        "technical_name": "course_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002112",
+        "owner_type_id": "00000000-0000-4000-8000-000000001102",
+        "name": "课程名称",
+        "technical_name": "title",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002113",
+        "owner_type_id": "00000000-0000-4000-8000-000000001102",
+        "name": "学分",
+        "technical_name": "credit",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002121",
+        "owner_type_id": "00000000-0000-4000-8000-000000001103",
+        "name": "成绩",
+        "technical_name": "score",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002122",
+        "owner_type_id": "00000000-0000-4000-8000-000000001103",
+        "name": "选课日期",
+        "technical_name": "enrolled_on",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003101",
+        "name": "选修",
+        "technical_name": "courses",
+        "description": "",
+        "inverse_name": "被选修",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001101",
+        "target_type_id": "00000000-0000-4000-8000-000000001102",
+        "multiplicity": "many_to_many",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": "enrollments",
+          "schema_name": "edu",
+          "source_columns": [
+            "student_id"
+          ],
+          "target_columns": [
+            "course_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003102",
+        "name": "所属学生",
+        "technical_name": "student",
+        "description": "",
+        "inverse_name": "选课记录",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001103",
+        "target_type_id": "00000000-0000-4000-8000-000000001101",
+        "multiplicity": "many_to_one",
+        "identifier": true,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "student_id",
+            "course_id"
+          ],
+          "target_columns": [
+            "student_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003103",
+        "name": "所选课程",
+        "technical_name": "course",
+        "description": "",
+        "inverse_name": "选课记录",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001103",
+        "target_type_id": "00000000-0000-4000-8000-000000001102",
+        "multiplicity": "many_to_one",
+        "identifier": true,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "student_id",
+            "course_id"
+          ],
+          "target_columns": [
+            "course_id"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "actions": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006101",
+        "name": "平均成绩",
+        "technical_name": "avg_score",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001103",
+        "aggregation": "avg",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002121"
+        },
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006102",
+        "name": "选课人次",
+        "technical_name": "enrollment_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001103",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006103",
+        "name": "高学分课程选课人次",
+        "technical_name": "high_credit_enrollments",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001103",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003103"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002113"
+            },
+            "operator": "ge",
+            "values": [
+              4
+            ]
+          }
+        ],
+        "evidence": []
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007101",
+        "type_id": "00000000-0000-4000-8000-000000001101",
+        "connection_alias": "school_db",
+        "table_name": "students",
+        "schema_name": "edu",
+        "key_columns": [
+          "student_id"
+        ],
+        "fields": {
+          "student_no": "student_id",
+          "name": "name"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007102",
+        "type_id": "00000000-0000-4000-8000-000000001102",
+        "connection_alias": "school_db",
+        "table_name": "courses",
+        "schema_name": "edu",
+        "key_columns": [
+          "course_id"
+        ],
+        "fields": {
+          "course_no": "course_id",
+          "title": "title",
+          "credit": "credit"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007103",
+        "type_id": "00000000-0000-4000-8000-000000001103",
+        "connection_alias": "school_db",
+        "table_name": "enrollments",
+        "schema_name": "edu",
+        "key_columns": [
+          "student_id",
+          "course_id"
+        ],
+        "fields": {
+          "score": "score",
+          "enrolled_on": "enrolled_on"
+        }
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

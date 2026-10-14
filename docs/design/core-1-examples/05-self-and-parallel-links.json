@@ -1,0 +1,443 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001401",
+        "name": "员工",
+        "technical_name": "employee",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001402",
+        "name": "工位",
+        "technical_name": "desk",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001403",
+        "name": "公司",
+        "technical_name": "company",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001404",
+        "name": "交易",
+        "technical_name": "trade",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002401",
+        "owner_type_id": "00000000-0000-4000-8000-000000001401",
+        "name": "工号",
+        "technical_name": "employee_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002402",
+        "owner_type_id": "00000000-0000-4000-8000-000000001401",
+        "name": "姓名",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002411",
+        "owner_type_id": "00000000-0000-4000-8000-000000001402",
+        "name": "工位号",
+        "technical_name": "desk_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002412",
+        "owner_type_id": "00000000-0000-4000-8000-000000001402",
+        "name": "楼层",
+        "technical_name": "floor",
+        "description": "",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002421",
+        "owner_type_id": "00000000-0000-4000-8000-000000001403",
+        "name": "统一社会信用代码",
+        "technical_name": "credit_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002422",
+        "owner_type_id": "00000000-0000-4000-8000-000000001403",
+        "name": "所在地区",
+        "technical_name": "region",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002431",
+        "owner_type_id": "00000000-0000-4000-8000-000000001404",
+        "name": "交易号",
+        "technical_name": "trade_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002432",
+        "owner_type_id": "00000000-0000-4000-8000-000000001404",
+        "name": "成交额",
+        "technical_name": "amount",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003401",
+        "name": "汇报给",
+        "technical_name": "manager",
+        "description": "",
+        "inverse_name": "管理",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001401",
+        "target_type_id": "00000000-0000-4000-8000-000000001401",
+        "multiplicity": "many_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "employee_id"
+          ],
+          "target_columns": [
+            "manager_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003402",
+        "name": "使用工位",
+        "technical_name": "desk",
+        "description": "",
+        "inverse_name": "使用者",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001401",
+        "target_type_id": "00000000-0000-4000-8000-000000001402",
+        "multiplicity": "one_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": "desks",
+          "schema_name": "hr",
+          "source_columns": [
+            "employee_id"
+          ],
+          "target_columns": [
+            "desk_id"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003403",
+        "name": "买方",
+        "technical_name": "buyer",
+        "description": "",
+        "inverse_name": "买入交易",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001404",
+        "target_type_id": "00000000-0000-4000-8000-000000001403",
+        "multiplicity": "many_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "trade_id"
+          ],
+          "target_columns": [
+            "buyer_code"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003404",
+        "name": "卖方",
+        "technical_name": "seller",
+        "description": "",
+        "inverse_name": "卖出交易",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001404",
+        "target_type_id": "00000000-0000-4000-8000-000000001403",
+        "multiplicity": "many_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "trade_id"
+          ],
+          "target_columns": [
+            "seller_code"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "actions": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006401",
+        "name": "华东买方成交额",
+        "technical_name": "east_buyer_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001404",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002432"
+        },
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003403"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002422"
+            },
+            "operator": "eq",
+            "values": [
+              "华东"
+            ]
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006402",
+        "name": "华东买方向华南卖方的成交额",
+        "technical_name": "east_to_south_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001404",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002432"
+        },
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003403"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002422"
+            },
+            "operator": "eq",
+            "values": [
+              "华东"
+            ]
+          },
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003404"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002422"
+            },
+            "operator": "eq",
+            "values": [
+              "华南"
+            ]
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006403",
+        "name": "有上级的员工数",
+        "technical_name": "managed_employee_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001401",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003401"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002401"
+            },
+            "operator": "not_null",
+            "values": []
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006404",
+        "name": "三楼员工数",
+        "technical_name": "third_floor_headcount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001401",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003402"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002412"
+            },
+            "operator": "eq",
+            "values": [
+              3
+            ]
+          }
+        ],
+        "evidence": []
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007401",
+        "type_id": "00000000-0000-4000-8000-000000001401",
+        "connection_alias": "hr_db",
+        "table_name": "employees",
+        "schema_name": "hr",
+        "key_columns": [
+          "employee_id"
+        ],
+        "fields": {
+          "employee_no": "employee_id",
+          "name": "name"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007402",
+        "type_id": "00000000-0000-4000-8000-000000001402",
+        "connection_alias": "hr_db",
+        "table_name": "desks",
+        "schema_name": "hr",
+        "key_columns": [
+          "desk_id"
+        ],
+        "fields": {
+          "desk_no": "desk_id",
+          "floor": "floor"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007403",
+        "type_id": "00000000-0000-4000-8000-000000001403",
+        "connection_alias": "trade_db",
+        "table_name": "companies",
+        "schema_name": "mkt",
+        "key_columns": [
+          "credit_code"
+        ],
+        "fields": {
+          "credit_code": "credit_code",
+          "region": "region"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007404",
+        "type_id": "00000000-0000-4000-8000-000000001404",
+        "connection_alias": "trade_db",
+        "table_name": "trades",
+        "schema_name": "mkt",
+        "key_columns": [
+          "trade_id"
+        ],
+        "fields": {
+          "trade_no": "trade_id",
+          "amount": "amount"
+        }
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

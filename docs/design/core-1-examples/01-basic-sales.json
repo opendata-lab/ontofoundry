@@ -1,0 +1,402 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户",
+        "technical_name": "customer",
+        "description": "与公司签约的企业客户",
+        "synonyms": [
+          "顾客",
+          "买方"
+        ],
+        "tags": [
+          "核心"
+        ],
+        "extends": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001002",
+        "name": "订单",
+        "technical_name": "sales_order",
+        "description": "客户的一次下单",
+        "synonyms": [
+          "销售单"
+        ],
+        "tags": [
+          "核心"
+        ],
+        "extends": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002001",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户编号",
+        "technical_name": "customer_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002002",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [
+          "客户名"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002003",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "所在地区",
+        "technical_name": "region",
+        "description": "华东 / 华北 / 华南 / 西部",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002004",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "签约日期",
+        "technical_name": "signed_on",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002011",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "订单号",
+        "technical_name": "order_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002012",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "金额",
+        "technical_name": "amount",
+        "description": "含税金额，单位元",
+        "value_kind": "decimal",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [
+          "销售额",
+          "订单金额"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002013",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "状态",
+        "technical_name": "status",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002014",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "下单时间",
+        "technical_name": "ordered_at",
+        "description": "",
+        "value_kind": "datetime",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003001",
+        "name": "属于",
+        "technical_name": "customer",
+        "description": "",
+        "inverse_name": "拥有",
+        "synonyms": [
+          "下单客户"
+        ],
+        "source_type_id": "00000000-0000-4000-8000-000000001002",
+        "target_type_id": "00000000-0000-4000-8000-000000001001",
+        "multiplicity": "many_to_one",
+        "identifier": false,
+        "tags": [],
+        "data_join": {
+          "table_name": null,
+          "schema_name": null,
+          "source_columns": [
+            "order_id"
+          ],
+          "target_columns": [
+            "customer_id"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [
+      {
+        "id": "00000000-0000-4000-8000-000000004001",
+        "name": "金额为正",
+        "technical_name": "positive",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002012",
+        "rule_kind": "constraint",
+        "expression": "sales_order.amount > 0",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000004002",
+        "name": "状态取值",
+        "technical_name": "status_values",
+        "description": "订单状态只能是这四种",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002013",
+        "rule_kind": "constraint",
+        "expression": "sales_order.status IN ('待支付', '已支付', '已完成', '已取消')",
+        "evidence": []
+      }
+    ],
+    "actions": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006001",
+        "name": "订单金额",
+        "technical_name": "order_amount",
+        "description": "",
+        "synonyms": [
+          "销售额",
+          "营收"
+        ],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002012"
+        },
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006002",
+        "name": "订单数",
+        "technical_name": "order_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006003",
+        "name": "已完成订单数",
+        "technical_name": "completed_order_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "path": {
+              "links": [],
+              "property_id": "00000000-0000-4000-8000-000000002013"
+            },
+            "operator": "eq",
+            "values": [
+              "已完成"
+            ]
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006004",
+        "name": "华东区订单金额",
+        "technical_name": "east_order_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002012"
+        },
+        "filters": [
+          {
+            "path": {
+              "links": [
+                "00000000-0000-4000-8000-000000003001"
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002003"
+            },
+            "operator": "eq",
+            "values": [
+              "华东"
+            ]
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006005",
+        "name": "下单客户数",
+        "technical_name": "buyer_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "integer",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "count_distinct",
+        "measure": {
+          "links": [
+            "00000000-0000-4000-8000-000000003001"
+          ],
+          "property_id": "00000000-0000-4000-8000-000000002001"
+        },
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006006",
+        "name": "客单价",
+        "technical_name": "revenue_per_buyer",
+        "description": "订单金额 ÷ 下单客户数",
+        "synonyms": [],
+        "kind": "ratio",
+        "value_kind": "decimal",
+        "numerator_id": "00000000-0000-4000-8000-000000006001",
+        "denominator_id": "00000000-0000-4000-8000-000000006005",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006007",
+        "name": "一季度有效订单金额",
+        "technical_name": "q1_valid_order_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "value_kind": "decimal",
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002012"
+        },
+        "filters": [
+          {
+            "path": {
+              "links": [],
+              "property_id": "00000000-0000-4000-8000-000000002014"
+            },
+            "operator": "between",
+            "values": [
+              "2026-01-01T00:00:00",
+              "2026-03-31T23:59:59"
+            ]
+          },
+          {
+            "path": {
+              "links": [],
+              "property_id": "00000000-0000-4000-8000-000000002013"
+            },
+            "operator": "not_in",
+            "values": [
+              "待支付",
+              "已取消"
+            ]
+          }
+        ],
+        "evidence": []
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007001",
+        "type_id": "00000000-0000-4000-8000-000000001001",
+        "connection_alias": "sales_db",
+        "table_name": "customers",
+        "schema_name": "dw",
+        "key_columns": [
+          "customer_id"
+        ],
+        "fields": {
+          "customer_no": "customer_id",
+          "name": "name",
+          "region": "region",
+          "signed_on": "signed_on"
+        }
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007002",
+        "type_id": "00000000-0000-4000-8000-000000001002",
+        "connection_alias": "sales_db",
+        "table_name": "orders",
+        "schema_name": "dw",
+        "key_columns": [
+          "order_id"
+        ],
+        "fields": {
+          "order_no": "order_id",
+          "amount": "amount",
+          "status": "status",
+          "ordered_at": "created_at"
+        }
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}
