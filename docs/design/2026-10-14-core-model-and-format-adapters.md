@@ -54,7 +54,7 @@
 | `link_types` | 关系 | **只有二元**：源对象 → 目标对象 |
 | `rules` | 规则 | 约束或派生，SQL 表达式，属于某个具体元素 |
 | `actions` | 动作 | 平台自有，沿用 v2 |
-| `metrics` | 指标 | **新增**，扁平结构，见 §3.6 |
+| `metrics` | 指标 | **新增**，结构化（粒度 + 聚合 + 属性路径 + 条件），见 §3.6 |
 | `mappings` | 数据映射 | 对象 → 表、主键列、属性 → 列 |
 | `material_objects` / `material_links` | 材料实例 | 沿用 v2；`material_links` 只有 source / target。保留用于后续的实例图谱（Palantir 的对象和链接实例也是同样用途） |
 
@@ -132,8 +132,9 @@
 `owner_kind` 为 `object_type / property / link_type / action`。**删除** `verbalizes`，自然语言说明写在 `description`。
 v3 中概念上重复存储的 `requires: list[UUID]`、`derived_by: list[UUID]` 不再存在，规则只存在 `rules` 集合。
 
-**表达式写法**：与指标相同（§3.6），ANSI SQL 中用路径引用：`对象.属性`、`对象.关系.属性`，第一段是规则所属的对象
-（属性、关系上的规则，第一段是其所属对象）。平台不执行规则，只检查路径中的对象、关系、属性都存在。例：
+**表达式写法**：ANSI SQL，用文字路径引用：`对象.属性`、`对象.关系.属性`，第一段是规则所属的对象
+（属性、关系上的规则，第一段是其所属对象），每一段的含义与指标的路径（§3.6）相同。平台不执行规则，只检查路径中的对象、关系、属性都存在。
+规则保留 SQL 文本，因为约束和派生的形式比指标多得多，结构化成本太高。例：
 
 ```sql
 -- 属性 sales_order.amount 上的约束
@@ -144,48 +145,94 @@ sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no I
 
 不使用 Ossie 的角色写法（如 `Person.parent_of(descendant)`）。
 
-### 3.6 指标 `Metric`（新增）
+### 3.6 指标 `Metric`（新增，结构化）
 
 指标是独立的顶层元素，不挂在某个对象下面，因为一个指标经常要跨多个对象（例如“华东区客户的订单金额”同时用到订单和客户）。
+指标**不写 SQL**，而是用结构化字段描述：聚合方式、聚合哪个属性、过滤条件。这和 dbt MetricFlow、Cube、LookML 等语义层的做法一致。
+
+#### 字段
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id`、`name`、`technical_name`、`description` | | |
-| `base_type_id` | UUID | 指标的粒度对象，即“按什么来数”。例如订单金额的粒度是订单，客户数的粒度是客户 |
-| `expression` | str | ANSI SQL 聚合表达式，引用**从粒度对象出发的路径**，见下 |
-| `value_kind` | enum / null | |
-| `synonyms` | list[str] | 如“营收” |
-| `evidence` | | |
+| `id`、`name`、`technical_name`、`description`、`synonyms`、`evidence` | | |
+| `kind` | `simple` / `ratio` | 简单指标或比率指标 |
+| `value_kind` | enum / null | 结果类型 |
+| **简单指标** | | |
+| `base_type_id` | UUID | 粒度对象，即“按什么来数”。例如订单金额的粒度是订单，客户数的粒度是客户 |
+| `aggregation` | enum | `sum / avg / min / max / count / count_distinct` |
+| `measure` | Path / null | 被聚合的属性。`count` 时为 null，表示数粒度对象本身；其余必填 |
+| `filters` | list[Condition] | 过滤条件，全部同时满足（AND）；可为空 |
+| **比率指标** | | |
+| `numerator_id`、`denominator_id` | UUID | 分子、分母各引用一个简单指标，两者粒度对象必须相同 |
 
-**路径写法**：`粒度对象.属性`，或经由关系跳到其他对象：`粒度对象.关系.属性`、`粒度对象.关系.关系.属性`。
-第一段必须是粒度对象的技术名；中间各段是**关系的技术名**，不是对象名；最后一段是落脚对象上的属性。
+**Path（路径）**：从粒度对象出发，沿关系走到某个属性。
 
-例：对象 `sales_order`（订单，标识属性 `order_no`，属性 `amount`），对象 `customer`（客户，标识属性 `customer_no`，属性 `region`），
-关系 `sales_order.customer`（订单 → 客户，多对一）。
+```json
+{ "links": [<关系 id>, ...], "property_id": <属性 id> }
+```
 
-| 指标 | 粒度 | 表达式 |
-|---|---|---|
-| 订单金额 | 订单 | `SUM(sales_order.amount)` |
-| 订单数 | 订单 | `COUNT(*)` |
-| 华东区订单金额 | 订单 | `SUM(CASE WHEN sales_order.customer.region = '华东' THEN sales_order.amount END)` |
-| 下单客户数 | 订单 | `COUNT(DISTINCT sales_order.customer.customer_no)` |
-| 客户数 | 客户 | `COUNT(*)` |
-| 每个下单客户的平均订单数 | 订单 | `COUNT(*) / COUNT(DISTINCT sales_order.customer.customer_no)` |
+- `links` 为空表示粒度对象自己的属性；每一跳都必须走向“一”的一侧（从源沿多对一 / 一对一关系走，或从目标反向沿一对一关系走），
+  这样连表后仍是一行一个粒度对象，聚合不会重复计算。
+- 用 id 引用，对象、关系、属性改名后指标不受影响。界面和导出时显示为 `sales_order.customer.region` 这样的文字路径。
 
-- **`COUNT(*)` 数的就是粒度对象**：每一跳都只走向“一”的一侧，JOIN 后仍是一行一个粒度对象，所以 `COUNT(*)` 等于粒度对象的个数。
-  模型里没有隐含的 `id` 属性，数“有多少个某对象”要么用 `COUNT(*)`，要么用 `COUNT(DISTINCT …标识属性)`。
-- 路径中每一跳都必须是**指向“一”的一侧**：从源沿多对一 / 一对一关系走，或从目标反向沿一对一关系走，
-  这样 JOIN 不会让粒度对象的行变多，聚合结果不会重复计算。
-- 走关系名而不是对象名，所以同一个对象有两条关系时不会有歧义（例如 `sales_order.buyer.level` 和 `sales_order.seller.level`）。
-- 需要“对多”方向的指标，换一个粒度对象来写，例如上表最后一行。
-- 技术名不能是 SQL 保留字（如 `order`、`user`、`group`），否则路径写进 SQL 会被解析错。这条对所有元素的技术名都适用（§3.9）。
+**Condition（条件）**：
 
-指标面向业务对象和属性，不面向表和列。查询时通过 `mappings` 和关系的 `data_join` 翻译到物理表列。
-取代 v3 的 `semantic_models / datasets / dataset_fields / dataset_relationships / metrics` 五个集合。
+```json
+{ "path": <Path>, "operator": "eq", "values": ["华东"] }
+```
 
-**为什么不做成函数（Function）**：Palantir 的 Function 是 TypeScript / Python 代码，能力更强，但平台要提供代码运行环境，
-agent 也难以理解和生成。指标是声明式 SQL，平台能校验、能翻译成查询，agent 也能直接读懂。
-以后真需要带参数的计算，可以另加 Function 元素，指标保持不变。
+`operator` 为 `eq / ne / gt / ge / lt / le / in / not_in / between / is_null / not_null`；`values` 的个数由运算符决定
+（`between` 两个，`in / not_in` 至少一个，`is_null / not_null` 零个），值的类型须与属性的 `value_kind` 一致。
+暂不支持“或”（OR），需要时拆成多个指标或以后扩展。
+
+#### 例子
+
+对象 `sales_order`（订单，标识属性 `order_no`，属性 `amount`、`status`），对象 `customer`（客户，标识属性 `customer_no`，属性 `region`），
+关系 `sales_order.customer`（订单 → 客户，多对一）。路径按文字形式书写，实际存的是 id。
+
+| 指标 | kind | 粒度 | aggregation | measure | filters |
+|---|---|---|---|---|---|
+| 订单金额 | simple | 订单 | sum | `sales_order.amount` | |
+| 订单数 | simple | 订单 | count | — | |
+| 已完成订单数 | simple | 订单 | count | — | `sales_order.status eq 已完成` |
+| 华东区订单金额 | simple | 订单 | sum | `sales_order.amount` | `sales_order.customer.region eq 华东` |
+| 下单客户数 | simple | 订单 | count_distinct | `sales_order.customer.customer_no` | |
+| 客户数 | simple | 客户 | count | — | |
+| 客单价 | ratio | 订单 | — | 分子：订单金额，分母：下单客户数 | |
+
+存储形式（华东区订单金额）：
+
+```json
+{
+  "kind": "simple",
+  "name": "华东区订单金额", "technical_name": "east_order_amount",
+  "base_type_id": "<sales_order>",
+  "aggregation": "sum",
+  "measure": { "links": [], "property_id": "<sales_order.amount>" },
+  "filters": [
+    { "path": { "links": ["<sales_order.customer>"], "property_id": "<customer.region>" },
+      "operator": "eq", "values": ["华东"] }
+  ]
+}
+```
+
+#### 不放进指标定义的东西
+
+- **按什么分组**（按月、按地区）和**时间范围**属于查询，不属于指标定义：查询时传入分组路径和条件，路径规则与上面相同，从粒度对象出发。
+- 比率以外的四则运算组合（如“金额 × 汇率 − 退款”）暂不支持；真需要时再加 `derived` 类型。
+
+#### 为什么结构化，而不是 SQL 或函数
+
+| | 结构化 | SQL 表达式 | 函数（Palantir Function） |
+|---|---|---|---|
+| 平台校验 | 每个字段都能校验：路径是否只走“一”的方向、类型是否匹配 | 要解析 SQL 才能校验 | 很难 |
+| 改名 | 用 id 引用，不受影响 | 表达式里的名字要跟着改 | 代码要改 |
+| 生成查询 | 直接拼 SQL，可按不同数据库生成 | 要解析后改写 | 要运行环境 |
+| 编辑界面 | 表单：选粒度、选聚合、选属性、加条件 | 写 SQL | 写代码 |
+| AI 生成 | 填字段，出错能被校验指出 | 容易写出解析不了的 SQL | 难 |
+| 导出到 Ossie | 编译成 ANSI SQL | 改写名字 | 无法导出 |
+
+代价是表达能力有限（没有 OR、没有任意运算），但覆盖了绝大多数业务指标；不够用时再扩展类型，而不是退回 SQL。
 
 ### 3.7 数据映射 `DataMapping`
 
@@ -217,7 +264,9 @@ metrics, mappings, material_objects, material_links
 
 - `data_join` 引用的表：`table_name` 为 null 时源对象必须已映射；目标对象必须已映射。
 - `data_join` 的 `source_columns` / `target_columns` 长度分别等于两端对象 `key_columns` 的长度。
-- `metrics.expression` 中的路径必须从 `base_type_id` 出发，每一跳都指向“一”的一侧，最后落在一个存在的属性上。
+- 指标：`simple` 的 `measure` 与 `aggregation` 匹配（`count` 时为空，`sum / avg` 时属性须为数值类型）；
+  `measure` 和 `filters` 中每条路径都从 `base_type_id` 出发，每一跳都指向“一”的一侧，落在存在的属性上；
+  条件的 `values` 个数和类型符合运算符与属性类型；`ratio` 的分子、分母都是 `simple` 且粒度对象相同。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
 - 对象只有一个标识属性时，该属性 `unique` 必须为 true。
@@ -507,17 +556,18 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.6 指标
 
-**不做任何推断**，只导入一眼就能确定含义的指标：
+**不做任何推断**，只识别下列固定形式（`ANSI_SQL` 方言、只引用**一个** dataset、所引用的字段都已映射到属性）：
 
-| 情况 | 导入 |
+| Ossie 表达式 | 导入为 |
 |---|---|
-| `ANSI_SQL` 表达式只引用**一个** dataset，且该 dataset 和所引用的字段都已映射到对象和属性 | ✅ `base_type_id` = 该 dataset 对应的对象，`dataset.字段` 改写为 `对象.属性`；`description` 照写；`datatype` 能对应 `value_kind` 就写入 |
-| 引用多个 dataset | ❌ `dropped` |
-| 引用未映射的 dataset 或字段 | ❌ `dropped` |
-| 只有非 ANSI 方言 | ❌ `dropped` |
+| `SUM(ds.f)`、`AVG(ds.f)`、`MIN(ds.f)`、`MAX(ds.f)` | `simple`，粒度 = ds 对应的对象，`aggregation` 对应，`measure` = f 对应的属性 |
+| `COUNT(*)` | `simple`，`aggregation = count` |
+| `COUNT(DISTINCT ds.f)` | `simple`，`aggregation = count_distinct` |
 
-丢弃的指标在导入报告里**保留原文**（名称、描述、各方言表达式）。以后可以把这些原文当作材料，
-由平台的自动构建按核心模型的指标写法（粒度对象 + 路径）重新生成，经提案确认后再加入模型。
+`description` 照写；`datatype` 能对应 `value_kind` 就写入。其余一律 `dropped`（RT-49）：引用多个 dataset、带 `CASE WHEN` 等条件、
+四则运算、其他函数、引用未映射的 dataset 或字段、只有非 ANSI 方言。
+
+丢弃的指标在导入报告里**保留原文**（名称、描述、各方言表达式），交给 AI 补全按结构化写法重建（§13.4）。
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
@@ -591,12 +641,19 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 - 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条（`from_columns` / `to_columns` 为多列时照列），
   外加所属对象 `link_mappings` 中的一个子节点。
 - 多对多 join 表 → 第 4 阶段；之前报 `dropped`。
-- 指标 → `semantic_model.metrics`。dataset 名 = 对象技术名、字段名 = 属性技术名，每条路径改写为“**落脚对象的技术名**.属性”：
-  `sales_order.amount` → `sales_order.amount`；`sales_order.customer.region` 落脚在客户对象，→ `customer.region`；
-  `sales_order.buyer.level` 中 `buyer` 是关系名，落脚对象是客户，同样 → `customer.level`。再包上
-  `{"dialects": [{"dialect": "ANSI_SQL", "expression": ...}]}`。
-  两条不同路径落到同一个 dataset（例如同时用了 `sales_order.buyer.level` 和 `sales_order.seller.level`）时，OSI 表达式无法区分，该指标报 `dropped`；
-  引用未映射对象的指标也报 `dropped`。
+- 指标 → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。路径改写为“**落脚对象的技术名**.属性”
+  （dataset 名 = 对象技术名、字段名 = 属性技术名）：`sales_order.customer.region` → `customer.region`。
+
+  | 指标 | 编译结果 |
+  |---|---|
+  | sum / avg / min / max，无条件 | `SUM(sales_order.amount)` |
+  | 带条件 | `SUM(CASE WHEN customer.region = '华东' THEN sales_order.amount END)` |
+  | count，无条件 / 带条件 | `COUNT(*)` / `COUNT(CASE WHEN sales_order.status = '已完成' THEN 1 END)` |
+  | count_distinct | `COUNT(DISTINCT customer.customer_no)`（带条件时同样用 CASE WHEN 包住） |
+  | ratio | `(<分子>) / NULLIF(<分母>, 0)` |
+
+  两条不同路径落到同一个 dataset（例如同时用了 `sales_order.buyer.level` 和 `sales_order.seller.level`）时，OSI 表达式无法区分，
+  该指标报 `dropped`；引用未映射对象的指标也报 `dropped`。
 
 ### 6.6 平台扩展块
 
@@ -672,8 +729,8 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `link_mappings`（一层 children） | ✅ | ✅ |
 | 一层 `referent_mappings`（对应 `identify_by`） | ✅ → 复合主键 | ✅ |
 | 嵌套 `referent_mappings`、多层 children、多个 object_mappings | ❌ dropped | — |
-| Metric（ANSI，只引用一个已映射 dataset） | ✅ | ✅ |
-| Metric（引用多个 dataset） | ❌ dropped（原文留在导入报告） | ✅（路径无歧义时） |
+| Metric（单个 dataset 上的 SUM / AVG / MIN / MAX / COUNT / COUNT DISTINCT） | ✅ → 结构化指标 | ✅ |
+| Metric（多个 dataset、条件、运算等其他形式） | ❌ dropped（原文留在导入报告） | ✅ 结构化指标编译成 SQL（路径无歧义时） |
 | 各处 `ai_context`、`custom_extensions` | ❌ dropped | — |
 | （平台）显示名、反向名称、同义词、标签、必填 | 从扩展块读 | 写入扩展块 |
 | （平台）规则名、动作 | — | ❌ 不导出（用原生格式） |
@@ -734,7 +791,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
 | RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(sales_order.amount)` |
 | RT-48 | 语义层各处的 `ai_context`、`custom_extensions` 丢失 | | 不出现 |
-| RT-49 | 跨多个 dataset 的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
+| RT-49 | 不是固定形式的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
 
 **保持不变的部分**：实体概念名（RT-12 除外）、实体继承、实体描述、属性和二元关系的名字与指向、二元关系的基数、
 `identify_by`（RT-30 除外）、概念和关系上的 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
@@ -774,7 +831,7 @@ dataset 的 `source` 和主键、物理列名。
 | 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
 | 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
-| 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为按路径翻译（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
+| 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为由结构化指标生成 SQL（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
 
@@ -782,7 +839,7 @@ dataset 的 `source` 和主键、物理列名。
 
 | # | 问题 | 决定 |
 |---|---|---|
-| 1 | 指标 | **保留，作为独立顶层元素**，带粒度对象，可跨对象（§3.6）。Palantir 用 Function（代码）计算指标，Fabric 的指标（DAX 度量值）放在 Power BI 语义模型里而非本体中；两家都把指标放在对象之外，我们选声明式 SQL，不做 Function |
+| 1 | 指标 | **保留，作为独立顶层元素，结构化表达**：粒度对象 + 聚合方式 + 属性路径 + 过滤条件，另有比率指标（§3.6）。Palantir 用 Function（代码）计算指标，Fabric 的指标（DAX 度量值）放在 Power BI 语义模型里而非本体中；两家都把指标放在对象之外。我们不用 SQL 也不做 Function |
 | 2 | `inverse_name` | 保留（§3.4） |
 | 3 | 复合主键 | **支持**：`key_columns`、`source_columns`、`target_columns` 都是列表（§3.4、§3.7）；Ossie 中经一层 `referent_mappings` 导入导出（§5.5、§6.5） |
 | 4 | 导出文档 `name` | 工作空间名称（§6.1） |
@@ -795,7 +852,7 @@ dataset 的 `source` 和主键、物理列名。
 | 11 | `value_concept` | 删除；值概念名的变化见 RT-23 |
 | 12 | 平台信息的承载 | Ossie 扩展块只放命名类信息；完整保留用原生格式（§4.6） |
 | 13 | 与原文件对比的界面 | 不做；导入报告逐项说明，对比只用于测试（§7.2） |
-| 14 | 规则表达式写法 | 与指标统一为路径写法（§3.5） |
+| 14 | 规则表达式写法 | SQL 文本，用与指标相同含义的文字路径引用（§3.5） |
 | 15 | 同义词 | 对象、属性、关系、指标都有 `synonyms` |
 
 ---
@@ -896,7 +953,7 @@ integrations/dataagent/skills/ontofoundry-modeling/
 | 自关联 | 源和目标是同一对象，例如“员工 汇报给 员工” |
 | 继承 | 子对象 `extends` 父对象，只写自己新增的属性和关系 |
 | 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
-| 指标 | 指定粒度对象，表达式用从粒度对象出发的路径，只沿“指向一”的方向走 |
+| 指标 | 结构化：选粒度对象、聚合方式、被聚合的属性路径、过滤条件；比率指标引用两个同粒度的简单指标。路径只沿“指向一”的方向走 |
 | 同义词 | 业务别名写进 `synonyms`（对象、属性、关系、指标都有），不写进名称或描述 |
 | 规则 | 挂在具体元素上，表达式用路径写法（`sales_order.customer.region`），不用 Ossie 角色写法 |
 
@@ -942,7 +999,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
 | 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
-| 跨多个 dataset 的指标被丢弃（原文在报告里） | RT-49 | 按核心模型写法重写：选粒度对象、写路径表达式 | create 指标 |
+| 不是固定形式的指标被丢弃（原文在报告里） | RT-49 | 按结构化写法重建：选粒度对象、聚合方式、属性路径、条件；表达不了的（如 OR、复杂运算）在回答中说明 | create 指标 |
 | 计算表达式、嵌套 referent 等映射被丢弃 | RT-43 | 只在能确定对应列时提出映射修改；其余在回答中列出，交给人工 | update 映射，或说明 |
 | 字段的 `label`、`dimension` 等被丢弃 | RT-46 | `label` 可作为属性显示名或同义词 | update 属性 |
 
