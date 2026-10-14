@@ -266,7 +266,7 @@ metrics, mappings, material_objects, material_links
 - `data_join` 引用的表：`table_name` 为 null 时源对象必须已映射；目标对象必须已映射。
 - `data_join` 的 `source_columns` / `target_columns` 长度分别等于两端对象 `key_columns` 的长度。
 - 指标：`simple` 的 `measure` 与 `aggregation` 匹配（`count` 时为空，`sum / avg` 时属性须为数值类型）；
-  `measure` 和 `filters` 中每条路径都从 `base_type_id` 出发，每一跳都指向“一”的一侧，落在存在的属性上；
+  `measure` 和 `filters` 中每条路径都从 `base_type_id` 出发，每一跳都沿关系正向走多对一或一对一关系，落在存在的属性上；
   条件的 `values` 个数和类型符合运算符与属性类型；`ratio` 的分子、分母都是 `simple` 且粒度对象相同。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
