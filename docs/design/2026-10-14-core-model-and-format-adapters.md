@@ -56,8 +56,9 @@
 | `actions` | 动作 | 平台自有，沿用 v2 |
 | `metrics` | 指标 | **新增**，扁平结构，见 §3.6 |
 | `mappings` | 数据映射 | 对象 → 表、主键列、属性 → 列 |
-| `material_objects` / `material_links` | 材料实例 | 沿用 v2；`material_links` 只有 source / target |
-| `ontology_requires` | 工作空间级约束 | 字符串列表，沿用 v2 |
+| `material_objects` / `material_links` | 材料实例 | 沿用 v2；`material_links` 只有 source / target。保留用于后续的实例图谱（Palantir 的对象和链接实例也是同样用途） |
+
+**删除**：v2 的 `ontology_requires`（工作空间级约束）。规则必须归属具体元素，不再有不属于任何元素的约束。
 
 ### 3.2 业务对象 `ObjectType`
 
@@ -179,7 +180,7 @@ agent 也难以理解和生成。指标是声明式 SQL，平台能校验、能�
 ```text
 schema_version: "core-1"
 workspace_id
-ontology_requires, object_types, properties, link_types, rules, actions,
+object_types, properties, link_types, rules, actions,
 metrics, mappings, material_objects, material_links
 ```
 
@@ -311,7 +312,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 |---|---|---|
 | `version` | 校验 | 不是 `0.2.0.dev0` 报 `error` |
 | `name`、`description` | 不读，记入报告 | 模型名称取工作空间自身 |
-| `requires` | → `ontology_requires` | 原样 |
+| `requires` | `dropped` | 核心模型没有工作空间级约束；原文留在报告里，可由 AI 补全改写成具体元素上的规则（§13.4） |
 | `ai_context`（字符串） | `dropped` | |
 | `ai_context.ontofoundry` | 读取，见 §5.7 | 平台自己导出的扩展块 |
 | `ai_context` 其他键（`synonyms`、`instructions`、其他厂商键） | `dropped` | |
@@ -407,7 +408,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.4 工作空间级约束和规则
 
-- 文档 `requires` → `ontology_requires`。
+- 文档 `requires`：`dropped`（RT-04）。
 - 各元素的 `requires` / `derived_by` → `rules`，规则名、技术名、描述优先取扩展块（§5.7），表达式原文不改。
 - 归属元素被 `dropped` 时，其规则一并 `dropped`。
 
@@ -478,7 +479,6 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `version` | 固定 `0.2.0.dev0` |
 | `name` | 工作空间名称 |
 | `description` | 工作空间描述，空则不写 |
-| `requires` | `ontology_requires`，空则不写 |
 | `ai_context` | 只写 `{ "ontofoundry": {...} }`，见 §6.6 |
 | `ontology` | 见 §6.2–6.4；模型没有任何业务对象时报 `error`（Ossie 要求至少 1 个组件） |
 | `ontology_mappings` | 见 §6.5；没有映射则不写 |
@@ -577,7 +577,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | Ossie 构造 | 导入 | 导出 |
 |---|---|---|
 | 文档 `version` / `name` / `description` | 校验 / 不读 / 不读 | 固定值 / 工作空间名称 / 工作空间描述 |
-| 文档 `requires` | ✅ | ✅ |
+| 文档 `requires` | ❌ dropped | — |
 | 文档 `ai_context` | 只读 `ontofoundry` 键 | 只写 `ontofoundry` 键 |
 | EntityType | ✅ | ✅ |
 | ValueType | 折叠进属性 `value_kind` | 只为标识属性或 `value_concept` 生成 |
@@ -626,6 +626,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-01 | 文档名称、描述换成工作空间的 | `"name": "library", "description": "图书馆"` | `"name": "<工作空间名称>", "description": "<工作空间描述>"` |
 | RT-02 | 文档 `ai_context` 只剩平台扩展块 | `{"synonyms": [...], "instructions": "...", "acme": {...}}` | `{"ontofoundry": {"version": "core-1", ...}}` |
 | RT-03 | 旧版本平台扩展块升级为 core-1 格式 | `"ontofoundry": {"version": "3", ...}` | `"ontofoundry": {"version": "core-1", ...}` |
+| RT-04 | 文档级 `requires` 消失 | `"requires": ["COUNT(Customer) > 0"]` | 不出现 |
 
 **格式规范化**（不改变含义）
 
@@ -668,8 +669,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-49 | 跨多个 dataset 的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
 
 **保持不变的部分**：实体概念名（RT-12 除外）、实体继承、实体描述、属性和二元关系的名字与指向、二元关系的基数、
-`identify_by`（RT-30 除外）、所有 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
-文档级 `requires`、dataset 的 `source` 和主键、物理列名。
+`identify_by`（RT-30 除外）、概念和关系上的 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
+dataset 的 `source` 和主键、物理列名。
 
 ### 7.2 往返差异报告
 
@@ -725,6 +726,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | 3 | 复合主键 | **支持**：`key_columns`、`source_columns`、`target_columns` 都是列表（§3.4、§3.7）；Ossie 中经一层 `referent_mappings` 导入导出（§5.5、§6.5） |
 | 4 | 导出文档 `name` | 工作空间名称（§6.1） |
 | 5 | 存量数据 | 清空，不迁移（§8） |
+| 6 | 材料实例 | 保留，用于后续实例图谱 |
+| 7 | 工作空间级约束 `ontology_requires` | 删除；Ossie 文档级 `requires` 导入时丢弃（RT-04） |
 
 ---
 
@@ -866,6 +869,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 值概念的描述、约束被丢弃 | RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
 | 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
+| 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
 | 跨多个 dataset 的指标被丢弃（原文在报告里） | RT-49 | 按核心模型写法重写：选粒度对象、写路径表达式 | create 指标 |
 | 计算表达式、嵌套 referent 等映射被丢弃 | RT-43 | 只在能确定对应列时提出映射修改；其余在回答中列出，交给人工 | update 映射，或说明 |
 | 字段的 `label`、`dimension` 等被丢弃 | RT-46 | `label` 可作为属性显示名或同义词 | update 属性 |
