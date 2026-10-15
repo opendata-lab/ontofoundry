@@ -630,7 +630,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
-平台导出时写入（§6.6），导入时读取，只承载**命名类信息**：显示名、反向名称、同义词、标签、必填，以及外部名到技术名的对照（`technical_names`）。其他工具可以忽略它。
+平台导出时写入（§6.6），导入时读取，只承载**命名类信息**：显示名、反向名称、同义词、标签、必填。其他工具可以忽略它。
 只读 `version = "core-1"`；旧版本（`1`–`4`）及其他内容一律不读，整块报 `dropped`（RT-03）。
 
 ### 5.8 id
@@ -662,17 +662,30 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `identifier=true` 的属性 | 所属组件的 `identify_by` |
 | 对象上的规则 | 组件的 `requires` / `derived_by` |
 | `Property` | 所属组件下的关系：`name = technical_name`，`roles = [{concept: 值概念}]` |
-| 值概念 | 标识属性生成一个 `ValueType`（`extends` 内置类型），名字按下方“生成名”规则分配；普通属性直接用内置类型名 |
+| 值概念 | 普通属性直接引用内置类型（见下方“值类型翻译”）；标识属性生成一个 `ValueType`（`extends` 对应内置类型），名字按下方“生成名”规则分配 |
 | 属性 `unique` | true 写 `OneToOne`，false 写 `ManyToOne` |
 | 属性读法 | 生成 `{对象}的{属性名}是{值概念}` |
 
-**外部名**：Ossie 的所有概念（业务对象、值概念、内置概念）共用一个名字空间。核心模型不为此加命名限制，由适配器给每个概念分配**外部名**：
+**值类型翻译**：属性的 `value_kind` 对应 Ossie 内置值类型，导入导出按同一张表互译：
 
-1. 预留 Ossie 内置概念名：`Any`、`String`、`Integer`、`Decimal`、`Float`、`Boolean`、`Date`、`DateTime`。所有比较忽略大小写。
-2. **业务对象**：按技术名排序，外部名默认等于技术名；与已预留的名字冲突时（如对象技术名是 `String`）依次试 `{技术名}_entity`、`{技术名}_entity_2`……，取到即预留，并在导出报告里列出改名。核心模型保证对象技术名之间不冲突，所以只会和内置名冲突。
-3. **值概念**：再按“对象技术名、属性技术名”排序，依次为每个标识属性取候选名 `{对象外部名}_{属性}_value`；已被占用就依次试 `_value_2`、`_value_3`……
-4. 概念定义、`extends`、关系的 `roles`、读法里的占位符、dataset 名、`concept_mappings.concept`、扩展块的键，一律使用外部名。
-5. 外部名与技术名不同的对象，记在扩展块的 `technical_names` 里（`{外部名: 技术名}`），平台再导入时据此恢复原技术名。
+| `value_kind` | Ossie 内置类型 |
+|---|---|
+| `string` | `String` |
+| `integer` | `Integer` |
+| `decimal` | `Decimal` |
+| `float` | `Float` |
+| `boolean` | `Boolean` |
+| `date` | `Date` |
+| `datetime` | `DateTime` |
+
+**生成名**：标识属性的值概念由适配器生成，名字不能和已有概念撞上：
+
+1. 先预留所有对象的技术名和 Ossie 内置概念名（`Any` 和上表七个），比较时忽略大小写。
+2. 按“对象技术名、属性技术名”排序，依次为每个标识属性取候选名 `{对象}_{属性}_value`；已被占用就依次试 `_value_2`、`_value_3`……，取到即预留。
+3. 关系的 `roles`、读法里的占位符一律使用分配到的名字。
+
+**本期不支持**：业务对象的技术名与 Ossie 内置概念同名（忽略大小写，如对象叫 `String`）。不做自动改名和还原：
+导出时这种对象使 Ossie 官方校验失败，导出报错并指出是哪个对象，由用户改名后再导出。
 
 例：对象 `customer_code_value` 已存在时，`customer.code` 的值概念名是 `customer_code_value_2`；`a_b.c` 与 `a.b_c` 都想用 `a_b_c_value`，
 按排序 `a.b_c` 先取到，`a_b.c` 得到 `a_b_c_value_2`。顺序固定，同一模型每次导出的名字相同。
@@ -695,9 +708,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 ### 6.4 规则和动作
 
 - `object_type / property / link_type` 规则 → 对应 Ossie 元素的 `requires` / `derived_by`。规则名、技术名、描述不导出。
-- **表达式里的对象名要改写成外部名**（§6.2）：规则里的路径平台本来就要解析并检查引用，第一段是对象技术名，导出时换成外部名，关系名、属性名不变。例：对象 `String` 导出为 `String_entity` 时，规则 `String.code <> ''` 写成 `String_entity.code <> ''`。导入时按扩展块的 `technical_names` 反向还原。表达式里有路径解析不了、无法可靠改写的，该规则不导出，报 `dropped`。
-  Ossie 校验器不解析规则表达式，这一步不能靠导出校验兜底，必须由适配器保证。
-- 导出后跑 Ossie 官方校验；校验器不检查规则表达式的语义，表达式正确性由上一条的改写保证。
+- 表达式原文写出：对象在 Ossie 里的概念名就是它的技术名，规则路径不需要改写。
+- 导出后跑 Ossie 官方校验；校验器不检查规则表达式的语义，表达式里的引用已由核心模型校验保证存在。
 - `action` 规则、`actions`：Ossie 没有对应构造，不导出，报 `dropped`。
 
 ### 6.5 数据映射和指标
@@ -724,7 +736,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | dataset 的 `primary_key` | 映射的 `key_columns` | 物理主键，用来连表 |
 | 对象怎么被认出来（`object_mappings`、`link_mappings` 根节点） | 标识属性映射到的字段 | 业务标识，与 `identify_by` 一致 |
 
-- 每个已映射对象生成一个 dataset：`name` = 对象外部名，`source` = `schema.table`，`primary_key` = `key_columns` 各列对应的字段名，
+- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key` = `key_columns` 各列对应的字段名，
   `fields` = 属性字段 + 辅助字段。
 - `concept_mappings`：
   - 只有一个标识属性：`object_mappings` 为 `[{"expression": "dataset.标识属性字段"}]`。示例 06 写 `person.id_card_no`，与 `identify_by: ["id_card_no"]` 一致。
@@ -775,13 +787,12 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
     "synonyms": { "sales_order": ["订单", "销售单"] },
     "tags": { "sales_order": ["核心"] },
     "required": ["sales_order.amount"],
-    "technical_names": { "String_entity": "String" },
     "unsupported": [ { "path": "material_objects", "message": "Ossie 没有实例数据" } ]
   }
 }
 ```
 
-键一律用文件里的名字路径（`对象外部名`、`对象外部名.属性`、`对象外部名.关系`、`metric:指标`），不用 UUID：文件可读，重新导入时先用 `technical_names` 还原对象技术名，再靠技术名匹配沿用 id。
+键一律用技术名路径（`对象`、`对象.属性`、`对象.关系`、`metric:指标`），不用 UUID：文件可读，重新导入时靠技术名匹配就能沿用 id。
 规则名、动作、实例、证据不放进扩展块，需要完整保留时用原生格式（§4.6）。
 
 ### 6.7 不导出
@@ -792,7 +803,6 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `material_objects` / `material_links` | Ossie 没有实例数据 | `dropped` |
 | `actions`、动作上的规则 | Ossie 没有动作 | `dropped` |
 | 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
-| 路径无法可靠改写成外部名的规则表达式 | | `dropped` |
 | 没有标识或标识属性未映射的对象的 `concept_mappings`；目标业务标识不是物理主键时的外键子节点 | | `dropped` |
 | 引用未映射对象的指标 | | `dropped` |
 
@@ -817,7 +827,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `extends`（实体 → 实体） | ✅ | ✅ |
 | `extends`（实体 → 值） | ❌ dropped | — |
 | `identify_by`（全部成员是属性） | ✅ | ✅（只列标识属性） |
-| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（对象名改写为外部名；改写不了的 dropped） |
+| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（表达式原文） |
 | 属性型关系（实体 → 值） | ✅ | ✅ |
 | 二元关系（实体 → 实体） | ✅ | ✅（三种基数） |
 | 自关联 | ✅ | ✅（角色名 `related`） |
@@ -1020,6 +1030,7 @@ dataset 的 `source` 和主键、物理列名。
 | 17 | 问数取数 | MCP 只提供语义和 SQL，agent 用 DataAgent 的数据查询工具按 schema 执行；MCP 工具精简为 4 个（§14） |
 | 18 | 实施顺序 | 分三部分：核心模型与增删改查与 MCP、导入、导出；完整包、差异对比、AI 补全、注册表推迟（§9） |
 | 19 | 对象、属性、标识、关系 | 各自分开定义：外键列可以建成属性；标识只由属性组成；关系单独定义、不参与标识（§3.1、§3.9） |
+| 20 | 与 Ossie 内置概念同名的对象 | 本期不支持，不做自动改名；导出时报错，由用户改名（§6.2） |
 
 ---
 
