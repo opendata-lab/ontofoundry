@@ -81,7 +81,7 @@
 | `value_kind` | enum | `string / integer / decimal / float / boolean / date / datetime` |
 | `required` | bool | |
 | `identifier` | bool | 是否参与对象标识 |
-| `unique` | bool | 值在所有对象中是否唯一（如身份证号）。对象只有一个标识属性时，它必须是 `unique` |
+| `unique` | bool | 值在所有对象中是否唯一（如身份证号）。对象的标识只由这一个属性构成时，它必须是 `unique`；参与复合标识时可以不唯一 |
 | `synonyms` | list[str] | **新增**，业务别名，如“金额”的“销售额” |
 | `evidence` | | |
 
@@ -123,8 +123,15 @@
 - 发货 对应 订单明细（订单明细主键为 `order_id + line_no`）：`table_name=null`（发货表），`source_columns=[shipment_id]`，
   `target_columns=[order_id, line_no]`。
 
-查询统一为：关系源表 JOIN 源对象表 ON 源列 = 源主键 JOIN 目标对象表 ON 目标列 = 目标主键（多列时逐列 AND）；
-关系源表与某一端是同一张表时省掉那次 JOIN。
+连接条件统一为：关系源表与源对象表按“源列 = 源主键”连接，与目标对象表按“目标列 = 目标主键”连接（多列时逐列 AND）；
+关系源表与某一端是同一张表时省掉那次连接。**连接方式按用途决定**：
+
+| 用途 | 连接方式 | 原因 |
+|---|---|---|
+| 指标、问数（从粒度对象出发沿路径走） | **LEFT JOIN** | 必须保留每一个粒度对象，再按条件过滤或聚合。用内连接会先删掉“没有关联对象”的粒度对象：例如“没有上级的员工数”（条件 `manager.employee_no is_null`），内连接结果永远是 0 |
+| 浏览某个实例的关联实例（如“这张订单的客户”） | 内连接 | 只列确实存在的关联 |
+
+指标里沿路径的条件写在 `WHERE` 或聚合内的 `CASE WHEN` 中，不写进连接条件。
 
 ### 3.5 规则 `Rule`
 
@@ -270,7 +277,9 @@ metrics, mappings, material_objects, material_links
   条件的 `values` 个数和类型符合运算符与属性类型；`ratio` 的分子、分母都是 `simple` 且粒度对象相同。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
-- 对象只有一个标识属性时，该属性 `unique` 必须为 true。
+- **标识**：对象的标识由它的全部标识成员组成，包括 `identifier=true` 的属性和关系，也包括从父对象继承来的。全部成员**组合起来**唯一。
+  标识只由一个属性构成时，该属性必须 `unique=true`；复合标识（多个成员，或属性 + 关系）不要求各成员单独唯一。
+  例：订单明细的标识是“所属订单”关系 + “行号”属性，行号在不同订单里会重复，`unique=false` 合法。
 - 技术名不能是 ANSI SQL 保留字（大小写不敏感），因为规则和指标的路径不加引号写进 SQL。
 
 ---
@@ -698,6 +707,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
    - 还存在另一条多跳路径能到同一 dataset（如订单 → 客户，以及订单 → 门店 → 客户），`dropped`。
 3. 路径上每个对象都已映射。
 
+另外，Ossie 的指标表达式不带连接方式，消费方可能用内连接。指标里有**经过关系的 `is_null` 条件**时（如“没有上级的员工数”），内连接会算错，导出照常进行，但在导出报告里对该指标给出警告。
+
   | 指标 | 编译结果 |
   |---|---|
   | sum / avg / min / max，无条件 | `SUM(sales_order.amount)` |
@@ -921,7 +932,7 @@ dataset 的 `source` 和主键、物理列名。
 | 原生格式导出 | 单文件形式（§4.6） |
 
 验收：示例 01–10 导出的 Ossie 文件全部通过官方校验；导出报告列出未导出的内容；
-核心模型 → Ossie → 核心模型，在技术名匹配下业务结构和命名不变。
+核心模型 → Ossie → 核心模型：支持转换的内容在技术名匹配下保持约定的语义；不支持的内容按导出报告和差异规则丢失，不要求无损。
 
 ### 以后的扩展（不在三部分之内）
 
@@ -933,14 +944,6 @@ dataset 的 `source` 和主键、物理列名。
 | 往返差异对比（`diff_roundtrip` 和“每处差异都有编号”的测试） | §7.2 | 导入导出稳定后，作为回归测试补上；差异编号表现在只作为说明 |
 | 导入后的 AI 补全 | §13.4 | 第二部分跑通、看到真实导入会丢什么之后 |
 | 适配器注册表、格式自动识别 | §4.1、§4.3 | 有了第二个适配器时 |
-
----|---|---|
-| 1 | 核心模型 core-1（含复合主键、新 `data_join`、指标）；清空数据的迁移；适配器框架；Ossie 导出（以现有 v2 编译器为基础改造）；删除 v1 / v2 / v3 模型与转换代码 | 每份导出都通过官方校验；`domain/` 不 import `adapters/` 的测试通过 |
-| 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
-| 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
-| 3+ | AI 建模技能 `ontofoundry-modeling`、提示词精简、导入补全（§13） | 样例 A/B 导入后 AI 补全的提案全部通过平台校验 |
-| 3+ | 问数：MCP 工具精简为 4 个，`get_ontology` 返回物理绑定和指标 SQL，问数 agent 提示词（§14） | 演示空间示例问题全部答对，聚合在一次 SQL 内完成 |
-| 4 | 多对多 join 表的映射、查询、导入导出；指标查询改为由结构化指标生成 SQL（改写 `metric_query.py`） | 多对多关系能查到实例；跨对象指标能查询 |
 
 ---
 
@@ -1191,7 +1194,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
     {
       "kind": "metric", "id": "…", "name": "华东区订单金额", "grain": "订单",
       "definition": { "aggregation": "sum", "measure": "sales_order.amount", "filters": ["sales_order.customer.region eq 华东"] },
-      "sql": "SELECT SUM(o.amount) FROM dw.orders o JOIN dw.customers c ON o.customer_id = c.customer_id WHERE c.region = '华东'"
+      "sql": "SELECT SUM(o.amount) FROM dw.orders o LEFT JOIN dw.customers c ON o.customer_id = c.customer_id WHERE c.region = '华东'"
     }
   ]
 }
@@ -1208,7 +1211,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 1. `search_ontology` 按名称和同义词找到问题涉及的对象、属性、指标；有歧义时请用户澄清。
 2. `get_ontology(ids)` 读取这些元素的定义和物理绑定。
-3. 有对应指标就用它的 SQL（可加分组和条件）；否则自己拼 SQL：只用返回的表、列和 JOIN 条件，遵守基数提示。
+3. 有对应指标就用它的 SQL（可加分组和条件）；否则自己拼 SQL：只用返回的表、列和 JOIN 条件，遵守基数提示；从粒度对象出发沿关系连接一律用 LEFT JOIN，条件写在 WHERE 里。
 4. 用 DataAgent 的数据查询工具按返回的 `schema` 执行；统计在数据库里完成，不要拉回全部明细再自己算。
 5. 用业务名称回答并说明口径；文档里的事实用 `search_objects` / `get_object` 查，并注明出处。
 
