@@ -415,9 +415,18 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 2. 用户确认后，平台：
    - 把原文件保存为一份材料（§13.4）；
    - 新建一个建模会话，标题“导入 <文件名>”，基于当前已发布版本；
-   - 把适配器产出的核心模型和会话草稿逐元素对比，按技术名匹配（对象按 `technical_name`，属性和关系按
-     `所属对象.technical_name`，规则按 `归属.technical_name`，指标按 `technical_name`），生成一批提案：
-     草稿里没有的 → create；内容不同的 → update；“以文件为准”时草稿有、文件没有的 → delete；
+   - 把适配器产出的核心模型和会话草稿逐元素对比，找出每个导入元素对应草稿里的哪个元素，生成一批提案：
+     对应不上的 → create；内容不同的 → update（含改名）；“以文件为准”时草稿有、文件没有的 → delete。匹配方式按格式区分：
+
+     | 格式 | 匹配方式 |
+     |---|---|
+     | **原生格式** | 文件带着稳定 UUID，**先按 UUID + 元素类型匹配**：草稿里有同 UUID 同类型的元素就对应它，技术名不同算改名（update）。UUID 对不上时再按技术名匹配（见下），匹配上就沿用草稿里的 id，并把文件里对这个元素的引用改成该 id；都对不上就保留文件里的 UUID 新建 |
+     | **Ossie 等外部格式** | 文件里没有我们的 UUID（适配器生成的 id 只在本次有效），**按技术名匹配**：对象按 `technical_name`，属性和关系按 `所属对象.technical_name`，规则按 `归属.technical_name`，指标按 `technical_name` |
+
+     冲突不硬套，逐条报告、不生成该元素的提案，由用户处理：
+     - UUID 在本工作空间登记过、但类型不同（元素身份表规定 id 不跨类型复用）；
+     - 按 UUID 对应后改出来的技术名，或新建元素的技术名，与草稿里另一个元素冲突。
+     元素身份按工作空间登记，同一个原生文件导入到别的工作空间时 UUID 可以原样使用。
    - 每条提案附材料证据，指向原文件里对应的行；
    - 提案批次的 `producer_json` 记为 `{"kind": "import", "adapter": "ossie-0.2", "report_id": ...}`，和 agent 产出的批次区分。
 3. 跳转到该会话。用户在提案面板审阅：可以逐条接受，也可以用已有的“全部接受”；然后照常在发布面板发布。
@@ -651,9 +660,18 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `identifier=true` 的属性 | 所属组件的 `identify_by` |
 | 对象上的规则 | 组件的 `requires` / `derived_by` |
 | `Property` | 所属组件下的关系：`name = technical_name`，`roles = [{concept: 值概念}]` |
-| 值概念 | 标识属性生成 `{对象}_{属性}_value`（`ValueType`，`extends` 内置类型）；普通属性直接用内置类型名。沿用现有编译器行为 |
+| 值概念 | 标识属性生成一个 `ValueType`（`extends` 内置类型），名字按下方“生成名”规则分配；普通属性直接用内置类型名 |
 | 属性 `unique` | true 写 `OneToOne`，false 写 `ManyToOne` |
 | 属性读法 | 生成 `{对象}的{属性名}是{值概念}` |
+
+**生成名**：Ossie 的所有概念共用一个名字空间，适配器生成的值概念名不能和别的概念撞上。核心模型不为此加命名限制，由适配器分配：
+
+1. 先预留所有对象的技术名和 Ossie 内置概念名（`Any`、`String`、`Integer`、`Decimal`、`Float`、`Boolean`、`Date`、`DateTime`），比较时忽略大小写。
+2. 按“对象技术名、属性技术名”排序，依次为每个标识属性取候选名 `{对象}_{属性}_value`；已被占用就依次试 `_value_2`、`_value_3`……，取到即预留。
+3. 关系的 `roles`、读法里的占位符一律使用分配到的名字。
+
+例：对象 `customer_code_value` 已存在时，`customer.code` 的值概念名是 `customer_code_value_2`；`a_b.c` 与 `a.b_c` 都想用 `a_b_c_value`，
+按排序 `a.b_c` 先取到，`a_b.c` 得到 `a_b_c_value_2`。顺序固定，同一模型每次导出的名字相同。
 | `required`、`name`（显示名）、`synonyms`、`tags` | 只写入扩展块 |
 | 属性上的规则 | 关系的 `requires` / `derived_by` |
 
@@ -844,7 +862,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-20 | 读法重新生成 | `["{order}由{customer}下单", "{order}属于{customer}", "{customer}拥有{order}"]` | `["{order}属于{customer}", "{customer}拥有{order}"]`（取自 `name` / `inverse_name`，见 §5.3 读法提取） |
 | RT-21 | 角色名丢失；自关联统一为 `related` | `"roles": [{"concept": "employee", "name": "manager"}]` | `"roles": [{"concept": "employee", "name": "related"}]` |
 | RT-22 | 没写基数的属性补上基数 | 属性关系无 `multiplicity` | `"multiplicity": "ManyToOne"` |
-| RT-23 | 值概念被替换：属性改为引用内置类型，标识属性改为引用生成的 `{对象}_{属性}_value` | `"roles": [{"concept": "money"}]`，`money extends Decimal` | `"roles": [{"concept": "Decimal"}]`，`money` 不再出现 |
+| RT-23 | 值概念被替换：属性改为引用内置类型，标识属性改为引用适配器生成的值概念（§6.2 生成名） | `"roles": [{"concept": "money"}]`，`money extends Decimal` | `"roles": [{"concept": "Decimal"}]`，`money` 不再出现 |
 | RT-24 | 值概念上的描述、规则、`identify_by`、关系随值概念一起丢失 | `{"concept": "money", "type": "ValueType", "requires": [...]}` | 不出现 |
 | RT-25 | （已并入 RT-23，编号保留不用） | | |
 | RT-26 | 一元关系变成布尔属性 | `{"name": "is_vip", "verbalizes": ["{customer}是VIP"]}` | `{"name": "is_vip", "roles": [{"concept": "Boolean"}], "multiplicity": "ManyToOne", "verbalizes": ["{customer}的是VIP是{Boolean}"]}` |
