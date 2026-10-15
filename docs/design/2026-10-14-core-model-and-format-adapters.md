@@ -173,7 +173,7 @@ sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no I
 |---|---|---|
 | `id`、`name`、`technical_name`、`description`、`synonyms`、`evidence` | | |
 | `kind` | `simple` / `ratio` | 简单指标或比率指标 |
-| `value_kind` | enum / null | 结果类型 |
+| `value_kind` | enum | 结果类型，**由平台推导**，不由用户决定：`count / count_distinct` → `integer`；`sum / min / max` → 被聚合属性的类型；`avg` → `decimal`；`ratio` → `decimal`。文件里写的值必须与推导结果一致 |
 | **简单指标** | | |
 | `base_type_id` | UUID | 粒度对象，即“按什么来数”。例如订单金额的粒度是订单，客户数的粒度是客户 |
 | `aggregation` | enum | `sum / avg / min / max / count / count_distinct` |
@@ -284,7 +284,9 @@ metrics, mappings, material_objects, material_links
 - `data_join` 的 `source_columns` / `target_columns` 长度分别等于两端对象 `key_columns` 的长度。
 - 指标：`simple` 的 `measure` 与 `aggregation` 匹配（`count` 时为空，`sum / avg` 时属性须为数值类型）；
   `measure` 和 `filters` 中每条路径都从 `base_type_id` 出发，每一跳都沿关系正向走多对一或一对一关系，落在存在的属性上；
-  条件的 `values` 个数和类型符合运算符与属性类型；`ratio` 的分子、分母都是 `simple` 且粒度对象相同。
+  条件的 `values` 个数和类型符合运算符与属性类型；`value_kind` 等于按聚合方式和属性类型推导出的结果类型；
+  `ratio` 的分子、分母都是 `simple`、粒度对象相同，且推导出的结果类型都是数值（`integer / decimal / float`）。
+  例：`MIN(customer.signed_on)` 的结果类型是 `date`，不能做比率的分子或分母。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
 - **标识只由属性组成**：对象的标识是它全部 `identifier=true` 的属性（含从父对象继承的），组合起来唯一。关系不参与标识，只负责连接对象。
@@ -420,7 +422,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 
      | 格式 | 匹配方式 |
      |---|---|
-     | **原生格式** | 文件带着稳定 UUID，**先按 UUID + 元素类型匹配**：草稿里有同 UUID 同类型的元素就对应它，技术名不同算改名（update）。UUID 对不上时再按技术名匹配（见下），匹配上就沿用草稿里的 id，并把文件里对这个元素的引用改成该 id；都对不上就保留文件里的 UUID 新建 |
+     | **原生格式** | 文件带着稳定 UUID，**分两轮匹配，结果必须一对一**：<br>① 先对**全部**导入元素按 UUID + 元素类型匹配，对上的双方都锁定；技术名不同算改名（update）。<br>② 再在**两边都未锁定**的元素之间按技术名匹配（规则见下行）；匹配上就沿用草稿里的 id，并把文件里对这个元素的引用改成该 id。<br>③ 仍对不上的保留文件里的 UUID 新建。<br>例：文件有 `alpha(id1)`、`beta(id2)`，草稿只有已改名为 `beta` 的 `id1`。第①轮 `alpha` 锁定 `id1`（改名回 `alpha`）；第②轮 `beta(id2)` 找不到未锁定的 `beta`，按③新建，但它的技术名与 `id1` 当前的名字 `beta` 冲突，按下面的冲突规则报告，不会把两个导入元素都对应到 `id1` |
      | **Ossie 等外部格式** | 文件里没有我们的 UUID（适配器生成的 id 只在本次有效），**按技术名匹配**：对象按 `technical_name`，属性和关系按 `所属对象.technical_name`，规则按 `归属.technical_name`，指标按 `technical_name` |
 
      冲突不硬套，逐条报告、不生成该元素的提案，由用户处理：
@@ -628,7 +630,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
-平台导出时写入（§6.6），导入时读取，只承载**命名类信息**：显示名、反向名称、同义词、标签、必填。其他工具可以忽略它。
+平台导出时写入（§6.6），导入时读取，只承载**命名类信息**：显示名、反向名称、同义词、标签、必填，以及外部名到技术名的对照（`technical_names`）。其他工具可以忽略它。
 只读 `version = "core-1"`；旧版本（`1`–`4`）及其他内容一律不读，整块报 `dropped`（RT-03）。
 
 ### 5.8 id
@@ -664,11 +666,13 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 属性 `unique` | true 写 `OneToOne`，false 写 `ManyToOne` |
 | 属性读法 | 生成 `{对象}的{属性名}是{值概念}` |
 
-**生成名**：Ossie 的所有概念共用一个名字空间，适配器生成的值概念名不能和别的概念撞上。核心模型不为此加命名限制，由适配器分配：
+**外部名**：Ossie 的所有概念（业务对象、值概念、内置概念）共用一个名字空间。核心模型不为此加命名限制，由适配器给每个概念分配**外部名**：
 
-1. 先预留所有对象的技术名和 Ossie 内置概念名（`Any`、`String`、`Integer`、`Decimal`、`Float`、`Boolean`、`Date`、`DateTime`），比较时忽略大小写。
-2. 按“对象技术名、属性技术名”排序，依次为每个标识属性取候选名 `{对象}_{属性}_value`；已被占用就依次试 `_value_2`、`_value_3`……，取到即预留。
-3. 关系的 `roles`、读法里的占位符一律使用分配到的名字。
+1. 预留 Ossie 内置概念名：`Any`、`String`、`Integer`、`Decimal`、`Float`、`Boolean`、`Date`、`DateTime`。所有比较忽略大小写。
+2. **业务对象**：按技术名排序，外部名默认等于技术名；与已预留的名字冲突时（如对象技术名是 `String`）依次试 `{技术名}_entity`、`{技术名}_entity_2`……，取到即预留，并在导出报告里列出改名。核心模型保证对象技术名之间不冲突，所以只会和内置名冲突。
+3. **值概念**：再按“对象技术名、属性技术名”排序，依次为每个标识属性取候选名 `{对象外部名}_{属性}_value`；已被占用就依次试 `_value_2`、`_value_3`……
+4. 概念定义、`extends`、关系的 `roles`、读法里的占位符、dataset 名、`concept_mappings.concept`、扩展块的键，一律使用外部名。
+5. 外部名与技术名不同的对象，记在扩展块的 `technical_names` 里（`{外部名: 技术名}`），平台再导入时据此恢复原技术名。
 
 例：对象 `customer_code_value` 已存在时，`customer.code` 的值概念名是 `customer_code_value_2`；`a_b.c` 与 `a.b_c` 都想用 `a_b_c_value`，
 按排序 `a.b_c` 先取到，`a_b.c` 得到 `a_b_c_value_2`。顺序固定，同一模型每次导出的名字相同。
@@ -755,17 +759,18 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 "ai_context": {
   "ontofoundry": {
     "version": "core-1",
-    "display_names": { "order": "订单", "order.amount": "金额", "order.customer": "属于" },
-    "inverse_names": { "order.customer": "拥有" },
-    "synonyms": { "order": ["订单", "销售单"] },
-    "tags": { "order": ["核心"] },
-    "required": ["order.amount"],
+    "display_names": { "sales_order": "订单", "sales_order.amount": "金额", "sales_order.customer": "属于" },
+    "inverse_names": { "sales_order.customer": "拥有" },
+    "synonyms": { "sales_order": ["订单", "销售单"] },
+    "tags": { "sales_order": ["核心"] },
+    "required": ["sales_order.amount"],
+    "technical_names": { "String_entity": "String" },
     "unsupported": [ { "path": "material_objects", "message": "Ossie 没有实例数据" } ]
   }
 }
 ```
 
-键一律用技术名路径（`对象`、`对象.属性`、`对象.关系`、`metric:指标`），不用 UUID：文件可读，重新导入时靠技术名匹配就能沿用 id。
+键一律用文件里的名字路径（`对象外部名`、`对象外部名.属性`、`对象外部名.关系`、`metric:指标`），不用 UUID：文件可读，重新导入时先用 `technical_names` 还原对象技术名，再靠技术名匹配沿用 id。
 规则名、动作、实例、证据不放进扩展块，需要完整保留时用原生格式（§4.6）。
 
 ### 6.7 不导出
