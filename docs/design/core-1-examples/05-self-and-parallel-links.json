@@ -164,6 +164,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001401",
         "target_type_id": "00000000-0000-4000-8000-000000001401",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,
@@ -187,6 +188,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001401",
         "target_type_id": "00000000-0000-4000-8000-000000001402",
         "multiplicity": "one_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": "desks",
@@ -210,6 +212,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001404",
         "target_type_id": "00000000-0000-4000-8000-000000001403",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,
@@ -233,6 +236,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001404",
         "target_type_id": "00000000-0000-4000-8000-000000001403",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,

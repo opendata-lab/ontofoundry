@@ -75,19 +75,6 @@
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002314",
-        "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "订单号",
-        "technical_name": "order_no",
-        "description": "",
-        "value_kind": "string",
-        "required": true,
-        "identifier": true,
-        "unique": false,
-        "synonyms": [],
-        "evidence": []
-      },
-      {
         "id": "00000000-0000-4000-8000-000000002311",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
         "name": "行号",
@@ -190,6 +177,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001302",
         "target_type_id": "00000000-0000-4000-8000-000000001301",
         "multiplicity": "many_to_one",
+        "identifier": true,
         "tags": [],
         "data_join": {
           "table_name": null,
@@ -214,6 +202,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001302",
         "target_type_id": "00000000-0000-4000-8000-000000001303",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,
@@ -238,6 +227,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001304",
         "target_type_id": "00000000-0000-4000-8000-000000001302",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,
@@ -371,7 +361,6 @@
           "line_no"
         ],
         "fields": {
-          "order_no": "order_id",
           "line_no": "line_no",
           "quantity": "qty",
           "unit_price": "unit_price"

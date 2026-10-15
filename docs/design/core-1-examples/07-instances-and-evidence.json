@@ -131,6 +131,7 @@
         "source_type_id": "00000000-0000-4000-8000-000000001602",
         "target_type_id": "00000000-0000-4000-8000-000000001601",
         "multiplicity": "many_to_one",
+        "identifier": false,
         "tags": [],
         "data_join": null,
         "evidence": []
