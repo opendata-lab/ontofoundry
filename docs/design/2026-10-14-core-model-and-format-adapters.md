@@ -180,7 +180,7 @@ sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no I
 | `measure` | Path / null | 被聚合的属性。`count` 时为 null，表示数粒度对象本身；其余必填 |
 | `filters` | list[Condition] | 过滤条件，全部同时满足（AND）；可为空 |
 | **比率指标** | | |
-| `numerator_id`、`denominator_id` | UUID | 分子、分母各引用一个简单指标，两者粒度对象必须相同 |
+| `numerator_id`、`denominator_id` | UUID | 分子、分母各引用一个简单指标，两者粒度对象必须相同。比率按**小数**相除：两边先转成 `DECIMAL(38, 10)` 再除，分母为 0 时结果为空；`value_kind` 固定为 `decimal`。平台查询、MCP 给出的 SQL、Ossie 导出都用这一条，避免两边都是计数时发生整数除法（1 / 2 得 0） |
 
 **Path（路径）**：从粒度对象出发，沿关系走到某个属性。
 
@@ -491,7 +491,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 | `description` | → `description` | |
 | `extends`（实体） | → `extends` | |
 | `extends`（值概念或内置类型） | `dropped` | 实体不能继承值 |
-| `identify_by` | 被引用的属性 `identifier=true` | 被引用的是关系时（Ossie 允许用关系做标识），关系照常导入但不作为标识，报 `dropped`（RT-32）；引用不存在时 `dropped` |
+| `identify_by` | 全部成员都是属性时：这些属性 `identifier=true` | 标识**整组翻译或整组放弃**，不裁剪：只要有一个成员是关系（Ossie 允许用关系做标识）或引用不存在，整组标识都不导入，所有成员属性都不设 `identifier`、`unique` 保持原样，关系照常作为普通关系导入，报告“标识待补全”（RT-32）。否则裁剪后剩下的单个属性会被当成唯一标识，与它 `unique=false` 冲突。<br>只有一个属性成员时，该属性设 `unique=true`：Ossie 的 `identify_by` 本身就表示能用它唯一找到对象；原文的 `multiplicity` 不是 `OneToOne` 时报 `converted`（RT-33） |
 | `requires` / `derived_by` | → `rules`（`owner_kind=object_type`，constraint / derivation） | 规则名取扩展块，没有则生成 `{对象名}·约束1` |
 | `ValueType` | **不建元素**，折叠进属性 | 见下 |
 
@@ -727,7 +727,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
   | 带条件 | `SUM(CASE WHEN customer.region = '华东' THEN sales_order.amount END)` |
   | count，无条件 / 带条件 | `COUNT(DISTINCT sales_order.order_no)` / `COUNT(DISTINCT CASE WHEN sales_order.status = '已完成' THEN sales_order.order_no END)` |
   | count_distinct（`measure` 在粒度对象上） | `COUNT(DISTINCT sales_order.status)` |
-  | ratio | `(<分子>) / NULLIF(<分母>, 0)`；分子、分母都满足上面的前提才导出 |
+  | ratio | `CAST(<分子> AS DECIMAL(38, 10)) / NULLIF(CAST(<分母> AS DECIMAL(38, 10)), 0)`；分子、分母都满足上面的前提才导出 |
 
 再导入时（§5.6），单 dataset 的 `COUNT(DISTINCT 粒度.主键字段)` 会读成 `count_distinct` 主键属性，口径与原来的 `count` 相同（RT-50）。
 
@@ -781,13 +781,14 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | ValueType | 折叠进属性 `value_kind`，值概念本身丢弃 | 只为标识属性生成 |
 | `extends`（实体 → 实体） | ✅ | ✅ |
 | `extends`（实体 → 值） | ❌ dropped | — |
-| `identify_by` | ✅（属性、二元关系） | ✅ |
+| `identify_by`（全部成员是属性） | ✅ | ✅（只列标识属性） |
 | 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（过不了 lint 的 dropped） |
 | 属性型关系（实体 → 值） | ✅ | ✅ |
 | 二元关系（实体 → 实体） | ✅ | ✅（三种基数） |
 | 自关联 | ✅ | ✅（角色名 `related`） |
 | 一元关系 | 🔁 布尔属性 | 不还原 |
 | 多元关系 | 🔁 中间对象 | 不还原 |
+| `identify_by` 含关系成员 | ❌ 整组标识不导入，报“标识待补全” | — |
 | 值概念上的关系 | ❌ dropped | — |
 | `roles[].name` | ❌ dropped | 只在自关联时生成 |
 | `verbalizes` | 提取动词，其余 dropped | 由名称生成 |
@@ -852,7 +853,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-29 | 不支持的构造消失：值概念上的关系、实体继承值概念、引用 `Any` 的关系 | | 不出现 |
 | RT-30 | `identify_by` 中引用了已消失元素的项被删除 | `"identify_by": ["supplies", "code"]` | `"identify_by": ["code"]` |
 | RT-31 | 引用无法按路径写法解析的规则消失 | `"derived_by": ["Person.parent_of(descendant)"]` | 不出现 |
-| RT-32 | 用关系做的标识不再是标识 | `"identify_by": ["acct", "seat_nr"]`（`acct` 是关系） | `"identify_by": ["seat_nr"]`，`acct` 作为普通关系导出 |
+| RT-32 | 含关系成员的标识整组不导入 | 座位：`"identify_by": ["acct", "seat_nr"]`（`acct` 是关系） | 座位没有 `identify_by`；`seat_nr` 是普通属性，`acct` 是普通关系 |
+| RT-33 | 单属性标识补上唯一性 | `identify_by: ["nr"]`，`nr` 的 `multiplicity` 为 `ManyToOne` 或未写 | `nr` 写成 `OneToOne` |
 
 **数据映射和指标**
 
@@ -1125,7 +1127,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 角色名被丢弃 | RT-21 | 自关联或中间对象的关系名不清楚时，参考角色名改名（如“汇报给”→“上级”） | update 关系 |
 | 值概念及其描述、约束被丢弃 | RT-23 / RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
 | 引用无法解析的规则被丢弃 | RT-31 | 按路径写法改写表达式，挂到对应元素上 | create 规则 |
-| 中间对象缺少标识；用关系做的标识被丢弃 | RT-27 / RT-32 | 为对象加上参与方或外键的编号属性，映射到对应列，并设为标识 | create 属性；update 映射 |
+| 中间对象缺少标识；含关系成员的标识整组未导入 | RT-27 / RT-32 | 为对象补全标识：把参与方或外键的编号建成属性、映射到对应列，与原标识中的属性一起设为标识（如座位：账户编号 + 座位号） | create / update 属性；update 映射 |
 | 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
 | 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
