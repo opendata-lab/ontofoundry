@@ -7,68 +7,173 @@
     "workspace_id": "11111111-1111-4111-8111-111111111111",
     "object_types": [
       {
-        "id": "00000000-0000-4000-8000-000000001501",
+        "id": "84122398-d13b-5228-a634-5e1e1168a901",
         "name": "当事人",
         "technical_name": "party",
-        "description": "合同的签约方，个人或机构",
+        "description": "建法①：父数据集包含全部当事人及全部子对象实例；查父对象只使用此完整来源。",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "title_property_id": "7a56c7a9-98f9-5594-8aa6-6265c3fcf67d",
+        "evidence": [],
+        "derived_by": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000001502",
+        "id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
         "name": "个人",
         "technical_name": "person",
-        "description": "",
+        "description": "建法①：父表与个人扩展表按当事人编号关联，扩展表有记录的父实例才是个人；姓名、电话和继承关系仍取父绑定。",
         "synonyms": [],
         "tags": [],
-        "extends": [
-          "00000000-0000-4000-8000-000000001501"
-        ],
-        "evidence": []
+        "extends": "84122398-d13b-5228-a634-5e1e1168a901",
+        "title_property_id": "7a56c7a9-98f9-5594-8aa6-6265c3fcf67d",
+        "evidence": [],
+        "derived_by": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000001503",
+        "id": "2d78ef0e-0315-5fee-9741-87876d06f8c1",
         "name": "机构",
         "technical_name": "organization",
-        "description": "",
+        "description": "建法①：机构特有属性来自成员扩展表，机构实例必须在父表中。",
         "synonyms": [],
         "tags": [],
-        "extends": [
-          "00000000-0000-4000-8000-000000001501"
-        ],
-        "evidence": []
+        "extends": "84122398-d13b-5228-a634-5e1e1168a901",
+        "title_property_id": "7a56c7a9-98f9-5594-8aa6-6265c3fcf67d",
+        "evidence": [],
+        "derived_by": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000001504",
+        "id": "902d87c4-c78f-511c-88a5-ee50b303a935",
+        "name": "VIP当事人",
+        "technical_name": "vip_party",
+        "description": "建法①：共用父表并以 main.level = 'VIP' 定义成员，属于本平台自有的行筛选设计。",
+        "synonyms": [],
+        "tags": [],
+        "extends": "84122398-d13b-5228-a634-5e1e1168a901",
+        "title_property_id": "7a56c7a9-98f9-5594-8aa6-6265c3fcf67d",
+        "evidence": [],
+        "derived_by": [
+          {
+            "kind": "simple",
+            "conditions": [
+              {
+                "path": {
+                  "links": [],
+                  "property_id": "00000000-0000-4000-8000-000000002550"
+                },
+                "operator": "eq",
+                "values": [
+                  "VIP"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "46eff2b2-13b4-51da-ac94-808b149c1857",
         "name": "合同",
         "technical_name": "contract",
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "title_property_id": null,
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "name": "资产",
+        "technical_name": "asset",
+        "description": "建法②：虚拟父对象，没有自己的映射或直接实例；实例来自设备与车辆，每个实例只属于一个具体子对象。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "8f73cc06-ae28-5e87-8735-a5dffb4c2905",
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "c77fc81f-c55b-5168-a6ab-496789de2e58",
+        "name": "设备",
+        "technical_name": "device",
+        "description": "建法②：设备独立数据集绑定继承属性及继承关系；查询资产时列入实例并集。",
+        "synonyms": [],
+        "tags": [],
+        "extends": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "title_property_id": "8f73cc06-ae28-5e87-8735-a5dffb4c2905",
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "e35178b4-d948-5b66-a9d3-29964add9055",
+        "name": "车辆",
+        "technical_name": "vehicle",
+        "description": "建法②：车辆独立数据集绑定继承属性及继承关系；查询资产时列入实例并集。",
+        "synonyms": [],
+        "tags": [],
+        "extends": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "title_property_id": "8f73cc06-ae28-5e87-8735-a5dffb4c2905",
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "a2da600a-3d76-500b-adce-54253a1b086b",
+        "name": "供应商",
+        "technical_name": "supplier",
+        "description": "建法③：独立对象，不与渠道商建立继承。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "04c62954-285d-5901-9ffa-110e96c70cd0",
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "518b4dc6-11d5-5dff-ac45-6ef7763548a5",
+        "name": "渠道商",
+        "technical_name": "channel_partner",
+        "description": "建法③：独立对象，与供应商有相似属性不表示实例包含关系。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "8e6330a7-b96c-5837-ae62-35dcfdd7083c",
+        "evidence": [],
+        "derived_by": []
       }
     ],
     "properties": [
       {
-        "id": "00000000-0000-4000-8000-000000002501",
-        "owner_type_id": "00000000-0000-4000-8000-000000001501",
+        "id": "8d008f70-5009-514b-86d8-c1d1d34d38bc",
+        "owner_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "name": "当事人编号",
+        "technical_name": "party_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "7a56c7a9-98f9-5594-8aa6-6265c3fcf67d",
+        "owner_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
         "name": "名称",
         "technical_name": "name",
         "description": "",
         "value_kind": "string",
-        "required": true,
+        "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002502",
-        "owner_type_id": "00000000-0000-4000-8000-000000001501",
-        "name": "联系电话",
+        "id": "dc161806-943a-5b13-9c61-aa75e5696b50",
+        "owner_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "name": "电话",
         "technical_name": "phone",
         "description": "",
         "value_kind": "string",
@@ -79,47 +184,73 @@
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002511",
-        "owner_type_id": "00000000-0000-4000-8000-000000001502",
+        "id": "a9ffbfef-dbac-550c-bca3-56d6e1f8f606",
+        "owner_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "name": "联络当事人编号",
+        "technical_name": "contact_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "eec69042-52bb-5020-bb01-666e6ca97a53",
+        "owner_type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
         "name": "身份证号",
         "technical_name": "id_card_no",
         "description": "",
         "value_kind": "string",
         "required": false,
-        "identifier": true,
+        "identifier": false,
         "unique": true,
         "synonyms": [],
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002521",
-        "owner_type_id": "00000000-0000-4000-8000-000000001503",
+        "id": "322336a6-dcde-56f0-90c1-32810c68fcc2",
+        "owner_type_id": "2d78ef0e-0315-5fee-9741-87876d06f8c1",
         "name": "统一社会信用代码",
         "technical_name": "credit_code",
         "description": "",
         "value_kind": "string",
         "required": false,
-        "identifier": true,
+        "identifier": false,
         "unique": true,
         "synonyms": [],
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002531",
-        "owner_type_id": "00000000-0000-4000-8000-000000001504",
+        "id": "3d3df591-ec80-57d1-b6ca-39a13a67d651",
+        "owner_type_id": "902d87c4-c78f-511c-88a5-ee50b303a935",
+        "name": "VIP说明",
+        "technical_name": "note",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "afe8fe5a-e964-5580-80e3-882adeb4274b",
+        "owner_type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
         "name": "合同编号",
         "technical_name": "contract_no",
         "description": "",
         "value_kind": "string",
-        "required": false,
+        "required": true,
         "identifier": true,
         "unique": true,
         "synonyms": [],
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000002532",
-        "owner_type_id": "00000000-0000-4000-8000-000000001504",
+        "id": "311890ac-eb17-56fb-8b5c-b3aeb04aef34",
+        "owner_type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
         "name": "金额",
         "technical_name": "amount",
         "description": "",
@@ -129,100 +260,590 @@
         "unique": false,
         "synonyms": [],
         "evidence": []
+      },
+      {
+        "id": "df12454d-96b7-5fb9-b2ac-ab14da4c6d46",
+        "owner_type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
+        "name": "签约当事人编号",
+        "technical_name": "signer_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "8f73cc06-ae28-5e87-8735-a5dffb4c2905",
+        "owner_type_id": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "name": "资产名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "7c7f3546-9be7-51c7-b07c-1a05ebf3b44b",
+        "owner_type_id": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "name": "负责人编号",
+        "technical_name": "responsible_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "7f07fce9-a67f-59bd-937a-91c55cc5668c",
+        "owner_type_id": "c77fc81f-c55b-5168-a6ab-496789de2e58",
+        "name": "设备编号",
+        "technical_name": "device_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "9a314204-5353-595b-8fd1-591c033fb5ce",
+        "owner_type_id": "e35178b4-d948-5b66-a9d3-29964add9055",
+        "name": "车辆编号",
+        "technical_name": "vehicle_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "1ea8ceaa-5906-5e63-8446-a50bce5d8b3d",
+        "owner_type_id": "a2da600a-3d76-500b-adce-54253a1b086b",
+        "name": "供应商编号",
+        "technical_name": "supplier_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "04c62954-285d-5901-9ffa-110e96c70cd0",
+        "owner_type_id": "a2da600a-3d76-500b-adce-54253a1b086b",
+        "name": "供应商名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "0dfcaf5a-c488-5b77-b1d2-0302f0c7fe30",
+        "owner_type_id": "518b4dc6-11d5-5dff-ac45-6ef7763548a5",
+        "name": "渠道商编号",
+        "technical_name": "partner_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "8e6330a7-b96c-5837-ae62-35dcfdd7083c",
+        "owner_type_id": "518b4dc6-11d5-5dff-ac45-6ef7763548a5",
+        "name": "渠道商名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002550",
+        "owner_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "name": "等级",
+        "technical_name": "level",
+        "description": "虚构场景明确提供的当事人等级，供 VIP 派生条件引用。",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
       }
     ],
     "link_types": [
       {
-        "id": "00000000-0000-4000-8000-000000003501",
+        "id": "f5a20122-2802-5022-bbbe-cf801014c448",
         "name": "签约方",
         "technical_name": "signer",
         "description": "",
-        "inverse_name": "签署的合同",
+        "inverse_name": null,
         "synonyms": [],
-        "source_type_id": "00000000-0000-4000-8000-000000001504",
-        "target_type_id": "00000000-0000-4000-8000-000000001501",
+        "source_type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
+        "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "df12454d-96b7-5fb9-b2ac-ab14da4c6d46"
+          ],
+          "target_property_ids": [
+            "8d008f70-5009-514b-86d8-c1d1d34d38bc"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "783bb6f0-3678-528e-8742-d0a615fdf33e",
+        "name": "联络人",
+        "technical_name": "contact",
+        "description": "子对象继承此关系及父表绑定，不另建关系。",
+        "inverse_name": null,
+        "synonyms": [],
+        "source_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "a9ffbfef-dbac-550c-bca3-56d6e1f8f606"
+          ],
+          "target_property_ids": [
+            "8d008f70-5009-514b-86d8-c1d1d34d38bc"
+          ]
+        },
+        "evidence": []
+      },
+      {
+        "id": "43ed6522-4af9-51ad-abc9-4a6c3959f508",
+        "name": "负责人",
+        "technical_name": "responsible_party",
+        "description": "虚拟父对象声明关系，具体子对象为同一关系 id 配置本地绑定。",
+        "inverse_name": null,
+        "synonyms": [],
+        "source_type_id": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
+        "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": null,
         "evidence": []
       }
     ],
-    "rules": [],
-    "actions": [],
+    "rules": [
+      {
+        "id": "afe8b809-35e8-5d05-9d22-e07925d32f88",
+        "name": "电话不能为空串",
+        "technical_name": "phone_not_empty",
+        "description": "个人、机构和VIP当事人继承此规则，引用由父表提供。",
+        "owner_kind": "property",
+        "owner_id": "dc161806-943a-5b13-9c61-aa75e5696b50",
+        "rule_kind": "constraint",
+        "expression": "party.phone IS NULL OR party.phone <> ''",
+        "evidence": []
+      }
+    ],
     "metrics": [
       {
-        "id": "00000000-0000-4000-8000-000000006501",
-        "name": "合同金额",
-        "technical_name": "contract_amount",
-        "description": "",
+        "id": "e2096ab6-9f37-5f6a-91b8-282036a9f24e",
+        "name": "个人数",
+        "technical_name": "person_count",
+        "description": "先以个人扩展表的存在确定成员，再数父来源中的个人实例。",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
-        "base_type_id": "00000000-0000-4000-8000-000000001504",
-        "aggregation": "sum",
-        "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002532"
-        },
+        "base_type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
+        "aggregation": "count",
+        "measure": null,
         "filters": [],
         "evidence": []
       }
     ],
+    "datasets": [
+      {
+        "id": "7878d71e-85c5-5366-b426-8cc2da54cb9e",
+        "name": "parties",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "parties",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "c45fdba8-a116-5789-b9ba-3347eb42f54f",
+        "name": "person_extensions",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "person_extensions",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "e7c2dc73-4e92-5fdd-8beb-ee2fa60faf7b",
+        "name": "organization_extensions",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "organization_extensions",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "de8f7866-5cbe-5e80-a3e8-c2e91301affc",
+        "name": "contracts",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "contracts",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "7c222e44-786e-515c-a1c7-0ebfd009d31d",
+        "name": "devices",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "devices",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "893849a0-07e2-5872-a6e7-bad11dc153ee",
+        "name": "vehicles",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "vehicles",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "3fc9b7ff-4975-52b2-80a0-985d20c0ba01",
+        "name": "suppliers",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "suppliers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "57c2e65c-7993-5cdb-ae1e-17067903cf29",
+        "name": "channel_partners",
+        "dialect": "mysql",
+        "schema_name": "inheritance_demo",
+        "table_name": "channel_partners",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      }
+    ],
     "mappings": [
       {
-        "id": "00000000-0000-4000-8000-000000007501",
-        "type_id": "00000000-0000-4000-8000-000000001502",
-        "connection_alias": "crm",
-        "table_name": "persons",
-        "schema_name": "crm",
-        "key_columns": [
-          "person_id"
+        "id": "9ddf3cbf-9a48-5b91-805e-dd0a795f4403",
+        "type_id": "84122398-d13b-5228-a634-5e1e1168a901",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "party_id"
+            ],
+            "dataset_id": "7878d71e-85c5-5366-b426-8cc2da54cb9e"
+          }
         ],
         "fields": {
-          "id_card_no": "id_card_no",
-          "name": "full_name",
-          "phone": "mobile"
+          "party_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "party_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "party_name"
+          },
+          "phone": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "phone"
+          },
+          "contact_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "contact_id"
+          },
+          "level": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "level"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "6e9fe1f6-d338-5a9a-8eac-860d77aca920",
+        "type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
+        "binding_mode": "shared_parent",
+        "sources": [
+          {
+            "id": "extension",
+            "key_columns": [
+              "party_id"
+            ],
+            "dataset_id": "c45fdba8-a116-5789-b9ba-3347eb42f54f"
+          }
+        ],
+        "fields": {
+          "id_card_no": {
+            "kind": "column",
+            "source_id": "extension",
+            "column": "id_card_no"
+          }
+        },
+        "membership_source_id": "extension",
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "1d104cc2-8edc-5712-a99f-b3b452030195",
+        "type_id": "2d78ef0e-0315-5fee-9741-87876d06f8c1",
+        "binding_mode": "shared_parent",
+        "sources": [
+          {
+            "id": "extension",
+            "key_columns": [
+              "party_id"
+            ],
+            "dataset_id": "e7c2dc73-4e92-5fdd-8beb-ee2fa60faf7b"
+          }
+        ],
+        "fields": {
+          "credit_code": {
+            "kind": "column",
+            "source_id": "extension",
+            "column": "credit_code"
+          }
+        },
+        "membership_source_id": "extension",
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "fb46f48c-77b4-5373-940e-4a65364eeaef",
+        "type_id": "902d87c4-c78f-511c-88a5-ee50b303a935",
+        "binding_mode": "shared_parent",
+        "sources": [],
+        "fields": {
+          "note": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "vip_note"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "43c9cd7f-c166-59bf-8147-0d6d63ed6a46",
+        "type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "contract_id"
+            ],
+            "dataset_id": "de8f7866-5cbe-5e80-a3e8-c2e91301affc"
+          }
+        ],
+        "fields": {
+          "contract_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "contract_id"
+          },
+          "amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "amount"
+          },
+          "signer_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "signer_id"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "23755092-83cb-513c-a5a0-a062b4b83e98",
+        "type_id": "c77fc81f-c55b-5168-a6ab-496789de2e58",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "device_id"
+            ],
+            "dataset_id": "7c222e44-786e-515c-a1c7-0ebfd009d31d"
+          }
+        ],
+        "fields": {
+          "device_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "device_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "device_name"
+          },
+          "responsible_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "responsible_id"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {
+          "43ed6522-4af9-51ad-abc9-4a6c3959f508": {
+            "kind": "direct",
+            "source_property_ids": [
+              "7c7f3546-9be7-51c7-b07c-1a05ebf3b44b"
+            ],
+            "target_property_ids": [
+              "8d008f70-5009-514b-86d8-c1d1d34d38bc"
+            ]
+          }
         }
       },
       {
-        "id": "00000000-0000-4000-8000-000000007502",
-        "type_id": "00000000-0000-4000-8000-000000001503",
-        "connection_alias": "crm",
-        "table_name": "organizations",
-        "schema_name": "crm",
-        "key_columns": [
-          "org_id"
+        "id": "9ca39331-a580-5947-aef9-a6a6d6eb541f",
+        "type_id": "e35178b4-d948-5b66-a9d3-29964add9055",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "vehicle_id"
+            ],
+            "dataset_id": "893849a0-07e2-5872-a6e7-bad11dc153ee"
+          }
         ],
         "fields": {
-          "credit_code": "credit_code",
-          "name": "org_name",
-          "phone": "tel"
+          "vehicle_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "vehicle_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "vehicle_name"
+          },
+          "responsible_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "responsible_id"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {
+          "43ed6522-4af9-51ad-abc9-4a6c3959f508": {
+            "kind": "direct",
+            "source_property_ids": [
+              "7c7f3546-9be7-51c7-b07c-1a05ebf3b44b"
+            ],
+            "target_property_ids": [
+              "8d008f70-5009-514b-86d8-c1d1d34d38bc"
+            ]
+          }
         }
       },
       {
-        "id": "00000000-0000-4000-8000-000000007503",
-        "type_id": "00000000-0000-4000-8000-000000001504",
-        "connection_alias": "crm",
-        "table_name": "contracts",
-        "schema_name": "crm",
-        "key_columns": [
-          "contract_id"
+        "id": "f3a4f071-6959-5546-8efd-2d24bb6123bc",
+        "type_id": "a2da600a-3d76-500b-adce-54253a1b086b",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "supplier_id"
+            ],
+            "dataset_id": "3fc9b7ff-4975-52b2-80a0-985d20c0ba01"
+          }
         ],
         "fields": {
-          "contract_no": "contract_id",
-          "amount": "amount"
-        }
+          "supplier_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "supplier_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "supplier_name"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "731eea3a-fc6b-5533-a7a5-29cedd54470c",
+        "type_id": "518b4dc6-11d5-5dff-ac45-6ef7763548a5",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "partner_id"
+            ],
+            "dataset_id": "57c2e65c-7993-5cdb-ae1e-17067903cf29"
+          }
+        ],
+        "fields": {
+          "partner_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "partner_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "partner_name"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [
       {
         "id": "00000000-0000-4000-8000-000000008501",
-        "type_id": "00000000-0000-4000-8000-000000001502",
-        "name": "张三",
+        "type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
         "values": {
           "name": "张三",
           "id_card_no": null,
-          "phone": "13800000000"
+          "phone": "13800000000",
+          "party_no": "P-001"
         },
         "evidence": [
           {
@@ -241,11 +862,11 @@
       },
       {
         "id": "00000000-0000-4000-8000-000000008502",
-        "type_id": "00000000-0000-4000-8000-000000001504",
-        "name": "HT-2026-001",
+        "type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
         "values": {
           "contract_no": "HT-2026-001",
-          "amount": 120000
+          "amount": 120000,
+          "signer_no": "P-001"
         },
         "evidence": [
           {
@@ -266,7 +887,7 @@
     "material_links": [
       {
         "id": "00000000-0000-4000-8000-000000008551",
-        "type_id": "00000000-0000-4000-8000-000000003501",
+        "type_id": "f5a20122-2802-5022-bbbe-cf801014c448",
         "source_id": "00000000-0000-4000-8000-000000008502",
         "target_id": "00000000-0000-4000-8000-000000008501",
         "evidence": [

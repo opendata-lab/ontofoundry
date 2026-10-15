@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001402",
@@ -23,8 +25,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001403",
@@ -33,8 +37,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001404",
@@ -43,8 +49,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -166,14 +174,20 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "employee_id"
           ],
           "target_columns": [
             "manager_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "ea651ca1-1168-5a16-b739-7fdcb55416a4"
         },
         "evidence": []
       },
@@ -189,14 +203,20 @@
         "multiplicity": "one_to_one",
         "tags": [],
         "data_join": {
-          "table_name": "desks",
-          "schema_name": "hr",
           "source_columns": [
             "employee_id"
           ],
           "target_columns": [
             "desk_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "d5ea21d1-29fd-5928-986f-bf4334306a43"
         },
         "evidence": []
       },
@@ -212,14 +232,20 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "trade_id"
           ],
           "target_columns": [
             "buyer_code"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd"
         },
         "evidence": []
       },
@@ -235,20 +261,25 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "trade_id"
           ],
           "target_columns": [
             "seller_code"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd"
         },
         "evidence": []
       }
     ],
     "rules": [],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006401",
@@ -257,7 +288,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001404",
         "aggregation": "sum",
         "measure": {
@@ -268,7 +298,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003403"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003403",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002422"
             },
@@ -287,7 +320,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001404",
         "aggregation": "sum",
         "measure": {
@@ -298,7 +330,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003403"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003403",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002422"
             },
@@ -310,7 +345,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003404"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003404",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002422"
             },
@@ -329,7 +367,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001401",
         "aggregation": "count",
         "measure": null,
@@ -337,7 +374,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003401"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003401",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002401"
             },
@@ -354,7 +394,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001401",
         "aggregation": "count",
         "measure": null,
@@ -362,7 +401,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003402"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003402",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002412"
             },
@@ -373,64 +415,197 @@
           }
         ],
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006490",
+        "name": "未使用工位数",
+        "technical_name": "unused_desk_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "base_type_id": "00000000-0000-4000-8000-000000001402",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "path": {
+              "links": [
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003402",
+                  "direction": "reverse"
+                }
+              ],
+              "property_id": "00000000-0000-4000-8000-000000002401"
+            },
+            "operator": "is_null",
+            "values": []
+          }
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006491",
+        "name": "华东买方向华南卖方交易金额表达式",
+        "technical_name": "east_to_south_expression",
+        "description": "买方华东且卖方华南的一笔100元交易应得100；降到同一companies.region会变0。导出不能保留角色时报本项error，不能输出错误表达式。",
+        "synonyms": [],
+        "kind": "expression",
+        "base_type_id": "00000000-0000-4000-8000-000000001404",
+        "value_kind": "decimal",
+        "expression": "SUM(CASE WHEN trade.buyer.region = '华东' AND trade.seller.region = '华南' THEN trade.amount ELSE 0 END)",
+        "evidence": []
+      }
+    ],
+    "datasets": [
+      {
+        "id": "ea651ca1-1168-5a16-b739-7fdcb55416a4",
+        "name": "employees",
+        "dialect": "mysql",
+        "schema_name": "hr",
+        "table_name": "employees",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "d5ea21d1-29fd-5928-986f-bf4334306a43",
+        "name": "desks",
+        "dialect": "mysql",
+        "schema_name": "hr",
+        "table_name": "desks",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "3a1a2def-496c-5823-9a24-809d9aba76d9",
+        "name": "companies",
+        "dialect": "mysql",
+        "schema_name": "mkt",
+        "table_name": "companies",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "9d1e3753-885a-5f86-b85a-229d13055cbd",
+        "name": "trades",
+        "dialect": "mysql",
+        "schema_name": "mkt",
+        "table_name": "trades",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
       }
     ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007401",
         "type_id": "00000000-0000-4000-8000-000000001401",
-        "connection_alias": "hr_db",
-        "table_name": "employees",
-        "schema_name": "hr",
-        "key_columns": [
-          "employee_id"
-        ],
         "fields": {
-          "employee_no": "employee_id",
-          "name": "name"
-        }
+          "employee_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "employee_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "employee_id"
+            ],
+            "dataset_id": "ea651ca1-1168-5a16-b739-7fdcb55416a4"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007402",
         "type_id": "00000000-0000-4000-8000-000000001402",
-        "connection_alias": "hr_db",
-        "table_name": "desks",
-        "schema_name": "hr",
-        "key_columns": [
-          "desk_id"
-        ],
         "fields": {
-          "desk_no": "desk_id",
-          "floor": "floor"
-        }
+          "desk_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "desk_id"
+          },
+          "floor": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "floor"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "desk_id"
+            ],
+            "dataset_id": "d5ea21d1-29fd-5928-986f-bf4334306a43"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007403",
         "type_id": "00000000-0000-4000-8000-000000001403",
-        "connection_alias": "trade_db",
-        "table_name": "companies",
-        "schema_name": "mkt",
-        "key_columns": [
-          "credit_code"
-        ],
         "fields": {
-          "credit_code": "credit_code",
-          "region": "region"
-        }
+          "credit_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "credit_code"
+          },
+          "region": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "region"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "credit_code"
+            ],
+            "dataset_id": "3a1a2def-496c-5823-9a24-809d9aba76d9"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007404",
         "type_id": "00000000-0000-4000-8000-000000001404",
-        "connection_alias": "trade_db",
-        "table_name": "trades",
-        "schema_name": "mkt",
-        "key_columns": [
-          "trade_id"
-        ],
         "fields": {
-          "trade_no": "trade_id",
-          "amount": "amount"
-        }
+          "trade_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "trade_id"
+          },
+          "amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "amount"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "trade_id"
+            ],
+            "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

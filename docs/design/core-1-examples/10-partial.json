@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001902",
@@ -23,8 +25,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -85,7 +89,6 @@
       }
     ],
     "rules": [],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006901",
@@ -94,7 +97,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001901",
         "aggregation": "sum",
         "measure": {
@@ -105,20 +107,45 @@
         "evidence": []
       }
     ],
+    "datasets": [
+      {
+        "id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8",
+        "name": "stores",
+        "dialect": "mysql",
+        "schema_name": null,
+        "table_name": "stores",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      }
+    ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007901",
         "type_id": "00000000-0000-4000-8000-000000001901",
-        "connection_alias": "retail_db",
-        "table_name": "stores",
-        "schema_name": null,
-        "key_columns": [
-          "store_code"
-        ],
         "fields": {
-          "store_code": "store_code",
-          "area": "area"
-        }
+          "store_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "store_code"
+          },
+          "area": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "area"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "store_code"
+            ],
+            "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001102",
@@ -23,8 +25,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001103",
@@ -33,8 +37,10 @@
         "description": "学生选修课程的一条记录，带成绩",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -169,14 +175,20 @@
         "multiplicity": "many_to_many",
         "tags": [],
         "data_join": {
-          "table_name": "enrollments",
-          "schema_name": "edu",
           "source_columns": [
             "student_id"
           ],
           "target_columns": [
             "course_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
         "evidence": []
       },
@@ -192,15 +204,21 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "student_id",
             "course_id"
           ],
           "target_columns": [
             "student_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
         "evidence": []
       },
@@ -216,21 +234,26 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "student_id",
             "course_id"
           ],
           "target_columns": [
             "course_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
         "evidence": []
       }
     ],
     "rules": [],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006101",
@@ -239,7 +262,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001103",
         "aggregation": "avg",
         "measure": {
@@ -256,7 +278,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001103",
         "aggregation": "count",
         "measure": null,
@@ -270,7 +291,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001103",
         "aggregation": "count",
         "measure": null,
@@ -278,7 +298,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003103"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003103",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002113"
             },
@@ -291,52 +314,135 @@
         "evidence": []
       }
     ],
+    "datasets": [
+      {
+        "id": "7b1e836b-1d99-5fec-a632-578de95b5d64",
+        "name": "students",
+        "dialect": "mysql",
+        "schema_name": "edu",
+        "table_name": "students",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "a34b0f35-6332-552a-9fe6-3cfd01952d89",
+        "name": "courses",
+        "dialect": "mysql",
+        "schema_name": "edu",
+        "table_name": "courses",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "58d9eae4-7d13-5946-bf56-53576e3ae72f",
+        "name": "enrollments",
+        "dialect": "mysql",
+        "schema_name": "edu",
+        "table_name": "enrollments",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      }
+    ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007101",
         "type_id": "00000000-0000-4000-8000-000000001101",
-        "connection_alias": "school_db",
-        "table_name": "students",
-        "schema_name": "edu",
-        "key_columns": [
-          "student_id"
-        ],
         "fields": {
-          "student_no": "student_id",
-          "name": "name"
-        }
+          "student_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "student_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "student_id"
+            ],
+            "dataset_id": "7b1e836b-1d99-5fec-a632-578de95b5d64"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007102",
         "type_id": "00000000-0000-4000-8000-000000001102",
-        "connection_alias": "school_db",
-        "table_name": "courses",
-        "schema_name": "edu",
-        "key_columns": [
-          "course_id"
-        ],
         "fields": {
-          "course_no": "course_id",
-          "title": "title",
-          "credit": "credit"
-        }
+          "course_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "course_id"
+          },
+          "title": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "title"
+          },
+          "credit": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "credit"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "course_id"
+            ],
+            "dataset_id": "a34b0f35-6332-552a-9fe6-3cfd01952d89"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007103",
         "type_id": "00000000-0000-4000-8000-000000001103",
-        "connection_alias": "school_db",
-        "table_name": "enrollments",
-        "schema_name": "edu",
-        "key_columns": [
-          "student_id",
-          "course_id"
-        ],
         "fields": {
-          "student_no": "student_id",
-          "course_no": "course_id",
-          "score": "score",
-          "enrolled_on": "enrolled_on"
-        }
+          "student_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "student_id"
+          },
+          "course_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "course_id"
+          },
+          "score": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "score"
+          },
+          "enrolled_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "enrolled_on"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "student_id",
+              "course_id"
+            ],
+            "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

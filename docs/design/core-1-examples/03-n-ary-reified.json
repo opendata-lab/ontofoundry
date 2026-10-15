@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001202",
@@ -23,8 +25,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001203",
@@ -33,19 +37,21 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001204",
         "name": "供货记录",
         "technical_name": "supply",
-        "description": "供应商向项目供应零件的一条记录（由 Ossie 多元关系 supplier.supplies 转换）",
+        "description": "由 Ossie supplier.supplies ManyToOne 重化，角色依次为供应商、零件、项目、数量；前三个角色决定最后的数量。供货日期为另行补充的属性，不参与元组标识。",
         "synonyms": [
           "供货"
         ],
         "tags": [],
-        "extends": [],
+        "extends": null,
         "evidence": [
           {
             "kind": "material",
@@ -59,7 +65,9 @@
             },
             "quote": "\"name\": \"supplies\""
           }
-        ]
+        ],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -145,8 +153,8 @@
         "id": "00000000-0000-4000-8000-000000002233",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
         "name": "供应商编码",
-        "technical_name": "supplier_code",
-        "description": "",
+        "technical_name": "supplier_supplier_code",
+        "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
@@ -158,8 +166,8 @@
         "id": "00000000-0000-4000-8000-000000002234",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
         "name": "零件号",
-        "technical_name": "part_no",
-        "description": "",
+        "technical_name": "part_part_no",
+        "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
@@ -171,8 +179,8 @@
         "id": "00000000-0000-4000-8000-000000002235",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
         "name": "项目编码",
-        "technical_name": "project_code",
-        "description": "",
+        "technical_name": "project_project_code",
+        "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
@@ -220,15 +228,12 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
-          "source_columns": [
-            "supplier_id",
-            "part_id",
-            "project_id"
+          "kind": "direct",
+          "source_property_ids": [
+            "00000000-0000-4000-8000-000000002233"
           ],
-          "target_columns": [
-            "supplier_id"
+          "target_property_ids": [
+            "00000000-0000-4000-8000-000000002201"
           ]
         },
         "evidence": []
@@ -245,15 +250,12 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
-          "source_columns": [
-            "supplier_id",
-            "part_id",
-            "project_id"
+          "kind": "direct",
+          "source_property_ids": [
+            "00000000-0000-4000-8000-000000002234"
           ],
-          "target_columns": [
-            "part_id"
+          "target_property_ids": [
+            "00000000-0000-4000-8000-000000002211"
           ]
         },
         "evidence": []
@@ -270,15 +272,12 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
-          "source_columns": [
-            "supplier_id",
-            "part_id",
-            "project_id"
+          "kind": "direct",
+          "source_property_ids": [
+            "00000000-0000-4000-8000-000000002235"
           ],
-          "target_columns": [
-            "project_id"
+          "target_property_ids": [
+            "00000000-0000-4000-8000-000000002221"
           ]
         },
         "evidence": []
@@ -289,24 +288,33 @@
         "id": "00000000-0000-4000-8000-000000004201",
         "name": "数量为正",
         "technical_name": "positive_quantity",
-        "description": "",
+        "description": "来自值类型“正数量”自身约束：数量>0，按变量绑定改写到多元值角色 quantity。",
         "owner_kind": "property",
         "owner_id": "00000000-0000-4000-8000-000000002231",
         "rule_kind": "constraint",
         "expression": "supply.quantity > 0",
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000004202",
+        "name": "数量非负",
+        "technical_name": "nonnegative_quantity",
+        "description": "来自“正数量”的祖先值类型“数量”的约束：数量>=0，按变量绑定实例化。",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002231",
+        "rule_kind": "constraint",
+        "expression": "supply.quantity >= 0",
+        "evidence": []
       }
     ],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006201",
-        "name": "深圳机场项目供货量",
-        "technical_name": "szx_supply_quantity",
+        "name": "示例项目甲供货量",
+        "technical_name": "project_a_supply_quantity",
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001204",
         "aggregation": "sum",
         "measure": {
@@ -317,13 +325,16 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003203"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003203",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002222"
             },
             "operator": "eq",
             "values": [
-              "深圳机场项目"
+              "示例项目甲"
             ]
           }
         ],
@@ -336,12 +347,14 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001204",
         "aggregation": "count_distinct",
         "measure": {
           "links": [
-            "00000000-0000-4000-8000-000000003201"
+            {
+              "link_type_id": "00000000-0000-4000-8000-000000003201",
+              "direction": "forward"
+            }
           ],
           "property_id": "00000000-0000-4000-8000-000000002201"
         },
@@ -349,67 +362,173 @@
         "evidence": []
       }
     ],
+    "datasets": [
+      {
+        "id": "09a47e11-8c07-5f2f-a4f2-42b418ae9760",
+        "name": "suppliers",
+        "dialect": "mysql",
+        "schema_name": "scm",
+        "table_name": "suppliers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "46d14171-aab1-5f09-ae32-411724292ebe",
+        "name": "parts",
+        "dialect": "mysql",
+        "schema_name": "scm",
+        "table_name": "parts",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "77c0c4f2-c3bc-5250-9492-736fa774214a",
+        "name": "projects",
+        "dialect": "mysql",
+        "schema_name": "scm",
+        "table_name": "projects",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
+        "name": "supplies",
+        "dialect": "mysql",
+        "schema_name": "scm",
+        "table_name": "supplies",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      }
+    ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007201",
         "type_id": "00000000-0000-4000-8000-000000001201",
-        "connection_alias": "erp",
-        "table_name": "suppliers",
-        "schema_name": "scm",
-        "key_columns": [
-          "supplier_id"
-        ],
         "fields": {
-          "supplier_code": "supplier_id",
-          "name": "name"
-        }
+          "supplier_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "supplier_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "supplier_id"
+            ],
+            "dataset_id": "09a47e11-8c07-5f2f-a4f2-42b418ae9760"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007202",
         "type_id": "00000000-0000-4000-8000-000000001202",
-        "connection_alias": "erp",
-        "table_name": "parts",
-        "schema_name": "scm",
-        "key_columns": [
-          "part_id"
-        ],
         "fields": {
-          "part_no": "part_id",
-          "name": "name"
-        }
+          "part_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "part_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "part_id"
+            ],
+            "dataset_id": "46d14171-aab1-5f09-ae32-411724292ebe"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007203",
         "type_id": "00000000-0000-4000-8000-000000001203",
-        "connection_alias": "erp",
-        "table_name": "projects",
-        "schema_name": "scm",
-        "key_columns": [
-          "project_id"
-        ],
         "fields": {
-          "project_code": "project_id",
-          "name": "name"
-        }
+          "project_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "project_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "project_id"
+            ],
+            "dataset_id": "77c0c4f2-c3bc-5250-9492-736fa774214a"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007204",
         "type_id": "00000000-0000-4000-8000-000000001204",
-        "connection_alias": "erp",
-        "table_name": "supplies",
-        "schema_name": "scm",
-        "key_columns": [
-          "supplier_id",
-          "part_id",
-          "project_id"
-        ],
         "fields": {
-          "supplier_code": "supplier_id",
-          "part_no": "part_id",
-          "project_code": "project_id",
-          "quantity": "qty",
-          "supplied_on": "supplied_on"
-        }
+          "supplier_supplier_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "supplier_id"
+          },
+          "part_part_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "part_id"
+          },
+          "project_project_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "project_id"
+          },
+          "quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          },
+          "supplied_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "supplied_on"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "supplier_id",
+              "part_id",
+              "project_id"
+            ],
+            "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

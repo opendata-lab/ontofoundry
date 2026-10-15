@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001702",
@@ -23,8 +25,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001703",
@@ -33,7 +37,21 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001704",
+        "name": "退款",
+        "technical_name": "refund",
+        "description": "使用正金额值类型的退款；无物理绑定时仍可保存属性约束语义。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "derived_by": [],
+        "title_property_id": null,
         "evidence": []
       }
     ],
@@ -141,6 +159,19 @@
         "unique": false,
         "synonyms": [],
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002731",
+        "owner_type_id": "00000000-0000-4000-8000-000000001704",
+        "name": "退款金额",
+        "technical_name": "amount",
+        "description": "正金额继承金额，基础类型为 decimal。",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
       }
     ],
     "link_types": [
@@ -197,17 +228,6 @@
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000004703",
-        "name": "客户等级划分",
-        "technical_name": "level_rule",
-        "description": "",
-        "owner_kind": "property",
-        "owner_id": "00000000-0000-4000-8000-000000002723",
-        "rule_kind": "derivation",
-        "expression": "CASE WHEN customer.total_spent >= 100000 THEN '金牌' WHEN customer.total_spent >= 10000 THEN '银牌' ELSE '普通' END",
-        "evidence": []
-      },
-      {
         "id": "00000000-0000-4000-8000-000000004704",
         "name": "订单必须有客户",
         "technical_name": "order_has_customer",
@@ -219,71 +239,85 @@
         "evidence": []
       },
       {
-        "id": "00000000-0000-4000-8000-000000004705",
-        "name": "只能完成已支付订单",
-        "technical_name": "paid_only",
-        "description": "",
-        "owner_kind": "action",
-        "owner_id": "00000000-0000-4000-8000-000000005701",
+        "id": "00000000-0000-4000-8000-000000004706",
+        "name": "订单金额非负",
+        "technical_name": "value_constraint_4706",
+        "description": "来自值类型“金额”的约束：金额>=0。",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002703",
         "rule_kind": "constraint",
-        "expression": "sales_order.status = '已支付'",
+        "expression": "sales_order.amount >= 0",
         "evidence": []
-      }
-    ],
-    "actions": [
+      },
       {
-        "id": "00000000-0000-4000-8000-000000005701",
-        "name": "完成订单",
-        "technical_name": "complete_order",
-        "description": "把已支付订单标记为已完成",
-        "input_type_id": "00000000-0000-4000-8000-000000001701",
-        "parameters": [
-          {
-            "id": "00000000-0000-4000-8000-000000005711",
-            "name": "完成时间",
-            "technical_name": "completed_at",
-            "value_kind": "datetime",
-            "required": true
-          },
-          {
-            "id": "00000000-0000-4000-8000-000000005712",
-            "name": "经办人工号",
-            "technical_name": "employee_no",
-            "value_kind": "string",
-            "required": false
-          }
-        ],
-        "precondition_rule_ids": [
-          "00000000-0000-4000-8000-000000004705"
-        ],
-        "effects": [
-          {
-            "id": "00000000-0000-4000-8000-000000005721",
-            "kind": "set_property",
-            "property_id": "00000000-0000-4000-8000-000000002702",
-            "link_type_id": null,
-            "expression": "'已完成'"
-          },
-          {
-            "id": "00000000-0000-4000-8000-000000005722",
-            "kind": "set_property",
-            "property_id": "00000000-0000-4000-8000-000000002704",
-            "link_type_id": null,
-            "expression": ":completed_at"
-          },
-          {
-            "id": "00000000-0000-4000-8000-000000005723",
-            "kind": "create_link",
-            "property_id": null,
-            "link_type_id": "00000000-0000-4000-8000-000000003702",
-            "expression": ":employee_no"
-          }
-        ],
+        "id": "00000000-0000-4000-8000-000000004707",
+        "name": "退款金额非负",
+        "technical_name": "value_constraint_4707",
+        "description": "来自正金额的祖先值类型“金额”的约束：金额>=0。",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002731",
+        "rule_kind": "constraint",
+        "expression": "refund.amount >= 0",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000004708",
+        "name": "退款金额为正",
+        "technical_name": "value_constraint_4708",
+        "description": "来自值类型“正金额”的自身约束：正金额>0。",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002731",
+        "rule_kind": "constraint",
+        "expression": "refund.amount > 0",
         "evidence": []
       }
     ],
     "metrics": [],
-    "mappings": [],
+    "datasets": [
+      {
+        "id": "232a8c9f-f43a-5028-b741-b0326cb14038",
+        "name": "customers",
+        "dialect": "mysql",
+        "schema_name": "crm",
+        "table_name": "customers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007790",
+        "type_id": "00000000-0000-4000-8000-000000001703",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "customer_id"
+            ],
+            "dataset_id": "232a8c9f-f43a-5028-b741-b0326cb14038"
+          }
+        ],
+        "fields": {
+          "customer_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_no"
+          },
+          "total_spent": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "total_spent"
+          },
+          "level": {
+            "kind": "expression",
+            "expression": "CASE WHEN main.total_spent >= 100000 THEN '金牌' WHEN main.total_spent >= 10000 THEN '银牌' ELSE '普通' END"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
     "material_objects": [],
     "material_links": []
   }

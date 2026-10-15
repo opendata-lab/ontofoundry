@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001302",
@@ -23,8 +25,10 @@
         "description": "订单中的一行，由订单 + 行号标识",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001303",
@@ -33,8 +37,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001304",
@@ -43,8 +49,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -177,6 +185,19 @@
         "unique": false,
         "synonyms": [],
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002330",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "明细金额",
+        "technical_name": "line_amount",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
       }
     ],
     "link_types": [
@@ -192,15 +213,21 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "order_id",
             "line_no"
           ],
           "target_columns": [
             "order_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
         },
         "evidence": []
       },
@@ -216,15 +243,21 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "order_id",
             "line_no"
           ],
           "target_columns": [
             "sku"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
         },
         "evidence": []
       },
@@ -240,21 +273,26 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "shipment_id"
           ],
           "target_columns": [
             "order_id",
             "line_no"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6"
         },
         "evidence": []
       }
     ],
     "rules": [],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006301",
@@ -263,7 +301,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001302",
         "aggregation": "sum",
         "measure": {
@@ -274,7 +311,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003301"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003301",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002302"
             },
@@ -293,7 +333,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001302",
         "aggregation": "sum",
         "measure": {
@@ -304,7 +343,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003302"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003302",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002322"
             },
@@ -323,7 +365,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001304",
         "aggregation": "count",
         "measure": null,
@@ -331,8 +372,14 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003303",
-                "00000000-0000-4000-8000-000000003301"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003303",
+                  "direction": "forward"
+                },
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003301",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002302"
             },
@@ -343,67 +390,189 @@
           }
         ],
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006330",
+        "name": "明细销售额",
+        "technical_name": "line_sales_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "base_type_id": "00000000-0000-4000-8000-000000001302",
+        "aggregation": "sum",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002330"
+        },
+        "filters": [],
+        "evidence": []
+      }
+    ],
+    "datasets": [
+      {
+        "id": "2f17e28b-ca84-5a54-a683-9c439a10f6ca",
+        "name": "orders",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "orders",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+        "name": "order_lines",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "order_lines",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "03785b10-53fc-5d05-9c8b-4d55e139104d",
+        "name": "products",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "products",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "1cf49f63-2949-534c-8821-3514c9314ac6",
+        "name": "shipments",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "shipments",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
       }
     ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007301",
         "type_id": "00000000-0000-4000-8000-000000001301",
-        "connection_alias": "sales_db",
-        "table_name": "orders",
-        "schema_name": "dw",
-        "key_columns": [
-          "order_id"
-        ],
         "fields": {
-          "order_no": "order_id",
-          "status": "status"
-        }
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id"
+            ],
+            "dataset_id": "2f17e28b-ca84-5a54-a683-9c439a10f6ca"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007302",
         "type_id": "00000000-0000-4000-8000-000000001302",
-        "connection_alias": "sales_db",
-        "table_name": "order_lines",
-        "schema_name": "dw",
-        "key_columns": [
-          "order_id",
-          "line_no"
-        ],
         "fields": {
-          "order_no": "order_id",
-          "line_no": "line_no",
-          "quantity": "qty",
-          "unit_price": "unit_price"
-        }
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "line_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "line_no"
+          },
+          "quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          },
+          "unit_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "unit_price"
+          },
+          "line_amount": {
+            "kind": "expression",
+            "expression": "main.qty * main.unit_price"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id",
+              "line_no"
+            ],
+            "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007303",
         "type_id": "00000000-0000-4000-8000-000000001303",
-        "connection_alias": "sales_db",
-        "table_name": "products",
-        "schema_name": "dw",
-        "key_columns": [
-          "sku"
-        ],
         "fields": {
-          "sku": "sku",
-          "category": "category"
-        }
+          "sku": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "sku"
+          },
+          "category": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "category"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "sku"
+            ],
+            "dataset_id": "03785b10-53fc-5d05-9c8b-4d55e139104d"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007304",
         "type_id": "00000000-0000-4000-8000-000000001304",
-        "connection_alias": "sales_db",
-        "table_name": "shipments",
-        "schema_name": "dw",
-        "key_columns": [
-          "shipment_id"
-        ],
         "fields": {
-          "shipment_no": "shipment_id",
-          "shipped_at": "shipped_at"
-        }
+          "shipment_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipment_id"
+          },
+          "shipped_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipped_at"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "shipment_id"
+            ],
+            "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

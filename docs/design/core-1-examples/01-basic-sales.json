@@ -18,22 +18,26 @@
         "tags": [
           "核心"
         ],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001002",
         "name": "订单",
         "technical_name": "sales_order",
-        "description": "客户的一次下单",
+        "description": "客户的一次下单\n\n采用指标时保留其固定过滤；完成率的已完成条件仅作用于分子。",
         "synonyms": [
           "销售单"
         ],
         "tags": [
           "核心"
         ],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": "00000000-0000-4000-8000-000000002011",
+        "derived_by": []
       }
     ],
     "properties": [
@@ -162,14 +166,20 @@
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": {
-          "table_name": null,
-          "schema_name": null,
           "source_columns": [
             "order_id"
           ],
           "target_columns": [
             "customer_id"
-          ]
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
         },
         "evidence": []
       }
@@ -198,7 +208,6 @@
         "evidence": []
       }
     ],
-    "actions": [],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006001",
@@ -210,7 +219,6 @@
           "营收"
         ],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "sum",
         "measure": {
@@ -227,7 +235,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count",
         "measure": null,
@@ -241,7 +248,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count",
         "measure": null,
@@ -266,7 +272,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "sum",
         "measure": {
@@ -277,7 +282,10 @@
           {
             "path": {
               "links": [
-                "00000000-0000-4000-8000-000000003001"
+                {
+                  "link_type_id": "00000000-0000-4000-8000-000000003001",
+                  "direction": "forward"
+                }
               ],
               "property_id": "00000000-0000-4000-8000-000000002003"
             },
@@ -296,12 +304,14 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "integer",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count_distinct",
         "measure": {
           "links": [
-            "00000000-0000-4000-8000-000000003001"
+            {
+              "link_type_id": "00000000-0000-4000-8000-000000003001",
+              "direction": "forward"
+            }
           ],
           "property_id": "00000000-0000-4000-8000-000000002001"
         },
@@ -315,7 +325,6 @@
         "description": "订单金额 ÷ 下单客户数",
         "synonyms": [],
         "kind": "ratio",
-        "value_kind": "decimal",
         "numerator_id": "00000000-0000-4000-8000-000000006001",
         "denominator_id": "00000000-0000-4000-8000-000000006005",
         "evidence": []
@@ -327,7 +336,6 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "value_kind": "decimal",
         "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "sum",
         "measure": {
@@ -340,10 +348,19 @@
               "links": [],
               "property_id": "00000000-0000-4000-8000-000000002014"
             },
-            "operator": "between",
+            "operator": "ge",
             "values": [
-              "2026-01-01T00:00:00",
-              "2026-03-31T23:59:59"
+              "2026-01-01T00:00:00"
+            ]
+          },
+          {
+            "path": {
+              "links": [],
+              "property_id": "00000000-0000-4000-8000-000000002014"
+            },
+            "operator": "lt",
+            "values": [
+              "2026-04-01T00:00:00"
             ]
           },
           {
@@ -359,40 +376,155 @@
           }
         ],
         "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006098",
+        "name": "完成率",
+        "technical_name": "completion_rate",
+        "description": "已完成订单数 / 全部订单数；分子过滤不得放公共 WHERE",
+        "synonyms": [],
+        "kind": "ratio",
+        "numerator_id": "00000000-0000-4000-8000-000000006003",
+        "denominator_id": "00000000-0000-4000-8000-000000006002",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006697",
+        "name": "订单金额中位数",
+        "technical_name": "median_order_amount",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "kind": "simple",
+        "aggregation": "median",
+        "measure": {
+          "links": [],
+          "property_id": "00000000-0000-4000-8000-000000002012"
+        },
+        "filters": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006698",
+        "name": "拼接订单状态去重数",
+        "technical_name": "distinct_order_status_pairs",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "kind": "expression",
+        "expression": "COUNT(DISTINCT sales_order.order_no || '::' || sales_order.status)",
+        "value_kind": "integer",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006699",
+        "name": "有效金额表达式",
+        "technical_name": "eligible_amount_expression",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "base_type_id": "00000000-0000-4000-8000-000000001002",
+        "kind": "expression",
+        "expression": "SUM(CASE WHEN sales_order.status = '已完成' OR sales_order.status = '已发货' THEN sales_order.amount ELSE 0 END)",
+        "value_kind": "decimal",
+        "evidence": []
+      }
+    ],
+    "datasets": [
+      {
+        "id": "bf62129a-8cb8-569a-806b-c8ae68eef7a0",
+        "name": "customers",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "customers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
+      },
+      {
+        "id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "orders",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "orders",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null
       }
     ],
     "mappings": [
       {
         "id": "00000000-0000-4000-8000-000000007001",
         "type_id": "00000000-0000-4000-8000-000000001001",
-        "connection_alias": "sales_db",
-        "table_name": "customers",
-        "schema_name": "dw",
-        "key_columns": [
-          "customer_id"
-        ],
         "fields": {
-          "customer_no": "customer_id",
-          "name": "name",
-          "region": "region",
-          "signed_on": "signed_on"
-        }
+          "customer_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          },
+          "region": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "region"
+          },
+          "signed_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "signed_on"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "customer_id"
+            ],
+            "dataset_id": "bf62129a-8cb8-569a-806b-c8ae68eef7a0"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       },
       {
         "id": "00000000-0000-4000-8000-000000007002",
         "type_id": "00000000-0000-4000-8000-000000001002",
-        "connection_alias": "sales_db",
-        "table_name": "orders",
-        "schema_name": "dw",
-        "key_columns": [
-          "order_id"
-        ],
         "fields": {
-          "order_no": "order_id",
-          "amount": "amount",
-          "status": "status",
-          "ordered_at": "created_at"
-        }
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "amount"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          },
+          "ordered_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "created_at"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id"
+            ],
+            "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
       }
     ],
     "material_objects": [],

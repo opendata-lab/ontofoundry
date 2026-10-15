@@ -13,8 +13,10 @@
         "description": "",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       },
       {
         "id": "00000000-0000-4000-8000-000000001602",
@@ -23,8 +25,10 @@
         "description": "客户提交的退货登记",
         "synonyms": [],
         "tags": [],
-        "extends": [],
-        "evidence": []
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
       }
     ],
     "properties": [
@@ -137,14 +141,13 @@
       }
     ],
     "rules": [],
-    "actions": [],
     "metrics": [],
+    "datasets": [],
     "mappings": [],
     "material_objects": [
       {
         "id": "00000000-0000-4000-8000-000000008601",
         "type_id": "00000000-0000-4000-8000-000000001601",
-        "name": "星海贸易",
         "values": {
           "customer_no": "C001",
           "name": "星海贸易",
@@ -175,7 +178,6 @@
       {
         "id": "00000000-0000-4000-8000-000000008602",
         "type_id": "00000000-0000-4000-8000-000000001602",
-        "name": "RT-0103",
         "values": {
           "return_no": "RT-0103",
           "refund": 168,
@@ -199,7 +201,6 @@
       {
         "id": "00000000-0000-4000-8000-000000008603",
         "type_id": "00000000-0000-4000-8000-000000001602",
-        "name": "远山咖啡 1 月退货",
         "values": {
           "registered_on": "2026-01-15"
         },
