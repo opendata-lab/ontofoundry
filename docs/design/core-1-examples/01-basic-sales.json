@@ -160,7 +160,6 @@
         "source_type_id": "00000000-0000-4000-8000-000000001002",
         "target_type_id": "00000000-0000-4000-8000-000000001001",
         "multiplicity": "many_to_one",
-        "identifier": false,
         "tags": [],
         "data_join": {
           "table_name": null,

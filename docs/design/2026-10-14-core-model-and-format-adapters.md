@@ -60,6 +60,17 @@
 
 **删除**：v2 的 `ontology_requires`（工作空间级约束）。规则必须归属具体元素，不再有不属于任何元素的约束。
 
+**对象、属性、标识、关系各自分开定义**，以订单明细为例：
+
+| 概念 | 订单明细 | 说明 |
+|---|---|---|
+| 对象 | 订单明细 | |
+| 属性 | 订单号（映射 `order_id` 列）、行号、数量、单价 | 表里的列都可以建成属性，外键列也一样 |
+| 标识 | 订单号 + 行号 | 只由属性组成，组合起来唯一 |
+| 关系 | 订单明细 属于 订单 | 单独定义，`data_join` 写明用 `order_id` 列连接；关系不参与标识 |
+
+订单号既是属性（有值、可以显示和过滤），连接时用到的 `order_id` 列又出现在关系的 `data_join` 里，两者各管各的，互不替代。
+
 ### 3.2 业务对象 `ObjectType`
 
 | 字段 | 类型 | 说明 |
@@ -87,8 +98,6 @@
 
 **删除**：`verbalizes`、`target_role_name`、`multiplicity`（由 `unique` 取代）、`value_concept`。
 
-**属性只描述对象自身的业务特征，不表示关系，也不存外键。** 订单上没有“客户编号”属性，订单和客户之间用关系“属于”表达；要看订单客户的编号，走路径 `sales_order.customer.customer_no`。外键列只出现在关系的 `data_join` 里。
-
 ### 3.4 关系 `LinkType`
 
 | 字段 | 类型 | 说明 |
@@ -98,7 +107,6 @@
 | `synonyms` | list[str] | **新增** |
 | `source_type_id`、`target_type_id` | UUID | 允许相同（自关联，例如 员工 汇报给 员工） |
 | `multiplicity` | enum | `one_to_one / many_to_one / many_to_many`。没有一对多：一对多关系一律从“多”的一端建成多对一，例如“订单 → 客户，多对一，名称‘属于’，反向名称‘拥有’”；界面上从客户一侧也能看到“拥有 订单” |
-| `identifier` | bool | 本关系是否是源对象标识的一部分，要求多对一或一对一。例：订单明细由“所属订单”关系 + “行号”属性共同标识 |
 | `tags` | list[str] | |
 | `data_join` | DataJoin / null | 关系的数据绑定，见下 |
 | `evidence` | | |
@@ -279,14 +287,10 @@ metrics, mappings, material_objects, material_links
   条件的 `values` 个数和类型符合运算符与属性类型；`ratio` 的分子、分母都是 `simple` 且粒度对象相同。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
-- **标识**：对象的标识由两类成员组成：`identifier=true` 的**属性**，和 `identifier=true` 的**关系**（含从父对象继承的）。
-  属性和关系各自定义、各自是标识成员，全部成员**组合起来**唯一。
-  - 标识只有一个成员、而且它是属性时，这个属性必须 `unique=true`（如订单号）。
-  - 标识只有一个成员、而且它是关系时，这个关系必须是一对一（如“员工档案”只由“所属员工”标识，一个员工只能有一份档案）。
-  - 复合标识（两个及以上成员）不要求成员各自唯一。例：订单明细的标识是“所属订单”（关系）+“行号”（属性），
-    行号在不同订单里会重复，`unique=false` 合法；订单的外键 `order_id` 不建属性，只出现在“所属订单”的 `data_join` 里。
-- **属性不映射外键列**：一个对象的属性不能映射到它表里的外键列，即该表作为关系源表时、等于另一端对象主键的那些列
-  （`table_name` 为源对象表时的 `target_columns`，为目标对象表时的 `source_columns`）。外键只由关系表达。
+- **标识只由属性组成**：对象的标识是它全部 `identifier=true` 的属性（含从父对象继承的），组合起来唯一。关系不参与标识，只负责连接对象。
+  标识只有一个属性时，该属性必须 `unique=true`；多个属性组成的复合标识不要求各自唯一。
+  例：订单明细的标识是“订单号”+“行号”两个属性，行号在不同订单里会重复，`unique=false` 合法；
+  “所属订单”关系另外存在，用于从明细走到订单。这与 Palantir、Fabric 一致：主键是属性，关系另行定义。
 - 技术名不能是 ANSI SQL 保留字（大小写不敏感），因为规则和指标的路径不加引号写进 SQL。
 
 ---
@@ -487,7 +491,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 | `description` | → `description` | |
 | `extends`（实体） | → `extends` | |
 | `extends`（值概念或内置类型） | `dropped` | 实体不能继承值 |
-| `identify_by` | 被引用的属性 `identifier=true`；被引用的二元关系 `identifier=true` | 引用不存在或被引用的是多元关系（见 §5.3 c）时 `dropped` |
+| `identify_by` | 被引用的属性 `identifier=true` | 被引用的是关系时（Ossie 允许用关系做标识），关系照常导入但不作为标识，报 `dropped`（RT-32）；引用不存在时 `dropped` |
 | `requires` / `derived_by` | → `rules`（`owner_kind=object_type`，constraint / derivation） | 规则名取扩展块，没有则生成 `{对象名}·约束1` |
 | `ValueType` | **不建元素**，折叠进属性 | 见下 |
 
@@ -549,13 +553,14 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 核心元素 | 技术名 | 说明 |
 |---|---|---|
 | 业务对象 | `supplier_supplies` | 命名 `{owner}_{关系名}`，冲突加后缀；显示名取扩展块，没有则用关系名；描述注明“由多元关系 supplier.supplies 转换” |
-| 关系 | `supplier_supplies.supplier` → `supplier` | 多对一，`identifier=true` |
-| 关系 | `supplier_supplies.part` → `part` | 多对一，`identifier=true` |
-| 关系 | `supplier_supplies.project` → `project` | 多对一，`identifier=true` |
+| 关系 | `supplier_supplies.supplier` → `supplier` | 多对一 |
+| 关系 | `supplier_supplies.part` → `part` | 多对一 |
+| 关系 | `supplier_supplies.project` → `project` | 多对一 |
 | 属性 | `supplier_supplies.quantity` | `integer`；值概念 / 内置类型角色变成中间对象的属性 |
 
 - 指向实体的角色变成中间对象到该实体的多对一关系，技术名取角色名，没有则取角色概念名。
-- 指向实体的角色全部 `identifier=true`，即中间对象由这些参与方共同标识。
+- 中间对象导入时**没有标识**：原文只说明了参与方，没有可作为标识的属性，不编造。导入报告提示“中间对象缺少标识”，
+  由用户或 AI 补全为它加上参与方编号等属性并设为标识（如供应商编码 + 零件号 + 项目编码）。
 - 原关系上的 `requires` / `derived_by` 挂到中间对象上，表达式原文保留，并报 `converted`：表达式里对原关系名的引用可能不再成立。
 - 原关系的读法 `dropped`。
 - 导出时**不还原**成多元关系，中间对象按普通实体导出。
@@ -577,7 +582,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 模式 | Ossie 形状 | 导入为 |
 |---|---|---|
 | 对象映射（单列主键） | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，`expression` 为 `dataset.字段`（或单列），与该 dataset 的 `primary_key` 对应 | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`，`key_columns = [主键列]` |
-| 对象映射（复合主键） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `key_columns` 按 `identify_by` 顺序列出这些列；`relationship` 是属性时同时写入 `fields`；是标识关系时，该列同时作为这条关系 `data_join` 的目标列 |
+| 对象映射（复合主键） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `key_columns` 按 `identify_by` 顺序列出这些列；`relationship` 是属性时同时写入 `fields`；是关系时（Ossie 允许用关系做标识），该列只作为主键列和这条关系 `data_join` 的目标列，不产生标识属性 |
 | 属性列 | `link_mappings` 根节点的 `object_mapping` 指向主键，`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式 |
 | 外键关系 | `children[].relationship` 为二元关系名，`object_mapping.concept` 为另一端；或 `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset | `data_join`：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端主键对应 |
 | 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别从它指向两端 dataset | 两端对象之间若恰有一条多对多关系，`data_join.table_name` 为该 dataset 的表，`source_columns` / `target_columns` 取两条 relationships 的 `from_columns`；对不上则 `dropped` |
@@ -643,7 +648,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 核心 | Ossie |
 |---|---|
 | `ObjectType` | `EntityType` 组件：`concept = technical_name`，`description`，`extends` = 父对象技术名 |
-| `identifier=true` 的属性和关系 | 所属组件的 `identify_by` |
+| `identifier=true` 的属性 | 所属组件的 `identify_by` |
 | 对象上的规则 | 组件的 `requires` / `derived_by` |
 | `Property` | 所属组件下的关系：`name = technical_name`，`roles = [{concept: 值概念}]` |
 | 值概念 | 标识属性生成 `{对象}_{属性}_value`（`ValueType`，`extends` 内置类型）；普通属性直接用内置类型名。沿用现有编译器行为 |
@@ -693,7 +698,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 - `concept_mappings`：
   - 单列主键：`object_mappings` 为 `[{"expression": "dataset.主键字段"}]`。
   - 复合主键：`object_mappings` 为 `[{"referent_mappings": [...]}]`，每个主键列一项，`relationship` 为映射到该列的标识属性，
-    或 `data_join` 目标列包含该列的标识关系，`expression` 为该列对应的字段。有主键列对不上任何标识属性或标识关系时，该对象的映射报 `dropped`。
+    `expression` 为该列对应的字段。有主键列没有标识属性映射到它时，该对象的映射报 `dropped`。
   - `link_mappings` 根节点指向主键字段，`children` 每项 `relationship` 为属性技术名、`expression` 为 `dataset.属性技术名`。
 - 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条，`from_columns` / `to_columns` 为对应字段名
   （多列时照列），外加所属对象 `link_mappings` 中的一个子节点。
@@ -847,6 +852,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-29 | 不支持的构造消失：值概念上的关系、实体继承值概念、引用 `Any` 的关系 | | 不出现 |
 | RT-30 | `identify_by` 中引用了已消失元素的项被删除 | `"identify_by": ["supplies", "code"]` | `"identify_by": ["code"]` |
 | RT-31 | 引用无法按路径写法解析的规则消失 | `"derived_by": ["Person.parent_of(descendant)"]` | 不出现 |
+| RT-32 | 用关系做的标识不再是标识 | `"identify_by": ["acct", "seat_nr"]`（`acct` 是关系） | `"identify_by": ["seat_nr"]`，`acct` 作为普通关系导出 |
 
 **数据映射和指标**
 
@@ -976,7 +982,7 @@ dataset 的 `source` 和主键、物理列名。
 | 16 | 数据集 | 不在核心模型里单独建；`get_ontology` 从映射和元数据快照推导出表、列、JOIN 条件交给 agent（§14） |
 | 17 | 问数取数 | MCP 只提供语义和 SQL，agent 用 DataAgent 的数据查询工具按 schema 执行；MCP 工具精简为 4 个（§14） |
 | 18 | 实施顺序 | 分三部分：核心模型与增删改查与 MCP、导入、导出；完整包、差异对比、AI 补全、注册表推迟（§9） |
-| 19 | 属性与关系 | 属性只描述业务特征，不含关系也不映射外键列；标识可以由属性和关系共同组成（§3.3、§3.9） |
+| 19 | 对象、属性、标识、关系 | 各自分开定义：外键列可以建成属性；标识只由属性组成；关系单独定义、不参与标识（§3.1、§3.9） |
 
 ---
 
@@ -1067,13 +1073,12 @@ integrations/dataagent/skills/ontofoundry-modeling/
 
 | 模式 | 写法 |
 |---|---|
-| 多方参与的事实（n 元关系） | 建中间对象，例如“供货记录”，到各参与方各一条多对一关系，参与方关系都设为标识；事实上的数量、日期等作为中间对象的属性 |
+| 多方参与的事实（n 元关系） | 建中间对象，例如“供货记录”，到各参与方各一条多对一关系；参与方的编号作为属性并设为复合标识；事实上的数量、日期等作为中间对象的属性 |
 | 是 / 否型事实（一元关系） | 布尔属性，例如“是否VIP” |
 | 一对多 | 从“多”的一端建多对一关系，`name` 写正向动词、`inverse_name` 写反向动词 |
 | 多对多（无附加信息） | `many_to_many` 关系，`data_join.table_name` 填中间表 |
 | 多对多（配对本身有信息） | 建中间对象，同 n 元关系 |
-| 复合标识 | 属性和关系都可以设为标识，组合起来唯一（如“所属订单”关系 + “行号”属性）；映射的 `key_columns` 按顺序列出 |
-| 外键 | 不建成属性，用关系表达；外键列写在关系的 `data_join` 里 |
+| 复合标识 | 多个属性同时设为标识（关系不参与标识），映射的 `key_columns` 按顺序列出 |
 | 自关联 | 源和目标是同一对象，例如“员工 汇报给 员工” |
 | 继承 | 子对象 `extends` 父对象，只写自己新增的属性和关系 |
 | 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
@@ -1120,6 +1125,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 角色名被丢弃 | RT-21 | 自关联或中间对象的关系名不清楚时，参考角色名改名（如“汇报给”→“上级”） | update 关系 |
 | 值概念及其描述、约束被丢弃 | RT-23 / RT-24 | 描述并入属性描述；约束改写成属性上的规则 | update 属性；create 规则 |
 | 引用无法解析的规则被丢弃 | RT-31 | 按路径写法改写表达式，挂到对应元素上 | create 规则 |
+| 中间对象缺少标识；用关系做的标识被丢弃 | RT-27 / RT-32 | 为对象加上参与方或外键的编号属性，映射到对应列，并设为标识 | create 属性；update 映射 |
 | 值概念上的关系、实体继承值概念等不支持的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档 `ai_context` 里的同义词和说明被丢弃 | RT-02 | 分配到对应对象的 `synonyms` 和描述 | update 对象 |
 | 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
