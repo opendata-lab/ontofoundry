@@ -142,7 +142,6 @@
         "source_type_id": "00000000-0000-4000-8000-000000001504",
         "target_type_id": "00000000-0000-4000-8000-000000001501",
         "multiplicity": "many_to_one",
-        "identifier": false,
         "tags": [],
         "data_join": null,
         "evidence": []
