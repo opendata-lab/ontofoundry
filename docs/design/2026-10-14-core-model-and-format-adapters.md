@@ -564,7 +564,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 对象映射（复合主键） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `key_columns` 按 `identify_by` 顺序列出这些列；`relationship` 是属性时同时写入 `fields`；是标识关系时，该列同时作为这条关系 `data_join` 的目标列 |
 | 属性列 | `link_mappings` 根节点的 `object_mapping` 指向主键，`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式 |
 | 外键关系 | `children[].relationship` 为二元关系名，`object_mapping.concept` 为另一端；或 `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset | `data_join`：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端主键对应 |
-| 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别指向两端 | 第 4 阶段支持（§9）；之前报 `dropped` |
+| 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别从它指向两端 dataset | 两端对象之间若恰有一条多对多关系，`data_join.table_name` 为该 dataset 的表，`source_columns` / `target_columns` 取两条 relationships 的 `from_columns`；对不上则 `dropped` |
 
 `dataset.字段` 中的“字段”是 dataset field 名，物理列名取该 field 的 `ANSI_SQL` 表达式；表达式必须是单个列名（可带引号）。
 没有被属性映射引用的字段只用于解析主键和 JOIN（平台导出的辅助字段就是这种），不导入为属性。
@@ -681,7 +681,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
   - `link_mappings` 根节点指向主键字段，`children` 每项 `relationship` 为属性技术名、`expression` 为 `dataset.属性技术名`。
 - 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条，`from_columns` / `to_columns` 为对应字段名
   （多列时照列），外加所属对象 `link_mappings` 中的一个子节点。
-- 多对多 join 表 → 第 4 阶段；之前报 `dropped`。
+- 多对多 join 表 → 为 join 表声明一个不映射到概念的 dataset（字段全是辅助字段），加两条 `relationships` 从它分别指向两端 dataset；源对象的 `link_mappings` 增加一个根节点，指向 join dataset 的源键字段，子节点为该关系，`object_mapping` 的 `concept` 为目标对象、`expression` 为 join dataset 的目标键字段。
 
 **指标** → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。导出必须让消费者**不经推断**就能确定粒度和每条路径，所以有三条前提，
 任一条不满足，该指标报 `dropped`（RT-49），不导出：
@@ -736,7 +736,6 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `actions`、动作上的规则 | Ossie 没有动作 | `dropped` |
 | 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
 | 过不了官方 lint 的规则表达式 | | `dropped` |
-| 多对多 join 表映射（第 4 阶段之前） | | `dropped` |
 | 引用未映射对象的指标 | | `dropped` |
 
 **Ossie 导出不需要任何占位字符串**：Ossie 的必填字段（`version`、`name`、`ontology`、`concept`、`type`、关系 `name` 和 `verbalizes`、
@@ -777,7 +776,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | Field（单列 ANSI 表达式） | ✅ | ✅ |
 | Field 计算表达式、其他方言、`dimension`、`label`、`datatype` | ❌ dropped | — |
 | OSI Relationship（外键） | ✅ → `data_join` | ✅ |
-| 多对多 join 表 | 第 4 阶段 | 第 4 阶段 |
+| 多对多 join 表 | ✅ | ✅ |
 | `object_mappings`（单个、单列） | ✅ | ✅ |
 | `link_mappings`（一层 children） | ✅ | ✅ |
 | 一层 `referent_mappings`（对应 `identify_by`） | ✅ → 复合主键 | ✅ |
@@ -839,7 +838,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-41 | OntologyMap 按 `connection_alias` 重组，描述换成生成文字 | 原 `name` / `description` | `name` 不变，`"description": "<别名> 的数据映射"` |
 | RT-42 | dataset 描述换成对象描述 | dataset 自己的 `description` | 对象的 `description` |
 | RT-43 | 不支持的映射消失（§5.5 不支持清单） | 嵌套 `referent_mappings`、计算表达式等 | 不出现 |
-| RT-44 | 没有映射到任何概念的 dataset 消失（第 4 阶段前 join 表也在此列） | | 不出现 |
+| RT-44 | 没有映射到任何概念、也不是可识别的 join 表的 dataset 消失 | | 不出现 |
 | RT-45 | 字段和指标只保留 ANSI_SQL 方言 | `"dialects": [{"dialect": "ANSI_SQL", ...}, {"dialect": "SNOWFLAKE", ...}]` | 只有 `ANSI_SQL` |
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
 | RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(sales_order.amount)` |
@@ -874,14 +873,68 @@ dataset 的 `source` 和主键、物理列名。
 - 只读 core-1，不保留 v1 / v2 / v3 的任何读取或转换代码。
 - 演示需要的数据，用新的 Ossie 适配器从样例文件重新导入。
 
-这样第 1 阶段不需要写任何兼容代码，`domain/legacy_v1.py`、`domain/snapshot.py` 中的版本转换、`models_v3.py` 可以直接删除。
+这样第一部分不需要写任何兼容代码，`domain/legacy_v1.py`、`domain/snapshot.py` 中的版本转换、`models_v3.py` 可以直接删除。
 
 ---
 
-## 9. 分阶段实施
+## 9. 实施：分三部分
 
-| 阶段 | 内容 | 完成标准 |
+### 第一部分：核心模型、增删改查、MCP
+
+目标：平台内部全部切到核心模型，建模、编辑、发布、问数都能用。
+
+| 内容 | 说明 |
+|---|---|
+| 核心模型 core-1 | §3 的全部元素和校验：二元关系、`unique`、`synonyms`、`inverse_name`、复合主键、新 `data_join`、结构化指标、路径规则、保留字检查 |
+| 清空数据 | 数据库迁移清空本体相关数据（§8） |
+| 增删改查 | 提案、草稿、合并、发布、元素编辑全部基于核心模型；前端删除角色、读法编辑器，增加反向名称、同义词、指标表单 |
+| 查询 | 实例浏览按新 `data_join` 生成 JOIN（含多对多 join 表、复合主键）；结构化指标生成 SQL（改写 `metric_query.py`） |
+| MCP | 精简为 4 个工具；`get_ontology` 返回物理绑定和指标 SQL（§14） |
+| AI 建模 | 技能 `md2ossie` 改写为 `ontofoundry-modeling`；轮次提示词精简；提案合同 `target_kind` 调整（§13.3） |
+| 问数 agent | 系统提示词按 §14.4 重写 |
+| 删除旧代码 | v1 / v2 / v3 模型与转换、`ossie/native.py`、`ossie/extensions.py` 等（§11） |
+
+现有的 Ossie 导入、导出依赖旧模型，第一部分期间在界面上**暂时下线**，由第二、三部分重新提供。
+
+验收：在界面和 AI 建模里建出示例 01–08 的模型并发布；演示空间的问数示例全部答对，聚合在一次 SQL 内完成；
+`domain/` 不 import 任何适配器。
+
+### 第二部分：导入
+
+| 内容 | 说明 |
+|---|---|
+| 适配器接口 | 只需导入函数：文件 → 核心模型 + 转换报告（§4.1、§4.2） |
+| Ossie 导入 | 概念、属性、二元关系、值概念折叠、一元 / 多元转换、规则、扩展块（§5.1–5.4、§5.7）；映射：对象、属性列、外键、多对多 join 表、复合主键（§5.5）；单表指标（§5.6） |
+| 导入走提案 | 新建会话、按技术名对比生成提案、复用提案面板和发布（§4.5）；原文件保存为材料，提案证据指向原文行号 |
+| 导入报告 | 按条目列出改写和丢弃，标注 RT 编号、原文路径、行号 |
+| 原生格式导入 | 单文件形式（§4.6） |
+
+验收：样例 A/B 和示例 01–10 都能导入；导入报告做成快照测试。
+
+### 第三部分：导出
+
+| 内容 | 说明 |
+|---|---|
+| 适配器接口 | 导出函数：核心模型 → 文件 + 转换报告 |
+| Ossie 导出 | 概念、属性、关系、规则、扩展块（§6.1–6.4、§6.6）；映射：逻辑字段与辅助字段、对象映射、复合主键、外键、多对多 join 表；指标：三条前提检查后编译成 SQL（§6.5） |
+| 官方校验 | 每份导出跑 Ossie 官方 schema 和语义校验，不通过不交付（§6.8） |
+| 原生格式导出 | 单文件形式（§4.6） |
+
+验收：示例 01–10 导出的 Ossie 文件全部通过官方校验；导出报告列出未导出的内容；
+核心模型 → Ossie → 核心模型，在技术名匹配下业务结构和命名不变。
+
+### 以后的扩展（不在三部分之内）
+
+设计已经写清楚，等有需求再做：
+
+| 项目 | 设计位置 | 什么时候做 |
 |---|---|---|
+| 原生格式完整包（打包材料、跨环境搬迁） | §4.6 | 出现跨环境搬迁需求时；之前备份靠数据库备份 |
+| 往返差异对比（`diff_roundtrip` 和“每处差异都有编号”的测试） | §7.2 | 导入导出稳定后，作为回归测试补上；差异编号表现在只作为说明 |
+| 导入后的 AI 补全 | §13.4 | 第二部分跑通、看到真实导入会丢什么之后 |
+| 适配器注册表、格式自动识别 | §4.1、§4.3 | 有了第二个适配器时 |
+
+---|---|---|
 | 1 | 核心模型 core-1（含复合主键、新 `data_join`、指标）；清空数据的迁移；适配器框架；Ossie 导出（以现有 v2 编译器为基础改造）；删除 v1 / v2 / v3 模型与转换代码 | 每份导出都通过官方校验；`domain/` 不 import `adapters/` 的测试通过 |
 | 2 | Ossie 导入重写：概念、属性、二元关系、值概念折叠、一元 / 多元转换、外键和复合主键映射、指标、扩展块、转换报告；导入时保存原文件；导入报告（§7.2）；原生格式适配器（§4.6） | 样例 A/B 的导入报告做成快照测试；Ossie → core-1 → Ossie 的每处差异都有 RT 编号；core-1 → Ossie → core-1 在技术名匹配下无差异 |
 | 3 | 提案 / 编辑 / MCP / agent prompt / 前端全部切到 core-1；删除剩余 v3 分支（见 §11） | agent prompt 中不再出现 owner_ref / roles / verbalizes；前端没有角色、读法编辑器 |
@@ -912,6 +965,7 @@ dataset 的 `source` 和主键、物理列名。
 | 15 | 同义词 | 对象、属性、关系、指标都有 `synonyms` |
 | 16 | 数据集 | 不在核心模型里单独建；`get_ontology` 从映射和元数据快照推导出表、列、JOIN 条件交给 agent（§14） |
 | 17 | 问数取数 | MCP 只提供语义和 SQL，agent 用 DataAgent 的数据查询工具按 schema 执行；MCP 工具精简为 4 个（§14） |
+| 18 | 实施顺序 | 分三部分：核心模型与增删改查与 MCP、导入、导出；完整包、差异对比、AI 补全、注册表推迟（§9） |
 
 ---
 
@@ -921,7 +975,7 @@ dataset 的 `source` 和主键、物理列名。
 
 - `domain/models_v3.py`、`domain/legacy_v1.py`，`domain/snapshot.py` 中的版本转换
 - `ossie/native.py`、`ossie/extensions.py`
-- `ossie/importer.py` 中 v3 路径（第 2 阶段整体重写）
+- `ossie/importer.py`、`ossie/compiler.py`：第一部分随旧模型删除，第二、三部分在 `adapters/ossie/` 重写
 - `services/element_save.py`、`api/proposals.py`、`contracts/proposals.py`（含 `_carry_placeholders`）、`api/mcp.py`、`api/modeling.py`、`services/publish_preview.py` 中的 `schema_version` 分支
 - `services/dataagent.py` 中关于 owner_ref、roles、verbalizes、endpoint_direction 的 prompt
 - `ossie/compiler.py` 中的 `_resolve_readings` 及别名逻辑；导入器中读取旧版本扩展块（1–4）的代码
@@ -1068,8 +1122,8 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 ### 13.5 实施
 
-- 第 3 阶段：技能改名改写、提示词精简、提案合同的 `target_kind` 调整、删除旧合同 B。
-- 第 3 阶段之后：导入补全（依赖第 2 阶段的导入报告和原文件材料）。
+- 第一部分：技能改名改写、提示词精简、提案合同的 `target_kind` 调整、删除旧合同 B。
+- 以后的扩展：导入补全（依赖第二部分的导入报告和原文件材料）。
 - 验收：用样例 A/B 导入后跑一次 AI 补全，提案全部能通过平台校验；技能和提示词里不出现 §13.3 列出的旧概念。
 
 ---
@@ -1160,5 +1214,5 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 ### 14.5 实施
 
-- 第 3 阶段之后（与 §13 并行）：MCP 工具精简为 4 个；`get_ontology` 返回物理绑定和指标 SQL；更新建模 agent 与问数 agent 的提示词。
+- 第一部分：MCP 工具精简为 4 个；`get_ontology` 返回物理绑定和指标 SQL；更新建模 agent 与问数 agent 的提示词。
 - 验收：演示空间“咖啡渠道销售”的示例问题全部通过“MCP 语义 + DataAgent 执行 SQL”答对，其中“销售额最高的客户”一次 SQL 完成，不翻页。
