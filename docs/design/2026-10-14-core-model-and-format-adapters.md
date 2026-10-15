@@ -594,9 +594,9 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 |---|---|---|
 | 对象映射（单个字段） | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，`expression` 为 `dataset.字段`（或单列） | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`；`key_columns` 取 dataset 的 `primary_key`（物理主键），dataset 没写 `primary_key` 时取这个字段的列。对象映射引用的字段只说明“用什么认出对象”，它对应的属性是否为标识以 `identify_by` 为准，不要求与物理主键相同 |
 | 对象映射（多个字段） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `relationship` 是属性时把该列写入 `fields`；是关系时（Ossie 允许用关系做标识），该列作为这条关系 `data_join` 的外键列，标识按 §5.2 整组放弃。`key_columns` 同样取 dataset 的 `primary_key`，没写时按 `identify_by` 顺序取这些列 |
-| 属性列 | `link_mappings` 根节点的 `object_mapping` 指向主键，`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式 |
-| 外键关系 | `children[].relationship` 为二元关系名，`object_mapping.concept` 为另一端；或 `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset | `data_join`：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端主键对应 |
-| 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别从它指向两端 dataset | 两端对象之间若恰有一条多对多关系，`data_join.table_name` 为该 dataset 的表，`source_columns` / `target_columns` 取两条 relationships 的 `from_columns`；对不上则 `dropped` |
+| 属性列 | `link_mappings` 根节点的 `object_mapping` 与该概念的对象映射相同（按对象身份识别，不要求指向物理主键），`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式。物理主键只从 dataset 的 `primary_key` 解析，与根节点无关 |
+| 外键关系 | `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset；或只有 `children[].relationship` 为二元关系名、`object_mapping.concept` 为另一端 | `data_join` 优先取自 `relationships`（物理连接）：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端物理主键对应。只有子节点、没有 `relationships` 时，仅当目标对象的身份字段就是它的物理主键才能据此建立 `data_join`，否则 `dropped` |
+| 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别从它指向两端 dataset | 两端对象之间若恰有一条多对多关系，`data_join.table_name` 为该 dataset 的表，`source_columns` / `target_columns` 取两条 relationships 的 `from_columns`（物理键）；对不上则 `dropped`。join dataset 上的 `link_mappings` 不参与建立连接 |
 
 `dataset.字段` 中的“字段”是 dataset field 名，物理列名取该 field 的 `ANSI_SQL` 表达式；表达式必须是单个列名（可带引号）。
 没有被属性映射引用的字段只用于解析主键和 JOIN（平台导出的辅助字段就是这种），不导入为属性。
@@ -747,7 +747,12 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
   （多列时照列）。这条只描述物理连接，总是导出。
 - 外键关系在所属对象 `link_mappings` 里的子节点，用外键字段去“认出”目标对象，所以要求**目标对象的标识属性正好映射到它的 `key_columns`**
   （业务标识就是物理主键，如示例 01 客户的 `customer_no` 映射到 `customer_id`）；否则外键值对不上目标的业务标识，子节点报 `dropped`。
-- 多对多 join 表 → 为 join 表声明一个不映射到概念的 dataset（字段全是辅助字段），加两条 `relationships` 从它分别指向两端 dataset；源对象的 `link_mappings` 增加一个根节点，指向 join dataset 的源键字段，子节点为该关系，`object_mapping` 的 `concept` 为目标对象、`expression` 为 join dataset 的目标键字段。
+- 多对多 join 表 → 物理连接与业务链接分开导出：
+  - **物理连接，总是导出**：为 join 表声明一个不映射到概念的 dataset（字段全是辅助字段），加两条 `relationships` 从它分别指向两端 dataset，列都是物理键。
+  - **业务链接映射，有条件导出**：源对象的 `link_mappings` 增加一个根节点，从 join dataset 认出源对象，子节点为该关系，`object_mapping` 的 `concept` 为目标对象，从 join dataset 认出目标对象。
+    join 表里存的是物理键，所以要求**两端对象的标识属性都正好映射到各自的 `key_columns`**（业务标识就是物理主键），这时 join 表的键字段就是两端的业务标识。
+    否则不导出这条业务链接映射，报 `dropped`。例：选课表存 `(student_id=42, course_id=7)`，学生、课程的标识是学号 `S001`、课程号 `C007`，
+    42、7 不是学号和课程号，只导出物理连接。
 
 **指标** → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。导出必须让消费者**不经推断**就能确定粒度和每条路径，所以有三条前提，
 任一条不满足，该指标报 `dropped`（RT-49），不导出：
@@ -803,7 +808,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `material_objects` / `material_links` | Ossie 没有实例数据 | `dropped` |
 | `actions`、动作上的规则 | Ossie 没有动作 | `dropped` |
 | 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
-| 没有标识或标识属性未映射的对象的 `concept_mappings`；目标业务标识不是物理主键时的外键子节点 | | `dropped` |
+| 没有标识或标识属性未映射的对象的 `concept_mappings`；目标业务标识不是物理主键时的外键子节点；两端业务标识不全是物理主键时的多对多业务链接映射（物理连接照常导出） | | `dropped` |
 | 引用未映射对象的指标 | | `dropped` |
 
 **Ossie 导出不需要任何占位字符串**：Ossie 的必填字段（`version`、`name`、`ontology`、`concept`、`type`、关系 `name` 和 `verbalizes`、
