@@ -1,11 +1,14 @@
 # core-1 原生格式示例
 
-配合 [核心模型与格式适配器设计](../2026-10-14-core-model-and-format-adapters.md) §3、§4.6 阅读。每个文件都是一份完整的
-OntoFoundry 原生格式文件：
+配合 [核心模型与格式适配器设计](../2026-10-14-core-model-and-format-adapters.md) §3、§4.6 阅读。每个文件都是原生格式的
+**单文件形式**，`draft` 部分就是完整包里 `draft.json` 的内容：
 
 ```json
 { "format": "ontofoundry", "schema_version": "core-1", "exported_at": "…", "draft": { …核心模型… } }
 ```
+
+示例里证据引用的材料（如 `mat_returns_jan`）没有附带原文件。真正备份或搬迁时要用完整包 `*.ontofoundry.zip`，
+它会把这些材料一起打包，导入时按 sha256 重建材料并改写证据里的材料 id（设计文档 §4.6）。
 
 `draft` 固定包含这些集合，空的也写出来：`object_types`、`properties`、`link_types`、`rules`、`actions`、`metrics`、`mappings`、
 `material_objects`、`material_links`。
@@ -49,6 +52,11 @@ id 是 UUID。为了好读，示例按类别编号：`…1xxx` 对象、`…2xxx
   | 下单客户数 | `count_distinct` + 路径 `sales_order.customer.customer_no` |
   | 客单价 | `ratio`，分子订单金额、分母下单客户数，粒度都是订单 |
   | 一季度有效订单金额 | 两个条件同时满足：`between` 两个值，`not_in` 多个值 |
+- **导出 Ossie 时**（设计文档 §6.5）：
+  - 订单数导出为 `COUNT(DISTINCT sales_order.order_no)`，用订单的主键字段写明粒度，不写 `COUNT(*)`。
+  - 下单客户数、客单价**不导出**：下单客户数只引用了客户的字段，表达式里看不出粒度是订单；客单价的分母是它，也跟着不导出。
+  - 对象映射写逻辑字段 `customer.customer_no`（属性 `customer_no` 映射到主键列 `customer_id`），不写物理列名；
+    订单表的外键列 `customer_id` 没有属性映射，导出为辅助字段 `customer_id`。
 
 ### 02 多对多
 
@@ -80,8 +88,10 @@ id 是 UUID。为了好读，示例按类别编号：`…1xxx` 对象、`…2xxx
 - **外键在目标表的一对一**：员工“使用工位”，外键 `employee_id` 在工位表里，所以 `table_name` 写 `desks`；
   `source_columns` 是工位表里等于员工主键的列（`employee_id`），`target_columns` 是工位表里等于工位主键的列（`desk_id`）。
 - **两条关系指向公司**：交易的“买方”和“卖方”，路径按关系名区分，`trade.buyer.region` 和 `trade.seller.region` 不会混。
-- **导出 Ossie 的边界**：“华东买方向华南卖方的成交额”在核心模型里合法，但两条路径都落到公司这张表，Ossie 的
-  `dataset.字段` 写法分不清，导出时丢弃（RT-49）。
+- **导出 Ossie 的边界**（设计文档 §6.5）：交易到公司有两条关系，所以**凡是经过买方或卖方的指标都不导出**，
+  哪怕只用了买方（“华东买方成交额”）：导出后只剩 `company.region`，看不出经过哪条关系。
+  “有上级的员工数”经过自关联落回员工表，与员工自己的字段分不清，也不导出。“三楼员工数”可以导出。
+  这些指标在核心模型里都合法，问数时由平台按关系 id 生成正确的 SQL，不受影响。
 - **路径只能正向走**：从工位出发走不到员工（关系是从员工指向工位的）。需要的话，以员工为粒度写，例如“三楼员工数”。
 
 ### 06 继承
@@ -95,6 +105,8 @@ id 是 UUID。为了好读，示例按类别编号：`…1xxx` 对象、`…2xxx
 ### 07 实例和证据
 
 - 一个实例可以有多条证据：材料证据（材料 id、哈希、行号、原文）和人工证据（谁、什么时候、备注）。
+- 这里引用了两份材料（`mat_returns_jan`、`mat_ossie_import_02`）：用完整包搬到新环境，证据完整保留；
+  用单文件形式且目标环境没有同内容的材料时，这些材料证据会被丢弃，人工证据保留。
 - “远山咖啡 1 月退货”缺单号和金额，照样保留，只写原文给出的登记日期；平台把它标为待补全。
 - `is_vip` 来自 Ossie 一元关系，证据指向导入的原文件。
 

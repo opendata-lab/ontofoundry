@@ -35,7 +35,7 @@
 | P2 | 适配器隔离 | `domain/` 不得 import 任何适配器；适配器只依赖核心模型的公开类型。外部格式的概念（角色、presence、方言……）不出现在适配器之外。 |
 | P3 | 有损可见 | 导入、导出都产出转换报告，逐项列出“结构改写 / 丢弃 / 占位 / 错误”。 |
 | P4 | 不猜测 | 无法确定含义的构造（例如任意 SQL 里的列）一律报告并跳过，不半读、不推断。 |
-| P5 | 无损只靠原生格式 | 平台自己的完整备份和搬迁用 OntoFoundry 原生格式（§4.6），完全无损。外部格式只保证业务结构和命名：核心模型 → 外部格式 → 核心模型时，规则名、动作、实例、证据等可能丢失。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并在导入报告里逐项列出。 |
+| P5 | 无损只靠原生格式 | 平台自己的完整备份和搬迁用 OntoFoundry 原生格式的**完整包**（§4.6，含材料），无损；不含材料的单文件形式会丢失证据，导入报告逐项说明。外部格式只保证业务结构和命名：核心模型 → 外部格式 → 核心模型时，规则名、动作、实例、证据等可能丢失。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并在导入报告里逐项列出。 |
 | P6 | 导出必须合法 | 导出的文档必须通过目标格式的官方校验。缺的信息优先省略或由模型推导，不往受校验的字段里塞占位字符串（见 §4.4）。 |
 
 ---
@@ -408,16 +408,40 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 
 ### 4.6 OntoFoundry 原生格式
 
-一个最简单的适配器，`id = ontofoundry-core-1`，用于完整备份、在环境之间搬迁、平台之间交换：
+适配器 `id = ontofoundry-core-1`，用于完整备份、在环境之间搬迁、平台之间交换。有两种形式：
+
+| 形式 | 内容 | 用途 | 无损 |
+|---|---|---|---|
+| **完整包**（默认）`*.ontofoundry.zip` | `manifest.json` + `draft.json` + `materials/` 下被证据引用的材料原文件 | 备份、跨环境搬迁 | 是 |
+| **单文件** `*.ontofoundry.json` | 只有核心模型 | 查看、比对、在同一环境内复制模型 | 否：证据引用的材料不随文件走 |
+
+`manifest.json`：
 
 ```json
-{ "format": "ontofoundry", "schema_version": "core-1", "exported_at": "...", "draft": { ...核心模型原样... } }
+{
+  "format": "ontofoundry", "schema_version": "core-1", "exported_at": "2026-10-14T08:00:00Z",
+  "materials": [
+    { "material_id": "mat_returns_jan", "name": "1月退货登记.md", "sha256": "3f1c…", "byte_size": 2048,
+      "path": "materials/3f1c….md" }
+  ]
+}
 ```
 
-- 导出：核心模型原样写出，包括规则名、动作、指标、映射、实例、证据。
-- 导入：校验 `schema_version`，同样走提案（§4.5）。证据引用的材料在目标工作空间不存在时，丢弃该证据并报 `dropped`。
-- 这是唯一保证无损的格式；Ossie 等外部格式只承载业务结构和命名。
-- 各种场景和边界情况的完整示例见 [`core-1-examples/`](core-1-examples/README.md)。
+单文件形式就是 `{ "format", "schema_version", "exported_at", "draft" }` 四个字段。
+
+**导出**：核心模型原样写入 `draft.json`，包括规则名、动作、指标、映射、实例、证据。完整包把**被任何证据引用**的材料（含导入时保存的原 Ossie 文件）
+按原字节打进 `materials/`，文件名用 sha256，manifest 记录材料 id、名称、哈希和大小。没被引用的材料不打包。
+
+**导入**（同样走提案，§4.5）：
+
+1. 校验 `schema_version`；完整包逐个校验材料文件的 sha256 与 manifest 一致，不一致整包拒绝。
+2. **重建材料**：按 sha256 在目标工作空间查找同内容的材料（材料表对 `workspace_id + sha256` 唯一），有就复用；没有就用包里的原文件新建，
+   照常切分。得到“包内材料 id → 目标材料 id”的对照表。
+3. **重写证据引用**：所有材料证据的 `material_id` 按对照表改成目标 id；`material_sha256` 不变，行号和原文不变（内容相同，行号仍然有效）。
+4. 人工证据原样保留；`created_by` 是导出环境的用户 id，目标环境不一定有这个用户，界面按原值显示，不做映射。
+5. 单文件形式没有材料：证据引用的材料在目标工作空间按 sha256 找得到就重写引用，找不到就丢弃该证据并报 `dropped`。
+
+各种场景和边界情况的完整示例见 [`core-1-examples/`](core-1-examples/README.md)（示例是 `draft.json` 部分的写法）。
 
 ---
 
@@ -543,6 +567,7 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别指向两端 | 第 4 阶段支持（§9）；之前报 `dropped` |
 
 `dataset.字段` 中的“字段”是 dataset field 名，物理列名取该 field 的 `ANSI_SQL` 表达式；表达式必须是单个列名（可带引号）。
+没有被属性映射引用的字段只用于解析主键和 JOIN（平台导出的辅助字段就是这种），不导入为属性。
 
 明确不支持（`dropped`）：
 
@@ -563,8 +588,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | Ossie 表达式 | 导入为 |
 |---|---|
 | `SUM(ds.f)`、`AVG(ds.f)`、`MIN(ds.f)`、`MAX(ds.f)` | `simple`，粒度 = ds 对应的对象，`aggregation` 对应，`measure` = f 对应的属性 |
-| `COUNT(*)` | `simple`，`aggregation = count` |
-| `COUNT(DISTINCT ds.f)` | `simple`，`aggregation = count_distinct` |
+| `COUNT(*)` | ❌ `dropped`：没有引用任何 dataset，确定不了粒度 |
+| `COUNT(DISTINCT ds.f)` | `simple`，`aggregation = count_distinct`（平台导出的计数指标就是这种形式，见 RT-50） |
 
 `description` 照写；`datatype` 能对应 `value_kind` 就写入。其余一律 `dropped`（RT-49）：引用多个 dataset、带 `CASE WHEN` 等条件、
 四则运算、其他函数、引用未映射的 dataset 或字段、只有非 ANSI 方言。
@@ -632,30 +657,56 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 6.5 数据映射和指标
 
+**字段**：Ossie 的映射表达式和关系引用的是 dataset 的**逻辑字段名**，不是物理列名
+（[Ossie 规范 · Object mappings](https://github.com/apache/ossie/blob/main/ontology/ontology.md#object-mappings)）。因此：
+
+- 每个已映射属性一个字段：字段名 = 属性技术名，表达式为 `ANSI_SQL` 方言下的物理列名。
+- 主键列、外键列等**被键或 JOIN 用到、但没有属性映射到它的物理列**，声明为**辅助字段**：字段名 = 列名；
+  与某个属性技术名冲突时加后缀 `_col`（仍冲突再加序号）。辅助字段只为键和 JOIN 服务。
+- 下文所有 `dataset.字段` 都指逻辑字段名。一个物理列由哪个字段代表，按“有属性映射用属性字段，否则用辅助字段”确定。
+
+例：示例 01 的客户映射 `{"customer_no": "customer_id", ...}`，主键列 `customer_id` 由属性 `customer_no` 映射，
+所以对象映射写 `customer.customer_no`；订单表的外键列 `customer_id` 没有属性映射，声明辅助字段 `customer_id`，
+关系写 `from_columns: ["customer_id"]`。
+
+**生成规则**：
+
 - 每个 `connection_alias` 生成一个 `OntologyMap`，`name` 和 `semantic_model.name` 都是该别名。
-- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key = key_columns`，
-  `fields` = 每个已映射属性一个字段（字段名 = 属性技术名，表达式为 `ANSI_SQL` 方言下的列名）。
+- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key` = 各主键列对应的字段名，
+  `fields` = 属性字段 + 辅助字段。
 - `concept_mappings`：
-  - 单列主键：`object_mappings` 为 `[{"expression": "dataset.主键列"}]`。
+  - 单列主键：`object_mappings` 为 `[{"expression": "dataset.主键字段"}]`。
   - 复合主键：`object_mappings` 为 `[{"referent_mappings": [...]}]`，每个主键列一项，`relationship` 为映射到该列的标识属性，
-    或 `data_join` 目标列包含该列的标识关系。有主键列对不上任何标识属性或标识关系时，该对象的映射报 `dropped`。
-  - `link_mappings` 根节点指向主键，`children` 列出属性列。
-- 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条（`from_columns` / `to_columns` 为多列时照列），
-  外加所属对象 `link_mappings` 中的一个子节点。
+    或 `data_join` 目标列包含该列的标识关系，`expression` 为该列对应的字段。有主键列对不上任何标识属性或标识关系时，该对象的映射报 `dropped`。
+  - `link_mappings` 根节点指向主键字段，`children` 每项 `relationship` 为属性技术名、`expression` 为 `dataset.属性技术名`。
+- 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条，`from_columns` / `to_columns` 为对应字段名
+  （多列时照列），外加所属对象 `link_mappings` 中的一个子节点。
 - 多对多 join 表 → 第 4 阶段；之前报 `dropped`。
-- 指标 → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。路径改写为“**落脚对象的技术名**.属性”
-  （dataset 名 = 对象技术名、字段名 = 属性技术名）：`sales_order.customer.region` → `customer.region`。
+
+**指标** → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。导出必须让消费者**不经推断**就能确定粒度和每条路径，所以有三条前提，
+任一条不满足，该指标报 `dropped`（RT-49），不导出：
+
+1. **表达式必须引用粒度对象的 dataset**，以此表明粒度。
+   - `count` 编译为 `COUNT(DISTINCT 粒度.主键字段)`，带条件时为 `COUNT(DISTINCT CASE WHEN … THEN 粒度.主键字段 END)`。
+     沿正向多对一 / 一对一连接不会让粒度行变多，所以与 `COUNT(*)` 等价，同时写明了粒度。粒度对象是复合主键时无法这样写，`dropped`。
+   - 其他聚合：`measure` 或某个条件直接落在粒度对象上，表达式自然引用了粒度 dataset；`measure` 和所有条件都经过关系落在别的对象上时
+     （例如以订单为粒度的“下单客户数” `COUNT(DISTINCT customer.customer_no)`），表达式里没有粒度 dataset，`dropped`。
+2. **每条路径在语义模型里必须唯一**：路径改写为“落脚对象的 dataset.字段”，消费者只能靠 `relationships` 从粒度 dataset 找到落脚 dataset。
+   因此在**整个语义模型的关系图**里（不只是本指标用到的关系），从粒度 dataset 沿 `from → to` 方向到落脚 dataset 必须恰好只有一条路径。
+   - 示例 05 的交易同时有“买方”“卖方”两条关系指向公司：哪怕指标只用了买方，`company.region` 也分不清经过哪条，`dropped`。
+   - 自关联落回粒度自己的 dataset（如 `employee.manager.name` → `employee.name`），与粒度自身的字段无法区分，`dropped`。
+   - 还存在另一条多跳路径能到同一 dataset（如订单 → 客户，以及订单 → 门店 → 客户），`dropped`。
+3. 路径上每个对象都已映射。
 
   | 指标 | 编译结果 |
   |---|---|
   | sum / avg / min / max，无条件 | `SUM(sales_order.amount)` |
   | 带条件 | `SUM(CASE WHEN customer.region = '华东' THEN sales_order.amount END)` |
-  | count，无条件 / 带条件 | `COUNT(*)` / `COUNT(CASE WHEN sales_order.status = '已完成' THEN 1 END)` |
-  | count_distinct | `COUNT(DISTINCT customer.customer_no)`（带条件时同样用 CASE WHEN 包住） |
-  | ratio | `(<分子>) / NULLIF(<分母>, 0)` |
+  | count，无条件 / 带条件 | `COUNT(DISTINCT sales_order.order_no)` / `COUNT(DISTINCT CASE WHEN sales_order.status = '已完成' THEN sales_order.order_no END)` |
+  | count_distinct（`measure` 在粒度对象上） | `COUNT(DISTINCT sales_order.status)` |
+  | ratio | `(<分子>) / NULLIF(<分母>, 0)`；分子、分母都满足上面的前提才导出 |
 
-  两条不同路径落到同一个 dataset（例如同时用了 `sales_order.buyer.level` 和 `sales_order.seller.level`）时，OSI 表达式无法区分，
-  该指标报 `dropped`；引用未映射对象的指标也报 `dropped`。
+再导入时（§5.6），单 dataset 的 `COUNT(DISTINCT 粒度.主键字段)` 会读成 `count_distinct` 主键属性，口径与原来的 `count` 相同（RT-50）。
 
 ### 6.6 平台扩展块
 
@@ -731,8 +782,8 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `link_mappings`（一层 children） | ✅ | ✅ |
 | 一层 `referent_mappings`（对应 `identify_by`） | ✅ → 复合主键 | ✅ |
 | 嵌套 `referent_mappings`、多层 children、多个 object_mappings | ❌ dropped | — |
-| Metric（单个 dataset 上的 SUM / AVG / MIN / MAX / COUNT / COUNT DISTINCT） | ✅ → 结构化指标 | ✅ |
-| Metric（多个 dataset、条件、运算等其他形式） | ❌ dropped（原文留在导入报告） | ✅ 结构化指标编译成 SQL（路径无歧义时） |
+| Metric（单个 dataset 上的 SUM / AVG / MIN / MAX / COUNT DISTINCT） | ✅ → 结构化指标 | ✅ |
+| Metric（多个 dataset、条件、运算、`COUNT(*)` 等其他形式） | ❌ dropped（原文留在导入报告） | ✅ 结构化指标编译成 SQL（满足 §6.5 三条前提时） |
 | 各处 `ai_context`、`custom_extensions` | ❌ dropped | — |
 | （平台）显示名、反向名称、同义词、标签、必填 | 从扩展块读 | 写入扩展块 |
 | （平台）规则名、动作 | — | ❌ 不导出（用原生格式） |
@@ -793,7 +844,9 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，dataset 的 `unique_keys` 丢失 | | 不出现 |
 | RT-47 | 指标表达式随 RT-40 改写 dataset / field 名 | `SUM(ORD_T.AMT)` | `SUM(sales_order.amount)` |
 | RT-48 | 语义层各处的 `ai_context`、`custom_extensions` 丢失 | | 不出现 |
-| RT-49 | 不是固定形式的指标（§5.6）、导出时路径有歧义的指标（§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
+| RT-49 | 不是固定形式的指标（§5.6）、导出时不满足三条前提的指标（粒度不明、路径不唯一、对象未映射，§6.5）消失 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` | 不出现 |
+| RT-50 | 计数指标以去重计数形式往返 | 平台导出的 `COUNT(DISTINCT sales_order.order_no)` | 再导入为 `count_distinct` 主键属性（口径不变） |
+| RT-51 | 没有属性映射的键列、外键列以辅助字段出现，字段名 = 列名 | dataset 原有的字段名 | `{"name": "customer_id", "expression": …}` |
 
 **保持不变的部分**：实体概念名（RT-12 除外）、实体继承、实体描述、属性和二元关系的名字与指向、二元关系的基数、
 `identify_by`（RT-30 除外）、概念和关系上的 `requires` / `derived_by` 表达式原文（RT-28 只移动位置）、
@@ -853,7 +906,7 @@ dataset 的 `source` 和主键、物理列名。
 | 9 | 关系基数 | 去掉一对多，只留一对一、多对一、多对多（§3.4） |
 | 10 | 属性基数 | 改为 `unique` 开关（§3.3） |
 | 11 | `value_concept` | 删除；值概念名的变化见 RT-23 |
-| 12 | 平台信息的承载 | Ossie 扩展块只放命名类信息；完整保留用原生格式（§4.6） |
+| 12 | 平台信息的承载 | Ossie 扩展块只放命名类信息；完整保留用原生格式完整包（含材料，§4.6） |
 | 13 | 与原文件对比的界面 | 不做；导入报告逐项说明，对比只用于测试（§7.2） |
 | 14 | 规则表达式写法 | SQL 文本，用与指标相同含义的文字路径引用（§3.5） |
 | 15 | 同义词 | 对象、属性、关系、指标都有 `synonyms` |
