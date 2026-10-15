@@ -7,12 +7,8 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { SemanticCatalog, NativeDraft } from "../api/types";
-import nativeJson from "../lib/nativeDraft.fixture.json";
-import { editorDraft } from "../lib/nativeDraft";
+import type { SemanticCatalog } from "../api/types";
 import { SemanticCatalogView } from "./SemanticModels";
-import { MappingPanel } from "./elements/ElementPanels";
-import { nativeSemanticModels } from "../lib/semanticEditing";
 
 const catalog: SemanticCatalog = {
   concepts: [
@@ -227,67 +223,6 @@ describe("语义模型工作台", () => {
     expect(
       screen.queryByRole("heading", { name: "中文数据集说明" }),
     ).not.toBeInTheDocument();
-  });
-  it("edits a complex native mapping without replacing semantic branches in the draft", () => {
-    const native = structuredClone(nativeJson) as NativeDraft;
-    native.semantic_models = [
-      { id: "model", name: "semantic", map_name: "semantic" },
-    ];
-    native.concept_mappings = [
-      {
-        id: "cm",
-        semantic_model_id: "model",
-        concept_id: { kind: "object_type", ref: native.object_types[0].id },
-      },
-    ];
-    native.mapping_nodes = [
-      {
-        id: "root",
-        concept_mapping_id: "cm",
-        parent_id: null,
-        slot: "object_mappings",
-        kind: "object",
-        concept: null,
-        expression: "dataset.field + 2",
-        position: 0,
-      },
-    ];
-    const legacy = editorDraft(native);
-    const models = nativeSemanticModels(native);
-    const cm = models[0]?.concept_mappings?.[0];
-    // Complex tree editing uses explicit changes outside the legacy draft.
-    expect(cm).toBeDefined();
-    const type = [...legacy.object_types, ...(legacy.value_types ?? [])].find(
-      (t) => t.id === cm!.concept_id.ref,
-    )!;
-    const change = vi.fn();
-    legacy.mapping_status = {
-      [type.id]: {
-        state: "readonly",
-        reason: "multiple_roots",
-        message: "复杂映射暂不支持实例查询",
-        dataset_id: null,
-      },
-    };
-    render(
-      <MappingPanel
-        draft={legacy}
-        nativeDraft={native}
-        type={type}
-        editing
-        change={change}
-        open={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "编辑映射树" }));
-    fireEvent.change(screen.getAllByLabelText("映射表达式")[0], {
-      target: { value: "dataset.field + 1" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "应用到元素" }));
-    expect(
-      change.mock.calls[0][0]._semantic_changes[0].nodes[0].expression,
-    ).toBe("dataset.field + 1");
-    expect(change.mock.calls[0][0]).not.toHaveProperty("semantic_models");
   });
 });
 

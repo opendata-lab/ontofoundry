@@ -181,7 +181,12 @@ function field<T extends object>(
 }
 
 export function nativeFromEditor(original: Draft, edited: LegacyDraft): Draft {
-  if (original.schema_version === "2") return edited;
+  if (original.schema_version === "2") {
+    const { _mapping_tables: _tables, _mapping_modes: _modes, ...saved } = edited;
+    void _tables;
+    void _modes;
+    return saved;
+  }
   const result = structuredClone(original);
   const before = editorDraft(original);
   const oldConcepts = new Map(original.object_types.map((c) => [c.id, c]));

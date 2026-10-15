@@ -1,40 +1,21 @@
-import { NativeRolesEditor } from "./NativeRolesEditor";
-import { NativeMappingEditor } from "./NativeMappingEditor";
-import {
-  ArrowRight,
-  Box,
-  Check,
-  Database,
-  FileText,
-  Info,
-  Plus,
-  Trash2,
-} from "lucide-react";
-import { HintIcon, HintedHeading } from "../HintIcon";
-import type { ReactNode } from "react";
 import { useState } from "react";
-import type {
-  LegacyDraft,
-  Evidence,
-  PropertyElement,
-  RuleElement,
-} from "../../api/types";
-import { workspaceRequest } from "../../api/client";
-import { toView } from "../../lib/draftView";
-import { MappingForm } from "../MappingForm";
-import { TagList } from "../TagList";
-import { TagEditor } from "../TagEditor";
+import type { Evidence } from "../../api/types";
+import { FileText } from "lucide-react";
 import {
   changeType,
-  inheritedProperties,
   isObject,
   rulesFor,
-  VALUE_KINDS,
-  MULTIPLICITY,
+  relationsFor,
   type ElementType,
   type PanelProps,
 } from "../../lib/elementModel";
-import { newId } from "../../lib/id";
+import { objectMapping, shortObjectName } from "../../lib/objectMapping";
+import { InspectorDialog } from "./InspectorDialog";
+import { InfoButton, ReadonlyIcon } from "./MappingWidgets";
+import { IdentifierBar } from "./IdentifierBar";
+import { ObjectRelationGraph } from "./ObjectRelationGraph";
+export { PropertyMappingTable as PropertiesPanel } from "./PropertyMappingTable";
+export { RelationMappingTable as RelationsPanel } from "./RelationMappingTable";
 
 export function EvidenceSection({
   workspaceId,
@@ -75,1078 +56,345 @@ export function EvidenceSection({
     </section>
   );
 }
-export function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="element-field">
-      <span>
-        {label}
-        {hint && <HintIcon text={hint} />}
-      </span>
-      {children}
-    </label>
-  );
-}
 export function BasicPanel(props: PanelProps) {
-  const { type, draft, editing, open } = props;
+  const { type, draft, editing, open, nativeDraft } = props;
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const update = (patch: Partial<ElementType>) => changeType(props, patch);
-  const nativeEditing = editing;
-  const context = isObject(type)
-    ? (type.concept_context ?? { synonyms: [], instructions: null })
-    : null;
+  const object = isObject(type) && type.concept_kind !== "value_type";
+  const record = object ? objectMapping(draft, type, nativeDraft) : null;
+  const alias = type.description?.match(/别名：(.+?)[。.]?$/)?.[1];
+  const description = (type.description ?? "").split("别名：")[0].trim();
+  const aliases = [
+    ...new Set(
+      [
+        ...(alias?.split(/[、，,]/) ?? []),
+        ...(isObject(type) ? (type.concept_context?.synonyms ?? []) : []),
+      ]
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
+  const context = isObject(type) ? type.concept_context?.instructions : null;
   return (
-    <section className="element-section">
-      <h3>基本信息</h3>
-      <div className="element-basic-grid">
-        <Field label="名称">
-          {nativeEditing ? (
-            <input
-              required
-              maxLength={240}
-              value={type.name}
-              onChange={(e) => update({ name: e.target.value })}
-            />
-          ) : (
-            <span className="element-value">{type.name}</span>
-          )}
-        </Field>
-        <Field label="英文名称">
-          {nativeEditing ? (
-            <input
-              required
-              pattern="[A-Za-z_][A-Za-z0-9_]*"
-              value={type.technical_name}
-              onChange={(e) => update({ technical_name: e.target.value })}
-            />
-          ) : (
-            <span className="element-value">{type.technical_name}</span>
-          )}
-        </Field>
-        {(nativeEditing || type.tags.length > 0) && (
-          <div className="element-field">
-            <span>标签</span>
-            {nativeEditing ? (
-              <TagEditor
-                key={type.id}
-                tags={type.tags}
-                onChange={(tags) => update({ tags })}
+    <div className={record ? "om-overview" : "om-overview om-overview--simple"}>
+      <div className="om-summary">
+        <section>
+          <div className="om-section-head">
+            <h3>基本信息</h3>
+            {type.evidence.length > 0 && (
+              <InfoButton
+                label="来源证据"
+                onClick={() => setEvidenceOpen(true)}
               />
-            ) : (
-              <TagList tags={type.tags} />
             )}
           </div>
-        )}
-        {isObject(type) && type.concept_kind !== "value_type" && (
-          <div className="element-field">
-            <span>继承自</span>
-            {nativeEditing ? (
-              <select
-                aria-label="继承自"
-                value={type.extends[0] ?? ""}
-                onChange={(e) =>
-                  update({ extends: e.target.value ? [e.target.value] : [] })
-                }
-              >
-                <option value="">无</option>
-                {draft.object_types
-                  .filter((t) => t.id !== type.id)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-              </select>
-            ) : (
-              <span className="element-value">
-                {type.extends.length
-                  ? type.extends.map((id) => (
-                      <button
-                        className="element-text-button"
-                        type="button"
-                        key={id}
-                        onClick={() => open({ kind: "object_type", id })}
-                      >
-                        {draft.object_types.find((t) => t.id === id)?.name ??
-                          id}
-                      </button>
-                    ))
-                  : "无"}
-              </span>
-            )}
-          </div>
-        )}
-        <div className="element-field-wide">
-          <Field label="描述">
-            {nativeEditing ? (
-              <textarea
-                maxLength={4000}
-                rows={4}
-                value={type.description}
-                placeholder="描述这个对象或关系"
-                onChange={(e) => update({ description: e.target.value })}
-              />
-            ) : (
-              <span className="element-value">
-                {type.description || "尚未填写描述"}
-              </span>
-            )}
-          </Field>
-        </div>
-        {context && (
-          <div className="element-field-wide">
-            <Field label="同义词" hint="平台扩展，导出到其他工具会被忽略">
-              {editing ? (
-                <textarea
-                  rows={3}
-                  placeholder="每行一个同义词"
-                  value={context.synonyms.join("\n")}
-                  onChange={(e) =>
-                    update({
-                      concept_context: {
-                        ...context,
-                        synonyms: e.target.value
-                          .split("\n")
-                          .filter((value) => value !== ""),
-                      },
-                    })
-                  }
-                />
-              ) : (
-                <span className="element-value">
-                  {context.synonyms.join("、") || "尚未填写同义词"}
-                </span>
-              )}
-            </Field>
-            <Field label="上下文说明">
-              {editing ? (
-                <textarea
-                  rows={3}
-                  value={context.instructions ?? ""}
-                  placeholder="帮助智能体理解此概念的业务口径"
-                  onChange={(e) =>
-                    update({
-                      concept_context: {
-                        ...context,
-                        instructions: e.target.value,
-                      },
-                    })
-                  }
-                />
-              ) : (
-                <span className="element-value">
-                  {context.instructions || "尚未填写上下文说明"}
-                </span>
-              )}
-            </Field>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-export function PropertiesPanel(props: PanelProps) {
-  const { draft, type, editing, change, open } = props;
-  if (!isObject(type)) return null;
-  const properties = draft.properties.filter(
-    (p) => p.owner_type_id === type.id,
-  );
-  const inherited = inheritedProperties(draft, type);
-  const update = (id: string, patch: Partial<PropertyElement>) =>
-    change({
-      ...draft,
-      properties: draft.properties.map((p) =>
-        p.id === id ? { ...p, ...patch } : p,
-      ),
-    });
-  const mark = (yes: boolean) =>
-    yes ? (
-      <span className="element-check">
-        <Check size={12} strokeWidth={3} />
-      </span>
-    ) : (
-      <span className="muted">—</span>
-    );
-  return (
-    <>
-      <section className="element-section">
-        <div className="element-section-title">
-          <h3>属性定义</h3>
-          <span className="muted">
-            本地 {properties.length} · 继承 {inherited.length}
-          </span>
-          {editing && (
-            <button
-              className="element-text-button"
-              type="button"
-              onClick={() =>
-                change({
-                  ...draft,
-                  properties: [
-                    ...draft.properties,
-                    {
-                      id: newId(),
-                      owner_type_id: type.id,
-                      name: "",
-                      technical_name: "",
-                      description: "",
-                      value_kind: "string",
-                      required: false,
-                      identifier: false,
-                      verbalizes: [],
-                      evidence: [],
-                    },
-                  ],
-                })
-              }
-            >
-              <Plus size={14} />
-              新增属性
-            </button>
-          )}
-        </div>
-        <div className="element-table-wrap">
-          <table className="element-table">
-            <thead>
-              <tr>
-                <th>名称</th>
-                <th>英文名称</th>
-                <th>类型</th>
-                <th>标识</th>
-                <th>必填</th>
-                <th>来源</th>
-                {editing && <th />}
-              </tr>
-            </thead>
-            <tbody>
-              {properties.map((p, i) => (
-                <tr key={p.id} data-element-id={p.id}>
-                  <td>
-                    {editing ? (
-                      <input
-                        aria-label={`属性名称 ${i + 1}`}
-                        required
-                        value={p.name}
-                        onChange={(e) => update(p.id, { name: e.target.value })}
-                      />
-                    ) : (
-                      p.name
-                    )}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <input
-                        aria-label={`属性英文名称 ${i + 1}`}
-                        required
-                        value={p.technical_name}
-                        pattern="[A-Za-z_][A-Za-z0-9_]*"
-                        onChange={(e) => {
-                          const nextName = e.target.value;
-                          const mappings = draft.mappings.map((m) => {
-                            if (
-                              m.type_id !== type.id ||
-                              !(p.technical_name in m.fields)
-                            )
-                              return m;
-                            const fields = { ...m.fields };
-                            const column = fields[p.technical_name];
-                            delete fields[p.technical_name];
-                            if (nextName) fields[nextName] = column;
-                            return { ...m, fields };
-                          });
-                          change({
-                            ...draft,
-                            mappings,
-                            properties: draft.properties.map((item) =>
-                              item.id === p.id
-                                ? { ...item, technical_name: nextName }
-                                : item,
-                            ),
-                          });
-                        }}
-                      />
-                    ) : (
-                      p.technical_name
-                    )}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <select
-                        aria-label={`属性类型 ${i + 1}`}
-                        value={p.value_kind}
-                        onChange={(e) =>
-                          update(p.id, { value_kind: e.target.value })
-                        }
-                      >
-                        {Object.entries(VALUE_KINDS).map(([k, v]) => (
-                          <option value={k} key={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      (VALUE_KINDS[p.value_kind] ?? p.value_kind)
-                    )}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <input
-                        type="checkbox"
-                        aria-label={`标识属性 ${i + 1}`}
-                        checked={p.identifier}
-                        onChange={(e) =>
-                          update(p.id, { identifier: e.target.checked })
-                        }
-                      />
-                    ) : (
-                      mark(p.identifier)
-                    )}
-                  </td>
-                  <td>
-                    {editing ? (
-                      <input
-                        type="checkbox"
-                        aria-label={`必填属性 ${i + 1}`}
-                        checked={p.required}
-                        onChange={(e) =>
-                          update(p.id, { required: e.target.checked })
-                        }
-                      />
-                    ) : (
-                      mark(p.required)
-                    )}
-                  </td>
-                  <td>本地</td>
-                  {editing && (
-                    <td>
-                      <button
-                        className="icon-button"
-                        type="button"
-                        aria-label={`删除属性 ${p.name || i + 1}`}
-                        onClick={() => {
-                          const mappings = draft.mappings.map((m) => {
-                            if (m.type_id !== type.id) return m;
-                            const fields = { ...m.fields };
-                            delete fields[p.technical_name];
-                            return { ...m, fields };
-                          });
-                          change({
-                            ...draft,
-                            mappings,
-                            properties: draft.properties.filter(
-                              (item) => item.id !== p.id,
-                            ),
-                            rules: draft.rules.filter(
-                              (r) =>
-                                !(
-                                  r.owner_kind === "property" &&
-                                  r.owner_id === p.id
-                                ),
-                            ),
-                          });
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
+          <dl className="om-info-grid">
+            {(editing || type.name) && (
+              <>
+                <dt>名称</dt>
+                <dd>
+                  {editing ? (
+                    <input
+                      aria-label="名称"
+                      required
+                      maxLength={240}
+                      value={type.name}
+                      onChange={(e) => update({ name: e.target.value })}
+                    />
+                  ) : (
+                    type.name
                   )}
-                </tr>
-              ))}
-              {inherited.map(({ property: p, owner }) => (
-                <tr key={p.id}>
-                  <td>{p.name}</td>
-                  <td>{p.technical_name}</td>
-                  <td>{VALUE_KINDS[p.value_kind] ?? p.value_kind}</td>
-                  <td>{mark(p.identifier)}</td>
-                  <td>{mark(p.required)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="element-inherited"
-                      onClick={() =>
-                        open({
-                          kind: "object_type",
-                          id: owner.id,
-                          tab: "properties",
+                </dd>
+              </>
+            )}
+            {(editing || type.technical_name) && (
+              <>
+                <dt>英文名</dt>
+                <dd>
+                  {editing ? (
+                    <input
+                      aria-label="英文名"
+                      readOnly
+                      required
+                      pattern="[A-Za-z_][A-Za-z0-9_]*"
+                      value={type.technical_name}
+                      onChange={(e) =>
+                        update({ technical_name: e.target.value })
+                      }
+                    />
+                  ) : (
+                    <code>{type.technical_name}</code>
+                  )}
+                </dd>
+              </>
+            )}
+            {isObject(type) && type.extends.length > 0 && (
+              <>
+                <dt>继承自</dt>
+                <dd>
+                  {type.extends.map((id) => {
+                    const parent = draft.object_types.find((t) => t.id === id);
+                    return (
+                      parent && (
+                        <button
+                          type="button"
+                          key={id}
+                          className="element-text-button"
+                          onClick={() => open({ kind: "object_type", id })}
+                        >
+                          {shortObjectName(parent)}
+                        </button>
+                      )
+                    );
+                  })}
+                </dd>
+              </>
+            )}
+            {(editing || description) && (
+              <>
+                <dt>描述</dt>
+                <dd>
+                  {editing ? (
+                    <textarea
+                      aria-label="描述"
+                      rows={3}
+                      maxLength={4000}
+                      value={description}
+                      onChange={(e) =>
+                        update({
+                          description:
+                            e.target.value + (alias ? ` 别名：${alias}` : ""),
                         })
                       }
-                    >
-                      继承自{owner.name}
-                    </button>
-                  </td>
-                  {editing && <td />}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {!properties.length && !inherited.length && (
-          <p className="element-empty">
-            暂无属性{editing ? "，点击新增属性定义数据结构。" : "。"}
-          </p>
-        )}
-        {!!inherited.length && (
-          <div className="element-info">
-            <Info size={16} />
-            <span>继承属性由所属对象类型维护</span>
-            <button
-              type="button"
-              className="element-text-button"
-              onClick={() =>
-                open({
-                  kind: "object_type",
-                  id: inherited[0].owner.id,
-                  tab: "properties",
-                })
-              }
-            >
-              查看{inherited[0].owner.name}
-            </button>
-          </div>
-        )}
-      </section>
-      <EvidenceSection
-        workspaceId={draft.workspace_id}
-        evidence={type.evidence}
-      />
-    </>
-  );
-}
-export function EndpointsPanel(props: PanelProps) {
-  const { type, draft, editing, open } = props;
-  if (isObject(type)) return null;
-  if (type.owner_ref) return <NativeRolesEditor {...props} />;
-  return (
-    <section className="element-section">
-      <HintedHeading
-        title="关系端点"
-        hint="修改端点会影响关系映射与实例引用。"
-      />
-      <div className="element-endpoints">
-        {(["source_type_id", "target_type_id"] as const).map((key, i) => (
-          <div className="element-endpoint-group" key={key}>
-            {i === 1 && (
-              <div className="element-endpoint-arrow">
-                <span>{type.name}</span>
-                <svg
-                  width="104"
-                  height="36"
-                  viewBox="0 0 104 36"
-                  fill="none"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path d="M2 18H100M94 12L100 18L94 24" />
-                </svg>
-              </div>
+                    />
+                  ) : (
+                    description
+                  )}
+                </dd>
+              </>
             )}
-            <div className="element-endpoint">
-              <Box size={32} strokeWidth={1.8} />
-              <Field label={i ? "目标对象" : "源对象"}>
-                {editing ? (
-                  <select
-                    required
-                    value={type[key]}
-                    onChange={(e) =>
-                      changeType(props, { [key]: e.target.value })
-                    }
-                  >
-                    <option value="">请选择对象</option>
-                    {draft.object_types.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <button
-                    type="button"
-                    className="element-endpoint-value"
-                    aria-label={`${i ? "目标" : "源"}对象：${draft.object_types.find((t) => t.id === type[key])?.name ?? "未指定"}`}
-                    onClick={() => open({ kind: "object_type", id: type[key] })}
-                  >
-                    {draft.object_types.find((t) => t.id === type[key])?.name ??
-                      "未指定"}
-                  </button>
-                )}
-              </Field>
-            </div>
-          </div>
-        ))}
-      </div>
-      <Field label="关系基数">
-        {editing ? (
-          <select
-            value={type.multiplicity}
-            onChange={(e) =>
-              changeType(props, { multiplicity: e.target.value })
-            }
-          >
-            {Object.entries(MULTIPLICITY).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span className="element-value">
-            {MULTIPLICITY[type.multiplicity] ?? type.multiplicity}
-          </span>
-        )}
-      </Field>
-      <label className="element-checkbox">
-        <input
-          type="checkbox"
-          checked={!!type.identifier}
-          disabled={!editing}
-          onChange={(e) => changeType(props, { identifier: e.target.checked })}
-        />
-        此关系用作标识
-      </label>
-    </section>
-  );
-}
-export function MappingPanel(
-  props: PanelProps & {
-    suggestedSource?: {
-      connection_alias: string;
-      table_name: string;
-      schema_name: string | null;
-    };
-  },
-) {
-  const { draft, type, editing, change, suggestedSource } = props;
-  const mapping = draft.mappings.find((m) => m.type_id === type.id);
-  if (isObject(type)) {
-    const status = draft.mapping_status?.[type.id];
-    if (
-      (status?.state === "readonly" || type.concept_kind === "value_type") &&
-      props.nativeDraft
-    )
-      return <NativeMappingEditor {...props} />;
-    const object = toView(draft).object_types.find((t) => t.id === type.id)!;
-    if (editing)
-      return (
-        <>
-          <MappingForm
-            workspaceId={draft.workspace_id}
-            type={object}
-            mapping={mapping}
-            suggestedSource={suggestedSource}
-            onChange={(value) =>
-              change({
-                ...draft,
-                mappings: [
-                  ...draft.mappings.filter((m) => m.type_id !== type.id),
-                  value,
-                ],
-              })
-            }
-          />
-          {props.nativeDraft && (
-            <details>
-              <summary>原生映射树</summary>
-              <NativeMappingEditor {...props} />
-            </details>
-          )}
-          <MappingPreview draft={draft} type={type} showSource={false} />
-        </>
-      );
-    return (
-      <>
-        <section className="element-section">
-          <h3>数据映射</h3>
-          {mapping ? (
-            <>
-              <div className="element-source">
-                <Database size={22} />
-                <div>
-                  <strong>
-                    {mapping.schema_name ? `${mapping.schema_name}.` : ""}
-                    {mapping.table_name}
-                  </strong>
-                  <span>
-                    {mapping.connection_alias} · 标识字段 {mapping.key_column}
-                  </span>
-                </div>
-              </div>
-              <table className="element-table">
-                <thead>
-                  <tr>
-                    <th>本体属性</th>
-                    <th>数据字段</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(mapping.fields).map(([name, column]) => (
-                    <tr key={name}>
-                      <td>
-                        {object.attributes.find(
-                          (p) => p.technical_name === name,
-                        )?.name ?? name}
-                        <small>{name}</small>
-                      </td>
-                      <td>{column}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          ) : (
-            <p className="element-empty">
-              暂无映射，点击右上角“编辑”配置数据表和属性映射。
-            </p>
-          )}
+            {aliases.length > 0 && (
+              <>
+                <dt>同义词</dt>
+                <dd>
+                  {editing && isObject(type) ? (
+                    <textarea
+                      aria-label="同义词"
+                      rows={2}
+                      value={
+                        type.concept_context?.synonyms.length
+                          ? type.concept_context.synonyms.join("\n")
+                          : aliases.join("\n")
+                      }
+                      onChange={(e) =>
+                        update({
+                          concept_context: {
+                            synonyms: e.target.value
+                              .split("\n")
+                              .filter(Boolean),
+                            instructions: context ?? null,
+                          },
+                        })
+                      }
+                    />
+                  ) : (
+                    aliases.join("、")
+                  )}
+                </dd>
+              </>
+            )}
+            {context?.trim() && (
+              <>
+                <dt>上下文说明</dt>
+                <dd>
+                  {editing && isObject(type) ? (
+                    <textarea
+                      aria-label="上下文说明"
+                      rows={2}
+                      value={context ?? ""}
+                      onChange={(e) =>
+                        update({
+                          concept_context: {
+                            synonyms: type.concept_context?.synonyms ?? [],
+                            instructions: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  ) : (
+                    context
+                  )}
+                </dd>
+              </>
+            )}
+          </dl>
         </section>
-        <MappingPreview draft={draft} type={type} showSource={false} />
-      </>
-    );
-  }
-  if (props.nativeDraft && (!type.source_type_id || type.roles?.length !== 1))
-    return <NativeMappingEditor {...props} />;
-  return (
-    <>
-      <section className="element-section">
-        <HintedHeading
-          title="关系映射"
-          hint="根据两端对象的数据映射，按字段相等查找关系。两端数据须来自同一数据源，跨数据源关系暂不可查询。"
-        />
-        <label className="element-checkbox">
-          <input
-            type="checkbox"
-            checked={!!type.data_join}
-            disabled={!editing}
-            onChange={(e) =>
-              changeType(props, {
-                data_join: e.target.checked
-                  ? { source_column: "", target_column: "" }
-                  : null,
-              })
-            }
-          />
-          配置字段关联
-        </label>
-        {type.data_join ? (
-          <div className="join-editor">
-            {(
-              type.data_join.source_columns ?? [type.data_join.source_column]
-            ).map((source, index) => (
-              <div className="join-pair" key={index}>
-                {(["source", "target"] as const).map((side) => {
-                  const columns = type.data_join![`${side}_columns`] ?? [
-                    type.data_join![`${side}_column`],
-                  ];
-                  const owner =
-                    (side === "source") !==
-                    (type.endpoint_direction === "reverse");
-                  return (
-                    <Field
-                      key={side}
-                      label={`${owner ? "所属概念" : "附加角色"}连接字段 ${index + 1}`}
-                    >
-                      {editing ? (
-                        <input
-                          required
-                          value={columns[index] ?? ""}
-                          onChange={(e) => {
-                            const next = columns.map((c, i) =>
-                              i === index ? e.target.value : c,
-                            );
-                            changeType(props, {
-                              data_join: {
-                                ...type.data_join!,
-                                [`${side}_column`]: next[0],
-                                [`${side}_columns`]: next,
-                              },
-                            });
-                          }}
-                        />
-                      ) : (
-                        <code>
-                          {side === "source" ? source : columns[index]}
-                        </code>
-                      )}
-                    </Field>
-                  );
-                })}
-                {editing && (
-                  <button
-                    type="button"
-                    aria-label={`删除连接键 ${index + 1}`}
-                    disabled={(type.data_join?.source_columns?.length ?? 1) < 2}
-                    onClick={() => {
-                      const source = type.data_join!.source_columns!.filter(
-                          (_, i) => i !== index,
-                        ),
-                        target = (
-                          type.data_join!.target_columns ?? [
-                            type.data_join!.target_column,
-                          ]
-                        ).filter((_, i) => i !== index);
-                      changeType(props, {
-                        data_join: {
-                          source_column: source[0],
-                          target_column: target[0],
-                          source_columns: source,
-                          target_columns: target,
-                        },
-                      });
-                    }}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+        {record && (
+          <>
+            <section>
+              <div className="om-section-head">
+                <h3>实例标识</h3>
+              </div>
+              <IdentifierBar {...props} heading={false} />
+            </section>
+            <section>
+              <div className="om-section-head">
+                <h3>数据来源</h3>
+              </div>
+              <div className="om-sources-summary">
+                {record.tables.length ? (
+                  record.tables.map((table) => (
+                    <div key={table.id}>
+                      <span
+                        className={
+                          table.id === record.mainDataset?.id
+                            ? "om-tag om-tag-key"
+                            : "om-tag"
+                        }
+                      >
+                        {table.id === record.mainDataset?.id ? "主表" : "附表"}
+                      </span>
+                      <code title={table.source}>
+                        {table.source.split(".").at(-1)}
+                      </code>
+                    </div>
+                  ))
+                ) : (
+                  <span className="muted">未绑定</span>
                 )}
               </div>
-            ))}
-            {editing && (
-              <button
-                type="button"
-                onClick={() =>
-                  changeType(props, {
-                    data_join: {
-                      ...type.data_join!,
-                      source_columns: [
-                        ...(type.data_join!.source_columns ?? [
-                          type.data_join!.source_column,
-                        ]),
-                        "",
-                      ],
-                      target_columns: [
-                        ...(type.data_join!.target_columns ?? [
-                          type.data_join!.target_column,
-                        ]),
-                        "",
-                      ],
-                    },
-                  })
-                }
-              >
-                <Plus size={12} />
-                添加连接键
-              </button>
-            )}
-          </div>
-        ) : (
-          <p className="element-empty">尚未配置关系映射。</p>
-        )}
-      </section>
-      <MappingPreview draft={draft} type={type} />
-    </>
-  );
-}
-export function DataSample({
-  workspaceId,
-  mapping,
-  showSource = true,
-}: {
-  workspaceId: string;
-  mapping: LegacyDraft["mappings"][number];
-  showSource?: boolean;
-}) {
-  const [rows, setRows] = useState<Record<string, unknown>[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const preview = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const result = await workspaceRequest<{
-        items: Record<string, unknown>[];
-      }>(workspaceId, "/mapping-preview", { mapping, limit: 10 });
-      setRows(result.items);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "读取失败");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const columns = rows?.length
-    ? Object.keys(rows[0]).filter((k) => k !== "__key")
-    : [];
-  return (
-    <div className="element-sample">
-      <div className={showSource ? "element-source" : "element-section-title"}>
-        {showSource && (
-          <>
-            <Database size={22} />
-            <div>
-              <strong>
-                {mapping.schema_name ? `${mapping.schema_name}.` : ""}
-                {mapping.table_name}
-              </strong>
-              <span>{mapping.connection_alias}</span>
-            </div>
+            </section>
           </>
         )}
-        <button
-          type="button"
-          className="button button--secondary"
-          disabled={busy || !mapping.key_column}
-          onClick={() => void preview()}
-        >
-          {busy ? "正在读取…" : "预览数据"}
-        </button>
       </div>
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
-      {rows && (
-        <div className="element-table-wrap">
-          <table className="element-table">
-            <thead>
-              <tr>
-                {columns.map((c) => (
-                  <th key={c}>{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, i) => (
-                <tr key={i}>
-                  {columns.map((c) => (
-                    <td key={c}>{String(row[c] ?? "—")}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!rows.length && <p className="element-empty">暂无数据。</p>}
-        </div>
+      {record && <ObjectRelationGraph {...props} />}
+      {evidenceOpen && (
+        <InspectorDialog
+          title="来源证据"
+          onClose={() => setEvidenceOpen(false)}
+        >
+          <EvidenceSection
+            workspaceId={draft.workspace_id}
+            evidence={type.evidence}
+          />
+        </InspectorDialog>
       )}
     </div>
   );
 }
-function MappingPreview({
-  draft,
-  type,
-  showSource = true,
-}: Pick<PanelProps, "draft" | "type"> & { showSource?: boolean }) {
-  const ids = isObject(type)
-    ? [type.id]
-    : [type.source_type_id, type.target_type_id];
-  const mappings = draft.mappings.filter((m) => ids.includes(m.type_id));
-  if (!mappings.length) return null;
-  return (
-    <section className="element-section">
-      <HintedHeading
-        title={isObject(type) ? "数据预览" : "端点数据预览"}
-        hint="按需读取最多 10 条映射结果；查看全部实例请切换到“实例”。"
-      />
-      {mappings.map((m) => (
-        <DataSample
-          key={JSON.stringify(m)}
-          workspaceId={draft.workspace_id}
-          mapping={m}
-          showSource={showSource}
-        />
-      ))}
-    </section>
-  );
-}
-export function RelationsPanel({ draft, type, editing, open }: PanelProps) {
-  const relations = draft.link_types.filter(
-    (r) => r.source_type_id === type.id || r.target_type_id === type.id,
-  );
-  return (
-    <section className="element-section">
-      <div className="element-section-title">
-        <h3>关联关系</h3>
-        {editing && (
-          <button
-            type="button"
-            className="element-text-button"
-            onClick={() => open({ kind: "link_type", id: "new", mode: "edit" })}
-          >
-            <Plus size={14} />
-            新增关系
-          </button>
-        )}
-      </div>
-      {relations.length ? (
-        relations.map((r) => (
-          <button
-            key={r.id}
-            type="button"
-            className="element-relation-row"
-            onClick={() =>
-              open({ kind: "link_type", id: r.id, tab: "endpoints" })
-            }
-          >
-            <strong>{r.name}</strong>
-            <span>
-              {draft.object_types.find((t) => t.id === r.source_type_id)?.name}{" "}
-              <ArrowRight size={14} />{" "}
-              {draft.object_types.find((t) => t.id === r.target_type_id)?.name}
-            </span>
-          </button>
-        ))
-      ) : (
-        <p className="element-empty">暂无关联关系。</p>
-      )}
-    </section>
-  );
-}
-export function RulesPanel({ draft, type, editing, change }: PanelProps) {
+export function RulesPanel(props: PanelProps) {
+  const { draft, type, editing, change, open } = props;
   const rules = rulesFor(draft, type);
-  const owners = [
-    {
-      kind: isObject(type) ? "object_type" : "link_type",
-      id: type.id,
-      name: type.name,
-    },
-    ...draft.properties
-      .filter((p) => p.owner_type_id === type.id)
-      .map((p) => ({ kind: "property", id: p.id, name: p.name })),
-    ...draft.actions
-      .filter((a) => a.input_type_id === type.id)
-      .map((a) => ({ kind: "action", id: a.id, name: a.name })),
-  ];
-  const update = (id: string, patch: Partial<RuleElement>) =>
-    change({
-      ...draft,
-      rules: draft.rules.map((r) => (r.id === id ? { ...r, ...patch } : r)),
-    });
   return (
-    <section className="element-section">
-      <div className="element-section-title">
-        <HintedHeading
-          title="规则"
-          hint="规则用于模型校验与定义，当前不执行推理。"
-        />
-        {editing && (
-          <button
-            className="element-text-button"
-            type="button"
-            onClick={() => {
-              const id = newId();
-              change({
-                ...draft,
-                rules: [
-                  ...draft.rules,
-                  {
-                    id,
-                    name: "新规则",
-                    technical_name: `rule_${id.replaceAll("-", "").slice(0, 8)}`,
-                    description: "",
-                    owner_kind: isObject(type) ? "object_type" : "link_type",
-                    owner_id: type.id,
-                    rule_kind: "constraint",
-                    expression: "",
-                    verbalizes: [],
-                    evidence: [],
-                  },
-                ],
-              });
-            }}
-          >
-            <Plus size={14} />
-            新增规则
-          </button>
-        )}
-      </div>
-      {rules.map((r) => (
-        <div className="element-rule" key={r.id} data-element-id={r.id}>
-          <div className="element-section-title">
-            {editing ? (
-              <input
-                aria-label="规则名称"
-                value={r.name}
-                onChange={(e) => update(r.id, { name: e.target.value })}
-              />
-            ) : (
-              <strong>{r.name}</strong>
-            )}
-            <span className="element-pill">
-              {r.rule_kind === "constraint" ? "约束" : "派生"}
-            </span>
-            {editing && (
-              <button
-                className="icon-button"
-                type="button"
-                aria-label={`删除规则 ${r.name}`}
-                onClick={() =>
-                  change({
-                    ...draft,
-                    rules: draft.rules.filter((item) => item.id !== r.id),
-                  })
-                }
-              >
-                <Trash2 size={14} />
-              </button>
-            )}
-          </div>
-          {editing && (
-            <div className="element-basic-grid">
-              <Field label="所属元素">
-                <select
-                  value={`${r.owner_kind}:${r.owner_id}`}
-                  onChange={(e) => {
-                    const owner = owners.find(
-                      (o) => `${o.kind}:${o.id}` === e.target.value,
-                    )!;
-                    update(r.id, {
-                      owner_kind: owner.kind as RuleElement["owner_kind"],
-                      owner_id: owner.id,
-                    });
-                  }}
-                >
-                  {owners.map((o) => (
-                    <option
-                      key={`${o.kind}:${o.id}`}
-                      value={`${o.kind}:${o.id}`}
-                    >
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="规则类型">
-                <select
-                  value={r.rule_kind}
-                  onChange={(e) =>
-                    update(r.id, {
-                      rule_kind: e.target.value as RuleElement["rule_kind"],
-                    })
-                  }
-                >
-                  <option value="constraint">约束</option>
-                  <option value="derivation">派生</option>
-                </select>
-              </Field>
-            </div>
-          )}
-          {editing ? (
-            <Field label="表达式">
-              <textarea
-                required
-                rows={2}
-                value={r.expression}
-                onChange={(e) => update(r.id, { expression: e.target.value })}
-              />
-            </Field>
-          ) : (
-            <>
-              <span className="muted">
-                {
-                  owners.find(
-                    (o) => o.kind === r.owner_kind && o.id === r.owner_id,
-                  )?.name
-                }
-              </span>
-              <code>{r.expression}</code>
-            </>
-          )}
-        </div>
-      ))}
-      {!rules.length && <p className="element-empty">暂无规则。</p>}
-    </section>
+    <div className="om-table-wrap">
+      <table className="om-table om-rules">
+        <thead>
+          <tr>
+            <th>作用于</th>
+            <th>类型</th>
+            <th>规则</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rules.map((rule) => {
+            const property = draft.properties.find(
+              (p) => p.id === rule.owner_id,
+            );
+            const relation = draft.link_types.find(
+              (r) => r.id === rule.owner_id,
+            );
+            const inheritedRelation = isObject(type)
+              ? relationsFor(draft, type).find(
+                  (r) => r.definition.id === rule.owner_id,
+                )
+              : undefined;
+            const inherited = property
+              ? property.owner_type_id !== type.id
+              : relation
+                ? !!inheritedRelation?.inherited
+                : rule.owner_kind === "object_type" &&
+                  rule.owner_id !== type.id;
+            const ownerId =
+              property?.owner_type_id ??
+              inheritedRelation?.inheritedFrom ??
+              rule.owner_id;
+            const label =
+              property?.name ??
+              relation?.name ??
+              (rule.owner_kind === "action"
+                ? draft.actions.find((a) => a.id === rule.owner_id)?.name
+                : "对象");
+            return (
+              <tr key={rule.id} data-element-id={rule.id}>
+                <td>
+                  <div className="om-property-name">
+                    {label}
+                    {inherited && <span className="om-tag">继承</span>}
+                    {editing && inherited && (
+                      <>
+                        <ReadonlyIcon reason="继承规则属于父对象，请编辑父对象。" />
+                        <button
+                          type="button"
+                          className="element-text-button"
+                          onClick={() =>
+                            open({
+                              kind: "object_type",
+                              id: ownerId,
+                              tab: "rules",
+                              mode: "edit",
+                            })
+                          }
+                        >
+                          编辑父对象
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {property && (
+                    <span className="om-sub">{property.technical_name}</span>
+                  )}
+                </td>
+                <td>
+                  <span className="om-tag">
+                    {rule.rule_kind === "derivation" ? "派生" : "约束"}
+                  </span>
+                </td>
+                <td>
+                  {editing && !inherited && !relation ? (
+                    <textarea
+                      aria-label={`${label}规则条件`}
+                      className="om-rule-expression"
+                      value={rule.expression}
+                      onChange={(e) =>
+                        change({
+                          ...draft,
+                          rules: draft.rules.map((r) =>
+                            r.id === rule.id
+                              ? { ...r, expression: e.target.value }
+                              : r,
+                          ),
+                        })
+                      }
+                    />
+                  ) : (
+                    <code className="om-rule-expression">
+                      {rule.expression}
+                    </code>
+                  )}
+                  {rule.description.trim() && (
+                    <div className="om-rule-description muted">
+                      {rule.description}
+                    </div>
+                  )}
+                  {editing && relation && !inherited && (
+                    <ReadonlyIcon reason="关系规则不属于当前对象的保存范围，请在「本体构建」中编辑对应关系规则。" />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

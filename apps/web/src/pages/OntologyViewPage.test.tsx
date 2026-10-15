@@ -4,15 +4,20 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, modelingApi, publishApi } from "../api/client";
+import { api, modelingApi, publishApi, workspaceRequest } from "../api/client";
 import type { TypeGraph, Workspace, WorkspaceOverview } from "../api/types";
 import { OntologyViewPage } from "./OntologyViewPage";
+import { emptyDraft } from "../lib/draftView";
 import type { SelectedGraphItem } from "../components/OntologyGraph";
 
-const context = vi.hoisted(() => ({ workspace: {} as Workspace, refresh: vi.fn() }));
+const context = vi.hoisted(() => ({
+  workspace: {} as Workspace,
+  refresh: vi.fn(),
+}));
 vi.mock("../hooks/useWorkspaceContext", () => ({
   useWorkspaceContext: () => context,
 }));
@@ -20,12 +25,24 @@ vi.mock("../api/client", () => ({
   api: { overview: vi.fn(), exportUrl: vi.fn(() => "/export") },
   modelingApi: { importOssie: vi.fn(), sessions: vi.fn() },
   publishApi: { preview: vi.fn(), publish: vi.fn() },
+  workspaceRequest: vi.fn(),
 }));
 vi.mock("../components/OntologyGraph", () => ({
-  OntologyGraph: ({ graph, onSelect }: { graph: TypeGraph; onSelect: (item: SelectedGraphItem) => void }) => (
+  OntologyGraph: ({
+    graph,
+    onSelect,
+  }: {
+    graph: TypeGraph;
+    onSelect: (item: SelectedGraphItem) => void;
+  }) => (
     <div data-testid="semantic-graph" data-edges={graph.edges.length}>
       {graph.nodes.map((n) => (
-        <button key={n.id} onClick={() => onSelect({ category: "node", item: n })}>{n.label}</button>
+        <button
+          key={n.id}
+          onClick={() => onSelect({ category: "node", item: n })}
+        >
+          {n.label}
+        </button>
       ))}
     </div>
   ),
@@ -140,52 +157,54 @@ beforeEach(() => {
     link_type_count: 1,
     updated_at: "",
   };
+  localStorage.clear();
+  vi.mocked(workspaceRequest).mockResolvedValue({ model: emptyDraft("w") });
   vi.mocked(api.overview).mockResolvedValue(overview());
   vi.mocked(modelingApi.sessions).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
 describe("本体视图", () => {
-  it("defaults to four stacked layers and switches the renderer, not just a caption", async () => {
+  it("keeps global layers and puts semantic controls on the approved view row", async () => {
     const { container } = show();
     await screen.findByRole("region", { name: "已发布本体分层总览" });
     expect(container.querySelectorAll("[data-layer]")).toHaveLength(4);
-    expect(screen.queryByTestId("semantic-graph")).not.toBeInTheDocument();
-    expect(screen.getByText("v2 · 已发布")).toBeInTheDocument();
-    expect(screen.getByText("业务对象 (2)")).toBeInTheDocument();
-    expect(screen.getByText("暂无已发布文档实例")).toBeInTheDocument();
-    expect(screen.getByText("暂无已发布数据映射")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "语义视图" }));
-    for (const name of ["图谱", "业务", "技术"])
+    expect(
+      screen.getByRole("complementary", { name: "资源管理器" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: "名称筛选" }),
+    ).toBeInTheDocument();
+    for (const name of ["构建本体", "本体关系"])
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    for (const name of ["构建本体", "关系", "全部"])
       expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
-    expect(container.querySelectorAll("[data-layer]")).toHaveLength(0);
-    expect(api.exportUrl).toHaveBeenLastCalledWith("w", "v2");
-    // Attributes are entity fields, so the value type and the attribute edge
-    // that carries it never reach the canvas, and there is no toggle for them.
-    expect(screen.queryByText("物料编号")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "搜索图谱" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("实体")).not.toBeInTheDocument();
+    expect(screen.queryByText("测试空间")).not.toBeInTheDocument();
+    const row = container.querySelector(".view-tabs-bar")!;
+    expect(
+      within(row as HTMLElement).getByRole("link", { name: "发布" }),
+    ).toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).getByRole("button", { name: "导入" }),
+    ).toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).getByRole("link", { name: "导出" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("显示 2 / 2 个对象 · 1 / 1 个关系"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("semantic-graph")).toHaveAttribute(
       "data-edges",
       "1",
     );
-    expect(
-      screen.queryByRole("checkbox", { name: "显示属性" }),
-    ).not.toBeInTheDocument();
-    // The count still comes from the published version, not from the canvas.
-    expect(screen.getByText("属性 1")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "图谱标签" }), {
-      target: { value: "采购" },
-    });
-    expect(screen.getByText("物料")).toBeInTheDocument();
-    expect(screen.queryByText("供应商")).not.toBeInTheDocument();
-    expect(screen.getByTestId("semantic-graph")).toHaveAttribute(
-      "data-edges",
-      "0",
-    );
+    expect(api.exportUrl).toHaveBeenLastCalledWith("w", "v2");
     fireEvent.click(screen.getByRole("tab", { name: "全局" }));
     expect(container.querySelectorAll("[data-layer]")).toHaveLength(4);
-    expect(
-      screen.getByRole("button", { name: "查看本体：供应商" }),
-    ).toBeInTheDocument();
   });
 
   it("supports node details, layer navigation, zoom reset and keyboard tabs", async () => {
@@ -193,7 +212,9 @@ describe("本体视图", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "查看本体：物料" }),
     );
-    expect(screen.getByLabelText("查看地址")).toHaveTextContent("inspect=object_type%3Amaterial");
+    expect(screen.getByLabelText("查看地址")).toHaveTextContent(
+      "inspect=object_type%3Amaterial",
+    );
     fireEvent.click(screen.getByRole("button", { name: "放大全局图" }));
     expect(screen.getByText("120%")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "适配全局图" }));
@@ -204,8 +225,15 @@ describe("本体视图", () => {
       "aria-selected",
       "true",
     );
-    fireEvent.click(screen.getByRole("button", { name: "供应商" }));
-    expect(screen.getByLabelText("查看地址")).toHaveTextContent("inspect=object_type%3Asupplier");
+    fireEvent.click(
+      within(screen.getByTestId("semantic-graph")).getByRole("button", {
+        name: "供应商",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "打开选中资源详情" }));
+    expect(screen.getByLabelText("查看地址")).toHaveTextContent(
+      "inspect=object_type%3Asupplier",
+    );
     expect(
       screen.queryByRole("link", { name: "打开本体详情" }),
     ).not.toBeInTheDocument();
@@ -268,7 +296,10 @@ describe("本体视图", () => {
   });
 
   it("first import: reports what it dropped and publishes as the initial version", async () => {
-    context.workspace = { ...context.workspace, current_version: null } as Workspace;
+    context.workspace = {
+      ...context.workspace,
+      current_version: null,
+    } as Workspace;
     const document = {
       version: "0.2.0.dev0",
       name: "crm",
@@ -312,23 +343,34 @@ describe("本体视图", () => {
     });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    expect(await screen.findByText(/确认下方报告无误后发布为初始版本/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/确认下方报告无误后发布为初始版本/),
+    ).toBeInTheDocument();
     // Nothing to merge with: the file is the model.
-    expect(modelingApi.importOssie).toHaveBeenCalledWith("w", document, "replace");
-    expect(screen.getByText("2 个 role 的关系暂不支持")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "先看草稿，稍后发布" })).toHaveAttribute(
-      "href",
-      "/builder?session=session-1",
+    expect(modelingApi.importOssie).toHaveBeenCalledWith(
+      "w",
+      document,
+      "replace",
     );
+    expect(screen.getByText("2 个 role 的关系暂不支持")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "先看草稿，稍后发布" }),
+    ).toHaveAttribute("href", "/builder?session=session-1");
     expect(api.overview).not.toHaveBeenCalled();
 
     const preview = { validation: { publishable: true, errors: [] } };
     vi.mocked(publishApi.preview).mockResolvedValue(preview as never);
-    vi.mocked(publishApi.publish).mockResolvedValue({ version: { version: 3 } } as never);
-    fireEvent.click(screen.getByRole("button", { name: "确认并发布为初始版本" }));
+    vi.mocked(publishApi.publish).mockResolvedValue({
+      version: { version: 3 },
+    } as never);
+    fireEvent.click(
+      screen.getByRole("button", { name: "确认并发布为初始版本" }),
+    );
     expect(await screen.findByText(/已发布为 v3/)).toBeInTheDocument();
     expect(publishApi.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "session-1" }), preview, "导入 crm",
+      expect.objectContaining({ id: "session-1" }),
+      preview,
+      "导入 crm",
     );
     // The page refreshes only once the confirmation has been seen and closed.
     expect(context.refresh).not.toHaveBeenCalled();
@@ -341,29 +383,53 @@ describe("本体视图", () => {
       id: "session-2",
       title: "导入 crm",
       import_report: {
-        name: "crm", description: "", mode: "merge",
-        counts: { objects_added: 1, objects_updated: 2, links_added: 0, links_updated: 0,
-          attributes_added: 0, attributes_updated: 1 },
-        skipped: [], notes: [],
+        name: "crm",
+        description: "",
+        mode: "merge",
+        counts: {
+          objects_added: 1,
+          objects_updated: 2,
+          links_added: 0,
+          links_updated: 0,
+          attributes_added: 0,
+          attributes_updated: 1,
+        },
+        skipped: [],
+        notes: [],
       },
     } as never);
     show();
     fireEvent.click(await screen.findByRole("tab", { name: "语义视图" }));
     fireEvent.click(screen.getByRole("button", { name: "导入" }));
-    expect(screen.getByText(/空间已有 v1：导入后进入对比与合并/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/空间已有 v1：导入后进入对比与合并/),
+    ).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("选择 Ossie JSON 文件"), {
-      target: { files: [new File(['{"version":"0.2.0.dev0","name":"crm","ontology":[]}'], "crm.json")] },
+      target: {
+        files: [
+          new File(
+            ['{"version":"0.2.0.dev0","name":"crm","ontology":[]}'],
+            "crm.json",
+          ),
+        ],
+      },
     });
-    const button = await screen.findByRole("button", { name: /导入 crm\.json/ });
+    const button = await screen.findByRole("button", {
+      name: /导入 crm\.json/,
+    });
     await waitFor(() => expect(button).toBeEnabled());
     fireEvent.click(button);
-    expect(await screen.findByText(/请对比差异并合并后发布/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/请对比差异并合并后发布/),
+    ).toBeInTheDocument();
     expect(vi.mocked(modelingApi.importOssie).mock.calls[0][2]).toBe("merge");
     expect(screen.getByRole("link", { name: "对比并合并" })).toHaveAttribute(
       "href",
       "/delivery?session=session-2",
     );
-    expect(screen.queryByRole("button", { name: /确认并发布/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /确认并发布/ }),
+    ).not.toBeInTheDocument();
     expect(publishApi.publish).not.toHaveBeenCalled();
   });
 
@@ -386,21 +452,40 @@ describe("本体视图", () => {
   it("points at a session whose accepted changes are not published yet", async () => {
     vi.mocked(modelingApi.sessions).mockResolvedValue({
       items: [
-        { id: "clean", title: "已发布", task_status: "idle", updated_at: "", has_unpublished_changes: false },
-        { id: "draft", title: "草稿", task_status: "finished", updated_at: "", has_unpublished_changes: true },
+        {
+          id: "clean",
+          title: "已发布",
+          task_status: "idle",
+          updated_at: "",
+          has_unpublished_changes: false,
+        },
+        {
+          id: "draft",
+          title: "草稿",
+          task_status: "finished",
+          updated_at: "",
+          has_unpublished_changes: true,
+        },
       ],
     });
     show();
-    expect(await screen.findByRole("link", { name: "有未发布的草稿修改 · 去发布" })).toHaveAttribute(
-      "href",
-      "/delivery?session=draft",
-    );
+    expect(
+      await screen.findByRole("link", { name: "有未发布的草稿修改 · 去发布" }),
+    ).toHaveAttribute("href", "/delivery?session=draft");
     expect(screen.getByText(/v2 · 已发布/)).toBeInTheDocument();
   });
 
   it("shows no draft hint when every session matches its published base", async () => {
     vi.mocked(modelingApi.sessions).mockResolvedValue({
-      items: [{ id: "clean", title: "已发布", task_status: "idle", updated_at: "", has_unpublished_changes: false }],
+      items: [
+        {
+          id: "clean",
+          title: "已发布",
+          task_status: "idle",
+          updated_at: "",
+          has_unpublished_changes: false,
+        },
+      ],
     });
     show();
     await screen.findByText(/v2 · 已发布/);

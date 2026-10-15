@@ -1,9 +1,15 @@
-import { Info } from "lucide-react";
+import { Info, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /** Hints remain visible inside scrolling tables, inspectors and drawers. */
-export function HintIcon({ text }: { text: string }) {
+export function HintIcon({
+  text,
+  icon: Icon = Info,
+}: {
+  text: string;
+  icon?: LucideIcon;
+}) {
   const label = text;
   const ref = useRef<HTMLSpanElement>(null);
   const id = useId();
@@ -46,7 +52,7 @@ export function HintIcon({ text }: { text: string }) {
           if (e.key === "Escape") setPosition(null);
         }}
       >
-        <Info size={14} aria-hidden="true" />
+        <Icon size={14} aria-hidden="true" />
       </span>
       {position &&
         createPortal(
@@ -58,7 +64,7 @@ export function HintIcon({ text }: { text: string }) {
           >
             {label}
           </span>,
-          document.body,
+          ref.current?.closest("dialog") ?? document.body,
         )}
     </>
   );

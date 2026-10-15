@@ -1,22 +1,12 @@
-import {
-  Download,
-  Search,
-  Upload,
-  Plus,
-  Rocket,
-  Box,
-  GitBranch,
-  Braces,
-} from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Download, Upload, Rocket } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, modelingApi } from "../api/client";
-import type { WorkspaceOverview } from "../api/types";
+import { api, modelingApi, workspaceRequest } from "../api/client";
+import type { Draft, LegacyDraft, WorkspaceOverview } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
-import {
-  OntologyGraph,
-  type SelectedGraphItem,
-} from "../components/OntologyGraph";
+import type { SelectedGraphItem } from "../components/OntologyGraph";
+import { SemanticView } from "../components/SemanticView";
+import { editorDraft } from "../lib/nativeDraft";
 import { useElementInspector } from "../hooks/useElementInspector";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { EmptyModel } from "../components/EmptyModel";
@@ -29,18 +19,44 @@ export function OntologyViewPage() {
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"global" | "semantic">("global");
   const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState("");
-  const [tag, setTag] = useState("");
+  const [model, setModel] = useState<LegacyDraft | null>(null);
+  const [resourceError, setResourceError] = useState("");
   const inspector = useElementInspector();
   const inspect = (selected: SelectedGraphItem) => {
     if (selected?.category === "node" && selected.item.kind === "object_type")
-      inspector.open({ kind: "object_type", id: selected.item.id, tab: "properties", sessionId: null });
-    else if (selected?.category === "node" && selected.item.kind === "link_type")
-      inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
+      inspector.open({
+        kind: "object_type",
+        id: selected.item.id,
+        tab: "basic",
+        sessionId: null,
+      });
+    else if (
+      selected?.category === "node" &&
+      selected.item.kind === "link_type"
+    )
+      inspector.open({
+        kind: "link_type",
+        id: selected.item.id,
+        tab: "basic",
+        sessionId: null,
+      });
     else if (selected?.category === "edge" && selected.item.kind === "role")
-      inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.source, tab: "endpoints", sessionId: null });
-    else if (selected?.category === "edge" && selected.item.kind === "link_type")
-      inspector.open({ kind: "link_type", id: selected.item.id, tab: "endpoints", sessionId: null });
+      inspector.open({
+        kind: "link_type",
+        id: selected.item.link_type_id ?? selected.item.source,
+        tab: "basic",
+        sessionId: null,
+      });
+    else if (
+      selected?.category === "edge" &&
+      selected.item.kind === "link_type"
+    )
+      inspector.open({
+        kind: "link_type",
+        id: selected.item.id,
+        tab: "basic",
+        sessionId: null,
+      });
   };
   const [importing, setImporting] = useState(false);
   const load = () => setAttempt((value) => value + 1);
@@ -76,7 +92,9 @@ export function OntologyViewPage() {
       .sessions(workspace.id)
       .then(({ items }) => {
         if (active)
-          setDraftSession(items.find((item) => item.has_unpublished_changes)?.id ?? null);
+          setDraftSession(
+            items.find((item) => item.has_unpublished_changes)?.id ?? null,
+          );
       })
       .catch(() => undefined);
     return () => {
@@ -84,27 +102,28 @@ export function OntologyViewPage() {
     };
   }, [workspace.id, workspace.role, workspace.current_version]);
   const graph = overview?.graph;
-  // Attributes are entity fields rather than nodes of their own, so the canvas
-  // carries object types and the edges between them and nothing else.
-  const visible = useMemo(() => {
-    if (!graph) return null;
-    const roleTargets = new Set(graph.edges.filter(e => e.kind === "role").map(e => e.target));
-    const nodes = graph.nodes.filter(
-      (n) => (n.kind === "object_type" || n.kind === "link_type" || roleTargets.has(n.id)) && (!tag || n.tags.includes(tag)),
-    );
-    const ids = new Set(nodes.map((n) => n.id));
-    return {
-      ...graph,
-      nodes,
-      edges: graph.edges.filter(
-        (e) => e.kind !== "attribute" && ids.has(e.source) && ids.has(e.target),
-      ),
+  useEffect(() => {
+    let live = true;
+    setModel(null);
+    setResourceError("");
+    if (!overview) return;
+    workspaceRequest<{ model: Draft }>(
+      workspace.id,
+      `/versions/${overview.version.version_id}/presentation`,
+    )
+      .then((result) => {
+        if (live) setModel(editorDraft(result.model));
+      })
+      .catch(() => {
+        if (live) setResourceError("规则读取失败，请重新打开本体视图。");
+      });
+    return () => {
+      live = false;
     };
-  }, [graph, tag]);
+  }, [workspace.id, overview]);
   if (error) return <ErrorSurface message={error} retry={load} />;
-  if (workspace.current_version && (!overview || !visible))
+  if (workspace.current_version && !overview)
     return <LoadingSurface label="正在读取本体图谱…" />;
-  const tags = [...new Set(graph?.nodes.flatMap((n) => n.tags) ?? [])];
   const objects = graph?.nodes.filter((n) => n.kind === "object_type") ?? [];
   return (
     <div className="ref-view">
@@ -152,6 +171,30 @@ export function OntologyViewPage() {
             语义视图
           </button>
         </div>
+        <div className="view-row-actions">
+          {workspace.role && (
+            <>
+              <Link className="view-tool view-tool--primary" to="../delivery">
+                <Rocket size={15} />
+                发布
+              </Link>
+              <button className="view-tool" onClick={() => setImporting(true)}>
+                <Upload size={15} />
+                导入
+              </button>
+            </>
+          )}
+          {overview && (
+            <a
+              className="view-tool"
+              href={api.exportUrl(workspace.id, overview.version.version_id)}
+              download
+            >
+              <Download size={15} />
+              导出
+            </a>
+          )}
+        </div>
         <span className="muted">
           {overview ? "v" + overview.version.version + " · 已发布" : "尚未发布"}
           {draftSession && (
@@ -164,63 +207,6 @@ export function OntologyViewPage() {
           )}
         </span>
       </div>
-      {mode === "semantic" && (
-        <div className="view-toolbar">
-          <span className="view-kind">实体</span>
-          <label className="ref-search">
-            <input
-              placeholder="请输入检索关键字"
-              aria-label="搜索图谱"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <Search size={15} />
-          </label>
-          <select
-            aria-label="图谱标签"
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-          >
-            <option value="">请选择标签</option>
-            {tags.map((t) => (
-              <option key={t}>{t}</option>
-            ))}
-          </select>
-          <div className="toolbar-spacer" />
-          {workspace.role && (
-            <>
-              <Link className="view-tool" to="../builder">
-                <Plus size={15} />
-                <span>构建本体</span>
-              </Link>
-              <Link className="view-tool" to="../relations">
-                <GitBranch size={15} />
-                <span>本体关系</span>
-              </Link>
-              <Link className="view-tool view-tool--primary" to="../delivery">
-                <Rocket size={15} />
-                <span>发布</span>
-              </Link>
-            </>
-          )}
-          {workspace.role && (
-            <button className="view-tool" onClick={() => setImporting(true)}>
-              <Upload size={15} />
-              <span>导入</span>
-            </button>
-          )}
-          {overview && (
-            <a
-              className="view-tool"
-              href={api.exportUrl(workspace.id, overview.version.version_id)}
-              download
-            >
-              <Download size={15} />
-              <span>导出</span>
-            </a>
-          )}
-        </div>
-      )}
       <div
         className="view-canvas"
         id="ontology-view-panel"
@@ -233,12 +219,12 @@ export function OntologyViewPage() {
             onSemantic={() => switchMode("semantic")}
             onSelect={inspect}
           />
-        ) : visible?.nodes.length ? (
-          <OntologyGraph
-            key={tag}
-            graph={visible}
-            query={query}
-            onSelect={inspect}
+        ) : graph?.nodes.length && mode === "semantic" ? (
+          <SemanticView
+            graph={graph}
+            model={model}
+            resourceError={resourceError}
+            onOpen={inspector.open}
           />
         ) : (
           <div className="view-empty">
@@ -256,23 +242,6 @@ export function OntologyViewPage() {
             )}
           </div>
         )}
-        {mode === "semantic" && graph && (
-          <div className="view-legend">
-            <span>
-              <Box size={12} />
-              实体 {objects.length}
-            </span>
-            <span>
-              <GitBranch size={12} />
-              关系 {graph.edges.filter((e) => e.kind === "link_type").length + graph.nodes.filter(n => n.kind === "link_type").length}
-            </span>
-            <span>
-              <Braces size={12} />
-              属性 {overview?.version.counts.attributes ?? 0}
-            </span>
-          </div>
-        )}
-
       </div>
       {importing && (
         <OssieImportDialog

@@ -15,6 +15,14 @@ export function MappingTreeEditor({
   concepts: SemanticConcept[];
   editing?: boolean;
 }) {
+  if (!editing) {
+    const branch = (node: MappingNode): React.ReactNode => <details key={node.id} open={!node.parent_id}>
+      <summary>{node.relationship || node.slot}{node.expression ? ` · ${node.expression}` : ""}</summary>
+      <pre>{JSON.stringify(node, null, 2)}</pre>
+      {nodes.filter(child => child.parent_id === node.id).map(branch)}
+    </details>;
+    return <div className="om-raw-tree">{nodes.filter(node => !node.parent_id).map(branch)}</div>;
+  }
   const update = (id: string, patch: Partial<MappingNode>) =>
     onChange(nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)));
   const add = (parent: MappingNode | null, slot: MappingNode["slot"]) => {

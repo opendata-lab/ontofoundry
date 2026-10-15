@@ -17,7 +17,7 @@ import {
   useInternalNode,
   useNodesState,
 } from "@xyflow/react";
-import { Box } from "lucide-react";
+import { Box, Braces } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -75,20 +75,35 @@ function classes(...values: (string | false | undefined)[]) {
 
 function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
   const { item, emphasis, focused } = data;
-  if (item.kind === "link_type") return (
-    <div className={classes("ontology-node", "ontology-node--hyperedge", emphasis === "dimmed" && "is-dimmed", emphasis === "match" && "is-match", selected && "is-selected", focused && "is-focused")}
-      title={[item.label, ...(item.verbalizes ?? [])].join("\n")} aria-label={`多元关系：${item.label}`}>
-      <Handle type="target" position={Position.Left} />
-      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 1L25 13L13 25L1 13Z" /></svg>
-      <strong>{item.label}</strong>
-      <Handle type="source" position={Position.Right} />
-    </div>
-  );
+  if (item.kind === "link_type")
+    return (
+      <div
+        className={classes(
+          "ontology-node",
+          "ontology-node--hyperedge",
+          emphasis === "dimmed" && "is-dimmed",
+          emphasis === "match" && "is-match",
+          selected && "is-selected",
+          focused && "is-focused",
+        )}
+        title={[item.label, ...(item.verbalizes ?? [])].join("\n")}
+        aria-label={`多元关系：${item.label}`}
+      >
+        <Handle type="target" position={Position.Left} />
+        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+          <path d="M13 1L25 13L13 25L1 13Z" />
+        </svg>
+        <strong>{item.label}</strong>
+        <Handle type="source" position={Position.Right} />
+      </div>
+    );
   return (
     <div
       className={classes(
         "ontology-node",
-        "ontology-node--object",
+        item.kind === "value_type"
+          ? "ontology-node--value"
+          : "ontology-node--object",
         emphasis === "dimmed" && "is-dimmed",
         emphasis === "match" && "is-match",
         focused && "is-focused",
@@ -98,7 +113,7 @@ function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
     >
       <Handle type="target" position={Position.Left} />
       <span className="ontology-node__icon">
-        <Box size={14} />
+        {item.kind === "value_type" ? <Braces size={14} /> : <Box size={14} />}
       </span>
       <span className="ontology-node__text">
         <strong>{item.label}</strong>
@@ -194,9 +209,19 @@ const edgeTypes = { ontology: OntologyEdgeView };
 
 // Attributes are entity fields, not graph nodes: only object types are drawn,
 // and only the edges that run between two of them.
-function buildElements(graph: TypeGraph) {
-  const roleTargets = new Set(graph.edges.filter(e => e.kind === "role").map(e => e.target));
-  const shown = graph.nodes.filter((node) => node.kind === "object_type" || node.kind === "link_type" || roleTargets.has(node.id));
+function buildElements(graph: TypeGraph, includeValues = false) {
+  const roleTargets = new Set(
+    graph.edges
+      .filter((e) => e.kind !== "attribute")
+      .flatMap((e) => [e.source, e.target]),
+  );
+  const shown = graph.nodes.filter(
+    (node) =>
+      node.kind === "object_type" ||
+      node.kind === "link_type" ||
+      roleTargets.has(node.id) ||
+      includeValues,
+  );
   const ids = new Set(shown.map((node) => node.id));
   const edges = graph.edges.filter(
     (edge) =>
@@ -213,6 +238,7 @@ function buildElements(graph: TypeGraph) {
       position: { x: point.x - NODE_WIDTH / 2, y: point.y - NODE_HEIGHT / 2 },
       data: { item, emphasis: "normal", focused: false },
       draggable: true,
+      ariaLabel: item.label,
     };
   });
   const flowEdges: OntologyFlowEdge[] = edges.map((item) => {
@@ -221,6 +247,7 @@ function buildElements(graph: TypeGraph) {
     if (item.source === item.target) loops.set(item.source, loop + 1);
     return {
       id: item.id,
+      ariaLabel: item.label,
       source: item.source,
       target: item.target,
       type: "ontology",
@@ -250,15 +277,27 @@ export function OntologyGraph({
   graph,
   query,
   onSelect,
+  selection,
+  onOpen,
+  semantic = false,
+  viewportKey,
 }: {
   graph: TypeGraph;
   query: string;
   onSelect: (item: SelectedGraphItem) => void;
+  selection?: SelectedGraphItem;
+  onOpen?: (item: SelectedGraphItem) => void;
+  semantic?: boolean;
+  viewportKey?: boolean;
 }) {
-  const elements = useMemo(() => buildElements(graph), [graph]);
+  const elements = useMemo(
+    () => buildElements(graph, semantic),
+    [graph, semantic],
+  );
   const [nodes, setNodes, onNodesChange] = useNodesState(elements.nodes);
   const [focus, setFocus] = useState("");
   const [hover, setHover] = useState("");
+  const [zoom, setZoom] = useState(100);
   const flow =
     useRef<ReactFlowInstance<OntologyFlowNode, OntologyFlowEdge>>(null);
   const select = useRef(onSelect);
@@ -276,16 +315,59 @@ export function OntologyGraph({
     return () => cancelAnimationFrame(frame);
   }, [elements.nodes, setNodes]);
 
-  const active = hover || focus;
+  const selectedId = selection?.item.id ?? "";
+  const active = selection !== undefined ? selectedId : hover || focus;
   const neighbourhood = useMemo(() => {
     if (!active) return null;
     const ids = new Set([active]);
+    const chosenEdge =
+      selection?.category === "edge"
+        ? selection.item
+        : elements.edges.find((e) => e.id === active)?.data?.item;
+    const relationId = chosenEdge?.link_type_id ?? chosenEdge?.id;
+    const valueRelations =
+      selection?.category === "node" && selection.item.kind === "value_type"
+        ? new Set(
+            elements.edges
+              .filter((e) => e.source === active || e.target === active)
+              .map((e) => e.data?.item.link_type_id ?? e.id),
+          )
+        : null;
     for (const edge of elements.edges) {
-      if (edge.source === active) ids.add(edge.target);
-      if (edge.target === active) ids.add(edge.source);
+      if (
+        relationId
+          ? edge.id === relationId ||
+            edge.data?.item.link_type_id === relationId
+          : valueRelations
+            ? valueRelations.has(edge.data?.item.link_type_id ?? edge.id)
+            : edge.source === active || edge.target === active
+      ) {
+        ids.add(edge.source);
+        ids.add(edge.target);
+      }
     }
     return ids;
-  }, [active, elements.edges]);
+  }, [active, elements.edges, selection]);
+  useEffect(() => {
+    if (selection === undefined) return;
+    const frame = requestAnimationFrame(() => {
+      const targets =
+        selection?.category === "edge"
+          ? [...(neighbourhood ?? [])].filter((id) =>
+              elements.nodes.some((n) => n.id === id),
+            )
+          : selectedId
+            ? [selectedId]
+            : [];
+      void flow.current?.fitView({
+        ...(targets.length ? { nodes: targets.map((id) => ({ id })) } : {}),
+        padding: 0.3,
+        maxZoom: selectedId ? 1.1 : 1.05,
+        duration: 220,
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selection, selectedId, elements.nodes, neighbourhood, viewportKey]);
   const normalized = query.trim().toLocaleLowerCase();
 
   const emphasis = useMemo(() => {
@@ -311,30 +393,69 @@ export function OntologyGraph({
       nodes.map((node) => {
         const state = emphasis.get(node.id) ?? "normal";
         if (
+          !semantic &&
+          selection === undefined &&
           node.data.emphasis === state &&
           node.data.focused === (node.id === active)
         )
           return node;
         return {
           ...node,
+          selected: node.id === selectedId,
+          hidden:
+            semantic &&
+            node.data.item.kind === "value_type" &&
+            (!(
+              selection?.category === "edge" ||
+              (selection?.category === "node" &&
+                selection.item.kind === "value_type")
+            ) ||
+              !neighbourhood?.has(node.id)),
           data: { ...node.data, emphasis: state, focused: node.id === active },
         };
       }),
-    [nodes, emphasis, active],
+    [nodes, emphasis, active, selectedId, semantic, neighbourhood, selection],
   );
   const shownEdges = useMemo<OntologyFlowEdge[]>(
     () =>
       elements.edges.map((edge) => {
+        const selectedRelation =
+          selection?.category === "edge"
+            ? (selection.item.link_type_id ?? selection.item.id)
+            : active;
+        const valueSelected =
+          selection?.category === "node" &&
+          selection.item.kind === "value_type";
         const touched =
-          !active || edge.source === active || edge.target === active;
+          !active ||
+          (valueSelected &&
+            !!neighbourhood?.has(edge.source) &&
+            !!neighbourhood?.has(edge.target)) ||
+          edge.id === selectedRelation ||
+          edge.data?.item.link_type_id === selectedRelation ||
+          edge.source === active ||
+          edge.target === active;
         const ends =
           emphasis.get(edge.source) === "dimmed" ||
           emphasis.get(edge.target) === "dimmed";
         const state: Emphasis =
           !touched || ends ? "dimmed" : active ? "match" : "normal";
-        return { ...edge, data: { ...edge.data!, emphasis: state } };
+        return {
+          ...edge,
+          selected: edge.id === selectedRelation,
+          hidden:
+            semantic &&
+            edge.data?.item.kind === "role" &&
+            !(
+              (selection?.category === "edge" && touched) ||
+              (selection?.category === "node" &&
+                selection.item.kind === "value_type" &&
+                touched)
+            ),
+          data: { ...edge.data!, emphasis: state },
+        };
       }),
-    [elements.edges, emphasis, active],
+    [elements.edges, emphasis, active, selection, semantic, neighbourhood],
   );
 
   return (
@@ -355,6 +476,7 @@ export function OntologyGraph({
         minZoom={0.15}
         maxZoom={1.8}
         nodesConnectable={false}
+        proOptions={{ hideAttribution: true }}
         elementsSelectable
         onPaneClick={() => {
           setFocus("");
@@ -362,6 +484,12 @@ export function OntologyGraph({
         }}
         onNodeMouseEnter={(_, node) => setHover(node.id)}
         onNodeMouseLeave={() => setHover("")}
+        onNodeDoubleClick={(_, node) =>
+          onOpen?.({ category: "node", item: node.data.item })
+        }
+        onEdgeDoubleClick={(_, edge) =>
+          onOpen?.({ category: "edge", item: edge.data!.item })
+        }
         onNodeClick={(_, node) => {
           setFocus(node.id);
           onSelect({ category: "node", item: node.data.item });
@@ -372,15 +500,29 @@ export function OntologyGraph({
             item: (edge.data as OntologyEdgeData).item,
           })
         }
+        onMove={(_, viewport) => setZoom(Math.round(viewport.zoom * 100))}
+        ariaLabelConfig={{
+          "controls.ariaLabel": "画布操作",
+          "controls.zoomIn.ariaLabel": "放大",
+          "controls.zoomOut.ariaLabel": "缩小",
+          "controls.fitView.ariaLabel": "适应画布",
+          "minimap.ariaLabel": "缩略图，点击定位；方向键移动画布",
+        }}
         aria-label="语义图谱"
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={26}
-          size={1}
-          color="var(--color-rule)"
-        />
-        <Controls showInteractive={false} position="bottom-right" />
+        {!semantic && (
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={26}
+            size={1}
+            color="var(--color-rule)"
+          />
+        )}
+        <Controls showInteractive={false} position="bottom-right">
+          {semantic && (
+            <span className="semantic-zoom-percentage">{zoom}%</span>
+          )}
+        </Controls>
         {/* React Flow reads the map's size from style, and lays the viewport
             rectangle out with it — CSS-only sizing letterboxes the picture and
             skews panning, so the box is declared here. */}
@@ -389,7 +531,11 @@ export function OntologyGraph({
           pannable
           zoomable
           nodeBorderRadius={3}
-          style={{ width: 168, height: 104, marginRight: 52 }}
+          style={
+            semantic
+              ? { width: 147, height: 96, marginRight: 56, marginBottom: 17 }
+              : { width: 168, height: 104, marginRight: 52 }
+          }
         />
       </ReactFlow>
     </EdgeSelectContext.Provider>

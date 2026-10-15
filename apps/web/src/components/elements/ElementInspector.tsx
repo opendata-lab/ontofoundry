@@ -1,12 +1,4 @@
-import {
-  Box,
-  Check,
-  GitBranch,
-  Link as LinkIcon,
-  Maximize2,
-  Minimize2,
-  X,
-} from "lucide-react";
+import { Box, Check, GitBranch, Maximize2, Minimize2, X } from "lucide-react";
 import {
   useContext,
   useEffect,
@@ -48,9 +40,6 @@ import {
 } from "../../lib/elementInspector";
 import {
   BasicPanel,
-  EndpointsPanel,
-  EvidenceSection,
-  MappingPanel,
   PropertiesPanel,
   RelationsPanel,
   RulesPanel,
@@ -58,13 +47,24 @@ import {
 import {
   isObject,
   rulesFor,
+  relationsFor,
   type ElementType,
   type PanelProps,
 } from "../../lib/elementModel";
+import { InspectorDialog } from "./InspectorDialog";
 import { ActionsPanel } from "./ElementActions";
+import { LinkMappingPanel } from "./LinkMappingPanel";
+import { objectMapping, shortObjectName } from "../../lib/objectMapping";
+import {
+  mappingChangesForSave,
+  mappingSaveError,
+} from "../../lib/objectMappingEditing";
+import { MappingStatusIcon } from "./MappingWidgets";
+import { inheritedProperties } from "../../lib/elementModel";
 import { ElementInstances } from "./ElementInstances";
 import { newId as generateId } from "../../lib/id";
 import "../../styles/element-inspector.css";
+import "../../styles/object-mapping.css";
 
 type Loaded = {
   draft: Draft;
@@ -88,7 +88,7 @@ function resolve(
   id: string,
 ): { type: ElementType | undefined; tab?: ElementTab; objectId?: string } {
   if (kind === "value_type")
-    return { type: draft.value_types?.find(t => t.id === id) };
+    return { type: draft.value_types?.find((t) => t.id === id) };
   if (kind === "object_type")
     return { type: draft.object_types.find((t) => t.id === id) };
   if (kind === "link_type")
@@ -132,11 +132,22 @@ function resolve(
     };
   if (kind === "rule") {
     const rule = draft.rules.find((r) => r.id === id);
-    if (rule)
+    if (rule) {
+      if (rule.owner_kind === "link_type") {
+        const relation = draft.link_types.find((r) => r.id === rule.owner_id);
+        const owner =
+          relation &&
+          draft.object_types.find(
+            (o) =>
+              o.id === (relation.owner_ref?.ref || relation.source_type_id),
+          );
+        if (owner) return { type: owner, tab: "rules" };
+      }
       return {
         ...resolve(draft, rule.owner_kind, rule.owner_id),
         tab: "rules",
       };
+    }
   }
   return { type: undefined };
 }
@@ -200,9 +211,21 @@ function Inspector({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copyFallback, setCopyFallback] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 2200);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
   const newId = useRef(generateId());
   const effectiveId = id === "new" ? newId.current : id;
   useEffect(() => {
@@ -331,50 +354,97 @@ function Inspector({
   const object = type ? isObject(type) : kind !== "link_type";
   const editing = editingIntent;
   const properties =
-    draft?.properties.filter((p) => p.owner_type_id === type?.id) ?? [];
-  const mappings = draft?.mappings.filter((m) => m.type_id === type?.id) ?? [];
+    draft && type
+      ? [
+          ...draft.properties.filter((p) => p.owner_type_id === type.id),
+          ...(isObject(type)
+            ? inheritedProperties(draft, type).map((p) => p.property)
+            : []),
+        ]
+      : [];
   const relations =
-    draft?.link_types.filter(
-      (r) => r.source_type_id === type?.id || r.target_type_id === type?.id || r.owner_ref?.ref === type?.id || r.roles?.some(role => role.concept.ref === type?.id),
-    ) ?? [];
+    draft && type && isObject(type) ? relationsFor(draft, type) : [];
   const rules = draft && type ? rulesFor(draft, type) : [];
   const actions =
     draft && type
-      ? draft.actions.filter((a) =>
-          object
-            ? a.input_type_id === type.id
-            : a.effects.some((e) => e.link_type_id === type.id),
+      ? draft.actions.filter(
+          (a) =>
+            a.input_type_id === type.id ||
+            (!isObject(type) &&
+              a.effects.some((e) => e.link_type_id === type.id)),
         )
       : [];
-  const valueConcept = type && isObject(type) && type.concept_kind === "value_type";
-  const selectedKind = valueConcept ? "value_type" : object ? "object_type" : "link_type";
+  const actionsTab = actions.length
+    ? [{ id: "actions" as const, name: "动作", count: actions.length }]
+    : [];
+  const valueConcept =
+    type && isObject(type) && type.concept_kind === "value_type";
+  const selectedKind = valueConcept
+    ? "value_type"
+    : object
+      ? "object_type"
+      : "link_type";
   const allTabs: {
     id: ElementTab;
     name: string;
     count?: number;
     private?: boolean;
-  }[] = [
-    { id: "basic", name: "基本信息" },
-    object
-      ? { id: "properties", name: "属性", count: properties.length }
-      : { id: "endpoints", name: "角色与语义描述" },
-    {
-      id: "mapping",
-      name: "映射",
-      count: object ? mappings.length : undefined,
-      private: true,
-    },
-    ...(object
-      ? [{ id: "relations" as const, name: "关系", count: relations.length }]
-      : []),
-    { id: "rules", name: "规则", count: rules.length },
-    { id: "actions", name: "动作", count: actions.length },
-    { id: "instances", name: "实例", private: true },
-  ];
-  const tabs = allTabs.filter((tab) => valueConcept ? tab.id === "basic" : !tab.private || workspace.role);
+  }[] = object
+    ? [
+        { id: "basic", name: "概览" },
+        ...(properties.length || editing
+          ? [
+              {
+                id: "properties" as const,
+                name: "属性与映射",
+                count: properties.length,
+              },
+            ]
+          : []),
+        ...(relations.length
+          ? [
+              {
+                id: "relations" as const,
+                name: "关系",
+                count: relations.length,
+              },
+            ]
+          : []),
+        ...(rules.length
+          ? [{ id: "rules" as const, name: "规则", count: rules.length }]
+          : []),
+        ...actionsTab,
+        { id: "instances", name: "实例", private: true },
+      ]
+    : [
+        { id: "basic", name: "概览" },
+        { id: "endpoints", name: "角色与语义描述" },
+        { id: "mapping", name: "关联条件", private: true },
+        ...(rules.length
+          ? [{ id: "rules" as const, name: "规则", count: rules.length }]
+          : []),
+        ...actionsTab,
+        { id: "instances", name: "实例", private: true },
+      ];
+  const tabs = allTabs.filter((tab) =>
+    valueConcept ? tab.id === "basic" : !tab.private || workspace.role,
+  );
   const requestedTab = params.get("inspectTab") ?? resolved?.tab ?? "basic";
-  const compatibleTab = requestedTab === "data" ? "mapping" : requestedTab;
+  const compatibleTab =
+    (requestedTab === "data" || requestedTab === "mapping") && object
+      ? "properties"
+      : requestedTab === "overview"
+        ? "basic"
+        : requestedTab;
   const selectedTab = tabs.find((t) => t.id === compatibleTab)?.id ?? "basic";
+  const record =
+    draft && type && isObject(type) && !valueConcept
+      ? objectMapping(
+          draft,
+          type,
+          loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
+        )
+      : null;
   const selectTab = (tab: ElementTab) =>
     setParams(
       (p) => {
@@ -389,7 +459,11 @@ function Inspector({
     Array.from(body.current.querySelectorAll<HTMLElement>("[data-element-id]"))
       .find((el) => el.dataset.elementId === effectiveId)
       ?.scrollIntoView?.({ block: "nearest" });
-  }, [loaded, selectedTab, effectiveId]);
+    if (active && !editingIntent)
+      dialog.current
+        ?.querySelector<HTMLButtonElement>(`[data-tab="${selectedTab}"]`)
+        ?.focus({ preventScroll: true });
+  }, [loaded, selectedTab, effectiveId, active, editingIntent]);
   const discard = () => {
     flushSync(() => {
       setDirty(false);
@@ -401,6 +475,7 @@ function Inspector({
   };
   const close = () => {
     if (busy) return;
+    discard();
     void navigate(withoutInspector(createPath(location)), { replace: true });
   };
   const open = (request: ElementRequest) => {
@@ -414,6 +489,7 @@ function Inspector({
       selectTab(request.tab ?? "basic");
       return;
     }
+    discard();
     void navigate(
       inspectorHref(createPath(location), {
         ...request,
@@ -422,21 +498,58 @@ function Inspector({
       }),
     );
   };
-  const save = async () => {
-    if (!draft || !type || !loaded || busy) return;
+  const save = async (override?: LegacyDraft): Promise<boolean> => {
+    const value = override ?? draft;
+    if (!value || !type || !loaded || busy || !workspace.role || previewHash)
+      return false;
+    if (override) {
+      setDraft(override);
+      setDirty(true);
+    }
+    const source = loaded;
+    const nativeDraft =
+      source.draft.schema_version === "3" ? source.draft : undefined;
+    const saveError = mappingSaveError({
+      draft: value,
+      nativeDraft,
+      type,
+      editing,
+      change: setDraft,
+      open,
+    });
+    if (saveError) {
+      setError(saveError);
+      return false;
+    }
+    const savingDraft = nativeFromEditor(source.draft, value);
+    if (savingDraft.schema_version === "3" && value._semantic_changes?.length) {
+      const legacyBefore = editorDraft(source.draft);
+      if (
+        JSON.stringify(legacyBefore.mappings) ===
+          JSON.stringify(value.mappings) &&
+        JSON.stringify(legacyBefore.link_types.map((l) => l.data_join)) ===
+          JSON.stringify(value.link_types.map((l) => l.data_join))
+      )
+        delete savingDraft._legacy_form;
+      else {
+        setError(
+          "原生结构编辑与单表映射替换需要分别保存，请先取消其中一组修改。",
+        );
+        return false;
+      }
+    }
     setBusy(true);
     setError("");
     setNotice("");
     try {
-      const source = loaded;
       const result = await modelingApi.saveElement(workspace.id, {
         target_kind: selectedKind,
         target_id: type.id,
         expected_current_version_id: loaded.versionId,
         session_id: source.session?.id ?? null,
         expected_session_revision: source.session?.revision ?? null,
-        draft: nativeFromEditor(source.draft, draft),
-        semantic_changes: draft._semantic_changes ?? [],
+        draft: savingDraft,
+        semantic_changes: mappingChangesForSave(value),
       });
       const next: Loaded = {
         draft: result.session?.draft ?? result.draft,
@@ -464,6 +577,7 @@ function Inspector({
         sessionId,
       });
       void navigate(target, { replace: true });
+      return true;
     } catch (e) {
       setError(
         e instanceof ApiError && e.status === 409
@@ -472,14 +586,20 @@ function Inspector({
             ? e.message
             : "保存失败",
       );
+      return false;
     } finally {
       setBusy(false);
     }
   };
   const beginEdit = () => {
-    if (!loaded || !draft || loading) return;
+    if (!loaded || !draft || loading || !workspace.role || previewHash) return;
     setEditing(true);
     setNotice("");
+    window.requestAnimationFrame(() =>
+      body.current
+        ?.querySelector<HTMLElement>("input, select, button, textarea")
+        ?.focus({ preventScroll: true }),
+    );
   };
   const cancel = () => {
     if (id === "new") {
@@ -495,23 +615,38 @@ function Inspector({
       setAttempt((n) => n + 1);
     }
   };
+  const objectLink = new URL(
+    type
+      ? inspectorHref(createPath(location), {
+          kind: selectedKind,
+          id: type.id,
+          tab: selectedTab,
+          sessionId,
+          previewHash: previewHash ?? undefined,
+        })
+      : createPath(location),
+    window.location.origin,
+  ).href;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(
-        new URL(createPath(location), window.location.origin).href,
-      );
-      setNotice("链接已复制");
+      await navigator.clipboard.writeText(objectLink);
+      setCopied(true);
     } catch {
-      setError("复制失败，请从浏览器地址栏复制链接。");
+      setCopyFallback(true);
     }
   };
   const props: PanelProps | null =
     draft && type
       ? {
           draft,
-          nativeDraft: loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
+          nativeDraft:
+            loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
           type,
           editing,
+          canEdit: !!workspace.role && !previewHash,
+          saveError: error,
+          requestEdit: beginEdit,
+          saveDraft: save,
           change: (next) => {
             setDraft(next);
             setDirty(true);
@@ -525,6 +660,17 @@ function Inspector({
       ref={dialog}
       className={`element-inspector${expanded ? " element-inspector--expanded" : ""}`}
       aria-labelledby={titleId}
+      onClick={(e) => {
+        if (e.target !== e.currentTarget) return;
+        const bounds = e.currentTarget.getBoundingClientRect();
+        if (
+          e.clientX < bounds.left ||
+          e.clientX > bounds.right ||
+          e.clientY < bounds.top ||
+          e.clientY > bounds.bottom
+        )
+          close();
+      }}
       onCancel={(e) => {
         e.preventDefault();
         close();
@@ -545,66 +691,68 @@ function Inspector({
             ) : (
               <GitBranch size={38} strokeWidth={1.8} />
             )}
-            <h2 id={titleId}>
-              {type?.name ||
-                (id === "new"
-                  ? object
-                    ? "新建对象"
-                    : "新建关系"
-                  : "本体元素")}
-            </h2>
+            <div className="element-title">
+              <h2 id={titleId} aria-label={type?.name || "本体元素"}>
+                {type
+                  ? shortObjectName(type)
+                  : id === "new"
+                    ? object
+                      ? "新建对象"
+                      : "新建关系"
+                    : "本体元素"}
+                {type?.technical_name && <code>{type.technical_name}</code>}
+              </h2>
+              {type && !isObject(type) && (
+                <small className="element-object-status">
+                  {
+                    draft?.object_types.find(
+                      (o) =>
+                        o.id === (type.source_type_id || type.owner_ref?.ref),
+                    )?.name
+                  }
+                  {" → "}
+                  {
+                    draft?.object_types.find(
+                      (o) => o.id === type.target_type_id,
+                    )?.name
+                  }
+                </small>
+              )}
+              {record && (
+                <div className="element-object-status">
+                  <MappingStatusIcon state={record.state} />
+                  <span>
+                    {record.label}
+                    {record.mainDataset
+                      ? ` · ${record.mainDataset.source}`
+                      : ""}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
           <div className="element-header-actions">
-            {notice && (
-              <span className="element-saved" role="status">
-                <Check size={14} />
-                {notice}
-              </span>
+            {!editing && workspace.role && !previewHash && type && (
+              <button
+                className="button button--secondary"
+                type="button"
+                onClick={beginEdit}
+                disabled={loading}
+              >
+                编辑
+              </button>
             )}
-            {editing ? (
-              <>
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={cancel}
-                >
-                  取消
-                </button>
-                <button
-                  className="button button--primary"
-                  type="submit"
-                  disabled={busy || !type || (!dirty && id !== "new")}
-                >
-                  {busy ? "保存中…" : "保存"}
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  className="button button--secondary"
-                  type="button"
-                  onClick={() => void copy()}
-                >
-                  <LinkIcon size={14} />
-                  复制链接
-                </button>
-                {workspace.role && !previewHash && type && (
-                  <button
-                    className="button button--primary"
-                    type="button"
-                    onClick={beginEdit}
-                    disabled={!type || loading}
-                  >
-                    编辑
-                  </button>
-                )}
-              </>
-            )}
+            <button
+              className="button button--secondary"
+              type="button"
+              onClick={() => void copy()}
+            >
+              {copied ? "已复制" : "复制链接"}
+            </button>
             <button
               className="icon-button"
               type="button"
-              aria-label={expanded ? "恢复窗口" : "最大化"}
+              aria-label={expanded ? "还原弹窗" : "展开弹窗"}
               onClick={() => setExpanded(!expanded)}
             >
               {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
@@ -612,7 +760,7 @@ function Inspector({
             <button
               className="icon-button"
               type="button"
-              aria-label="关闭本体元素"
+              aria-label="关闭对象弹窗"
               disabled={busy}
               onClick={close}
             >
@@ -620,56 +768,64 @@ function Inspector({
             </button>
           </div>
         </header>
-        <div
-          className="element-tabs"
-          role="tablist"
-          aria-label="本体元素内容"
-          onKeyDown={(e) => {
-            const index = tabs.findIndex((t) => t.id === selectedTab);
-            const next =
-              e.key === "ArrowRight"
-                ? (index + 1) % tabs.length
-                : e.key === "ArrowLeft"
-                  ? (index - 1 + tabs.length) % tabs.length
-                  : e.key === "Home"
-                    ? 0
-                    : e.key === "End"
-                      ? tabs.length - 1
-                      : -1;
-            if (next < 0) return;
-            e.preventDefault();
-            selectTab(tabs[next].id);
-            dialog.current
-              ?.querySelector<HTMLButtonElement>(
-                `[data-tab="${tabs[next].id}"]`,
-              )
-              ?.focus();
-          }}
-        >
-          {tabs.map((tab) => (
-            <button
-              id={tabId(tab.id)}
-              role="tab"
-              data-tab={tab.id}
-              type="button"
-              key={tab.id}
-              aria-selected={selectedTab === tab.id}
-              aria-controls={panelId}
-              tabIndex={selectedTab === tab.id ? 0 : -1}
-              onClick={() => selectTab(tab.id)}
-            >
-              {tab.name}
-              {tab.count !== undefined && <span>{tab.count}</span>}
-            </button>
-          ))}
-        </div>
+        {object && (
+          <div
+            className="element-tabs"
+            role="tablist"
+            aria-label="本体元素内容"
+            onKeyDown={(e) => {
+              const index = tabs.findIndex((t) => t.id === selectedTab);
+              const next =
+                e.key === "ArrowRight"
+                  ? (index + 1) % tabs.length
+                  : e.key === "ArrowLeft"
+                    ? (index - 1 + tabs.length) % tabs.length
+                    : e.key === "Home"
+                      ? 0
+                      : e.key === "End"
+                        ? tabs.length - 1
+                        : -1;
+              if (next < 0) return;
+              e.preventDefault();
+              selectTab(tabs[next].id);
+              dialog.current
+                ?.querySelector<HTMLButtonElement>(
+                  `[data-tab="${tabs[next].id}"]`,
+                )
+                ?.focus();
+            }}
+          >
+            {tabs.map((tab) => (
+              <button
+                id={tabId(tab.id)}
+                role="tab"
+                data-tab={tab.id}
+                type="button"
+                key={tab.id}
+                aria-selected={selectedTab === tab.id}
+                aria-controls={panelId}
+                tabIndex={selectedTab === tab.id ? 0 : -1}
+                onClick={() => {
+                  selectTab(tab.id);
+                  dialog.current
+                    ?.querySelector<HTMLButtonElement>(`[data-tab="${tab.id}"]`)
+                    ?.focus({ preventScroll: true });
+                }}
+              >
+                {tab.name}
+                {tab.count !== undefined && <span>{tab.count}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <div
           ref={body}
           id={panelId}
           className="element-body"
           role="tabpanel"
-          aria-labelledby={tabId(selectedTab)}
+          aria-labelledby={object ? tabId(selectedTab) : titleId}
           aria-busy={busy}
+          tabIndex={0}
         >
           {error && (
             <div className="element-error" role="alert">
@@ -697,19 +853,13 @@ function Inspector({
           )}
           {props && (
             <fieldset disabled={busy || loading}>
-              {selectedTab === "basic" && (
-                <>
-                  <BasicPanel {...props} />
-                  <EvidenceSection
-                    workspaceId={workspace.id}
-                    evidence={type!.evidence}
-                  />
-                </>
+              {!object ? (
+                <LinkMappingPanel {...props} />
+              ) : (
+                selectedTab === "basic" && <BasicPanel {...props} />
               )}
-              {selectedTab === "properties" && <PropertiesPanel {...props} />}
-              {selectedTab === "endpoints" && <EndpointsPanel {...props} />}
-              {selectedTab === "mapping" && (
-                <MappingPanel
+              {object && selectedTab === "properties" && (
+                <PropertiesPanel
                   {...props}
                   suggestedSource={
                     params.get("mapping_source") && params.get("mapping_table")
@@ -722,10 +872,14 @@ function Inspector({
                   }
                 />
               )}
-              {selectedTab === "relations" && <RelationsPanel {...props} />}
-              {selectedTab === "rules" && <RulesPanel {...props} />}
-              {selectedTab === "actions" && <ActionsPanel {...props} />}
-              {selectedTab === "instances" && (
+              {object && selectedTab === "relations" && (
+                <RelationsPanel {...props} />
+              )}
+              {object && selectedTab === "rules" && <RulesPanel {...props} />}
+              {object && selectedTab === "actions" && (
+                <ActionsPanel {...props} />
+              )}
+              {object && selectedTab === "instances" && (
                 <ElementInstances
                   key={type!.id}
                   {...props}
@@ -737,6 +891,50 @@ function Inspector({
             </fieldset>
           )}
         </div>
+        <footer className="element-footer" hidden={!editing}>
+          {editing && (
+            <>
+              <button
+                className="button button--secondary om-push"
+                type="button"
+                disabled={busy}
+                onClick={cancel}
+              >
+                取消
+              </button>
+              <button
+                className="button button--primary"
+                type="submit"
+                disabled={busy || !type || (!dirty && id !== "new")}
+              >
+                {busy ? "保存中…" : "保存"}
+              </button>
+            </>
+          )}
+        </footer>
+        {notice && (
+          <div className="element-saved-toast" role="status">
+            <Check size={14} />
+            {notice}
+          </div>
+        )}
+        {copyFallback && (
+          <InspectorDialog
+            title="复制链接"
+            onClose={() => setCopyFallback(false)}
+          >
+            <label className="element-field">
+              <span>对象链接</span>
+              <input
+                aria-label="对象链接"
+                autoFocus
+                readOnly
+                value={objectLink}
+                onFocus={(e) => e.currentTarget.select()}
+              />
+            </label>
+          </InspectorDialog>
+        )}
       </form>
     </dialog>
   );

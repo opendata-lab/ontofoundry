@@ -1,14 +1,16 @@
 import { materialLinkEndpoints } from "../../lib/instanceGraph";
-import { databaseTypeHints, documentGapHints } from "../../lib/instanceHints";
-import { ArrowLeft, ArrowRight, Database, Search } from "lucide-react";
-import { HintedHeading } from "../HintIcon";
+import { ArrowRight, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Draft, MaterialObject } from "../../api/types";
 import { workspaceRequest } from "../../api/client";
-import { inheritedProperties, isObject, VALUE_KINDS, type PanelProps } from "../../lib/elementModel";
+import {
+  inheritedProperties,
+  isObject,
+  type PanelProps,
+} from "../../lib/elementModel";
 import { EvidenceSection } from "./ElementPanels";
 
-/** The same instance browser can be embedded without route params or page headers. */
+const PAGE_SIZE = 6;
 export function ElementInstances({
   draft,
   type,
@@ -21,15 +23,11 @@ export function ElementInstances({
   canBrowseDatabase: boolean;
   initialObjectId?: string;
 }) {
-  draft = { ...draft, material_links: draft.material_links.map(fact => ({ ...fact,
-    ...materialLinkEndpoints(fact, draft.link_types.find(r => r.id === fact.type_id)),
-  })) };
-  // Open on the source that has something to show: an object known only from
-  // its table would otherwise greet the viewer with an empty document list.
+  const mapping = draft.mappings.find((m) => m.type_id === type.id);
   const [source, setSource] = useState(() =>
     !initialObjectId &&
     canBrowseDatabase &&
-    draft.mappings.some((m) => m.type_id === type.id) &&
+    mapping &&
     !draft.material_objects.some((o) => o.type_id === type.id)
       ? "database"
       : "document",
@@ -49,10 +47,8 @@ export function ElementInstances({
     warnings: string[];
     truncated: boolean;
   } | null>(null);
-  const mappingStatus = draft.mapping_status?.[type.id];
-  const mapping = draft.mappings.find((m) => m.type_id === type.id);
   useEffect(() => {
-    if (source !== "database" || !mapping) return;
+    if (source !== "database" || !mapping || !canBrowseDatabase) return;
     let active = true;
     const timer = window.setTimeout(() => {
       setBusy(true);
@@ -60,7 +56,7 @@ export function ElementInstances({
       workspaceRequest<{ items: Record<string, unknown>[]; has_more: boolean }>(
         draft.workspace_id,
         "/mapping-preview",
-        { mapping, q: query, offset: page * 20, limit: 20 },
+        { mapping, q: query, offset: page * PAGE_SIZE, limit: PAGE_SIZE },
       )
         .then((result) => {
           if (active) {
@@ -79,7 +75,7 @@ export function ElementInstances({
       active = false;
       window.clearTimeout(timer);
     };
-  }, [source, mapping, query, page, draft.workspace_id]);
+  }, [source, mapping, query, page, draft.workspace_id, canBrowseDatabase]);
   const visitDatabase = async (typeId: string, key: string) => {
     if (!canBrowseDatabase) return;
     setBusy(true);
@@ -104,143 +100,87 @@ export function ElementInstances({
     }
   };
   const objects = neighbors?.objects ?? draft.material_objects;
-  const links = neighbors?.links ?? draft.material_links;
-  const propertyOwner = draft.object_types.find(
-    (t) => t.id === (selected?.type_id ?? type.id),
+  const links = (neighbors?.links ?? draft.material_links).map((fact) => ({
+    ...fact,
+    ...materialLinkEndpoints(
+      fact,
+      draft.link_types.find((r) => r.id === fact.type_id),
+    ),
+  }));
+  const propertiesFor = (id: string) => {
+    const owner = draft.object_types.find((t) => t.id === id);
+    return owner
+      ? [
+          ...draft.properties.filter((p) => p.owner_type_id === id),
+          ...inheritedProperties(draft, owner).map((p) => p.property),
+        ]
+      : [];
+  };
+  const properties = propertiesFor(type.id),
+    sideProperties = propertiesFor(selected?.type_id ?? type.id);
+  const identifiers = properties.filter((p) => p.identifier);
+  const valueProperties = properties.filter((p) => !p.identifier).slice(0, 4);
+  const documentRows = draft.material_objects.filter(
+    (o) =>
+      o.type_id === type.id &&
+      `${o.name} ${JSON.stringify(o.values)}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
-  const properties = propertyOwner
-    ? [
-        ...draft.properties.filter((p) => p.owner_type_id === propertyOwner.id),
-        ...inheritedProperties(draft, propertyOwner).map((p) => p.property),
-      ]
+  const documentPage = documentRows.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  );
+  const related = selected
+    ? links
+        .filter(
+          (l) =>
+            l.source_id === selected.id ||
+            l.target_id === selected.id ||
+            l.role_values?.some((v) => v.object_id === selected.id),
+        )
+        .flatMap((l) => {
+          const roleIds =
+            l.role_values?.flatMap((v) =>
+              v.object_id && v.object_id !== selected.id ? [v.object_id] : [],
+            ) ?? [];
+          return [
+            ...new Set(
+              roleIds.length
+                ? roleIds
+                : [l.source_id === selected.id ? l.target_id : l.source_id],
+            ),
+          ].flatMap((id) => {
+            const other = objects.find((o) => o.id === id);
+            return other ? [{ link: l, other }] : [];
+          });
+        })
     : [];
-  if (selected)
-    return (
-      <section className="element-section">
-        <button
-          type="button"
-          className="element-text-button"
-          onClick={() => {
-            setSelected(null);
-            setNeighbors(null);
-          }}
-        >
-          <ArrowLeft size={14} />
-          返回实例列表
-        </button>
-        <h3>{selected.name}</h3>
-        {mappingStatus?.state === "readonly" && <p role="status">{mappingStatus.message ?? "复杂映射暂不支持实例查询"}</p>}
-      {error && (
-          <p className="inline-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="element-basic-grid">
-          {properties.map((p) => (
-            <div className="element-field" key={p.id}>
-              <span>
-                {p.name}
-                <small>{VALUE_KINDS[p.value_kind]}</small>
-              </span>
-              <span className="element-value">
-                {String(selected.values[p.technical_name] ?? "—")}
-              </span>
-            </div>
-          ))}
-        </div>
-        <h3>关联关系</h3>
-        {links
-          .filter(
-            (l) => l.source_id === selected.id || l.target_id === selected.id || l.role_values?.some(v => v.object_id === selected.id),
-          )
-          .flatMap(l => {
-            const roleIds = l.role_values?.flatMap(v => v.object_id && v.object_id !== selected.id ? [v.object_id] : []) ?? [];
-            const ids = roleIds.length ? roleIds : [l.source_id === selected.id ? l.target_id : l.source_id];
-            return [...new Set(ids)].map(id => ({ l, id }));
-          })
-          .map(({ l, id }) => {
-            const other = objects.find(
-              (o) =>
-                o.id ===
-                id,
-            );
-            return (
-              other && (
-                <button
-                  type="button"
-                  className="element-relation-row"
-                  key={`${l.id}:${other.id}`}
-                  disabled={busy}
-                  onClick={() => {
-                    if ("key" in other)
-                      void visitDatabase(other.type_id, String(other.key));
-                    else setSelected(other);
-                  }}
-                >
-                  <strong>
-                    {draft.link_types.find((t) => t.id === l.type_id)?.name}
-                  </strong>
-                  <span>
-                    {other.name}
-                    <ArrowRight size={14} />
-                  </span>
-                </button>
-              )
-            );
-          })}
-        {neighbors?.warnings.map((w) => (
-          <p className="element-note" key={w}>
-            {w}
-          </p>
-        ))}
-        {neighbors?.truncated && (
-          <p className="element-note">
-            结果已达到查询范围上限，仅展示部分关系。
-          </p>
-        )}
-        <EvidenceSection
-          workspaceId={draft.workspace_id}
-          evidence={selected.evidence}
-        />
-      </section>
-    );
   if (!isObject(type)) {
-    const materialLinks = draft.material_links.filter(
-      (l) => l.type_id === type.id,
-    );
+    const facts = links.filter((l) => l.type_id === type.id);
     return (
-      <section className="element-section">
-        <HintedHeading title="关系实例" hint="查看数据库关系时，从源对象或目标对象的实例进入。" />
-        <table className="element-table">
-          <thead>
-            <tr>
-              <th>源实例</th>
-              <th>目标实例</th>
-              <th>来源证据</th>
-            </tr>
-          </thead>
-          <tbody>
-            {materialLinks.map((l) => (
-              <tr key={l.id}>
-                <td>
-                  {draft.material_objects.find((o) => o.id === l.source_id)
-                    ?.name ?? l.source_id}
-                </td>
-                <td>
-                  {draft.material_objects.find((o) => o.id === l.target_id)
-                    ?.name ?? l.target_id}
-                </td>
-                <td>{l.evidence.length} 条</td>
+      <>
+        <div className="om-table-wrap">
+          <table className="om-table">
+            <thead>
+              <tr>
+                <th>来源实例</th>
+                <th>目标实例</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {!materialLinks.length && (
-          <p className="element-empty">暂无材料关系实例。</p>
-        )}
+            </thead>
+            <tbody>
+              {facts.map((l) => (
+                <tr key={l.id}>
+                  <td>{objects.find((o) => o.id === l.source_id)?.name}</td>
+                  <td>{objects.find((o) => o.id === l.target_id)?.name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <button
           type="button"
-          className="element-text-button"
+          className="element-text-button om-detail-section"
           onClick={() =>
             open({
               kind: "object_type",
@@ -249,31 +189,20 @@ export function ElementInstances({
             })
           }
         >
-          查看源对象实例
+          查看来源对象实例
           <ArrowRight size={14} />
         </button>
-      </section>
+      </>
     );
   }
-  const documentRows = draft.material_objects.filter(
-    (o) =>
-      o.type_id === type.id &&
-      `${o.name} ${JSON.stringify(o.values)}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+  const clearSide = () => {
+    setSelected(null);
+    setNeighbors(null);
+  };
   return (
-    <section className="element-section">
-      <div className="element-section-title">
-        <h3>实例</h3>
-        <span className="muted">
-          {source === "document"
-            ? `${documentRows.length} 个材料实例`
-            : "数据库实时查询"}
-        </span>
-      </div>
-      <div className="element-instance-tools">
-        <label className="element-instance-search">
+    <>
+      <div className="om-mapping-tools">
+        <label className="om-search">
           <Search size={16} />
           <input
             aria-label="搜索实例"
@@ -282,30 +211,29 @@ export function ElementInstances({
             onChange={(e) => {
               setQuery(e.target.value);
               setPage(0);
+              clearSide();
             }}
           />
         </label>
-        <select
-          aria-label="实例来源"
-          value={source}
-          onChange={(e) => {
-            setSource(e.target.value);
-            setPage(0);
-            setError("");
-          }}
-        >
-          <option value="document">文档实例</option>
-          <option value="database" disabled={!mapping}>
-            数据库实例{mapping ? "" : "（未映射）"}
-          </option>
-        </select>
+        {mapping && (
+          <select
+            aria-label="实例来源"
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value);
+              setPage(0);
+              setRows([]);
+              setError("");
+              clearSide();
+            }}
+          >
+            <option value="document">文档实例</option>
+            <option value="database" disabled={!canBrowseDatabase}>
+              数据库实例
+            </option>
+          </select>
+        )}
       </div>
-      {source === "database" && !canBrowseDatabase && (
-        <p className="element-note">
-          当前可预览数据列表；保存后再查看实例关系。
-        </p>
-      )}
-      {mappingStatus?.state === "readonly" && <p role="status">{mappingStatus.message ?? "复杂映射暂不支持实例查询"}</p>}
       {error && (
         <p className="inline-error" role="alert">
           {error}
@@ -316,97 +244,208 @@ export function ElementInstances({
           正在读取实例…
         </p>
       )}
-      {(source === "database" && mapping
-        ? databaseTypeHints(properties, mapping.fields, rows)
-        : source === "document"
-          ? documentGapHints(properties, documentRows)
-          : []
-      ).map((hint) => (
-        <p key={hint} className="element-note element-note--warn" role="note">
-          {hint}
-        </p>
-      ))}
-      <div className="element-table-wrap">
-        <table className="element-table">
-          <thead>
-            <tr>
-              <th>名称</th>
-              {properties.map((p) => (
-                <th key={p.id}>{p.name}</th>
-              ))}
-              <th>来源</th>
-            </tr>
-          </thead>
-          <tbody>
-            {source === "document"
-              ? documentRows.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <button
-                        className="element-text-button"
-                        type="button"
+      <div className="om-instance-layout">
+        <div className="om-instance-main">
+          <div className="om-table-wrap">
+            <table className="om-table om-instances">
+              <thead>
+                <tr>
+                  <th>
+                    实例标识 <span className="om-tag om-tag-key">标识</span>
+                  </th>
+                  {valueProperties.map((p) => (
+                    <th key={p.id}>{p.name}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {source === "document"
+                  ? documentPage.map((o) => (
+                      <tr
+                        key={o.id}
+                        className="om-open-row"
+                        tabIndex={0}
                         onClick={() => setSelected(o)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") setSelected(o);
+                        }}
                       >
-                        {o.name}
-                      </button>
-                    </td>
-                    {properties.map((p) => (
-                      <td key={p.id}>
-                        {String(o.values[p.technical_name] ?? "—")}
+                        <td>
+                          <button
+                            type="button"
+                            className="element-text-button"
+                            onClick={() => setSelected(o)}
+                          >
+                            {identifiers
+                              .map((p) => o.values[p.technical_name])
+                              .filter((v) => v != null)
+                              .join(" + ") || o.name}
+                          </button>
+                        </td>
+                        {valueProperties.map((p) => (
+                          <td key={p.id}>
+                            {o.values[p.technical_name] == null
+                              ? ""
+                              : String(o.values[p.technical_name])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : rows.map((row, index) => (
+                      <tr
+                        key={String(row.__key ?? index)}
+                        className="om-open-row"
+                      >
+                        <td>
+                          <button
+                            type="button"
+                            className="element-text-button"
+                            disabled={busy || !canBrowseDatabase}
+                            onClick={() =>
+                              void visitDatabase(type.id, String(row.__key))
+                            }
+                          >
+                            {String(row.__key ?? "")}
+                          </button>
+                        </td>
+                        {valueProperties.map((p) => (
+                          <td key={p.id}>
+                            {row[p.technical_name] == null
+                              ? ""
+                              : String(row[p.technical_name])}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                {!busy &&
+                  !(source === "document" ? documentRows : rows).length && (
+                    <tr>
+                      <td
+                        colSpan={valueProperties.length + 1}
+                        className="om-blank"
+                      >
+                        无匹配实例
                       </td>
-                    ))}
-                    <td>文档</td>
-                  </tr>
-                ))
-              : rows.map((row) => (
-                  <tr key={String(row.__key)}>
-                    <td>
-                      <button
-                        className="element-text-button"
-                        type="button"
-                        disabled={busy || !canBrowseDatabase}
-                        onClick={() =>
-                          void visitDatabase(type.id, String(row.__key))
-                        }
-                      >
-                        {String(row.__key)}
-                      </button>
-                    </td>
-                    {properties.map((p) => (
-                      <td key={p.id}>{String(row[p.technical_name] ?? "—")}</td>
-                    ))}
-                    <td>
-                      <Database size={14} />
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
-      </div>
-      {!busy && !(source === "document" ? documentRows : rows).length && (
-        <p className="element-empty">暂无实例。</p>
-      )}
-      {source === "database" && (
-        <div className="element-pagination">
-          <button
-            type="button"
-            className="button button--secondary"
-            disabled={busy || page === 0}
-            onClick={() => setPage(page - 1)}
-          >
-            上一页
-          </button>
-          <span>第 {page + 1} 页</span>
-          <button
-            type="button"
-            className="button button--secondary"
-            disabled={busy || !more}
-            onClick={() => setPage(page + 1)}
-          >
-            下一页
-          </button>
+                    </tr>
+                  )}
+              </tbody>
+            </table>
+          </div>
+          <div className="om-pager">
+            {source === "document" && <span>共 {documentRows.length} 条</span>}
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={busy || page === 0}
+              onClick={() => {
+                setPage(page - 1);
+                clearSide();
+              }}
+            >
+              上一页
+            </button>
+            <span>
+              {page + 1}
+              {source === "document"
+                ? ` / ${Math.max(1, Math.ceil(documentRows.length / PAGE_SIZE))}`
+                : ""}
+            </span>
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={
+                busy ||
+                (source === "document"
+                  ? (page + 1) * PAGE_SIZE >= documentRows.length
+                  : !more)
+              }
+              onClick={() => {
+                setPage(page + 1);
+                clearSide();
+              }}
+            >
+              下一页
+            </button>
+          </div>
         </div>
-      )}
-    </section>
+        {selected && (
+          <aside className="om-instance-side" aria-label="实例详情">
+            <header>
+              <h3>{selected.name}</h3>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="关闭实例详情"
+                onClick={clearSide}
+              >
+                <X size={15} />
+              </button>
+            </header>
+            <div className="om-side-content">
+              <section>
+                <h3>属性</h3>
+                <dl className="om-info-grid">
+                  {sideProperties
+                    .filter((p) => selected.values[p.technical_name] != null)
+                    .map((p) => (
+                      <div className="om-info-pair" key={p.id}>
+                        <dt>{p.name}</dt>
+                        <dd>{String(selected.values[p.technical_name])}</dd>
+                      </div>
+                    ))}
+                </dl>
+              </section>
+              <section>
+                <h3>关联实例</h3>
+                {related.map(({ link, other }) => (
+                  <div
+                    className="om-related-instance"
+                    key={`${link.id}:${other.id}`}
+                  >
+                    <small>
+                      {
+                        draft.link_types.find((r) => r.id === link.type_id)
+                          ?.name
+                      }
+                    </small>
+                    <button
+                      type="button"
+                      className="element-text-button"
+                      disabled={busy}
+                      onClick={() => {
+                        if ("key" in other)
+                          void visitDatabase(other.type_id, String(other.key));
+                        else setSelected(other);
+                      }}
+                    >
+                      {
+                        draft.object_types.find((o) => o.id === other.type_id)
+                          ?.name
+                      }{" "}
+                      · {other.name}
+                    </button>
+                  </div>
+                ))}
+                {!related.length && <span className="muted">无关联实例</span>}
+              </section>
+              {neighbors?.warnings.map((warning) => (
+                <p className="element-note" key={warning}>
+                  {warning}
+                </p>
+              ))}
+              {neighbors?.truncated && (
+                <p className="element-note">
+                  结果已达到查询范围上限，仅展示部分关系。
+                </p>
+              )}
+              <EvidenceSection
+                workspaceId={draft.workspace_id}
+                evidence={selected.evidence}
+              />
+            </div>
+          </aside>
+        )}
+      </div>
+    </>
   );
 }

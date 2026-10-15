@@ -1,0 +1,450 @@
+.view-tabs-bar {
+  flex: none;
+  gap: 10px;
+}
+.view-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+}
+.view-tabs-bar > .muted {
+  margin-left: 4px;
+  font-size: 11px;
+}
+.view-row-actions .view-tool {
+  height: 31px;
+  min-height: 31px;
+  padding: 0 10px;
+  flex-direction: row;
+  gap: 6px;
+  font-size: 12px;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+}
+.semantic-view-workbench {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+.semantic-explorer {
+  width: 260px;
+  flex: none;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-rule);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  z-index: 2;
+}
+.semantic-explorer > header {
+  height: 49px;
+  padding: 0 12px 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+}
+.semantic-explorer h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.semantic-view-workbench .icon-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-muted);
+}
+.semantic-view-workbench .icon-button:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.semantic-explorer-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.semantic-explorer [hidden] {
+  display: none !important;
+}
+.semantic-filter-wrap {
+  padding: 0 14px 14px;
+}
+.semantic-filter {
+  height: 33px;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--color-muted);
+}
+.semantic-filter:focus-within {
+  border-color: var(--color-focus);
+}
+.semantic-filter input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  min-width: 0;
+  flex: 1;
+  font-size: 12px;
+  width: 100%;
+  padding: 0;
+}
+.semantic-filter .icon-button {
+  height: 22px;
+  width: 22px;
+}
+.semantic-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.semantic-group {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: none;
+}
+.semantic-group.is-open {
+  flex: 1;
+}
+.semantic-group-heading {
+  flex: none;
+  height: 33px;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 7px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+}
+.semantic-group-heading:hover {
+  background: var(--color-surface-raised);
+}
+.semantic-group-heading[aria-expanded="false"] > svg {
+  transform: rotate(-90deg);
+}
+.semantic-group-heading small {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+.semantic-group-items {
+  margin-left: 12px;
+  padding-left: 7px;
+  border-left: 1px solid var(--color-rule);
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.semantic-tree-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+  min-height: 36px;
+  border-radius: 5px;
+  margin: 2px 0;
+}
+.semantic-tree-row:hover {
+  background: var(--color-surface-raised);
+}
+.semantic-tree-row.is-selected {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.semantic-item-select {
+  min-width: 0;
+  flex: 1;
+  padding: 7px 3px 7px 7px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: inherit;
+}
+.semantic-item-select > svg {
+  color: var(--color-muted);
+  flex: none;
+}
+.is-selected .semantic-item-select > svg {
+  color: var(--color-accent);
+}
+.semantic-item-select > span {
+  min-width: 0;
+}
+.semantic-item-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.semantic-item-select small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 172px;
+  margin-top: 1px;
+}
+.semantic-tree-row .semantic-item-menu {
+  opacity: 0;
+  flex: none;
+  width: 24px;
+  height: 25px;
+  margin-right: 3px;
+}
+.semantic-tree-row:hover .semantic-item-menu,
+.semantic-tree-row:focus-within .semantic-item-menu,
+.semantic-item-menu[aria-expanded="true"] {
+  opacity: 1;
+}
+.semantic-empty-group {
+  font-size: 11px;
+  color: var(--color-muted);
+  padding: 9px 8px;
+  margin: 0;
+}
+.semantic-explorer > footer {
+  height: 36px;
+  padding: 0 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--color-rule);
+  font-size: 10px;
+  color: var(--color-muted);
+  flex: none;
+}
+.semantic-explorer > footer > span:last-child {
+  margin-left: auto;
+}
+.semantic-explorer kbd {
+  font: 10px var(--font-mono);
+  border: 1px solid var(--color-rule);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.semantic-explorer.is-collapsed {
+  width: 44px;
+}
+.semantic-explorer.is-collapsed > header {
+  padding: 9px 7px;
+}
+.semantic-explorer.is-collapsed h2 {
+  display: none;
+}
+.semantic-explorer-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  align-items: center;
+  margin-top: 5px;
+  color: var(--color-muted);
+}
+.semantic-explorer-rail > span {
+  writing-mode: vertical-rl;
+  letter-spacing: 4px;
+  font-size: 11px;
+}
+.semantic-canvas {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--color-canvas);
+}
+.semantic-selection-chip {
+  position: absolute;
+  left: 18px;
+  top: 16px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 4px 5px 4px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  box-shadow: 0 1px 3px var(--color-shadow);
+  font-size: 11px;
+  z-index: 5;
+  max-width: 55%;
+}
+.semantic-selection-chip strong {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.semantic-selection-chip .icon-button {
+  width: 22px;
+  height: 22px;
+}
+.semantic-status-chip {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  box-shadow: 0 1px 3px var(--color-shadow);
+  padding: 7px 12px;
+  font-size: 11px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.semantic-context-menu {
+  position: fixed;
+  left: 246px;
+  top: 49px;
+  z-index: 10;
+  padding: 5px;
+  min-width: 146px;
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  background: var(--color-surface);
+  box-shadow: 0 5px 20px var(--color-shadow);
+}
+.semantic-context-menu button {
+  display: flex;
+  width: 100%;
+  gap: 9px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.semantic-context-menu button:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.semantic-resource-error {
+  color: var(--color-muted);
+  font-size: 11px;
+  padding: 8px 14px;
+}
+.semantic-canvas .ontology-node {
+  width: 184px;
+  height: 53px;
+  min-height: 53px;
+  padding: 11px;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.semantic-canvas .ontology-node__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  background: var(--color-ink);
+  color: var(--color-surface);
+}
+.semantic-canvas .ontology-node--value .ontology-node__icon {
+  background: var(--color-success);
+}
+.semantic-canvas .ontology-node strong {
+  font-size: 13px;
+}
+.semantic-canvas .ontology-node small {
+  font: 9px var(--font-mono);
+}
+.semantic-canvas .ontology-node.is-dimmed {
+  opacity: 0.16;
+}
+.semantic-canvas .ontology-edge.is-dimmed {
+  opacity: 0.12;
+}
+.semantic-canvas .react-flow__controls {
+  margin: 0 16px 17px 0;
+  border: 1px solid var(--color-rule);
+  border-radius: 5px;
+  box-shadow: 0 1px 3px var(--color-shadow);
+  overflow: hidden;
+}
+.semantic-canvas .react-flow__controls-button {
+  width: 31px;
+  height: 30px;
+  border-bottom: 1px solid var(--color-rule);
+}
+.semantic-canvas .react-flow__minimap {
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px var(--color-shadow);
+}
+@media (max-width: 1200px) {
+  .semantic-explorer {
+    width: 246px;
+  }
+  .semantic-status-chip {
+    left: 18px;
+    transform: none;
+    font-size: 10px;
+  }
+}
+@media (max-width: 1000px) {
+  .semantic-canvas .react-flow__minimap {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .semantic-explorer:not(.is-collapsed) {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(260px, calc(100% - 48px));
+    box-shadow: 5px 0 20px var(--color-shadow);
+  }
+  .view-tabs-bar > .muted {
+    display: none;
+  }
+  .view-tabs-bar {
+    padding-inline: 12px;
+  }
+  .view-row-actions .view-tool {
+    font-size: 11px;
+    padding-inline: 7px;
+  }
+  .semantic-selection-chip {
+    top: 12px;
+    left: 12px;
+    max-width: calc(100% - 24px);
+  }
+}
+.semantic-zoom-percentage {
+  display: block;
+  font-size: 9px;
+  text-align: center;
+  color: var(--color-muted);
+  padding: 4px 0;
+  min-width: 31px;
+  background: var(--color-surface);
+}

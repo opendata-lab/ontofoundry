@@ -9,9 +9,7 @@ import {
   CheckCircle2,
   Copy,
   Download,
-  KeyRound,
   Rocket,
-  Trash2,
 } from "lucide-react";
 import { api, workspaceRequest } from "../api/client";
 import type { VersionSummary } from "../api/types";
@@ -40,23 +38,6 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
-// The `mcpServers` shape DataAgent (and most MCP clients) import as is.
-function mcpConfig(url: string, token: string) {
-  return JSON.stringify(
-    {
-      mcpServers: {
-        ontofoundry: {
-          type: "http",
-          url,
-          headers: { Authorization: "Bearer " + token },
-        },
-      },
-    },
-    null,
-    2,
-  );
-}
-
 export function DeliveryPage() {
   const { workspace, refresh } = useWorkspaceContext();
   const model = useModeling(workspace.id, !!workspace.role, true);
@@ -74,10 +55,6 @@ export function DeliveryPage() {
     );
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [result, setResult] = useState("");
-  const [tokens, setTokens] = useState<
-    { id: string; name: string; scopes?: string[] }[]
-  >([]);
-  const [token, setToken] = useState("");
   const { setError } = model;
   usePageTab({
     title: model.session ? `发布 · ${model.session.title}` : undefined,
@@ -92,14 +69,7 @@ export function DeliveryPage() {
   );
   useEffect(() => {
     loadVersions().catch((e: Error) => setError(e.message));
-    if (workspace.role === "admin")
-      workspaceRequest<{ items: typeof tokens }>(
-        workspace.id,
-        "/service-tokens",
-      )
-        .then((r) => setTokens(r.items))
-        .catch((e: Error) => setError(e.message));
-  }, [workspace.id, workspace.role, loadVersions, setError]);
+  }, [loadVersions, setError]);
   const serviceRoot =
     window.location.origin + "/api/v1/ontology/workspaces/" + workspace.id;
   const session = model.session;
@@ -230,9 +200,6 @@ export function DeliveryPage() {
           <div className="service-columns">
             <div>
               <h3>REST API</h3>
-              <p className="muted">
-                指定版本读取模型与语义图谱；获准的调用方可读取文档或数据库实例。
-              </p>
               <code>{serviceRoot}/types</code>
               <div className="service-links">
                 <CopyButton text={serviceRoot + "/types"} label="复制地址" />
@@ -248,112 +215,12 @@ export function DeliveryPage() {
             </div>
             <div>
               <h3>MCP</h3>
-              <p className="muted">
-                供智能体调用：本体查询、实例查询及指标工具 list_metrics、query_metric（执行指标需允许查询业务数据）。兼容
-                MCP 2026-07-28 与 2025 系列客户端。
-              </p>
               <code>{serviceRoot}/mcp</code>
               <div className="service-links">
                 <CopyButton text={serviceRoot + "/mcp"} label="复制地址" />
               </div>
             </div>
           </div>
-          {workspace.role === "admin" && (
-            <>
-              <h3>访问令牌</h3>
-              <form
-                className="row-actions"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const data = new FormData(e.currentTarget);
-                  workspaceRequest<{ id: string; name: string; token: string }>(
-                    workspace.id,
-                    "/service-tokens",
-                    {
-                      name: data.get("name"),
-                      scopes: data.get("instances")
-                        ? ["ontology:read", "instances:read"]
-                        : ["ontology:read"],
-                    },
-                  )
-                    .then((t) => {
-                      setToken(t.token);
-                      setTokens((ts) => [...ts, t]);
-                    })
-                    .catch((e: Error) => model.setError(e.message));
-                }}
-              >
-                <input
-                  aria-label="令牌名称"
-                  name="name"
-                  placeholder="调用方名称"
-                  required
-                />
-                <label>
-                  <input type="checkbox" name="instances" />
-                  允许查询业务数据（问数需要）
-                </label>
-                <button className="button button--secondary">
-                  <KeyRound size={14} />
-                  创建令牌
-                </button>
-              </form>
-              {token && (
-                <div className="token-result">
-                  <strong>请保存令牌，仅此时显示</strong>
-                  <code>{token}</code>
-                  <CopyButton text={token} label="复制令牌" />
-                  <strong>智能体 MCP 配置</strong>
-                  <p className="muted">
-                    在 DataAgent「MCP 服务 → 导入」中粘贴，即可让智能体通过本体查询数据。
-                  </p>
-                  <pre className="token-config">
-                    {mcpConfig(serviceRoot + "/mcp", token)}
-                  </pre>
-                  <CopyButton
-                    text={mcpConfig(serviceRoot + "/mcp", token)}
-                    label="复制 MCP 配置"
-                  />
-                  <button
-                    className="button button--text"
-                    onClick={() => setToken("")}
-                  >
-                    已保存，隐藏
-                  </button>
-                </div>
-              )}
-              {tokens.map((t) => (
-                <div className="token-row" key={t.id}>
-                  {t.name}{" "}
-                  {t.scopes?.includes("instances:read")
-                    ? " · 本体与实例"
-                    : " · 仅本体"}
-                  <button
-                    className="button button--text"
-                    onClick={() =>
-                      workspaceRequest(
-                        workspace.id,
-                        "/service-tokens/" + t.id,
-                        undefined,
-                        "DELETE",
-                      )
-                        .then(() =>
-                          setTokens((ts) => ts.filter((x) => x.id !== t.id)),
-                        )
-                        .catch((e: Error) => model.setError(e.message))
-                    }
-                  >
-                    <Trash2 size={13} />
-                    撤销
-                  </button>
-                </div>
-              ))}
-              <p className="muted">
-                请求头：Authorization: Bearer
-                &lt;令牌&gt;。令牌仅能读取本空间已发布本体。
-              </p>
-            </>
-          )}
         </section>
         )}
       </div>

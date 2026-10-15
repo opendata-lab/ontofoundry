@@ -499,6 +499,10 @@ export type LegacyDraft = {
   material_links: MaterialLink[];
   mappings: DataMapping[];
   mapping_status?: Record<string, MappingStatus>;
+  /** Client-only table choice before its fields are bound; never persisted. */
+  _mapping_tables?: Record<string, string>;
+  /** Client-only editor mode, including an unfinished constant; never persisted. */
+  _mapping_modes?: Record<string, "field" | "expression" | "constant">;
   /** Explicit native edits travel outside draft JSON. */
   _semantic_changes?: SemanticChange[];
 };
