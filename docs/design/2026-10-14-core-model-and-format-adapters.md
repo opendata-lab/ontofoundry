@@ -592,8 +592,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 | 模式 | Ossie 形状 | 导入为 |
 |---|---|---|
-| 对象映射（单列主键） | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，`expression` 为 `dataset.字段`（或单列），与该 dataset 的 `primary_key` 对应 | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`，`key_columns = [主键列]` |
-| 对象映射（复合主键） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `key_columns` 按 `identify_by` 顺序列出这些列；`relationship` 是属性时同时写入 `fields`；是关系时（Ossie 允许用关系做标识），该列只作为主键列和这条关系 `data_join` 的目标列，不产生标识属性 |
+| 对象映射（单个字段） | `concept_mappings[]` 中实体概念恰好 1 个 `object_mappings`，`expression` 为 `dataset.字段`（或单列） | `DataMapping`：`source` 按最后一个 `.` 拆成 `schema_name` / `table_name`；`key_columns` 取 dataset 的 `primary_key`（物理主键），dataset 没写 `primary_key` 时取这个字段的列。对象映射引用的字段只说明“用什么认出对象”，它对应的属性是否为标识以 `identify_by` 为准，不要求与物理主键相同 |
+| 对象映射（多个字段） | 恰好 1 个 `object_mappings`，没有 `expression`，`referent_mappings` 为一层平铺列表，每项 `relationship` 是该概念 `identify_by` 中的一项、`expression` 为 `dataset.字段` | `relationship` 是属性时把该列写入 `fields`；是关系时（Ossie 允许用关系做标识），该列作为这条关系 `data_join` 的外键列，标识按 §5.2 整组放弃。`key_columns` 同样取 dataset 的 `primary_key`，没写时按 `identify_by` 顺序取这些列 |
 | 属性列 | `link_mappings` 根节点的 `object_mapping` 指向主键，`children[].relationship` 为属性名，`object_mapping.expression` 为 `dataset.字段` | `fields[属性] = 列`；也接受旧平台扩展 v1 写出的扁平形式 |
 | 外键关系 | `children[].relationship` 为二元关系名，`object_mapping.concept` 为另一端；或 `semantic_model.relationships` 中 `from` / `to` 分别是两端的 dataset | `data_join`：`table_name` 为外键所在 dataset 的表，源列 / 目标列按两端主键对应 |
 | 多对多 join 表 | 不映射到任何概念的 dataset，带两条 `relationships` 分别从它指向两端 dataset | 两端对象之间若恰有一条多对多关系，`data_join.table_name` 为该 dataset 的表，`source_columns` / `target_columns` 取两条 relationships 的 `from_columns`；对不上则 `dropped` |
@@ -694,8 +694,10 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 ### 6.4 规则和动作
 
-- `object_type / property / link_type` 规则 → 对应 Ossie 元素的 `requires` / `derived_by`，表达式原文写出。规则名、技术名、描述不导出。
-- 导出后用 Ossie 官方 lint 检查表达式，不通过的规则从文件中去掉，导出报告 `dropped`。
+- `object_type / property / link_type` 规则 → 对应 Ossie 元素的 `requires` / `derived_by`。规则名、技术名、描述不导出。
+- **表达式里的对象名要改写成外部名**（§6.2）：规则里的路径平台本来就要解析并检查引用，第一段是对象技术名，导出时换成外部名，关系名、属性名不变。例：对象 `String` 导出为 `String_entity` 时，规则 `String.code <> ''` 写成 `String_entity.code <> ''`。导入时按扩展块的 `technical_names` 反向还原。表达式里有路径解析不了、无法可靠改写的，该规则不导出，报 `dropped`。
+  Ossie 校验器不解析规则表达式，这一步不能靠导出校验兜底，必须由适配器保证。
+- 导出后跑 Ossie 官方校验；校验器不检查规则表达式的语义，表达式正确性由上一条的改写保证。
 - `action` 规则、`actions`：Ossie 没有对应构造，不导出，报 `dropped`。
 
 ### 6.5 数据映射和指标
@@ -715,15 +717,24 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 **生成规则**：
 
 - 每个 `connection_alias` 生成一个 `OntologyMap`，`name` 和 `semantic_model.name` 都是该别名。
-- 每个已映射对象生成一个 dataset：`name` = 对象技术名，`source` = `schema.table`，`primary_key` = 各主键列对应的字段名，
+**物理主键和业务标识分开处理**。核心模型不要求两者相同：示例 06 的个人表物理主键是 `person_id`，业务标识是“身份证号”。
+
+| Ossie 里 | 来自 | 说明 |
+|---|---|---|
+| dataset 的 `primary_key` | 映射的 `key_columns` | 物理主键，用来连表 |
+| 对象怎么被认出来（`object_mappings`、`link_mappings` 根节点） | 标识属性映射到的字段 | 业务标识，与 `identify_by` 一致 |
+
+- 每个已映射对象生成一个 dataset：`name` = 对象外部名，`source` = `schema.table`，`primary_key` = `key_columns` 各列对应的字段名，
   `fields` = 属性字段 + 辅助字段。
 - `concept_mappings`：
-  - 单列主键：`object_mappings` 为 `[{"expression": "dataset.主键字段"}]`。
-  - 复合主键：`object_mappings` 为 `[{"referent_mappings": [...]}]`，每个主键列一项，`relationship` 为映射到该列的标识属性，
-    `expression` 为该列对应的字段。有主键列没有标识属性映射到它时，该对象的映射报 `dropped`。
-  - `link_mappings` 根节点指向主键字段，`children` 每项 `relationship` 为属性技术名、`expression` 为 `dataset.属性技术名`。
+  - 只有一个标识属性：`object_mappings` 为 `[{"expression": "dataset.标识属性字段"}]`。示例 06 写 `person.id_card_no`，与 `identify_by: ["id_card_no"]` 一致。
+  - 多个标识属性：`object_mappings` 为 `[{"referent_mappings": [...]}]`，每个标识属性一项，`relationship` 为该属性，`expression` 为它的字段。
+  - 对象没有标识，或某个标识属性没有映射：认不出对象，该对象的 `concept_mappings` 报 `dropped`（dataset 照常导出，供连表和指标使用）。
+  - `link_mappings` 根节点与 `object_mappings` 写法相同，`children` 每项 `relationship` 为属性技术名、`expression` 为 `dataset.属性技术名`。
 - 外键关系（`data_join.table_name` 为某一端的表）→ `semantic_model.relationships` 一条，`from_columns` / `to_columns` 为对应字段名
-  （多列时照列），外加所属对象 `link_mappings` 中的一个子节点。
+  （多列时照列）。这条只描述物理连接，总是导出。
+- 外键关系在所属对象 `link_mappings` 里的子节点，用外键字段去“认出”目标对象，所以要求**目标对象的标识属性正好映射到它的 `key_columns`**
+  （业务标识就是物理主键，如示例 01 客户的 `customer_no` 映射到 `customer_id`）；否则外键值对不上目标的业务标识，子节点报 `dropped`。
 - 多对多 join 表 → 为 join 表声明一个不映射到概念的 dataset（字段全是辅助字段），加两条 `relationships` 从它分别指向两端 dataset；源对象的 `link_mappings` 增加一个根节点，指向 join dataset 的源键字段，子节点为该关系，`object_mapping` 的 `concept` 为目标对象、`expression` 为 join dataset 的目标键字段。
 
 **指标** → `semantic_model.metrics`，结构编译成 `ANSI_SQL` 表达式。导出必须让消费者**不经推断**就能确定粒度和每条路径，所以有三条前提，
@@ -781,7 +792,8 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 | `material_objects` / `material_links` | Ossie 没有实例数据 | `dropped` |
 | `actions`、动作上的规则 | Ossie 没有动作 | `dropped` |
 | 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
-| 过不了官方 lint 的规则表达式 | | `dropped` |
+| 路径无法可靠改写成外部名的规则表达式 | | `dropped` |
+| 没有标识或标识属性未映射的对象的 `concept_mappings`；目标业务标识不是物理主键时的外键子节点 | | `dropped` |
 | 引用未映射对象的指标 | | `dropped` |
 
 **Ossie 导出不需要任何占位字符串**：Ossie 的必填字段（`version`、`name`、`ontology`、`concept`、`type`、关系 `name` 和 `verbalizes`、
@@ -805,7 +817,7 @@ dataset `name` 和 `source`、field `name` 和 `expression` 等）都能从核�
 | `extends`（实体 → 实体） | ✅ | ✅ |
 | `extends`（实体 → 值） | ❌ dropped | — |
 | `identify_by`（全部成员是属性） | ✅ | ✅（只列标识属性） |
-| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（过不了 lint 的 dropped） |
+| 概念 / 关系的 `requires`、`derived_by` | ✅ → rules（引用解析不了的 dropped） | ✅（对象名改写为外部名；改写不了的 dropped） |
 | 属性型关系（实体 → 值） | ✅ | ✅ |
 | 二元关系（实体 → 实体） | ✅ | ✅（三种基数） |
 | 自关联 | ✅ | ✅（角色名 `related`） |
