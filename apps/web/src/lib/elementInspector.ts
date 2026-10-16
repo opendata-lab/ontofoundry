@@ -7,8 +7,11 @@ export type ElementTab =
   | "mapping"
   | "relations"
   | "rules"
-  | "actions"
-  | "instances";
+  | "members"
+  | "instances"
+  | "definition"
+  | "preview"
+  | "columns";
 export type ElementRequest = {
   kind: TargetKind;
   id: string;
@@ -16,6 +19,8 @@ export type ElementRequest = {
   mode?: "view" | "edit";
   sessionId?: string | null;
   previewHash?: string;
+  /** For a new link or metric: the object or dataset it starts from. */
+  owner?: string;
 };
 const INSPECT_KEYS = [
   "inspect",
@@ -24,6 +29,7 @@ const INSPECT_KEYS = [
   "inspectSession",
   "inspectSource",
   "inspectPreviewHash",
+  "inspectOwner",
   "mapping_source",
   "mapping_table",
   "mapping_schema",
@@ -38,6 +44,7 @@ export function inspectorHref(href: string, request: ElementRequest) {
   url.searchParams.set("inspect", `${request.kind}:${request.id}`);
   if (request.tab) url.searchParams.set("inspectTab", request.tab);
   if (request.mode === "edit") url.searchParams.set("inspectMode", "edit");
+  if (request.owner) url.searchParams.set("inspectOwner", request.owner);
   const session =
     request.sessionId === undefined
       ? url.searchParams.get("session")

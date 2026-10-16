@@ -1,185 +1,165 @@
-import { Database, X, PlugZap } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { modelingApi, workspaceRequest } from "../api/client";
+import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Typography } from "antd";
+import { Database, PlugZap } from "lucide-react";
+import { useEffect, useState } from "react";
+import { catalogApi, workspaceRequest } from "../api/client";
 import type { DataConnection } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+
+const { Text } = Typography;
+const PORTS: Record<DataConnection["kind"], number> = { postgresql: 5432, mysql: 3306, doris: 9030 };
+
+type ConnectionForm = {
+  name: string;
+  kind: DataConnection["kind"];
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password?: string;
+};
 
 /**
  * 数据连接管理。
  *
- * 只负责内容，不含标题——标题归页面。这样组件被嵌到别处时不会带出一个重复的
- * 二级标题。新建弹窗由组件持有（表单状态在这里），触发按钮通过 onReady 交给
- * 页面工具栏，和其他页的主操作位置保持一致。
+ * 只负责内容，不含标题——标题归页面。新建弹窗由组件持有（表单状态在这里），
+ * 触发按钮通过 onReady 交给页面工具栏，和其他页的主操作位置保持一致。
  */
-export function DataConnections({
-  onReady,
-}: {
-  /** 把"打开新建弹窗"交给调用方，让按钮能放进页面工具栏。 */
-  onReady?: (open: () => void) => void;
-}) {
+export function DataConnections({ onReady }: { onReady?: (open: () => void) => void }) {
   const { workspace } = useWorkspaceContext();
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
-  const [kind, setKind] = useState("postgresql");
   const [busy, setBusy] = useState(false);
-  const dialog = useRef<HTMLDialogElement>(null);
-
+  const [open, setOpen] = useState(false);
+  const [form] = Form.useForm<ConnectionForm>();
   useEffect(() => {
-    onReady?.(() => dialog.current?.showModal());
+    onReady?.(() => setOpen(true));
   }, [onReady]);
-
   useEffect(() => {
-    modelingApi
+    catalogApi
       .connections(workspace.id)
       .then((r) => setConnections(r.items))
       .catch((e: Error) => setError(e.message));
   }, [workspace.id]);
-
+  const submit = async (values: ConnectionForm) => {
+    setBusy(true);
+    setError("");
+    try {
+      const c = await workspaceRequest<DataConnection>(workspace.id, "/connections", values);
+      setConnections((cs) => [...cs, c]);
+      setOpen(false);
+      form.resetFields();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "连接失败");
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
-    <section className="detail-section">
-      <p className="muted">
-        使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。
-      </p>
-
-      {error && <div className="inline-error">{error}</div>}
-
-      <div className="connection-grid">
-        {connections.map((c) => (
-          <article className="connection-card" key={c.id}>
-            <Database size={23} />
-            <div>
-              <h3>{c.name}</h3>
-              <p>
-                {c.kind} · {c.database}
-              </p>
-              <small>
-                {c.host}:{c.port}
-              </small>
-            </div>
-            <button
-              className="button button--text"
-              onClick={() => {
-                setStatus("");
-                workspaceRequest(workspace.id, "/connections/" + c.id + "/test", {})
-                  .then(() => setStatus(c.name + "：连接正常"))
-                  .catch((e: Error) => setError(e.message));
-              }}
-            >
-              <PlugZap size={14} />
-              测试
-            </button>
-          </article>
-        ))}
-      </div>
-
-      {!connections.length && (
-        <div className="empty-data">
-          <Database size={26} />
-          <strong>尚未添加数据连接</strong>
-          <p>添加 MySQL、PostgreSQL 或 Doris 连接后，即可在数据映射里选择表和字段。</p>
+    <section className="flex flex-col gap-4">
+      <Text type="secondary">使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。</Text>
+      {error && !open && <Alert type="error" showIcon message={error} />}
+      {status && <Alert type="success" showIcon role="status" message={status} />}
+      {connections.length ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+          {connections.map((c) => (
+            <Card key={c.id} size="small">
+              <div className="flex items-start gap-3">
+                <Database size={23} className="flex-none text-accent" />
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <Text strong className="truncate">
+                    {c.name}
+                  </Text>
+                  <Text className="text-xs">
+                    {c.kind} · {c.database}
+                  </Text>
+                  <Text type="secondary" className="text-xs">
+                    {c.host}:{c.port}
+                  </Text>
+                </div>
+                <Button
+                  size="small"
+                  icon={<PlugZap size={14} />}
+                  onClick={() => {
+                    setStatus("");
+                    workspaceRequest(workspace.id, "/connections/" + c.id + "/test", {})
+                      .then(() => setStatus(c.name + "：连接正常"))
+                      .catch((e: Error) => setError(e.message));
+                  }}
+                >
+                  测试
+                </Button>
+              </div>
+            </Card>
+          ))}
         </div>
+      ) : (
+        <Empty
+          image={<Database size={40} className="mx-auto text-muted" />}
+          description={
+            <>
+              <strong>尚未添加数据连接</strong>
+              <br />
+              添加 MySQL、PostgreSQL 或 Doris 连接后，即可在数据映射里登记数据集。
+            </>
+          }
+        />
       )}
-
-      {status && (
-        <p className="muted" role="status">
-          {status}
-        </p>
-      )}
-
-      <dialog ref={dialog} className="ref-dialog connection-dialog" aria-label="添加数据连接">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            setError("");
-            const f = new FormData(e.currentTarget);
-            try {
-              const c = await workspaceRequest<DataConnection>(
-                workspace.id,
-                "/connections",
-                {
-                  name: f.get("name"),
-                  kind,
-                  host: f.get("host"),
-                  port: Number(f.get("port")),
-                  database: f.get("database"),
-                  username: f.get("username"),
-                  password: f.get("password"),
-                },
-              );
-              setConnections((cs) => [...cs, c]);
-              dialog.current?.close();
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "连接失败");
-            } finally {
-              setBusy(false);
-            }
+      <Modal
+        open={open}
+        title="添加数据连接"
+        onCancel={() => !busy && setOpen(false)}
+        closable={{ "aria-label": "关闭添加连接" }}
+        okText={busy ? "测试连接中…" : "测试并保存"}
+        okButtonProps={{ loading: busy }}
+        cancelText="取消"
+        onOk={() => form.submit()}
+        destroyOnHidden
+      >
+        <Form<ConnectionForm>
+          form={form}
+          layout="vertical"
+          initialValues={{ kind: "postgresql", port: PORTS.postgresql }}
+          onFinish={(values) => void submit(values)}
+          onValuesChange={(changed: Partial<ConnectionForm>) => {
+            if (changed.kind) form.setFieldValue("port", PORTS[changed.kind]);
           }}
         >
-          <header>
-            <h2>添加数据连接</h2>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => dialog.current?.close()}
-              aria-label="关闭添加连接"
-            >
-              <X size={18} />
-            </button>
-          </header>
-          <label className="section-field">
-            <span>连接名称</span>
-            <input name="name" required />
-          </label>
-          <label className="section-field">
-            <span>数据库类型</span>
-            <select value={kind} onChange={(e) => setKind(e.target.value)}>
-              <option value="postgresql">PostgreSQL</option>
-              <option value="mysql">MySQL</option>
-              <option value="doris">Apache Doris</option>
-            </select>
-          </label>
-          <div className="form-columns">
-            <label className="section-field">
-              <span>主机</span>
-              <input name="host" required />
-            </label>
-            <label className="section-field">
-              <span>端口</span>
-              <input
-                name="port"
-                type="number"
-                key={kind}
-                defaultValue={kind === "postgresql" ? 5432 : kind === "doris" ? 9030 : 3306}
-                required
-                min="1"
-                max="65535"
-              />
-            </label>
+          <Form.Item name="name" label="连接名称" rules={[{ required: true, message: "请填写连接名称" }]}>
+            <Input aria-label="连接名称" />
+          </Form.Item>
+          <Form.Item name="kind" label="数据库类型">
+            <Select
+              aria-label="数据库类型"
+              options={[
+                { value: "postgresql", label: "PostgreSQL" },
+                { value: "mysql", label: "MySQL" },
+                { value: "doris", label: "Apache Doris" },
+              ]}
+            />
+          </Form.Item>
+          <div className="grid grid-cols-[1fr_140px] gap-x-3">
+            <Form.Item name="host" label="主机" rules={[{ required: true, message: "请填写主机" }]}>
+              <Input aria-label="主机" />
+            </Form.Item>
+            <Form.Item name="port" label="端口" rules={[{ required: true, message: "请填写端口" }]}>
+              <InputNumber aria-label="端口" min={1} max={65535} className="!w-full" />
+            </Form.Item>
           </div>
-          <label className="section-field">
-            <span>数据库名称</span>
-            <input name="database" required />
-          </label>
-          <div className="form-columns">
-            <label className="section-field">
-              <span>查询用户名</span>
-              <input name="username" required autoComplete="off" />
-            </label>
-            <label className="section-field">
-              <span>密码</span>
-              <input name="password" type="password" autoComplete="new-password" />
-            </label>
+          <Form.Item name="database" label="数据库名称" rules={[{ required: true, message: "请填写数据库名称" }]}>
+            <Input aria-label="数据库名称" />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-x-3">
+            <Form.Item name="username" label="查询用户名" rules={[{ required: true, message: "请填写用户名" }]}>
+              <Input aria-label="查询用户名" autoComplete="off" />
+            </Form.Item>
+            <Form.Item name="password" label="密码">
+              <Input.Password aria-label="密码" autoComplete="new-password" />
+            </Form.Item>
           </div>
-          {error && <p className="inline-error">{error}</p>}
-          <footer>
-            <button className="button button--primary" disabled={busy}>
-              {busy ? "测试连接中…" : "测试并保存"}
-            </button>
-          </footer>
-        </form>
-      </dialog>
+          {error && <Alert type="error" showIcon message={error} />}
+        </Form>
+      </Modal>
     </section>
   );
 }

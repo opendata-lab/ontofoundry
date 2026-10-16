@@ -1,7 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ModelingSession, Workspace } from "../api/types";
+import { modelingSession, workspace } from "../test/apiRecords";
+import { renderWithProviders } from "../test/renderWithProviders";
 import type { AgentConversationElement } from "../types/agent-conversation";
 import { BuilderPage } from "./BuilderPage";
 
@@ -25,7 +27,6 @@ vi.mock("../components/ModelResults", () => ({
 vi.mock("../api/client", () => ({
   modelingApi: {
     materials: vi.fn().mockResolvedValue({ items: [] }),
-    connections: vi.fn().mockResolvedValue({ items: [] }),
     capabilities: vi.fn().mockResolvedValue({
       agent_configured: true,
       model: "DataAgent",
@@ -33,6 +34,11 @@ vi.mock("../api/client", () => ({
       connections_configured: false,
       skills: [],
     }),
+  },
+  catalogApi: {
+    connections: vi.fn().mockResolvedValue({ items: [] }),
+    tables: vi.fn().mockResolvedValue({ items: [] }),
+    tableMaterial: vi.fn(),
   },
   proposalsApi: {
     batches: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
@@ -43,56 +49,12 @@ vi.mock("../api/client", () => ({
 }));
 
 function session(): ModelingSession {
-  return {
-    id: "s1",
-    workspace_id: "w1",
-    title: "Session",
-    revision: 1,
-    base_version_id: null,
-    draft: {
-      schema_version: "2",
-      workspace_id: "w1",
-      ontology_requires: [],
-      object_types: [],
-      properties: [],
-      link_types: [],
-      rules: [],
-      actions: [],
-      material_objects: [],
-      material_links: [],
-      mappings: [],
-    },
-    graph: {
-      workspace_id: "w1",
-      version_id: "",
-      version_sha256: "",
-      nodes: [],
-      edges: [],
-    },
-    candidates: [],
-    material_ids: [],
-    task_status: "idle",
-    task_detail: "",
-    updated_at: "",
-  };
+  return modelingSession({ title: "Session" });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  context.workspace = {
-    id: "w1",
-    slug: "test",
-    name: "Test",
-    description: "",
-    role: "admin",
-    visibility: "member",
-    current_version: 1,
-    version_id: "v1",
-    version_sha256: "sha",
-    object_type_count: 0,
-    link_type_count: 0,
-    updated_at: "",
-  };
+  context.workspace = workspace({ name: "Test", slug: "test" });
   context.model = {
     session: session(),
     sessionId: "s1",
@@ -110,7 +72,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it("reloads the session after an agent error advances the backend revision", async () => {
-  const { container } = render(
+  const { container } = renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,
@@ -147,7 +109,7 @@ it("reloads the session after an agent error advances the backend revision", asy
 
 it("starts a modeling run only from 开始建模, tagged so the BFF expects proposals", async () => {
   context.model.session = { ...session(), material_ids: ["m1"] };
-  const { container } = render(
+  const { container } = renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,
@@ -161,7 +123,7 @@ it("starts a modeling run only from 开始建模, tagged so the BFF expects prop
   const start = await screen.findByRole("button", { name: "开始建模" });
   await waitFor(() => expect(start).toBeEnabled());
 
-  fireEvent.change(screen.getByPlaceholderText(/描述你希望构建的业务本体/), {
+  fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), {
     target: { value: "渠道销售" },
   });
   fireEvent.click(start);
@@ -172,7 +134,7 @@ it("starts a modeling run only from 开始建模, tagged so the BFF expects prop
 });
 
 it("keeps 开始建模 disabled without material or a scenario", async () => {
-  render(
+  renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,
@@ -187,7 +149,7 @@ it("says when the last modeling run is waiting for the user's reply", async () =
     result_state: "awaiting_reply",
     task_detail: "智能体需要你确认后才能生成提案，请在对话中回复",
   };
-  render(
+  renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,
@@ -199,7 +161,7 @@ it("says when the last modeling run is waiting for the user's reply", async () =
 
 it("shows no reply hint for a run that produced its result", async () => {
   context.model.session = { ...session(), task_status: "finished", result_state: "done" };
-  render(
+  renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,

@@ -18,166 +18,19 @@ export type Kind = 'direct'
  * @minItems 1
  * @maxItems 16
  */
-export type SourcePropertyIds =
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type SourcePropertyIds = [string, ...string[]]
 /**
  * @minItems 1
  * @maxItems 16
  */
-export type TargetPropertyIds =
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type TargetPropertyIds = [string, ...string[]]
 export type DatasetId = string
 export type Kind1 = 'mapping_table'
 /**
  * @minItems 1
  * @maxItems 16
  */
-export type SourceColumns =
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type SourceColumns = [string, ...string[]]
 export type SourceKey = MappingKey | PropertiesKey
 export type Kind2 = 'mapping_key'
 export type Kind3 = 'properties'
@@ -185,110 +38,12 @@ export type Kind3 = 'properties'
  * @minItems 1
  * @maxItems 16
  */
-export type PropertyIds =
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type PropertyIds = [string, ...string[]]
 /**
  * @minItems 1
  * @maxItems 16
  */
-export type TargetColumns =
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type TargetColumns = [string, ...string[]]
 export type TargetKey = MappingKey | PropertiesKey
 export type Description1 = string
 export type Id1 = string
@@ -340,57 +95,7 @@ export type Id5 = string
 /**
  * @maxItems 16
  */
-export type KeyColumns =
-  | []
-  | [string]
-  | [string, string]
-  | [string, string, string]
-  | [string, string, string, string]
-  | [string, string, string, string, string]
-  | [string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
-  | [
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string,
-      string
-    ]
+export type KeyColumns = string[]
 /**
  * @maxItems 64
  */
@@ -475,271 +180,16 @@ export type TechnicalName3 = string
 export type ValueKind = 'string' | 'integer' | 'decimal' | 'float' | 'boolean' | 'date' | 'datetime'
 export type Metrics = (SimpleMetric | RatioMetric | ExpressionMetric)[]
 /**
- * @maxItems 20
- */
-export type DerivedBy =
-  | []
-  | [DerivedSimple | DerivedExpression]
-  | [DerivedSimple | DerivedExpression, DerivedSimple | DerivedExpression]
-  | [DerivedSimple | DerivedExpression, DerivedSimple | DerivedExpression, DerivedSimple | DerivedExpression]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-  | [
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression,
-      DerivedSimple | DerivedExpression
-    ]
-/**
  * @minItems 1
  * @maxItems 50
  */
 export type Conditions = [PathCondition, ...PathCondition[]]
+export type Direction = 'forward' | 'reverse'
+export type LinkTypeId = string
 /**
  * @maxItems 8
  */
-export type Links =
-  | []
-  | [LinkStep]
-  | [LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep, LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep]
-  | [LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep, LinkStep]
-export type Direction = 'forward' | 'reverse'
-export type LinkTypeId = string
+export type Links = LinkStep[]
 export type PropertyId = string
 /**
  * @maxItems 200
@@ -748,6 +198,10 @@ export type Values2 = (string | number | number | boolean | null)[]
 export type Kind11 = 'simple'
 export type Expression2 = string
 export type Kind12 = 'expression'
+/**
+ * @maxItems 20
+ */
+export type DerivedBy = (DerivedSimple | DerivedExpression)[]
 export type Description5 = string
 /**
  * @maxItems 50

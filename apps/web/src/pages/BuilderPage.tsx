@@ -7,6 +7,7 @@ import {
   Rocket,
   Sparkles,
 } from "lucide-react";
+import { Alert, Button, Checkbox, Form, Input, Segmented, Tooltip, Typography } from "antd";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { modelingApi } from "../api/client";
@@ -28,6 +29,16 @@ import { useProposals } from "../hooks/useProposals";
 import { usePageTab } from "../hooks/usePageTab";
 import { createOntoFoundryConversationTransport } from "../lib/agentConversation";
 
+// The SDK reads its theme from these properties; unset, it would be the one
+// green thing on a blue page.
+const CONVERSATION = [
+  "block h-full min-h-0 w-full flex-[1_1_0] overflow-hidden",
+  "[--dac-font-family:var(--font-body)] [--dac-text-color:var(--color-ink)] [--dac-text-muted:var(--color-muted)]",
+  "[--dac-content-max-width:760px] [--dac-content-padding-inline:clamp(16px,2vw,24px)] [--dac-content-padding-block:24px] [--dac-message-gap:20px]",
+  "[--dac-primary:var(--color-accent)] [--dac-primary-dark:var(--color-accent-hover)] [--dac-primary-color:var(--color-accent)] [--dac-accent:var(--color-accent)] [--dac-user-bubble-bg:var(--color-accent-soft)]",
+  "[&::part(run-detail)]:hidden [&::part(root)]:justify-start [&::part(messages)]:flex-[1_1_0] [&::part(messages)]:overflow-auto",
+].join(" ");
+
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
@@ -39,15 +50,13 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
-  const [constraintsDirty, setConstraintsDirty] = useState(false);
-  const [constraintsBusy, setConstraintsBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
-    dirty: !!scenario.trim() || constraintsDirty,
-    busy: busy || uploading || constraintsBusy,
+    dirty: !!scenario.trim(),
+    busy: busy || uploading,
   });
   // Run state comes from the element, not from a status column the page
   // polls. It knows first, and it covers the parked states — waiting_input is
@@ -214,121 +223,96 @@ export function BuilderPage() {
       : "";
   }, [sessionId, workspace.id]);
 
+  const heading = (text: string) => (
+    <h3 className="m-0 mb-3 flex items-center text-xs font-semibold before:mr-2 before:block before:h-3 before:w-0.5 before:bg-accent before:content-['']">
+      {text}
+    </h3>
+  );
   return (
-    <div className="ref-builder">
-      <header className="context-bar">
-        <h1>本体构建</h1>
-        <SessionPicker
-          session={session}
-          sessionId={sessionId}
-          sessions={model.sessions}
-          onSelect={model.select}
-        />
-        <button
-          className="icon-button"
-          aria-label="新建会话"
-          onClick={() =>
-            act(async () => {
-              await model.create();
-            })
-          }
-          disabled={busy}
-        >
-          <Plus size={15} />
-        </button>
-        <small className="saved-at">
-          {session
-            ? "最近保存: " +
-              new Date(session.updated_at).toLocaleString("zh-CN", {
-                hour12: false,
+    <div className="flex h-full min-w-0 flex-col">
+      <header className="flex min-h-14 flex-none flex-wrap items-center gap-3 border-b border-rule-soft bg-surface px-5">
+        <h1 className="m-0 text-sm font-semibold whitespace-nowrap text-ink">本体构建</h1>
+        <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} />
+        <Tooltip title="新建会话">
+          <Button
+            aria-label="新建会话"
+            icon={<Plus size={15} />}
+            disabled={busy}
+            onClick={() =>
+              act(async () => {
+                await model.create();
               })
-            : "尚未开始"}
-        </small>
-        <div className="context-right">
-          {/* 配好之后这里恒等于同一个运行时名，既不是模型名也点不动，下拉箭头
-              还让它看着像个选择器。只在没配的时候提示——那才是用户需要做事的时候，
-              「空间设置」本来就在主导航里。 */}
-          {capabilities && !capabilities.agent_configured && (
-            <span>
-              <Link to="../settings">DataAgent 未配置，查看连通性</Link>
-            </span>
-          )}
-          <button
-            className="button button--primary"
+            }
+          />
+        </Tooltip>
+        <Typography.Text type="secondary" className="text-xs">
+          {session ? "最近保存: " + new Date(session.updated_at).toLocaleString("zh-CN", { hour12: false }) : "尚未开始"}
+        </Typography.Text>
+        <div className="ml-auto flex items-center gap-3 text-xs">
+          {/* 只在没配的时候提示——那才是用户需要做事的时候。 */}
+          {capabilities && !capabilities.agent_configured && <Link to="../settings">DataAgent 未配置，查看连通性</Link>}
+          <Button
+            type="primary"
+            icon={<Rocket size={14} />}
             disabled={!session || running || busy}
             onClick={() => navigate("../delivery?session=" + session?.id)}
           >
-            <Rocket size={14} />
             发布本体
-          </button>
+          </Button>
         </div>
       </header>
       {error && (
-        <div className="inline-error" role="alert">
-          {error}
-          <button onClick={() => setError("")} aria-label="关闭错误">
-            ×
-          </button>
-        </div>
+        <Alert
+          type="error"
+          showIcon
+          banner
+          closable={{ closeIcon: true, "aria-label": "关闭错误" }}
+          message={error}
+          onClose={() => setError("")}
+        />
       )}
       {/* A modeling run that ended with questions instead of a result. The
           conversation's own run label only says the turn finished. */}
       {!running && session?.result_state === "awaiting_reply" && (
-        <div className="inline-notice" role="status">
-          {session.task_detail}
-        </div>
+        <Alert type="info" showIcon banner role="status" message={session.task_detail} />
       )}
       <div
-        className={
-          "ref-builder-columns" + (collapsed ? " config-collapsed" : "")
-        }
+        className={`grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] ${collapsed ? "grid-cols-[36px_minmax(0,1fr)_minmax(0,1fr)]" : "grid-cols-[minmax(240px,0.95fr)_minmax(280px,1fr)_minmax(310px,1.05fr)] max-[1100px]:grid-cols-[260px_minmax(260px,1fr)_minmax(290px,1fr)]"}`}
       >
-        <aside className="ref-build-config">
-          <header>
-            <h2>构建配置</h2>
-            <button
-              className="icon-button"
+        <aside className="flex min-h-0 flex-col overflow-hidden border-r border-rule">
+          <header className="flex h-10 flex-none items-center justify-between border-b border-rule-soft px-4">
+            {!collapsed && <h2 className="m-0 text-[13px] font-semibold">构建配置</h2>}
+            <Button
+              type="text"
+              size="small"
               onClick={() => setCollapsed(!collapsed)}
               aria-label={collapsed ? "展开构建配置" : "收起构建配置"}
-            >
-              {collapsed ? (
-                <PanelLeftOpen size={15} />
-              ) : (
-                <PanelLeftClose size={15} />
-              )}
-            </button>
+              icon={collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            />
           </header>
           {!collapsed && (
-            <div className="build-config-scroll">
+            <div className="flex flex-1 flex-col gap-6 overflow-auto px-[18px] py-5">
               <section>
-                <h3>业务场景标签</h3>
+                {heading("业务场景标签")}
                 <TagList tags={[workspace.name]} />
               </section>
               <section>
-                <h3>业务知识</h3>
-                <div
-                  className="ref-tabs"
-                  role="tablist"
+                {heading("业务知识")}
+                <Segmented
+                  size="small"
                   aria-label="建模材料来源"
-                >
-                  <button
-                    role="tab"
-                    aria-selected={materialMode === "upload"}
-                    onClick={() => setMaterialMode("upload")}
-                  >
-                    上传业务知识
-                  </button>
-                  <button
-                    role="tab"
-                    aria-selected={materialMode === "library"}
-                    onClick={() => setMaterialMode("library")}
-                  >
-                    选择已上传材料
-                  </button>
-                </div>
+                  className="!mb-3"
+                  value={materialMode}
+                  onChange={(v) => setMaterialMode(String(v))}
+                  options={[
+                    { value: "upload", label: "上传业务知识" },
+                    { value: "library", label: "选择已上传材料" },
+                  ]}
+                />
                 {materialMode === "upload" && (
                   <button
-                    className="ref-upload"
+                    type="button"
+                    className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong bg-surface-raised px-4 py-6 text-center text-ink-2 hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
                     aria-label="上传业务知识材料"
                     disabled={uploading || running}
                     onClick={() => input.current?.click()}
@@ -338,11 +322,9 @@ export function BuilderPage() {
                       if (!running) void upload(e.dataTransfer.files);
                     }}
                   >
-                    <Upload size={23} />
-                    <strong>
-                      {uploading ? "正在上传…" : "点击或拖拽文件至此上传"}
-                    </strong>
-                    <small>
+                    <Upload size={23} className="text-accent" />
+                    <strong className="text-[13px]">{uploading ? "正在上传…" : "点击或拖拽文件至此上传"}</strong>
+                    <small className="text-xs leading-5 text-muted">
                       支持 Markdown、TXT、JSON、YAML、CSV · UTF-8
                       <br />
                       单文件不超过 {capabilities?.max_file_mb ?? 256} MB
@@ -355,79 +337,77 @@ export function BuilderPage() {
                   accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"
                   multiple
                   hidden
-                  onChange={(e) =>
-                    e.target.files && void upload(e.target.files)
-                  }
+                  onChange={(e) => e.target.files && void upload(e.target.files)}
                 />
                 {materialMode === "library" && (
-                  <div className="material-list">
+                  <div className="flex flex-col gap-1">
                     {!materials.length && (
-                      <p className="muted">
+                      <Typography.Text type="secondary" className="text-xs">
                         尚未上传材料，请先上传业务知识文件。
-                      </p>
+                      </Typography.Text>
                     )}
                     {materials.map((m) => (
-                      <label key={m.id}>
-                        <input
-                          type="checkbox"
-                          checked={!!session?.material_ids.includes(m.id)}
-                          disabled={busy || running}
-                          onChange={() =>
-                            act(async () => {
-                              const s = await model.ensure();
-                              setSession(
-                                await modelingApi.save(s, s.draft, {
-                                  material_ids: s.material_ids.includes(m.id)
-                                    ? s.material_ids.filter((id) => id !== m.id)
-                                    : [...s.material_ids, m.id],
-                                }),
-                              );
-                            })
-                          }
-                        />
-                        <FileText size={14} />
-                        <span title={m.name}>{m.name}</span>
-                        <small>{m.chunk_count} 段</small>
-                      </label>
+                      <Checkbox
+                        key={m.id}
+                        checked={!!session?.material_ids.includes(m.id)}
+                        disabled={busy || running}
+                        onChange={() =>
+                          act(async () => {
+                            const s = await model.ensure();
+                            setSession(
+                              await modelingApi.save(s, s.draft, {
+                                material_ids: s.material_ids.includes(m.id)
+                                  ? s.material_ids.filter((id) => id !== m.id)
+                                  : [...s.material_ids, m.id],
+                              }),
+                            );
+                          })
+                        }
+                      >
+                        <span className="inline-flex min-w-0 items-center gap-1.5 text-[13px]">
+                          <FileText size={14} className="flex-none" />
+                          <span className="truncate" title={m.name}>
+                            {m.name}
+                          </span>
+                          <Typography.Text type="secondary" className="text-xs">
+                            {m.chunk_count} 段
+                          </Typography.Text>
+                        </span>
+                      </Checkbox>
                     ))}
                   </div>
                 )}
               </section>
               <section>
-                <h3>业务数据</h3>
+                {heading("业务数据")}
                 <TableMaterialPicker
                   workspaceId={workspace.id}
                   disabled={busy || running}
                   onMaterial={(material) => act(() => attach(material))}
                 />
               </section>
-              <section>
-                <label className="section-field">
-                  <span>业务场景描述</span>
-                  <textarea
-                    rows={6}
-                    placeholder="描述你希望构建的业务本体，例如采购协同中的供应商、物料和供货关系。"
-                    value={scenario}
-                    onChange={(e) => setScenario(e.target.value)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="button button--primary start-modeling"
-                  disabled={!canModel}
-                  title={
-                    canModel ? undefined : "先上传或选择业务材料，或填写业务场景描述"
-                  }
-                  onClick={startModeling}
-                >
-                  <Sparkles size={15} />
-                  {running ? "建模中…" : "开始建模"}
-                </button>
+              <section className="flex flex-col gap-3">
+                <Form layout="vertical" component="div">
+                  <Form.Item label="业务场景描述" className="!mb-0">
+                    <Input.TextArea
+                      aria-label="业务场景描述"
+                      rows={6}
+                      placeholder="描述你希望构建的业务本体，例如采购协同中的供应商、物料和供货关系。"
+                      value={scenario}
+                      onChange={(e) => setScenario(e.target.value)}
+                    />
+                  </Form.Item>
+                </Form>
+                <Tooltip title={canModel ? undefined : "先上传或选择业务材料，或填写业务场景描述"}>
+                  <Button type="primary" block icon={<Sparkles size={15} />} disabled={!canModel} onClick={startModeling}>
+                    {running ? "建模中…" : "开始建模"}
+                  </Button>
+                </Tooltip>
               </section>
             </div>
           )}
         </aside>
-        <section className="ref-chat">
+        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-rule bg-surface">
           {/* The endpoint is derived from sessionId, never from `session`.
               That object is null while a session loads, and an endpoint that
               momentarily goes empty reads as a conversation switch — the
@@ -435,19 +415,19 @@ export function BuilderPage() {
           <dataagent-conversation
             ref={conversation}
             placeholder="向智能体提问以辅助本体构建…"
+            className={CONVERSATION}
           >
             <BuilderConversationEmpty />
           </dataagent-conversation>
         </section>
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface px-3 pt-1 pb-3">
         <ModelResults
           session={session}
           proposals={proposals}
           running={running}
           onRemodel={remodel}
-          onSession={setSession}
-          onConstraintsDirty={setConstraintsDirty}
-          onConstraintsBusy={setConstraintsBusy}
         />
+        </div>
       </div>
     </div>
   );

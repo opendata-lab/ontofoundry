@@ -1,382 +1,242 @@
-import { Box, Database, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { modelingApi } from "../api/client";
-import type { DataConnection } from "../api/types";
-import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
-import { useSnapshot } from "../hooks/useSnapshot";
-import { usePageTab } from "../hooks/usePageTab";
-import { useElementInspector } from "../hooks/useElementInspector";
-import { nativeSemanticModels } from "../lib/semanticEditing";
-import { editorDraft } from "../lib/nativeDraft";
-import { emptyDraft, fromView } from "../lib/draftView";
-import {
-  objectMapping,
-  shortObjectName,
-  type ObjectMapping,
-} from "../lib/objectMapping";
-import { SemanticModels } from "../components/SemanticModels";
-import { DataAssets } from "../components/DataAssets";
+import { Alert, Button, Empty, Input, Progress, Segmented, Table, Tabs, Tag, Typography } from "antd";
+import { PageBody, PageHeader } from "../components/PageHeader";
+import { Database } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { Dataset } from "../api/types";
 import { DatasetPicker } from "../components/DatasetPicker";
-import { InspectorDialog } from "../components/elements/InspectorDialog";
-import {
-  InfoButton,
-  MappingStatusIcon,
-} from "../components/elements/MappingWidgets";
+import { MappingStatusIcon } from "../components/elements/MappingWidgets";
+import { datasetLabel } from "../lib/datasetEditing";
+import { useElementInspector } from "../hooks/useElementInspector";
+import { useSnapshot } from "../hooks/useSnapshot";
+import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { identifier, metricsOnDataset } from "../lib/coreModel";
+import { notifyOntologySaved } from "../lib/elementInspector";
+import { BINDING_MODES, objectMappings, shortObjectName, type ObjectMapping } from "../lib/objectMapping";
 
-const FILTERS = [
-  ["all", "全部"],
-  ["mapped", "已映射"],
-  ["partial", "部分映射"],
-  ["unmapped", "未映射"],
-] as const;
+const { Text } = Typography;
+
+type Filter = "all" | ObjectMapping["state"];
+
 export function MappingsPage() {
-  const { workspace } = useWorkspaceContext();
+  const { workspace, refresh } = useWorkspaceContext();
   const inspector = useElementInspector();
   const snapshot = useSnapshot(workspace);
-  const [filter, setFilter] = useState<"all" | ObjectMapping["state"]>("all");
+  const draft = snapshot.draft;
+  const [tab, setTab] = useState<"datasets" | "mappings">("datasets");
+  const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<"assets" | "mappings" | "semantic">(
-    "assets",
-  );
   const [picker, setPicker] = useState(false);
-  const [assetBusy, setAssetBusy] = useState(false);
-  const [connections, setConnections] = useState<DataConnection[]>([]);
-  const [info, setInfo] = useState<{ title: string; tables?: string[] } | null>(
-    null,
-  );
-  usePageTab({ busy: assetBusy });
-  useEffect(() => {
-    let live = true;
-    modelingApi
-      .connections(workspace.id)
-      .then((result) => {
-        if (live) setConnections(result.items);
-      })
-      .catch(() => {
-        if (live) setConnections([]);
-      });
-    return () => {
-      live = false;
-    };
-  }, [workspace.id]);
-  const source = snapshot.sourceDraft;
-  const nativeDraft = source?.schema_version === "3" ? source : undefined;
-  const draft = useMemo(
-    () =>
-      source
-        ? editorDraft(source)
-        : snapshot.draft
-          ? editorDraft(fromView(emptyDraft(workspace.id), snapshot.draft))
-          : null,
-    [source, snapshot.draft, workspace.id],
-  );
-  const records = useMemo(
-    () =>
-      draft?.object_types.map((object) =>
-        objectMapping(draft, object, nativeDraft),
-      ) ?? [],
-    [draft, nativeDraft],
-  );
+  const records = useMemo(() => (draft ? objectMappings(draft) : []), [draft]);
+  const normalized = query.trim().toLowerCase();
   const rows = records.filter(
-    (record) =>
-      (filter === "all" || record.state === filter) &&
-      [
-        record.object.name,
-        record.object.technical_name,
-        ...record.tables.map((t) => t.source),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(query.toLowerCase()),
+    (r) =>
+      (filter === "all" || (r.mode !== "virtual" && r.state === filter)) &&
+      (!normalized ||
+        [r.object.name, r.object.technical_name, ...r.sources.map((s) => s.dataset?.name ?? "")]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalized)),
   );
-  const open = (record: ObjectMapping) =>
-    inspector.open({
-      kind: "object_type",
-      id: record.object.id,
-      tab: "properties",
-      sessionId: snapshot.sessionId,
-    });
+  const datasets = (draft?.datasets ?? []).filter(
+    (d) => !normalized || [d.name, d.table_name, d.schema_name ?? "", d.description].join(" ").toLowerCase().includes(normalized),
+  );
+  const openDataset = (id: string) => inspector.open({ kind: "dataset", id, sessionId: snapshot.sessionId });
+  const openObject = (record: ObjectMapping) =>
+    inspector.open({ kind: "object_type", id: record.object.id, tab: "properties", sessionId: snapshot.sessionId });
+  const usage = (dataset: Dataset) =>
+    draft ? records.filter((r) => r.sources.some((s) => s.dataset_id === dataset.id)).length : 0;
   return (
-    <div
-      className={`ref-catalog om-mappings-page${view === "semantic" ? " ref-catalog--semantic" : ""}`}
-    >
-      <header className="catalog-toolbar">
-        <h1>数据映射</h1>
-        <div className="toolbar-spacer" />
-        <button
-          type="button"
-          className="button button--secondary"
-          disabled={assetBusy}
-          onClick={() => setPicker(true)}
-        >
-          <Database size={14} />
-          浏览数据目录
-        </button>
-      </header>
-      <div className="management-tabs" role="group" aria-label="数据映射视图">
-        <button
-          type="button"
-          aria-pressed={view === "assets"}
-          disabled={assetBusy}
-          onClick={() => setView("assets")}
-        >
-          数据源与资产
-        </button>
-        <button
-          type="button"
-          aria-pressed={view === "mappings"}
-          disabled={assetBusy}
-          onClick={() => setView("mappings")}
-        >
-          本体映射
-        </button>
-        <button
-          type="button"
-          aria-pressed={view === "semantic"}
-          disabled={assetBusy}
-          onClick={() => setView("semantic")}
-        >
-          语义模型
-        </button>
-      </div>
-      {snapshot.error && (
-        <p className="inline-error" role="alert">
-          {snapshot.error}
-        </p>
-      )}
-      {view === "assets" ? (
-        <div className="management-content">
-          <DataAssets
-            key={workspace.id + ":" + snapshot.sessionId}
-            onBusyChange={setAssetBusy}
-            workspaceId={workspace.id}
-            connections={connections}
-            draft={snapshot.draft}
-            sessionId={snapshot.sessionId}
+    <div className="flex h-full min-h-0 flex-col bg-canvas">
+      <PageHeader title="数据映射" note={snapshot.sessionId ? "建模会话草稿" : "当前版本"}>
+        {workspace.role && (
+          <Button icon={<Database size={14} />} onClick={() => setPicker(true)}>
+            从数据目录登记
+          </Button>
+        )}
+      </PageHeader>
+      <PageBody className="!gap-3">
+      {snapshot.error && <Alert type="error" showIcon message={snapshot.error} />}
+      <Tabs
+        activeKey={tab}
+        onChange={(key) => setTab(key as typeof tab)}
+        items={[
+          { key: "datasets", label: `数据集 ${draft?.datasets.length ?? ""}` },
+          { key: "mappings", label: `本体映射 ${records.length || ""}` },
+        ]}
+        tabBarExtraContent={
+          <Input.Search
+            allowClear
+            size="small"
+            aria-label={tab === "datasets" ? "搜索数据集" : "搜索对象或数据集"}
+            placeholder={tab === "datasets" ? "名称或表名" : "对象、英文名或数据集"}
+            className="w-[260px]"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
-        </div>
-      ) : view === "semantic" ? (
-        <div className="management-content">
-          <SemanticModels
-            workspaceId={workspace.id}
-            sessionId={snapshot.sessionId}
-            canEdit={!!workspace.role}
-            onBusyChange={setAssetBusy}
-          />
-        </div>
+        }
+      />
+      {tab === "datasets" ? (
+        <Table
+          size="middle"
+          rowKey="id"
+          loading={!draft && !snapshot.error}
+          dataSource={datasets}
+          pagination={datasets.length > 20 ? { pageSize: 20 } : false}
+          onRow={(d) => ({ onDoubleClick: () => openDataset(d.id) })}
+          locale={{
+            emptyText: (
+              <Empty description={query ? "没有匹配的数据集" : "还没有登记数据集"}>
+                {workspace.role && !query && <Button onClick={() => setPicker(true)}>从数据目录登记</Button>}
+              </Empty>
+            ),
+          }}
+          columns={[
+            {
+              title: "数据集",
+              key: "name",
+              render: (_, d) => (
+                <div className="flex flex-col">
+                  <Button type="link" className="!h-auto self-start !p-0" onClick={() => openDataset(d.id)}>
+                    {d.name}
+                  </Button>
+                  {d.description && (
+                    <Text type="secondary" className="max-w-[420px] truncate text-xs">
+                      {d.description}
+                    </Text>
+                  )}
+                </div>
+              ),
+            },
+            {
+              title: "物理位置",
+              key: "location",
+              render: (_, d) => <code>{[d.schema_name, d.table_name].filter(Boolean).join(".")}</code>,
+            },
+            { title: "列", key: "columns", width: 72, render: (_, d) => d.columns?.length ?? <Text type="secondary">未登记</Text> },
+            {
+              title: "快照",
+              key: "snapshot",
+              width: 140,
+              render: (_, d) => (d.snapshot_date_column ? <Tag className="!m-0">每日 · {d.snapshot_date_column}</Tag> : "—"),
+            },
+            { title: "对象", key: "objects", width: 72, render: (_, d) => usage(d) || "—" },
+            { title: "指标", key: "metrics", width: 72, render: (_, d) => (draft ? metricsOnDataset(draft, d.id).length || "—" : "—") },
+          ]}
+        />
       ) : (
-      <div className="om-panel">
-        <div className="om-tabbar" role="group" aria-label="映射状态">
-          {FILTERS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={filter === value}
-              onClick={() => setFilter(value)}
-            >
-              {label}
-              <small>
-                {value === "all"
-                  ? records.length
-                  : records.filter((r) => r.state === value).length}
-              </small>
-            </button>
-          ))}
-        </div>
-        <div className="om-toolbar">
-          <label className="om-search">
-            <Search size={16} />
-            <input
-              aria-label="搜索对象、英文名或表"
-              placeholder="搜索对象、英文名或表"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-          <span className="om-push muted">{rows.length} 个对象</span>
-        </div>
-        <table className="om-table om-page-table">
-          <thead>
-            <tr>
-              <th>业务对象</th>
-              <th>标识字段</th>
-              <th>来源表</th>
-              <th>
-                覆盖{" "}
-                <InfoButton
-                  label="覆盖怎么算"
-                  onClick={() => setInfo({ title: "覆盖怎么算" })}
-                />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((record) => {
-              const extra = record.tables.filter(
-                (d) => d.id !== record.mainDataset?.id,
-              );
-              return (
-                <tr
-                  key={record.object.id}
-                  className="om-open-row"
-                  onClick={() => open(record)}
-                >
-                  <td data-label="业务对象">
-                    <button
-                      type="button"
-                      className="om-table-object"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        open(record);
-                      }}
-                    >
-                      <Box size={16} />
-                      {shortObjectName(record.object)}
-                    </button>
-                    <small className="om-sub">
-                      {record.object.technical_name} · 对象
-                    </small>
-                  </td>
-                  <td data-label="标识字段">
-                    {record.keys.length ? (
-                      <>
-                        <code>
-                          {record.keys.map((e) => e.expression).join(" + ")}
-                        </code>
-                        <span className="om-tag-key" title="实例标识">
-                          标识
-                        </span>
-                      </>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td data-label="来源表">
-                    {record.mainDataset ? (
-                      <>
-                        <code>{record.mainDataset.source}</code>
-                        {extra.length > 0 && (
-                          <span onClick={(e) => e.stopPropagation()}>
-                            <InfoButton
-                              label="相关表"
-                              onClick={() =>
-                                setInfo({
-                                  title: "相关表",
-                                  tables: extra.map((t) => t.source),
-                                })
-                              }
-                            />
-                          </span>
-                        )}
-                        <small className="om-sub">
-                          {draft?.mappings.find(
-                            (m) => m.type_id === record.object.id,
-                          )?.connection_alias ??
-                            record.models.find((m) =>
-                              m.datasets.some(
-                                (d) => d.id === record.mainDataset?.id,
-                              ),
-                            )?.name}
-                        </small>
-                      </>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td data-label="覆盖">
-                    <div className="om-coverage">
-                      <span>
-                        {record.covered}/{record.total}
-                      </span>
-                      {record.total > 0 && (
-                        <span className="om-coverage-track">
-                          <i
-                            style={{
-                              width: `${(100 * record.covered) / record.total}%`,
-                            }}
-                          />
-                        </span>
-                      )}
-                    </div>
-                    <span className={`om-status om-status-${record.state}`}>
-                      <MappingStatusIcon state={record.state} />
-                      {record.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-            {!draft && !snapshot.error ? (
-              <tr>
-                <td colSpan={4} className="om-blank" role="status">
-                  正在读取对象映射…
-                </td>
-              </tr>
-            ) : (
-              !rows.length && (
-                <tr>
-                  <td colSpan={4} className="om-blank">
-                    没有匹配对象{" "}
-                    <button
-                      type="button"
-                      className="element-text-button"
+        <div className="flex flex-col gap-3">
+          <Segmented
+            className="self-start"
+            value={filter}
+            onChange={(value) => setFilter(value as Filter)}
+            options={(
+              [
+                ["all", "全部"],
+                ["mapped", "已映射"],
+                ["partial", "部分映射"],
+                ["unmapped", "未映射"],
+              ] as const
+            ).map(([value, label]) => ({
+              value,
+              label: `${label} ${value === "all" ? records.length : records.filter((r) => r.mode !== "virtual" && r.state === value).length}`,
+            }))}
+          />
+          <Table
+            size="middle"
+            rowKey={(r) => r.object.id}
+            loading={!draft && !snapshot.error}
+            dataSource={rows}
+            pagination={rows.length > 20 ? { pageSize: 20 } : false}
+            onRow={(r) => ({ onClick: () => openObject(r), className: "cursor-pointer" })}
+            locale={{
+              emptyText: (
+                <Empty description="没有匹配的对象">
+                  {(query || filter !== "all") && (
+                    <Button
                       onClick={() => {
                         setQuery("");
                         setFilter("all");
                       }}
                     >
                       清除筛选
-                    </button>
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
-        <div className="om-panel-foot">
-          <span className="om-push">
-            {snapshot.sessionId ? "建模会话草稿" : "当前版本"}
-          </span>
+                    </Button>
+                  )}
+                </Empty>
+              ),
+            }}
+            columns={[
+              {
+                title: "业务对象",
+                key: "object",
+                render: (_, r) => (
+                  <div className="flex flex-col">
+                    <span>{shortObjectName(r.object)}</span>
+                    <code className="text-xs text-muted">{r.object.technical_name}</code>
+                  </div>
+                ),
+              },
+              {
+                title: "标识",
+                key: "identifier",
+                render: (_, r) => {
+                  const keys = draft ? identifier(draft, r.object.id) : [];
+                  return keys.length ? keys.map((p) => p.name).join(" + ") : <Text type="secondary">—</Text>;
+                },
+              },
+              { title: "实例来源", key: "mode", width: 140, render: (_, r) => BINDING_MODES[r.mode] },
+              {
+                title: "主数据集",
+                key: "main",
+                render: (_, r) =>
+                  r.main ? (
+                    <span className="flex flex-col">
+                      {datasetLabel(r.main.dataset)}
+                      {r.sources.length > 1 && <Text type="secondary" className="text-xs">另有 {r.sources.length - 1} 个来源</Text>}
+                    </span>
+                  ) : (
+                    <Text type="secondary">—</Text>
+                  ),
+              },
+              {
+                title: "属性覆盖",
+                key: "coverage",
+                width: 220,
+                render: (_, r) =>
+                  r.mode === "virtual" ? (
+                    <Text type="secondary">实例来自子对象</Text>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <Progress percent={r.total ? Math.round((100 * r.covered) / r.total) : 0} size="small" format={() => `${r.covered}/${r.total}`} />
+                      <span className="self-start">
+                        <MappingStatusIcon state={r.state} label={r.label} />
+                      </span>
+                    </div>
+                  ),
+              },
+            ]}
+          />
+          <Text type="secondary" className="text-xs">
+            属性覆盖只统计已绑定的属性；继承属性按父对象或本对象的绑定计算。关系的绑定在关系弹窗中查看。
+          </Text>
         </div>
-      </div>
       )}
       <DatasetPicker
-        workspaceId={workspace.id}
-        onOpenObject={(id) =>
-          inspector.open({
-            kind: "object_type",
-            id,
-            tab: "properties",
-            sessionId: snapshot.sessionId,
-          })
-        }
+        workspace={workspace}
+        draft={draft}
+        sessionId={snapshot.sessionId}
         open={picker}
-        onClose={() => {
-          if (!assetBusy) setPicker(false);
+        onClose={() => setPicker(false)}
+        onOpenDataset={(id) => {
+          setPicker(false);
+          openDataset(id);
         }}
-        datasets={
-          nativeDraft
-            ? nativeSemanticModels(nativeDraft).flatMap((m) => m.datasets)
-            : []
-        }
-        draft={draft ?? undefined}
-        nativeDraft={nativeDraft}
+        onRegistered={(result) => {
+          notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
+          refresh();
+          snapshot.load();
+        }}
       />
-      {info && (
-        <InspectorDialog title={info.title} onClose={() => setInfo(null)}>
-          {info.tables ? (
-            info.tables.map((table) => (
-              <div className="om-entry" key={table}>
-                <code>{table}</code>
-              </div>
-            ))
-          ) : (
-            <p>
-              覆盖只统计已绑定的属性。同一属性来自多张表也只统计一次。关系配置情况只在关系页显示；继承的属性只在合并表中展示一次。
-            </p>
-          )}
-        </InspectorDialog>
-      )}
+      </PageBody>
     </div>
   );
 }

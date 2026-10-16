@@ -110,6 +110,8 @@
   --color-relation-soft: var(--color-relation-soft);
   --color-attribute: var(--color-attribute);
   --color-attribute-soft: var(--color-attribute-soft);
+  --color-graph-edge: var(--color-graph-edge);
+  --color-shadow: var(--color-shadow);
 
   --text-xs: var(--text-xs);
   --text-sm: var(--text-sm);

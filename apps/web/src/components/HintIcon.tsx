@@ -1,84 +1,21 @@
+import { Tooltip } from "antd";
 import { Info, type LucideIcon } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
-/** Hints remain visible inside scrolling tables, inspectors and drawers. */
-export function HintIcon({
-  text,
-  icon: Icon = Info,
-}: {
-  text: string;
-  icon?: LucideIcon;
-}) {
-  const label = text;
-  const ref = useRef<HTMLSpanElement>(null);
-  const id = useId();
-  const [position, setPosition] = useState<{
-    left: number;
-    top: number;
-  } | null>(null);
-  const show = () => {
-    const bounds = ref.current?.getBoundingClientRect();
-    if (bounds)
-      setPosition({
-        left: Math.max(8, Math.min(bounds.left, window.innerWidth - 352)),
-        top: bounds.top + bounds.height / 2,
-      });
-  };
-  useEffect(() => {
-    if (!position) return;
-    const hide = () => setPosition(null);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
-    };
-  }, [position]);
+/** An icon that explains itself on hover or focus. */
+export function HintIcon({ text, icon: Icon = Info }: { text: string; icon?: LucideIcon }) {
   return (
-    <>
-      <span
-        ref={ref}
-        className="hint-icon hint-icon--portal"
-        tabIndex={0}
-        role="img"
-        aria-label={label}
-        aria-describedby={position ? id : undefined}
-        onMouseEnter={show}
-        onMouseLeave={() => setPosition(null)}
-        onFocus={show}
-        onBlur={() => setPosition(null)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") setPosition(null);
-        }}
-      >
+    <Tooltip title={text}>
+      <span className="inline-flex cursor-help text-muted" tabIndex={0} role="img" aria-label={text}>
         <Icon size={14} aria-hidden="true" />
       </span>
-      {position &&
-        createPortal(
-          <span
-            id={id}
-            className="hint-bubble"
-            role="tooltip"
-            style={{ left: position.left, top: position.top }}
-          >
-            {label}
-          </span>,
-          ref.current?.closest("dialog") ?? document.body,
-        )}
-    </>
+    </Tooltip>
   );
 }
-export function HintedHeading({
-  title,
-  hint,
-}: {
-  title: string;
-  hint: string;
-}) {
+
+export function HintedHeading({ title, hint }: { title: string; hint: string }) {
   return (
-    <div className="hinted-heading">
-      <h3>{title}</h3>
+    <div className="flex items-center gap-1">
+      <h3 className="m-0 text-sm font-semibold">{title}</h3>
       <HintIcon text={hint} />
     </div>
   );

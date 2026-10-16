@@ -1,591 +1,423 @@
+// REST types for the core-1 API. Core element shapes come from the generated
+// core.generated.ts; the read projections and envelopes below follow
+// docs/plans/2026-10-16-core1-p2-api-contract.md.
+import type * as Core from "./core.generated";
+
+/** The server always fills defaults, so stored elements carry every field. */
+type Stored<T> = { [K in keyof T]-?: T[K] };
+
+export type UUID = string;
+export type ISODate = string;
+export type ISOTime = string;
+export type SHA256 = string;
+export type Scalar = string | number | boolean | null;
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+
+export type ValueKind = Core.ValueKind;
+export type ObjectType = Stored<Core.ObjectType>;
+export type Property = Stored<Core.Property>;
+export type LinkType = Stored<Core.LinkType>;
+export type Rule = Stored<Core.Rule>;
+export type Dataset = Stored<Core.Dataset>;
+export type DatasetColumn = Core.DatasetColumn;
+export type DataMapping = Stored<Core.DataMapping>;
+export type MappingSource = Stored<Core.MappingSource>;
+export type ColumnBinding = Core.ColumnBinding;
+export type ExpressionBinding = Core.ExpressionBinding;
+export type FieldBinding = ColumnBinding | ExpressionBinding;
+export type DirectJoin = Core.DirectJoin;
+export type MappingTableJoin = Core.MappingTableJoin;
+export type DataJoin = DirectJoin | MappingTableJoin;
+export type SimpleMetric = Stored<Core.SimpleMetric>;
+export type RatioMetric = Stored<Core.RatioMetric>;
+export type ExpressionMetric = Stored<Core.ExpressionMetric>;
+export type Metric = SimpleMetric | RatioMetric | ExpressionMetric;
+export type ColumnReference = Core.ColumnReference;
+export type Condition = Core.Condition;
+export type Operator = Core.Condition["operator"];
+export type Aggregation = Core.SimpleMetric["aggregation"];
+export type Path = Core.Path;
+export type LinkStep = Core.LinkStep;
+export type PathCondition = Core.PathCondition;
+export type DerivedSimple = Core.DerivedSimple;
+export type DerivedExpression = Core.DerivedExpression;
+export type DerivedBranch = DerivedSimple | DerivedExpression;
+export type MaterialObject = Stored<Core.MaterialObject>;
+export type MaterialLink = Stored<Core.MaterialLink>;
+export type MaterialEvidence = Core.MaterialEvidence;
+export type ManualEvidence = Core.ManualEvidence;
+export type EvidenceLocator = Core.EvidenceLocator;
+export type Evidence = MaterialEvidence | ManualEvidence;
+
+export type TargetKind =
+  | "object_type"
+  | "property"
+  | "link_type"
+  | "rule"
+  | "metric"
+  | "dataset"
+  | "mapping"
+  | "material_object"
+  | "material_link";
+
+export type ElementByKind = {
+  object_type: ObjectType;
+  property: Property;
+  link_type: LinkType;
+  rule: Rule;
+  metric: Metric;
+  dataset: Dataset;
+  mapping: DataMapping;
+  material_object: MaterialObject;
+  material_link: MaterialLink;
+};
+export type CoreElement = ElementByKind[TargetKind];
+
+export type CollectionKey =
+  | "object_types"
+  | "properties"
+  | "link_types"
+  | "rules"
+  | "metrics"
+  | "datasets"
+  | "mappings"
+  | "material_objects"
+  | "material_links";
+
+export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
+  object_type: "object_types",
+  property: "properties",
+  link_type: "link_types",
+  rule: "rules",
+  metric: "metrics",
+  dataset: "datasets",
+  mapping: "mappings",
+  material_object: "material_objects",
+  material_link: "material_links",
+};
+
+/** A core-1 draft as the server returns it: all nine collections present. */
+export type Draft = {
+  schema_version: "core-1";
+  workspace_id: UUID;
+  object_types: ObjectType[];
+  properties: Property[];
+  link_types: LinkType[];
+  rules: Rule[];
+  metrics: Metric[];
+  datasets: Dataset[];
+  mappings: DataMapping[];
+  material_objects: MaterialObject[];
+  material_links: MaterialLink[];
+};
+
+export type Page<T> = { total: number; items: T[]; next_cursor: string | null };
+export type Items<T> = { items: T[] };
+
+// --- errors ---------------------------------------------------------------
+
+export type ValidationIssue = {
+  code?: string;
+  message: string;
+  path?: string;
+  element_id?: UUID;
+  element_kind?: TargetKind;
+};
+
+export type ValidationReport = {
+  standard: "core-1";
+  schema_status: "passed" | "failed";
+  semantic_status: "passed" | "failed";
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+  publishable: boolean;
+};
+
+// --- workspaces, versions, read projections -------------------------------
+
+export type User = {
+  id: UUID;
+  subject: string;
+  display_name: string;
+  email: string | null;
+};
+
 export type Workspace = {
-  id: string;
+  id: UUID;
   slug: string;
   name: string;
   description: string;
   role: "admin" | "member" | null;
   visibility: "member" | "published_only";
   current_version: number | null;
-  version_id: string | null;
-  version_sha256: string | null;
+  version_id: UUID | null;
+  version_sha256: SHA256 | null;
   object_type_count: number;
   link_type_count: number;
-  updated_at: string;
+  updated_at: ISOTime;
 };
 
-export type User = {
-  id: string;
-  subject: string;
-  display_name: string;
-  email: string | null;
+export type Counts = {
+  object_types: number;
+  link_types: number;
+  attributes: number;
+  rules: number;
+  metrics: number;
+  datasets?: number;
+  mappings?: number;
+  material_objects?: number;
+  material_links?: number;
 };
 
-export type ConceptRef = {
-  kind: "object_type" | "value_type" | "builtin" | "any";
-  ref: string;
-};
-export type NativeRole = {
-  id: string;
-  name?: string | null;
-  concept: ConceptRef;
-  position?: number | null;
-  native_presence?: string[];
-  origin?: "platform" | "imported" | "migrated";
-  client_ref?: null;
-  implicit_owner?: boolean;
-};
-export type RoleConcept = {
-  id: string;
-  name?: string | null;
-  concept: string;
-  kind: ConceptRef["kind"];
-  ref?: string;
-};
-export type NativeFields = {
-  native_presence?: string[];
-  position?: number | null;
-  origin?: "platform" | "imported" | "migrated";
-};
-export type NativeRelationFields = NativeFields & {
-  owner_ref?: ConceptRef;
-  roles?: NativeRole[];
-  owner_role_id?: string;
-  all_roles?: NativeRole[];
-  role_concepts?: RoleConcept[];
-  readonly?: boolean;
-  endpoint_direction?: "forward" | "reverse";
-  owner_role_name?: string | null;
-  legacy_multiplicity?: string | null;
-  native_multiplicity?: "ManyToOne" | "OneToOne" | null;
-};
-export type MappingStatus = {
-  state: "queryable" | "readonly" | "unmapped";
-  reason: string | null;
-  message: string | null;
-  dataset_id: string | null;
-};
-export type JoinView = {
-  source_column: string;
-  target_column: string;
-  source_columns?: string[];
-  target_columns?: string[];
-};
-export type RoleJoin = { owner_columns: string[]; role_columns: string[] };
-export type LegacyMappingForm = {
-  mappings: DataMapping[];
-  joins: Record<string, RoleJoin | JoinView | null>;
-  mapping_status?: Record<string, MappingStatus>;
-};
-export type SemanticExpression = {
-  dialects: { dialect: string; expression: string }[];
-};
-export type SemanticInfo = {
-  id: string;
-  name: string;
-  display_name?: string;
-  description?: string | null;
-  ai_context?: unknown;
-  custom_extensions?: { vendor_name: string; data: string }[];
-};
-export type SemanticConcept = {
-  id: string;
-  kind?: ConceptRef["kind"];
-  name: string;
-  technical_name: string;
-};
-export type SemanticField = SemanticInfo & {
-  expression: SemanticExpression;
-  datatype?: string | null;
-  dimension?: { is_time?: boolean | null } | null;
-  label?: string | null;
-};
-export type SemanticDataset = SemanticInfo & {
-  source: string;
-  primary_key: string[];
-  unique_keys: string[][];
-  fields: SemanticField[];
-  concepts?: SemanticConcept[];
-  metrics?: string[];
-};
-export type SemanticRelationship = SemanticInfo & {
-  from: string;
-  to: string;
-  from_columns: string[];
-  to_columns: string[];
-};
-export type MetricQueryInfo = {
-  executable: boolean;
-  reason?: string | null;
-  datasets?: { id: string; name: string; source: string }[];
-  group_by?: { name: string; datatype?: string | null }[];
-  time_semantics?: string | null;
-  time_field?: string | null;
-  requires_snapshot_filter?: boolean;
-  group_by_fields?: { name: string; datatype?: string | null }[];
-  filter_fields?: { name: string; datatype?: string | null }[];
-};
-export type SemanticMetric = SemanticInfo & {
-  expression: SemanticExpression;
-  datatype?: string | null;
-  ambiguous?: boolean;
-  concepts: SemanticConcept[];
-  query?: MetricQueryInfo;
-};
-export type MappingNode = {
-  id: string;
-  parent_id: string | null;
-  slot:
-    | "object_mappings"
-    | "link_mappings"
-    | "object_mapping"
-    | "children"
-    | "referent_mappings";
-  kind: "object" | "link" | "referent";
-  relationship?: string | null;
-  concept?: ConceptRef | null;
-  expression?: string | null;
-  concept_mapping_id?: string;
-};
-export type SemanticConceptMapping = {
-  id: string;
-  concept_id: ConceptRef;
-  concept?: SemanticConcept;
-  nodes: MappingNode[];
-};
-export type SemanticModel = SemanticInfo & {
-  connection_alias: string | null;
-  datasets: SemanticDataset[];
-  relationships: SemanticRelationship[];
-  metrics: SemanticMetric[];
-  concept_mappings?: SemanticConceptMapping[];
-};
-export type SemanticCatalog = {
-  items: SemanticModel[];
-  mapping_status: Record<string, MappingStatus>;
-  concepts?: SemanticConcept[];
-  current_version_id?: string | null;
-  session_revision?: number | null;
-};
-export type SemanticKind =
-  | "semantic_model"
-  | "dataset"
-  | "dataset_field"
-  | "dataset_relationship"
-  | "metric"
-  | "concept_mapping";
-export type SemanticChange = {
-  kind: SemanticKind;
-  operation: "create" | "update" | "delete";
-  id: string;
-  parent_id?: string;
-  values: Record<string, unknown>;
-  unset_fields?: string[];
-  nodes?: MappingNode[];
-  display_name?: string;
-};
-export type MetricSQLPreview = {
-  executed: false;
-  executable: boolean;
-  sql?: string | null;
-  parameters?: Record<string, unknown>;
-  columns?: string[];
-  reason?: string | null;
-  datasets?: string[];
-  warnings?: string[];
+export type VersionEnvelope = {
+  workspace_id: UUID;
+  version_id: UUID;
+  version_sha256: SHA256;
+  version_content_sha256: SHA256;
+  normalized_snapshot_sha256: SHA256;
 };
 
-export type AttributeDefinition = {
-  id: string;
-  name: string;
-  technical_name: string;
-  description: string;
-  value_kind: string;
-  required: boolean;
-  identifier: boolean;
-  value_concept?: string | null;
-  target_role_name?: string | null;
-  multiplicity?: "one_to_one" | "many_to_one" | null;
-  // Ossie relationship fields: constraints, derivations and readings.
-  requires?: string[];
-  derived_by?: string[];
-  verbalizes?: string[];
-  declared_by?: string;
-};
-
-export type ObjectType = {
-  concept_context?: ConceptContext;
-  id: string;
-  kind: "object_type";
-  name: string;
-  technical_name: string;
-  description: string;
-  tags: string[];
-  extends?: string[];
-  requires?: string[];
-  derived_by?: string[];
-  attributes: AttributeDefinition[];
-  attribute_count: number;
-  supertypes?: { id: string; name: string; technical_name: string }[];
-  inherited_attributes?: AttributeDefinition[];
-};
-
-export type LinkType = NativeRelationFields & {
-  id: string;
-  kind: "link_type";
-  name: string;
-  technical_name: string;
-  description: string;
-  tags: string[];
-  source_type_id: string;
-  target_type_id: string;
-  source_role_name?: string | null;
-  target_role_name?: string | null;
-  multiplicity: string;
-  attribute_count: 0;
-  identifier?: boolean;
-  requires?: string[];
-  derived_by?: string[];
-  verbalizes?: string[];
-  data_join?: JoinView | null;
-};
-
-export type ValueType = Omit<
-  ObjectType,
-  "kind" | "extends" | "description" | "attributes" | "attribute_count"
-> & {
-  kind: "value_type";
-  concept: string;
-  extends: ConceptRef[];
-  description: string | null;
-};
-export type OntologyType = ObjectType | LinkType | ValueType;
-
-export type VersionSummary = {
-  workspace_id: string;
-  version_id: string;
+export type VersionSummary = VersionEnvelope & {
   version: number;
-  version_sha256: string;
   status: "published";
   message: string;
-  published_at: string;
-  validation: {
-    standard: string;
-    schema_status: "passed" | "failed";
-    semantic_status: "passed" | "failed";
-    errors: unknown[];
-    warnings: unknown[];
-    publishable: boolean;
-  };
-  counts: {
-    object_types: number;
-    link_types: number;
-    attributes: number;
-  };
+  published_at: ISOTime;
+  validation: ValidationReport;
+  counts: Counts;
 };
 
+export type BindingStatus =
+  | "bound"
+  | "unbound"
+  | "virtual"
+  | "missing_key"
+  | "cross_connection"
+  | "metadata_stale"
+  | "forbidden";
+
+export type SQLReference = {
+  sql: string;
+  params: Record<string, Scalar>;
+  dialect: string;
+  database: string;
+  note?: string;
+};
+
+export type DatasetRead = Dataset & {
+  binding_status: BindingStatus;
+  database?: string;
+  schema?: string | null;
+  metadata_snapshot_id?: string | null;
+  observed_at?: ISOTime | null;
+};
+
+export type MetricRead =
+  | (SimpleMetric & {
+      value_kind: ValueKind | null;
+      binding_status: BindingStatus;
+      sql_reference?: SQLReference;
+    })
+  | (RatioMetric & {
+      dataset_id: UUID;
+      value_kind: "decimal";
+      binding_status: BindingStatus;
+      components: { numerator: SimpleMetric; denominator: SimpleMetric };
+      sql_reference?: SQLReference;
+    })
+  | (ExpressionMetric & { binding_status: BindingStatus; sql_reference?: SQLReference });
+
+export type ForbiddenMetricRead = {
+  id: UUID;
+  name: string;
+  technical_name: string;
+  description?: string;
+  synonyms?: string[];
+  binding_status: "forbidden";
+};
+
+export type Effective<T> = T & { inherited_from: UUID | null; binding_status: BindingStatus };
+export type PropertyRead = Effective<Property> & {
+  binding?: FieldBinding;
+  physical_type?: string | null;
+};
+export type LinkRead = Effective<LinkType> & { direction: "forward" | "reverse" };
+export type MappingRead = DataMapping & { binding_status: BindingStatus };
+
+export type ObjectTypeRead = ObjectType & {
+  properties: PropertyRead[];
+  links: LinkRead[];
+  rules: Effective<Rule>[];
+  child_types: Pick<ObjectType, "id" | "name" | "technical_name">[];
+  binding_status: BindingStatus;
+  mapping?: MappingRead | null;
+  instance_source_type_ids?: UUID[];
+};
+
+/** The outer kind names the resource; definition.kind keeps the metric union. */
+export type ResourceRead =
+  | { kind: "object_type"; definition: ObjectTypeRead }
+  | { kind: "link_type"; definition: LinkRead }
+  | { kind: "metric"; definition: MetricRead | ForbiddenMetricRead }
+  | { kind: "dataset"; definition: DatasetRead };
+export type ResourceKind = ResourceRead["kind"];
+
+export type TypeList = VersionEnvelope & Items<ResourceRead> & {
+  next_cursor: null;
+  ambiguous: boolean;
+};
+export type TypeDetail = VersionEnvelope &
+  (
+    | { ambiguous: false; item: ResourceRead }
+    | { ambiguous: true; item: null; candidates: ResourceRead[] }
+  );
+
 export type GraphNode = {
-  id: string;
-  kind: "object_type" | "value_type" | "link_type";
+  id: UUID;
+  kind: "object_type";
   label: string;
   technical_name: string;
   description: string;
   tags: string[];
-  roles?: NativeRole[];
-  all_roles?: NativeRole[];
-  verbalizes?: string[];
-  owner_ref?: ConceptRef;
   attribute_count?: number;
-  value_kind?: string;
-  identifier?: boolean;
 };
-
 export type GraphEdge = {
   id: string;
-  kind: "attribute" | "link_type" | "extends" | "role";
+  kind: "link_type" | "extends";
   label: string;
   technical_name: string;
-  source: string;
-  target: string;
-  link_type_id?: string;
-  role_id?: string;
-  multiplicity?: string;
+  source: UUID;
+  target: UUID;
+  link_type_id?: UUID;
+  multiplicity?: LinkType["multiplicity"];
   description?: string;
   tags?: string[];
 };
-
-export type TypeGraph = {
-  workspace_id: string;
-  version_id: string;
-  version_sha256: string;
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-};
+export type TypeGraph = VersionEnvelope & { nodes: GraphNode[]; edges: GraphEdge[] };
 
 export type WorkspaceOverview = {
-  version: VersionSummary;
-  graph: TypeGraph;
-  details: {
-    object_count: number;
-    link_count: number;
-    evidence_material_count: number;
-    mapping_count: number;
-    objects: { id: string; name: string; type_id: string }[];
-    links: {
-      id: string;
-      type_id: string;
-      source_id: string;
-      target_id: string;
-    }[];
-    mappings: { id: string; type_id: string; table_name: string }[];
-  } | null;
-};
-
-// --- Draft views -------------------------------------------------------------
-// Components read drafts through DraftView: types carry their own properties as
-// `attributes` and their rules as `requires`/`derived_by`, which is how the UI
-// presents them. Only lib/draftView converts between this and the stored Draft.
-export type ObjectDefinition = Omit<ObjectType, "kind" | "attribute_count">;
-export type LinkDefinition = Omit<LinkType, "kind" | "attribute_count">;
-export type EvidenceLocator = {
-  heading?: string | null;
-  line_start: number;
-  line_end: number;
-};
-/** Stored shape, exactly as in drafts and version snapshots. */
-export type MaterialEvidence = {
-  kind: "material";
-  id: string;
-  material_id: string;
-  material_sha256: string | null;
-  locator: EvidenceLocator;
-  quote: string;
-};
-export type ManualEvidence = {
-  kind: "manual";
-  id: string;
-  note: string;
-  created_by: string;
-  created_at: string;
-};
-export type Evidence = MaterialEvidence | ManualEvidence;
-/** Detail DTO shape: the server adds the material name for display. */
-export type EvidenceView =
-  | (MaterialEvidence & { material_name: string; material_archived: boolean })
-  | ManualEvidence;
-export type MaterialObject = {
-  id: string;
-  type_id: string;
-  name: string;
-  values: Record<string, string | number | boolean | null>;
-  evidence: Evidence[];
-};
-export type MaterialLink = NativeRelationFields & {
-  id: string;
-  type_id: string;
-  source_id: string | null;
-  target_id: string | null;
-  role_values?: {
-    role_id: string;
-    object_id?: string | null;
-    value?: unknown;
-  }[];
-  evidence: Evidence[];
-};
-export type DataMapping = {
-  id: string;
-  type_id: string;
-  // The data source's name, not a connection id: the published model carries no
-  // credentials, and the workspace binds the name to a connection at query time.
-  connection_alias: string;
-  table_name: string;
-  schema_name: string | null;
-  key_column: string;
-  fields: Record<string, string>;
-};
-export type DraftView = {
-  workspace_id: string;
-  requires: string[];
-  object_types: ObjectDefinition[];
-  value_types?: ObjectTypeElement[];
-  link_types: LinkDefinition[];
-  objects: MaterialObject[];
-  links: MaterialLink[];
-  mappings: DataMapping[];
-  mapping_status?: Record<string, MappingStatus>;
-  /** Explicit native edits travel outside draft JSON. */
-  _semantic_changes?: SemanticChange[];
-};
-
-// --- Stored draft (schema v2) ------------------------------------------------
-export type ConceptContext = {
-  synonyms: string[];
-  instructions: string | null;
-};
-
-export type ObjectTypeElement = NativeFields & {
-  /** Read/edit projection; persisted only in extension_v4.concept_context. */
-  concept_context?: ConceptContext;
-  concept_kind?: "object_type" | "value_type";
-  id: string;
-  name: string;
-  technical_name: string;
-  description: string;
-  tags: string[];
-  extends: string[];
-  evidence: Evidence[];
-};
-export type PropertyElement = Omit<
-  AttributeDefinition,
-  "requires" | "derived_by" | "declared_by"
-> &
-  NativeRelationFields & { owner_type_id: string; evidence: Evidence[] };
-export type LinkTypeElement = Omit<
-  LinkDefinition,
-  "requires" | "derived_by"
-> & {
-  evidence: Evidence[];
-};
-export type RuleElement = {
-  id: string;
-  name: string;
-  technical_name: string;
-  description: string;
-  owner_kind:
-    | "object_type"
-    | "value_type"
-    | "property"
-    | "link_type"
-    | "action";
-  owner_id: string;
-  rule_kind: "constraint" | "derivation";
-  expression: string;
-  verbalizes: string[];
-  evidence: Evidence[];
-};
-export type ActionElement = {
-  id: string;
-  name: string;
-  technical_name: string;
-  description: string;
-  input_type_id: string;
-  parameters: {
-    id: string;
-    name: string;
-    technical_name: string;
-    value_kind: string;
-    required: boolean;
-  }[];
-  precondition_rule_ids: string[];
-  effects: {
-    id: string;
-    kind: "set_property" | "create_link" | "delete_link";
-    property_id: string | null;
-    link_type_id: string | null;
-    expression: string;
-  }[];
-  evidence: Evidence[];
-};
-export type LegacyDraft = {
-  schema_version: "2";
-  workspace_id: string;
-  ontology_requires: string[];
-  object_types: ObjectTypeElement[];
-  value_types?: ObjectTypeElement[];
-  properties: PropertyElement[];
-  link_types: LinkTypeElement[];
-  rules: RuleElement[];
-  actions: ActionElement[];
-  material_objects: MaterialObject[];
-  material_links: MaterialLink[];
-  mappings: DataMapping[];
-  mapping_status?: Record<string, MappingStatus>;
-  /** Client-only table choice before its fields are bound; never persisted. */
-  _mapping_tables?: Record<string, string>;
-  /** Client-only editor mode, including an unfinished constant; never persisted. */
-  _mapping_modes?: Record<string, "field" | "expression" | "constant">;
-  /** Explicit native edits travel outside draft JSON. */
-  _semantic_changes?: SemanticChange[];
-};
-export type NativeConcept = Omit<
-  ObjectTypeElement,
-  "extends" | "description" | "concept_context" | "concept_kind"
-> & {
-  concept: string;
-  description: string | null;
-  extends: ConceptRef[];
-  identify_by: string[];
-  requires: string[];
-  derived_by: string[];
-};
-export type NativeLink = Omit<
-  LinkTypeElement,
-  | "source_type_id"
-  | "target_type_id"
-  | "multiplicity"
-  | "description"
-  | "data_join"
-> & {
-  owner_ref: ConceptRef;
-  roles: NativeRole[];
-  multiplicity: "ManyToOne" | "OneToOne" | null;
-  description: string | null;
-  requires: string[];
-  derived_by: string[];
-};
-export type NativeProperty = NativeLink & {
-  value_kind: string;
-  required: boolean;
-  identifier: boolean;
-  owner_type_id?: never;
-};
-export type NativeDraft = Omit<
-  LegacyDraft,
-  | "schema_version"
-  | "object_types"
-  | "value_types"
-  | "properties"
-  | "link_types"
-> & {
-  schema_version: "3";
-  hash_algorithm: "ontofoundry-domain-v3";
-  object_types: NativeConcept[];
-  value_types: NativeConcept[];
-  properties: NativeProperty[];
-  link_types: NativeLink[];
-  document_origin: "platform" | "imported" | "migrated";
-  native_presence: string[];
-  ossie_version: string;
-  ossie_name: string | null;
-  ossie_description: string | null;
-  ai_context: unknown;
-  semantic_models: { id: string; [key: string]: unknown }[];
-  datasets: unknown[];
-  dataset_fields: unknown[];
-  dataset_relationships: unknown[];
-  metrics: unknown[];
-  concept_mappings: unknown[];
-  mapping_nodes: unknown[];
-  core_version?: string | null;
-  core_presence?: string[];
-  extension_v4: Record<string, unknown> & {
-    concept_context?: Record<string, ConceptContext>;
+  version: VersionSummary | null;
+  graph: TypeGraph | null;
+  details: null | {
+    object_count?: number;
+    link_count?: number;
+    evidence_material_count?: number;
+    mapping_count?: number;
+    objects?: Pick<DocumentFactRead, "id" | "type_id" | "display_text">[];
+    links?: Pick<MaterialLink, "id" | "type_id" | "source_id" | "target_id">[];
+    mappings?: { id: UUID; type_id: UUID; binding_status: BindingStatus }[];
   };
-  /** Client-only copy of the existing mapping form; excluded from draft JSON. */
-  _legacy_form?: LegacyMappingForm;
 };
-export type Draft = LegacyDraft | NativeDraft;
 
-// --- Proposals (frontend contract §4) ---------------------------------------
-export type TargetKind =
-  | "value_type"
-  | "object_type"
-  | "property"
-  | "link_type"
-  | "rule"
-  | "action"
-  | "material_object"
-  | "material_link"
-  | "mapping";
+// --- sessions, diffs, publishing ------------------------------------------
+
+export type FieldChange = { path: string; before: Json; after: Json };
+export type ElementChange = {
+  element_kind: TargetKind;
+  element_id: UUID;
+  label: string;
+  owner_label?: string | null;
+  change: "created" | "updated" | "deleted";
+  field_changes: FieldChange[];
+  before: CoreElement | null;
+  after: CoreElement | null;
+};
+
+export type ModelingSession = {
+  id: UUID;
+  workspace_id: UUID;
+  title: string;
+  base_version_id: UUID | null;
+  revision: number;
+  draft: Draft;
+  draft_sha256: SHA256;
+  base_version_sha256: SHA256;
+  pending_proposal_count: number;
+  latest_batch_id: UUID | null;
+  base_diff: ElementChange[];
+  graph: Omit<TypeGraph, "version_id"> & { version_id: UUID | "" };
+  material_ids: string[];
+  task_status: string;
+  task_detail: string;
+  dataagent_topic_id: string | null;
+  dataagent_task_id: string | null;
+  dataagent_task_mode?: string | null;
+  dataagent_run_token?: string | null;
+  uploaded_material_ids?: string[];
+  last_result_task_id?: string | null;
+  result_state?: string;
+  result_warnings?: string[];
+  result_claimed_at?: ISOTime | null;
+  updated_at: ISOTime;
+  validation?: ValidationReport;
+};
+
+export type ModelingSessionSummary = Pick<
+  ModelingSession,
+  "id" | "title" | "task_status" | "updated_at" | "base_version_id"
+> & { has_unpublished_changes: boolean };
+
+export type MergeConflict = {
+  key: string;
+  element_kind: TargetKind | null;
+  element_id: UUID | null;
+  element_label: string;
+  path: string;
+  kind: "field" | "delete_modify" | "duplicate_name" | "dangling_reference";
+  base: Json;
+  latest: Json;
+  draft: Json;
+  allowed: ("latest" | "draft" | "custom" | "both")[];
+};
+export type Resolution = { choice: "latest" | "draft" | "custom" | "both"; value?: Json };
+export type Impact = { element_kind: TargetKind; element_id: UUID; label: string; reason: string };
+
+export type PublishPreview = {
+  session_revision: number;
+  base_version_id: UUID | null;
+  base_version_number: number | null;
+  current_version_id: UUID | null;
+  current_version_number: number | null;
+  next_version_number: number;
+  current_version_sha256: SHA256;
+  merged_snapshot_sha256: SHA256;
+  merged_model: Draft;
+  validation: ValidationReport;
+  changes: ElementChange[];
+  labels: Record<UUID, string>;
+  impacts: Impact[];
+  auto_merged: (ElementChange & { side: "latest" | "both" })[];
+};
+export type PublishResult = { version: VersionSummary; session: ModelingSession };
+
+export type Comparison = {
+  left: VersionSummary | null;
+  right: VersionSummary;
+  changes: { path: string; kind: "added" | "removed" | "changed"; before: Json; after: Json }[];
+  impacts: { kind: TargetKind; id: UUID; label: string }[];
+};
+
+export type AffectedItem = {
+  target_kind: TargetKind;
+  target_id: UUID;
+  expected_target_hash: SHA256;
+};
+export type ElementSaveKind = "object_type" | "link_type" | "metric" | "dataset" | "mapping";
+export type ElementSave = {
+  target_kind: ElementSaveKind;
+  target_id: UUID;
+  expected_current_version_id: UUID | null;
+  session_id?: UUID | null;
+  expected_session_revision?: number | null;
+  draft: Draft;
+  affected_items?: AffectedItem[];
+};
+export type ElementSaveResult = {
+  version: VersionSummary;
+  draft: Draft;
+  session: ModelingSession | null;
+};
+
+// --- proposals ------------------------------------------------------------
 
 export type ProposalStatus =
   | "pending"
@@ -594,192 +426,241 @@ export type ProposalStatus =
   | "stale"
   | "conflict"
   | "superseded";
-
-export type FieldChange = { path: string; before: unknown; after: unknown };
-
-export type ElementChange = {
-  element_kind: TargetKind;
-  element_id: string;
-  label: string;
-  owner_label?: string | null;
-  change: "created" | "updated" | "deleted";
-  field_changes: FieldChange[];
-  before: Record<string, unknown> | null;
-  after: Record<string, unknown> | null;
+export type EvidenceView = Evidence & { material_name?: string; material_archived?: boolean };
+export type DuplicateCandidate = {
+  id: UUID;
+  type_id: UUID;
+  display_text: string;
+  expected_target_hash: SHA256;
 };
-
 export type ProposalItem = {
-  id: string;
-  batch_id: string;
+  id: UUID;
+  batch_id: UUID;
   ordinal: number;
   client_ref: string | null;
   operation: "create" | "update" | "delete";
   target_kind: TargetKind;
-  target_id: string;
+  target_id: UUID;
   display_name: string;
-  owner_label?: string | null;
-  before: Record<string, unknown> | null;
-  after: Record<string, unknown> | null;
+  owner_label: string | null;
+  before: CoreElement | null;
+  after: CoreElement | null;
   field_changes: FieldChange[];
   evidence: EvidenceView[];
   reason: string;
-  depends_on: string[];
-  dependency_group: string[];
+  depends_on: UUID[];
+  dependency_group: UUID[];
+  atomic_group_id: UUID | null;
+  duplicate_candidates: DuplicateCandidate[];
   status: ProposalStatus;
   stored_status: "pending" | "accepted" | "rejected" | "superseded";
-  status_reason?: string;
-  accepted_revision?: number | null;
-  decided_at?: string | null;
+  status_reason: string;
+  accepted_revision: number | null;
+  decided_at: ISOTime | null;
 };
-
 export type ProposalBatch = {
-  id: string;
+  id: UUID;
   status: "validating" | "available" | "failed";
-  created_at: string;
+  created_at: ISOTime;
   source_session_revision: number;
-  base_version_id: string | null;
+  base_version_id: UUID | null;
   counts: Record<ProposalStatus, number>;
-  error?: { code: string; message: string } | null;
+  error: { code: string; message: string } | null;
 };
-
 export type ProposalBatchDetail = ProposalBatch & { items: ProposalItem[] };
-
+export type Decision = { proposal_id: UUID; decision: "accept" | "reject" | "restore" };
 export type DecisionResult = {
   session: ModelingSession;
-  results: { proposal_id: string; status: ProposalStatus; reason?: string }[];
-  validation: VersionSummary["validation"];
+  results: { proposal_id: UUID; status: ProposalStatus; reason?: string }[];
+  validation: ValidationReport;
+};
+export type FactProposalRevision = {
+  expected_session_revision: number;
+  target_id: UUID;
+  expected_target_hash: SHA256;
+  after: MaterialObject;
+  reason?: string;
 };
 
-export type MergeConflict = {
-  key: string;
-  element_kind: TargetKind | null;
-  element_id: string | null;
-  element_label: string;
-  path: string;
-  kind: "field" | "delete_modify" | "duplicate_name" | "dangling_reference";
-  base: unknown;
-  latest: unknown;
-  draft: unknown;
-  allowed: ("latest" | "draft" | "custom" | "both")[];
-};
+// --- data catalog, datasets, mapping preview ------------------------------
 
-export type Resolution = {
-  choice: "latest" | "draft" | "custom" | "both";
-  value?: unknown;
-};
-
-export type Impact = {
-  element_kind: TargetKind;
-  element_id: string;
-  label: string;
-  reason: string;
-};
-
-export type PublishPreview = {
-  session_revision: number;
-  base_version_id: string | null;
-  /** The version the session started from; null for a blank start. */
-  base_version_number: number | null;
-  current_version_id: string | null;
-  current_version_number: number | null;
-  next_version_number: number;
-  current_version_sha256: string;
-  merged_snapshot_sha256: string;
-  /** Actual merged v2 snapshot, including changes from other sessions. */
-  merged_model?: Draft;
-  validation: VersionSummary["validation"];
-  changes: ElementChange[];
-  /** Workspace constraints publishing changes; null when unchanged. */
-  requires_change: { before: string[]; after: string[] } | null;
-  /** Display labels by element id, across the current version and the merge. */
-  labels: Record<string, string>;
-  impacts: Impact[];
-  auto_merged: (ElementChange & { side: "latest" | "both" })[];
-  ossie: Record<string, unknown> | null;
-};
-
-export type Candidate = {
-  id: string;
-  status: string;
-  reason: string;
-  conflict?: string;
-  evidence?: Evidence[];
-  /**
-   * The draft value this proposal was computed against. accept_candidates
-   * compares against it to detect hand edits — without it every acceptance
-   * would read as a conflict.
-   */
-  before?: unknown;
-  source_task_id?: string;
-} & (
-  | { kind: "object_type"; value: ObjectDefinition }
-  | { kind: "link_type"; value: LinkDefinition }
-  | { kind: "object"; value: MaterialObject }
-  | { kind: "link"; value: MaterialLink }
-  | { kind: "mapping"; value: DataMapping }
-  | { kind: "clarification"; value: { name: string } }
-);
-export type ModelingSession = {
-  id: string;
-  title: string;
-  workspace_id: string;
-  base_version_id: string | null;
-  revision: number;
-  draft: Draft;
-  draft_sha256?: string;
-  base_version_sha256?: string;
-  pending_proposal_count?: number;
-  latest_batch_id?: string | null;
-  base_diff?: ElementChange[];
-  graph: TypeGraph;
-  candidates: Candidate[];
-  material_ids: string[];
-  task_status: string;
-  task_detail: string;
-  /**
-   * Non-blocking import notes from the complete model produced by the last run.
-   */
-  result_warnings?: string[];
-  /** Last run's result: "done", "awaiting_reply" (the agent asked a question), … */
-  result_state?: string;
-  dataagent_topic_id?: string | null;
-  dataagent_task_id?: string | null;
-  updated_at: string;
-  validation?: VersionSummary["validation"];
-};
-export type ModelingSessionSummary = Pick<
-  ModelingSession,
-  "id" | "title" | "task_status" | "updated_at"
-> & {
-  base_version_id?: string | null;
-  /** The draft differs from the version the session started from. */
-  has_unpublished_changes?: boolean;
-};
-export type OssieImportReport = {
+export type DataConnection = {
+  id: UUID;
   name: string;
-  description: string;
-  mode: "merge" | "replace";
-  counts: {
-    objects_added: number;
-    objects_updated: number;
-    links_added: number;
-    links_updated: number;
-    attributes_added: number;
-    attributes_updated: number;
-    mappings_added?: number;
-  };
-  skipped: { path: string; reason: string }[];
-  notes: string[];
+  kind: "mysql" | "doris" | "postgresql";
+  host: string;
+  port: number;
+  database: string;
+  username: string;
 };
-export type OssieImportResult = ModelingSession & {
-  import_report: OssieImportReport;
+export type CatalogColumn = {
+  name: string;
+  type: string;
+  primary_key: boolean;
+  nullable?: boolean | null;
+  comment?: string | null;
 };
+export type DataTable = { name: string; schema: string | null; columns: CatalogColumn[] };
+export type SchemaChange = {
+  table: string;
+  column: string | null;
+  kind: "added" | "removed" | "changed";
+  before: Json;
+  after: Json;
+};
+export type AssetTable = DataTable & {
+  comment?: string | null;
+  missing: boolean;
+  datasets: DatasetRead[];
+};
+export type Assets = {
+  connection_id: UUID;
+  version_id: UUID | null;
+  items: AssetTable[];
+  metadata_snapshot_id: string | null;
+  observed_at: ISOTime | null;
+  error: string | null;
+  changes: SchemaChange[];
+  status: "ready" | "stale" | "unobserved";
+};
+
+export type TypedKeyPart =
+  | { type: "string"; value: string }
+  | { type: "integer"; value: string }
+  | { type: "decimal"; value: string }
+  | { type: "float"; value: number }
+  | { type: "boolean"; value: boolean }
+  | { type: "date"; value: ISODate }
+  | { type: "datetime"; value: ISOTime };
+export type TypedKey = TypedKeyPart[];
+export type SnapshotDates = { dataset_id: UUID; date: ISODate | null }[];
+
+export type MappingPreviewRequest = {
+  mapping: DataMapping;
+  session_id?: UUID;
+  q?: string;
+  key?: TypedKey;
+  offset?: number;
+  limit?: number;
+  snapshot_date?: ISODate;
+};
+export type MappingPreview = {
+  items: {
+    __key: TypedKey;
+    __type_id: UUID;
+    __ref: string;
+    values: Record<string, Scalar>;
+    display_text: string;
+  }[];
+  has_more: boolean;
+  source: "database";
+  snapshot_dates: SnapshotDates;
+};
+
+// --- instances ------------------------------------------------------------
+
+export type DocumentFactRead = MaterialObject & {
+  ref: string;
+  source: "document";
+  display_text: string;
+};
+export type DatabaseInstanceRead = {
+  id: string;
+  ref: string;
+  type_id: UUID;
+  key: TypedKey;
+  source: "database";
+  display_text: string;
+  values: Record<string, Scalar>;
+  evidence: [];
+};
+export type InstanceRead = DocumentFactRead | DatabaseInstanceRead;
+export type InstanceEnvelope = VersionEnvelope & {
+  queried_at: ISOTime;
+  data_mode: "live" | "snapshot";
+  quality_issues: ValidationIssue[];
+};
+export type InstanceList = InstanceEnvelope & {
+  items: InstanceRead[];
+  source: "document" | "database";
+  next_cursor: string | null;
+  truncated: boolean;
+  snapshot_dates: SnapshotDates;
+};
+export type InstanceDetail = InstanceEnvelope & {
+  item: InstanceRead;
+  snapshot_dates: SnapshotDates;
+};
+export type InstanceLinkRead = {
+  id: string;
+  type_id: UUID;
+  source_id: string;
+  target_id: string;
+  evidence: Evidence[];
+};
+export type InstanceNeighborhood = {
+  center_id: string;
+  objects: InstanceRead[];
+  links: InstanceLinkRead[];
+  warnings: string[];
+  truncated: boolean;
+  source: "document" | "database";
+  depth: number;
+  snapshot_dates: SnapshotDates;
+};
+export type NeighborhoodRequest = {
+  type_id: UUID;
+  key: TypedKey;
+  session_id?: UUID;
+  depth?: number;
+  snapshot_date?: ISODate;
+};
+
+// --- metric preview -------------------------------------------------------
+
+export type MetricPreviewRequest = {
+  session_id?: UUID;
+  expected_session_revision?: number;
+  expected_current_version_id?: UUID | null;
+  metric: Metric;
+  components?: SimpleMetric[];
+  time_range?: { start: ISOTime | ISODate; end: ISOTime | ISODate };
+  trend_grain?: "month";
+};
+export type MetricPreviewReason =
+  | "expression_not_supported"
+  | "engine_not_supported"
+  | "binding_not_ready"
+  | "source_ambiguous"
+  | "forbidden"
+  | "query_timeout"
+  | "query_failed";
+export type MetricPreview = {
+  definition_hash: SHA256;
+  context_version: UUID | null;
+  session_revision: number | null;
+  status: "ok" | "unable";
+  reason_code?: MetricPreviewReason | string;
+  reason?: string;
+  value: Scalar;
+  value_kind: ValueKind | null;
+  total_query: SQLReference | null;
+  trend_query?: SQLReference | null;
+  trend?: { period: ISODate; value: Scalar }[];
+  snapshot_dates: { dataset_id: UUID; period: ISODate | null; date: ISODate | null }[];
+  warnings: string[];
+};
+
+// --- unchanged auxiliary resources ----------------------------------------
+
 export type Material = {
   id: string;
   name: string;
   byte_size: number;
   chunk_count: number;
-  sha256: string;
+  sha256: SHA256;
+  created_at?: ISOTime;
+  archived_at?: ISOTime | null;
 };
 export type Capabilities = {
   agent_configured: boolean;
@@ -790,24 +671,14 @@ export type Capabilities = {
 };
 export type DataAgentHealth = {
   ok: boolean;
-  checks: {
-    name: string;
-    ok: boolean;
-    message: string;
-    hint: string;
-  }[];
+  checks: { name: string; ok: boolean; message: string; hint: string }[];
 };
-export type DataConnection = {
-  id: string;
+export type Member = {
+  id: number;
+  user_id: UUID;
   name: string;
-  kind: string;
-  host: string;
-  port: number;
-  database: string;
-  username: string;
+  subject: string;
+  role: "admin" | "member";
 };
-export type DataTable = {
-  name: string;
-  schema: string | null;
-  columns: { name: string; type: string; primary_key: boolean }[];
-};
+export type Scope = "ontology:read" | "mappings:read" | "instances:read";
+export type ServiceToken = { id: UUID; name: string; created_at: ISOTime; scopes: Scope[] };

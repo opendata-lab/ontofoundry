@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { modelingApi, workspaceRequest } from "../api/client";
 import type { Workspace } from "../api/types";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { SettingsPage } from "./SettingsPage";
 
 const context = vi.hoisted(() => ({
@@ -73,17 +74,17 @@ afterEach(cleanup);
 
 describe("空间设置", () => {
   it("keeps member management and shows the read-only DataAgent checks", async () => {
-    render(<SettingsPage />);
+    renderWithProviders(<SettingsPage />);
 
-    expect(
-      screen.getByRole("heading", { name: "空间成员" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "空间设置" })).toBeInTheDocument();
+    expect(screen.getByText("空间信息")).toBeInTheDocument();
+    expect(screen.getByText("空间成员")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "成员身份标识" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "成员角色" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "添加成员" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "保存空间信息" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "智能问数" })).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "DataAgent 连通性" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByText("智能问数")).not.toBeInTheDocument();
+    expect(screen.getByText("DataAgent 连通性")).toBeInTheDocument();
     expect(
       await screen.findByText("DataAgent 上找不到该 Agent"),
     ).toBeInTheDocument();

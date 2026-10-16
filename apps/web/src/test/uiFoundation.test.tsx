@@ -22,6 +22,11 @@ describe("antd theme from tokens", () => {
     });
   });
 
+  it("keeps the workbench compact: 13px controls and pill-shaped buttons", () => {
+    expect(theme.token?.fontSize).toBe(13);
+    expect(theme.components?.Button).toMatchObject({ borderRadius: 16 });
+  });
+
   it("leaves out colours Ant Design cannot parse and tokens that are unset", () => {
     expect(theme.token).not.toHaveProperty("colorSuccess");
     expect(theme.token).not.toHaveProperty("colorText");

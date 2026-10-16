@@ -1,472 +1,499 @@
-import {
-  ArrowLeft,
-  Box,
-  Search,
-  Network,
-  FileText,
-  Database,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import {
-  Link,
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
-import { workspaceRequest } from "../api/client";
-import type { MaterialObject, MaterialLink } from "../api/types";
-import { instanceCanvas, instanceNeighborhood } from "../lib/instanceGraph";
-import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
-import { useSnapshot } from "../hooks/useSnapshot";
-import { usePageTab } from "../hooks/usePageTab";
+import { Alert, Breadcrumb, Button, DatePicker, Descriptions, Empty, Input, Select, Table, Tag, Typography } from "antd";
+import dayjs from "dayjs";
+import { Box, FileText, Network } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { catalogApi, instancesApi } from "../api/client";
+import type { Draft, InstanceList, InstanceNeighborhood, MappingPreview, Scalar, TypedKey } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
-import { EmptyModel } from "../components/EmptyModel";
+import { EvidenceSection } from "../components/elements/ElementPanels";
 import { OntologyGraph } from "../components/OntologyGraph";
+import { usePageTab } from "../hooks/usePageTab";
+import { useSnapshot } from "../hooks/useSnapshot";
+import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { bindingMode, byId, effectiveProperties, effectiveSources, isA, mappingFor } from "../lib/coreModel";
+import { documentDisplayText, documentSearchText } from "../lib/instanceDisplay";
+import { instanceCanvas, instanceNeighborhood, type InstanceEdge, type InstanceNode } from "../lib/instanceGraph";
+import { ensureMapping } from "../lib/objectMappingEditing";
+
+const { Text, Title } = Typography;
+const PAGE_SIZE = 20;
+
+type Shown = InstanceNode & {
+  ref?: string;
+  values: Record<string, Scalar>;
+  key?: TypedKey;
+  source?: "document" | "database";
+  evidence?: Draft["material_objects"][number]["evidence"];
+};
+
+const cell = (value: Scalar | undefined) =>
+  value === null || value === undefined || value === "" ? (
+    <Text type="secondary">—</Text>
+  ) : typeof value === "boolean" ? (
+    value ? "是" : "否"
+  ) : (
+    String(value)
+  );
 
 export function InstancesPage() {
   const { workspace } = useWorkspaceContext();
-  const { typeId, objectId } = useParams();
+  const { typeId = "", objectId } = useParams();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const dbKey = params.get("key");
+  const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
-  const databaseDetail = objectId === "database" && dbKey !== null;
+  const keyParam = params.get("key");
+  const refParam =
+    params.get("ref") ??
+    (objectId && objectId !== "database" && (params.get("source") === "database" || objectId.startsWith("db."))
+      ? objectId
+      : null);
+  const databaseDetail = (objectId === "database" && (keyParam !== null || refParam !== null)) || Boolean(refParam);
+  const snapshotDate = params.get("date");
   const { draft, error, load, suffix } = useSnapshot(workspace);
-  const [source, setSource] = useState(params.get("source") ?? "document");
+  const [source, setSource] = useState<"document" | "database">(params.get("source") === "database" ? "database" : "document");
   const [depth, setDepth] = useState(1);
-  const [neighborhood, setNeighborhood] = useState<{
-    center_id: string;
-    objects: (MaterialObject & { key: string })[];
-    links: MaterialLink[];
-    warnings: string[];
-    truncated: boolean;
-  } | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const [databaseRows, setDatabaseRows] = useState<Record<string, unknown>[]>(
-    [],
-  );
-  const [more, setMore] = useState(false);
+  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
+  const [preview, setPreview] = useState<MappingPreview | null>(null);
+  const [list, setList] = useState<InstanceList | null>(null);
+  const [neighborhood, setNeighborhood] = useState<InstanceNeighborhood | null>(null);
   const [dbError, setDbError] = useState("");
   const [loading, setLoading] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
-  const mapping = draft?.mappings.find((m) => m.type_id === typeId);
+  const key = useMemo(() => {
+    try {
+      return keyParam ? (JSON.parse(keyParam) as TypedKey) : null;
+    } catch {
+      return null;
+    }
+  }, [keyParam]);
+  const mode = draft ? bindingMode(draft, typeId) : "unbound";
+  const databaseReady =
+    Boolean(draft) &&
+    (sessionId
+      ? mode === "independent" || mode === "shared_parent"
+      : !workspace.role && !draft!.mappings.length
+        ? true
+        : mode !== "unbound");
+  const mapping = useMemo(
+    () => (draft && sessionId && databaseReady ? (mappingFor(draft, typeId) ?? ensureMapping(draft, typeId)) : null),
+    [draft, sessionId, typeId, databaseReady],
+  );
+  const cursor = cursors[page];
+  const resetPage = () => {
+    setPage(0);
+    setCursors([undefined]);
+  };
   useEffect(() => {
     setDepth(1);
     setGraphOpen(false);
-  }, [typeId, objectId, dbKey]);
+  }, [typeId, objectId, keyParam, refParam]);
   useEffect(() => {
     setNeighborhood(null);
     if (!databaseDetail) return;
+    if (sessionId ? !key : !refParam && !key) return;
     let active = true;
     setLoading(true);
     setDbError("");
-    workspaceRequest<NonNullable<typeof neighborhood>>(
-      workspace.id,
-      "/instance-neighborhood",
-      {
-        type_id: typeId,
-        key: dbKey,
-        session_id: sessionId,
-        depth,
-      },
-    )
-      .then((r) => {
-        if (active) setNeighborhood(r);
-      })
-      .catch((e: Error) => {
-        if (active) setDbError(e.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    const request =
+      !sessionId && refParam
+        ? instancesApi.neighborhood(workspace.id, refParam, {
+            depth,
+            ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
+          })
+        : instancesApi.draftNeighborhood(workspace.id, {
+            type_id: typeId,
+            key: key!,
+            ...(sessionId ? { session_id: sessionId } : {}),
+            depth,
+            ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
+          });
+    request
+      .then((r) => active && setNeighborhood(r))
+      .catch((e: Error) => active && setDbError(e.message))
+      .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [workspace.id, typeId, databaseDetail, dbKey, sessionId, depth]);
+  }, [workspace.id, typeId, databaseDetail, key, refParam, sessionId, depth, snapshotDate]);
   useEffect(() => {
-    if (objectId || source !== "database" || !mapping) return;
+    if (objectId || source !== "database" || !databaseReady) return;
+    if (sessionId && !mapping) return;
     let active = true;
     setLoading(true);
     setDbError("");
-    const timer = setTimeout(
-      () =>
-        workspaceRequest<{
-          items: Record<string, unknown>[];
-          has_more: boolean;
-        }>(workspace.id, "/mapping-preview", {
-          mapping,
-          q: query,
-          offset: page * 20,
-          limit: 20,
-        })
-          .then((r) => {
-            if (!active) return;
-            setDatabaseRows(r.items);
-            setMore(r.has_more);
+    const timer = setTimeout(() => {
+      if (sessionId && mapping) {
+        catalogApi
+          .mappingPreview(workspace.id, {
+            mapping,
+            session_id: sessionId,
+            q: query,
+            offset: page * PAGE_SIZE,
+            limit: PAGE_SIZE,
+            ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
           })
-          .catch((e: Error) => {
-            if (active) setDbError(e.message);
+          .then((r) => active && setPreview(r))
+          .catch((e: Error) => active && setDbError(e.message))
+          .finally(() => active && setLoading(false));
+      } else {
+        instancesApi
+          .list(workspace.id, {
+            type_id: typeId,
+            source: "database",
+            q: query,
+            ...(cursor ? { cursor } : {}),
+            limit: PAGE_SIZE,
+            ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
           })
-          .finally(() => {
-            if (active) setLoading(false);
-          }),
-      250,
-    );
+          .then((r) => active && setList(r))
+          .catch((e: Error) => active && setDbError(e.message))
+          .finally(() => active && setLoading(false));
+      }
+    }, 250);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [mapping, source, query, page, workspace.id, objectId]);
-  const type = draft?.object_types.find((t) => t.id === typeId);
-  const object = databaseDetail
-    ? neighborhood?.objects.find((o) => o.id === neighborhood.center_id)
-    : draft?.objects.find((o) => o.id === objectId && o.type_id === typeId);
+  }, [mapping, databaseReady, source, query, page, cursor, workspace.id, typeId, objectId, sessionId, snapshotDate]);
+  const type = draft ? byId(draft.object_types, typeId) : undefined;
+  const facts: Shown[] = useMemo(
+    () =>
+      draft
+        ? draft.material_objects.map((o) => ({
+            id: o.id,
+            type_id: o.type_id,
+            display_text: documentDisplayText(draft, o),
+            values: o.values,
+            evidence: o.evidence,
+          }))
+        : [],
+    [draft],
+  );
+  const object: Shown | undefined = databaseDetail
+    ? (() => {
+        const center = neighborhood?.objects.find((o) => o.id === neighborhood.center_id);
+        return center && { ...center, ref: center.ref ?? center.id, key: center.source === "database" ? center.key : undefined };
+      })()
+    : facts.find((o) => o.id === objectId);
   usePageTab({
-    title: object
-      ? `实例 · ${object.name}`
-      : type
-        ? `${type.name} · ${objectId ? "实例详情" : "实例列表"}`
-        : undefined,
+    title: object ? `实例 · ${object.display_text}` : type ? `${type.name} · ${objectId ? "实例详情" : "实例列表"}` : undefined,
   });
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (!draft) return <LoadingSurface label="正在读取实例…" />;
-  if (!type) return <EmptyModel text="没有找到业务对象" />;
-  const all = draft.objects.filter((o) => o.type_id === typeId);
-  const filtered = all.filter((o) =>
-    (o.name + JSON.stringify(o.values))
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+  if (!type) return <Empty className="mt-16" description="没有找到业务对象" />;
+  const properties = effectiveProperties(draft, typeId).map((p) => p.definition);
+  const columnsShown = properties.filter((p) => !p.identifier).slice(0, 4);
+  const snapshotDates = (sessionId ? preview?.snapshot_dates : list?.snapshot_dates) ?? [];
+  const snapshotted =
+    draft.object_types.some(
+      (o) => isA(draft, o.id, typeId) && effectiveSources(draft, o.id).some((s) => s.dataset?.snapshot_date_column),
+    ) || snapshotDates.some((s) => s.date);
+  const documentRows = facts.filter(
+    (f) =>
+      isA(draft, f.type_id, typeId) &&
+      (!query || documentSearchText(draft, byId(draft.material_objects, f.id)!).includes(query.toLowerCase())),
   );
-  const availableObjects = databaseDetail
-    ? (neighborhood?.objects ?? [])
-    : draft.objects;
-  const availableLinks = databaseDetail
-    ? (neighborhood?.links ?? [])
-    : draft.links;
-  const links = object
-    ? availableLinks.filter(
-        (l) => l.source_id === object.id || l.target_id === object.id,
-      )
-    : [];
-  const related = links
-    .map((l) => ({
-      link: l,
-      object: availableObjects.find(
-        (o) =>
-          o.id === (l.source_id === object?.id ? l.target_id : l.source_id),
-      ),
-    }))
-    .filter((x) => x.object);
-  const dbLink = (tid: string, key: string) => {
-    const query = new URLSearchParams({ source: "database", key });
-    if (sessionId) query.set("session", sessionId);
-    return `/workspaces/${workspace.id}/objects/${tid}/instances/database?${query}`;
+  const databaseRows: Shown[] = sessionId
+    ? (preview?.items ?? []).map((i) => ({
+        id: i.__ref,
+        ref: i.__ref,
+        type_id: i.__type_id,
+        display_text: i.display_text,
+        values: i.values,
+        key: i.__key,
+        source: "database",
+      }))
+    : (list?.items ?? []).map((i) => ({
+        id: i.ref,
+        ref: i.ref,
+        type_id: i.type_id,
+        display_text: i.display_text,
+        values: i.values,
+        key: i.source === "database" ? i.key : undefined,
+        source: "database",
+      }));
+  const withSession = (search: URLSearchParams) => {
+    if (sessionId) search.set("session", sessionId);
+    return search;
   };
-  const linkTo = (o: MaterialObject) =>
-    "key" in o
-      ? dbLink(o.type_id, String(o.key))
-      : `/workspaces/${workspace.id}/objects/${o.type_id}/instances/${o.id}${suffix}`;
+  const linkTo = (o: Shown) => {
+    if (sessionId && o.key) {
+      return `/workspaces/${workspace.id}/objects/${o.type_id}/instances/database?${withSession(
+        new URLSearchParams({ source: "database", key: JSON.stringify(o.key), ...(snapshotDate ? { date: snapshotDate } : {}) }),
+      )}`;
+    }
+    if (o.source === "database" || o.ref?.startsWith("db.") || o.key) {
+      const ref = o.ref ?? o.id;
+      const search = new URLSearchParams({ source: "database", ...(snapshotDate ? { date: snapshotDate } : {}) });
+      return `/workspaces/${workspace.id}/objects/${o.type_id}/instances/${encodeURIComponent(ref)}?${search}`;
+    }
+    return `/workspaces/${workspace.id}/objects/${o.type_id}/instances/${o.id}${suffix}`;
+  };
+  const availableObjects: Shown[] = databaseDetail
+    ? (neighborhood?.objects ?? []).map((o) => ({
+        ...o,
+        ref: o.ref ?? o.id,
+        key: o.source === "database" ? o.key : undefined,
+      }))
+    : facts;
+  const availableLinks: InstanceEdge[] = databaseDetail ? (neighborhood?.links ?? []) : draft.material_links;
+  const related = object
+    ? availableLinks
+        .filter((l) => l.source_id === object.id || l.target_id === object.id)
+        .map((l) => {
+          const outgoing = l.source_id === object.id;
+          const link = byId(draft.link_types, l.type_id);
+          return {
+            id: l.id,
+            label: outgoing ? link?.name : (link?.inverse_name ?? `${link?.name ?? "关系"}（反向）`),
+            other: availableObjects.find((o) => o.id === (outgoing ? l.target_id : l.source_id)),
+          };
+        })
+        .filter((r) => r.other)
+    : [];
   const neighborhoodGraph = object
     ? instanceNeighborhood(availableObjects, availableLinks, object.id, depth)
     : { objects: [], links: [] };
+  const showTypeColumn =
+    mode === "shared_parent" ||
+    mode === "virtual" ||
+    documentRows.some((f) => f.type_id !== typeId) ||
+    databaseRows.some((r) => r.type_id !== typeId);
+  const columns = [
+    {
+      title: "实例",
+      key: "display",
+      render: (_: unknown, o: Shown) => <Link to={linkTo(o)}>{o.display_text}</Link>,
+    },
+    ...(showTypeColumn
+      ? [{ title: "类型", key: "type", render: (_: unknown, o: Shown) => byId(draft.object_types, o.type_id)?.name }]
+      : []),
+    ...columnsShown.map((p) => ({ title: p.name, key: p.id, render: (_: unknown, o: Shown) => cell(o.values[p.technical_name]) })),
+  ];
+  const hasNext = sessionId ? Boolean(preview?.has_more) : Boolean(list?.next_cursor);
+  const setDate = (date: string | null) =>
+    setParams(
+      (p) => {
+        const next = new URLSearchParams(p);
+        if (date) next.set("date", date);
+        else next.delete("date");
+        return next;
+      },
+      { replace: true },
+    );
   return (
-    <div className="ref-detail-page">
-      <header className="breadcrumb-bar">
-        <Link to={"../objects" + suffix}>
-          <ArrowLeft size={14} />
-          本体对象
-        </Link>
-        <span>/</span>
-        <Link to={"../objects/" + type.id + suffix}>{type.name}</Link>
-        <span>/</span>
-        <Link to={"../objects/" + type.id + "/instances" + suffix}>
-          实例列表
-        </Link>
-        {object && (
-          <>
-            <span>/</span>
-            <span>{object.name}</span>
-          </>
-        )}
-      </header>
-      <div className="detail-identity">
-        <span className="catalog-object-icon">
-          <Box size={23} />
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto bg-canvas px-6 py-5">
+      <Breadcrumb
+        items={[
+          { title: <Link to={"../objects" + suffix}>本体对象</Link> },
+          { title: <Link to={`../objects${suffix ? suffix + "&" : "?"}inspect=object_type:${type.id}`}>{type.name}</Link> },
+          { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
+          ...(object ? [{ title: object.display_text }] : []),
+        ]}
+      />
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-sm bg-object-soft text-object">
+          <Box size={22} />
         </span>
-        <div>
-          <h1>{object?.name ?? type.name}</h1>
-          <small>
-            {type.name} / {type.technical_name}
-          </small>
+        <div className="flex flex-col">
+          <Title level={5} className="!m-0">
+            {object?.display_text ?? type.name}
+          </Title>
+          <Text type="secondary" className="text-xs">
+            {byId(draft.object_types, object?.type_id ?? typeId)?.name} / {type.technical_name}
+          </Text>
         </div>
-        <div className="toolbar-spacer" />
         {object && (
-          <button
-            className="button button--primary"
-            onClick={() => setGraphOpen(!graphOpen)}
-          >
-            <Network size={14} />
+          <Button type="primary" className="ml-auto" icon={<Network size={14} />} onClick={() => setGraphOpen(!graphOpen)}>
             {graphOpen ? "返回详情" : "实例图谱"}
-          </button>
+          </Button>
         )}
       </div>
-      {objectId && dbError && <p className="inline-error">{dbError}</p>}
-      {databaseDetail &&
-        neighborhood?.warnings.map((w) => (
-          <p className="muted" key={w}>
-            {w}
-          </p>
-        ))}
+      {objectId && dbError && <Alert type="error" showIcon message={dbError} />}
+      {databaseDetail && neighborhood?.warnings.map((w) => <Alert key={w} type="info" showIcon message={w} />)}
       {neighborhood?.truncated && (
-        <p className="muted">
-          已达到查询范围上限，当前结果仅为部分关系。请缩小范围或选择新的中心实例。
-        </p>
+        <Alert type="warning" showIcon message="已达到查询范围上限，当前结果仅为部分关系。请缩小范围或选择新的中心实例。" />
+      )}
+      {databaseDetail && neighborhood?.snapshot_dates.some((s) => s.date) && (
+        <Text type="secondary" className="text-xs">
+          数据日期：{[...new Set(neighborhood.snapshot_dates.map((s) => s.date).filter(Boolean))].join("、")}
+        </Text>
       )}
       {!objectId ? (
         <>
-          <div className="instance-search">
-            <label className="ref-search">
-              <input
-                placeholder="请输入关键字"
-                aria-label="搜索实例"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(0);
-                }}
-              />
-              <Search size={16} />
-            </label>
-            <select
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
               aria-label="实例来源"
               value={source}
-              onChange={(e) => {
-                setSource(e.target.value);
-                setPage(0);
+              className="w-[180px]"
+              onChange={(value: typeof source) => {
+                setSource(value);
+                resetPage();
               }}
-            >
-              <option value="document">文档实例</option>
-              <option value="database" disabled={!mapping}>
-                数据库实例{mapping ? "" : "（未映射）"}
-              </option>
-            </select>
-          </div>
-          <div className="ref-tabs detail-tabs">
-            <span className="active-tab">实例列表</span>
-          </div>
-          <div className="instance-table-wrap">
-            {dbError && <p className="inline-error">{dbError}</p>}
-            {loading ? (
-              <p className="muted">正在按映射查询…</p>
-            ) : (
-              <table className="ref-table">
-                <thead>
-                  <tr>
-                    <th>名称 / 标识</th>
-                    {type.attributes.slice(0, 4).map((a) => (
-                      <th key={a.id}>{a.name}</th>
-                    ))}
-                    <th>来源</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {source === "document"
-                    ? filtered.slice(page * 20, page * 20 + 20).map((o) => (
-                        <tr key={o.id}>
-                          <td>
-                            <Link className="text-link" to={linkTo(o)}>
-                              {o.name}
-                            </Link>
-                          </td>
-                          {type.attributes.slice(0, 4).map((a) => (
-                            <td key={a.id}>
-                              {String(o.values[a.technical_name] ?? "—")}
-                            </td>
-                          ))}
-                          <td>
-                            <FileText size={13} />
-                            文档
-                          </td>
-                        </tr>
-                      ))
-                    : databaseRows.map((o, i) => (
-                        <tr key={i}>
-                          <td>
-                            <Link
-                              className="text-link"
-                              to={dbLink(type.id, String(o.__key))}
-                            >
-                              {String(o.__key)}
-                            </Link>
-                          </td>
-                          {type.attributes.slice(0, 4).map((a) => (
-                            <td key={a.id}>
-                              {String(o[a.technical_name] ?? "—")}
-                            </td>
-                          ))}
-                          <td>
-                            <Database size={13} />
-                            实时查询
-                          </td>
-                        </tr>
-                      ))}
-                </tbody>
-              </table>
+              options={[
+                { value: "document", label: "文档实例" },
+                { value: "database", label: databaseReady ? "数据库实例" : "数据库实例（未映射）", disabled: !databaseReady },
+              ]}
+            />
+            <Input.Search
+              allowClear
+              aria-label="搜索实例"
+              placeholder="显示名称或属性值"
+              className="w-[280px]"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPage();
+              }}
+            />
+            {source === "database" && snapshotted && (
+              <DatePicker
+                aria-label="数据日期"
+                placeholder="最新日期"
+                value={snapshotDate ? dayjs(snapshotDate) : null}
+                onChange={(d) => {
+                  setDate(d ? d.format("YYYY-MM-DD") : null);
+                  resetPage();
+                }}
+              />
             )}
-            {source === "document" && !filtered.length && (
-              <EmptyModel text="暂无文档实例，可从建模材料中抽取" />
+            {source === "database" && snapshotDates.some((s) => s.date) && (
+              <Text type="secondary" className="text-xs">
+                数据日期：{[...new Set(snapshotDates.map((s) => s.date).filter(Boolean))].join("、")}
+              </Text>
             )}
-            <footer className="pagination">
-              <span>
-                {source === "document"
-                  ? "共 " + filtered.length + " 条"
-                  : "按需查询 · 每页 20 条"}
-              </span>
-              <button
-                className="button button--text"
-                disabled={page === 0}
-                onClick={() => setPage(page - 1)}
-              >
-                上一页
-              </button>
-              <b>{page + 1}</b>
-              <button
-                className="button button--text"
-                disabled={
-                  source === "document"
-                    ? (page + 1) * 20 >= filtered.length
-                    : !more
-                }
-                onClick={() => setPage(page + 1)}
-              >
-                下一页
-              </button>
-            </footer>
           </div>
+          {dbError && <Alert type="error" showIcon message={dbError} />}
+          {source === "document" ? (
+            <Table
+              size="middle"
+              rowKey="id"
+              dataSource={documentRows}
+              columns={columns}
+              pagination={{ pageSize: PAGE_SIZE, showTotal: (total) => `共 ${total} 条`, hideOnSinglePage: true }}
+              locale={{ emptyText: <Empty description="暂无文档实例，可从建模材料中抽取" /> }}
+            />
+          ) : (
+            <>
+              <Table
+                size="middle"
+                rowKey="id"
+                loading={loading}
+                dataSource={databaseRows}
+                columns={columns}
+                pagination={false}
+                locale={{ emptyText: <Empty description="没有匹配的实例" /> }}
+              />
+              <div className="flex items-center justify-end gap-2">
+                <Text type="secondary" className="text-xs">
+                  按需查询 · 每页 {PAGE_SIZE} 条
+                </Text>
+                <Button size="small" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
+                  上一页
+                </Button>
+                <span className="tabular-nums">{page + 1}</span>
+                <Button
+                  size="small"
+                  disabled={!hasNext || loading}
+                  onClick={() => {
+                    if (!sessionId && list?.next_cursor) {
+                      setCursors((prev) => {
+                        const next = prev.slice(0, page + 1);
+                        next[page + 1] = list.next_cursor ?? undefined;
+                        return next;
+                      });
+                    }
+                    setPage(page + 1);
+                  }}
+                >
+                  下一页
+                </Button>
+              </div>
+            </>
+          )}
         </>
       ) : loading ? (
         <LoadingSurface label="正在查询实例及关联关系…" />
       ) : !object ? (
-        <EmptyModel text="此实例不存在" />
+        <Empty description="此实例不存在" />
       ) : graphOpen ? (
-        <div className="instance-graph">
+        <div className="relative h-[560px] overflow-hidden rounded-md border border-rule">
           <OntologyGraph
             query=""
             graph={{
               workspace_id: workspace.id,
               version_id: "instances",
               version_sha256: "",
-              ...instanceCanvas(neighborhoodGraph.objects.filter((o, i, a) => a.findIndex(x => x.id === o.id) === i), neighborhoodGraph.links, draft.object_types, draft.link_types),
+              version_content_sha256: "",
+              normalized_snapshot_sha256: "",
+              ...instanceCanvas(neighborhoodGraph.objects, neighborhoodGraph.links, draft.object_types, draft.link_types),
             }}
             onSelect={(selected) => {
-              if (selected?.category === "node") {
-                const next = availableObjects.find(
-                  (o) => o.id === selected.item.id,
-                );
-                if (next && next.id !== object.id) navigate(linkTo(next));
-              }
+              if (selected?.category !== "node") return;
+              const next = availableObjects.find((o) => o.id === selected.item.id);
+              if (next && next.id !== object.id) navigate(linkTo(next));
             }}
           />
-          <div className="graph-caption">
-            {databaseDetail ? "数据库关联" : "文档原生实例"} ·{" "}
-            <label>
-              展开范围{" "}
-              <select
-                aria-label="实例图谱深度"
-                value={depth}
-                onChange={(e) => setDepth(Number(e.target.value))}
-              >
-                <option value={1}>1 跳</option>
-                <option value={2}>2 跳</option>
-                <option value={3}>3 跳</option>
-              </select>
-            </label>{" "}
+          <div className="absolute top-3 left-3 flex items-center gap-2 rounded-md border border-rule bg-surface px-3 py-1 text-xs text-muted">
+            {databaseDetail ? "数据库关联" : "文档实例"} · 展开范围
+            <Select
+              size="small"
+              aria-label="实例图谱深度"
+              value={depth}
+              onChange={setDepth}
+              options={[1, 2, 3].map((d) => ({ value: d, label: `${d} 跳` }))}
+            />
             · 点击其他节点设为中心
           </div>
         </div>
       ) : (
-        <div className="instance-detail-content">
-          <div className="property-tiles">
-            {type.attributes.slice(0, 4).map((a) => (
-              <div key={a.id}>
-                <span>{a.name}</span>
-                <strong>
-                  {String(object.values[a.technical_name] ?? "—")}
-                </strong>
-              </div>
-            ))}
-          </div>
-          <section className="detail-section">
-            <h2>全部属性</h2>
-            <dl className="ref-definition">
-              {type.attributes.map((a) => (
-                <div key={a.id}>
-                  <dt>{a.name}</dt>
-                  <dd>{String(object.values[a.technical_name] ?? "—")}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-          <div className="instance-related-columns">
-            <section className="detail-section">
-              <h2>关联关系</h2>
+        <div className="flex flex-col gap-4">
+          <Descriptions
+            size="small"
+            bordered
+            column={2}
+            title="全部属性"
+            items={effectiveProperties(draft, object.type_id).map((p) => ({
+              key: p.definition.id,
+              label: p.definition.name,
+              children: cell(object.values[p.definition.technical_name]),
+            }))}
+          />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <section className="flex flex-col gap-2">
+              <Text strong>关联关系</Text>
               {related.length ? (
                 related.map((r) => (
-                  <Link
-                    className="relation-list-row"
-                    key={r.link.id}
-                    to={linkTo(r.object!)}
-                  >
+                  <Link key={r.id} to={linkTo(r.other!)} className="inline-flex items-center gap-2">
                     <Network size={15} />
-                    {
-                      draft.link_types.find((t) => t.id === r.link.type_id)
-                        ?.name
-                    }
-                    <strong>{r.object!.name}</strong>
+                    <Text type="secondary">{r.label}</Text>
+                    {r.other!.display_text}
+                    <Tag className="!m-0">{byId(draft.object_types, r.other!.type_id)?.name}</Tag>
                   </Link>
                 ))
               ) : (
-                <EmptyModel text="暂无关联关系" />
+                <Text type="secondary">暂无关联关系</Text>
               )}
             </section>
-            <section className="detail-section">
-              <h2>来源证据</h2>
+            <section className="flex flex-col gap-2">
               {databaseDetail ? (
-                <p>
-                  数据库实时查询 · {mapping?.table_name}
-                  <br />
-                  标识字段：{mapping?.key_column}
-                  <br />
-                  没有全量同步或写回源系统。
-                </p>
-              ) : object.evidence.length ? (
-                object.evidence.map((ev, i) =>
-                  ev.kind === "manual" ? (
-                    <div className="evidence" key={i}>
-                      <p>人工确认：{ev.note}</p>
-                    </div>
-                  ) : (
-                  <div className="evidence" key={i}>
-                    <a
-                      href={
-                        "/api/v1/workspaces/" +
-                        workspace.id +
-                        "/materials/" +
-                        ev.material_id
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <FileText size={14} />
-                      查看原文 {ev.locator.line_start}–{ev.locator.line_end} 行
-                    </a>
-                    <p>{ev.quote}</p>
-                  </div>
-                  ),
-                )
+                <>
+                  <Text strong>来源</Text>
+                  <span className="inline-flex items-center gap-2 text-sm">
+                    <FileText size={14} />
+                    数据库实时查询，没有全量同步或写回源系统。
+                  </span>
+                </>
+              ) : object.evidence?.length ? (
+                <EvidenceSection workspaceId={workspace.id} evidence={object.evidence} />
               ) : (
-                <EmptyModel text="暂无文档证据" />
+                <>
+                  <Text strong>来源证据</Text>
+                  <Text type="secondary">暂无文档证据</Text>
+                </>
               )}
             </section>
           </div>

@@ -1,221 +1,194 @@
+import { Alert, Button, Card, Form, Input, Select, Space, Spin, Table, Tag, Typography } from "antd";
+import { PageBody, PageHeader } from "../components/PageHeader";
 import { useCallback, useEffect, useState } from "react";
 import { workspaceRequest } from "../api/client";
-import type { DataAgentHealth } from "../api/types";
-import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import type { DataAgentHealth, Member } from "../api/types";
 import { usePageTab } from "../hooks/usePageTab";
+import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+
+const { Text } = Typography;
 
 export function SettingsPage() {
   const { workspace, user, refresh } = useWorkspaceContext();
-  const [members, setMembers] = useState<
-    {
-      id: number;
-      user_id: string;
-      name: string;
-      subject: string;
-      role: string;
-    }[]
-  >([]);
-  const [dataagentHealth, setDataagentHealth] =
-    useState<DataAgentHealth | null>(null);
+  const admin = workspace.role === "admin";
+  const [members, setMembers] = useState<Member[]>([]);
+  const [dataagentHealth, setDataagentHealth] = useState<DataAgentHealth | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [infoDirty, setInfoDirty] = useState(false);
   const [memberDirty, setMemberDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [memberForm] = Form.useForm<{ subject: string; role: Member["role"] }>();
   usePageTab({ dirty: infoDirty || memberDirty, busy });
   const load = useCallback(
-    () =>
-      workspaceRequest<{ items: typeof members }>(
-        workspace.id,
-        "/members",
-      ).then((r) => setMembers(r.items)),
+    () => workspaceRequest<{ items: Member[] }>(workspace.id, "/members").then((r) => setMembers(r.items)),
     [workspace.id],
   );
   useEffect(() => {
     load().catch((e: Error) => setError(e.message));
-    workspaceRequest<DataAgentHealth>(
-      workspace.id,
-      "/settings/dataagent-health",
-    )
+    workspaceRequest<DataAgentHealth>(workspace.id, "/settings/dataagent-health")
       .then(setDataagentHealth)
       .catch((e: Error) => setError(e.message));
   }, [workspace.id, load]);
   return (
-    <div className="ref-catalog">
-      <header className="catalog-toolbar">
-        <h1>空间设置</h1>
-      </header>
-      <div className="management-content settings-content">
-        {error && <p className="inline-error">{error}</p>}
-        <section className="detail-section">
-          <h2>空间信息</h2>
-          <form
-            onChange={() => setInfoDirty(true)}
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
+    <div className="flex h-full min-h-0 flex-col bg-canvas">
+      <PageHeader title="空间设置" />
+      <PageBody>
+      {error && (
+        <Alert
+          type="error"
+          showIcon
+          message={error}
+          closable={{ closeIcon: true, "aria-label": "关闭错误" }}
+          onClose={() => setError("")}
+        />
+      )}
+      <Card title="空间信息" size="small" className="max-w-[880px]">
+        <Form
+          layout="vertical"
+          disabled={!admin}
+          initialValues={{ name: workspace.name, description: workspace.description }}
+          onValuesChange={() => setInfoDirty(true)}
+          onFinish={(values: { name: string; description: string }) => {
+            setBusy(true);
+            workspaceRequest(workspace.id, "", values, "PATCH")
+              .then(() => {
+                refresh();
+                setNotice("空间信息已保存");
+                setInfoDirty(false);
+              })
+              .catch((e: Error) => setError(e.message))
+              .finally(() => setBusy(false));
+          }}
+        >
+          <Form.Item name="name" label="空间名称" rules={[{ required: true, message: "请填写空间名称" }]}>
+            <Input aria-label="空间名称" />
+          </Form.Item>
+          <Form.Item name="description" label="说明">
+            <Input.TextArea aria-label="说明" rows={3} />
+          </Form.Item>
+          {admin && (
+            <Space>
+              <Button type="primary" htmlType="submit" loading={busy}>
+                保存空间信息
+              </Button>
+              {notice && <Text type="success">{notice}</Text>}
+            </Space>
+          )}
+        </Form>
+      </Card>
+      <Card title="空间成员" size="small" className="max-w-[880px]">
+        <Text type="secondary" className="mb-3 block">
+          非成员可查看已发布本体；材料、草稿、映射和实例仅成员可见。
+        </Text>
+        <Table
+          size="small"
+          rowKey="id"
+          pagination={false}
+          dataSource={members}
+          columns={[
+            { title: "用户", dataIndex: "name" },
+            { title: "身份标识", dataIndex: "subject" },
+            { title: "角色", key: "role", render: (_, m) => (m.role === "admin" ? "管理员" : "成员") },
+            {
+              title: "",
+              key: "action",
+              width: 80,
+              render: (_, m) =>
+                admin && m.user_id !== user.id ? (
+                  <Button
+                    size="small"
+                    type="link"
+                    danger
+                    onClick={() =>
+                      workspaceRequest(workspace.id, "/members/" + m.id, undefined, "DELETE")
+                        .then(load)
+                        .catch((e: Error) => setError(e.message))
+                    }
+                  >
+                    移除
+                  </Button>
+                ) : null,
+            },
+          ]}
+        />
+        {admin && (
+          <Form
+            form={memberForm}
+            layout="inline"
+            className="!mt-3"
+            initialValues={{ role: "member" }}
+            onValuesChange={() => setMemberDirty(true)}
+            onFinish={(values) => {
               setBusy(true);
-              workspaceRequest(
-                workspace.id,
-                "",
-                { name: f.get("name"), description: f.get("description") },
-                "PATCH",
-              )
+              workspaceRequest(workspace.id, "/members", values)
                 .then(() => {
-                  refresh();
-                  setNotice("空间信息已保存");
-                  setInfoDirty(false);
+                  setMemberDirty(false);
+                  memberForm.resetFields();
+                  return load();
                 })
                 .catch((e: Error) => setError(e.message))
                 .finally(() => setBusy(false));
             }}
           >
-            <label className="section-field">
-              <span>空间名称</span>
-              <input
-                name="name"
-                defaultValue={workspace.name}
-                required
-                disabled={workspace.role !== "admin"}
+            <Form.Item name="subject" rules={[{ required: true, message: "请填写身份标识" }]}>
+              <Input aria-label="成员身份标识" placeholder="provider:sub，需先登录过平台" className="!w-[300px]" />
+            </Form.Item>
+            <Form.Item name="role">
+              <Select
+                aria-label="成员角色"
+                className="!w-[120px]"
+                options={[
+                  { value: "member", label: "成员" },
+                  { value: "admin", label: "管理员" },
+                ]}
               />
-            </label>
-            <label className="section-field">
-              <span>说明</span>
-              <textarea
-                name="description"
-                rows={3}
-                defaultValue={workspace.description}
-                disabled={workspace.role !== "admin"}
-              />
-            </label>
-            {workspace.role === "admin" && (
-              <button className="button button--primary">保存空间信息</button>
-            )}
-            {notice && <span className="muted">{notice}</span>}
-          </form>
-        </section>
-        <section className="detail-section">
-          <h2>空间成员</h2>
-          <p className="muted">
-            非成员可查看已发布本体；材料、草稿、映射和实例仅成员可见。
-          </p>
-          <table className="ref-table">
-            <thead>
-              <tr>
-                <th>用户</th>
-                <th>身份标识</th>
-                <th>角色</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr key={m.id}>
-                  <td>{m.name}</td>
-                  <td>{m.subject}</td>
-                  <td>{m.role === "admin" ? "管理员" : "成员"}</td>
-                  <td>
-                    {workspace.role === "admin" && m.user_id !== user.id && (
-                      <button
-                        className="button button--text"
-                        onClick={() =>
-                          workspaceRequest(
-                            workspace.id,
-                            "/members/" + m.id,
-                            undefined,
-                            "DELETE",
-                          )
-                            .then(load)
-                            .catch((e: Error) => setError(e.message))
-                        }
-                      >
-                        移除
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {workspace.role === "admin" && (
-            <form
-              className="row-actions"
-              onChange={() => setMemberDirty(true)}
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                const form = e.currentTarget;
-                setBusy(true);
-                workspaceRequest(workspace.id, "/members", {
-                  subject: f.get("subject"),
-                  role: f.get("role"),
-                })
-                  .then(() => {
-                    setMemberDirty(false);
-                    form.reset();
-                    return load();
-                  })
-                  .catch((e: Error) => setError(e.message))
-                  .finally(() => setBusy(false));
-              }}
-            >
-              <input
-                name="subject"
-                aria-label="成员身份标识"
-                placeholder="provider:sub，需先登录过平台"
-                required
-              />
-              <select name="role" aria-label="成员角色">
-                <option value="member">成员</option>
-                <option value="admin">admin</option>
-              </select>
-              <button className="button button--secondary">添加成员</button>
-            </form>
-          )}
-        </section>
-        <section className="detail-section">
-          <h2>DataAgent 连通性</h2>
-          <p className="muted">
-            配置检查。地址、站点与凭据均由部署环境和 DataAgent 管理端配置。
-          </p>
-          {dataagentHealth ? (
-            <table className="ref-table dataagent-health-table">
-              <thead>
-                <tr>
-                  <th>检查项</th>
-                  <th>状态</th>
-                  <th>结果与修复指引</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dataagentHealth.checks.map((check) => (
-                  <tr key={check.name}>
-                    <td>{check.name}</td>
-                    <td>
-                      <span
-                        className={
-                          "status-chip " +
-                          (check.ok
-                            ? "status-chip--published"
-                            : "dataagent-health-status--failed")
-                        }
-                      >
-                        {check.ok ? "通过" : "需处理"}
-                      </span>
-                    </td>
-                    <td>
-                      <div>{check.message}</div>
-                      {check.hint && <div className="muted">{check.hint}</div>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="muted">正在检查…</p>
-          )}
-        </section>
-      </div>
+            </Form.Item>
+            <Button htmlType="submit" loading={busy}>
+              添加成员
+            </Button>
+          </Form>
+        )}
+      </Card>
+      <Card title="DataAgent 连通性" size="small" className="max-w-[880px]">
+        <Text type="secondary" className="mb-3 block">
+          配置检查。地址、站点与凭据均由部署环境和 DataAgent 管理端配置。
+        </Text>
+        {dataagentHealth ? (
+          <Table
+            size="small"
+            rowKey="name"
+            pagination={false}
+            dataSource={dataagentHealth.checks}
+            columns={[
+              { title: "检查项", dataIndex: "name", width: 180 },
+              {
+                title: "状态",
+                key: "ok",
+                width: 90,
+                render: (_, check) => (
+                  <Tag color={check.ok ? "success" : "error"} className="!m-0">
+                    {check.ok ? "通过" : "需处理"}
+                  </Tag>
+                ),
+              },
+              {
+                title: "结果与修复指引",
+                key: "message",
+                render: (_, check) => (
+                  <div className="flex flex-col">
+                    <span>{check.message}</span>
+                    {check.hint && <Text type="secondary">{check.hint}</Text>}
+                  </div>
+                ),
+              },
+            ]}
+          />
+        ) : (
+          <Spin />
+        )}
+      </Card>
+      </PageBody>
     </div>
   );
 }

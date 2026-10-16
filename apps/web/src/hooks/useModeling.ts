@@ -155,7 +155,17 @@ export function useModeling(
   const create = async (title = "新的建模会话") => {
     const created = await modelingApi.create(workspaceId, title);
     if (!sessionId) setSession(created);
-    setSessions((list) => [created, ...list]);
+    setSessions((list) => [
+      {
+        id: created.id,
+        title: created.title,
+        task_status: created.task_status,
+        updated_at: created.updated_at,
+        base_version_id: created.base_version_id,
+        has_unpublished_changes: false,
+      },
+      ...list,
+    ]);
     select(created.id, true);
     return created;
   };

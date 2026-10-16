@@ -1,3 +1,4 @@
+import { Alert, Button, Modal } from "antd";
 import {
   memo,
   Suspense,
@@ -89,7 +90,7 @@ const TabPanel = memo(function TabPanel({
   );
   return (
     <section
-      className="route-panel"
+      className="h-full min-w-0 overflow-auto"
       id={`panel-${tab.id}`}
       role="tabpanel"
       aria-labelledby={`tab-${tab.id}`}
@@ -155,7 +156,6 @@ export function WorkspaceTabs({
   const strip = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
   const inspectionKey = (address: string) => {
@@ -177,10 +177,6 @@ export function WorkspaceTabs({
   );
   const blocked = blocker.state === "blocked";
   const blockingBusy = blocked && busy && !closing;
-  useEffect(() => {
-    if (closing || blocked) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [closing, blocked]);
   useEffect(() => {
     try {
       sessionStorage.setItem(
@@ -255,9 +251,9 @@ export function WorkspaceTabs({
   };
   const target = state.tabs.find((t) => t.id === closing);
   return (
-    <>
+    <div className="flex h-full flex-col">
       <div
-        className="route-tabs"
+        className="flex min-w-0 flex-[0_0_36px] gap-[3px] overflow-x-auto border-b border-rule-soft bg-[#f3f5f7] px-2.5 pt-1 [scrollbar-width:thin]"
         ref={strip}
         role="tablist"
         aria-label="已打开的页面"
@@ -306,9 +302,7 @@ export function WorkspaceTabs({
           return (
             <div
               key={tab.id}
-              className={
-                "route-tab" + (state.active === tab.id ? " is-active" : "")
-              }
+              className={`flex flex-none items-center rounded-t-xs border border-b-0 ${state.active === tab.id ? "border-rule-soft bg-surface text-accent" : "border-transparent text-muted hover:bg-[#eaf0f6]"}`}
             >
               <button
                 id={`tab-${tab.id}`}
@@ -318,13 +312,14 @@ export function WorkspaceTabs({
                 tabIndex={state.active === tab.id ? 0 : -1}
                 title={tab.title + (tab.dirty ? " · 未保存" : "")}
                 onClick={() => void navigate(tab.href)}
+                className="flex h-[30px] min-w-0 items-center gap-[7px] border-0 bg-transparent py-0 pr-2 pl-3 text-xs whitespace-nowrap text-inherit focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
               >
-                <Icon size={14} />
-                <span>{tab.title}</span>
-                {tab.dirty && <i className="tab-dirty" aria-label="未保存" />}
+                <Icon size={14} className="flex-none" />
+                <span className="max-w-[180px] truncate">{tab.title}</span>
+                {tab.dirty && <i className="size-[5px] flex-none rounded-full bg-[#d58b20]" aria-label="未保存" />}
               </button>
               <button
-                className="tab-close"
+                className="mr-[5px] grid size-5 place-items-center rounded-[3px] border-0 bg-transparent p-0 text-muted hover:bg-[#e5eaf0] hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                 aria-label={`关闭 ${tab.title}`}
                 title="关闭页面"
                 onClick={() => requestClose(tab)}
@@ -336,14 +331,16 @@ export function WorkspaceTabs({
         })}
       </div>
       {notice && (
-        <div className="tab-notice" role="status">
-          {notice}
-          <button onClick={() => setNotice("")} aria-label="关闭提示">
-            <X size={14} />
-          </button>
-        </div>
+        <Alert
+          banner
+          type="warning"
+          role="status"
+          message={notice}
+          closable={{ closeIcon: true, "aria-label": "关闭提示" }}
+          onClose={() => setNotice("")}
+        />
       )}
-      <div className="route-panels">
+      <div className="relative min-h-0 min-w-0 flex-1">
         {state.tabs
           .filter((t) => t.visited)
           .map((tab) => (
@@ -355,21 +352,32 @@ export function WorkspaceTabs({
             />
           ))}
       </div>
-      <dialog
-        ref={dialog}
-        className="ref-dialog tab-confirm"
-        aria-labelledby="tab-confirm-title"
-        onCancel={(e) => {
-          e.preventDefault();
-          cancel();
-        }}
+      <Modal
+        open={!!closing || blocked}
+        width={420}
+        title={blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
+        onCancel={cancel}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button autoFocus onClick={cancel}>
+              返回页面
+            </Button>
+            {!blockingBusy && (
+              <Button
+                type="primary"
+                danger
+                onClick={() => {
+                  if (closing) remove(closing);
+                  else if (blocker.state === "blocked") blocker.proceed();
+                }}
+              >
+                放弃并{closing ? "关闭" : "离开"}
+              </Button>
+            )}
+          </div>
+        }
       >
-        <header>
-          <h2 id="tab-confirm-title">
-            {blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
-          </h2>
-        </header>
-        <p>
+        <p className="text-[13px] leading-[1.7]">
           {blockingBusy
             ? "请等待当前操作完成后再离开空间。"
             : target
@@ -378,27 +386,7 @@ export function WorkspaceTabs({
                 ? "离开当前内容将丢失尚未保存的修改，是否继续？"
                 : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
         </p>
-        <footer className="row-actions">
-          <button
-            className="button button--secondary"
-            autoFocus
-            onClick={cancel}
-          >
-            返回页面
-          </button>
-          {!blockingBusy && (
-            <button
-              className="button button--primary"
-              onClick={() => {
-                if (closing) remove(closing);
-                else if (blocker.state === "blocked") blocker.proceed();
-              }}
-            >
-              放弃并{closing ? "关闭" : "离开"}
-            </button>
-          )}
-        </footer>
-      </dialog>
-    </>
+      </Modal>
+    </div>
   );
 }

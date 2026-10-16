@@ -1,11 +1,57 @@
+import { Alert, Button, Form, Input, Progress, Radio, Tag, Typography } from "antd";
 import { useState } from "react";
 import { ApiError, publishApi } from "../../api/client";
-import type { MergeConflict, ModelingSession, Resolution } from "../../api/types";
+import type { Json, MergeConflict, ModelingSession, Resolution } from "../../api/types";
 import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
+
+const { Text, Title } = Typography;
 
 function show(value: unknown) {
   if (value === null || value === undefined) return "（无）";
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+}
+
+const title = (c: MergeConflict) =>
+  `${c.element_kind ? `${KIND[c.element_kind].label} · ` : ""}${c.element_label} / ${
+    c.kind === "delete_modify" ? "删除与修改" : (FIELD_LABELS[c.path] ?? c.path)
+  }`;
+
+const LABELS: Record<Resolution["choice"], [string, string]> = {
+  latest: ["采用当前发布版本", "保留当前发布版本的内容，放弃本会话的修改"],
+  draft: ["采用本会话修改", "用本会话的修改覆盖当前发布版本"],
+  custom: ["自定义", "手动编辑合并后的内容"],
+  both: ["都保留", "保留两边新增的所有值"],
+};
+
+const STRING_PATHS = new Set([
+  "name",
+  "technical_name",
+  "description",
+  "inverse_name",
+  "expression",
+  "schema_name",
+  "table_name",
+  "snapshot_date_column",
+  "membership_source_id",
+  "extends",
+  "title_property_id",
+]);
+
+function isStringConflict(c: MergeConflict): boolean {
+  if (typeof c.draft === "string" || typeof c.latest === "string" || typeof c.base === "string") return true;
+  if (
+    (c.draft !== null && c.draft !== undefined) ||
+    (c.latest !== null && c.latest !== undefined) ||
+    (c.base !== null && c.base !== undefined)
+  ) {
+    return false;
+  }
+  return STRING_PATHS.has(c.path);
+}
+
+function initialCustomText(c: MergeConflict): string {
+  if (isStringConflict(c)) return typeof c.draft === "string" ? c.draft : "";
+  return JSON.stringify(c.draft ?? null, null, 2);
 }
 
 /**
@@ -37,7 +83,7 @@ export function ConflictResolver({
   const choose = (choice: Resolution["choice"]) => {
     setChoices((all) => ({ ...all, [conflict.key]: { choice } }));
     if (choice === "custom" && customText[conflict.key] === undefined)
-      setCustomText((t) => ({ ...t, [conflict.key]: show(conflict.draft) }));
+      setCustomText((t) => ({ ...t, [conflict.key]: initialCustomText(conflict) }));
   };
   const submit = async () => {
     setBusy(true);
@@ -51,10 +97,10 @@ export function ConflictResolver({
           continue;
         }
         const text = customText[c.key] ?? "";
-        let value: unknown = text;
-        if (typeof c.draft !== "string" && typeof c.latest !== "string") {
+        let value: Json = text;
+        if (!isStringConflict(c)) {
           try {
-            value = JSON.parse(text);
+            value = JSON.parse(text) as Json;
           } catch {
             throw new Error(`「${c.element_label} / ${c.path}」的自定义值不是有效 JSON`);
           }
@@ -63,10 +109,7 @@ export function ConflictResolver({
       }
       onResolved(await publishApi.resolve(session, currentVersionId, resolutions));
     } catch (e) {
-      if (
-        e instanceof ApiError &&
-        (e.code === "PREVIEW_OUTDATED" || e.code === "CONFLICTS_UNRESOLVED")
-      ) {
+      if (e instanceof ApiError && (e.code === "PREVIEW_OUTDATED" || e.code === "CONFLICTS_UNRESOLVED")) {
         onOutdated();
         return;
       }
@@ -75,110 +118,93 @@ export function ConflictResolver({
       setBusy(false);
     }
   };
-  const labels: Record<Resolution["choice"], [string, string]> = {
-    latest: ["采用当前发布版本", "保留当前发布版本的内容，放弃本会话的修改"],
-    draft: ["采用本会话修改", "用本会话的修改覆盖当前发布版本"],
-    custom: ["自定义", "手动编辑合并后的内容"],
-    both: ["都保留", "保留两边新增的所有值"],
-  };
   return (
-    <div className="conflict-resolver">
-      <aside className="conflict-list" aria-label="冲突列表">
-        <h3>冲突</h3>
-        {conflicts.map((c, i) => (
-          <button
-            key={c.key}
-            type="button"
-            className="conflict-item"
-            aria-current={i === index ? "true" : undefined}
-            onClick={() => setIndex(i)}
-          >
-            <span className="dot" aria-hidden />
-            {c.element_kind ? `${KIND[c.element_kind].label} · ` : ""}
-            {c.element_label} / {c.kind === "delete_modify" ? "删除与修改" : (FIELD_LABELS[c.path] ?? c.path)}
-            <span className={`tag ${choices[c.key] ? "tag--accepted" : "tag--stale"}`}>
-              {choices[c.key] ? "已选择" : "待处理"}
-            </span>
-          </button>
-        ))}
-      </aside>
-      <section className="conflict-detail" aria-label="解决冲突">
-        <h3>
-          {conflict.element_kind ? `${KIND[conflict.element_kind].label} · ` : ""}
-          {conflict.element_label} /{" "}
-          {conflict.kind === "delete_modify" ? "删除与修改" : (FIELD_LABELS[conflict.path] ?? conflict.path)}
-        </h3>
-        <div className="three-way">
-          {(
-            [
-              ["会话起点", conflict.base],
-              ["当前发布版本", conflict.latest],
-              ["本会话修改", conflict.draft],
-            ] as [string, unknown][]
-          ).map(([label, value]) => (
-            <div key={label}>
-              <small>{label}</small>
-              <pre>{show(value)}</pre>
-            </div>
-          ))}
-        </div>
-        <div className="choice-cards" role="radiogroup" aria-label="处理方式">
-          {conflict.allowed.map((choice) => (
-            <button
-              key={choice}
-              type="button"
-              role="radio"
-              aria-checked={choices[conflict.key]?.choice === choice}
-              className="choice-card"
-              onClick={() => choose(choice)}
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <aside className="flex flex-col gap-1" aria-label="冲突列表">
+          <Text strong>冲突</Text>
+          {conflicts.map((c, i) => (
+            <Button
+              key={c.key}
+              type={i === index ? "primary" : "text"}
+              ghost={i === index}
+              aria-current={i === index ? "true" : undefined}
+              className="!flex !h-auto !justify-between !py-1.5 !text-left"
+              onClick={() => setIndex(i)}
             >
-              <strong>{labels[choice][0]}</strong>
-              <small>{labels[choice][1]}</small>
-            </button>
+              <span className="truncate">{title(c)}</span>
+              <Tag color={choices[c.key] ? "success" : "warning"} className="!m-0">
+                {choices[c.key] ? "已选择" : "待处理"}
+              </Tag>
+            </Button>
           ))}
-        </div>
-        {choices[conflict.key]?.choice === "custom" && (
-          <label className="section-field">
-            <span>合并后的内容</span>
-            <textarea
-              rows={4}
-              value={customText[conflict.key] ?? ""}
-              onChange={(e) => setCustomText((t) => ({ ...t, [conflict.key]: e.target.value }))}
-            />
-          </label>
-        )}
-        <div className="row-actions">
-          <button type="button" className="button button--secondary" disabled={index === 0} onClick={() => setIndex(index - 1)}>
-            上一个
-          </button>
-          <button
-            type="button"
-            className="button button--secondary"
-            disabled={index >= conflicts.length - 1}
-            onClick={() => setIndex(index + 1)}
+        </aside>
+        <section className="flex min-w-0 flex-col gap-3" aria-label="解决冲突">
+          <Title level={5} className="!m-0">
+            {title(conflict)}
+          </Title>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["会话起点", conflict.base],
+                ["当前发布版本", conflict.latest],
+                ["本会话修改", conflict.draft],
+              ] as [string, unknown][]
+            ).map(([label, value]) => (
+              <div key={label} className="flex min-w-0 flex-col gap-1">
+                <Text type="secondary" className="text-xs">
+                  {label}
+                </Text>
+                <pre className="m-0 max-h-48 overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs whitespace-pre-wrap">
+                  {show(value)}
+                </pre>
+              </div>
+            ))}
+          </div>
+          <Radio.Group
+            aria-label="处理方式"
+            value={choices[conflict.key]?.choice}
+            onChange={(e) => choose(e.target.value as Resolution["choice"])}
+            className="flex flex-col gap-2"
           >
-            下一个
-          </button>
-        </div>
-      </section>
-      <footer className="conflict-bar">
+            {conflict.allowed.map((choice) => (
+              <Radio key={choice} value={choice}>
+                <strong>{LABELS[choice][0]}</strong> <Text type="secondary">{LABELS[choice][1]}</Text>
+              </Radio>
+            ))}
+          </Radio.Group>
+          {choices[conflict.key]?.choice === "custom" && (
+            <Form layout="vertical" component="div">
+              <Form.Item label="合并后的内容" className="!mb-0">
+                <Input.TextArea
+                  aria-label="合并后的内容"
+                  className="font-mono"
+                  rows={4}
+                  value={customText[conflict.key] ?? ""}
+                  onChange={(e) => setCustomText((t) => ({ ...t, [conflict.key]: e.target.value }))}
+                />
+              </Form.Item>
+            </Form>
+          )}
+          <div className="flex gap-2">
+            <Button disabled={index === 0} onClick={() => setIndex(index - 1)}>
+              上一个
+            </Button>
+            <Button disabled={index >= conflicts.length - 1} onClick={() => setIndex(index + 1)}>
+              下一个
+            </Button>
+          </div>
+        </section>
+      </div>
+      <footer className="flex flex-wrap items-center gap-3 border-t border-rule pt-3">
         <span>
           已解决 {resolved} / {conflicts.length}
         </span>
-        <progress value={resolved} max={conflicts.length} />
-        {error && (
-          <span className="inline-error" role="alert">
-            {error}
-          </span>
-        )}
-        <button
-          type="button"
-          className="button button--primary"
-          disabled={busy || resolved < conflicts.length}
-          onClick={() => void submit()}
-        >
-          {busy ? "正在应用…" : "应用到会话并重新预览"}
-        </button>
+        <Progress className="!m-0 max-w-[200px]" percent={Math.round((100 * resolved) / conflicts.length)} size="small" showInfo={false} />
+        {error && <Alert type="error" showIcon message={error} />}
+        <Button className="ml-auto" type="primary" loading={busy} disabled={resolved < conflicts.length} onClick={() => void submit()}>
+          应用到会话并重新预览
+        </Button>
       </footer>
     </div>
   );

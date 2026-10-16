@@ -1,217 +1,104 @@
+import { Alert, Collapse, Select, Spin, Table, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { workspaceRequest } from "../api/client";
-import type { ModelingSession, VersionSummary } from "../api/types";
-import { ExpressionsEditor } from "./ExpressionsEditor";
-import { modelingApi } from "../api/client";
+import { api } from "../api/client";
+import type { Comparison, Json, VersionSummary } from "../api/types";
 
-type Comparison = {
-  changes: { path: string; kind: string; before: unknown; after: unknown }[];
-  impacts: { id: string; kind: string; label: string }[];
-};
+const { Text } = Typography;
+const KINDS = { added: { text: "新增", color: "success" }, removed: { text: "删除", color: "error" }, changed: { text: "修改", color: "processing" } };
+
+const json = (value: Json) =>
+  value === null || value === undefined ? (
+    <Text type="secondary">—</Text>
+  ) : (
+    <pre className="m-0 max-h-48 overflow-auto font-mono text-xs whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+  );
 
 function Changes({ value }: { value: Comparison }) {
   return (
-    <>
-      <p className="muted">
+    <div className="flex flex-col gap-2">
+      <Text type="secondary">
         {value.changes.length} 项变化 · {value.impacts.length} 个模型内依赖
-      </p>
-      {value.impacts.length > 0 && (
-        <p>影响：{value.impacts.map((i) => i.label).join("、")}</p>
-      )}
-      <div className="change-list">
-        {value.changes.map((change) => (
-          <article key={change.path}>
-            <code>{change.path}</code>
-            <span className="reading-badge">
-              {" "}
-              ·{" "}
-              {{ added: "新增", removed: "删除", changed: "修改" }[change.kind]}
-            </span>
-            <div className="change-values">
-              <div>
-                <small>修改前</small>
-                <pre>{JSON.stringify(change.before, null, 2) ?? "—"}</pre>
-              </div>
-              <div>
-                <small>修改后</small>
-                <pre>{JSON.stringify(change.after, null, 2) ?? "—"}</pre>
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
-      {!value.changes.length && <p className="muted">两个版本没有模型变化。</p>}
-    </>
-  );
-}
-
-/**
- * Workspace-level constraints (Ossie ontology `requires`), edited with the
- * rest of the session in the builder's 本体草稿 tab. Publishing previews only
- * saved revisions, so unsaved edits are flagged here and mark the page dirty.
- */
-export function WorkspaceConstraints({
-  session,
-  onSaved,
-  disabled = false,
-  onDirtyChange,
-  onBusyChange,
-}: {
-  session: ModelingSession;
-  onSaved: (value: ModelingSession) => void;
-  disabled?: boolean;
-  onDirtyChange?: (dirty: boolean) => void;
-  onBusyChange?: (busy: boolean) => void;
-}) {
-  const [error, setError] = useState("");
-  const [rules, setRules] = useState(session.draft.ontology_requires ?? []);
-  const [saving, setSaving] = useState(false);
-  const dirty =
-    JSON.stringify(rules) !==
-    JSON.stringify(session.draft.ontology_requires ?? []);
-  useEffect(() => {
-    onDirtyChange?.(dirty);
-    return () => onDirtyChange?.(false);
-  }, [dirty, onDirtyChange]);
-  useEffect(() => {
-    onBusyChange?.(saving);
-    return () => onBusyChange?.(false);
-  }, [saving, onBusyChange]);
-  useEffect(() => {
-    setRules(session.draft.ontology_requires ?? []);
-  }, [session.id, session.revision, session.draft.ontology_requires]);
-  return (
-    <section className="workspace-constraints" aria-label="工作空间约束">
-      <ExpressionsEditor
-        disabled={disabled || saving}
-        label="工作空间约束"
-        value={{ requires: rules }}
-        onChange={(next) => {
-          if (next.requires) setRules(next.requires);
-        }}
-        onlyConstraints
-        bare
+      </Text>
+      {value.impacts.length > 0 && <Alert type="info" showIcon message={`影响：${value.impacts.map((i) => i.label).join("、")}`} />}
+      <Table
+        size="small"
+        rowKey="path"
+        pagination={value.changes.length > 20 ? { pageSize: 20, size: "small" } : false}
+        dataSource={value.changes}
+        locale={{ emptyText: "两个版本没有模型变化" }}
+        columns={[
+          { title: "位置", key: "path", width: 260, render: (_, c) => <code className="break-all text-xs">{c.path}</code> },
+          {
+            title: "变化",
+            key: "kind",
+            width: 72,
+            render: (_, c) => <Tag color={KINDS[c.kind].color} className="!m-0">{KINDS[c.kind].text}</Tag>,
+          },
+          { title: "修改前", key: "before", render: (_, c) => json(c.before) },
+          { title: "修改后", key: "after", render: (_, c) => json(c.after) },
+        ]}
       />
-      {dirty && (
-        <p className="muted" role="status">
-          工作空间约束尚未保存。发布页只预览已保存的内容。
-        </p>
-      )}
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
-      {dirty && (
-        <button
-          disabled={disabled || saving}
-          className="button button--secondary"
-          onClick={async () => {
-            setSaving(true);
-            setError("");
-            try {
-              onSaved(
-                await modelingApi.save(session, {
-                  ...session.draft,
-                  ontology_requires: rules
-                    .map((r) => r.trim())
-                    .filter(Boolean),
-                }),
-              );
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "保存失败");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          {saving ? "正在保存…" : "保存空间约束"}
-        </button>
-      )}
-    </section>
+    </div>
   );
 }
 
-export function HistoryComparison({
-  workspaceId,
-  versions,
-}: {
-  workspaceId: string;
-  versions: VersionSummary[];
-}) {
+function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versions: VersionSummary[] }) {
   const [left, setLeft] = useState("");
   const [chosen, setChosen] = useState("");
   const right = chosen || versions[0]?.version_id || "";
   const [value, setValue] = useState<Comparison | null>(null);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState(false);
   useEffect(() => {
     let active = true;
     setValue(null);
     setError("");
-    if (open && right && left !== right)
-      workspaceRequest<Comparison>(
-        workspaceId,
-        `/version-comparison?${new URLSearchParams({ right_id: right, ...(left ? { left_id: left } : {}) })}`,
-      )
-        .then((r) => {
-          if (active) setValue(r);
-        })
-        .catch((e: Error) => {
-          if (active) setError(e.message);
-        });
+    if (right && left !== right)
+      api
+        .comparison(workspaceId, right, left || undefined)
+        .then((r) => active && setValue(r))
+        .catch((e: Error) => active && setError(e.message));
     return () => {
       active = false;
     };
-  }, [workspaceId, left, right, open]);
+  }, [workspaceId, left, right]);
+  const options = versions.map((v) => ({ value: v.version_id, label: `v${v.version}` }));
   return (
-    <details
-      className="expression-editor"
-      onToggle={(e) => setOpen(e.currentTarget.open)}
-    >
-      <summary>比较历史版本</summary>
-      <div className="row-actions">
-        <label>
-          基线{" "}
-          <select
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="inline-flex items-center gap-2">
+          基线
+          <Select
             aria-label="比较基线"
+            className="w-[120px]"
             value={left}
-            onChange={(e) => setLeft(e.target.value)}
-          >
-            <option value="">空基线</option>
-            {versions.map((v) => (
-              <option key={v.version_id} value={v.version_id}>
-                v{v.version}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          目标{" "}
-          <select
-            aria-label="比较目标"
-            value={right}
-            onChange={(e) => setChosen(e.target.value)}
-          >
-            {versions.map((v) => (
-              <option key={v.version_id} value={v.version_id}>
-                v{v.version}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={[{ value: "", label: "空基线" }, ...options]}
+            onChange={setLeft}
+          />
+        </span>
+        <span className="inline-flex items-center gap-2">
+          目标
+          <Select aria-label="比较目标" className="w-[120px]" value={right} options={options} onChange={setChosen} />
+        </span>
       </div>
       {left === right ? (
-        <p className="muted">请选择不同版本。</p>
+        <Text type="secondary">请选择不同版本。</Text>
       ) : error ? (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
+        <Alert type="error" showIcon message={error} />
       ) : value ? (
         <Changes value={value} />
       ) : (
-        open && <p>正在比较…</p>
+        <Spin />
       )}
-    </details>
+    </div>
+  );
+}
+
+export function HistoryComparison({ workspaceId, versions }: { workspaceId: string; versions: VersionSummary[] }) {
+  return (
+    <Collapse
+      size="small"
+      destroyOnHidden
+      items={[{ key: "compare", label: "比较历史版本", children: <ComparisonBody workspaceId={workspaceId} versions={versions} /> }]}
+    />
   );
 }

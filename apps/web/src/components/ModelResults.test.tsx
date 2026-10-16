@@ -1,157 +1,89 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ModelingSession } from "../api/types";
+import { example } from "../test/drafts";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { ModelResults } from "./ModelResults";
-import type { Draft, DraftView, ModelingSession } from "../api/types";
-import { emptyDraft, fromView } from "../lib/draftView";
 
 vi.mock("./OntologyGraph", () => ({
-  OntologyGraph: () => <div data-testid="semantic-graph" />,
+  OntologyGraph: ({ graph }: { graph: { nodes: unknown[] } }) => <div data-testid="semantic-graph">{graph.nodes.length}</div>,
 }));
 afterEach(cleanup);
-// Written as the nested view for readability, stored as v2 like the API sends.
-const view: DraftView = {
-  workspace_id: "w",
-  requires: [],
-  object_types: [
-    {
-      id: "material",
-      name: "物料",
-      technical_name: "material",
-      description: "材料定义",
-      tags: [],
-      attributes: [
-        {
-          id: "name",
-          name: "物料名称",
-          technical_name: "name",
-          description: "",
-          value_kind: "string",
-          identifier: false,
-          required: false,
-        },
-      ],
-    },
-  ],
-  link_types: [],
-  objects: [],
-  links: [],
-  mappings: [],
-};
-const draft: Draft = fromView(emptyDraft("w"), view);
-function session(): ModelingSession {
+
+function session(extra: Partial<ModelingSession> = {}): ModelingSession {
   return {
     id: "s",
     title: "测试",
     workspace_id: "w",
     base_version_id: null,
     revision: 0,
-    draft: structuredClone(draft),
-    graph: {
-      workspace_id: "w",
-      version_id: "v",
-      version_sha256: "",
-      nodes: [],
-      edges: [],
-    },
-    candidates: [],
-    material_ids: [],
-    task_status: "idle",
-    task_detail: "",
-    updated_at: "",
-  };
+    draft: example("01-basic-sales"),
+    graph: { workspace_id: "w", version_id: "", version_sha256: "", nodes: [], edges: [] },
+    base_diff: [],
+    pending_proposal_count: 0,
+    latest_batch_id: null,
+    result_warnings: [],
+    ...extra,
+  } as unknown as ModelingSession;
 }
+const show = (s: ModelingSession | null) =>
+  renderWithProviders(
+    <MemoryRouter>
+      <ModelResults session={s} />
+    </MemoryRouter>,
+  );
 
-describe("建模结果", () => {
-  it("without proposals shows the draft and graph tabs, with real counts and searchable attributes", () => {
-    render(
-      <MemoryRouter>
-        <ModelResults session={session()} />
-      </MemoryRouter>,
-    );
-    expect(screen.getAllByRole("tab")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "实体 1" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "属性 1" }));
-    expect(screen.getByText("物料名称")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("textbox", { name: "搜索模型" }), {
-      target: { value: "不存在" },
-    });
-    expect(screen.queryByText("物料名称")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: "语义图谱" }));
-    expect(screen.getByTestId("semantic-graph")).toBeInTheDocument();
+describe("modeling results", () => {
+  it("counts every kind in the draft and searches within one", () => {
+    show(session());
+    expect(screen.getByText("对象 2")).toBeInTheDocument();
+    expect(screen.getByText("指标 10")).toBeInTheDocument();
+    expect(screen.getByText("数据集 2")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("属性 8"));
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索模型" }), { target: { value: "region" } });
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "所在地区" })).toBeInTheDocument();
   });
-  it("shows the complete result as a version draft without candidate actions", () => {
+
+  it("marks changes against the base version, including deletions", () => {
     const s = session();
-    s.draft.object_types[0].name = "新版本物料";
-    render(
-      <MemoryRouter>
-        <ModelResults session={s} />
-      </MemoryRouter>,
+    const customer = s.draft.object_types[0];
+    show(
+      session({
+        base_diff: [
+          { element_kind: "object_type", element_id: customer.id, label: customer.name, change: "updated", field_changes: [], before: null, after: null },
+          { element_kind: "object_type", element_id: "gone", label: "旧对象", change: "deleted", field_changes: [], before: { technical_name: "old" } as never, after: null },
+        ],
+      }),
     );
-    expect(screen.getByText("新版本物料")).toBeInTheDocument();
-    expect(screen.getByText(/本会话的修改/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /接受/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: customer.name }).closest("tr")!).getByText("已修改")).toBeInTheDocument();
+    expect(within(screen.getByText("旧对象").closest("tr")!).getByText("待删除")).toBeInTheDocument();
   });
+
+  it("draws the draft when the server graph is empty and shows notes from the last run", () => {
+    show(session({ result_warnings: ["有 1 张表没有主键"] }));
+    expect(screen.getByText("有 1 张表没有主键")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "语义图谱" }));
+    expect(screen.getByTestId("semantic-graph")).toHaveTextContent("2");
+  });
+
   it("has an honest empty state before generation", () => {
-    render(
-      <MemoryRouter>
-        <ModelResults session={null} />
-      </MemoryRouter>,
-    );
+    show(null);
     expect(screen.getByText("暂无构建结果")).toBeInTheDocument();
-    expect(screen.queryByText("接受全部无冲突项")).not.toBeInTheDocument();
-  });
-});
-
-describe("version draft mappings", () => {
-  const mapping = {
-    id: "map-1",
-    type_id: "material",
-    connection_alias: "warehouse",
-    table_name: "dim_material",
-    schema_name: "ods",
-    key_column: "material_id",
-    fields: {},
-  };
-
-  const withMapping = (): ModelingSession => {
-    const value = session();
-    value.draft.mappings = [mapping];
-    return value;
-  };
-
-  it("labels a mapping by its connection alias and table", () => {
-    // DataMapping has no name field on purpose: a published model carries an
-    // alias rather than a connection, so this pair is the only stable label.
-    render(
-      <MemoryRouter>
-        <ModelResults session={withMapping()} />
-      </MemoryRouter>,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: /映射/ }));
-
-    expect(screen.getByText(/warehouse · ods\.dim_material/)).toBeInTheDocument();
-    expect(screen.getByText(/主键 material_id/)).toBeInTheDocument();
   });
 
-});
+  it("shows material_link rows with endpoint display names and Chinese binding mode labels for mappings", () => {
+    show(session({ draft: example("07-instances-and-evidence") }));
+    fireEvent.click(screen.getByText(/^文档关系 /));
+    expect(screen.getByRole("button", { name: /RT-0103 → C001/ })).toBeInTheDocument();
 
-describe("result warnings", () => {
-  it("surfaces notes from the last run so they are not lost silently", () => {
-    // Top-level ontology constraints are not turned into candidates in v1.
-    // Without this the agent's proposal would vanish with no trace at all.
-    const warned: ModelingSession = {
-      ...session(),
-      result_warnings: ["本轮结果包含顶层本体约束变更，v1 不生成候选"],
-    };
-
-    render(
-      <MemoryRouter>
-        <ModelResults session={warned} />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByRole("status")).toHaveTextContent("顶层本体约束变更");
+    cleanup();
+    show(session({ draft: example("06-inheritance") }));
+    fireEvent.click(screen.getByText(/^映射 /));
+    expect(screen.getAllByText("独立绑定").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("共用父对象数据").length).toBeGreaterThan(0);
+    expect(screen.queryByText("independent")).not.toBeInTheDocument();
+    expect(screen.queryByText("shared_parent")).not.toBeInTheDocument();
   });
 });

@@ -1,36 +1,14 @@
-import { Box, Check, GitBranch, Maximize2, Minimize2, X } from "lucide-react";
-import {
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { Alert, Button, Input, Modal, Spin, Tabs, Tooltip, Typography } from "antd";
+import { Box, Check, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import {
-  createPath,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from "react-router-dom";
-import {
-  api,
-  ApiError,
-  modelingApi,
-  publishApi,
-  workspaceRequest,
-} from "../../api/client";
-import { editorDraft, nativeFromEditor } from "../../lib/nativeDraft";
-import type {
-  Draft,
-  LegacyDraft,
-  ModelingSession,
-  TargetKind,
-  VersionSummary,
-} from "../../api/types";
-import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
+import { createPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ApiError, api, modelingApi, publishApi } from "../../api/client";
+import type { Dataset, Draft, LinkType, Metric, ModelingSession, ObjectType } from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
+import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
+import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
+import { branchProblem } from "../../lib/derivedEditing";
 import {
   inspectorHref,
   notifyOntologySaved,
@@ -38,201 +16,219 @@ import {
   type ElementRequest,
   type ElementTab,
 } from "../../lib/elementInspector";
-import {
-  BasicPanel,
-  PropertiesPanel,
-  RelationsPanel,
-  RulesPanel,
-} from "./ElementPanels";
-import {
-  isObject,
-  rulesFor,
-  relationsFor,
-  type ElementType,
-  type PanelProps,
-} from "../../lib/elementModel";
-import { InspectorDialog } from "./InspectorDialog";
-import { ActionsPanel } from "./ElementActions";
-import { LinkMappingPanel } from "./LinkMappingPanel";
+import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
+import { newId } from "../../lib/id";
+import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
 import { objectMapping, shortObjectName } from "../../lib/objectMapping";
-import {
-  mappingChangesForSave,
-  mappingSaveError,
-} from "../../lib/objectMappingEditing";
-import { MappingStatusIcon } from "./MappingWidgets";
-import { inheritedProperties } from "../../lib/elementModel";
+import { newDataset } from "../../lib/datasetEditing";
+import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
-import { newId as generateId } from "../../lib/id";
+import { LinkBasicPanel, ObjectBasicPanel, RulesPanel } from "./ElementPanels";
+import { InspectorDialog } from "./InspectorDialog";
+import { joinProblem } from "../../lib/objectMappingEditing";
+import { LinkMappingPanel } from "./LinkMappingPanel";
+import { MappingStatusIcon } from "./MappingWidgets";
+import { MetricPanel } from "./MetricPanel";
+import { PropertiesPanel } from "./PropertyMappingTable";
+import { RelationsPanel } from "./RelationMappingTable";
 
-type Loaded = {
-  draft: Draft;
-  session: ModelingSession | null;
-  versionId: string | null;
-};
-const KINDS: TargetKind[] = [
+const { Text } = Typography;
+
+type InspectKind = "object_type" | "link_type" | "metric" | "dataset";
+type Element = ObjectType | LinkType | Metric | Dataset;
+type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null };
+type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
+
+const KINDS = new Set([
   "object_type",
-  "value_type",
   "property",
   "link_type",
   "rule",
-  "action",
+  "metric",
+  "dataset",
+  "mapping",
   "material_object",
   "material_link",
-  "mapping",
-];
-function resolve(
-  draft: LegacyDraft,
-  kind: string,
-  id: string,
-): { type: ElementType | undefined; tab?: ElementTab; objectId?: string } {
-  if (kind === "value_type")
-    return { type: draft.value_types?.find((t) => t.id === id) };
-  if (kind === "object_type")
-    return { type: draft.object_types.find((t) => t.id === id) };
-  if (kind === "link_type")
-    return { type: draft.link_types.find((t) => t.id === id) };
-  if (kind === "property")
-    return {
-      type: draft.object_types.find(
-        (t) =>
-          t.id === draft.properties.find((p) => p.id === id)?.owner_type_id,
-      ),
-      tab: "properties",
-    };
-  if (kind === "action")
-    return {
-      type: draft.object_types.find(
-        (t) => t.id === draft.actions.find((a) => a.id === id)?.input_type_id,
-      ),
-      tab: "actions",
-    };
-  if (kind === "mapping")
-    return {
-      type: draft.object_types.find(
-        (t) => t.id === draft.mappings.find((m) => m.id === id)?.type_id,
-      ),
-      tab: "mapping",
-    };
-  if (kind === "material_object") {
-    const object = draft.material_objects.find((o) => o.id === id);
-    return {
-      type: draft.object_types.find((t) => t.id === object?.type_id),
-      tab: "instances",
-      objectId: object?.id,
-    };
-  }
-  if (kind === "material_link")
-    return {
-      type: draft.link_types.find(
-        (t) => t.id === draft.material_links.find((l) => l.id === id)?.type_id,
-      ),
-      tab: "instances",
-    };
-  if (kind === "rule") {
-    const rule = draft.rules.find((r) => r.id === id);
-    if (rule) {
-      if (rule.owner_kind === "link_type") {
-        const relation = draft.link_types.find((r) => r.id === rule.owner_id);
-        const owner =
-          relation &&
-          draft.object_types.find(
-            (o) =>
-              o.id === (relation.owner_ref?.ref || relation.source_type_id),
-          );
-        if (owner) return { type: owner, tab: "rules" };
-      }
+]);
+const NEW_KINDS: InspectKind[] = ["object_type", "link_type", "metric", "dataset"];
+const COLLECTION = { object_type: "object_types", link_type: "link_types", metric: "metrics", dataset: "datasets" } as const;
+const NOUN: Record<InspectKind, string> = { object_type: "对象", link_type: "关系", metric: "指标", dataset: "数据集" };
+
+/** Opens the owning resource for a nested element (property, rule, mapping, fact). */
+function resolve(draft: Draft, kind: string, id: string): Resolved {
+  switch (kind) {
+    case "object_type":
+    case "link_type":
+    case "metric":
+    case "dataset":
+      return { kind, element: byId(draft[COLLECTION[kind]] as Element[], id) };
+    case "property":
       return {
-        ...resolve(draft, rule.owner_kind, rule.owner_id),
-        tab: "rules",
+        kind: "object_type",
+        element: byId(draft.object_types, byId(draft.properties, id)?.owner_type_id),
+        tab: "properties",
       };
+    case "mapping":
+      return {
+        kind: "object_type",
+        element: byId(draft.object_types, byId(draft.mappings, id)?.type_id),
+        tab: "properties",
+      };
+    case "material_object": {
+      const fact = byId(draft.material_objects, id);
+      return { kind: "object_type", element: byId(draft.object_types, fact?.type_id), tab: "instances", factId: fact?.id };
     }
+    case "material_link":
+      return {
+        kind: "link_type",
+        element: byId(draft.link_types, byId(draft.material_links, id)?.type_id),
+        tab: "instances",
+      };
+    case "rule": {
+      const rule = byId(draft.rules, id);
+      if (!rule) return { kind: "object_type", element: undefined };
+      const owner = rule.owner_kind === "property" ? byId(draft.properties, rule.owner_id)?.owner_type_id : rule.owner_id;
+      return rule.owner_kind === "link_type"
+        ? { kind: "link_type", element: byId(draft.link_types, owner), tab: "rules" }
+        : { kind: "object_type", element: byId(draft.object_types, owner), tab: "rules" };
+    }
+    default:
+      return { kind: "object_type", element: undefined };
   }
-  return { type: undefined };
+}
+
+function blank(draft: Draft, kind: InspectKind, id: string, owner: string | null): Element {
+  const base = { id, name: "", technical_name: "", description: "", synonyms: [], evidence: [] };
+  if (kind === "object_type")
+    return { ...base, tags: [], extends: null, derived_by: [], title_property_id: null };
+  if (kind === "link_type") {
+    const source = byId(draft.object_types, owner)?.id ?? draft.object_types[0]?.id ?? "";
+    return {
+      ...base,
+      tags: [],
+      source_type_id: source,
+      target_type_id: draft.object_types.find((o) => o.id !== source)?.id ?? source,
+      multiplicity: "many_to_one",
+      inverse_name: null,
+      data_join: null,
+    };
+  }
+  if (kind === "metric") return newMetric(id, byId(draft.datasets, owner)?.id ?? draft.datasets[0]?.id ?? null);
+  return newDataset(id);
+}
+
+/** First problem to fix before saving, or null. */
+function saveProblem(draft: Draft, kind: InspectKind, element: Element): string | null {
+  if (kind === "dataset") {
+    const dataset = element as Dataset;
+    if (!dataset.name.trim()) return "请填写数据集名称";
+    return dataset.table_name ? null : "请填写表或视图";
+  }
+  if (kind === "metric") return Object.values(metricErrors(draft, element as Metric))[0] ?? null;
+  const named = element as ObjectType | LinkType;
+  if (!named.name.trim() || !named.technical_name) return `请填写${NOUN[kind]}的名称和技术名`;
+  if (rulesFor(draft, named).some((r) => !r.name.trim() || !r.technical_name || !r.expression.trim()))
+    return "有规则还没有填写名称、技术名和表达式";
+  if (kind === "link_type") return joinProblem((element as LinkType).data_join);
+  const object = element as ObjectType;
+  const unnamed = draft.properties.find((p) => p.owner_type_id === object.id && (!p.name.trim() || !p.technical_name));
+  if (unnamed) return "有属性还没有填写名称和技术名";
+  const derived = branchProblem(draft, object.derived_by);
+  if (derived) return derived;
+  for (const join of Object.values(mappingFor(draft, object.id)?.inherited_link_bindings ?? {})) {
+    const problem = joinProblem(join);
+    if (problem) return problem;
+  }
+  return null;
+}
+
+function errorText(e: unknown): ReactNode {
+  if (e instanceof ApiError) {
+    const details = e.errors.map((issue) => issue.message).filter(Boolean);
+    const head = e.status === 409 ? `${e.message}。你的修改仍保留，可以取消编辑后重新读取。` : e.message;
+    return details.length ? (
+      <div className="flex flex-col gap-1">
+        <span>{head}</span>
+        <ul className="m-0 pl-5">
+          {details.slice(0, 8).map((d, i) => (
+            <li key={i}>{d}</li>
+          ))}
+        </ul>
+      </div>
+    ) : (
+      head
+    );
+  }
+  return e instanceof Error ? e.message : "保存失败";
 }
 
 export function ElementInspector() {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const target = params.get("inspect");
   if (!target) return null;
   const split = target.indexOf(":");
   const kind = target.slice(0, split);
   const id = target.slice(split + 1);
-  const sourceSession =
-    params.get("inspectSource") === "published"
-      ? null
-      : (params.get("inspectSession") ?? params.get("session"));
+  const sessionId =
+    params.get("inspectSource") === "published" ? null : (params.get("inspectSession") ?? params.get("session"));
   const previewHash = params.get("inspectPreviewHash");
   return (
     <Inspector
-      key={`${kind}:${id}:${sourceSession}:${previewHash}`}
+      key={`${kind}:${id}:${sessionId}:${previewHash}`}
       kind={kind}
       id={id}
-      sessionId={sourceSession}
+      sessionId={sessionId}
       previewHash={previewHash}
-      setParams={setParams}
     />
   );
 }
 
 function Inspector({
-  kind,
+  kind: requestedKind,
   id,
   sessionId,
   previewHash,
-  setParams,
 }: {
   kind: string;
   id: string;
   sessionId: string | null;
   previewHash: string | null;
-  setParams: ReturnType<typeof useSearchParams>[1];
 }) {
   const { workspace, refresh } = useWorkspaceContext();
   const location = useLocation();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const active = usePageActive();
   const page = useContext(PageTabContext);
   const reportElement = page?.updateElement;
-  const identity = useId();
-  const titleId = `${identity}-title`;
-  const panelId = `${identity}-panel`;
-  const tabId = (tab: string) => `${identity}-tab-${tab}`;
-  const dialog = useRef<HTMLDialogElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const creating = id === "new";
+  const createdId = useRef(newId());
+  const effectiveId = creating ? createdId.current : id;
+  const owner = params.get("inspectOwner");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
-  const [draft, setDraft] = useState<LegacyDraft | null>(null);
-  const [editingIntent, setEditing] = useState(
-    !previewHash && params.get("inspectMode") === "edit" && !!workspace.role,
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [editing, setEditing] = useState(
+    !previewHash && (creating || params.get("inspectMode") === "edit") && !!workspace.role,
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ReactNode>(null);
+  const [showErrors, setShowErrors] = useState(false);
   const [copyFallback, setCopyFallback] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 2200);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(""), 2200);
     return () => window.clearTimeout(timer);
   }, [notice]);
-  const newId = useRef(generateId());
-  const effectiveId = id === "new" ? newId.current : id;
   useEffect(() => {
     let live = true;
-    setError("");
-    setLoading(true);
+    setError(null);
     const load = async () => {
-      if (!KINDS.includes(kind as TargetKind))
-        throw new Error("不支持的本体元素");
+      if (!KINDS.has(requestedKind)) throw new Error("不支持的元素类型");
       if (sessionId && !workspace.role) throw new Error("没有权限查看此内容");
       const current = await api.workspace(workspace.id);
       let source: Loaded;
@@ -240,100 +236,36 @@ function Inspector({
         const session = await modelingApi.get(workspace.id, sessionId);
         if (previewHash) {
           const preview = await publishApi.preview(session);
-          if (
-            !preview.merged_model ||
-            preview.merged_snapshot_sha256 !== previewHash
-          )
+          if (preview.merged_snapshot_sha256 !== previewHash)
             throw new Error("待发布内容已变化，请关闭弹窗并重新预览");
-          source = {
-            draft: preview.merged_model,
-            session: null,
-            versionId: preview.current_version_id,
-          };
-        } else
-          source = {
-            draft: session.draft,
-            session,
-            versionId: current.version_id,
-          };
+          source = { draft: preview.merged_model, session: null, versionId: preview.current_version_id };
+        } else source = { draft: session.draft, session, versionId: current.version_id };
       } else {
-        const model = current.version_id
-          ? (
-              await workspaceRequest<{ model: Draft; version: VersionSummary }>(
-                workspace.id,
-                `/versions/${current.version_id}/presentation`,
-              )
-            ).model
-          : await modelingApi.snapshot(workspace.id);
+        const model = workspace.role
+          ? await modelingApi.snapshot(workspace.id)
+          : current.version_id
+            ? (await api.presentation(workspace.id, current.version_id)).model
+            : null;
+        if (!model) throw new Error("还没有发布内容");
         source = { draft: model, session: null, versionId: current.version_id };
       }
-      let value = editorDraft(source.draft);
-      if (id === "new") {
-        if (!workspace.role) throw new Error("没有权限创建本体元素");
-        const base = {
-          id: effectiveId,
-          name: "",
-          technical_name: "",
-          description: "",
-          tags: [],
-          evidence: [],
-        };
-        if (kind === "object_type")
-          value = {
-            ...value,
-            object_types: [...value.object_types, { ...base, extends: [] }],
-          };
-        else if (kind === "link_type")
-          value = {
-            ...value,
-            link_types: [
-              ...value.link_types,
-              {
-                ...base,
-                source_type_id: value.object_types[0]?.id ?? "",
-                target_type_id:
-                  value.object_types[1]?.id ?? value.object_types[0]?.id ?? "",
-                multiplicity: "many_to_many",
-                verbalizes: [],
-              },
-            ],
-          };
-        else throw new Error("请从所属对象或关系中新增元素");
+      let value = source.draft;
+      if (creating) {
+        if (!workspace.role) throw new Error("没有权限新建");
+        if (!NEW_KINDS.includes(requestedKind as InspectKind)) throw new Error("请从所属对象或关系中新增");
+        const kind = requestedKind as InspectKind;
+        value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
         setLoaded(source);
         setDraft(value);
       }
     };
-    void load()
-      .catch((e: Error) => {
-        if (live) setError(e.message);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
+    void load().catch((e: Error) => live && setError(e.message));
     return () => {
       live = false;
     };
-  }, [
-    workspace.id,
-    workspace.role,
-    kind,
-    id,
-    effectiveId,
-    sessionId,
-    previewHash,
-    attempt,
-  ]);
-  useEffect(() => {
-    const el = dialog.current;
-    if (!el) return;
-    if (active && !el.open) el.showModal();
-    if (!active && el.open) el.close();
-    return () => {
-      if (el.open) el.close();
-    };
-  }, [active]);
+  }, [workspace.id, workspace.role, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt]);
   useLayoutEffect(() => {
     reportElement?.({ dirty, busy });
     return () => reportElement?.({ dirty: false, busy: false });
@@ -347,102 +279,40 @@ function Inspector({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
-  const resolved = draft ? resolve(draft, kind, effectiveId) : null;
-  const type = resolved?.type;
-  const object = type ? isObject(type) : kind !== "link_type";
-  const editing = editingIntent;
-  const properties =
-    draft && type
+
+  const resolved = draft ? resolve(draft, requestedKind, effectiveId) : null;
+  const kind: InspectKind = resolved?.kind ?? (NEW_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
+  const element = resolved?.element;
+  const object = kind === "object_type" ? (element as ObjectType | undefined) : undefined;
+  const link = kind === "link_type" ? (element as LinkType | undefined) : undefined;
+  const properties = draft && object ? effectiveProperties(draft, object.id) : [];
+  const relations = draft && object ? relationsFor(draft, object) : [];
+  const rules = draft && (object || link) ? rulesFor(draft, (object ?? link)!) : [];
+  const member = !!workspace.role;
+  const tabs: { key: ElementTab; label: string; count?: number }[] = object
+    ? [
+        { key: "basic", label: "概览" },
+        { key: "properties", label: "属性与映射", count: properties.length },
+        { key: "relations", label: "关系", count: relations.length },
+        ...(rules.length || editing ? [{ key: "rules" as const, label: "规则", count: rules.length }] : []),
+        ...(member && !creating ? [{ key: "instances" as const, label: "实例" }] : []),
+      ]
+    : link
       ? [
-          ...draft.properties.filter((p) => p.owner_type_id === type.id),
-          ...(isObject(type)
-            ? inheritedProperties(draft, type).map((p) => p.property)
-            : []),
+          { key: "basic", label: "概览" },
+          ...(member ? [{ key: "mapping" as const, label: "数据绑定" }] : []),
+          ...(rules.length || editing ? [{ key: "rules" as const, label: "规则", count: rules.length }] : []),
+          ...(member && !creating ? [{ key: "instances" as const, label: "实例" }] : []),
         ]
       : [];
-  const relations =
-    draft && type && isObject(type) ? relationsFor(draft, type) : [];
-  const rules = draft && type ? rulesFor(draft, type) : [];
-  const actions =
-    draft && type
-      ? draft.actions.filter(
-          (a) =>
-            a.input_type_id === type.id ||
-            (!isObject(type) &&
-              a.effects.some((e) => e.link_type_id === type.id)),
-        )
-      : [];
-  const actionsTab = actions.length
-    ? [{ id: "actions" as const, name: "动作", count: actions.length }]
-    : [];
-  const valueConcept =
-    type && isObject(type) && type.concept_kind === "value_type";
-  const selectedKind = valueConcept
-    ? "value_type"
-    : object
-      ? "object_type"
-      : "link_type";
-  const allTabs: {
-    id: ElementTab;
-    name: string;
-    count?: number;
-    private?: boolean;
-  }[] = object
-    ? [
-        { id: "basic", name: "概览" },
-        ...(properties.length || editing
-          ? [
-              {
-                id: "properties" as const,
-                name: "属性与映射",
-                count: properties.length,
-              },
-            ]
-          : []),
-        ...(relations.length
-          ? [
-              {
-                id: "relations" as const,
-                name: "关系",
-                count: relations.length,
-              },
-            ]
-          : []),
-        ...(rules.length
-          ? [{ id: "rules" as const, name: "规则", count: rules.length }]
-          : []),
-        ...actionsTab,
-        { id: "instances", name: "实例", private: true },
-      ]
-    : [
-        { id: "basic", name: "概览" },
-        { id: "endpoints", name: "角色与语义描述" },
-        { id: "mapping", name: "关联条件", private: true },
-        ...(rules.length
-          ? [{ id: "rules" as const, name: "规则", count: rules.length }]
-          : []),
-        ...actionsTab,
-        { id: "instances", name: "实例", private: true },
-      ];
-  const tabs = allTabs.filter((tab) =>
-    valueConcept ? tab.id === "basic" : !tab.private || workspace.role,
-  );
   const requestedTab = params.get("inspectTab") ?? resolved?.tab ?? "basic";
-  const compatibleTab =
-    (requestedTab === "data" || requestedTab === "mapping") && object
+  const compatible =
+    requestedTab === "data" || (requestedTab === "mapping" && object)
       ? "properties"
-      : requestedTab === "overview"
+      : requestedTab === "overview" || requestedTab === "endpoints"
         ? "basic"
         : requestedTab;
-  const selectedTab = tabs.find((t) => t.id === compatibleTab)?.id ?? "basic";
-  const record =
-    draft && type && isObject(type) && !valueConcept
-      ? objectMapping(
-          draft,
-          type,
-          loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
-        )
-      : null;
+  const selectedTab = tabs.find((t) => t.key === compatible)?.key ?? "basic";
   const selectTab = (tab: ElementTab) =>
     setParams(
       (p) => {
@@ -455,19 +325,17 @@ function Inspector({
   useEffect(() => {
     if (!loaded || !body.current) return;
     Array.from(body.current.querySelectorAll<HTMLElement>("[data-element-id]"))
-      .find((el) => el.dataset.elementId === effectiveId)
+      .find((el) => el.dataset.elementId === id)
       ?.scrollIntoView?.({ block: "nearest" });
-    if (active && !editingIntent)
-      dialog.current
-        ?.querySelector<HTMLButtonElement>(`[data-tab="${selectedTab}"]`)
-        ?.focus({ preventScroll: true });
-  }, [loaded, selectedTab, effectiveId, active, editingIntent]);
+  }, [loaded, selectedTab, id]);
+
   const discard = () => {
     flushSync(() => {
       setDirty(false);
       setEditing(false);
-      setError("");
-      setDraft(loaded ? editorDraft(loaded.draft) : null);
+      setError(null);
+      setShowErrors(false);
+      setDraft(loaded?.draft ?? null);
     });
     reportElement?.({ dirty: false, busy: false });
   };
@@ -478,76 +346,35 @@ function Inspector({
   };
   const open = (request: ElementRequest) => {
     if (busy) return;
-    if (
-      type &&
-      request.id === type.id &&
-      request.kind === selectedKind &&
-      request.mode !== "edit"
-    ) {
+    if (element && request.id === element.id && request.kind === kind && request.mode !== "edit") {
       selectTab(request.tab ?? "basic");
       return;
     }
     discard();
     void navigate(
-      inspectorHref(createPath(location), {
-        ...request,
-        sessionId,
-        previewHash: previewHash ?? undefined,
-      }),
+      inspectorHref(createPath(location), { ...request, sessionId, previewHash: previewHash ?? undefined }),
     );
   };
-  const save = async (override?: LegacyDraft): Promise<boolean> => {
-    const value = override ?? draft;
-    if (!value || !type || !loaded || busy || !workspace.role || previewHash)
-      return false;
-    if (override) {
-      setDraft(override);
-      setDirty(true);
-    }
-    const source = loaded;
-    const nativeDraft =
-      source.draft.schema_version === "3" ? source.draft : undefined;
-    const saveError = mappingSaveError({
-      draft: value,
-      nativeDraft,
-      type,
-      editing,
-      change: setDraft,
-      open,
-    });
-    if (saveError) {
-      setError(saveError);
-      return false;
-    }
-    const savingDraft = nativeFromEditor(source.draft, value);
-    if (savingDraft.schema_version === "3" && value._semantic_changes?.length) {
-      const legacyBefore = editorDraft(source.draft);
-      if (
-        JSON.stringify(legacyBefore.mappings) ===
-          JSON.stringify(value.mappings) &&
-        JSON.stringify(legacyBefore.link_types.map((l) => l.data_join)) ===
-          JSON.stringify(value.link_types.map((l) => l.data_join))
-      )
-        delete savingDraft._legacy_form;
-      else {
-        setError(
-          "原生结构编辑与单表映射替换需要分别保存，请先取消其中一组修改。",
-        );
-        return false;
-      }
+  const save = async () => {
+    if (!draft || !element || !loaded || busy || !member || previewHash) return;
+    const value = kind === "metric" ? upsert(draft, "metrics", storedMetric(element as Metric)) : draft;
+    const problem = saveProblem(value, kind, element);
+    if (problem) {
+      setShowErrors(true);
+      setError(problem);
+      return;
     }
     setBusy(true);
-    setError("");
+    setError(null);
     setNotice("");
     try {
       const result = await modelingApi.saveElement(workspace.id, {
-        target_kind: selectedKind,
-        target_id: type.id,
+        target_kind: kind,
+        target_id: element.id,
         expected_current_version_id: loaded.versionId,
-        session_id: source.session?.id ?? null,
-        expected_session_revision: source.session?.revision ?? null,
-        draft: savingDraft,
-        semantic_changes: mappingChangesForSave(value),
+        session_id: loaded.session?.id ?? null,
+        expected_session_revision: loaded.session?.revision ?? null,
+        draft: value,
       });
       const next: Loaded = {
         draft: result.session?.draft ?? result.draft,
@@ -556,51 +383,33 @@ function Inspector({
       };
       flushSync(() => {
         setLoaded(next);
-        setDraft(editorDraft(next.draft));
+        setDraft(next.draft);
         setDirty(false);
         setEditing(false);
+        setShowErrors(false);
         setBusy(false);
       });
       reportElement?.({ dirty: false, busy: false });
-      notifyOntologySaved({
-        workspaceId: workspace.id,
-        session: result.session,
-      });
+      notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
       refresh();
       setNotice("已保存");
-      const target = inspectorHref(createPath(location), {
-        kind: selectedKind,
-        id: type.id,
-        tab: selectedTab,
-        sessionId,
-      });
-      void navigate(target, { replace: true });
-      return true;
-    } catch (e) {
-      setError(
-        e instanceof ApiError && e.status === 409
-          ? `${e.message}。你的修改仍保留，可以取消编辑后重新读取。`
-          : e instanceof Error
-            ? e.message
-            : "保存失败",
+      void navigate(
+        inspectorHref(createPath(location), { kind, id: element.id, tab: selectedTab, sessionId }),
+        { replace: true },
       );
-      return false;
+    } catch (e) {
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
   };
   const beginEdit = () => {
-    if (!loaded || !draft || loading || !workspace.role || previewHash) return;
+    if (!loaded || !draft || !member || previewHash) return;
     setEditing(true);
     setNotice("");
-    window.requestAnimationFrame(() =>
-      body.current
-        ?.querySelector<HTMLElement>("input, select, button, textarea")
-        ?.focus({ preventScroll: true }),
-    );
   };
   const cancel = () => {
-    if (id === "new") {
+    if (creating) {
       flushSync(() => {
         setDirty(false);
         setEditing(false);
@@ -609,15 +418,14 @@ function Inspector({
       close();
     } else {
       discard();
-      setLoading(true);
       setAttempt((n) => n + 1);
     }
   };
-  const objectLink = new URL(
-    type
+  const elementLink = new URL(
+    element
       ? inspectorHref(createPath(location), {
-          kind: selectedKind,
-          id: type.id,
+          kind,
+          id: element.id,
           tab: selectedTab,
           sessionId,
           previewHash: previewHash ?? undefined,
@@ -627,313 +435,190 @@ function Inspector({
   ).href;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(objectLink);
-      setCopied(true);
+      await navigator.clipboard.writeText(elementLink);
+      setNotice("链接已复制");
     } catch {
       setCopyFallback(true);
     }
   };
-  const props: PanelProps | null =
-    draft && type
-      ? {
-          draft,
-          nativeDraft:
-            loaded?.draft.schema_version === "3" ? loaded.draft : undefined,
-          type,
-          editing,
-          canEdit: !!workspace.role && !previewHash,
-          saveError: error,
-          requestEdit: beginEdit,
-          saveDraft: save,
-          change: (next) => {
-            setDraft(next);
-            setDirty(true);
-            setNotice("");
-          },
-          open,
-        }
+  const change = (next: Draft) => {
+    setDraft(next);
+    setDirty(true);
+    setNotice("");
+  };
+  const panel: PanelProps | null =
+    draft && (object || link)
+      ? { draft, type: (object ?? link)!, editing, canEdit: member && !previewHash, sessionId, change, open }
       : null;
+  const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
+  const record = draft && object ? objectMapping(draft, object) : null;
+  const title = element?.name
+    ? kind === "object_type" || kind === "link_type"
+      ? shortObjectName(element)
+      : element.name
+    : creating
+      ? `新建${NOUN[kind]}`
+      : NOUN[kind];
+  const technical = element && "technical_name" in element ? element.technical_name : "";
+  const content = (() => {
+    if (!draft || !element) return null;
+    if (kind === "metric")
+      return (
+        <MetricPanel
+          draft={draft}
+          metric={element as Metric}
+          editing={editing}
+          canPreview={member && !previewHash}
+          showErrors={showErrors}
+          context={
+            loaded?.session
+              ? { session_id: loaded.session.id, expected_session_revision: loaded.session.revision }
+              : { expected_current_version_id: loaded?.versionId ?? null }
+          }
+          change={change}
+          open={open}
+        />
+      );
+    if (kind === "dataset")
+      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} />;
+    if (!panel) return null;
+    if (object) {
+      const props = panel as PanelProps<ObjectType>;
+      if (selectedTab === "properties") return <PropertiesPanel {...props} />;
+      if (selectedTab === "relations") return <RelationsPanel {...props} />;
+      if (selectedTab === "rules") return <RulesPanel {...panel} />;
+      if (selectedTab === "instances")
+        return (
+          <ElementInstances key={object.id} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
+        );
+      return <ObjectBasicPanel {...props} />;
+    }
+    const props = panel as PanelProps<LinkType>;
+    if (selectedTab === "mapping") return <LinkMappingPanel {...props} />;
+    if (selectedTab === "rules") return <RulesPanel {...panel} />;
+    if (selectedTab === "instances") return <ElementInstances {...panel} canBrowseDatabase={!previewHash && !editing} />;
+    return <LinkBasicPanel {...props} />;
+  })();
   return (
-    <dialog
-      ref={dialog}
-      className={`element-inspector${expanded ? " element-inspector--expanded" : ""}`}
-      aria-labelledby={titleId}
-      onClick={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const bounds = e.currentTarget.getBoundingClientRect();
-        if (
-          e.clientX < bounds.left ||
-          e.clientX > bounds.right ||
-          e.clientY < bounds.top ||
-          e.clientY > bounds.bottom
-        )
-          close();
-      }}
-      onCancel={(e) => {
-        e.preventDefault();
-        close();
-      }}
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void save();
-        }}
-      >
-        <header className="element-header">
-          <div
-            className={`element-identity ${object ? "" : "element-identity--relation"}`}
-          >
-            {object ? (
-              <Box size={38} strokeWidth={1.8} />
-            ) : (
-              <GitBranch size={38} strokeWidth={1.8} />
-            )}
-            <div className="element-title">
-              <h2 id={titleId} aria-label={type?.name || "本体元素"}>
-                {type
-                  ? shortObjectName(type)
-                  : id === "new"
-                    ? object
-                      ? "新建对象"
-                      : "新建关系"
-                    : "本体元素"}
-                {type?.technical_name && <code>{type.technical_name}</code>}
-              </h2>
-              {type && !isObject(type) && (
-                <small className="element-object-status">
-                  {
-                    draft?.object_types.find(
-                      (o) =>
-                        o.id === (type.source_type_id || type.owner_ref?.ref),
-                    )?.name
-                  }
-                  {" → "}
-                  {
-                    draft?.object_types.find(
-                      (o) => o.id === type.target_type_id,
-                    )?.name
-                  }
-                </small>
-              )}
-              {record && (
-                <div className="element-object-status">
-                  <MappingStatusIcon state={record.state} />
-                  <span>
-                    {record.label}
-                    {record.mainDataset
-                      ? ` · ${record.mainDataset.source}`
-                      : ""}
-                  </span>
-                </div>
-              )}
-            </div>
+    <Modal
+      open={active}
+      onCancel={close}
+      maskClosable={!busy && !dirty}
+      keyboard={!busy}
+      width={expanded ? "96vw" : 1180}
+      centered
+      destroyOnHidden={false}
+      closable={{ "aria-label": `关闭${NOUN[kind]}弹窗`, disabled: busy }}
+      styles={{ body: { minHeight: 360, maxHeight: expanded ? "82vh" : "70vh", overflowY: "auto" } }}
+      footer={
+        editing ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button disabled={busy} onClick={cancel}>
+              取消
+            </Button>
+            <Button type="primary" loading={busy} disabled={!element || (!dirty && !creating)} onClick={() => void save()}>
+              保存
+            </Button>
           </div>
-          <div className="element-header-actions">
-            {!editing && workspace.role && !previewHash && type && (
-              <button
-                className="button button--secondary"
-                type="button"
-                onClick={beginEdit}
-                disabled={loading}
-              >
+        ) : null
+      }
+      title={
+        <div className="flex items-start gap-3 pr-8">
+          <span className="mt-0.5 text-accent">
+            <Icon size={28} strokeWidth={1.8} />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="flex flex-wrap items-baseline gap-2" aria-label={element?.name || title}>
+              <span className="text-lg">{title}</span>
+              {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
+            </span>
+            {draft && link && (
+              <Text type="secondary" className="text-xs font-normal">
+                {byId(draft.object_types, link.source_type_id)?.name} → {byId(draft.object_types, link.target_type_id)?.name}
+              </Text>
+            )}
+            {record && record.mode !== "virtual" && record.mode !== "unbound" && (
+              <span className="mt-1 flex items-center gap-2 text-xs font-normal">
+                <MappingStatusIcon state={record.state} label={record.label} />
+                {record.main?.dataset && <Text type="secondary">{record.main.dataset.name}</Text>}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {notice && (
+              <Text type="success" className="inline-flex items-center gap-1 text-xs font-normal" role="status">
+                <Check size={14} />
+                {notice}
+              </Text>
+            )}
+            {!editing && member && !previewHash && element && (
+              <Button size="small" onClick={beginEdit} disabled={!loaded}>
                 编辑
-              </button>
+              </Button>
             )}
-            <button
-              className="button button--secondary"
-              type="button"
-              onClick={() => void copy()}
-            >
-              {copied ? "已复制" : "复制链接"}
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label={expanded ? "还原弹窗" : "展开弹窗"}
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
-            </button>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label="关闭对象弹窗"
-              disabled={busy}
-              onClick={close}
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </header>
-        {object && (
-          <div
-            className="element-tabs"
-            role="tablist"
-            aria-label="本体元素内容"
-            onKeyDown={(e) => {
-              const index = tabs.findIndex((t) => t.id === selectedTab);
-              const next =
-                e.key === "ArrowRight"
-                  ? (index + 1) % tabs.length
-                  : e.key === "ArrowLeft"
-                    ? (index - 1 + tabs.length) % tabs.length
-                    : e.key === "Home"
-                      ? 0
-                      : e.key === "End"
-                        ? tabs.length - 1
-                        : -1;
-              if (next < 0) return;
-              e.preventDefault();
-              selectTab(tabs[next].id);
-              dialog.current
-                ?.querySelector<HTMLButtonElement>(
-                  `[data-tab="${tabs[next].id}"]`,
-                )
-                ?.focus();
-            }}
-          >
-            {tabs.map((tab) => (
-              <button
-                id={tabId(tab.id)}
-                role="tab"
-                data-tab={tab.id}
-                type="button"
-                key={tab.id}
-                aria-selected={selectedTab === tab.id}
-                aria-controls={panelId}
-                tabIndex={selectedTab === tab.id ? 0 : -1}
-                onClick={() => {
-                  selectTab(tab.id);
-                  dialog.current
-                    ?.querySelector<HTMLButtonElement>(`[data-tab="${tab.id}"]`)
-                    ?.focus({ preventScroll: true });
-                }}
-              >
-                {tab.name}
-                {tab.count !== undefined && <span>{tab.count}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-        <div
-          ref={body}
-          id={panelId}
-          className="element-body"
-          role="tabpanel"
-          aria-labelledby={object ? tabId(selectedTab) : titleId}
-          aria-busy={busy}
-          tabIndex={0}
-        >
-          {error && (
-            <div className="element-error" role="alert">
-              <p>{error}</p>
-              {!draft && (
-                <button
-                  type="button"
-                  className="element-text-button"
-                  onClick={() => setAttempt((n) => n + 1)}
-                >
-                  重新读取
-                </button>
-              )}
-            </div>
-          )}
-          {!loaded && !error && (
-            <p className="element-empty" role="status">
-              正在读取本体元素…
-            </p>
-          )}
-          {loaded && !type && (
-            <p className="element-empty">
-              此元素不存在，或已从当前内容中删除。
-            </p>
-          )}
-          {props && (
-            <fieldset disabled={busy || loading}>
-              {!object ? (
-                <LinkMappingPanel {...props} />
-              ) : (
-                selectedTab === "basic" && <BasicPanel {...props} />
-              )}
-              {object && selectedTab === "properties" && (
-                <PropertiesPanel
-                  {...props}
-                  suggestedSource={
-                    params.get("mapping_source") && params.get("mapping_table")
-                      ? {
-                          connection_alias: params.get("mapping_source")!,
-                          table_name: params.get("mapping_table")!,
-                          schema_name: params.get("mapping_schema") || null,
-                        }
-                      : undefined
-                  }
-                />
-              )}
-              {object && selectedTab === "relations" && (
-                <RelationsPanel {...props} />
-              )}
-              {object && selectedTab === "rules" && <RulesPanel {...props} />}
-              {object && selectedTab === "actions" && (
-                <ActionsPanel {...props} />
-              )}
-              {object && selectedTab === "instances" && (
-                <ElementInstances
-                  key={type!.id}
-                  {...props}
-                  sessionId={sessionId}
-                  canBrowseDatabase={!previewHash && !editing}
-                  initialObjectId={resolved?.objectId}
-                />
-              )}
-            </fieldset>
-          )}
-        </div>
-        <footer className="element-footer" hidden={!editing}>
-          {editing && (
-            <>
-              <button
-                className="button button--secondary om-push"
-                type="button"
-                disabled={busy}
-                onClick={cancel}
-              >
-                取消
-              </button>
-              <button
-                className="button button--primary"
-                type="submit"
-                disabled={busy || !type || (!dirty && id !== "new")}
-              >
-                {busy ? "保存中…" : "保存"}
-              </button>
-            </>
-          )}
-        </footer>
-        {notice && (
-          <div className="element-saved-toast" role="status">
-            <Check size={14} />
-            {notice}
-          </div>
-        )}
-        {copyFallback && (
-          <InspectorDialog
-            title="复制链接"
-            onClose={() => setCopyFallback(false)}
-          >
-            <label className="element-field">
-              <span>对象链接</span>
-              <input
-                aria-label="对象链接"
-                autoFocus
-                readOnly
-                value={objectLink}
-                onFocus={(e) => e.currentTarget.select()}
+            {element && !creating && (
+              <Button size="small" onClick={() => void copy()}>
+                复制链接
+              </Button>
+            )}
+            <Tooltip title={expanded ? "还原弹窗" : "展开弹窗"}>
+              <Button
+                size="small"
+                type="text"
+                aria-label={expanded ? "还原弹窗" : "展开弹窗"}
+                icon={expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+                onClick={() => setExpanded(!expanded)}
               />
-            </label>
-          </InspectorDialog>
+            </Tooltip>
+          </div>
+        </div>
+      }
+    >
+      <div ref={body} aria-busy={busy} className="flex flex-col gap-3">
+        {tabs.length > 0 && (
+          <Tabs
+            size="small"
+            className="sticky top-0 z-10 !mb-0 bg-surface"
+            activeKey={selectedTab}
+            onChange={(key) => selectTab(key as ElementTab)}
+            items={tabs.map((tab) => ({
+              key: tab.key,
+              label: (
+                <span>
+                  {tab.label}
+                  {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
+                </span>
+              ),
+            }))}
+          />
         )}
-      </form>
-    </dialog>
+        {error && (
+          <Alert
+            type="error"
+            showIcon
+            message={error}
+            action={
+              !draft ? (
+                <Button size="small" onClick={() => setAttempt((n) => n + 1)}>
+                  重新读取
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+        {!loaded && !error && (
+          <div className="flex justify-center py-12" role="status" aria-label="正在读取">
+            <Spin />
+          </div>
+        )}
+        {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
+        {content && <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">{content}</fieldset>}
+      </div>
+      {copyFallback && (
+        <InspectorDialog title="复制链接" onClose={() => setCopyFallback(false)}>
+          <Input aria-label="元素链接" autoFocus readOnly value={elementLink} onFocus={(e) => e.currentTarget.select()} />
+        </InspectorDialog>
+      )}
+    </Modal>
   );
 }

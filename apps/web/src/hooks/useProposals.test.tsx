@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, proposalsApi } from "../api/client";
 import type { ModelingSession, ProposalBatchDetail } from "../api/types";
-import { emptyDraft } from "../lib/draftView";
+import { emptyDraft } from "../lib/coreModel";
 import { useProposals } from "./useProposals";
 
 afterEach(() => vi.restoreAllMocks());
@@ -71,6 +71,7 @@ describe("useProposals", () => {
     const detail: ProposalBatchDetail = {
       id: "b", status: "available", created_at: "", source_session_revision: 3, base_version_id: null,
       counts: { pending: 0, accepted: 1, rejected: 0, stale: 0, conflict: 0, superseded: 0 },
+      error: null,
       items: [],
     };
     batches.mockResolvedValue({ items: [detail], next_cursor: null });
@@ -93,5 +94,23 @@ describe("useProposals", () => {
     await waitFor(() => expect(batches).toHaveBeenCalled());
     await waitFor(() => expect(hook.result.current.detail?.counts).toEqual(rejected.counts));
     expect(batch).toHaveBeenCalledWith(expect.objectContaining({ id: "s" }), "b");
+  });
+
+  it("revises a duplicate fact proposal with the current revision and rereads", async () => {
+    const { hook, onStale } = setup();
+    const revise = vi.spyOn(proposalsApi, "reviseFact").mockResolvedValue({} as ProposalBatchDetail);
+    const after = { id: "f", type_id: "t", values: { name: "甲" }, evidence: [] };
+    let ok = false;
+    await act(async () => {
+      ok = await hook.result.current.revise("p", { target_id: "f", expected_target_hash: "h", after });
+    });
+    expect(ok).toBe(true);
+    expect(revise).toHaveBeenCalledWith(session, "p", {
+      target_id: "f",
+      expected_target_hash: "h",
+      after,
+      expected_session_revision: 3,
+    });
+    expect(onStale).toHaveBeenCalled();
   });
 });

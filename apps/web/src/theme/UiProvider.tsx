@@ -18,7 +18,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const theme = useMemo(() => antdTheme(), []);
   return (
     <StyleProvider layer>
-      <ConfigProvider locale={zhCN} theme={theme}>
+      <ConfigProvider locale={zhCN} theme={theme} button={{ autoInsertSpace: false }}>
         <AntApp component={false}>{children}</AntApp>
       </ConfigProvider>
     </StyleProvider>

@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import { modelingApi } from "../api/client";
 import type { ModelingSession } from "../api/types";
+import { modelingSession, sessionSummary } from "../test/apiRecords";
 import { useModeling } from "./useModeling";
 
 vi.mock("../api/client", () => ({
@@ -13,40 +14,8 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-function session(id: string): ModelingSession {
-  return {
-    id,
-    workspace_id: "w",
-    title: id,
-    revision: 0,
-    base_version_id: null,
-    draft: {
-      schema_version: "2",
-      workspace_id: "w",
-      ontology_requires: [],
-      object_types: [],
-      properties: [],
-      link_types: [],
-      rules: [],
-      actions: [],
-      material_objects: [],
-      material_links: [],
-      mappings: [],
-    },
-    graph: {
-      workspace_id: "w",
-      version_id: "",
-      version_sha256: "",
-      nodes: [],
-      edges: [],
-    },
-    candidates: [],
-    material_ids: [],
-    task_status: "idle",
-    task_detail: "",
-    updated_at: "",
-  };
-}
+const session = (id: string) =>
+  modelingSession({ id, workspace_id: "w", title: id, revision: 0 });
 
 it.each(["resolve", "reject"])(
   "ignores a previous session's late %s after navigation",
@@ -82,18 +51,18 @@ it.each(["resolve", "reject"])(
 it("automatically resumes the latest active session when the URL has none", async () => {
   vi.mocked(modelingApi.sessions).mockResolvedValue({
     items: [
-      {
+      sessionSummary({
         id: "active",
         title: "电商核心业务本体构建",
         task_status: "running",
         updated_at: "2026-09-22T07:00:00Z",
-      },
-      {
+      }),
+      sessionSummary({
         id: "idle",
         title: "空白会话",
         task_status: "idle",
         updated_at: "2026-09-22T08:00:00Z",
-      },
+      }),
     ],
   });
   vi.mocked(modelingApi.get).mockImplementation((_workspace, id) =>

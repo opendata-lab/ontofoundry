@@ -1,147 +1,113 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { modelingApi } from "../api/client";
+import { api, catalogApi, modelingApi } from "../api/client";
+import type { Assets, Draft } from "../api/types";
 import { useSnapshot } from "../hooks/useSnapshot";
-import { toView } from "../lib/draftView";
-import { nativeMappingFixture } from "../lib/objectMapping.fixture";
+import { example } from "../test/drafts";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { MappingsPage } from "./MappingsPage";
 
-const { open, workspace } = vi.hoisted(() => ({
+const { open, workspace, refresh } = vi.hoisted(() => ({
   open: vi.fn(),
-  workspace: { id: "w", role: "admin", current_version: 1 },
+  refresh: vi.fn(),
+  workspace: { id: "w", role: "admin", current_version: 1, version_id: "v1" },
 }));
-vi.mock("../hooks/useWorkspaceContext", () => ({
-  useWorkspaceContext: () => ({ workspace }),
-}));
-vi.mock("../hooks/useElementInspector", () => ({
-  useElementInspector: () => ({ open }),
-}));
+vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh }) }));
+vi.mock("../hooks/useElementInspector", () => ({ useElementInspector: () => ({ open }) }));
 vi.mock("../hooks/useSnapshot", () => ({ useSnapshot: vi.fn() }));
-vi.mock("../hooks/usePageTab", () => ({
-  usePageTab: vi.fn(),
-  usePageActive: () => true,
-}));
+vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
+vi.mock("react-router-dom", () => ({ Link: ({ children }: { children: unknown }) => children }));
 vi.mock("../api/client", () => ({
-  modelingApi: { connections: vi.fn(), tables: vi.fn() },
+  api: { workspace: vi.fn() },
+  modelingApi: { saveElement: vi.fn(), get: vi.fn() },
+  catalogApi: { connections: vi.fn(), schemas: vi.fn(), assets: vi.fn(), refreshAssets: vi.fn() },
+  ApiError: class extends Error {},
 }));
-vi.mock("../components/SemanticModels", () => ({
-  SemanticModels: () => <h3>语义模型管理</h3>,
-}));
-vi.mock("../components/DataAssets", () => ({
-  DataAssets: () => <h3>资产管理</h3>,
-}));
+
+let draft: Draft;
 beforeEach(() => {
   vi.clearAllMocks();
-  const sourceDraft = nativeMappingFixture();
+  draft = example("06-inheritance");
   vi.mocked(useSnapshot).mockReturnValue({
-    sourceDraft,
-    draft: toView(sourceDraft),
+    draft,
     error: "",
-    sessionId: "s",
-    suffix: "?session=s",
+    sessionId: null,
+    suffix: "",
     load: vi.fn(),
     setDraft: vi.fn(),
   });
-  vi.mocked(modelingApi.connections).mockResolvedValue({ items: [] });
-  vi.mocked(modelingApi.tables).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
-describe("approved mapping index", () => {
-  it("shows a single business object table with identifier tag and coverage status", () => {
-    render(<MappingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "本体映射" }));
-    expect(screen.getAllByRole("table")).toHaveLength(1);
-    const headers = screen.getAllByRole("columnheader");
-    expect(headers.slice(0, 3).map((h) => h.textContent)).toEqual([
-      "业务对象",
-      "标识字段",
-      "来源表",
-    ]);
-    expect(headers[3]).toHaveTextContent("覆盖");
-    const row = screen.getByRole("button", { name: "供应商" }).closest("tr")!;
-    expect(within(row).getByText("标识")).toHaveClass("om-tag-key");
-    expect(row).toHaveTextContent("public.dim_supplier");
-    expect(row).toHaveTextContent("1/2");
-    expect(row).toHaveTextContent("部分映射");
-    expect(screen.queryByText("复杂映射")).not.toBeInTheDocument();
-    expect(screen.queryByText("语义模型管理")).not.toBeInTheDocument();
-    expect(screen.queryByText("资产管理")).not.toBeInTheDocument();
+describe("data mapping page", () => {
+  it("lists registered datasets with their usage and opens one", () => {
+    renderWithProviders(<MappingsPage />);
+    const parties = screen.getByRole("button", { name: "parties" }).closest("tr")!;
+    expect(within(parties).getByText("6")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "parties" }));
+    expect(open).toHaveBeenCalledWith({ kind: "dataset", id: draft.datasets[0].id, sessionId: null });
   });
-  it("filters by coverage and searches names, technical names and source tables", () => {
-    render(<MappingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "本体映射" }));
-    const statuses = screen.getByRole("group", { name: "映射状态" });
-    expect(
-      within(statuses)
-        .getAllByRole("button")
-        .map((b) => b.textContent),
-    ).toEqual(["全部2", "已映射1", "部分映射1", "未映射0"]);
-    fireEvent.click(
-      within(statuses).getByRole("button", { name: "部分映射 1" }),
-    );
-    expect(
-      screen.queryByRole("button", { name: "产品" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(within(statuses).getByRole("button", { name: "全部 2" }));
-    const search = screen.getByRole("textbox", {
-      name: "搜索对象、英文名或表",
-    });
-    fireEvent.change(search, { target: { value: "DIM_PRODUCT" } });
-    // Supplier also references this table through its relation target only when physically mapped there;
-    // the index searches actual source tables, not the target object's own table.
-    expect(screen.getByRole("button", { name: "产品" })).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "供应商" }),
-    ).not.toBeInTheDocument();
-    fireEvent.change(search, { target: { value: "SUPPLIER" } });
-    expect(screen.getByRole("button", { name: "供应商" })).toBeInTheDocument();
-    fireEvent.change(search, { target: { value: "不存在" } });
-    expect(screen.getByText("没有匹配对象")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "清除筛选" }));
-    expect(search).toHaveValue("");
+
+  it("shows every object's binding mode and coverage, and filters them", () => {
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(screen.getByRole("tab", { name: /本体映射/ }));
+    const asset = screen.getByText("资产").closest("tr")!;
+    expect(within(asset).getByText("虚拟父对象")).toBeInTheDocument();
+    expect(within(asset).getByText("实例来自子对象")).toBeInTheDocument();
+    expect(within(screen.getByText("个人").closest("tr")!).getByText("共用父对象数据")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索对象或数据集" }), { target: { value: "vehicle" } });
+    expect(screen.getAllByRole("row")).toHaveLength(2);
+    fireEvent.click(screen.getByText("车辆").closest("tr")!);
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ kind: "object_type", tab: "properties" }));
   });
-  it("opens a row on 属性与映射 and retains the session source", () => {
-    render(<MappingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "本体映射" }));
-    const row = screen.getByRole("button", { name: "供应商" }).closest("tr")!;
-    fireEvent.click(within(row).getAllByRole("cell")[1]);
-    expect(open).toHaveBeenCalledWith({
-      kind: "object_type",
-      id: nativeMappingFixture().object_types[0].id,
-      tab: "properties",
-      sessionId: "s",
+
+  it("registers a catalog table as a dataset through an element save", async () => {
+    const assets: Assets = {
+      connection_id: "c",
+      version_id: "v1",
+      metadata_snapshot_id: "m",
+      observed_at: "2026-10-16T00:00:00Z",
+      error: null,
+      changes: [],
+      status: "ready",
+      items: [
+        {
+          name: "contacts",
+          schema: "crm",
+          comment: "联系人",
+          missing: false,
+          datasets: [],
+          columns: [
+            { name: "id", type: "bigint", primary_key: true, comment: "编号" },
+            { name: "snapshot_on", type: "date", primary_key: false, comment: "快照日" },
+          ],
+        },
+      ],
+    };
+    vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
+    vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
+    vi.mocked(catalogApi.assets).mockResolvedValue(assets);
+    vi.mocked(api.workspace).mockResolvedValue({ version_id: "v1" } as never);
+    vi.mocked(modelingApi.saveElement).mockResolvedValue({ version: {} as never, draft, session: null });
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "从数据目录登记" }));
+    fireEvent.click(await screen.findByRole("button", { name: "登记" }));
+    const form = (await screen.findAllByRole("dialog")).find((d) => d.textContent?.includes("将带入"))!;
+    expect(within(form).getByRole("textbox", { name: "数据集名称" })).toHaveValue("联系人");
+    fireEvent.click(within(form).getByRole("button", { name: "登记" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(payload).toMatchObject({ target_kind: "dataset", expected_current_version_id: "v1", session_id: null });
+    expect(payload.draft.datasets.find((d) => d.id === payload.target_id)).toMatchObject({
+      name: "联系人",
+      dialect: "postgresql",
+      schema_name: "crm",
+      table_name: "contacts",
+      columns: [
+        { name: "id", physical_type: "bigint", comment: "编号" },
+        { name: "snapshot_on", physical_type: "date", comment: "快照日" },
+      ],
     });
-  });
-  it("keeps 数据源与资产 / 本体映射 / 语义模型 as page tabs without 高级", async () => {
-    render(<MappingsPage />);
-    const tabs = screen.getByRole("group", { name: "数据映射视图" });
-    expect(within(tabs).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "数据源与资产",
-      "本体映射",
-      "语义模型",
-    ]);
-    expect(screen.getByRole("heading", { name: "资产管理" })).toBeInTheDocument();
-    fireEvent.click(within(tabs).getByRole("button", { name: "语义模型" }));
-    expect(screen.getByRole("heading", { name: "语义模型管理" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "高级" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "查找表" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "浏览数据目录" }));
-    const browser = await screen.findByRole("dialog", { name: "浏览数据目录" });
-    expect(within(browser).getByText("public.fact_calls")).toBeInTheDocument();
-    const search = within(browser).getByRole("textbox", {
-      name: "搜索表或字段",
-    });
-    fireEvent.change(search, { target: { value: "supplier_name" } });
-    expect(within(browser).getByText("public.fact_calls")).toBeInTheDocument();
-    expect(
-      within(browser).queryByText("public.dim_product"),
-    ).not.toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
   });
 });

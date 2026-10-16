@@ -11,6 +11,8 @@ const schema = JSON.parse(await readFile(schemaPath, 'utf8'))
 const output = await compile(schema, 'CoreDraft', {
   bannerComment: '/* Generated from the core-1 Pydantic schema. Do not edit by hand. */',
   additionalProperties: false,
+  // Plain arrays instead of tuple unions for bounded lists, so the UI can edit them.
+  maxItems: -1,
   style: { singleQuote: true, semi: false },
 })
 if (process.argv.includes('--check')) {

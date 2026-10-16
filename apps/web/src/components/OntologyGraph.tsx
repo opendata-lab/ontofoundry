@@ -17,7 +17,7 @@ import {
   useInternalNode,
   useNodesState,
 } from "@xyflow/react";
-import { Box, Braces } from "lucide-react";
+import { Box } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -75,54 +75,29 @@ function classes(...values: (string | false | undefined)[]) {
 
 function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
   const { item, emphasis, focused } = data;
-  if (item.kind === "link_type")
-    return (
-      <div
-        className={classes(
-          "ontology-node",
-          "ontology-node--hyperedge",
-          emphasis === "dimmed" && "is-dimmed",
-          emphasis === "match" && "is-match",
-          selected && "is-selected",
-          focused && "is-focused",
-        )}
-        title={[item.label, ...(item.verbalizes ?? [])].join("\n")}
-        aria-label={`多元关系：${item.label}`}
-      >
-        <Handle type="target" position={Position.Left} />
-        <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
-          <path d="M13 1L25 13L13 25L1 13Z" />
-        </svg>
-        <strong>{item.label}</strong>
-        <Handle type="source" position={Position.Right} />
-      </div>
-    );
   return (
     <div
       className={classes(
-        "ontology-node",
-        item.kind === "value_type"
-          ? "ontology-node--value"
-          : "ontology-node--object",
-        emphasis === "dimmed" && "is-dimmed",
-        emphasis === "match" && "is-match",
-        focused && "is-focused",
-        selected && "is-selected",
+        "flex min-h-[46px] w-[184px] items-center gap-2 rounded-md border bg-surface px-3 py-2 text-object transition-[opacity,box-shadow,border-color] duration-200",
+        String.raw`[&_.react-flow\_\_handle]:!size-px [&_.react-flow\_\_handle]:!min-h-px [&_.react-flow\_\_handle]:!min-w-px [&_.react-flow\_\_handle]:!border-0 [&_.react-flow\_\_handle]:!bg-transparent [&_.react-flow\_\_handle]:opacity-0`,
+        emphasis === "dimmed" ? "opacity-20 shadow-none" : "shadow-[0_1px_3px_var(--color-shadow)]",
+        emphasis === "match" || focused || selected ? "border-accent" : "border-rule",
+        (focused || selected) && "shadow-[0_0_0_3px_var(--color-accent-soft)]",
       )}
       title={item.description || item.label}
     >
       <Handle type="target" position={Position.Left} />
-      <span className="ontology-node__icon">
-        {item.kind === "value_type" ? <Braces size={14} /> : <Box size={14} />}
+      <span className="flex size-6 flex-none items-center justify-center rounded-xs bg-ink-2 text-surface">
+        <Box size={14} />
       </span>
-      <span className="ontology-node__text">
-        <strong>{item.label}</strong>
-        <small>{item.technical_name}</small>
+      <span className="grid min-w-0">
+        <strong className="truncate text-sm text-ink">{item.label}</strong>
+        <small className="truncate font-mono text-[10px] text-muted">{item.technical_name}</small>
       </span>
-      {/* Attributes are not drawn as nodes; this badge and the inspector are
-          how a card reports how many it declares. */}
       {!!item.attribute_count && (
-        <span className="ontology-node__count">{item.attribute_count}</span>
+        <span className="ml-auto flex-none rounded-full bg-surface-soft px-[7px] py-px text-[10px] text-muted">
+          {item.attribute_count}
+        </span>
       )}
       <Handle type="source" position={Position.Right} />
     </div>
@@ -162,14 +137,25 @@ function OntologyEdgeView({
     source === target
       ? selfLoopGeometry(from, data.loop)
       : edgeGeometry(from, to, data.offset);
+  const extendsEdge = data.item.kind === "extends";
+  const strong = data.emphasis === "match" || selected;
   const className = classes(
-    "ontology-edge",
-    data.item.kind === "extends"
-      ? "ontology-edge--extends"
-      : "ontology-edge--relation",
-    data.emphasis === "dimmed" && "is-dimmed",
-    data.emphasis === "match" && "is-match",
-    selected && "is-selected",
+    "transition-opacity duration-200",
+    extendsEdge
+      ? "!stroke-object [stroke-dasharray:8_4] [stroke-width:1.4]"
+      : strong
+        ? "!stroke-accent [stroke-width:2]"
+        : "!stroke-graph-edge [stroke-width:1.4]",
+    data.emphasis === "dimmed" && "opacity-[0.12]",
+  );
+  const labelClass = classes(
+    "nodrag nopan pointer-events-auto absolute max-w-[140px] truncate rounded-full border bg-surface px-2 py-px font-sans text-[11px] leading-normal",
+    extendsEdge
+      ? "border-object-soft text-object"
+      : strong
+        ? "border-accent text-accent"
+        : "border-rule text-muted hover:border-rule-strong hover:text-ink-2",
+    data.emphasis === "dimmed" && "pointer-events-none border-transparent opacity-[0.14]",
   );
   return (
     <>
@@ -183,12 +169,7 @@ function OntologyEdgeView({
       <EdgeLabelRenderer>
         <button
           type="button"
-          className={classes(
-            "ontology-edge__label",
-            "nodrag",
-            "nopan",
-            className,
-          )}
+          className={labelClass}
           style={{
             transform: `translate(-50%, -50%) translate(${geometry.labelX}px, ${geometry.labelY}px)`,
           }}
@@ -207,26 +188,11 @@ function OntologyEdgeView({
 const nodeTypes = { ontology: OntologyNodeView };
 const edgeTypes = { ontology: OntologyEdgeView };
 
-// Attributes are entity fields, not graph nodes: only object types are drawn,
-// and only the edges that run between two of them.
-function buildElements(graph: TypeGraph, includeValues = false) {
-  const roleTargets = new Set(
-    graph.edges
-      .filter((e) => e.kind !== "attribute")
-      .flatMap((e) => [e.source, e.target]),
-  );
-  const shown = graph.nodes.filter(
-    (node) =>
-      node.kind === "object_type" ||
-      node.kind === "link_type" ||
-      roleTargets.has(node.id) ||
-      includeValues,
-  );
+// Only object types are drawn, with the links and inheritance between them.
+function buildElements(graph: TypeGraph) {
+  const shown = graph.nodes;
   const ids = new Set(shown.map((node) => node.id));
-  const edges = graph.edges.filter(
-    (edge) =>
-      edge.kind !== "attribute" && ids.has(edge.source) && ids.has(edge.target),
-  );
+  const edges = graph.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target));
   const positions = layoutGraph(shown, edges);
   const offsets = parallelOffsets(edges);
   const loops = new Map<string, number>();
@@ -291,8 +257,8 @@ export function OntologyGraph({
   viewportKey?: boolean;
 }) {
   const elements = useMemo(
-    () => buildElements(graph, semantic),
-    [graph, semantic],
+    () => buildElements(graph),
+    [graph],
   );
   const [nodes, setNodes, onNodesChange] = useNodesState(elements.nodes);
   const [focus, setFocus] = useState("");
@@ -325,22 +291,12 @@ export function OntologyGraph({
         ? selection.item
         : elements.edges.find((e) => e.id === active)?.data?.item;
     const relationId = chosenEdge?.link_type_id ?? chosenEdge?.id;
-    const valueRelations =
-      selection?.category === "node" && selection.item.kind === "value_type"
-        ? new Set(
-            elements.edges
-              .filter((e) => e.source === active || e.target === active)
-              .map((e) => e.data?.item.link_type_id ?? e.id),
-          )
-        : null;
     for (const edge of elements.edges) {
       if (
         relationId
           ? edge.id === relationId ||
             edge.data?.item.link_type_id === relationId
-          : valueRelations
-            ? valueRelations.has(edge.data?.item.link_type_id ?? edge.id)
-            : edge.source === active || edge.target === active
+          : edge.source === active || edge.target === active
       ) {
         ids.add(edge.source);
         ids.add(edge.target);
@@ -402,19 +358,10 @@ export function OntologyGraph({
         return {
           ...node,
           selected: node.id === selectedId,
-          hidden:
-            semantic &&
-            node.data.item.kind === "value_type" &&
-            (!(
-              selection?.category === "edge" ||
-              (selection?.category === "node" &&
-                selection.item.kind === "value_type")
-            ) ||
-              !neighbourhood?.has(node.id)),
           data: { ...node.data, emphasis: state, focused: node.id === active },
         };
       }),
-    [nodes, emphasis, active, selectedId, semantic, neighbourhood, selection],
+    [nodes, emphasis, active, selectedId, semantic, selection],
   );
   const shownEdges = useMemo<OntologyFlowEdge[]>(
     () =>
@@ -423,14 +370,8 @@ export function OntologyGraph({
           selection?.category === "edge"
             ? (selection.item.link_type_id ?? selection.item.id)
             : active;
-        const valueSelected =
-          selection?.category === "node" &&
-          selection.item.kind === "value_type";
         const touched =
           !active ||
-          (valueSelected &&
-            !!neighbourhood?.has(edge.source) &&
-            !!neighbourhood?.has(edge.target)) ||
           edge.id === selectedRelation ||
           edge.data?.item.link_type_id === selectedRelation ||
           edge.source === active ||
@@ -443,19 +384,10 @@ export function OntologyGraph({
         return {
           ...edge,
           selected: edge.id === selectedRelation,
-          hidden:
-            semantic &&
-            edge.data?.item.kind === "role" &&
-            !(
-              (selection?.category === "edge" && touched) ||
-              (selection?.category === "node" &&
-                selection.item.kind === "value_type" &&
-                touched)
-            ),
           data: { ...edge.data!, emphasis: state },
         };
       }),
-    [elements.edges, emphasis, active, selection, semantic, neighbourhood],
+    [elements.edges, emphasis, active, selection],
   );
 
   return (
@@ -509,6 +441,15 @@ export function OntologyGraph({
           "minimap.ariaLabel": "缩略图，点击定位；方向键移动画布",
         }}
         aria-label="语义图谱"
+        className={classes(
+          "!bg-canvas [--xy-edge-stroke:var(--color-graph-edge)] [--xy-edge-stroke-selected:var(--color-accent)]",
+          String.raw`[&_.react-flow\_\_minimap]:rounded-md [&_.react-flow\_\_minimap]:border [&_.react-flow\_\_minimap]:border-rule [&_.react-flow\_\_minimap]:!bg-surface`,
+          String.raw`[&_.react-flow\_\_minimap-mask]:fill-ink/[0.07] [&_.react-flow\_\_minimap-mask]:stroke-rule-strong`,
+          String.raw`[&_.react-flow\_\_minimap-node]:fill-object-soft [&_.react-flow\_\_minimap-node]:stroke-rule-strong [&_.react-flow\_\_minimap-node]:[stroke-width:2]`,
+          String.raw`[&_.react-flow\_\_controls]:overflow-hidden [&_.react-flow\_\_controls]:rounded-sm [&_.react-flow\_\_controls]:border [&_.react-flow\_\_controls]:border-rule [&_.react-flow\_\_controls]:!shadow-none`,
+          String.raw`[&_.react-flow\_\_controls_button]:!size-8 [&_.react-flow\_\_controls_button]:!bg-surface [&_.react-flow\_\_controls_button]:!text-ink-2`,
+          String.raw`max-[1000px]:[&_.react-flow\_\_minimap]:hidden`,
+        )}
       >
         {!semantic && (
           <Background
@@ -520,7 +461,7 @@ export function OntologyGraph({
         )}
         <Controls showInteractive={false} position="bottom-right">
           {semantic && (
-            <span className="semantic-zoom-percentage">{zoom}%</span>
+            <span className="flex h-7 items-center justify-center bg-surface px-1 text-[10px] text-muted">{zoom}%</span>
           )}
         </Controls>
         {/* React Flow reads the map's size from style, and lays the viewport

@@ -49,5 +49,12 @@ export function antdTheme(read: TokenReader = readRoot): ThemeConfig {
   const token = Object.fromEntries(
     Object.entries(pick).filter(([, value]) => value !== "" && value !== undefined),
   );
-  return { token };
+  // The workbench is compact: 13px controls and pill-shaped buttons, as the
+  // pages looked before the move to Ant Design.
+  return {
+    token: { ...token, fontSize: 13 },
+    components: {
+      Button: { borderRadius: 16, borderRadiusLG: 20, borderRadiusSM: 12, fontWeight: 500 },
+    },
+  };
 }

@@ -1,182 +1,130 @@
-import type {
-  GraphEdge,
-  GraphNode,
-  LegacyDraft,
-  TypeGraph,
-} from "../api/types";
+// The semantic view's resource explorer: objects, relations, metrics and
+// datasets (§8A). Rules open inside their owner's popup, so they are not a
+// resource kind. The relation graph only draws objects and links.
+import type { Draft, GraphEdge, GraphNode, TypeGraph } from "../api/types";
 import type { SelectedGraphItem } from "../components/OntologyGraph";
-import { shortObjectName } from "./objectMapping";
+import { AGGREGATIONS, byId, effectiveProperties, isExpression, isRatio, metricDatasetId } from "./coreModel";
 import type { ElementRequest } from "./elementInspector";
+import { shortObjectName } from "./objectMapping";
+
+export type ResourceKind = "object" | "relation" | "metric" | "dataset";
+
+export const RESOURCE_KIND_LABELS: Record<ResourceKind, string> = {
+  object: "对象",
+  relation: "关系",
+  metric: "指标",
+  dataset: "数据集",
+};
 
 export type SemanticResource = {
   id: string;
-  kind: "object" | "relation" | "value" | "rule";
+  kind: ResourceKind;
   name: string;
   technical: string;
   subtitle?: string;
+  /** Graph selection for objects and relations; metrics and datasets have none. */
   selection: SelectedGraphItem;
-  detail?: ElementRequest;
+  detail: ElementRequest;
 };
-const builtinLabels: Record<string, string> = {
-  String: "文本",
-  Integer: "整数",
-  Decimal: "小数",
-  Float: "小数",
-  Boolean: "布尔值",
-  Date: "日期",
-  DateTime: "日期时间",
-};
-export function semanticResources(
-  graph: TypeGraph,
-  model?: LegacyDraft | null,
-): SemanticResource[] {
-  const objects = graph.nodes.filter((n) => n.kind === "object_type");
-  const objectName = (id: string) =>
-    graph.nodes.find((n) => n.id === id)?.label ?? "";
-  const binary = graph.edges.filter((e) => e.kind === "link_type");
-  const resources: SemanticResource[] = graph.nodes
-    .filter((n) => n.kind !== "value_type" || !n.id.startsWith("value:"))
-    .map((item) => ({
-      id: item.id,
-      kind:
-        item.kind === "object_type"
-          ? "object"
-          : item.kind === "link_type"
-            ? "relation"
-            : "value",
-      name: item.id.startsWith("builtin:")
-        ? (builtinLabels[item.technical_name] ?? item.label)
-        : shortObjectName({ name: item.label }),
-      technical: item.technical_name,
-      selection: { category: "node", item },
-      subtitle:
-        item.kind === "link_type"
-          ? [
-              objectName(item.owner_ref?.ref ?? ""),
-              ...(item.roles
-                ?.filter((r) => r.concept.kind === "object_type")
-                .map((r) => objectName(r.concept.ref)) ?? []),
-            ]
-              .filter(Boolean)
-              .join(" → ")
-          : undefined,
-      detail: { kind: item.kind, id: item.id, tab: "basic", sessionId: null },
-    }));
-  resources.push(
-    ...binary.map((item): SemanticResource => ({
-      id: item.id,
+
+export function semanticResources(graph: TypeGraph, model?: Draft | null): SemanticResource[] {
+  const objectName = (id: string) => graph.nodes.find((n) => n.id === id)?.label ?? "";
+  const resources: SemanticResource[] = graph.nodes.map((item: GraphNode) => ({
+    id: item.id,
+    kind: "object",
+    name: shortObjectName({ name: item.label }),
+    technical: item.technical_name,
+    selection: { category: "node", item },
+    detail: { kind: "object_type", id: item.id, tab: "basic", sessionId: null },
+  }));
+  for (const item of graph.edges.filter((e: GraphEdge) => e.kind === "link_type")) {
+    const id = item.link_type_id ?? item.id;
+    resources.push({
+      id,
       kind: "relation",
-      name: item.id.startsWith("builtin:")
-        ? (builtinLabels[item.technical_name] ?? item.label)
-        : shortObjectName({ name: item.label }),
+      name: shortObjectName({ name: item.label }),
       technical: item.technical_name,
       subtitle: `${objectName(item.source)} → ${objectName(item.target)}`,
       selection: { category: "edge", item },
-      detail: { kind: "link_type", id: item.id, tab: "basic", sessionId: null },
-    })),
-  );
-  // V2 attribute-value nodes are projections of properties, not declared value types.
-  for (const value of model?.value_types ?? [])
-    if (!resources.some((r) => r.id === value.id)) {
-      const item: GraphNode = {
-        id: value.id,
-        kind: "value_type",
-        label: value.name,
-        technical_name: value.technical_name,
-        description: value.description,
-        tags: value.tags,
-      };
-      resources.push({
-        id: value.id,
-        kind: "value",
-        name: value.name,
-        technical: value.technical_name,
-        selection: { category: "node", item },
-        detail: {
-          kind: "value_type",
-          id: value.id,
-          tab: "basic",
-          sessionId: null,
-        },
-      });
-    }
-  for (const rule of model?.rules ?? []) {
-    const property = model?.properties.find((p) => p.id === rule.owner_id);
-    const ownerId = property?.owner_type_id ?? rule.owner_id;
-    const item = objects.find((n) => n.id === ownerId);
-    const relation = resources.find(
-      (r) => r.kind === "relation" && r.id === ownerId,
-    );
+      detail: { kind: "link_type", id, tab: "basic", sessionId: null },
+    });
+  }
+  if (!model) return resources;
+  for (const metric of model.metrics) {
+    const dataset = byId(model.datasets, metricDatasetId(model, metric));
+    const how = isRatio(metric) ? "比率" : isExpression(metric) ? "表达式" : AGGREGATIONS[metric.aggregation];
     resources.push({
-      id: rule.id,
-      kind: "rule",
-      name: rule.expression,
-      technical: "",
-      subtitle: property?.name ?? item?.label ?? relation?.name,
-      selection: item
-        ? { category: "node", item }
-        : (relation?.selection ?? null),
-      detail: { kind: "rule", id: rule.id, tab: "rules", sessionId: null },
+      id: metric.id,
+      kind: "metric",
+      name: metric.name,
+      technical: metric.technical_name,
+      subtitle: [dataset?.name, how].filter(Boolean).join(" · "),
+      selection: null,
+      detail: { kind: "metric", id: metric.id, tab: "definition", sessionId: null },
+    });
+  }
+  for (const dataset of model.datasets) {
+    resources.push({
+      id: dataset.id,
+      kind: "dataset",
+      name: dataset.name,
+      technical: [dataset.schema_name, dataset.table_name].filter(Boolean).join("."),
+      subtitle: dataset.snapshot_date_column ? `每日快照 · ${dataset.snapshot_date_column}` : undefined,
+      selection: null,
+      detail: { kind: "dataset", id: dataset.id, tab: "basic", sessionId: null },
     });
   }
   return resources;
 }
-/** Record relations are edges with optional role branches, as in the approved canvas. */
-export function semanticCanvas(
-  graph: TypeGraph,
-  resources: SemanticResource[],
-): TypeGraph {
-  const nodes = [
-    ...graph.nodes
-      .filter((n) => n.kind !== "link_type" && !n.id.startsWith("value:"))
-      .map((n) => ({
-        ...n,
-        label: resources.find((r) => r.id === n.id)?.name ?? n.label,
+
+/** Objects, links and inheritance only; metrics and datasets are never drawn. */
+export function semanticCanvas(graph: TypeGraph, resources: SemanticResource[]): TypeGraph {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n) => ({ ...n, label: resources.find((r) => r.id === n.id)?.name ?? n.label })),
+    edges: graph.edges.filter((e) => e.kind === "extends" || e.kind === "link_type"),
+  };
+}
+
+/** The session draft as a graph when the server sent none. */
+export function draftGraph(draft: Draft): TypeGraph {
+  return {
+    workspace_id: draft.workspace_id,
+    version_id: "draft",
+    version_sha256: "",
+    version_content_sha256: "",
+    normalized_snapshot_sha256: "",
+    nodes: draft.object_types.map((t) => ({
+      id: t.id,
+      kind: "object_type",
+      label: t.name,
+      technical_name: t.technical_name,
+      description: t.description,
+      tags: t.tags,
+      attribute_count: effectiveProperties(draft, t.id).length,
+    })),
+    edges: [
+      ...draft.link_types.map((r) => ({
+        id: r.id,
+        kind: "link_type" as const,
+        label: r.name,
+        technical_name: r.technical_name,
+        source: r.source_type_id,
+        target: r.target_type_id,
+        link_type_id: r.id,
+        description: r.description,
+        multiplicity: r.multiplicity,
       })),
-  ];
-  for (const resource of resources)
-    if (
-      resource.kind === "value" &&
-      resource.selection?.category === "node" &&
-      !nodes.some((n) => n.id === resource.id)
-    )
-      nodes.push(resource.selection.item);
-  const edges = graph.edges.filter(
-    (e) => e.kind === "extends" || e.kind === "link_type",
-  );
-  for (const relation of graph.nodes.filter((n) => n.kind === "link_type")) {
-    const source =
-      relation.owner_ref?.ref ??
-      graph.edges.find((e) => e.source === relation.id && e.kind === "role")
-        ?.target;
-    if (!source) continue;
-    const incidences = graph.edges.filter(
-      (e) => e.source === relation.id && e.kind === "role",
-    );
-    const declaredRoles = new Set(relation.roles?.map((role) => role.id) ?? []);
-    const ownerEdge = incidences.find(
-      (e) =>
-        e.target === source && (!e.role_id || !declaredRoles.has(e.role_id)),
-    );
-    const roles = incidences.filter((e) => e.id !== ownerEdge?.id);
-    const first = roles.find((e) =>
-      nodes.some((n) => n.id === e.target && n.kind === "object_type"),
-    );
-    const main: GraphEdge = {
-      id: relation.id,
-      kind: "link_type",
-      source,
-      target: first?.target ?? source,
-      label: relation.label,
-      technical_name: relation.technical_name,
-      link_type_id: relation.id,
-    };
-    edges.push(
-      main,
-      ...roles
-        .filter((r) => r.id !== first?.id)
-        .map((role) => ({ ...role, source, link_type_id: relation.id })),
-    );
-  }
-  return { ...graph, nodes, edges };
+      ...draft.object_types
+        .filter((t) => t.extends)
+        .map((t) => ({
+          id: `extends:${t.id}`,
+          kind: "extends" as const,
+          label: "继承",
+          technical_name: "extends",
+          source: t.id,
+          target: t.extends!,
+        })),
+    ],
+  };
 }

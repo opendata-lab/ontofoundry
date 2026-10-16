@@ -2,7 +2,6 @@ import {
   act,
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
   within,
@@ -18,6 +17,7 @@ import {
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { usePageTab } from "../hooks/usePageTab";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 
 function TestPage() {
@@ -73,7 +73,7 @@ function show(path = "/workspaces/w/view") {
     ],
     { initialEntries: [path] },
   );
-  render(<RouterProvider router={router} />);
+  renderWithProviders(<RouterProvider router={router} />);
   return router;
 }
 const tabs = () =>
@@ -85,24 +85,10 @@ const input = () =>
 
 beforeEach(() => {
   sessionStorage.clear();
-  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
-    configurable: true,
-    value: function (this: HTMLDialogElement) {
-      this.setAttribute("open", "");
-    },
-  });
-  Object.defineProperty(HTMLDialogElement.prototype, "close", {
-    configurable: true,
-    value: function (this: HTMLDialogElement) {
-      this.removeAttribute("open");
-    },
-  });
 });
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
-  Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal");
-  Reflect.deleteProperty(HTMLDialogElement.prototype, "close");
 });
 
 describe("页签交互", () => {
@@ -117,11 +103,14 @@ describe("页签交互", () => {
       expect(router.state.location.pathname).toBe("/workspaces/w/objects/b"),
     );
     expect(screen.getByRole("tabpanel")).toHaveTextContent("b / s2");
-    expect(document.querySelector(".route-panel[hidden]")).toHaveTextContent(
+    expect(document.querySelector('[role="tabpanel"][hidden]')).toHaveTextContent(
       "a / s1",
     );
     fireEvent.change(input(), { target: { value: "B 的内容" } });
-    fireEvent.click(tabs().getByRole("tab", { name: "对象 a 未保存" }));
+    const tabA = tabs().getByRole("tab", { name: "对象 a 未保存" });
+    expect(tabA).toHaveAttribute("aria-selected", "false");
+    fireEvent.click(tabA);
+    expect(tabA).toHaveAttribute("aria-selected", "true");
     expect(input()).toBe(original);
     expect(input()).toHaveValue("尚未保存");
     expect(scroll.scrollTop).toBe(123);
@@ -144,7 +133,7 @@ describe("页签交互", () => {
       expect(router.state.location.pathname).toBe("/workspaces/w/view"),
     );
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
   it("离开空间和刷新均保护后台草稿，取消不会丢失，确认后可离开", async () => {
     const router = show("/workspaces/w/objects/a");
@@ -168,7 +157,7 @@ describe("页签交互", () => {
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
     await act(() => router.navigate("/workspaces/w/view"));
     expect(tabs().getAllByRole("tab")).toHaveLength(2);
-    expect(document.querySelectorAll(".route-panel")).toHaveLength(1);
+    expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体对象" }));
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(tabs().getAllByRole("tab")).toHaveLength(1);
@@ -179,10 +168,13 @@ describe("页签交互", () => {
     fireEvent.click(screen.getByRole("button", { name: "切换忙碌" }));
     await act(() => router.navigate("/workspaces/w/delivery"));
     expect(router.state.location.pathname).toBe("/workspaces/w/delivery");
-    expect(document.querySelector(".route-panel[hidden]")).toHaveTextContent("列表");
+    expect(document.querySelector('[role="tabpanel"][hidden]')).toHaveTextContent("列表");
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(screen.getByRole("status")).toHaveTextContent("本体视图」的操作正在进行");
-    fireEvent.click(screen.getByRole("button", { name: "关闭提示" }));
+    const closeAlertBtn = screen.getByRole("button", { name: "关闭提示" });
+    expect(closeAlertBtn).toBeInTheDocument();
+    fireEvent.click(closeAlertBtn);
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体发布" }));
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
     fireEvent.click(screen.getByRole("link", { name: "离开空间" }));
