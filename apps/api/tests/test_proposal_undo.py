@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 from sqlalchemy import select
-from test_instance_queries import mapped_session
+from test_instance_queries import mapped_session as mapped_session
 from test_modeling import ROOT, create_session, save
 from test_t4_proposal_decisions import chain, create, current, decide, seed_batch, update
 

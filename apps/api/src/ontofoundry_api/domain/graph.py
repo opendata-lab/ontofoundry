@@ -78,3 +78,27 @@ class DraftIndex:
 
     def children(self, type_id: UUID) -> list[ObjectType]:
         return [o for o in self.draft.object_types if o.extends == type_id]
+
+    def effective_links(self, type_id: UUID) -> list[LinkType]:
+        """Both directions, with a self-link occurring once."""
+        return list(
+            {
+                link.id: link
+                for link in [*self.outgoing_links(type_id), *self.incoming_links(type_id)]
+            }.values()
+        )
+
+    def effective_rules(self, type_id: UUID):
+        owners = {
+            *self.lineage(type_id),
+            *(prop.id for prop in self.effective_properties(type_id)),
+            *(link.id for link in self.outgoing_links(type_id)),
+        }
+        return [rule for rule in self.draft.rules if rule.owner_id in owners]
+
+    def title_property(self, type_id: UUID) -> Property | None:
+        for ancestor_id in self.lineage(type_id):
+            obj = self.objects.get(ancestor_id)
+            if obj is not None and obj.title_property_id is not None:
+                return self.properties.get(obj.title_property_id)
+        return None

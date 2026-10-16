@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from contextlib import suppress
 from datetime import timedelta
 from typing import Any
 
@@ -302,10 +303,8 @@ async def reconcile_run(
                         detail=_permanent_detail(marker_exc),
                     )
             else:
-                try:
+                with suppress(UnicodeDecodeError, json.JSONDecodeError, TypeError):
                     marker = json.loads(marker_content)
-                except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
-                    pass
 
             what = "提案" if manifest.get("result_contract") == "proposals" else "建模结果"
             if not (

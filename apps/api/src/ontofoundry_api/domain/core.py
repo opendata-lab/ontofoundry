@@ -18,7 +18,14 @@ from enum import StrEnum
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 SCHEMA_VERSION = "core-1"
 
@@ -30,7 +37,7 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 class Strict(BaseModel):
     """Stored shapes reject unknown fields: hashing and diffs see every field."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 def _display_name(value: str) -> str:
@@ -52,7 +59,10 @@ TechnicalName = Annotated[
     str, Field(min_length=1, max_length=240), AfterValidator(_technical_name)
 ]
 Description = Annotated[str, Field(default="", max_length=8000)]
-Labels = Annotated[list[Annotated[str, Field(min_length=1, max_length=120)]], Field(default_factory=list, max_length=50)]
+Labels = Annotated[
+    list[Annotated[str, Field(min_length=1, max_length=120)]],
+    Field(default_factory=list, max_length=50),
+]
 Expression = Annotated[str, Field(min_length=1, max_length=4000)]
 Scalar = str | int | float | bool | None
 
@@ -124,7 +134,9 @@ def _unique_evidence(items: list) -> list:
 
 
 EvidenceList = Annotated[
-    list[Evidence], Field(default_factory=list, max_length=50), AfterValidator(_unique_evidence)
+    list[Evidence],
+    Field(default_factory=list, max_length=50),
+    AfterValidator(_unique_evidence),
 ]
 
 
@@ -262,7 +274,10 @@ class PropertiesKey(Strict):
 
 
 JoinKey = Annotated[MappingKey | PropertiesKey, Field(discriminator="kind")]
-Columns = Annotated[list[Annotated[str, Field(min_length=1, max_length=240)]], Field(min_length=1, max_length=16)]
+Columns = Annotated[
+    list[Annotated[str, Field(min_length=1, max_length=240)]],
+    Field(min_length=1, max_length=16),
+]
 
 
 class DirectJoin(Strict):
@@ -407,7 +422,8 @@ class SimpleMetric(_MetricBase):
         elif self.measure is None:
             raise ValueError(f"{self.aggregation.value} 必须指定度量列")
         _same_dataset(
-            self.dataset_id, [self.measure, self.time_field, *(f.column for f in self.filters)]
+            self.dataset_id,
+            [self.measure, self.time_field, *(f.column for f in self.filters)],
         )
         return self
 
@@ -433,7 +449,9 @@ class ExpressionMetric(_MetricBase):
         return self
 
 
-Metric = Annotated[SimpleMetric | RatioMetric | ExpressionMetric, Field(discriminator="kind")]
+Metric = Annotated[
+    SimpleMetric | RatioMetric | ExpressionMetric, Field(discriminator="kind")
+]
 
 
 # --- datasets and mappings --------------------------------------------------
