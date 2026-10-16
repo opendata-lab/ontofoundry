@@ -63,8 +63,6 @@ import { MappingStatusIcon } from "./MappingWidgets";
 import { inheritedProperties } from "../../lib/elementModel";
 import { ElementInstances } from "./ElementInstances";
 import { newId as generateId } from "../../lib/id";
-import "../../styles/element-inspector.css";
-import "../../styles/object-mapping.css";
 
 type Loaded = {
   draft: Draft;

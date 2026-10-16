@@ -4,7 +4,6 @@ import { ArrowUpRight, LockKeyhole, Maximize, Minus, Plus } from "lucide-react";
 import { useElementInspector } from "../hooks/useElementInspector";
 import type { WorkspaceOverview } from "../api/types";
 import type { SelectedGraphItem } from "./OntologyGraph";
-import "../styles/ontology-overview.css";
 
 type Layer = "service" | "semantic" | "instance" | "mapping";
 const layers: {

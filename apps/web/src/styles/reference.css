@@ -2,29 +2,70 @@
    Workbench: full-width header, quiet side navigation, three-panel modeling.
    User reference parity governs compact controls, cards and embedded scaling. */
 
+/* Legacy element styles. Scoped away from Ant Design with a zero-specificity
+   :where(), so the existing pages keep their look until P2 rewrites them. */
 body {
   font-size: 14px;
   background: var(--color-canvas);
 }
-h1,
-h2,
-h3 {
+h1:where(:not([class*="ant-"], [class*="ant-"] *)),
+h2:where(:not([class*="ant-"], [class*="ant-"] *)),
+h3:where(:not([class*="ant-"], [class*="ant-"] *)) {
   letter-spacing: 0;
   font-weight: 600;
   overflow-wrap: anywhere;
   min-width: 0;
 }
-button,
-a,
-select {
+button:where(:not([class*="ant-"], [class*="ant-"] *)),
+a:where(:not([class*="ant-"], [class*="ant-"] *)),
+select:where(:not([class*="ant-"], [class*="ant-"] *)) {
   white-space: nowrap;
 }
-button:disabled {
+button:where(:not([class*="ant-"], [class*="ant-"] *)):disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-button:not(:disabled):active {
+button:where(:not([class*="ant-"], [class*="ant-"] *)):not(:disabled):active {
   filter: brightness(0.96);
+}
+input:where(:not([class*="ant-"], [class*="ant-"] *)):not([type="checkbox"]):not([type="radio"]),
+select:where(:not([class*="ant-"], [class*="ant-"] *)),
+textarea:where(:not([class*="ant-"], [class*="ant-"] *)) {
+  background: var(--color-surface);
+  border: 1px solid var(--color-rule);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 0;
+  font-size: 13px;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+}
+input:where(:not([class*="ant-"], [class*="ant-"] *)):not([type="checkbox"]):not([type="radio"]),
+select:where(:not([class*="ant-"], [class*="ant-"] *)) {
+  height: 34px;
+}
+textarea:where(:not([class*="ant-"], [class*="ant-"] *)) {
+  resize: vertical;
+  line-height: 1.7;
+}
+input:where(:not([class*="ant-"], [class*="ant-"] *)):focus-visible,
+select:where(:not([class*="ant-"], [class*="ant-"] *)):focus-visible,
+textarea:where(:not([class*="ant-"], [class*="ant-"] *)):focus-visible {
+  outline-color: var(--color-focus);
+}
+input:where(:not([class*="ant-"], [class*="ant-"] *))[type="checkbox"],
+input:where(:not([class*="ant-"], [class*="ant-"] *))[type="radio"] {
+  accent-color: var(--color-accent);
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+input:where(:not([class*="ant-"], [class*="ant-"] *)):disabled,
+textarea:where(:not([class*="ant-"], [class*="ant-"] *)):disabled,
+select:where(:not([class*="ant-"], [class*="ant-"] *)):disabled {
+  background: var(--color-surface-soft);
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 .button,
 .icon-button {
@@ -41,45 +82,6 @@ button:not(:disabled):active {
   min-width: 32px;
   width: 32px;
   padding: 0;
-}
-input:not([type="checkbox"]):not([type="radio"]),
-select,
-textarea {
-  background: var(--color-surface);
-  border: 1px solid var(--color-rule);
-  border-radius: 6px;
-  padding: 8px 12px;
-  min-width: 0;
-  font-size: 13px;
-  outline: 2px solid transparent;
-  outline-offset: 1px;
-}
-input:not([type="checkbox"]):not([type="radio"]),
-select {
-  height: 34px;
-}
-textarea {
-  resize: vertical;
-  line-height: 1.7;
-}
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline-color: var(--color-focus);
-}
-input[type="checkbox"],
-input[type="radio"] {
-  accent-color: var(--color-accent);
-  width: 14px;
-  height: 14px;
-  flex: none;
-}
-input:disabled,
-textarea:disabled,
-select:disabled {
-  background: var(--color-surface-soft);
-  cursor: not-allowed;
-  opacity: 0.65;
 }
 small,
 .muted {

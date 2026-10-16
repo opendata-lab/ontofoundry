@@ -5,7 +5,6 @@ import { flushSync } from "react-dom";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { workspaceRequest } from "../api/client";
 import type { DataConnection, DraftView } from "../api/types";
-import "../styles/ontology-reading.css";
 
 type AssetColumn = {
   name: string;

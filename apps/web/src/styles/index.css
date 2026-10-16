@@ -1,0 +1,28 @@
+/* The only stylesheet entry. Cascade order, lowest first:
+   theme      Tailwind theme variables
+   base       design tokens and element-level base styles
+   antd       Ant Design (StyleProvider layer in main.tsx)
+   components existing page and component styles
+   utilities  Tailwind utilities
+   Tailwind preflight is deliberately not imported: it would reset Ant Design
+   and the existing pages. */
+@layer theme, base, antd, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "./tokens.css" layer(base);
+@import "./base.css" layer(base);
+
+@import "@xyflow/react/dist/style.css" layer(components);
+@import "./global.css" layer(components);
+@import "./reference.css" layer(components);
+@import "./proposals.css" layer(components);
+@import "./publish.css" layer(components);
+@import "./page-tabs.css" layer(components);
+@import "./ontology-overview.css" layer(components);
+@import "./ontology-reading.css" layer(components);
+@import "./semantic.css" layer(components);
+@import "./semantic-view.css" layer(components);
+@import "./element-inspector.css" layer(components);
+@import "./object-mapping.css" layer(components);
+
+@import "tailwindcss/utilities.css" layer(utilities);

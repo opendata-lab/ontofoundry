@@ -37,7 +37,6 @@ import {
   SemanticObjectForm,
   type SemanticFormTarget,
 } from "./semantic/SemanticObjectForm";
-import "../styles/semantic.css";
 import { contextSynonyms, semanticLabel } from "../lib/semanticEditing";
 import { newId } from "../lib/id";
 

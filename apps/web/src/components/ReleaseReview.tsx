@@ -3,7 +3,6 @@ import { workspaceRequest } from "../api/client";
 import type { ModelingSession, VersionSummary } from "../api/types";
 import { ExpressionsEditor } from "./ExpressionsEditor";
 import { modelingApi } from "../api/client";
-import "../styles/ontology-reading.css";
 
 type Comparison = {
   changes: { path: string; kind: string; before: unknown; after: unknown }[];

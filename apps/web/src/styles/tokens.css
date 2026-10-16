@@ -76,3 +76,49 @@
   --color-step-wash: #e7f8ff;
   --ref-sidebar: clamp(184px, 14.4vw, 208px);
 }
+
+/* Expose the tokens above to Tailwind utilities (bg-surface, text-muted,
+   rounded-sm, font-sans …). `inline` makes utilities reference these
+   variables directly; the :root values above stay the single source. */
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-soft: var(--color-surface-soft);
+  --color-rule-soft: var(--color-rule-soft);
+  --color-rule: var(--color-rule);
+  --color-rule-strong: var(--color-rule-strong);
+  --color-ink: var(--color-ink);
+  --color-ink-2: var(--color-ink-2);
+  --color-muted: var(--color-muted);
+  --color-subtle: var(--color-subtle);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-ink: var(--color-accent-ink);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-focus: var(--color-focus);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-danger: var(--color-danger);
+  --color-danger-soft: var(--color-danger-soft);
+  --color-object: var(--color-object);
+  --color-object-soft: var(--color-object-soft);
+  --color-relation: var(--color-relation);
+  --color-relation-soft: var(--color-relation-soft);
+  --color-attribute: var(--color-attribute);
+  --color-attribute-soft: var(--color-attribute-soft);
+
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-base: var(--text-base);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+}

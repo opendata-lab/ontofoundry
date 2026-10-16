@@ -2,7 +2,6 @@ import { X } from "lucide-react";
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { usePageActive } from "../../hooks/usePageTab";
 import { createPortal } from "react-dom";
-import "../../styles/object-mapping.css";
 
 /** Native modal stacking keeps Escape, focus trapping and focus restoration consistent. */
 export function InspectorDialog({

@@ -39,7 +39,6 @@ import {
 import { preloadWorkspacePages } from "../lib/workspacePages";
 import { LoadingSurface } from "./AsyncState";
 import { WorkspaceRoutes } from "./WorkspaceRoutes";
-import "../styles/page-tabs.css";
 
 // Each panel reads its own location, fixed to the tab's href. The router's
 // context changes on every navigation; without this every open page, hidden

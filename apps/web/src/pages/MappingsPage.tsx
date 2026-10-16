@@ -22,7 +22,6 @@ import {
   InfoButton,
   MappingStatusIcon,
 } from "../components/elements/MappingWidgets";
-import "../styles/object-mapping.css";
 
 const FILTERS = [
   ["all", "全部"],

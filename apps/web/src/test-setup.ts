@@ -1,5 +1,33 @@
 import { transferableAbortController } from "node:util";
+import "@ant-design/v5-patch-for-react-19";
 import "@testing-library/jest-dom/vitest";
+
+// Browser APIs Ant Design relies on that jsdom does not implement.
+if (!window.matchMedia) {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList;
+}
+if (!window.ResizeObserver) {
+  window.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+}
+window.scrollTo = () => {};
+Element.prototype.scrollIntoView ??= function scrollIntoView() {};
+// jsdom rejects the pseudo-element argument antd passes when measuring.
+const computedStyle = window.getComputedStyle.bind(window);
+window.getComputedStyle = (element: Element) => computedStyle(element);
 
 // jsdom ships no <dialog> behaviour; give it the open/close semantics the app
 // relies on so dialog components can be tested like any other markup.

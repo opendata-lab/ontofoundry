@@ -21,7 +21,6 @@ import {
   type SemanticResource,
 } from "../lib/semanticExplorer";
 import { OntologyGraph, type SelectedGraphItem } from "./OntologyGraph";
-import "../styles/semantic-view.css";
 
 const STORAGE_KEY = "ontofoundry.semantic.explorer.collapsed";
 const groups = [
