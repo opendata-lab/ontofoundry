@@ -1,0 +1,545 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户",
+        "technical_name": "customer",
+        "description": "与公司签约的企业客户",
+        "synonyms": [
+          "顾客",
+          "买方"
+        ],
+        "tags": [
+          "核心"
+        ],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001002",
+        "name": "订单",
+        "technical_name": "sales_order",
+        "description": "客户的一次下单\n\n采用指标时保留其固定过滤；完成率的已完成条件仅作用于分子。",
+        "synonyms": [
+          "销售单"
+        ],
+        "tags": [
+          "核心"
+        ],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": "00000000-0000-4000-8000-000000002011",
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002001",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户编号",
+        "technical_name": "customer_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002002",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "客户名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [
+          "客户名"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002003",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "所在地区",
+        "technical_name": "region",
+        "description": "华东 / 华北 / 华南 / 西部",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002004",
+        "owner_type_id": "00000000-0000-4000-8000-000000001001",
+        "name": "签约日期",
+        "technical_name": "signed_on",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002011",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "订单号",
+        "technical_name": "order_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002012",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "金额",
+        "technical_name": "amount",
+        "description": "含税金额，单位元",
+        "value_kind": "decimal",
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [
+          "销售额",
+          "订单金额"
+        ],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002013",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "状态",
+        "technical_name": "status",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002014",
+        "owner_type_id": "00000000-0000-4000-8000-000000001002",
+        "name": "下单时间",
+        "technical_name": "ordered_at",
+        "description": "",
+        "value_kind": "datetime",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003001",
+        "name": "属于",
+        "technical_name": "customer",
+        "description": "",
+        "inverse_name": "拥有",
+        "synonyms": [
+          "下单客户"
+        ],
+        "source_type_id": "00000000-0000-4000-8000-000000001002",
+        "target_type_id": "00000000-0000-4000-8000-000000001001",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "source_columns": [
+            "order_id"
+          ],
+          "target_columns": [
+            "customer_id"
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [
+      {
+        "id": "00000000-0000-4000-8000-000000004001",
+        "name": "金额为正",
+        "technical_name": "positive",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002012",
+        "rule_kind": "constraint",
+        "expression": "sales_order.amount > 0",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000004002",
+        "name": "状态取值",
+        "technical_name": "status_values",
+        "description": "订单状态只能是这四种",
+        "owner_kind": "property",
+        "owner_id": "00000000-0000-4000-8000-000000002013",
+        "rule_kind": "constraint",
+        "expression": "sales_order.status IN ('待支付', '已支付', '已完成', '已取消')",
+        "evidence": []
+      }
+    ],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006001",
+        "name": "订单金额",
+        "technical_name": "order_amount",
+        "description": "",
+        "synonyms": [
+          "销售额",
+          "营收"
+        ],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
+        },
+        "filters": [],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006002",
+        "name": "订单数",
+        "technical_name": "order_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006003",
+        "name": "已完成订单数",
+        "technical_name": "completed_order_count",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "operator": "eq",
+            "values": [
+              "已完成"
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "status"
+            }
+          }
+        ],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006005",
+        "name": "下单客户数",
+        "technical_name": "buyer_count",
+        "description": "订单数据集中 customer_id 精确去重；示例外键有效，一名客户多次下单只计一次。",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "count_distinct",
+        "measure": {
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "customer_id"
+        },
+        "filters": [],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006006",
+        "name": "客单价",
+        "technical_name": "revenue_per_buyer",
+        "description": "订单金额 ÷ 下单客户数",
+        "synonyms": [],
+        "kind": "ratio",
+        "numerator_id": "00000000-0000-4000-8000-000000006001",
+        "denominator_id": "00000000-0000-4000-8000-000000006005",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006007",
+        "name": "一季度有效订单金额",
+        "technical_name": "q1_valid_order_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
+        },
+        "filters": [
+          {
+            "operator": "ge",
+            "values": [
+              "2026-01-01T00:00:00"
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "created_at"
+            }
+          },
+          {
+            "operator": "lt",
+            "values": [
+              "2026-04-01T00:00:00"
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "created_at"
+            }
+          },
+          {
+            "operator": "not_in",
+            "values": [
+              "待支付",
+              "已取消"
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "status"
+            }
+          }
+        ],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006098",
+        "name": "完成率",
+        "technical_name": "completion_rate",
+        "description": "已完成订单数 / 全部订单数；分子过滤不得放公共 WHERE",
+        "synonyms": [],
+        "kind": "ratio",
+        "numerator_id": "00000000-0000-4000-8000-000000006003",
+        "denominator_id": "00000000-0000-4000-8000-000000006002",
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006697",
+        "name": "订单金额中位数",
+        "technical_name": "median_order_amount",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "median",
+        "measure": {
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
+        },
+        "filters": [],
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006698",
+        "name": "拼接订单状态去重数",
+        "technical_name": "distinct_order_status_pairs",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "kind": "expression",
+        "expression": "COUNT(DISTINCT orders.order_id || '::' || orders.status)",
+        "value_kind": "integer",
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006699",
+        "name": "有效金额表达式",
+        "technical_name": "eligible_amount_expression",
+        "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
+        "synonyms": [],
+        "kind": "expression",
+        "expression": "SUM(CASE WHEN orders.status = '已完成' OR orders.status = '已发货' THEN orders.amount ELSE 0 END)",
+        "value_kind": "decimal",
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+      }
+    ],
+    "datasets": [
+      {
+        "id": "bf62129a-8cb8-569a-806b-c8ae68eef7a0",
+        "name": "customers",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "customers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "region",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "signed_on",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "orders",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "orders",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "created_at",
+            "physical_type": "datetime",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007001",
+        "type_id": "00000000-0000-4000-8000-000000001001",
+        "fields": {
+          "customer_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_id"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          },
+          "region": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "region"
+          },
+          "signed_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "signed_on"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "customer_id"
+            ],
+            "dataset_id": "bf62129a-8cb8-569a-806b-c8ae68eef7a0"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007002",
+        "type_id": "00000000-0000-4000-8000-000000001002",
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "amount"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          },
+          "ordered_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "created_at"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id"
+            ],
+            "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

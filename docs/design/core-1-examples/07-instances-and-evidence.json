@@ -1,0 +1,246 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001601",
+        "name": "客户",
+        "technical_name": "customer",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001602",
+        "name": "退货单",
+        "technical_name": "return_request",
+        "description": "客户提交的退货登记",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002601",
+        "owner_type_id": "00000000-0000-4000-8000-000000001601",
+        "name": "客户编号",
+        "technical_name": "customer_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002602",
+        "owner_type_id": "00000000-0000-4000-8000-000000001601",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002603",
+        "owner_type_id": "00000000-0000-4000-8000-000000001601",
+        "name": "是否VIP",
+        "technical_name": "is_vip",
+        "description": "由 Ossie 一元关系 customer.is_vip 转换",
+        "value_kind": "boolean",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009601",
+            "material_id": "mat_ossie_import_02",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 41,
+              "line_end": 45
+            },
+            "quote": "\"name\": \"is_vip\""
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002611",
+        "owner_type_id": "00000000-0000-4000-8000-000000001602",
+        "name": "退货单号",
+        "technical_name": "return_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002612",
+        "owner_type_id": "00000000-0000-4000-8000-000000001602",
+        "name": "退款金额",
+        "technical_name": "refund",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002613",
+        "owner_type_id": "00000000-0000-4000-8000-000000001602",
+        "name": "登记日期",
+        "technical_name": "registered_on",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003601",
+        "name": "发起客户",
+        "technical_name": "customer",
+        "description": "",
+        "inverse_name": "退货单",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001602",
+        "target_type_id": "00000000-0000-4000-8000-000000001601",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": null,
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [],
+    "datasets": [],
+    "mappings": [],
+    "material_objects": [
+      {
+        "id": "00000000-0000-4000-8000-000000008601",
+        "type_id": "00000000-0000-4000-8000-000000001601",
+        "values": {
+          "customer_no": "C001",
+          "name": "星海贸易",
+          "is_vip": true
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009611",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "星海贸易（C001，VIP 客户）"
+          },
+          {
+            "kind": "manual",
+            "id": "00000000-0000-4000-8000-000000009612",
+            "note": "已与销售确认为 VIP",
+            "created_by": "u_zhangsan",
+            "created_at": "2026-10-12T09:30:00Z"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008602",
+        "type_id": "00000000-0000-4000-8000-000000001602",
+        "values": {
+          "return_no": "RT-0103",
+          "refund": 168,
+          "registered_on": "2026-01-03"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009613",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 6
+            },
+            "quote": "1 月 3 日，星海贸易退回经典手冲壶一个，退款 168 元，单号 RT-0103"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008603",
+        "type_id": "00000000-0000-4000-8000-000000001602",
+        "values": {
+          "registered_on": "2026-01-15"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009614",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "1 月 15 日远山咖啡也办理了退货，金额待财务确认"
+          }
+        ]
+      }
+    ],
+    "material_links": [
+      {
+        "id": "00000000-0000-4000-8000-000000008651",
+        "type_id": "00000000-0000-4000-8000-000000003601",
+        "source_id": "00000000-0000-4000-8000-000000008602",
+        "target_id": "00000000-0000-4000-8000-000000008601",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009615",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "星海贸易退回经典手冲壶"
+          }
+        ]
+      }
+    ]
+  }
+}

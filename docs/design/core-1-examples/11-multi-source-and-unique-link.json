@@ -1,0 +1,305 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001901",
+        "name": "账户",
+        "technical_name": "account",
+        "description": "主表决定账户集合；来源键由建模者声明，无数据库主键也是有效语义绑定。",
+        "synonyms": [],
+        "title_property_id": null,
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001902",
+        "name": "客户",
+        "technical_name": "customer",
+        "description": "",
+        "synonyms": [],
+        "title_property_id": "00000000-0000-4000-8000-000000002913",
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002901",
+        "owner_type_id": "00000000-0000-4000-8000-000000001901",
+        "name": "账户号",
+        "technical_name": "account_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002902",
+        "owner_type_id": "00000000-0000-4000-8000-000000001901",
+        "name": "客户编码",
+        "technical_name": "customer_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002903",
+        "owner_type_id": "00000000-0000-4000-8000-000000001901",
+        "name": "可用金额",
+        "technical_name": "available_amount",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002911",
+        "owner_type_id": "00000000-0000-4000-8000-000000001902",
+        "name": "客户编号",
+        "technical_name": "customer_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002912",
+        "owner_type_id": "00000000-0000-4000-8000-000000001902",
+        "name": "编码",
+        "technical_name": "code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002913",
+        "owner_type_id": "00000000-0000-4000-8000-000000001902",
+        "name": "名称",
+        "technical_name": "name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003901",
+        "name": "所属客户",
+        "technical_name": "customer",
+        "description": "引用客户唯一编码，不是物理 customer_id",
+        "inverse_name": "账户",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001901",
+        "target_type_id": "00000000-0000-4000-8000-000000001902",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "00000000-0000-4000-8000-000000002902"
+          ],
+          "target_property_ids": [
+            "00000000-0000-4000-8000-000000002912"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006901",
+        "name": "账户可用金额",
+        "technical_name": "account_available_amount",
+        "description": "对 account_amounts 的 available_amount 求和，包括不属于 accounts 的孤儿行；如需排除，由 agent 关联主表或清理数据。",
+        "synonyms": [],
+        "kind": "simple",
+        "evidence": [],
+        "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
+          "column": "available_amount"
+        },
+        "filters": []
+      }
+    ],
+    "datasets": [
+      {
+        "id": "087a0418-6f35-5d97-bc5b-cb5801868616",
+        "name": "accounts",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "accounts",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "account_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
+        "name": "account_amounts",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "account_amounts",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "available_amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "acct_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "e1ee1c80-3d24-507c-bb58-b27fb936bcf8",
+        "name": "customers",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "customers",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007901",
+        "type_id": "00000000-0000-4000-8000-000000001901",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "account_id"
+            ],
+            "dataset_id": "087a0418-6f35-5d97-bc5b-cb5801868616"
+          },
+          {
+            "id": "amounts",
+            "key_columns": [
+              "acct_id"
+            ],
+            "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5"
+          }
+        ],
+        "fields": {
+          "account_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "account_id"
+          },
+          "customer_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_code"
+          },
+          "available_amount": {
+            "kind": "column",
+            "source_id": "amounts",
+            "column": "available_amount"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007902",
+        "type_id": "00000000-0000-4000-8000-000000001902",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "customer_id"
+            ],
+            "dataset_id": "e1ee1c80-3d24-507c-bb58-b27fb936bcf8"
+          }
+        ],
+        "fields": {
+          "customer_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_id"
+          },
+          "code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "customer_code"
+          },
+          "name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "name"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

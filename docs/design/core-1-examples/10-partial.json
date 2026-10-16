@@ -1,0 +1,166 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001901",
+        "name": "门店",
+        "technical_name": "store",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001902",
+        "name": "城市",
+        "technical_name": "city",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002901",
+        "owner_type_id": "00000000-0000-4000-8000-000000001901",
+        "name": "门店编码",
+        "technical_name": "store_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002902",
+        "owner_type_id": "00000000-0000-4000-8000-000000001901",
+        "name": "营业面积",
+        "technical_name": "area",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002911",
+        "owner_type_id": "00000000-0000-4000-8000-000000001902",
+        "name": "城市名",
+        "technical_name": "city_name",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003901",
+        "name": "位于",
+        "technical_name": "city",
+        "description": "",
+        "inverse_name": "门店",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001901",
+        "target_type_id": "00000000-0000-4000-8000-000000001902",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": null,
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006901",
+        "name": "门店总面积",
+        "technical_name": "total_store_area",
+        "description": "",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8",
+          "column": "area"
+        },
+        "filters": [],
+        "evidence": [],
+        "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8"
+      }
+    ],
+    "datasets": [
+      {
+        "id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8",
+        "name": "stores",
+        "dialect": "mysql",
+        "schema_name": null,
+        "table_name": "stores",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "store_code",
+            "physical_type": "varchar",
+            "comment": "门店编码"
+          },
+          {
+            "name": "area",
+            "physical_type": "decimal",
+            "comment": "门店面积"
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007901",
+        "type_id": "00000000-0000-4000-8000-000000001901",
+        "fields": {
+          "store_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "store_code"
+          },
+          "area": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "area"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "store_code"
+            ],
+            "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

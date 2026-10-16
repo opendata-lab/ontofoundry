@@ -1,0 +1,582 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-14T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000001301",
+        "name": "订单",
+        "technical_name": "sales_order",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001302",
+        "name": "订单明细",
+        "technical_name": "order_line",
+        "description": "订单中的一行，由订单 + 行号标识",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001303",
+        "name": "商品",
+        "technical_name": "product",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000001304",
+        "name": "发货单",
+        "technical_name": "shipment",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "evidence": [],
+        "title_property_id": null,
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000002301",
+        "owner_type_id": "00000000-0000-4000-8000-000000001301",
+        "name": "订单号",
+        "technical_name": "order_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002302",
+        "owner_type_id": "00000000-0000-4000-8000-000000001301",
+        "name": "状态",
+        "technical_name": "status",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002314",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "订单号",
+        "technical_name": "order_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002311",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "行号",
+        "technical_name": "line_no",
+        "description": "",
+        "value_kind": "integer",
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002312",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "数量",
+        "technical_name": "quantity",
+        "description": "",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002313",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "单价",
+        "technical_name": "unit_price",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002321",
+        "owner_type_id": "00000000-0000-4000-8000-000000001303",
+        "name": "SKU",
+        "technical_name": "sku",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002322",
+        "owner_type_id": "00000000-0000-4000-8000-000000001303",
+        "name": "品类",
+        "technical_name": "category",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002331",
+        "owner_type_id": "00000000-0000-4000-8000-000000001304",
+        "name": "发货单号",
+        "technical_name": "shipment_no",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002332",
+        "owner_type_id": "00000000-0000-4000-8000-000000001304",
+        "name": "发货时间",
+        "technical_name": "shipped_at",
+        "description": "",
+        "value_kind": "datetime",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000002330",
+        "owner_type_id": "00000000-0000-4000-8000-000000001302",
+        "name": "明细金额",
+        "technical_name": "line_amount",
+        "description": "",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000003301",
+        "name": "所属订单",
+        "technical_name": "parent_order",
+        "description": "",
+        "inverse_name": "明细",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001302",
+        "target_type_id": "00000000-0000-4000-8000-000000001301",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "source_columns": [
+            "order_id",
+            "line_no"
+          ],
+          "target_columns": [
+            "order_id"
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003302",
+        "name": "商品",
+        "technical_name": "product",
+        "description": "",
+        "inverse_name": "出现在明细",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001302",
+        "target_type_id": "00000000-0000-4000-8000-000000001303",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "source_columns": [
+            "order_id",
+            "line_no"
+          ],
+          "target_columns": [
+            "sku"
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
+        },
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000003303",
+        "name": "发货明细",
+        "technical_name": "order_line",
+        "description": "",
+        "inverse_name": "发货单",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000001304",
+        "target_type_id": "00000000-0000-4000-8000-000000001302",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "source_columns": [
+            "shipment_id"
+          ],
+          "target_columns": [
+            "order_id",
+            "line_no"
+          ],
+          "kind": "mapping_table",
+          "source_key": {
+            "kind": "mapping_key"
+          },
+          "target_key": {
+            "kind": "mapping_key"
+          },
+          "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6"
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000006301",
+        "name": "销量",
+        "technical_name": "units_sold",
+        "description": "全部订单明细的数量合计，不限定订单状态。",
+        "synonyms": [],
+        "kind": "simple",
+        "evidence": [],
+        "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+          "column": "qty"
+        },
+        "filters": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006303",
+        "name": "发货单数",
+        "technical_name": "shipment_count",
+        "description": "发货表全部记录的行数，不限定订单状态或明细匹配情况。",
+        "synonyms": [],
+        "kind": "simple",
+        "evidence": [],
+        "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6",
+        "aggregation": "count",
+        "measure": null,
+        "filters": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000006330",
+        "name": "明细销售额",
+        "technical_name": "line_sales_amount",
+        "description": "",
+        "synonyms": [],
+        "kind": "expression",
+        "evidence": [],
+        "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+        "expression": "SUM(order_lines.qty * order_lines.unit_price)",
+        "value_kind": "decimal"
+      }
+    ],
+    "datasets": [
+      {
+        "id": "2f17e28b-ca84-5a54-a683-9c439a10f6ca",
+        "name": "orders",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "orders",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+        "name": "order_lines",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "order_lines",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "line_no",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "qty",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "unit_price",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "sku",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "03785b10-53fc-5d05-9c8b-4d55e139104d",
+        "name": "products",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "products",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "sku",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "category",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "1cf49f63-2949-534c-8821-3514c9314ac6",
+        "name": "shipments",
+        "dialect": "mysql",
+        "schema_name": "dw",
+        "table_name": "shipments",
+        "description": "虚构示例数据集。",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "shipment_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "shipped_at",
+            "physical_type": "datetime",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "line_no",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000007301",
+        "type_id": "00000000-0000-4000-8000-000000001301",
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id"
+            ],
+            "dataset_id": "2f17e28b-ca84-5a54-a683-9c439a10f6ca"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007302",
+        "type_id": "00000000-0000-4000-8000-000000001302",
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_id"
+          },
+          "line_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "line_no"
+          },
+          "quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          },
+          "unit_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "unit_price"
+          },
+          "line_amount": {
+            "kind": "expression",
+            "expression": "main.qty * main.unit_price"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "order_id",
+              "line_no"
+            ],
+            "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007303",
+        "type_id": "00000000-0000-4000-8000-000000001303",
+        "fields": {
+          "sku": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "sku"
+          },
+          "category": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "category"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "sku"
+            ],
+            "dataset_id": "03785b10-53fc-5d05-9c8b-4d55e139104d"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000007304",
+        "type_id": "00000000-0000-4000-8000-000000001304",
+        "fields": {
+          "shipment_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipment_id"
+          },
+          "shipped_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shipped_at"
+          }
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "shipment_id"
+            ],
+            "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6"
+          }
+        ],
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}

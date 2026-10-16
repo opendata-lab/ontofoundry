@@ -1,0 +1,464 @@
+{
+  "format": "ontofoundry",
+  "schema_version": "core-1",
+  "exported_at": "2026-10-15T08:00:00Z",
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "11111111-1111-4111-8111-111111111111",
+    "object_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000011101",
+        "name": "组件",
+        "technical_name": "component",
+        "description": "组件属性来自数量与状态两个数据集；各数据集独立取末日，同一数据集的所有行使用同一天。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "00000000-0000-4000-8000-000000021101",
+        "evidence": [],
+        "derived_by": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000011201",
+        "name": "仓库",
+        "technical_name": "warehouse",
+        "description": "仓库快照数据集独立选取最新日或周期内末日；与组件日期不齐时如何关联交给 agent。",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "00000000-0000-4000-8000-000000021201",
+        "evidence": [],
+        "derived_by": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "00000000-0000-4000-8000-000000021101",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "组件编号",
+        "technical_name": "component_no",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021102",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "快照日期",
+        "technical_name": "snapshot_date",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021103",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "数量",
+        "technical_name": "quantity",
+        "description": "",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021104",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "状态",
+        "technical_name": "status",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021105",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "仓库编码",
+        "technical_name": "warehouse_code",
+        "description": "",
+        "value_kind": "string",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021106",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "覆盖率",
+        "technical_name": "coverage_ratio",
+        "description": "来源表已计算的逐组件覆盖率，只作为属性；总体覆盖率需要覆盖数量和应覆盖数量作为分子分母。",
+        "value_kind": "decimal",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021107",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "近一月使用次数",
+        "technical_name": "usage_1m",
+        "description": "截至快照日期回看一个日历月的使用次数，不与近三月窗口相加。",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021108",
+        "owner_type_id": "00000000-0000-4000-8000-000000011101",
+        "name": "近三月使用次数",
+        "technical_name": "usage_3m",
+        "description": "截至快照日期回看三个日历月的使用次数，与近一月窗口重叠，不能相加。",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021201",
+        "owner_type_id": "00000000-0000-4000-8000-000000011201",
+        "name": "仓库编码",
+        "technical_name": "warehouse_code",
+        "description": "",
+        "value_kind": "string",
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021202",
+        "owner_type_id": "00000000-0000-4000-8000-000000011201",
+        "name": "快照日期",
+        "technical_name": "snapshot_date",
+        "description": "",
+        "value_kind": "date",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000021203",
+        "owner_type_id": "00000000-0000-4000-8000-000000011201",
+        "name": "库存数量",
+        "technical_name": "stock_quantity",
+        "description": "",
+        "value_kind": "integer",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "00000000-0000-4000-8000-000000031101",
+        "name": "存放于",
+        "technical_name": "warehouse",
+        "description": "组件按仓库编码指向一个仓库；两端各取自己的数据集日期，agent 处理日期不齐并说明，核心不强制日期相等。",
+        "inverse_name": "存放组件",
+        "synonyms": [],
+        "source_type_id": "00000000-0000-4000-8000-000000011101",
+        "target_type_id": "00000000-0000-4000-8000-000000011201",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "00000000-0000-4000-8000-000000021105"
+          ],
+          "target_property_ids": [
+            "00000000-0000-4000-8000-000000021201"
+          ]
+        },
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [
+      {
+        "id": "00000000-0000-4000-8000-000000061101",
+        "name": "组件期末数量",
+        "technical_name": "component_closing_quantity",
+        "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "quantity"
+        },
+        "filters": [],
+        "evidence": [],
+        "time_field": {
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "snapshot_date"
+        },
+        "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000061201",
+        "name": "仓库期末库存",
+        "technical_name": "warehouse_closing_stock",
+        "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf",
+          "column": "stock_quantity"
+        },
+        "filters": [],
+        "evidence": [],
+        "time_field": {
+          "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf",
+          "column": "snapshot_date"
+        },
+        "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf"
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000061102",
+        "name": "数量表期末合计",
+        "technical_name": "dataset_closing_quantity",
+        "description": "显式挂 component_daily；不根据该数据集的对象绑定反查组件。",
+        "synonyms": [],
+        "kind": "simple",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "quantity"
+        },
+        "filters": [],
+        "evidence": [],
+        "time_field": {
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "snapshot_date"
+        },
+        "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
+      }
+    ],
+    "datasets": [
+      {
+        "id": "d87c134f-d101-5fae-8841-427b309a61cd",
+        "name": "component_daily",
+        "dialect": "mysql",
+        "schema_name": "snapshot_demo",
+        "table_name": "component_daily",
+        "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
+        "snapshot_date_column": "snapshot_date",
+        "columns": [
+          {
+            "name": "component_id",
+            "physical_type": "varchar",
+            "comment": "组件编号"
+          },
+          {
+            "name": "snapshot_date",
+            "physical_type": "date",
+            "comment": "业务快照日期"
+          },
+          {
+            "name": "quantity",
+            "physical_type": "integer",
+            "comment": "数量"
+          },
+          {
+            "name": "warehouse_code",
+            "physical_type": "varchar",
+            "comment": "仓库编码"
+          }
+        ]
+      },
+      {
+        "id": "be77e869-9121-5714-80fb-e5dcdef4751d",
+        "name": "component_state_daily",
+        "dialect": "mysql",
+        "schema_name": "snapshot_demo",
+        "table_name": "component_state_daily",
+        "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
+        "snapshot_date_column": "snapshot_date",
+        "columns": [
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "coverage_ratio",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "usage_1m",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "usage_3m",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "component_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
+      },
+      {
+        "id": "1411465a-966b-5695-b7e1-b467074a73cf",
+        "name": "warehouse_daily",
+        "dialect": "mysql",
+        "schema_name": "snapshot_demo",
+        "table_name": "warehouse_daily",
+        "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
+        "snapshot_date_column": "snapshot_date",
+        "columns": [
+          {
+            "name": "warehouse_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "snapshot_date",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "stock_quantity",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "00000000-0000-4000-8000-000000071101",
+        "type_id": "00000000-0000-4000-8000-000000011101",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "component_id"
+            ],
+            "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
+          },
+          {
+            "id": "states",
+            "key_columns": [
+              "component_id"
+            ],
+            "dataset_id": "be77e869-9121-5714-80fb-e5dcdef4751d"
+          }
+        ],
+        "fields": {
+          "component_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "component_id"
+          },
+          "snapshot_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "snapshot_date"
+          },
+          "quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "quantity"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "states",
+            "column": "status"
+          },
+          "warehouse_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "warehouse_code"
+          },
+          "coverage_ratio": {
+            "kind": "column",
+            "source_id": "states",
+            "column": "coverage_ratio"
+          },
+          "usage_1m": {
+            "kind": "column",
+            "source_id": "states",
+            "column": "usage_1m"
+          },
+          "usage_3m": {
+            "kind": "column",
+            "source_id": "states",
+            "column": "usage_3m"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000071201",
+        "type_id": "00000000-0000-4000-8000-000000011201",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "key_columns": [
+              "warehouse_code"
+            ],
+            "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf"
+          }
+        ],
+        "fields": {
+          "warehouse_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "warehouse_code"
+          },
+          "snapshot_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "snapshot_date"
+          },
+          "stock_quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "stock_quantity"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": []
+  }
+}
