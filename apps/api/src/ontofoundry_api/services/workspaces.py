@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -13,10 +15,10 @@ from ontofoundry_api.db_models import (
     WorkspaceMemberRecord,
     WorkspaceRecord,
 )
-from ontofoundry_api.domain.instance_validation import include_instance_validation
+from ontofoundry_api.domain.canonical import canonical, jcs
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
-from ontofoundry_api.domain.snapshot import as_v3_dict
-from ontofoundry_api.ossie.compiler import compile_ossie, sha256_json, validate_ossie
+from ontofoundry_api.domain.snapshot import read_snapshot_json
+from ontofoundry_api.services.core_validation import validation_report
 from ontofoundry_api.services.identities import sync_identities
 
 from .errors import ConflictError, NotFoundError, PublishValidationError
@@ -121,7 +123,7 @@ def workspace_summary(session: Session, workspace: WorkspaceRecord, user_id: str
         if workspace.current_version_id
         else None
     )
-    draft = as_v3_dict(version.snapshot_json, workspace.id) if version else {}
+    draft = read_snapshot_json(version.snapshot_json, workspace.id) if version else {}
     return {
         "id": workspace.id,
         "slug": workspace.slug,
@@ -175,10 +177,6 @@ def publish_draft(
 ) -> OntologyVersionRecord:
     workspace = get_workspace(session, workspace_id)
     previous_version_id = workspace.current_version_id
-    if draft.schema_version != "3":
-        draft = OntologyDraft.model_validate(as_v3_dict(draft.model_dump(mode="json"), workspace_id))
-        # A direct platform publication has never been a stored historic row.
-        draft.document_origin = "platform"
     if str(draft.workspace_id) != workspace.id:
         raise PublishValidationError(
             "草稿所属工作空间与发布目标不一致",
@@ -198,14 +196,9 @@ def publish_draft(
     if membership_role(session, workspace_id, user_id) is None:
         raise NotFoundError("没有找到可发布的工作空间")
 
-    ossie = compile_ossie(
-        draft,
-        ontology_name=workspace.slug.replace("-", "_"),
-        ontology_description=workspace.description or workspace.name,
-    )
-    report = include_instance_validation(validate_ossie(ossie), draft)
+    report = validation_report(draft.model_dump(mode="json"))
     if not report["publishable"]:
-        raise PublishValidationError("Ossie 校验未通过，版本未发布", report)
+        raise PublishValidationError("核心校验未通过，版本未发布", report)
 
     next_version = (
         session.scalar(
@@ -216,29 +209,22 @@ def publish_draft(
         or 0
     ) + 1
     snapshot = draft.model_dump(mode="json")
-    sha256 = sha256_json(
-        {
-            "snapshot": snapshot,
-            "ossie": ossie,
-            "validation": report,
-        }
-    )
+    sha256 = hashlib.sha256(
+        jcs({"snapshot": json.loads(canonical(snapshot)), "validation": report}).encode()
+    ).hexdigest()
     version = OntologyVersionRecord(
         id=str(uuid4()),
         workspace_id=workspace_id,
         version_number=next_version,
         message=message,
         snapshot_json=snapshot,
-        ossie_json=ossie,
         validation_json=report,
         sha256=sha256,
         published_by=user_id,
     )
     session.add(version)
     session.flush()
-    sync_identities(
-        session, workspace_id, snapshot, user_id=user_id, now=datetime.now(UTC)
-    )
+    sync_identities(session, workspace_id, snapshot, user_id=user_id, now=datetime.now(UTC))
     changed = session.execute(
         update(WorkspaceRecord)
         .where(

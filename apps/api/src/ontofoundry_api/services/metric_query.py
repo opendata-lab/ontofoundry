@@ -1,24 +1,19 @@
-"""Read-only execution projections of native Ossie metrics; never edit the model."""
+"""Bounded aggregate previews over registered core datasets."""
 
-import json
-import math
-from dataclasses import dataclass
+from decimal import Decimal
 
 import sqlglot
-from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlglot import Dialect, exp
 from sqlglot.errors import ErrorLevel, SqlglotError
 
-from ontofoundry_api.db_models import ConnectionRecord
-from ontofoundry_api.domain.models import OntologyDraft
-from ontofoundry_api.domain.semantic_views import connection_alias
-from ontofoundry_api.services.errors import NotFoundError, ServiceError
-from ontofoundry_api.services.ontology_context import synonyms
-from ontofoundry_api.services.ontology_query import snapshot_of
+from ontofoundry_api.domain.core import RatioMetric, SimpleMetric
+from ontofoundry_api.domain.expressions import resolve_metric_expression
+from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.validation import physical_value_kind
+from ontofoundry_api.services.dataset_sources import resolve_dataset
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.readonly import connect_readonly
 
-# Exact classes: allowing Func/Expression subclasses would admit UDFs or queries.
 SCALARS = {
     exp.Column,
     exp.Identifier,
@@ -91,35 +86,10 @@ CAST_TYPES = {
     "TIMESTAMP",
     "TIMESTAMPTZ",
 }
-DIALECTS = {
-    "POSTGRES": "postgres",
-    "POSTGRESQL": "postgres",
-    "MYSQL": "mysql",
-    "DORIS": "mysql",
-    "SQLITE": "sqlite",
-    "ANSI_SQL": "",
-}
-OPERATORS = {
-    "=": exp.EQ,
-    "!=": exp.NEQ,
-    "<": exp.LT,
-    "<=": exp.LTE,
-    ">": exp.GT,
-    ">=": exp.GTE,
-}
 
 
-def invalid(message, code="METRIC_QUERY_INVALID"):
+def invalid(message, code="expression_unsupported"):
     return ServiceError(message, code=code, status_code=422)
-
-
-def expression_for(expression, target):
-    dialects = expression.dialects
-    chosen = next((d for d in dialects if DIALECTS.get(d.dialect.upper()) == target), None)
-    chosen = chosen or next((d for d in dialects if d.dialect.upper() == "ANSI_SQL"), None)
-    if chosen is None:
-        raise invalid("没有目标方言或 ANSI_SQL 表达式", "METRIC_DIALECT_UNSUPPORTED")
-    return parse_expression(chosen.expression, DIALECTS[chosen.dialect.upper()])
 
 
 def parse_expression(value, dialect):
@@ -171,25 +141,6 @@ def check_ast(tree, *, aggregate):
                     parent = parent.parent
 
 
-def vendor_parameters(item):
-    result = {}
-    for extension in item.custom_extensions:
-        if extension.vendor_name != "ONTOFOUNDRY":
-            continue
-        try:
-            data = json.loads(extension.data)
-        except (ValueError, TypeError):
-            continue  # unrelated opaque vendor payloads remain untouched
-        if not isinstance(data, dict):
-            continue
-        for key in ("time_semantics", "time_field"):
-            if key in data:
-                if key in result and result[key] != data[key]:
-                    raise invalid("平台时间参数存在重复键冲突", "METRIC_TIME_INVALID")
-                result[key] = data[key]
-    return result
-
-
 def serialize(tree, dialect):
     # Render driver-native named binds from AST nodes. Do not replace text inside
     # literals, and do not feed SQLAlchemy.text literals containing ':name'.
@@ -221,389 +172,295 @@ def serialize(tree, dialect):
         raise invalid("表达式无法无损转译到目标方言", "METRIC_DIALECT_UNSUPPORTED") from exc
 
 
-@dataclass
-class MetricPlan:
-    sql: str
-    parameters: dict
-    columns: list[str]
-    limit: int
+def dataset_for(draft, metric):
+    if isinstance(metric, RatioMetric):
+        metric = next(m for m in draft.metrics if m.id == metric.numerator_id)
+    return DraftIndex(draft).datasets[metric.dataset_id]
+
+
+def value_kind(draft, metric):
+    if isinstance(metric, RatioMetric):
+        return "decimal"
+    if not isinstance(metric, SimpleMetric):
+        return metric.value_kind
+    if metric.aggregation in {"count", "count_distinct"}:
+        return "integer"
+    if metric.aggregation in {"avg", "median"}:
+        return "decimal"
+    dataset = dataset_for(draft, metric)
+    column = next(
+        (c for c in dataset.columns or [] if c.name == metric.measure.column), None
+    )
+    return physical_value_kind(column.physical_type) if column else None
 
 
 class MetricCompiler:
-    def __init__(self, draft, metric, dialect=""):
-        self.draft, self.metric, self.dialect = draft, metric, dialect
-        self.model = next(
-            m for m in draft.semantic_models if m.id == metric.semantic_model_id
+    def __init__(
+        self, draft, metric, *, db=None, workspace_id=None, source=None, time_range=None
+    ):
+        self.draft, self.metric = draft, metric
+        self.dataset = dataset_for(draft, metric)
+        self.source = source or resolve_dataset(db, workspace_id, self.dataset)
+        self.dialect = (
+            "postgres"
+            if self.source.connection.kind == "postgresql"
+            else "mysql"
+            if self.source.connection.kind in {"mysql", "doris"}
+            else self.source.connection.kind
         )
-        self.datasets = {
-            d.name: d for d in draft.datasets if d.semantic_model_id == self.model.id
-        }
-        self.tree = expression_for(metric.expression, dialect)
-        check_ast(self.tree, aggregate=True)
-        references = list(self.tree.find_all(exp.Column))
-        if any(len(c.parts) != 2 or c.table not in self.datasets for c in references):
-            raise invalid(
-                "指标字段必须引用同一语义模型内的 dataset.field", "METRIC_FIELD_INVALID"
-            )
-        names = list(dict.fromkeys(c.table for c in references))
-        self.involved = [self.datasets[n] for n in names]
-        for column in references:
-            if not any(
-                f.dataset_id == self.datasets[column.table].id and f.name == column.name
-                for f in draft.dataset_fields
-            ):
-                raise invalid(
-                    "指标引用了不存在的字段：" + column.sql(), "METRIC_FIELD_INVALID"
-                )
-        self.dataset = self.involved[0] if len(self.involved) == 1 else None
-        self.fields = {
-            f.name: f
-            for f in draft.dataset_fields
-            if self.dataset and f.dataset_id == self.dataset.id
-        }
-        self.table = None
-        self.time_semantics, self.time_field = None, None
-        if self.dataset:
-            try:
-                tables = Dialect.get_or_raise("").parse_into(exp.Table, self.dataset.source)
-                if len(tables) != 1 or tables[0] is None:
-                    raise ValueError("not one table")
-                table = tables[0]
-                if (
-                    any(type(n) not in {exp.Table, exp.Identifier} for n in table.walk())
-                    or not table.name
-                ):
-                    raise ValueError("not a table")
-                self.table = table
-            except (SqlglotError, ValueError, RecursionError) as exc:
-                raise invalid(
-                    "数据集 source 必须是限定物理表名", "METRIC_SOURCE_UNSUPPORTED"
-                ) from exc
-            parameters = {**vendor_parameters(self.dataset), **vendor_parameters(metric)}
-            self.time_semantics = parameters.get(
-                "time_semantics", "snapshot" if "snapshot_date" in self.fields else "event"
-            )
-            self.time_field = parameters.get(
-                "time_field", "snapshot_date" if "snapshot_date" in self.fields else None
-            )
-            if (
-                self.time_semantics not in ("snapshot", "rolling", "event")
-                or (
-                    self.time_field is not None
-                    and (
-                        not isinstance(self.time_field, str)
-                        or self.time_field not in self.fields
-                    )
-                )
-                or (self.time_semantics != "event" and self.time_field is None)
-            ):
-                raise invalid(
-                    "时间参数必须指定合法语义及当前数据集时间字段", "METRIC_TIME_INVALID"
-                )
-            # Validate only referenced fields here; unused complex fields do not
-            # make an otherwise executable metric read-only.
-            self.rewritten = self.tree.transform(
-                lambda n: self.field(n.name) if isinstance(n, exp.Column) else n
-            )
-            if self.time_semantics in ("snapshot", "rolling"):
-                self.field(self.time_field)
+        self.params = {}
+        self.time_range = time_range
+        self.snapshot_column = self.dataset.snapshot_date_column
+        if not self.dataset.columns:
+            raise invalid("数据集列清单尚未就绪，无法预览", "binding_not_ready")
+        self.known = {c.name for c in self.dataset.columns}
 
-    def field_name(self, name):
-        prefix = self.dataset.name + "."
-        name = name[len(prefix) :] if name.startswith(prefix) else name
-        if name not in self.fields:
-            raise invalid("字段不属于当前数据集：" + name, "METRIC_FIELD_INVALID")
-        return name
+    def identifier(self, name):
+        return exp.to_identifier(name, quoted=True).sql(dialect=self.dialect)
 
-    def field(self, name):
-        tree = expression_for(self.fields[name].expression, self.dialect)
-        check_ast(tree, aggregate=False)
-        for column in tree.find_all(exp.Column):
-            qualifiers = [p.name for p in column.parts[:-1]]
-            table_parts = [p.name for p in self.table.parts]
-            if qualifiers and qualifiers not in (
-                [self.dataset.name],
-                table_parts,
-                [self.table.name],
-            ):
-                raise invalid(
-                    "字段表达式引用了其他表：" + column.sql(), "METRIC_FIELD_INVALID"
-                )
-            column.set("table", exp.to_identifier("__metric_source", quoted=True))
-            column.set("db", None)
-            column.set("catalog", None)
-            column.set("this", exp.to_identifier(column.name, quoted=True))
-        return exp.Paren(this=tree)
+    def column(self, name):
+        if name not in self.known:
+            raise invalid("指标列未登记", "binding_not_ready")
+        return "d." + self.identifier(name)
 
-    def explanation(self):
-        names = {d.name for d in self.involved}
-        joins = [
-            {
-                "name": r.name,
-                "from": r.from_,
-                "to": r.to,
-                "from_columns": list(r.from_columns),
-                "to_columns": list(r.to_columns),
-            }
-            for r in self.draft.dataset_relationships
-            if r.semantic_model_id == self.model.id and r.from_ in names and r.to in names
+    def bind(self, value):
+        name = f"p{len(self.params)}"
+        self.params[name] = value
+        return f"%({name})s" if self.dialect in {"mysql", "postgres"} else ":" + name
+
+    def table(self):
+        schema = self.source.schema
+        if self.dialect == "sqlite":
+            schema = None
+        return (self.identifier(schema) + "." if schema else "") + self.identifier(
+            self.dataset.table_name
+        )
+
+    def month(self, value):
+        if self.dialect == "postgres":
+            return f"DATE_TRUNC('month', {value})"
+        if self.dialect == "mysql":
+            return f"DATE_FORMAT({value}, '%%Y-%%m-01')"
+        if self.dialect == "sqlite":
+            return f"strftime('%Y-%m-01', {value})"
+        raise invalid("当前引擎不支持月趋势", "dialect_unsupported")
+
+    def range_predicate(self, column):
+        if not self.time_range:
+            return []
+        return [
+            f"{column} >= {self.bind(self.time_range['start'])}",
+            f"{column} < {self.bind(self.time_range['end'])}",
         ]
+
+    def predicate(self, cond):
+        column, values, op = self.column(cond.column.column), cond.values, cond.operator
+        if op in {"is_null", "not_null"}:
+            return column + (" IS NULL" if op == "is_null" else " IS NOT NULL")
+        if op in {"in", "not_in"}:
+            return (
+                f"{column} {'NOT IN' if op == 'not_in' else 'IN'} ("
+                + ", ".join(self.bind(v) for v in values)
+                + ")"
+            )
+        if op == "between":
+            return f"{column} BETWEEN {self.bind(values[0])} AND {self.bind(values[1])}"
+        if values[0] is None and op in {"eq", "ne"}:
+            return column + (" IS NULL" if op == "eq" else " IS NOT NULL")
+        operators = {"eq": "=", "ne": "<>", "gt": ">", "ge": ">=", "lt": "<", "le": "<="}
+        return f"{column} {operators[op]} {self.bind(values[0])}"
+
+    def aggregate(self, metric):
+        if isinstance(metric, SimpleMetric):
+            if metric.aggregation == "count":
+                return "COUNT(*)"
+            measure = self.column(metric.measure.column)
+            if metric.aggregation == "count_distinct":
+                return f"COUNT(DISTINCT {measure})"
+            if metric.aggregation == "median":
+                if self.dialect != "postgres":
+                    raise invalid("当前引擎不支持中位数预览", "dialect_unsupported")
+                return f"PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {measure})"
+            return f"{metric.aggregation.upper()}({measure})"
+        resolve_metric_expression(self.draft, metric)
+        tree = parse_expression(metric.expression, "")
+        check_ast(tree, aggregate=True)
+        for column in tree.find_all(exp.Column):
+            self.column(column.name)
+            column.set("table", exp.to_identifier("d"))
+            column.set("this", exp.to_identifier(column.name, quoted=True))
+        for node in list(tree.find_all(exp.Literal)):
+            if not node.is_string:
+                continue
+            name = f"p{len(self.params)}"
+            self.params[name] = node.this if node.is_string else Decimal(node.this)
+            node.replace(exp.Placeholder(this=name))
+        return serialize(tree, self.dialect)
+
+    def component(self, metric, trend):
+        aggregate = self.aggregate(metric)
+        table = self.table()
+        where = (
+            [self.predicate(f) for f in metric.filters]
+            if isinstance(metric, SimpleMetric)
+            else []
+        )
+        time = self.column(metric.time_field.column) if metric.time_field else None
+        snap = self.column(self.snapshot_column) if self.snapshot_column else None
+        if self.time_range and not time and not snap:
+            raise invalid("指标没有时间字段，无法应用范围", "time_field_required")
+        period = self.month(snap or time) if trend and (snap or time) else None
+        if trend and period is None:
+            raise invalid("指标没有时间字段，无法生成趋势", "time_field_required")
+        if snap:
+            global_column = self.identifier(self.snapshot_column)
+            selection = self.range_predicate(global_column)
+            selection_sql = " WHERE " + " AND ".join(selection) if selection else ""
+            if trend:
+                global_month = self.month(global_column)
+                where.append(
+                    f"{snap} IN (SELECT MAX({global_column}) FROM {table}{selection_sql} GROUP BY {global_month})"
+                )
+            else:
+                where.append(
+                    f"{snap} = (SELECT MAX({global_column}) FROM {table}{selection_sql})"
+                )
+        elif time:
+            where += self.range_predicate(time)
+        select_fields = (period + " AS period, " if trend else "") + aggregate + " AS value"
+        if snap:
+            select_fields += f", MAX({snap}) AS snapshot_date"
+        return (
+            "SELECT "
+            + select_fields
+            + f" FROM {table} AS d"
+            + (" WHERE " + " AND ".join(where) if where else "")
+            + (f" GROUP BY {period}" if trend else "")
+        )
+
+    def compile(self, trend=False):
+        if isinstance(self.metric, RatioMetric):
+            components = [
+                next(m for m in self.draft.metrics if m.id == mid)
+                for mid in (self.metric.numerator_id, self.metric.denominator_id)
+            ]
+            numerator, denominator = [self.component(m, trend) for m in components]
+            if trend:
+                sql = f"WITH n AS ({numerator}), d AS ({denominator}), periods AS (SELECT period FROM n UNION SELECT period FROM d) SELECT periods.period, 1.0*n.value/NULLIF(d.value,0) AS value FROM periods LEFT JOIN n ON n.period=periods.period LEFT JOIN d ON d.period=periods.period ORDER BY periods.period"
+            else:
+                sql = (
+                    f"WITH n AS ({numerator}), d AS ({denominator}) SELECT 1.0*n.value/NULLIF(d.value,0) AS value"
+                    + (", n.snapshot_date AS snapshot_date" if self.snapshot_column else "")
+                    + " FROM n CROSS JOIN d"
+                )
+        else:
+            sql = self.component(self.metric, trend) + (" ORDER BY period" if trend else "")
+        # Only generated SELECT statements reach the executor; user expressions
+        # have already passed the exact AST and dataset-column allowlists.
         return {
-            "datasets": [
-                {"id": str(d.id), "name": d.name, "source": d.source} for d in self.involved
-            ],
-            "dataset_relationships": joins,
-            "reason": "指标引用多个数据集，P4 暂只解释、不执行"
-            if len(names) > 1
-            else "指标没有显式引用数据集，无法确定数据源",
+            "sql": sql,
+            "params": dict(self.params),
+            "dialect": self.dialect,
+            "database": self.source.database,
         }
 
-    def compile(self, *, group_by=None, filters=None, limit=100, as_of=None):
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
-            raise invalid("limit 必须为 1 到 1000 的整数")
-        group_by, filters = group_by or [], filters or []
-        if (
-            not isinstance(group_by, list)
-            or len(group_by) > 100
-            or any(not isinstance(f, str) for f in group_by)
-        ):
-            raise invalid("group_by 必须为当前数据集字段列表")
-        names = [self.field_name(n) for n in group_by]
-        if len(names) != len(set(names)) or self.metric.name in names:
-            raise invalid("分组列重复或与指标名相同")
-        if not isinstance(filters, list) or len(filters) > 100:
-            raise invalid("filters 必须为结构化条件列表，最多 100 项")
-        params, conditions, time_filters = {}, [], []
 
-        def bind(value):
-            if value is None or not isinstance(value, (str, int, float, bool)):
-                raise invalid("过滤值必须为非空标量；空值请使用 is_null/not_null")
-            if isinstance(value, float) and not math.isfinite(value):
-                raise invalid("过滤数值必须为有限数")
-            key = "p" + str(len(params))
-            params[key] = value
-            return exp.Placeholder(this=key)
-
-        for f in filters:
-            if (
-                not isinstance(f, dict)
-                or set(f) - {"field", "op", "value"}
-                or not isinstance(f.get("field"), str)
-            ):
-                raise invalid("过滤条件必须包含 field、op 和需要的 value")
-            name = self.field_name(f["field"])
-            field, op, value = self.field(name), f.get("op"), f.get("value")
-            if not isinstance(op, str):
-                raise invalid("过滤运算符必须为字符串")
-            if name == self.time_field:
-                time_filters.append(f)
-            if op in OPERATORS:
-                condition = OPERATORS[op](this=field, expression=bind(value))
-            elif op == "in":
-                if not isinstance(value, list) or not 1 <= len(value) <= 1000:
-                    raise invalid("in 需要 1 到 1000 个标量值")
-                condition = exp.In(this=field, expressions=[bind(v) for v in value])
-            elif op == "between":
-                if not isinstance(value, list) or len(value) != 2:
-                    raise invalid("between 需要两个标量值")
-                condition = exp.Between(this=field, low=bind(value[0]), high=bind(value[1]))
-            elif op in ("is_null", "not_null"):
-                if "value" in f and value is not None:
-                    raise invalid("空值条件不接受 value")
-                condition = exp.Is(this=field, expression=exp.Null())
-                if op == "not_null":
-                    condition = exp.Not(this=condition)
-            else:
-                raise invalid("不支持的过滤运算符")
-            conditions.append(condition)
-
-        if self.time_semantics in ("snapshot", "rolling"):
-            if as_of is not None:
-                if time_filters or not isinstance(as_of, str) or not as_of.strip():
-                    raise invalid(
-                        "as_of 必须为日期字符串，且不能同时过滤时间字段",
-                        "METRIC_TIME_INVALID",
-                    )
-                date = self.field(self.time_field)
-                latest = (
-                    exp.select(exp.Max(this=date.copy()))
-                    .from_(self.table.copy().as_("__metric_source"))
-                    .where(exp.LTE(this=date.copy(), expression=bind(as_of)))
-                )
-                conditions.append(exp.EQ(this=date, expression=exp.Subquery(this=latest)))
-            elif len(time_filters) != 1 or time_filters[0].get("op") != "=":
-                raise invalid(
-                    f"快照/滚动指标不能跨快照聚合，请对 {self.time_field} 等值过滤或提供 as_of",
-                    "METRIC_SNAPSHOT_REQUIRED",
-                )
-        elif as_of is not None:
-            raise invalid(
-                "事件指标请使用时间字段 filters，不能使用 as_of", "METRIC_TIME_INVALID"
-            )
-        query = exp.select(
-            *[self.field(n).as_(n, quoted=True) for n in names],
-            self.rewritten.copy().as_(self.metric.name, quoted=True),
-        ).from_(self.table.copy().as_("__metric_source"))
-        if conditions:
-            query = query.where(exp.and_(*conditions))
-        if names:
-            query = query.group_by(*[self.field(n) for n in names]).order_by(
-                *[exp.column(n, quoted=True) for n in names]
-            )
-        query = query.limit(limit + 1)
-        return MetricPlan(
-            serialize(query, self.dialect), params, names + [self.metric.name], limit
-        )
+def compile_metric_reference(draft, metric, *, db, workspace_id):
+    return MetricCompiler(draft, metric, db=db, workspace_id=workspace_id).compile()
 
 
-def connection_for(db, workspace_id, model):
-    return db.scalar(
-        select(ConnectionRecord).where(
-            ConnectionRecord.workspace_id == workspace_id,
-            ConnectionRecord.name == connection_alias(model),
-        )
+def compile_metric_preview(
+    draft, metric, *, db, workspace_id, time_range=None, trend=False
+):
+    return MetricCompiler(
+        draft, metric, db=db, workspace_id=workspace_id, time_range=time_range
+    ).compile(trend)
+
+
+def scalar(value):
+    if isinstance(value, Decimal):
+        return str(value)
+    return value.isoformat() if hasattr(value, "isoformat") else value
+
+
+def execute_metric_preview(
+    db, workspace_id, draft, metric, settings, *, time_range=None, trend=False
+):
+    source = resolve_dataset(db, workspace_id, dataset_for(draft, metric))
+    total = compile_metric_preview(
+        draft, metric, db=db, workspace_id=workspace_id, time_range=time_range
     )
-
-
-def target_dialect(connection):
-    return DIALECTS.get(connection.kind.upper(), "") if connection else ""
-
-
-def metrics_for_draft(db, workspace_id, draft, *, version_id=None, query="", semantic_model=None):
-    items = []
-    for metric in draft.metrics:
-        model = next(m for m in draft.semantic_models if m.id == metric.semantic_model_id)
-        if semantic_model and semantic_model not in (
-            str(model.id),
-            model.name,
-            model.map_name,
-        ):
-            continue
-        aliases = synonyms(metric.ai_context)
-        display = draft.extension_v4.display_names.get(metric.id) or next(
-            iter(aliases), metric.name
+    trend_query = (
+        compile_metric_preview(
+            draft,
+            metric,
+            db=db,
+            workspace_id=workspace_id,
+            time_range=time_range,
+            trend=True,
         )
-        if (
-            query.casefold()
-            not in " ".join(
-                [metric.name, display, metric.description or "", *aliases]
-            ).casefold()
-        ):
-            continue
-        item = dict(
-            id=str(metric.id),
-            name=metric.name,
-            technical_name=metric.name,
-            display_name=display,
-            synonyms=aliases,
-            description=metric.description,
-            semantic_model={"id": str(model.id), "name": model.name},
-            connection_alias=connection_alias(model),
-            executable=False,
-            reason=None,
-            datasets=[],
-            group_by_fields=[],
-            filter_fields=[],
+        if trend
+        else None
+    )
+    with connect_readonly(source.connection, settings, timeout_ms=10000) as conn:
+        rows = list(conn.exec_driver_sql(total["sql"], total["params"]).mappings())
+        trend_rows = (
+            list(conn.exec_driver_sql(trend_query["sql"], trend_query["params"]).mappings())
+            if trend_query
+            else []
         )
+    result = {
+        "status": "ok",
+        "value": scalar(rows[0]["value"]) if rows else None,
+        "value_kind": value_kind(draft, metric),
+        "total_query": total,
+        "trend_query": trend_query,
+        "trend": [
+            {"period": str(r["period"])[:10], "value": scalar(r["value"])}
+            for r in trend_rows
+        ]
+        if trend
+        else None,
+        "snapshot_dates": [],
+        "warnings": [],
+    }
+    for period, row in [(None, r) for r in rows] + [
+        (str(r["period"])[:10], r) for r in trend_rows
+    ]:
+        if "snapshot_date" in row:
+            result["snapshot_dates"].append(
+                {
+                    "dataset_id": str(dataset_for(draft, metric).id),
+                    "period": period,
+                    "date": scalar(row["snapshot_date"]),
+                }
+            )
+    return result
+
+
+def metric_projection(draft, metric, *, db=None, workspace_id=None):
+    result = {
+        **metric.model_dump(mode="json"),
+        "value_kind": value_kind(draft, metric),
+        "binding_status": "unbound",
+    }
+    if isinstance(metric, RatioMetric):
+        components = {str(m.id): m for m in draft.metrics}
+        result.update(
+            dataset_id=str(dataset_for(draft, metric).id),
+            components={
+                "numerator": components[str(metric.numerator_id)].model_dump(mode="json"),
+                "denominator": components[str(metric.denominator_id)].model_dump(
+                    mode="json"
+                ),
+            },
+        )
+    if db is not None:
         try:
-            connection = connection_for(db, workspace_id, model)
-            declared = expression_for(metric.expression, target_dialect(connection))
-            names = {c.table for c in declared.find_all(exp.Column) if len(c.parts) == 2}
-            item["datasets"] = [
-                dict(id=str(d.id), name=d.name, source=d.source)
-                for d in draft.datasets
-                if d.semantic_model_id == model.id and d.name in names
-            ]
-            compiler = MetricCompiler(draft, metric, target_dialect(connection))
-            item.update(compiler.explanation())
-            if compiler.dataset:
-                fields = []
-                for field in compiler.fields.values():
-                    try:
-                        compiler.field(field.name)
-                    except ServiceError:
-                        continue
-                    fields.append(
-                        dict(
-                            name=field.name,
-                            datatype=field.datatype,
-                            synonyms=synonyms(field.ai_context),
-                            dimension=field.dimension,
-                        )
-                    )
-                item.update(
-                    executable=connection is not None,
-                    reason=None
-                    if connection
-                    else "尚未配置数据集对应的数据连接，仅可生成 SQL",
-                    group_by_fields=fields,
-                    filter_fields=fields,
-                    time_semantics=compiler.time_semantics,
-                    time_field=compiler.time_field,
-                    requires_snapshot_filter=compiler.time_semantics
-                    in ("snapshot", "rolling"),
-                )
-        except ServiceError as exc:
-            item.update(reason=exc.message, reason_code=exc.code)
-        items.append(item)
-    return {"version_id": version_id, "items": items}
-
-
-def list_metrics(db, version, *, query="", semantic_model=None):
-    return metrics_for_draft(db, version.workspace_id, OntologyDraft.model_validate(snapshot_of(version)), version_id=version.id, query=query, semantic_model=semantic_model)
-
-
-def query_metric(db, version, settings, metric_id, **arguments):
-    draft = OntologyDraft.model_validate(snapshot_of(version))
-    metric = next((m for m in draft.metrics if str(m.id) == metric_id), None)
-    if metric is None:
-        raise NotFoundError("已发布版本中不存在此指标")
-    model = next(m for m in draft.semantic_models if m.id == metric.semantic_model_id)
-    connection = connection_for(db, version.workspace_id, model)
-    compiler = MetricCompiler(draft, metric, target_dialect(connection))
-    value = dict(
-        metric_id=metric_id,
-        version_id=version.id,
-        sql=None,
-        columns=[],
-        rows=[],
-        truncated=False,
-        warnings=[],
-        executable=False,
-        dialect=target_dialect(connection) or "ANSI_SQL",
-        connection_alias=connection_alias(model),
-        datasets=compiler.explanation()["datasets"],
-    )
-    if compiler.dataset is None:
-        return {**value, **compiler.explanation()}
-    plan = compiler.compile(**arguments)
-    value.update(sql=plan.sql, parameters=plan.parameters, columns=plan.columns)
-    if connection is None:
-        return {**value, "reason": "尚未配置数据集对应的数据连接，仅返回 SQL，不执行"}
-    from ontofoundry_api.api.connections import connect_readonly
-
-    try:
-        with connect_readonly(
-            connection, settings, timeout_ms=settings.metric_query_timeout_seconds * 1000
-        ) as sql:
-            rows = sql.exec_driver_sql(plan.sql, plan.parameters).fetchmany(plan.limit + 1)
-    except (SQLAlchemyError, HTTPException) as exc:
-        underlying = getattr(exc, "orig", None) or getattr(exc, "__cause__", None)
-        underlying = getattr(underlying, "orig", underlying)
-        if (
-            getattr(underlying, "sqlstate", None) == "57014"
-            or (getattr(underlying, "args", ()) and underlying.args[0] in (3024, 1205))
-            or isinstance(underlying, TimeoutError)
-        ):
-            raise invalid("指标查询超时，请缩小查询范围", "METRIC_QUERY_TIMEOUT") from exc
-        raise invalid(
-            "指标只读查询失败，请检查连接、物理字段和字段类型", "METRIC_QUERY_FAILED"
-        ) from exc
-    value.update(
-        executable=True,
-        rows=[dict(zip(plan.columns, row, strict=True)) for row in rows[: plan.limit]],
-        truncated=len(rows) > plan.limit,
-    )
-    if value["truncated"]:
-        value["warnings"].append(f"结果超过 limit={plan.limit}，仅返回前 {plan.limit} 行")
-    return value
+            result["sql_reference"] = compile_metric_reference(
+                draft, metric, db=db, workspace_id=workspace_id
+            )
+            result["binding_status"] = "bound"
+        except ServiceError:
+            pass
+    return result

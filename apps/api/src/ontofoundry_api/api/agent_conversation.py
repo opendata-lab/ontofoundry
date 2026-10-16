@@ -75,7 +75,9 @@ class InteractionRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
-def run_mcp_access(request, workspace_id, session_id, run_token, item, user_id) -> dict[str, Any]:
+def run_mcp_access(
+    request, workspace_id, session_id, run_token, item, user_id
+) -> dict[str, Any]:
     settings = request.app.state.settings
     base = (settings.public_base_url or str(request.base_url)).rstrip("/")
     return {
@@ -127,12 +129,15 @@ def _compact_tool_io(item: dict[str, Any]) -> dict[str, Any]:
     elif isinstance(output, list):
         item["output"] = [
             {**part, "text": _shorten(part["text"], TOOL_TEXT_LIMIT, "工具输出")}
-            if isinstance(part, dict) and isinstance(part.get("text"), str) else part
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+            else part
             for part in output
         ]
     if isinstance(item.get("input"), dict):
         item["input"] = {
-            key: _shorten(value, TOOL_TEXT_LIMIT, "工具输入") if isinstance(value, str) else value
+            key: _shorten(value, TOOL_TEXT_LIMIT, "工具输入")
+            if isinstance(value, str)
+            else value
             for key, value in item["input"].items()
         }
     return item
@@ -164,16 +169,19 @@ def compact_message(message: dict[str, Any]) -> dict[str, Any]:
         blocks = None
     if isinstance(blocks, list):
         message["blocks"] = [
-            _compact_tool_io(block) if isinstance(block, dict) and block.get("type") == "tool_use"
+            _compact_tool_io(block)
+            if isinstance(block, dict) and block.get("type") == "tool_use"
             else {**block, "text": _shorten(block["text"], REASONING_LIMIT, "思考过程")}
-            if isinstance(block, dict) and block.get("type") == "thinking"
+            if isinstance(block, dict)
+            and block.get("type") == "thinking"
             and isinstance(block.get("text"), str)
             else block
             for block in blocks
         ]
     if isinstance(records, list):
         message["records"] = [
-            compact_event(record) if isinstance(record, dict) else record for record in records
+            compact_event(record) if isinstance(record, dict) else record
+            for record in records
         ]
     return message
 
@@ -201,7 +209,9 @@ def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
             and USER_MESSAGE_MARK in content
         ):
             message = {**message, "content": content.split(USER_MESSAGE_MARK, 1)[1]}
-        shown.append(json.loads(redact_credentials(json.dumps(message, ensure_ascii=False))))
+        shown.append(
+            json.loads(redact_credentials(json.dumps(message, ensure_ascii=False)))
+        )
     return shown
 
 
@@ -510,10 +520,15 @@ async def sync_session_run(app, workspace_id: str, session_id: str) -> None:
     """
     now = time.monotonic()
     with _sync_lock:
-        if session_id in _syncing or now - _last_sync.get(session_id, -1e9) < _SYNC_INTERVAL_SECONDS:
+        if (
+            session_id in _syncing
+            or now - _last_sync.get(session_id, -1e9) < _SYNC_INTERVAL_SECONDS
+        ):
             return
         if len(_last_sync) > 1024:  # forget sessions no longer throttled
-            for key in [k for k, at in _last_sync.items() if now - at >= _SYNC_INTERVAL_SECONDS]:
+            for key in [
+                k for k, at in _last_sync.items() if now - at >= _SYNC_INTERVAL_SECONDS
+            ]:
                 del _last_sync[key]
         _syncing.add(session_id)
         _last_sync[session_id] = now
@@ -529,7 +544,11 @@ async def sync_session_run(app, workspace_id: str, session_id: str) -> None:
 async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
     with app.state.session_factory() as db:
         item = db.get(ModelingSessionRecord, session_id)
-        if item is None or item.workspace_id != workspace_id or not needs_run_sync(app, item):
+        if (
+            item is None
+            or item.workspace_id != workspace_id
+            or not needs_run_sync(app, item)
+        ):
             return
         task_id = str(item.dataagent_task_id)
         topic_id = str(item.dataagent_topic_id or "")
@@ -542,8 +561,14 @@ async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
             str(task.get("task_status") or "") == "suspended"
             and not task.get("cancel_requested_at")
             and topic_id
-            and (replacement := replacement_task_id(await dataagent.messages(topic_id), task_id))
-            and _adopt_replacement(app.state.session_factory, session_id, task_id, replacement)
+            and (
+                replacement := replacement_task_id(
+                    await dataagent.messages(topic_id), task_id
+                )
+            )
+            and _adopt_replacement(
+                app.state.session_factory, session_id, task_id, replacement
+            )
         ):
             task_id = replacement
             task = await dataagent.task(replacement)
@@ -738,7 +763,7 @@ async def send_message(
         if item.title in {"新的建模会话", "未命名建模会话"}
         else item.title
     )
-    # Modeling sessions and new runs use v3.
+    # Modeling sessions and new runs use core-1.
     draft = session_draft(item)
     uploaded_ids = set(item.uploaded_material_ids or [])
     # Where earlier runs put material in this topic, read before the claim
@@ -753,8 +778,7 @@ async def send_message(
     # so the run's source revision is the one after it.
     manifest = {
         "run_token": run_token,
-        "draft_schema_version": "3",
-        "hash_algorithm": draft["hash_algorithm"],
+        "draft_schema_version": "core-1",
         "workspace_id": workspace_id,
         "session_id": session_id,
         "base_version_id": item.base_version_id,
@@ -765,7 +789,7 @@ async def send_message(
         "materials": [{"id": m.id, "sha256": m.sha256} for m in materials],
         "producer": {
             "agent_id": request.app.state.settings.dataagent_agent_id,
-            "skill": "md2ossie",
+            "skill": "ontofoundry-modeling",
             "mode": mode,
         },
         "result_contract": request.app.state.settings.modeling_result_contract
@@ -881,7 +905,9 @@ async def send_message(
             )
             mcp = None
             if item.base_version_id:
-                access = run_mcp_access(request, workspace_id, session_id, run_token, item, user.id)
+                access = run_mcp_access(
+                    request, workspace_id, session_id, run_token, item, user.id
+                )
                 uploaded_access = await dataagent.upload(
                     topic_id,
                     f"ontofoundry-mcp-{run_token}.json",

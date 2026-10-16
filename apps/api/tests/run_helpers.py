@@ -40,4 +40,6 @@ def install_download(monkeypatch, values) -> list[str]:
 
 
 def reconcile(client, session_id: str, task_id: str = TASK_ID) -> str:
-    return asyncio.run(reconcile_run(client.app, str(DEMO_WORKSPACE_ID), session_id, task_id))
+    return asyncio.run(
+        reconcile_run(client.app, str(DEMO_WORKSPACE_ID), session_id, task_id)
+    )

@@ -21,10 +21,17 @@ def _cell(value: Any) -> str:
 
 
 def _candidates(stem: str) -> list[str]:
-    return [stem, stem + "s", stem + "es", stem[:-1] + "ies" if stem.endswith("y") else stem]
+    return [
+        stem,
+        stem + "s",
+        stem + "es",
+        stem[:-1] + "ies" if stem.endswith("y") else stem,
+    ]
 
 
-def foreign_key_hints(tables: list[dict[str, Any]]) -> dict[str, list[tuple[str, str, str]]]:
+def foreign_key_hints(
+    tables: list[dict[str, Any]],
+) -> dict[str, list[tuple[str, str, str]]]:
     """(column, target table, how) per table: declared constraints first, then
     `<name>_id` columns that name another selected table with a single-column key."""
     keys = {
@@ -43,8 +50,11 @@ def foreign_key_hints(tables: list[dict[str, Any]]) -> dict[str, list[tuple[str,
                 continue
             stem = name[:-3].lower()
             target = next(
-                (other for other in _candidates(stem)
-                 if other in keys and other != table["name"] and len(keys[other]) == 1),
+                (
+                    other
+                    for other in _candidates(stem)
+                    if other in keys and other != table["name"] and len(keys[other]) == 1
+                ),
                 None,
             )
             if target and (name, target) not in found:
@@ -54,12 +64,18 @@ def foreign_key_hints(tables: list[dict[str, Any]]) -> dict[str, list[tuple[str,
 
 
 def tables_markdown(
-    *, source: str, kind: str, database: str, schema: str | None,
+    *,
+    source: str,
+    kind: str,
+    database: str,
+    schema: str | None,
     tables: list[dict[str, Any]],
 ) -> str:
     """`tables`: name, comment, row_count, columns (name, type, nullable,
     primary_key, comment), foreign_keys ({column, table}), samples (rows)."""
-    keys = {t["name"]: [c["name"] for c in t["columns"] if c.get("primary_key")] for t in tables}
+    keys = {
+        t["name"]: [c["name"] for c in t["columns"] if c.get("primary_key")] for t in tables
+    }
     hints = foreign_key_hints(tables)
     lines = [
         f"# 数据表结构：{source}",
@@ -76,10 +92,16 @@ def tables_markdown(
         name = table["name"]
         lines += [f"## 表 {name}", ""]
         lines.append(f"- 表说明：{table.get('comment') or '（无）'}")
-        lines.append(f"- 主键（key_column）：{', '.join(keys[name]) or '（无，需人工指定）'}")
+        lines.append(
+            f"- 主键（key_column）：{', '.join(keys[name]) or '（无，需人工指定）'}"
+        )
         if table.get("row_count") is not None:
             lines.append(f"- 行数：{table['row_count']}")
-        lines += ["", "| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |", "| --- | --- | --- | --- | --- | --- |"]
+        lines += [
+            "",
+            "| 字段 | 类型 | 可空 | 主键 | 说明 | 样例值 |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
         samples = table.get("samples") or []
         for column in table["columns"]:
             values = [_cell(row.get(column["name"])) for row in samples]

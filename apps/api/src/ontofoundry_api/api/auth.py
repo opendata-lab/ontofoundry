@@ -22,7 +22,10 @@ from ontofoundry_api.db_models import (
     ServiceTokenScopeRecord,
     UserRecord,
 )
-from ontofoundry_api.services.workspaces import ensure_dev_user, upsert_oauth_user
+from ontofoundry_api.services.workspaces import (
+    ensure_dev_user,
+    upsert_oauth_user,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 NONCE_COOKIE = "ontofoundry_oauth_nonce"
@@ -128,7 +131,9 @@ def safe_return_to(value: str) -> str:
     )
 
 
-def _run_principal(request: Request, session: Session, token: str, workspace_id: str | None) -> Principal:
+def _run_principal(
+    request: Request, session: Session, token: str, workspace_id: str | None
+) -> Principal:
     from ontofoundry_api.db_models import ModelingSessionRecord
     from ontofoundry_api.services.run_credentials import verify
     from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
@@ -142,6 +147,9 @@ def _run_principal(request: Request, session: Session, token: str, workspace_id:
         or grant.workspace_id != workspace_id
         or item.dataagent_run_token != grant.run_token
         or item.task_status not in ACTIVE_RUN_STATUSES
+        or not __import__(
+            "ontofoundry_api.services.workspaces", fromlist=["membership_role"]
+        ).membership_role(session, grant.workspace_id, grant.user_id)
     ):
         raise HTTPException(401, "建模运行凭据无效、已失效或不属于当前空间")
     user = session.get(UserRecord, grant.user_id)

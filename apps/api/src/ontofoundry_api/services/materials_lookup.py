@@ -17,7 +17,9 @@ def material_lookup(db, settings, workspace_id: str) -> MaterialLookup:
             else:
                 path = settings.data_dir / workspace_id / (record.sha256 + ".md")
                 lines = (
-                    path.read_text(encoding="utf-8-sig").splitlines() if path.is_file() else []
+                    path.read_text(encoding="utf-8-sig").splitlines()
+                    if path.is_file()
+                    else []
                 )
                 cache[material_id] = (record.sha256, lines)
         return cache[material_id]

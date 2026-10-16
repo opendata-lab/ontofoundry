@@ -1,0 +1,539 @@
+"""Four read-only ontology tools with authorization-bound segmented pagination."""
+
+import json
+from copy import deepcopy
+from typing import Literal
+from uuid import UUID
+
+from pydantic import Field
+
+from ontofoundry_api.domain.bindings import resolve_binding
+from ontofoundry_api.domain.core import CoreDraft, Strict
+from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.instance_display import document_display_text
+from ontofoundry_api.domain.snapshot import empty_snapshot
+from ontofoundry_api.services.access import (
+    authorization_fingerprint,
+    can_read_instances,
+    can_read_mappings,
+    require_instances,
+)
+from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.ontology_query import (
+    current_version,
+    resource_items,
+    snapshot_of,
+)
+from ontofoundry_api.services.workspaces import get_workspace
+
+Kind = Literal["object_type", "property", "link_type", "rule", "metric"]
+
+
+class Paging(Strict):
+    cursor: str | None = None
+    limit: int = Field(default=20, ge=1, le=100)
+
+
+class SearchOntology(Paging):
+    query: str = Field(max_length=240)
+    kinds: list[Kind] | None = None
+
+
+class GetOntology(Paging):
+    ids: list[UUID] | None = Field(default=None, min_length=1, max_length=100)
+    kinds: list[Kind] | None = None
+    include: list[Literal["semantic", "physical", "rules", "adjacency"]] = Field(
+        default_factory=lambda: ["semantic"]
+    )
+
+
+class SearchObjects(Paging):
+    type_id: UUID | None = None
+    q: str = Field(default="", max_length=240)
+
+
+class GetObject(Paging):
+    id: UUID
+    include: list[Literal["properties", "evidence", "adjacency"]] = Field(
+        default_factory=lambda: ["properties"]
+    )
+
+
+INPUTS = {
+    "search_ontology": SearchOntology,
+    "get_ontology": GetOntology,
+    "search_objects": SearchObjects,
+    "get_object": GetObject,
+}
+BUDGET = 110_000  # Both text and structuredContent count toward the 256 KiB wire limit.
+
+
+def size(value):
+    from fastapi.encoders import jsonable_encoder
+
+    return len(
+        json.dumps(
+            jsonable_encoder(value), ensure_ascii=False, separators=(",", ":")
+        ).encode()
+    )
+
+
+def _invoke(db, workspace_id, principal, name, arguments, settings):
+    args = INPUTS[name].model_validate(arguments)
+    space = get_workspace(db, workspace_id)
+    version_id = (
+        principal.pinned_version_id
+        if principal.pinned_version_id is not None
+        else space.current_version_id
+    )
+    if version_id:
+        try:
+            version = current_version(db, workspace_id, version_id)
+        except ServiceError as exc:
+            raise ServiceError(
+                "固定发布版已不可用", code="version_unavailable", status_code=404
+            ) from exc
+        snapshot = snapshot_of(version)
+    else:
+        snapshot = empty_snapshot(workspace_id)
+    envelope = {"workspace_id": workspace_id, "version_id": version_id or None}
+    context = [
+        workspace_id,
+        version_id or None,
+        name,
+        args.model_dump(mode="json", exclude={"cursor"}),
+        authorization_fingerprint(db, workspace_id, principal),
+    ]
+    offset, section = decode_cursor(settings, args.cursor, context)
+    mappings = can_read_mappings(db, workspace_id, principal)
+    instances = can_read_instances(db, workspace_id, principal)
+    draft = CoreDraft.model_validate(snapshot)
+    index = DraftIndex(draft)
+
+    def page(values, path, start=0):
+        items, cursor = [], None
+        for n in range(start, min(len(values), start + args.limit)):
+            if items and size(items + [values[n]]) > BUDGET // 2:
+                break
+            items.append(values[n])
+        end = start + len(items)
+        if end < len(values):
+            cursor = encode_cursor(settings, context, end, {"kind": "list", "path": path})
+        return {"total": len(values), "items": items, "next_cursor": cursor}
+
+    def paginate_nested(item, path):
+        values = item
+        for token in path:
+            values = values[token]
+        return page(values, path, offset)
+
+    fields = []
+
+    def segment_fields(value, element_id, path=()):
+        if isinstance(value, dict):
+            result = {}
+            for key, entry in value.items():
+                if isinstance(entry, str) and len(entry.encode()) > 12000:
+                    pointer = "/" + "/".join((*path, key))
+                    text = entry[:2000]
+                    fields.append(
+                        {
+                            "element_id": element_id,
+                            "field": pointer,
+                            "start": 0,
+                            "end": len(text),
+                            "total": len(entry),
+                            "text": text,
+                            "next_cursor": encode_cursor(
+                                settings,
+                                context,
+                                len(text),
+                                {
+                                    "kind": "field",
+                                    "element_id": element_id,
+                                    "path": [*path, key],
+                                },
+                            )
+                            if len(text) < len(entry)
+                            else None,
+                        }
+                    )
+                else:
+                    result[key] = segment_fields(entry, element_id, (*path, key))
+            return result
+        if isinstance(value, list):
+            return [
+                segment_fields(v, element_id, (*path, str(n))) for n, v in enumerate(value)
+            ]
+        return value
+
+    resources = resource_items(
+        snapshot,
+        mappings=mappings
+        and (name != "get_ontology" or "physical" in getattr(args, "include", [])),
+        instances=instances,
+        db=db if mappings else None,
+        workspace_id=workspace_id,
+    )
+    lookup = {r["definition"]["id"]: r for r in resources if r["kind"] != "dataset"}
+    for kind, collection in (("property", "properties"), ("rule", "rules")):
+        for e in snapshot[collection]:
+            definition = deepcopy(e)
+            if not instances:
+                definition.pop("evidence", None)
+            lookup[e["id"]] = {"kind": kind, "definition": definition}
+    if name == "search_ontology":
+        hits = []
+        for identity, r in lookup.items():
+            d = r["definition"]
+            if args.kinds and r["kind"] not in args.kinds:
+                continue
+            q = args.query.casefold()
+            matched = [s for s in d.get("synonyms", []) if q in s.casefold()]
+            if (
+                q
+                and not matched
+                and not any(
+                    q in str(d.get(k, "")).casefold()
+                    for k in ("name", "technical_name", "description")
+                )
+            ):
+                continue
+            hit = {
+                "id": identity,
+                "kind": r["kind"],
+                "name": d["name"],
+                "technical_name": d["technical_name"],
+                "summary": d.get("description", ""),
+                "matched_synonyms": matched,
+            }
+            owner = d.get("owner_type_id", d.get("source_type_id", d.get("owner_id")))
+            if owner:
+                hit.update(owner_id=owner, owner_kind=d.get("owner_kind", "object_type"))
+            if r["kind"] == "metric" and mappings:
+                metric = next(m for m in draft.metrics if str(m.id) == identity)
+                from ontofoundry_api.services.metric_query import dataset_for
+
+                ds = dataset_for(draft, metric)
+                hit["dataset"] = {"id": str(ds.id), "name": ds.name}
+            hits.append(hit)
+        hits.sort(key=lambda h: (h["kind"], h["id"]))
+        data = page(hits, [], offset)
+        return {**envelope, **data}
+    if name == "get_ontology":
+        values = []
+        wanted = {str(i) for i in args.ids} if args.ids is not None else None
+        for identity, r in sorted(lookup.items()):
+            if (wanted is not None and identity not in wanted) or (
+                args.kinds and r["kind"] not in args.kinds
+            ):
+                continue
+            d = r["definition"]
+            element = {
+                "id": identity,
+                "kind": r["kind"],
+                "name": d["name"],
+                "technical_name": d["technical_name"],
+            }
+            if wanted is not None:
+                for field in ("description", "synonyms", "binding_status"):
+                    if field in d:
+                        element[field] = d[field]
+                definition = deepcopy(
+                    next(
+                        (
+                            e
+                            for e in snapshot[
+                                {
+                                    "object_type": "object_types",
+                                    "link_type": "link_types",
+                                    "property": "properties",
+                                    "rule": "rules",
+                                    "metric": "metrics",
+                                }[r["kind"]]
+                            ]
+                            if e["id"] == identity
+                        ),
+                        {},
+                    )
+                )
+                if not instances:
+                    definition.pop("evidence", None)
+                if not mappings or "physical" not in args.include:
+                    definition.pop("data_join", None)
+                    if r["kind"] == "metric":
+                        definition = None
+                if definition is not None:
+                    element["definition"] = definition
+                for key in ("properties", "child_types"):
+                    if key in d:
+                        element[key] = page(d[key], [len(values), key])
+                if "rules" in args.include and "rules" in d:
+                    element["rules"] = page(d["rules"], [len(values), "rules"])
+                if "adjacency" in args.include and "links" in d:
+                    element["links"] = page(d["links"], [len(values), "links"])
+                if mappings and "physical" in args.include:
+                    if "sql_reference" in d:
+                        element["sql_reference"] = d["sql_reference"]
+                    if r["kind"] == "object_type":
+                        binding = resolve_binding(draft, UUID(identity))
+                        element["sources"] = page(
+                            [s.model_dump(mode="json") for s in binding.sources.values()],
+                            [len(values), "sources"],
+                        )
+                        datasets = {str(s.dataset_id) for s in binding.sources.values()}
+                        element["datasets"] = page(
+                            [
+                                r["definition"]
+                                for r in resources
+                                if r["kind"] == "dataset"
+                                and r["definition"]["id"] in datasets
+                            ],
+                            [len(values), "datasets"],
+                        )
+                        element["instance_source_type_ids"] = d.get(
+                            "instance_source_type_ids", []
+                        )
+            values.append(element)
+        if section and section["kind"] == "list":
+            path = section["path"]
+            # Rebuild the unpaged section by requesting the matching resource.
+            n, key = path
+            d = lookup[values[n]["id"]]["definition"]
+            raw = d.get(key)
+            if raw is None and key in {"sources", "datasets"}:
+                binding = resolve_binding(draft, UUID(values[n]["id"]))
+                raw = (
+                    [s.model_dump(mode="json") for s in binding.sources.values()]
+                    if key == "sources"
+                    else [
+                        r["definition"]
+                        for r in resources
+                        if r["kind"] == "dataset"
+                        and UUID(r["definition"]["id"])
+                        in {s.dataset_id for s in binding.sources.values()}
+                    ]
+                )
+            values[n][key] = page(raw, path, offset)
+            return {
+                **envelope,
+                "total": len(values),
+                "elements": [values[n]],
+                "missing": [],
+                "next_cursor": None,
+            }
+        if section and section["kind"] == "field":
+            value = next(v for v in values if v["id"] == section["element_id"])
+            for token in section["path"]:
+                value = value[int(token)] if isinstance(value, list) else value[token]
+            text = value[offset : offset + 2000]
+            segment = {
+                "element_id": section["element_id"],
+                "field": "/" + "/".join(section["path"]),
+                "start": offset,
+                "end": offset + len(text),
+                "total": len(value),
+                "text": text,
+                "next_cursor": encode_cursor(settings, context, offset + len(text), section)
+                if offset + len(text) < len(value)
+                else None,
+            }
+            return {
+                **envelope,
+                "total": len(values),
+                "elements": [],
+                "missing": [],
+                "next_cursor": None,
+                "field_segments": [segment],
+            }
+        cleaned = [segment_fields(v, v["id"]) for v in values]
+        data = page(cleaned, [], offset)
+        return {
+            **envelope,
+            "total": len(values),
+            "elements": data["items"],
+            "missing": sorted(wanted - set(lookup)) if wanted else [],
+            "next_cursor": encode_cursor(settings, context, offset + len(data["items"]))
+            if offset + len(data["items"]) < len(values)
+            else None,
+            **(
+                {
+                    "field_segments": [
+                        f
+                        for f in fields
+                        if f["element_id"] in {e["id"] for e in data["items"]}
+                    ]
+                }
+                if fields
+                else {}
+            ),
+        }
+    require_instances(db, workspace_id, principal)
+    if name == "search_objects":
+        objects = [
+            o
+            for o in draft.material_objects
+            if (args.type_id is None or index.is_a(o.type_id, args.type_id))
+            and args.q.casefold()
+            in (
+                document_display_text(draft, o)
+                + " "
+                + " ".join(map(str, o.values.values()))
+            ).casefold()
+        ]
+        objects.sort(key=lambda o: o.id.bytes)
+        return {
+            **envelope,
+            **page(
+                [
+                    {
+                        "id": str(o.id),
+                        "type_id": str(o.type_id),
+                        "display_text": document_display_text(draft, o),
+                        "values": dict(list(o.values.items())[:4]),
+                    }
+                    for o in objects
+                ],
+                [],
+                offset,
+            ),
+        }
+    fact = next((o for o in draft.material_objects if o.id == args.id), None)
+    if fact is None:
+        raise ServiceError("文档事实不存在", code="not_found", status_code=404)
+    item = {
+        "id": str(fact.id),
+        "type_id": str(fact.type_id),
+        "display_text": document_display_text(draft, fact),
+        "values": dict(list(fact.values.items())[:4]),
+    }
+    sections = {
+        "properties": [
+            {"property_id": str(p.id), "value": fact.values[p.technical_name]}
+            for p in index.effective_properties(fact.type_id)
+            if p.technical_name in fact.values
+        ],
+        "evidence": [e.model_dump(mode="json") for e in fact.evidence],
+        "adjacency": [],
+    }
+    for link in draft.material_links:
+        for direction, endpoint in (
+            ("forward", link.source_id),
+            ("reverse", link.target_id),
+        ):
+            if endpoint == fact.id:
+                sections["adjacency"].append(
+                    {
+                        "link_type_id": str(link.type_id),
+                        "direction": direction,
+                        "source_id": str(link.source_id),
+                        "target_id": str(link.target_id),
+                    }
+                )
+    sections["adjacency"].sort(
+        key=lambda e: (e["link_type_id"], e["direction"], e["source_id"], e["target_id"])
+    )
+    for key in args.include:
+        item[key] = page(
+            sections[key], [key], offset if section and section.get("path") == [key] else 0
+        )
+    return {**envelope, "item": item}
+
+
+def invoke(db, workspace_id, principal, name, arguments, settings):
+    args = INPUTS[name].model_validate(arguments)
+    space = get_workspace(db, workspace_id)
+    version_id = (
+        principal.pinned_version_id
+        if principal.pinned_version_id is not None
+        else space.current_version_id
+    )
+    context = [
+        workspace_id,
+        version_id or None,
+        name,
+        args.model_dump(mode="json", exclude={"cursor"}),
+        authorization_fingerprint(db, workspace_id, principal),
+    ]
+    offset, section = decode_cursor(settings, args.cursor, context)
+    if section and section.get("kind") == "wire_field":
+        original = {**arguments, "cursor": section.get("base_cursor")}
+        value = _invoke(db, workspace_id, principal, name, original, settings)
+        field = value
+        for token in section["path"]:
+            field = field[int(token)] if isinstance(field, list) else field[token]
+        chunk = field[offset : offset + 2000]
+        return {
+            "workspace_id": workspace_id,
+            "version_id": version_id or None,
+            "field_segments": [
+                {
+                    "element_id": section["element_id"],
+                    "field": section["pointer"],
+                    "start": offset,
+                    "end": offset + len(chunk),
+                    "total": len(field),
+                    "text": chunk,
+                    "next_cursor": encode_cursor(
+                        settings, context, offset + len(chunk), section
+                    )
+                    if offset + len(chunk) < len(field)
+                    else None,
+                }
+            ],
+        }
+    result = _invoke(db, workspace_id, principal, name, arguments, settings)
+    segments = []
+
+    def bounded(value, path=(), element_id=None, relative=()):
+        if isinstance(value, dict):
+            if "id" in value:
+                element_id, relative = value["id"], ()
+            copied = {}
+            for key, entry in value.items():
+                if isinstance(entry, str) and len(entry.encode()) > 12000 and element_id:
+                    pointer = "/" + "/".join((*relative, key))
+                    part = entry[:2000]
+                    state = {
+                        "kind": "wire_field",
+                        "path": [*path, key],
+                        "pointer": pointer,
+                        "element_id": element_id,
+                        "base_cursor": args.cursor,
+                    }
+                    segments.append(
+                        {
+                            "element_id": element_id,
+                            "field": pointer,
+                            "start": 0,
+                            "end": len(part),
+                            "total": len(entry),
+                            "text": part,
+                            "next_cursor": encode_cursor(
+                                settings, context, len(part), state
+                            )
+                            if len(part) < len(entry)
+                            else None,
+                        }
+                    )
+                else:
+                    copied[key] = bounded(entry, (*path, key), element_id, (*relative, key))
+            return copied
+        if isinstance(value, list):
+            return [
+                bounded(entry, (*path, str(n)), element_id, (*relative, str(n)))
+                for n, entry in enumerate(value)
+            ]
+        return value
+
+    result = bounded(result)
+    if segments:
+        result.setdefault("field_segments", []).extend(segments)
+    if size(result) > 120000:
+        raise ServiceError(
+            "当前投影超过单页预算，请缩小 limit 或 include",
+            code="response_too_large",
+            status_code=422,
+        )
+    return result

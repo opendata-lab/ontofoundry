@@ -2,19 +2,34 @@ from ontofoundry_api.services.table_material import foreign_key_hints, tables_ma
 
 
 def column(name, type_="BIGINT", pk=False, nullable=False, comment=None):
-    return {"name": name, "type": type_, "primary_key": pk, "nullable": nullable,
-            "comment": comment}
+    return {
+        "name": name,
+        "type": type_,
+        "primary_key": pk,
+        "nullable": nullable,
+        "comment": comment,
+    }
 
 
 CUSTOMERS = {
-    "name": "customers", "comment": None, "row_count": 8,
+    "name": "customers",
+    "comment": None,
+    "row_count": 8,
     "columns": [column("id", pk=True), column("customer_name", "VARCHAR(128)")],
-    "samples": [{"id": 1, "customer_name": "星海贸易"}, {"id": 2, "customer_name": "晨光零售"}],
+    "samples": [
+        {"id": 1, "customer_name": "星海贸易"},
+        {"id": 2, "customer_name": "晨光零售"},
+    ],
 }
 ORDERS = {
-    "name": "orders", "comment": "客户订单", "row_count": 780,
-    "columns": [column("id", pk=True), column("customer_id"),
-                column("total_amount", "DECIMAL(12, 2)", comment="订单 | 金额")],
+    "name": "orders",
+    "comment": "客户订单",
+    "row_count": 780,
+    "columns": [
+        column("id", pk=True),
+        column("customer_id"),
+        column("total_amount", "DECIMAL(12, 2)", comment="订单 | 金额"),
+    ],
     "samples": [{"id": 1, "customer_id": 1, "total_amount": 240}],
 }
 
@@ -31,8 +46,13 @@ def test_foreign_keys_are_inferred_from_names_and_declared_constraints():
 
 
 def test_markdown_names_everything_a_mapping_proposal_needs():
-    text = tables_markdown(source="销售业务库", kind="mysql", database="demo_analytics",
-                           schema=None, tables=[CUSTOMERS, ORDERS])
+    text = tables_markdown(
+        source="销售业务库",
+        kind="mysql",
+        database="demo_analytics",
+        schema=None,
+        tables=[CUSTOMERS, ORDERS],
+    )
     assert "数据源（connection_alias）：销售业务库" in text
     assert "模式（schema_name）：demo_analytics" in text
     assert "## 表 orders" in text and "- 主键（key_column）：id" in text

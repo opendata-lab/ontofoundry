@@ -44,9 +44,10 @@ def test_preview_is_what_gets_published(client):
     session = edited(client, "预览即发布")
     body = preview(client, session).json()
     assert body["current_version_number"] == 1 and body["next_version_number"] == 2
-    assert body["current_version_sha256"] == client.get(ONTOLOGY + "/version").json()[
-        "normalized_snapshot_sha256"
-    ]
+    assert (
+        body["current_version_sha256"]
+        == client.get(ONTOLOGY + "/version").json()["normalized_snapshot_sha256"]
+    )
     assert [c["change"] for c in body["changes"]] == ["updated"]
 
     response = publish(client, session, body)
@@ -68,7 +69,9 @@ def test_a_new_version_after_preview_forces_a_new_preview_even_if_it_merges(clie
     assert refused.json()["error"]["code"] == "PREVIEW_OUTDATED"
     assert client.get(ONTOLOGY + "/version").json()["version"] == 2
     again = preview(client, mine).json()
-    assert [c["element_id"] for c in again["auto_merged"]] == [other["draft"]["object_types"][1]["id"]]
+    assert [c["element_id"] for c in again["auto_merged"]] == [
+        other["draft"]["object_types"][1]["id"]
+    ]
     assert publish(client, mine, again).status_code == 200
 
 
@@ -76,16 +79,21 @@ def test_revision_or_merged_hash_drift_is_refused(client):
     session = edited(client, "一")
     body = preview(client, session).json()
     wrong_hash = {**body, "merged_snapshot_sha256": "0" * 64}
-    assert publish(client, session, wrong_hash).json()["error"]["code"] == "PREVIEW_OUTDATED"
+    assert (
+        publish(client, session, wrong_hash).json()["error"]["code"] == "PREVIEW_OUTDATED"
+    )
 
     session["draft"]["object_types"][0]["description"] = "二"
     newer = save(client, session, session["draft"]).json()
     stale = publish(client, {**newer, "revision": newer["revision"] - 1}, body)
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "PREVIEW_OUTDATED"
-    assert preview(client, {**newer, "revision": newer["revision"] - 1}).json()["error"][
-        "code"
-    ] == "SESSION_REVISION_CHANGED"
+    assert (
+        preview(client, {**newer, "revision": newer["revision"] - 1}).json()["error"][
+            "code"
+        ]
+        == "SESSION_REVISION_CHANGED"
+    )
 
 
 def test_field_conflicts_are_structured_and_resolved_with_a_custom_value(client):
@@ -144,7 +152,9 @@ def test_deleting_what_another_session_changed_is_a_whole_element_conflict(clien
     a, b = create_session(client), create_session(client)
     link = a["draft"]["link_types"][0]
     a["draft"]["link_types"][0]["description"] = "改了关系"
-    b["draft"]["link_types"] = [x for x in b["draft"]["link_types"] if x["id"] != link["id"]]
+    b["draft"]["link_types"] = [
+        x for x in b["draft"]["link_types"] if x["id"] != link["id"]
+    ]
     a, b = save(client, a, a["draft"]).json(), save(client, b, b["draft"]).json()
     assert publish(client, a, preview(client, a).json()).status_code == 200
     (conflict,) = preview(client, b).json()["error"]["conflicts"]
@@ -196,23 +206,22 @@ def test_invalid_resolutions_are_refused_before_anything_is_saved(client):
         assert response.status_code == 422, bad
         assert response.json()["error"]["code"] == "RESOLUTION_INVALID"
     after = client.get(ROOT + f"/sessions/{b['id']}").json()
-    assert after["revision"] == b["revision"] and after["base_version_id"] == b["base_version_id"]
+    assert (
+        after["revision"] == b["revision"]
+        and after["base_version_id"] == b["base_version_id"]
+    )
     assert resolve({key: {"choice": "custom", "value": "合并"}}).status_code == 200
 
 
-def test_a_constraints_only_change_is_a_change_and_the_preview_names_its_base(client):
+def test_preview_has_only_core_contract(client):
     session = create_session(client)
-    session["draft"]["ontology_requires"] = ["供应商必须有统一社会信用代码"]
+    session["draft"]["object_types"][0]["synonyms"] = ["顾客"]
     session = save(client, session, session["draft"]).json()
-
     body = preview(client, session).json()
-
-    assert body["changes"] == []
-    assert body["requires_change"] == {"before": [], "after": ["供应商必须有统一社会信用代码"]}
-    assert body["base_version_number"] == body["current_version_number"] == 1
-    first = session["draft"]["object_types"][0]
-    assert body["labels"][first["id"]] == first["name"]
+    assert (
+        "ossie" not in body
+        and "requires_change" not in body
+        and "legacy_mapping_form" not in body
+    )
+    assert body["changes"]
     assert publish(client, session, body).status_code == 200
-    assert preview(client, client.get(ROOT + f"/sessions/{session['id']}").json()).json()[
-        "requires_change"
-    ] is None

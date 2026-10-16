@@ -23,9 +23,7 @@ from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ADMIN_URL = os.environ.get("ONTOFOUNDRY_TEST_POSTGRES_URL")
 
-pytestmark = pytest.mark.skipif(
-    not ADMIN_URL, reason="Disposable PostgreSQL not supplied"
-)
+pytestmark = pytest.mark.skipif(not ADMIN_URL, reason="Disposable PostgreSQL not supplied")
 
 
 def publish_together(client, sessions):
@@ -37,9 +35,7 @@ def publish_together(client, sessions):
         barrier.wait()
         results[index] = publish(client, session)
 
-    threads = [
-        threading.Thread(target=run, args=(i, s)) for i, s in enumerate(sessions)
-    ]
+    threads = [threading.Thread(target=run, args=(i, s)) for i, s in enumerate(sessions)]
     for thread in threads:
         thread.start()
     for thread in threads:

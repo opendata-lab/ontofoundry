@@ -1,5 +1,9 @@
-from fastapi import HTTPException
+"""Single authorization policy for all ontology projections and caches."""
 
+import hashlib
+import json
+
+from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.workspaces import membership_role
 
 
@@ -11,14 +15,32 @@ def can_read_instances(db, workspace_id, principal):
 
 def can_read_mappings(db, workspace_id, principal):
     return bool(membership_role(db, workspace_id, principal.id)) and (
-        principal.service_token_id is None
-        or bool({"mappings:read", "instances:read"} & principal.scopes)
+        principal.service_token_id is None or "mappings:read" in principal.scopes
     )
 
 
 def require_instances(db, workspace_id, principal):
     if not can_read_instances(db, workspace_id, principal):
-        raise HTTPException(
-            403,
-            {"code": "INSTANCES_FORBIDDEN", "message": "需要空间成员身份及实例读取授权"},
+        raise ServiceError(
+            "需要空间成员身份及实例读取授权", code="INSTANCES_FORBIDDEN", status_code=403
         )
+
+
+def require_mappings(db, workspace_id, principal):
+    if not can_read_mappings(db, workspace_id, principal):
+        raise ServiceError("需要映射读取授权", code="MAPPINGS_FORBIDDEN", status_code=403)
+
+
+def authorization_fingerprint(db, workspace_id, principal):
+    return hashlib.sha256(
+        json.dumps(
+            [
+                principal.id,
+                principal.service_token_id,
+                membership_role(db, workspace_id, principal.id),
+                sorted(principal.scopes),
+                can_read_instances(db, workspace_id, principal),
+                can_read_mappings(db, workspace_id, principal),
+            ]
+        ).encode()
+    ).hexdigest()

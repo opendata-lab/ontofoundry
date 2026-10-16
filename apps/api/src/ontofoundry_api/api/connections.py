@@ -1,22 +1,15 @@
-from contextlib import contextmanager
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import (
-    URL,
     MetaData,
-    String,
     Table,
-    cast,
-    create_engine,
     func,
     inspect,
-    or_,
     select,
     text,
 )
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -24,7 +17,7 @@ from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
-from ontofoundry_api.services.source_rows import validate_source_rows
+from ontofoundry_api.services.readonly import connect_readonly
 from ontofoundry_api.services.table_material import SAMPLE_ROWS, tables_markdown
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["data"])
@@ -39,65 +32,6 @@ def get_connection(db, wid, cid):
     if not item or item.workspace_id != wid:
         raise HTTPException(404, "数据连接不存在")
     return item
-
-
-def resolve_alias(db, wid, alias: str):
-    """Bind a mapping's data source name to a configured connection.
-
-    The published model only names the source, so a workspace that has not
-    configured that name yet gets a precise message instead of a broken query.
-    """
-    item = db.scalar(
-        select(ConnectionRecord).where(
-            ConnectionRecord.workspace_id == wid, ConnectionRecord.name == alias
-        )
-    )
-    if not item:
-        raise HTTPException(422, f"映射使用的数据源“{alias}”还没有在本空间配置连接")
-    return item
-
-
-@contextmanager
-def connect_readonly(item, settings, *, timeout_ms=None):
-    try:
-        password = item.secret_encrypted
-        config = item.config_json
-        driver = "postgresql+psycopg" if item.kind == "postgresql" else "mysql+pymysql"
-        statement_ms = 10000 if timeout_ms is None else int(timeout_ms)
-        args = (
-            {"connect_timeout": 5, "options": f"-c statement_timeout={statement_ms}"}
-            if item.kind == "postgresql"
-            else {"connect_timeout": 5, "read_timeout": 10 if timeout_ms is None else (statement_ms + 999) // 1000 + 2, "write_timeout": 5}
-        )
-        engine = create_engine(
-            URL.create(
-                driver,
-                username=config["username"],
-                password=password,
-                host=config["host"],
-                port=config["port"],
-                database=config["database"],
-            ),
-            connect_args=args,
-            pool_pre_ping=False,
-        )
-        try:
-            with engine.connect() as connection:
-                if item.kind == "postgresql":
-                    connection.execute(text("SET TRANSACTION READ ONLY"))
-                elif item.kind == "mysql":
-                    connection.execute(text("SET SESSION TRANSACTION READ ONLY"))
-                    connection.execute(text(f"SET SESSION MAX_EXECUTION_TIME={statement_ms}"))
-                else:
-                    connection.execute(text(f"SET query_timeout = {(statement_ms + 999) // 1000}"))
-                yield connection
-                connection.rollback()
-        finally:
-            engine.dispose()
-    except (SQLAlchemyError, ValueError) as exc:
-        raise HTTPException(
-            422, "连接或只读查询失败，请检查只读账号、网络、字段和服务器配置"
-        ) from exc
 
 
 class ConnectionCreate(BaseModel):
@@ -249,34 +183,57 @@ def table_material(
     described = []
     with connect_readonly(item, request.app.state.settings) as conn:
         inspector = inspect(conn)
-        names = set(inspector.get_table_names(schema=schema) + inspector.get_view_names(schema=schema))
+        names = set(
+            inspector.get_table_names(schema=schema)
+            + inspector.get_view_names(schema=schema)
+        )
         missing = [t for t in body.tables if t not in names]
         if missing:
             raise HTTPException(404, "数据表不存在：" + "、".join(missing))
         for name in dict.fromkeys(body.tables):
-            pks = inspector.get_pk_constraint(name, schema=schema).get("constrained_columns", [])
+            pks = inspector.get_pk_constraint(name, schema=schema).get(
+                "constrained_columns", []
+            )
             columns = inspector.get_columns(name, schema=schema)
             table = Table(name, MetaData(), schema=schema, autoload_with=conn)
-            samples = [dict(row._mapping) for row in conn.execute(select(table).limit(SAMPLE_ROWS))]
+            samples = [
+                dict(row._mapping) for row in conn.execute(select(table).limit(SAMPLE_ROWS))
+            ]
             count = conn.execute(select(func.count()).select_from(table)).scalar()
-            described.append({
-                "name": name,
-                "comment": (inspector.get_table_comment(name, schema=schema) or {}).get("text"),
-                "row_count": count,
-                "columns": [{
-                    "name": c["name"], "type": str(c["type"]), "nullable": c.get("nullable"),
-                    "primary_key": c["name"] in pks, "comment": c.get("comment"),
-                } for c in columns],
-                "foreign_keys": [
-                    {"column": fk["constrained_columns"][0], "table": fk["referred_table"]}
-                    for fk in inspector.get_foreign_keys(name, schema=schema)
-                    if len(fk.get("constrained_columns") or []) == 1
-                ],
-                "samples": samples,
-            })
+            described.append(
+                {
+                    "name": name,
+                    "comment": (inspector.get_table_comment(name, schema=schema) or {}).get(
+                        "text"
+                    ),
+                    "row_count": count,
+                    "columns": [
+                        {
+                            "name": c["name"],
+                            "type": str(c["type"]),
+                            "nullable": c.get("nullable"),
+                            "primary_key": c["name"] in pks,
+                            "comment": c.get("comment"),
+                        }
+                        for c in columns
+                    ],
+                    "foreign_keys": [
+                        {
+                            "column": fk["constrained_columns"][0],
+                            "table": fk["referred_table"],
+                        }
+                        for fk in inspector.get_foreign_keys(name, schema=schema)
+                        if len(fk.get("constrained_columns") or []) == 1
+                    ],
+                    "samples": samples,
+                }
+            )
     config = item.config_json
     text_value = tables_markdown(
-        source=item.name, kind=item.kind, database=config["database"], schema=schema,
+        source=item.name,
+        kind=item.kind,
+        database=config["database"],
+        schema=schema,
         tables=described,
     )
     file_name = f"数据表结构-{item.name}-{'-'.join(body.tables)}"[:200] + ".md"
@@ -287,50 +244,50 @@ def table_material(
 
 
 class PreviewRequest(BaseModel):
+    model_config = {"extra": "forbid"}
     mapping: DataMapping
+    session_id: str | None = None
     q: str = Field(default="", max_length=240)
-    key: str | None = Field(default=None, max_length=2000)
+    key: list[dict] | None = None
     offset: int = Field(default=0, ge=0, le=10000)
     limit: int = Field(default=20, ge=1, le=100)
+    snapshot_date: str | None = None
 
 
-def query_mapping(db, workspace_id, body, settings):
-    mapping = body.mapping
-    item = resolve_alias(db, workspace_id, mapping.connection_alias)
-    with connect_readonly(item, settings) as conn:
-        table = Table(
-            mapping.table_name, MetaData(), schema=mapping.schema_name, autoload_with=conn
-        )
-        column_names = set(mapping.fields.values()) | {mapping.key_column}
-        if not column_names <= set(table.c.keys()):
-            raise HTTPException(422, "映射字段不存在，请刷新字段列表")
-        columns = [table.c[mapping.key_column].label("__key")] + [
-            table.c[column].label(name) for name, column in mapping.fields.items()
-        ]
-        query = select(*columns)
-        if body.key is not None:
-            query = query.where(table.c[mapping.key_column] == body.key)
-        elif body.q:
-            query = query.where(
-                or_(
-                    *(
-                        cast(table.c[name], String).contains(body.q, autoescape=True)
-                        for name in column_names
-                    )
-                )
+def query_mapping(db, workspace_id, body, settings, draft=None):
+    from ontofoundry_api.api.modeling import get_modeling_session, version_snapshot
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.services.instance_plan import query_instances
+    from ontofoundry_api.services.workspaces import get_workspace
+
+    if draft is None:
+        raw = (
+            get_modeling_session(db, workspace_id, body.session_id).draft_json
+            if body.session_id
+            else version_snapshot(
+                db, workspace_id, get_workspace(db, workspace_id).current_version_id
             )
-        query = (
-            query.order_by(table.c[mapping.key_column])
-            .offset(body.offset)
-            .limit(body.limit + 1)
         )
-        rows = [dict(r) for r in conn.execute(query).mappings()]
-        validate_source_rows(rows)
-        return {
-            "items": rows[: body.limit],
-            "has_more": len(rows) > body.limit,
-            "source": "database",
+        raw = {
+            **raw,
+            "mappings": [
+                m for m in raw["mappings"] if m["type_id"] != str(body.mapping.type_id)
+            ]
+            + [body.mapping.model_dump(mode="json")],
         }
+        draft = OntologyDraft.model_validate(raw)
+    return query_instances(
+        db,
+        workspace_id,
+        draft,
+        body.mapping.type_id,
+        settings,
+        key=body.key,
+        q=body.q,
+        offset=body.offset,
+        limit=body.limit,
+        snapshot_date=body.snapshot_date,
+    )
 
 
 @router.post("/mapping-preview")
@@ -341,5 +298,8 @@ def preview(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    from ontofoundry_api.services.access import require_instances, require_mappings
+
+    require_instances(db, workspace_id, user)
+    require_mappings(db, workspace_id, user)
     return query_mapping(db, workspace_id, body, request.app.state.settings)

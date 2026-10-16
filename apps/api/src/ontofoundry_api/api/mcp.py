@@ -5,39 +5,13 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from jsonschema import ValidationError, validate
 from pydantic import ValidationError as ModelValidationError
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, mcp_principal
 from ontofoundry_api.database import get_db
-from ontofoundry_api.domain.models import COLLECTIONS
-from ontofoundry_api.services.access import (
-    can_read_instances,
-    can_read_mappings,
-    require_instances,
-)
-from ontofoundry_api.services.errors import NotFoundError, ServiceError
-from ontofoundry_api.services.instance_query import (
-    ObjectSearch,
-    get_object,
-    object_neighborhood,
-    search_objects,
-)
-from ontofoundry_api.services.ontology_context import (
-    concept_context,
-    context_elements,
-    document_context,
-)
-from ontofoundry_api.services.ontology_query import (
-    current_version,
-    get_type,
-    search_types,
-    snapshot_of,
-    type_graph,
-    version_hashes,
-    version_summary,
-)
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.mcp_ontology import INPUTS, invoke
 
 router = APIRouter(prefix="/api/v1/ontology/workspaces/{workspace_id}/mcp", tags=["mcp"])
 PROTOCOL_VERSION = "2026-07-28"
@@ -47,147 +21,13 @@ LEGACY_PROTOCOL_VERSIONS = (
     "2025-03-26",
 )
 META = "io.modelcontextprotocol/"
-INSTRUCTIONS = (
-    "Read published ontology versions. Mapping metadata requires mappings:read or "
-    "instances:read; instance tools require instances:read. Both require workspace "
-    "membership. Database rows are live; modeling and raw materials are not exposed."
-)
-TOOLS = [
-    ("get_ontology_version", "读取当前已发布本体版本", {}),
-    ("search_ontology_types", "按名称或同义词搜索概念、文档上下文与语义层字段/数据集/指标，返回来源；歧义时保留所有候选", {"query": {"type": "string"}}),
-    ("get_ontology_type", "读取概念、关系或语义层定义及同义词来源", {"type_id": {"type": "string"}}),
-    (
-        "get_ontology_graph",
-        "读取已发布的语义图谱",
-        {
-            "focus_id": {"type": "string"},
-            "depth": {"type": "integer", "minimum": 1, "maximum": 3},
-        },
-    ),
-    ("export_ontology", "读取官方 Ossie JSON", {}),
-    (
-        "search_objects",
-        "搜索实例。source=document（默认）查材料中抽取的文档实例；source=database 按已发布映射"
-        "实时查询数据库行，此时必须给 type_id（先用 list_ontology_elements kind=mapping 找到"
-        "有映射的对象）。结果分页：next_cursor 非空表示还有更多，统计或汇总前必须翻完所有页。",
-        {
-            "type_id": {
-                "type": "string", "format": "uuid",
-                "description": "业务对象类型 id；source=database 时必填",
-            },
-            "source": {
-                "type": "string", "enum": ["document", "database"], "default": "document",
-                "description": "document=文档实例，database=映射的数据库实例",
-            },
-            "q": {"type": "string", "maxLength": 240, "description": "关键字，可省略"},
-            "cursor": {
-                "type": "string", "maxLength": 4000,
-                "description": "上一页返回的 next_cursor",
-            },
-            "limit": {
-                "type": "integer", "minimum": 1, "maximum": 100, "default": 20,
-                "description": "每页条数，最大 100",
-            },
-        },
-    ),
-    (
-        "get_object",
-        "读取实例属性、来源与证据",
-        {"ref": {"type": "string", "maxLength": 4000}},
-    ),
-    (
-        "expand_object_graph",
-        "展开实例关系邻域（最多三跳）",
-        {
-            "ref": {"type": "string", "maxLength": 4000},
-            "depth": {"type": "integer", "minimum": 1, "maximum": 3},
-        },
-    ),
-]
-TOOLS += [
-    ("list_metrics", "列出已发布指标，按名称/同义词搜索；返回数据集、可执行性、分组/过滤字段与快照约束", {
-        "query": {"type": "string", "maxLength": 240},
-        "semantic_model": {"type": "string", "maxLength": 240},
-    }),
-    ("query_metric", "查询单数据集聚合指标。过滤值参数绑定，最大 1000 行；快照/滚动数据须等值过滤时间字段或提供 as_of。跨数据集仅解释，不执行", {
-        "metric_id": {"type": "string", "format": "uuid"},
-        "group_by": {"type": "array", "maxItems": 100, "uniqueItems": True,
-                     "items": {"type": "string", "maxLength": 240}},
-        "filters": {"type": "array", "maxItems": 100, "items": {
-            "type": "object", "required": ["field", "op"], "additionalProperties": False,
-            "properties": {
-                "field": {"type": "string", "maxLength": 240},
-                "op": {"enum": ["=", "!=", "<", "<=", ">", ">=", "in", "between", "is_null", "not_null"]},
-                "value": {"type": ["string", "number", "boolean", "null", "array"],
-                          "maxItems": 1000, "items": {"type": ["string", "number", "boolean"]}},
-            },
-        }},
-        "limit": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
-        "as_of": {"type": "string", "minLength": 1, "maxLength": 240,
-                  "description": "选择不晚于目标日的该数据集最新快照，不能同时过滤快照字段"},
-    }),
-    ("get_ontology_manifest", "读取版本清单：两个版本哈希与各类元素数量", {}),
-    (
-        "list_ontology_elements",
-        "按类型分页列出本体元素（稳定 id，v3 原生角色结构）",
-        {
-            "kind": {
-                "type": "string",
-                "enum": [
-                    "object_type", "value_type", "property", "link_type", "rule", "action",
-                    "material_object", "material_link", "mapping",
-                    "document", "semantic_model", "dataset", "dataset_field", "metric",
-                ],
-            },
-            "cursor": {"type": "string", "maxLength": 64},
-            "limit": {"type": "integer", "minimum": 1, "maximum": 200},
-        },
-    ),
-    (
-        "get_ontology_elements",
-        "按 id 读取本体元素",
-        {
-            "element_ids": {
-                "type": "array",
-                "items": {"type": "string", "maxLength": 64},
-                "minItems": 1,
-                "maxItems": 100,
-            }
-        },
-    ),
-]
-INSTANCE_TOOLS = {"search_objects", "get_object", "expand_object_graph", "query_metric"}
-# Element kinds that carry material quotes or table names.
-PRIVATE_KINDS = {"material_object": "instances", "material_link": "instances", "mapping": "mappings"}
-
-
-def visible_elements(db, workspace_id, principal, snapshot) -> dict[str, list[dict]]:
-    """Native elements this principal may read: material instances need instance
-    access, mappings need mapping access, evidence needs instance access."""
-    instances = can_read_instances(db, workspace_id, principal)
-    mappings = can_read_mappings(db, workspace_id, principal)
-    from ontofoundry_api.domain.models import OntologyDraft
-    from ontofoundry_api.domain.runtime_views import all_roles_of, mappings_of
-    result = {}
-    for kind, collection in COLLECTIONS.items():
-        need = PRIVATE_KINDS.get(kind.value)
-        if (need == "instances" and not instances) or (need == "mappings" and not mappings):
-            continue
-        items = snapshot.get(collection) or []
-        if collection in ("object_types", "value_types"):
-            items = [concept_context(item, snapshot) for item in items]
-        if collection == "mappings" and snapshot.get("schema_version") == "3":
-            items = [m.model_dump(mode="json") for m in mappings_of(OntologyDraft.model_validate(snapshot))]
-        if collection in ("properties", "link_types") and snapshot.get("schema_version") == "3":
-            items = [{**item, "owner_role_id": all_roles_of(item)[0]["id"], "all_roles": all_roles_of(item)} for item in items]
-        if not instances:
-            items = [{**item, "evidence": []} if "evidence" in item else item for item in items]
-        result[kind.value] = sorted([{**item, 'kind': kind.value} for item in items], key=lambda item: str(item["id"]))
-    result['document'] = [document_context(snapshot)]
-    if mappings:
-        result.update(context_elements(snapshot))
-    from ontofoundry_api.services.public_projection import public_projection
-    return public_projection(result)
+INSTRUCTIONS = "只读核心本体和已接受的文档事实；数据库聚合由 DataAgent 自有查询工具执行。"
+TOOLS = {
+    "search_ontology": "按名称和同义词搜索核心语义",
+    "get_ontology": "读取核心定义、继承及授权物理投影",
+    "search_objects": "按事实 UUID 分页搜索已接受的文档事实",
+    "get_object": "读取文档事实、证据与直接邻接",
+}
 
 
 def rpc_error(rid, code, message, status=400, data=None):
@@ -200,26 +40,8 @@ def rpc_error(rid, code, message, status=400, data=None):
     return JSONResponse(body, status_code=status)
 
 
-def tool_schema(name, properties):
-    return {
-        "type": "object",
-        "properties": {**properties, "version_id": {"type": "string"}},
-        "required": ["metric_id"]
-        if name == "query_metric"
-        else ["type_id"]
-        if name == "get_ontology_type"
-        else ["ref"]
-        if name in ("get_object", "expand_object_graph")
-        else ["kind"]
-        if name == "list_ontology_elements"
-        else ["element_ids"]
-        if name == "get_ontology_elements"
-        else [],
-        "additionalProperties": False,
-        # Database rows are only reachable through one type's published mapping.
-        **({"if": {"properties": {"source": {"const": "database"}}, "required": ["source"]},
-            "then": {"required": ["type_id"]}} if name == "search_objects" else {}),
-    }
+def tool_schema(name):
+    return INPUTS[name].model_json_schema()
 
 
 def legacy_initialize(rid, params):
@@ -231,9 +53,7 @@ def legacy_initialize(rid, params):
     ):
         return rpc_error(rid, -32602, "Invalid initialize params")
     negotiated = (
-        requested
-        if requested in LEGACY_PROTOCOL_VERSIONS
-        else LEGACY_PROTOCOL_VERSIONS[0]
+        requested if requested in LEGACY_PROTOCOL_VERSIONS else LEGACY_PROTOCOL_VERSIONS[0]
     )
     return {
         "jsonrpc": "2.0",
@@ -300,9 +120,7 @@ async def rpc(
         if not isinstance(metadata, dict):
             return rpc_error(rid, -32602, "Invalid request metadata")
         if not header_version or request.headers.get("mcp-method") != method:
-            return rpc_error(
-                rid, -32020, "Missing or mismatched protocol/method headers"
-            )
+            return rpc_error(rid, -32020, "Missing or mismatched protocol/method headers")
         if header_version != metadata.get(META + "protocolVersion"):
             return rpc_error(
                 rid, -32020, "Protocol version header does not match request metadata"
@@ -315,9 +133,7 @@ async def rpc(
                 data={"supported": [PROTOCOL_VERSION], "requested": header_version},
             )
         if not isinstance(metadata.get(META + "clientCapabilities"), dict):
-            return rpc_error(
-                rid, -32602, "Required clientCapabilities metadata is missing"
-            )
+            return rpc_error(rid, -32602, "Required clientCapabilities metadata is missing")
     if "application/json" not in accept or "text/event-stream" not in accept:
         return rpc_error(
             rid, -32600, "Accept must include application/json and text/event-stream", 406
@@ -349,163 +165,58 @@ async def rpc(
                 {
                     "name": n,
                     "description": d,
-                    "inputSchema": tool_schema(n, p),
+                    "inputSchema": tool_schema(n),
                     "annotations": {"readOnlyHint": True, "destructiveHint": False},
                 }
-                for n, d, p in TOOLS
-                if n not in INSTANCE_TOOLS
-                or can_read_instances(db, workspace_id, principal)
-                if n != "list_metrics" or can_read_mappings(db, workspace_id, principal)
+                for n, d in TOOLS.items()
             ]
         }
     elif method == "tools/call":
         name, args = params.get("name"), params.get("arguments", {})
-        schema = next((tool_schema(n, p) for n, _, p in TOOLS if n == name), None)
-        if schema is None:
+        if name not in TOOLS:
             return rpc_error(rid, -32602, "Unknown tool")
         try:
-            validate(args, schema)
-        except ValidationError as exc:
-            if name in ("list_metrics", "query_metric"):
-                return rpc_error(rid, -32602, "指标参数无效，请检查指标 ID、分组字段、结构化过滤及 limit（1–1000）",
-                                 data={"field": list(exc.path)})
-            if name == "search_objects" and exc.validator == "required":
-                return rpc_error(rid, -32602, "source=database 时必须提供 type_id；先用 "
-                                 "list_ontology_elements(kind=mapping) 查看有映射的业务对象")
-            return rpc_error(rid, -32602, exc.message)
-        try:
-            if name in INSTANCE_TOOLS:
-                require_instances(db, workspace_id, principal)
-            if name == "list_metrics" and not can_read_mappings(db, workspace_id, principal):
-                raise HTTPException(403, "需要空间成员身份及映射读取授权")
-            if principal.pinned_version_id is not None:
-                # A modeling run reads only the version its session is based on.
-                pinned = principal.pinned_version_id
-                if not pinned:
-                    raise NotFoundError("该建模会话基于空白模型，没有可读取的已发布版本")
-                if args.get("version_id") not in (None, pinned):
-                    return rpc_error(
-                        rid, -32602, f"本次建模运行只能读取固定版本 {pinned}"
-                    )
-                args = {**args, "version_id": pinned}
-            version = current_version(db, workspace_id, args.get("version_id"))
-            if name == "get_ontology_version":
-                value = version_summary(version)
-            elif name in ("list_metrics", "query_metric"):
-                from ontofoundry_api.services.metric_query import list_metrics, query_metric
-                arguments = {k: v for k, v in args.items() if k != "version_id"}
-                value = list_metrics(db, version, **arguments) if name == "list_metrics" else query_metric(db, version, request.app.state.settings, **arguments)
-            elif name in ("get_ontology_manifest", "list_ontology_elements", "get_ontology_elements"):
-                elements = visible_elements(db, workspace_id, principal, snapshot_of(version))
-                envelope = {
-                    "workspace_id": version.workspace_id,
-                    "version_id": version.id,
-                    **version_hashes(version),
-                }
-                if name == "get_ontology_manifest":
-                    value = {
-                        **envelope,
-                        "version": version.version_number,
-                        "counts": {kind: len(items) for kind, items in elements.items()},
-                    }
-                elif name == "list_ontology_elements":
-                    items = elements.get(args["kind"])
-                    if items is None:
-                        raise NotFoundError("没有读取该类元素的权限")
-                    cursor = args.get("cursor")
-                    start = next(
-                        (i + 1 for i, item in enumerate(items) if str(item["id"]) == cursor), 0
-                    ) if cursor else 0
-                    limit = args.get("limit", 50)
-                    page = items[start : start + limit]
-                    value = {
-                        **envelope,
-                        "kind": args["kind"],
-                        "items": page,
-                        "next_cursor": str(page[-1]["id"])
-                        if start + limit < len(items) and page
-                        else None,
-                    }
-                else:
-                    wanted = set(args["element_ids"])
-                    found = [
-                        {"kind": kind, "element": item}
-                        for kind, items in elements.items()
-                        for item in items
-                        if str(item["id"]) in wanted
-                    ]
-                    value = {
-                        **envelope,
-                        "items": found,
-                        "missing": sorted(wanted - {str(f["element"]["id"]) for f in found}),
-                    }
-            elif name == "search_ontology_types":
-                value = search_types(version, query=args.get('query', ''), include_document_context=True,
-                                     include_context_elements=can_read_mappings(db, workspace_id, principal))
-            elif name == "get_ontology_type":
-                value = get_type(version, args["type_id"], include_document_context=True,
-                                 include_context_elements=can_read_mappings(db, workspace_id, principal))
-            elif name == "get_ontology_graph":
-                value = type_graph(
-                    version, focus_id=args.get("focus_id"), depth=args.get("depth", 1)
-                )
-            elif name == "search_objects":
-                value = search_objects(
-                    db,
-                    version,
-                    ObjectSearch(**{k: v for k, v in args.items() if k != "version_id"}),
-                    request.app.state.settings,
-                )
-            elif name == "get_object":
-                value = get_object(db, version, args["ref"], request.app.state.settings)
-            elif name == "expand_object_graph":
-                value = object_neighborhood(
-                    db,
-                    version,
-                    args["ref"],
-                    args.get("depth", 1),
-                    request.app.state.settings,
-                )
-            else:
-                mappings_allowed = can_read_mappings(db, workspace_id, principal)
-                value = {
-                    key: value
-                    for key, value in version.ossie_json.items()
-                    if key != "ontology_mappings"
-                    or mappings_allowed
-                }
-                if not mappings_allowed and "ontology_mappings" in version.ossie_json:
-                    value["redacted_fields"] = ["ontology_mappings"]
+            value = invoke(
+                db, workspace_id, principal, name, args, request.app.state.settings
+            )
             structured = jsonable_encoder(value)
             result = {
                 "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(structured, ensure_ascii=False),
-                    }
+                    {"type": "text", "text": json.dumps(structured, ensure_ascii=False)}
                 ],
                 "structuredContent": structured,
                 "isError": False,
             }
         except (ServiceError, ValueError, HTTPException, ModelValidationError) as exc:
-            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            code = (
+                "cursor_invalid"
+                if isinstance(exc, ServiceError) and exc.code == "INVALID_CURSOR"
+                else exc.code.lower()
+                if isinstance(exc, ServiceError)
+                else "invalid_arguments"
+            )
+            structured = {"code": code, "message": str(exc)}
             result = {
                 "content": [
-                    {"type": "text", "text": json.dumps(detail, ensure_ascii=False)}
+                    {"type": "text", "text": json.dumps(structured, ensure_ascii=False)}
                 ],
+                "structuredContent": structured,
                 "isError": True,
             }
-            if name in ("list_metrics", "query_metric") and isinstance(exc, ServiceError):
-                result["structuredContent"] = {"code": exc.code, "message": exc.message, **exc.details}
+
     else:
         return rpc_error(
             rid, -32601, "Method not found; supported protocol: " + PROTOCOL_VERSION, 404
         )
-    response_result = result if legacy else {
-        **result,
-        "resultType": "complete",
-        "_meta": {META + "serverInfo": {"name": "ontofoundry", "version": "0.1.0"}},
-    }
+    response_result = (
+        result
+        if legacy
+        else {
+            **result,
+            "resultType": "complete",
+            "_meta": {META + "serverInfo": {"name": "ontofoundry", "version": "0.1.0"}},
+        }
+    )
     return {
         "jsonrpc": "2.0",
         "id": rid,

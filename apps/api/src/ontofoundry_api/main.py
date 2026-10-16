@@ -16,10 +16,10 @@ from ontofoundry_api.api import (
     instances,
     materials,
     mcp,
+    metrics,
     modeling,
     ontology,
     proposals,
-    semantic_editing,
     workspaces,
 )
 from ontofoundry_api.api import settings as settings_api
@@ -57,9 +57,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         workspace = create_workspace(
                             session,
                             payload=WorkspaceCreate(
-                                name="制造供应链",
-                                slug="manufacturing-supply-chain",
-                                description="采购、物料、生产与设备的发布本体样例。",
+                                name="星港销售",
+                                slug="starlane-sales",
+                                description="虚构的销售模型演示。",
                             ),
                             user_id=DEV_USER_ID,
                             workspace_id=DEMO_WORKSPACE_ID,
@@ -150,7 +150,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(workspaces.router)
     app.include_router(ontology.router)
     app.include_router(modeling.router)
-    app.include_router(semantic_editing.router)
+    app.include_router(metrics.router)
     app.include_router(proposals.router)
     app.include_router(proposals.metrics_router)
     app.include_router(materials.router)

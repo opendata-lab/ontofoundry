@@ -36,7 +36,7 @@ def proposals_run(client) -> tuple[dict, dict]:
         "source_session_revision": session["revision"] + 1,
         "source_draft_sha256": snapshot_sha256(draft),
         "materials": [],
-        "producer": {"agent_id": "agent", "skill": "md2ossie", "mode": "model"},
+        "producer": {"agent_id": "agent", "skill": "ontofoundry-modeling", "mode": "model"},
         "result_contract": "proposals",
         "pinned_draft": draft,
     }
@@ -89,7 +89,7 @@ def some_items(draft: dict) -> list[dict]:
             "target_id": None,
             "expected_target_hash": None,
             "before": None,
-            "after": {"name": "采购订单", "technical_name": "purchase_order", "concept": "purchase_order"},
+            "after": {"name": "采购订单", "technical_name": "purchase_order"},
         },
         {
             "client_ref": "po-no",
@@ -99,8 +99,8 @@ def some_items(draft: dict) -> list[dict]:
             "expected_target_hash": None,
             "before": None,
             "after": {
-                "owner_ref": {"kind": "object_type", "ref": {"client_ref": "po"}},
-                "roles": [{"concept": {"kind": "builtin", "ref": "String"}}],
+                "owner_type_id": {"client_ref": "po"},
+                "value_kind": "string",
                 "name": "订单号",
                 "technical_name": "order_no",
             },
@@ -109,9 +109,12 @@ def some_items(draft: dict) -> list[dict]:
             "operation": "update",
             "target_kind": "object_type",
             "target_id": target["id"],
-            "expected_target_hash": element_sha256(target, hash_algorithm="ontofoundry-domain-v3", collection="object_types"),
+            "expected_target_hash": element_sha256(target, collection="object_types"),
             "before": target,
-            "after": {**{k: v for k, v in target.items() if k != "id"}, "description": "提案修改"},
+            "after": {
+                **{k: v for k, v in target.items() if k != "id"},
+                "description": "提案修改",
+            },
         },
     ]
 
@@ -179,7 +182,9 @@ def test_edits_during_the_run_only_make_affected_items_stale(client, monkeypatch
 
     _, items, _ = stored(client, session["id"])
     with client.app.state.session_factory() as db:
-        deps = dependency_map(db, [items[0].batch_id], session["workspace_id"], session["id"])
+        deps = dependency_map(
+            db, [items[0].batch_id], session["workspace_id"], session["id"]
+        )
     statuses = effective_statuses(items, deps, edited)
     assert statuses[items[2].id][0] == "stale"  # the edited target
     assert statuses[items[0].id][0] == statuses[items[1].id][0] == "pending"
@@ -291,16 +296,23 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert manifest["result_contract"] == "proposals"
     assert manifest["pinned_draft"] == session["draft"]
 
-    context = json.loads(next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-")))
+    context = json.loads(
+        next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-"))
+    )
     first = session["draft"]["object_types"][0]
-    assert context["element_hashes"][first["id"]] == element_sha256(first, hash_algorithm="ontofoundry-domain-v3", collection="object_types")
+    assert context["element_hashes"][first["id"]] == element_sha256(
+        first, collection="object_types"
+    )
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt
     token = manifest["run_token"]
     assert f"output/ontofoundry-needs-input-{token}.json" in prompt
     assert f'{{"run_token": "{token}", "questions": ["待确认问题"]}}' in prompt
-    assert "questions 必须是非空的中文问题列表，与回答中询问用户的问题一致，此时不要写结果文件" in prompt
+    assert (
+        "questions 必须是非空的中文问题列表，与回答中询问用户的问题一致，此时不要写结果文件"
+        in prompt
+    )
     assert "否则必须写入结果文件" in prompt
     assert session["base_version_id"] in prompt
     # The prompt is shown as the user's chat message: the credential lives in a file.
@@ -318,7 +330,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
             "jsonrpc": "2.0",
             "id": 1,
             "method": "tools/call",
-            "params": {"name": "get_ontology_manifest", "arguments": {}},
+            "params": {"name": "get_ontology", "arguments": {}},
         },
     ).json()
     assert called["result"]["structuredContent"]["version_id"] == session["base_version_id"]
@@ -344,11 +356,17 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
 
     monkeypatch.setattr(agent_conversation, "_client", lambda *_: FakeAgent())
     monkeypatch.setattr(agent_conversation, "_require_configured", lambda _r: None)
-    material = client.post(ROOT + "/materials?name=a.md", content="# a\n内容\n".encode()).json()
+    material = client.post(
+        ROOT + "/materials?name=a.md", content="# a\n内容\n".encode()
+    ).json()
     session = create_session(client)
     session = client.put(
         ROOT + f"/sessions/{session['id']}",
-        json={"revision": session["revision"], "draft": session["draft"], "material_ids": [material["id"]]},
+        json={
+            "revision": session["revision"],
+            "draft": session["draft"],
+            "material_ids": [material["id"]],
+        },
     ).json()
 
     def turn():
@@ -364,7 +382,9 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
 
     turn()
     turn()
-    assert sum(1 for name in uploads if name.startswith(material["id"])) == 1  # uploaded once
+    assert (
+        sum(1 for name in uploads if name.startswith(material["id"])) == 1
+    )  # uploaded once
     assert f"inputs/{material['id']}-a.md" in prompts[1]  # still named in the second run
     manifest = row(client, session["id"]).run_manifest_json
     assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
@@ -409,9 +429,7 @@ def test_proposals_run_with_needs_input_marker_asks_for_a_reply(client, monkeypa
         pytest.param({"run_token": RUN_TOKEN, "questions": [1]}, id="non-string-question"),
     ],
 )
-def test_proposals_run_without_valid_marker_fails_permanently(
-    client, monkeypatch, marker
-):
+def test_proposals_run_without_valid_marker_fails_permanently(client, monkeypatch, marker):
     session, _ = proposals_run(client)
     before = row(client, session["id"])
     paths = install_download(
@@ -422,7 +440,10 @@ def test_proposals_run_without_valid_marker_fails_permanently(
     current = row(client, session["id"])
     assert current.result_state == "failed_permanent"
     assert current.task_status == "failed"
-    assert current.task_detail == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
+    assert (
+        current.task_detail
+        == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
+    )
     assert current.draft_json == before.draft_json
     assert current.candidates_json == before.candidates_json
     assert current.revision == before.revision
@@ -436,9 +457,7 @@ def test_proposals_run_without_valid_marker_fails_permanently(
 
 
 @pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
-def test_proposals_marker_download_error_is_retriable(
-    client, monkeypatch, status_code
-):
+def test_proposals_marker_download_error_is_retriable(client, monkeypatch, status_code):
     session, _ = proposals_run(client)
     before = row(client, session["id"])
     paths = install_download(

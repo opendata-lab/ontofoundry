@@ -8,7 +8,6 @@ from uuid import uuid4
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from fastapi import HTTPException
 from sqlalchemy import JSON, DateTime, String, create_engine, inspect, text, update
 
 from ontofoundry_api.api.modeling import revise, session_data
@@ -16,6 +15,7 @@ from ontofoundry_api.database import Base, build_session_factory
 from ontofoundry_api.db_models import ModelingSessionRecord
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
+from ontofoundry_api.services.errors import ServiceError
 
 MIGRATION = (
     Path(__file__).parents[1]
@@ -49,7 +49,9 @@ def _new_record(*, status: str = "idle") -> ModelingSessionRecord:
         workspace_id=workspace_id,
         created_by="test-user",
         title="显式字段测试",
-        draft_json=OntologyDraft(workspace_id=workspace_id, schema_version="3", hash_algorithm="ontofoundry-domain-v3").model_dump(mode="json"),
+        draft_json=OntologyDraft(
+            workspace_id=workspace_id, schema_version="core-1"
+        ).model_dump(mode="json"),
         base_version_sha256="0" * 64,
         draft_sha256="0" * 64,
         candidates_json=[],
@@ -117,16 +119,15 @@ def test_explicit_dataagent_model_columns_match_the_contract():
 
 
 @pytest.mark.parametrize("status", ACTIVE_STATUSES)
-def test_revise_rejects_every_active_status(session_factory, status):
+def test_revise_allows_edits_in_core_proposal_runs(session_factory, status):
     with session_factory() as db:
         item = _new_record(status=status)
         db.add(item)
         db.commit()
 
-        with pytest.raises(HTTPException) as exc_info:
-            revise(db, item, item.revision, draft_json=item.draft_json)
-
-    assert exc_info.value.status_code == 409
+        previous_revision = item.revision
+        result = revise(db, item, previous_revision, draft_json=item.draft_json)
+        assert result["revision"] == previous_revision + 1
 
 
 def test_revise_cas_rejects_status_changed_by_another_transaction(session_factory):
@@ -145,11 +146,11 @@ def test_revise_cas_rejects_status_changed_by_another_transaction(session_factor
             concurrent_db.execute(
                 update(ModelingSessionRecord)
                 .where(ModelingSessionRecord.id == item_id)
-                .values(task_status="waiting_permission")
+                .values(task_status="waiting_permission", revision=stale_item.revision + 1)
             )
             concurrent_db.commit()
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(ServiceError) as exc_info:
             revise(
                 stale_db,
                 stale_item,
@@ -179,9 +180,10 @@ def test_migration_backfills_existing_rows_and_can_downgrade(tmp_path):
         migration.op = Operations(context)
         migration.upgrade()
 
-        row = connection.execute(
-            text(
-                """
+        row = (
+            connection.execute(
+                text(
+                    """
                 SELECT dataagent_topic_id, dataagent_task_id, dataagent_task_mode,
                        dataagent_run_token, uploaded_material_ids,
                        last_result_task_id, result_state, result_warnings,
@@ -189,9 +191,12 @@ def test_migration_backfills_existing_rows_and_can_downgrade(tmp_path):
                 FROM modeling_sessions
                 WHERE id = :id
                 """
-            ),
-            {"id": "existing-session"},
-        ).mappings().one()
+                ),
+                {"id": "existing-session"},
+            )
+            .mappings()
+            .one()
+        )
         assert row["dataagent_topic_id"] is None
         assert row["dataagent_task_id"] is None
         assert row["dataagent_task_mode"] == ""
@@ -224,11 +229,7 @@ def test_migration_backfills_existing_rows_and_can_downgrade(tmp_path):
         assert columns["result_state"]["type"].length == 20
         assert isinstance(columns["result_warnings"]["type"], JSON)
         assert isinstance(columns["result_claimed_at"]["type"], DateTime)
-        assert {
-            name: columns[name]["nullable"]
-            for name in columns
-            if name != "id"
-        } == {
+        assert {name: columns[name]["nullable"] for name in columns if name != "id"} == {
             "dataagent_topic_id": True,
             "dataagent_task_id": True,
             "dataagent_task_mode": False,
@@ -241,9 +242,10 @@ def test_migration_backfills_existing_rows_and_can_downgrade(tmp_path):
         }
 
         migration.downgrade()
-        assert {column["name"] for column in inspect(connection).get_columns("modeling_sessions")} == {
-            "id"
-        }
+        assert {
+            column["name"]
+            for column in inspect(connection).get_columns("modeling_sessions")
+        } == {"id"}
 
 
 @pytest.mark.parametrize(

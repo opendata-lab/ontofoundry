@@ -49,7 +49,9 @@ def _upstream(monkeypatch, statuses: list[str]) -> list[str]:
         raise AssertionError(request.url.path)
 
     monkeypatch.setattr(
-        httpx, "AsyncClient", partial(httpx.AsyncClient, transport=httpx.MockTransport(handler))
+        httpx,
+        "AsyncClient",
+        partial(httpx.AsyncClient, transport=httpx.MockTransport(handler)),
     )
     return asked
 
@@ -147,17 +149,26 @@ def test_a_newer_run_is_never_overwritten_by_a_slow_sync(client, monkeypatch):
 
     def handler(request: httpx.Request) -> httpx.Response:
         # A new turn takes the session while DataAgent answers for the old task.
-        _set(client, session["id"], dataagent_task_id="task-new", task_status="running",
-             task_detail="new")
+        _set(
+            client,
+            session["id"],
+            dataagent_task_id="task-new",
+            task_status="running",
+            task_detail="new",
+        )
         return httpx.Response(200, json={"task_id": TASK_ID, "task_status": "finished"})
 
     monkeypatch.setattr(
-        httpx, "AsyncClient", partial(httpx.AsyncClient, transport=httpx.MockTransport(handler))
+        httpx,
+        "AsyncClient",
+        partial(httpx.AsyncClient, transport=httpx.MockTransport(handler)),
     )
     paths = install_download(monkeypatch, [])
     client.get(ROOT + "/sessions/" + session["id"])
     current = row(client, session["id"])
     assert (current.dataagent_task_id, current.task_status, current.task_detail) == (
-        "task-new", "running", "new"
+        "task-new",
+        "running",
+        "new",
     )
     assert paths == []

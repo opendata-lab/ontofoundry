@@ -1,6 +1,5 @@
 """Observed source schemas and their links to a published ontology."""
 
-from datetime import UTC
 from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -9,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.connections import connect_readonly, get_connection
-from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MetadataSnapshotRecord, utc_now
+from ontofoundry_api.services.access import require_mappings
+from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.ontology_query import current_version, snapshot_of
 from ontofoundry_api.services.workspaces import get_workspace
 
@@ -128,7 +128,7 @@ def schemas(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_mappings(db, workspace_id, user)
     with connect_readonly(
         get_connection(db, workspace_id, connection_id), request.app.state.settings
     ) as conn:
@@ -136,98 +136,49 @@ def schemas(
 
 
 def asset_response(db, wid, connection, record, version_id=None, schema_name=""):
+    from ontofoundry_api.domain.core import Dataset
+    from ontofoundry_api.services.dataset_sources import (
+        authorized_dataset_projection,
+        resolve_dataset,
+    )
+    from ontofoundry_api.services.errors import ServiceError
+
     space = get_workspace(db, wid)
     version = (
         current_version(db, wid, version_id)
         if version_id or space.current_version_id
         else None
     )
-    from ontofoundry_api.domain.runtime_views import query_compat
-    snapshot = query_compat(snapshot_of(version)) if version else {}
-    types = {t["id"]: t for t in snapshot.get("object_types", [])}
+    snapshot = snapshot_of(version) if version else {}
     schema = record.schema_name if record else schema_name
-    mappings = [
-        m
-        for m in snapshot.get("mappings", [])
-        if m["connection_alias"] == connection.name
-        and (m.get("schema_name") or "") == schema
+    datasets = []
+    for raw in snapshot.get("datasets", []):
+        dataset = Dataset.model_validate(raw)
+        try:
+            source = resolve_dataset(db, wid, dataset)
+        except ServiceError:
+            continue
+        if source.connection.id == connection.id and (source.schema or "") == (
+            schema or source.schema or ""
+        ):
+            datasets.append(authorized_dataset_projection(db, wid, dataset))
+    tables = (
+        {t["name"]: t for t in record.snapshot_json.get("tables", [])} if record else {}
+    )
+    items = [
+        {
+            **tables.get(name, {"name": name, "schema": schema or None, "columns": []}),
+            "missing": name not in tables and bool(record and record.observed_at),
+            "datasets": [d for d in datasets if d["table_name"] == name],
+        }
+        for name in sorted(set(tables) | {d["table_name"] for d in datasets})
     ]
-    tables = record.snapshot_json.get("tables", []) if record else []
-    by_name = {table["name"]: table for table in tables}
-    items = []
-    for name in sorted(by_name.keys() | {m["table_name"] for m in mappings}):
-        table = by_name.get(name)
-        columns = {c["name"] for c in table["columns"]} if table else set()
-        bound = []
-        for mapping in mappings:
-            if mapping["table_name"] != name:
-                continue
-            used_columns = {mapping["key_column"]} | set(mapping["fields"].values())
-            for relation in snapshot.get("link_types", []):
-                join = relation.get("data_join")
-                if not join:
-                    continue
-                if "owner_columns" in join:
-                    if relation["owner_ref"]["ref"] == mapping["type_id"]:
-                        used_columns.update(join["owner_columns"])
-                    if relation["roles"][0]["concept"]["ref"] == mapping["type_id"]:
-                        used_columns.update(join["role_columns"])
-                else:
-                    if relation["source_type_id"] == mapping["type_id"]:
-                        used_columns.update(join.get("source_columns", [join["source_column"]]))
-                    if relation["target_type_id"] == mapping["type_id"]:
-                        used_columns.update(join.get("target_columns", [join["target_column"]]))
-            missing = sorted(used_columns - columns)
-            changed = [
-                change
-                for change in (record.changes_json if record else [])
-                if change["table"] == name
-                and (change["column"] is None or change["column"] in used_columns)
-            ]
-            bound.append(
-                {
-                    "id": mapping["id"],
-                    "type_id": mapping["type_id"],
-                    "name": types.get(mapping["type_id"], {}).get("name", "未知对象"),
-                    "fields": mapping["fields"],
-                    "key_column": mapping["key_column"],
-                    "missing_columns": missing,
-                    "changed_columns": changed,
-                    "status": "unverified"
-                    if not record or not record.observed_at
-                    else "invalid"
-                    if missing
-                    else "review"
-                    if changed
-                    else "valid",
-                }
-            )
-        items.append(
-            {
-                **(
-                    table
-                    or {
-                        "name": name,
-                        "schema": schema or None,
-                        "columns": [],
-                        "comment": None,
-                    }
-                ),
-                "missing": table is None and bool(record and record.observed_at),
-                "mappings": bound,
-            }
-        )
     return {
         "connection_id": connection.id,
         "version_id": version.id if version else None,
         "items": items,
-        "observed_at": (
-            record.observed_at
-            if record.observed_at.tzinfo
-            else record.observed_at.replace(tzinfo=UTC)
-        )
-        if record and record.observed_at
-        else None,
+        "metadata_snapshot_id": f"{connection.id}:{schema}" if record else None,
+        "observed_at": record.observed_at if record else None,
         "error": record.error if record else None,
         "changes": record.changes_json if record else [],
         "status": "stale"
@@ -247,7 +198,7 @@ def assets(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_mappings(db, workspace_id, user)
     connection = get_connection(db, workspace_id, connection_id)
     record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)
@@ -263,7 +214,7 @@ def refresh(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_mappings(db, workspace_id, user)
     connection = get_connection(db, workspace_id, connection_id)
     record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
     if not record:
@@ -286,7 +237,7 @@ def refresh(
             else []
         )
         record.snapshot_json, record.observed_at, record.error = observed, utc_now(), None
-    except HTTPException as exc:
-        record.error = str(exc.detail)
+    except (HTTPException, ServiceError) as exc:
+        record.error = str(exc)
     db.commit()
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)

@@ -2,8 +2,6 @@
 
 
 def compare_snapshots(left, right):
-    from ontofoundry_api.domain.runtime_views import query_compat
-    left, right = query_compat(left), query_compat(right)
     changes = []
 
     def walk(a, b, path):
@@ -40,9 +38,7 @@ def compare_snapshots(left, right):
     }
     affected = {tid for tid in types if any(tid in item["path"] for item in changes)}
     while True:
-        inherited = {
-            tid for tid, t in types.items() if affected.intersection(t.get("extends", []))
-        }
+        inherited = {tid for tid, t in types.items() if t.get("extends") in affected}
         if inherited <= affected:
             break
         affected.update(inherited)
@@ -54,9 +50,7 @@ def compare_snapshots(left, right):
             mapping["type_id"] in affected or mapping["id"] in item["path"]
             for item in changes
         ):
-            impacts.append(
-                {"kind": "mapping", "id": mapping["id"], "label": mapping["table_name"]}
-            )
+            impacts.append({"kind": "mapping", "id": mapping["id"], "label": mapping["id"]})
     links = {
         r["id"]: r for snapshot in (left, right) for r in snapshot.get("link_types", [])
     }

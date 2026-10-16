@@ -1,6 +1,6 @@
 """A small per-process memo for values derived from immutable inputs.
 
-Session reads rebuild the legacy mapping form, the graph, the diff against
+Session reads rebuild the core graph, the diff against
 the base version and the proposal summary from a large draft. Each of those
 is a pure function of content that only changes together with the session
 revision and draft hash, so callers key entries by those and a changed draft
@@ -40,7 +40,7 @@ class ReadCache:
             self._entries.clear()
 
 
-# Bounded by memory, not hit rate: a large draft's graph, mapping form and diff
+# Bounded by memory, not hit rate: a large draft's graph and diff
 # take megabytes. Three entries per session revision; the latest is what's read.
 session_reads = ReadCache(max_entries=64)
 # Normalized published snapshots, keyed by version id and content hash. Sessions

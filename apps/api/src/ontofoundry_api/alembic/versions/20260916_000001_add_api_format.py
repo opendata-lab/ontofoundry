@@ -15,6 +15,7 @@ place, settings bootstrap recreates every deleted provider on the next start, so
 the provider-related keys are cleared there too. Database, skill and widget
 settings in the same row are preserved.
 """
+
 from alembic import op
 
 revision = "20260916_000001"

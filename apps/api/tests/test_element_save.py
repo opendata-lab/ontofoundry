@@ -1,20 +1,23 @@
 from copy import deepcopy
-from uuid import uuid4
 
 from test_modeling import ONTOLOGY, ROOT, create_session, save
 
-from ontofoundry_api.domain.models import OntologyDraft
 
-
-def submit(client, draft, *, kind="object_type", target_id=None, session=None, version=None):
-    return client.post(ROOT + "/element-saves", json={
-        "target_kind": kind,
-        "target_id": target_id or draft["object_types"][0]["id"],
-        "expected_current_version_id": version or client.get(ONTOLOGY + "/version").json()["version_id"],
-        "session_id": session["id"] if session else None,
-        "expected_session_revision": session["revision"] if session else None,
-        "draft": draft,
-    })
+def submit(
+    client, draft, *, kind="object_type", target_id=None, session=None, version=None
+):
+    return client.post(
+        ROOT + "/element-saves",
+        json={
+            "target_kind": kind,
+            "target_id": target_id or draft["object_types"][0]["id"],
+            "expected_current_version_id": version
+            or client.get(ONTOLOGY + "/version").json()["version_id"],
+            "session_id": session["id"] if session else None,
+            "expected_session_revision": session["revision"] if session else None,
+            "draft": draft,
+        },
+    )
 
 
 def test_save_immediately_creates_version_and_preserves_history(client):
@@ -25,7 +28,9 @@ def test_save_immediately_creates_version_and_preserves_history(client):
     assert response.status_code == 200, response.text
     assert response.json()["version"]["version"] == 2
     assert client.get(ROOT + "/published-snapshot").json() == response.json()["draft"]
-    historical = client.get(ROOT + f"/versions/{old['version_id']}/presentation").json()["model"]
+    historical = client.get(ROOT + f"/versions/{old['version_id']}/presentation").json()[
+        "model"
+    ]
     assert historical["object_types"][0]["description"] != "当前弹窗修改"
 
 
@@ -54,7 +59,10 @@ def test_stale_version_refuses_overwrite(client):
     response = submit(client, draft, version=version)
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "VERSION_CHANGED"
-    assert client.get(ROOT + "/published-snapshot").json()["object_types"][0]["description"] == "第一次"
+    assert (
+        client.get(ROOT + "/published-snapshot").json()["object_types"][0]["description"]
+        == "第一次"
+    )
 
 
 def test_stale_session_and_validation_failure_are_atomic(client):
@@ -67,7 +75,10 @@ def test_stale_session_and_validation_failure_are_atomic(client):
     invalid["object_types"][0]["technical_name"] = "bad name"
     assert submit(client, invalid, session=newer).status_code == 422
     assert client.get(ONTOLOGY + "/version").json()["version"] == 1
-    assert client.get(ROOT + f"/sessions/{session['id']}").json()["revision"] == newer["revision"]
+    assert (
+        client.get(ROOT + f"/sessions/{session['id']}").json()["revision"]
+        == newer["revision"]
+    )
 
 
 def test_out_of_scope_changes_are_rejected(client):
@@ -100,45 +111,17 @@ def test_selected_session_conflict_does_not_commit(client):
     response = submit(client, session["draft"], session=session)
     assert response.status_code == 409
     assert client.get(ONTOLOGY + "/version").json()["version"] == 2
-    assert client.get(ROOT + f"/sessions/{session['id']}").json()["revision"] == session["revision"]
-
-
-def test_action_owned_rules_and_parameters_survive_object_save(client):
-    draft = client.get(ROOT + "/published-snapshot").json()
-    action_id, rule_id, param_id = (str(uuid4()) for _ in range(3))
-    draft["actions"].append({
-        "id": action_id, "name": "批准供应商", "technical_name": "approve_supplier",
-        "description": "审批", "input_type_id": draft["object_types"][0]["id"],
-        "parameters": [{"id": param_id, "name": "备注", "technical_name": "note",
-                        "value_kind": "string", "required": True}],
-        "precondition_rule_ids": [rule_id], "effects": [], "evidence": [],
-    })
-    draft["rules"].append({
-        "id": rule_id, "name": "审批前置", "technical_name": "approval_check",
-        "description": "", "owner_kind": "action", "owner_id": action_id,
-        "rule_kind": "constraint", "expression": "TRUE", "verbalizes": [], "evidence": [],
-    })
-    response = submit(client, draft)
-    assert response.status_code == 200, response.text
-    session = create_session(client)
-    edited = deepcopy(session["draft"])
-    edited["object_types"][0]["description"] = "仅修改对象描述"
-    response = submit(client, edited, session=session)
-    assert response.status_code == 200, response.text
-    current = client.get(ROOT + "/published-snapshot").json()
-    assert current["actions"] == draft["actions"]
-    assert current["rules"] == OntologyDraft.model_validate(draft).model_dump(mode="json")["rules"]
-    preview = client.post(ROOT + f"/sessions/{session['id']}/preview", json={"expected_session_revision": response.json()["session"]["revision"]})
-    assert preview.status_code == 200, preview.text
-    assert preview.json()["merged_model"]["actions"] == draft["actions"]
-    assert preview.json()["merged_model"]["rules"] == OntologyDraft.model_validate(draft).model_dump(mode="json")["rules"]
+    assert (
+        client.get(ROOT + f"/sessions/{session['id']}").json()["revision"]
+        == session["revision"]
+    )
 
 
 def test_cannot_take_another_types_property_by_changing_owner(client):
     draft = client.get(ROOT + "/published-snapshot").json()
     selected = draft["object_types"][0]["id"]
-    other = next(p for p in draft["properties"] if p["owner_ref"]["ref"] != selected)
-    other["owner_ref"]["ref"] = selected
+    other = next(p for p in draft["properties"] if p["owner_type_id"] != selected)
+    other["owner_type_id"] = selected
     response = submit(client, draft)
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"

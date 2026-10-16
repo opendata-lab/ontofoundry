@@ -37,8 +37,9 @@ class ConflictError(ServiceError):
 
 class PublishValidationError(ServiceError):
     status_code = 422
-    code = "OSSIE_VALIDATION_FAILED"
+    code = "CORE_VALIDATION_FAILED"
 
     def __init__(self, message: str, report: dict):
         super().__init__(message)
         self.report = report
+        self.details = {"errors": report.get("errors", [])}

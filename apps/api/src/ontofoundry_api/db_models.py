@@ -83,7 +83,6 @@ class OntologyVersionRecord(Base):
     status: Mapped[str] = mapped_column(String(20), default="published", nullable=False)
     message: Mapped[str] = mapped_column(String(240), default="", nullable=False)
     snapshot_json: Mapped[dict] = mapped_column(JSON, nullable=False)
-    ossie_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     validation_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     published_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -98,7 +97,9 @@ class ModelingSessionRecord(Base):
     __tablename__ = "modeling_sessions"
     # Target of composite foreign keys, so proposal rows can only ever point at
     # a session of their own workspace.
-    __table_args__ = (UniqueConstraint("workspace_id", "id", name="uq_modeling_sessions_ws_id"),)
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_modeling_sessions_ws_id"),
+    )
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
@@ -126,12 +127,8 @@ class ModelingSessionRecord(Base):
         JSON, nullable=False, server_default="[]"
     )
     last_result_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    result_state: Mapped[str] = mapped_column(
-        String(20), nullable=False, server_default=""
-    )
-    result_warnings: Mapped[list] = mapped_column(
-        JSON, nullable=False, server_default="[]"
-    )
+    result_state: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
+    result_warnings: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
     result_claimed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -150,7 +147,9 @@ class MaterialRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     # Referenced material is archived, never deleted: evidence must stay
     # recoverable for every proposal, draft and published version.
-    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     archived_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
 
@@ -216,7 +215,9 @@ class OntologyElementIdentityRecord(Base):
     __tablename__ = "ontology_element_identities"
     __table_args__ = (
         PrimaryKeyConstraint("workspace_id", "element_id"),
-        UniqueConstraint("workspace_id", "element_id", "kind", name="uq_element_identity_kind"),
+        UniqueConstraint(
+            "workspace_id", "element_id", "kind", name="uq_element_identity_kind"
+        ),
     )
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
     element_id: Mapped[str] = mapped_column(String(36))
@@ -225,14 +226,18 @@ class OntologyElementIdentityRecord(Base):
         DateTime(timezone=True), nullable=True, default=utc_now
     )
     created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class ProposalBatchRecord(Base):
     __tablename__ = "proposal_batches"
     __table_args__ = (
         UniqueConstraint("workspace_id", "session_id", "run_token", name="uq_batch_run"),
-        UniqueConstraint("workspace_id", "session_id", "result_sha256", name="uq_batch_result"),
+        UniqueConstraint(
+            "workspace_id", "session_id", "result_sha256", name="uq_batch_result"
+        ),
         UniqueConstraint("workspace_id", "session_id", "id", name="uq_batch_scope"),
         ForeignKeyConstraint(
             ["workspace_id", "session_id"],
@@ -250,7 +255,9 @@ class ProposalBatchRecord(Base):
     base_version_sha256: Mapped[str] = mapped_column(String(64))
     source_session_revision: Mapped[int] = mapped_column(Integer)
     source_draft_sha256: Mapped[str] = mapped_column(String(64))
-    material_manifest_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    material_manifest_json: Mapped[list | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
     producer_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     result_sha256: Mapped[str] = mapped_column(String(64))
     # validating | available | failed — never "stale": staleness is per item.
@@ -266,10 +273,16 @@ class ProposalItemRecord(Base):
     __table_args__ = (
         UniqueConstraint("batch_id", "ordinal", name="uq_item_ordinal"),
         UniqueConstraint("batch_id", "fingerprint", name="uq_item_fingerprint"),
-        UniqueConstraint("workspace_id", "session_id", "batch_id", "id", name="uq_item_scope"),
+        UniqueConstraint(
+            "workspace_id", "session_id", "batch_id", "id", name="uq_item_scope"
+        ),
         ForeignKeyConstraint(
             ["workspace_id", "session_id", "batch_id"],
-            ["proposal_batches.workspace_id", "proposal_batches.session_id", "proposal_batches.id"],
+            [
+                "proposal_batches.workspace_id",
+                "proposal_batches.session_id",
+                "proposal_batches.id",
+            ],
             name="fk_item_batch",
         ),
     )
@@ -279,6 +292,7 @@ class ProposalItemRecord(Base):
     session_id: Mapped[str] = mapped_column(String(36), index=True)
     ordinal: Mapped[int] = mapped_column(Integer)
     client_ref: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    atomic_group_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     fingerprint: Mapped[str] = mapped_column(String(64))
     operation: Mapped[str] = mapped_column(String(8))
     target_kind: Mapped[str] = mapped_column(String(24))
@@ -286,14 +300,18 @@ class ProposalItemRecord(Base):
     expected_target_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     before_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     after_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    field_changes_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
+    field_changes_json: Mapped[list | None] = mapped_column(
+        JSON, nullable=True, default=list
+    )
     evidence_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
     # Stored decision state only: pending | accepted | rejected | superseded.
     # stale / conflict are derived on read and never written (design §7.3).
     status: Mapped[str] = mapped_column(String(16), default="pending")
     decided_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     accepted_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=utc_now
