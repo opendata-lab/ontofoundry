@@ -283,177 +283,45 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006401",
-        "name": "华东买方成交额",
-        "technical_name": "east_buyer_amount",
-        "description": "",
+        "name": "成交额",
+        "technical_name": "trade_amount",
+        "description": "交易表全部记录的金额合计。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001404",
+        "evidence": [],
+        "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002432"
+          "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd",
+          "column": "amount"
         },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003403",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002422"
-            },
-            "operator": "eq",
-            "values": [
-              "华东"
-            ]
-          }
-        ],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006402",
-        "name": "华东买方向华南卖方的成交额",
-        "technical_name": "east_to_south_amount",
-        "description": "",
-        "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001404",
-        "aggregation": "sum",
-        "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002432"
-        },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003403",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002422"
-            },
-            "operator": "eq",
-            "values": [
-              "华东"
-            ]
-          },
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003404",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002422"
-            },
-            "operator": "eq",
-            "values": [
-              "华南"
-            ]
-          }
-        ],
-        "evidence": []
+        "filters": []
       },
       {
         "id": "00000000-0000-4000-8000-000000006403",
-        "name": "有上级的员工数",
-        "technical_name": "managed_employee_count",
-        "description": "",
+        "name": "员工数",
+        "technical_name": "employee_count",
+        "description": "员工表的行数。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001401",
+        "evidence": [],
+        "dataset_id": "ea651ca1-1168-5a16-b739-7fdcb55416a4",
         "aggregation": "count",
         "measure": null,
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003401",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002401"
-            },
-            "operator": "not_null",
-            "values": []
-          }
-        ],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006404",
-        "name": "三楼员工数",
-        "technical_name": "third_floor_headcount",
-        "description": "",
-        "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001401",
-        "aggregation": "count",
-        "measure": null,
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003402",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002412"
-            },
-            "operator": "eq",
-            "values": [
-              3
-            ]
-          }
-        ],
-        "evidence": []
+        "filters": []
       },
       {
         "id": "00000000-0000-4000-8000-000000006490",
-        "name": "未使用工位数",
-        "technical_name": "unused_desk_count",
-        "description": "",
+        "name": "工位数",
+        "technical_name": "desk_count",
+        "description": "工位表的行数，不限定分配状态。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001402",
+        "evidence": [],
+        "dataset_id": "d5ea21d1-29fd-5928-986f-bf4334306a43",
         "aggregation": "count",
         "measure": null,
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003402",
-                  "direction": "reverse"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002401"
-            },
-            "operator": "is_null",
-            "values": []
-          }
-        ],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006491",
-        "name": "华东买方向华南卖方交易金额表达式",
-        "technical_name": "east_to_south_expression",
-        "description": "买方华东且卖方华南的一笔100元交易应得100；降到同一companies.region会变0。导出不能保留角色时报本项error，不能输出错误表达式。",
-        "synonyms": [],
-        "kind": "expression",
-        "base_type_id": "00000000-0000-4000-8000-000000001404",
-        "value_kind": "decimal",
-        "expression": "SUM(CASE WHEN trade.buyer.region = '华东' AND trade.seller.region = '华南' THEN trade.amount ELSE 0 END)",
-        "evidence": []
+        "filters": []
       }
     ],
     "datasets": [
@@ -464,7 +332,24 @@
         "schema_name": "hr",
         "table_name": "employees",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "employee_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "manager_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "d5ea21d1-29fd-5928-986f-bf4334306a43",
@@ -473,7 +358,24 @@
         "schema_name": "hr",
         "table_name": "desks",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "desk_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "floor",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "employee_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "3a1a2def-496c-5823-9a24-809d9aba76d9",
@@ -482,7 +384,19 @@
         "schema_name": "mkt",
         "table_name": "companies",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "credit_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "region",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "9d1e3753-885a-5f86-b85a-229d13055cbd",
@@ -491,7 +405,29 @@
         "schema_name": "mkt",
         "table_name": "trades",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "trade_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "buyer_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "seller_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

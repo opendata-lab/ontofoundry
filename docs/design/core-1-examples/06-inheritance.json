@@ -470,13 +470,36 @@
         "id": "e2096ab6-9f37-5f6a-91b8-282036a9f24e",
         "name": "个人数",
         "technical_name": "person_count",
-        "description": "先以个人扩展表的存在确定成员，再数父来源中的个人实例。",
+        "description": "统计 person_extensions 中 party_id 非空的记录，不自动关联 parties 或套用对象成员条件。",
+        "synonyms": [],
+        "kind": "expression",
+        "evidence": [],
+        "dataset_id": "c45fdba8-a116-5789-b9ba-3347eb42f54f",
+        "expression": "COUNT(person_extensions.party_id)",
+        "value_kind": "integer"
+      },
+      {
+        "id": "e5883a83-7057-5ff4-aeb9-895bcf8f357d",
+        "name": "VIP 数",
+        "technical_name": "vip_party_count",
+        "description": "在 parties 上固定过滤 level=VIP；不随对象 derived_by 变化。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
+        "dataset_id": "7878d71e-85c5-5366-b426-8cc2da54cb9e",
         "aggregation": "count",
         "measure": null,
-        "filters": [],
+        "filters": [
+          {
+            "column": {
+              "dataset_id": "7878d71e-85c5-5366-b426-8cc2da54cb9e",
+              "column": "level"
+            },
+            "operator": "eq",
+            "values": [
+              "VIP"
+            ]
+          }
+        ],
         "evidence": []
       }
     ],
@@ -488,7 +511,39 @@
         "schema_name": "inheritance_demo",
         "table_name": "parties",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "party_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "party_name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "phone",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "contact_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "vip_note",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "level",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "c45fdba8-a116-5789-b9ba-3347eb42f54f",
@@ -497,7 +552,19 @@
         "schema_name": "inheritance_demo",
         "table_name": "person_extensions",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "id_card_no",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "party_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "e7c2dc73-4e92-5fdd-8beb-ee2fa60faf7b",
@@ -506,7 +573,19 @@
         "schema_name": "inheritance_demo",
         "table_name": "organization_extensions",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "credit_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "party_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "de8f7866-5cbe-5e80-a3e8-c2e91301affc",
@@ -515,7 +594,24 @@
         "schema_name": "inheritance_demo",
         "table_name": "contracts",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "contract_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "signer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "7c222e44-786e-515c-a1c7-0ebfd009d31d",
@@ -524,7 +620,14 @@
         "schema_name": "inheritance_demo",
         "table_name": "devices",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "device_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "893849a0-07e2-5872-a6e7-bad11dc153ee",
@@ -533,7 +636,14 @@
         "schema_name": "inheritance_demo",
         "table_name": "vehicles",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "vehicle_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "3fc9b7ff-4975-52b2-80a0-985d20c0ba01",
@@ -542,7 +652,19 @@
         "schema_name": "inheritance_demo",
         "table_name": "suppliers",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "supplier_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "supplier_name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "57c2e65c-7993-5cdb-ae1e-17067903cf29",
@@ -551,7 +673,19 @@
         "schema_name": "inheritance_demo",
         "table_name": "channel_partners",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "partner_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "partner_name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

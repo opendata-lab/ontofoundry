@@ -97,14 +97,14 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001901",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002902"
+          "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8",
+          "column": "area"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8"
       }
     ],
     "datasets": [
@@ -115,7 +115,19 @@
         "schema_name": null,
         "table_name": "stores",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "store_code",
+            "physical_type": "varchar",
+            "comment": "门店编码"
+          },
+          {
+            "name": "area",
+            "physical_type": "decimal",
+            "comment": "门店面积"
+          }
+        ]
       }
     ],
     "mappings": [

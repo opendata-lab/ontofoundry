@@ -43,7 +43,7 @@ core-1 只在两个地方声明时间，其余规则都由这两处推出：
 | 字段 | 类型 | 什么时候填 | 说明 |
 |---|---|---|---|
 | `Dataset.snapshot_date_column` | 字符串，可以为空 | 每日全量快照表填写快照日期列；其他表留空 | 声明后，每周期按该数据集最后有数据的日期选行，实例浏览默认只取最新一天 |
-| `Metric.time_field` | 属性路径或列引用，可以为空 | 仅 simple、expression 可填；ratio 不保存 | 统计对象是业务对象时引用它的日期类属性；统计对象是数据集时引用日期类列。快照日期列也可以选 |
+| `Metric.time_field` | 日期类列引用，可以为空 | 仅 simple、expression 可填；ratio 不保存 | simple、expression 均只选自己的 dataset_id 所指数据集列；快照日期列也可选，ratio 各用分量时间 |
 
 ## 4. 怎么计算
 
@@ -67,11 +67,33 @@ ratio 使用分子、分母各自的 time_field。例如退款率 = 退款金额
   "schema_name": "snapshot_demo",
   "table_name": "component_daily",
   "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
-  "snapshot_date_column": "snapshot_date"
+  "snapshot_date_column": "snapshot_date",
+  "columns": [
+    {
+      "name": "component_id",
+      "physical_type": "varchar",
+      "comment": "组件编号"
+    },
+    {
+      "name": "snapshot_date",
+      "physical_type": "date",
+      "comment": "业务快照日期"
+    },
+    {
+      "name": "quantity",
+      "physical_type": "integer",
+      "comment": "数量"
+    },
+    {
+      "name": "warehouse_code",
+      "physical_type": "varchar",
+      "comment": "仓库编码"
+    }
+  ]
 }
 ```
 
-“组件期末数量”的时间字段是快照日期属性，数据集已经声明快照：
+“组件期末数量”的时间字段是快照日期列，数据集已经声明快照：
 
 ```json
 {
@@ -81,18 +103,18 @@ ratio 使用分子、分母各自的 time_field。例如退款率 = 退款金额
   "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
   "synonyms": [],
   "kind": "simple",
-  "base_type_id": "00000000-0000-4000-8000-000000011101",
   "aggregation": "sum",
   "measure": {
-    "links": [],
-    "property_id": "00000000-0000-4000-8000-000000021103"
+    "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+    "column": "quantity"
   },
   "filters": [],
   "evidence": [],
   "time_field": {
-    "links": [],
-    "property_id": "00000000-0000-4000-8000-000000021102"
-  }
+    "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+    "column": "snapshot_date"
+  },
+  "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
 }
 ```
 
@@ -146,11 +168,11 @@ JOIN chosen_day AS c ON q.snapshot_date = c.d;
 
 **窗口表不要相加。** 近一月、近三月这类窗口统计分别建成属性或来源，并说明窗口起止。窗口互相重叠，不能相加；日均值不能再平均成总体均值。
 
-改变 snapshot_date_column 会改变来源的选行范围，须在提案中列出受影响的对象指标、数据集指标及其 ratio。派生条件和成员扩展来源的变更也须沿继承和成员依赖传播。语义与范围保持的物理换绑可以只更新 SQL 参考；无法确认等价时列出潜在影响，不扫描数据库证明等价。
+删除数据集或列、调整来源位置和快照声明时，列出直接引用与 ratio 间接依赖的指标，相关修订归同一依赖组。范围保持的来源搬迁只更新 SQL 参考，不能确认等价则列潜在影响，不扫描数据证明等价。对象成员、继承、属性或关系定义的变化不触发指标定义修订。
 
 ## 7. 校验与限制
 
-- 快照日期列和 simple、expression 的时间字段必须能定位到存在的列或属性；ratio 不得保存 time_field，分量时间字段允许不同；对象上的时间字段必须是 date 或 datetime 类型。
+- 快照日期列和 simple、expression 的时间字段必须能定位到登记数据集的日期类列；ratio 不得保存 time_field，分量时间字段允许不同。两个分量必须引用同一数据集。
 - 平台不检查多个数据集的日期是否一致，不证明快照是否完整。
 - 取期末固定为“周期内最后一个有数据的日期”，不提供取期初。
 - 日期不齐时如何关联、空周期如何显示（补零、留空或省略），核心都不规定，由 agent 处理并说明。

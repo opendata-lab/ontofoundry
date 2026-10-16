@@ -219,14 +219,14 @@
           "营收"
         ],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002012"
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006002",
@@ -235,11 +235,11 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count",
         "measure": null,
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006003",
@@ -248,75 +248,38 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count",
         "measure": null,
         "filters": [
           {
-            "path": {
-              "links": [],
-              "property_id": "00000000-0000-4000-8000-000000002013"
-            },
             "operator": "eq",
             "values": [
               "已完成"
-            ]
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "status"
+            }
           }
         ],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006004",
-        "name": "华东区订单金额",
-        "technical_name": "east_order_amount",
-        "description": "",
-        "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
-        "aggregation": "sum",
-        "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002012"
-        },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003001",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002003"
-            },
-            "operator": "eq",
-            "values": [
-              "华东"
-            ]
-          }
-        ],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006005",
         "name": "下单客户数",
         "technical_name": "buyer_count",
-        "description": "",
+        "description": "订单数据集中 customer_id 精确去重；示例外键有效，一名客户多次下单只计一次。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "count_distinct",
         "measure": {
-          "links": [
-            {
-              "link_type_id": "00000000-0000-4000-8000-000000003001",
-              "direction": "forward"
-            }
-          ],
-          "property_id": "00000000-0000-4000-8000-000000002001"
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "customer_id"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006006",
@@ -336,46 +299,46 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002012"
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
         },
         "filters": [
           {
-            "path": {
-              "links": [],
-              "property_id": "00000000-0000-4000-8000-000000002014"
-            },
             "operator": "ge",
             "values": [
               "2026-01-01T00:00:00"
-            ]
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "created_at"
+            }
           },
           {
-            "path": {
-              "links": [],
-              "property_id": "00000000-0000-4000-8000-000000002014"
-            },
             "operator": "lt",
             "values": [
               "2026-04-01T00:00:00"
-            ]
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "created_at"
+            }
           },
           {
-            "path": {
-              "links": [],
-              "property_id": "00000000-0000-4000-8000-000000002013"
-            },
             "operator": "not_in",
             "values": [
               "待支付",
               "已取消"
-            ]
+            ],
+            "column": {
+              "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+              "column": "status"
+            }
           }
         ],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006098",
@@ -394,15 +357,15 @@
         "technical_name": "median_order_amount",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "kind": "simple",
         "aggregation": "median",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002012"
+          "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+          "column": "amount"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006698",
@@ -410,11 +373,11 @@
         "technical_name": "distinct_order_status_pairs",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "kind": "expression",
-        "expression": "COUNT(DISTINCT sales_order.order_no || '::' || sales_order.status)",
+        "expression": "COUNT(DISTINCT orders.order_id || '::' || orders.status)",
         "value_kind": "integer",
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       },
       {
         "id": "00000000-0000-4000-8000-000000006699",
@@ -422,11 +385,11 @@
         "technical_name": "eligible_amount_expression",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
-        "base_type_id": "00000000-0000-4000-8000-000000001002",
         "kind": "expression",
-        "expression": "SUM(CASE WHEN sales_order.status = '已完成' OR sales_order.status = '已发货' THEN sales_order.amount ELSE 0 END)",
+        "expression": "SUM(CASE WHEN orders.status = '已完成' OR orders.status = '已发货' THEN orders.amount ELSE 0 END)",
         "value_kind": "decimal",
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
       }
     ],
     "datasets": [
@@ -437,7 +400,29 @@
         "schema_name": "dw",
         "table_name": "customers",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "region",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "signed_on",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "b7cc4307-1928-522c-a58b-921b2b697d75",
@@ -446,7 +431,34 @@
         "schema_name": "dw",
         "table_name": "orders",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "created_at",
+            "physical_type": "datetime",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

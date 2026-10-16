@@ -8,7 +8,7 @@
 
 问“本月完成了多少订单”之前，先要说清什么算订单、什么算完成，以及金额和状态从哪里读取。核心模型保存这些共同含义，让人和 agent 使用同一套业务定义。它也能直接描述汇总表上的计算，例如“代码行日统计”的提交数，不要求先创建一个业务对象。
 
-**我们给的是语义。** 订单、客户等对象描述业务事物，属性保存单个实例的值，关系连接实例，指标定义一批记录怎样计算，数据集和绑定说明数据来源。需要让多次问数沿用相同口径时使用这些定义；只想执行一次临时 SQL 时，不必把每个临时结果都建成对象或指标。平台校验定义和引用，agent 根据授权、问题与引擎组织查询，保持指标算法、固定条件和快照口径。
+**我们给的是语义。** 订单、客户等对象描述业务事物，属性保存单个实例的值，关系连接实例，每个指标只引用自己的数据集列，定义这张表的记录怎样计算，数据集和绑定说明数据来源。需要让多次问数沿用相同口径时使用这些定义；只想执行一次临时 SQL 时，不必把每个临时结果都建成对象或指标。平台校验定义和引用，agent 根据授权、问题与引擎组织查询，保持指标算法、固定条件和快照口径。
 
 ### 概念关系图
 
@@ -20,11 +20,11 @@ flowchart TD
   R[规则] -->|归属| O
   R -->|归属| P
   R -->|归属| L
-  M[独立指标] -->|粒度与路径| O
+  M[独立指标]
   B[数据绑定] -->|对象与属性| O
   B -->|引用| D[数据集登记]
   L -->|映射表绑定| D
-  M -->|显式数据集粒度| D
+  M -->|数据集列引用| D
   I[文档对象与链接事实] -->|类型| O
   I -->|关系类型| L
   E[材料与人工证据] -->|支持| I
@@ -170,14 +170,14 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
         "营收"
       ],
       "kind": "simple",
-      "base_type_id": "00000000-0000-4000-8000-000000001002",
       "aggregation": "sum",
       "measure": {
-        "links": [],
-        "property_id": "00000000-0000-4000-8000-000000002012"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "column": "amount"
       },
       "filters": [],
-      "evidence": []
+      "evidence": [],
+      "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
     }
   ],
   "datasets": [
@@ -188,7 +188,34 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
       "schema_name": "dw",
       "table_name": "orders",
       "description": "虚构示例数据集。",
-      "snapshot_date_column": null
+      "snapshot_date_column": null,
+      "columns": [
+        {
+          "name": "order_id",
+          "physical_type": "varchar",
+          "comment": "示例登记列"
+        },
+        {
+          "name": "amount",
+          "physical_type": "decimal",
+          "comment": "示例登记列"
+        },
+        {
+          "name": "status",
+          "physical_type": "varchar",
+          "comment": "示例登记列"
+        },
+        {
+          "name": "created_at",
+          "physical_type": "datetime",
+          "comment": "示例登记列"
+        },
+        {
+          "name": "customer_id",
+          "physical_type": "varchar",
+          "comment": "示例登记列"
+        }
+      ]
     }
   ],
   "mappings": [
@@ -243,7 +270,7 @@ SELECT SUM(o.amount) AS order_amount
 FROM dw.orders AS o;
 ```
 
-界面中，“全局”显示元素类别与数量；点击指标层进入语义视图的指标筛选。在语义视图筛选到“指标”，点击订单金额查看完整口径；对象弹窗不提供指标入口。
+界面中，“全局”显示元素类别与数量；点击指标层进入语义视图的指标筛选。在语义视图筛选到“指标”，点击订单金额查看完整口径；对象详情是否按绑定推导展示相关指标由工程和原型阶段决定，模型不保存该关联。
 
 ## 4. 建模建议
 
@@ -262,7 +289,7 @@ FROM dw.orders AS o;
 2. 定义二元关系。多方共同发生的事实建中间对象，配对有数量或日期时把它们放在中间对象上。
 3. 登记数据集。写明方言、命名空间、表名、说明和可空快照日期列，再用绑定引用数据集和列。
 4. 决定实例范围。普通对象由主表决定范围；有绑定父对象必须覆盖所有子实例，虚拟父对象按具体子对象实例并集理解。
-5. 显式选择业务对象或数据集作为指标统计对象，再定义时间口径。优先 simple、ratio，复杂算法保存 expression。逐行比率列仍是属性。
+5. 选择一个登记数据集，仅用该数据集的列定义指标及时间口径。优先 simple、ratio，复杂本数据集算法保存 expression；其他数据集条件在 agent 查询时沿本体关系筛选。逐行比率列仍是属性。
 6. 添加具体元素的规则、说明、同义词及证据。通过提案审阅、接受和发布，让 agent 消费已发布语义。
 
 正例：先定义“完成率 = 已完成订单数 / 全部订单数”，再让 agent 按月查询。反例：把完成状态放入所有查询的公共 WHERE，导致分母也只剩已完成订单。没有现成指标时，agent 可以依据模型组合查询，但须解释所用口径。
@@ -284,5 +311,5 @@ FROM dw.orders AS o;
 | 对象、属性、二元关系 | [Object / Link types](https://www.palantir.com/docs/foundry/object-link-types/type-reference) 是相近业务建模概念。 | [Entity / Relationship types](https://learn.microsoft.com/en-us/fabric/iq/ontology/overview) 是相近概念。 | [EntityType 与 relationships](https://github.com/apache/ossie/blob/main/ontology/ontology.md)；其关系还允许一元和多元。 |
 | 数据集与绑定 | [创建对象时选择 backing datasource](https://www.palantir.com/docs/foundry/object-link-types/create-object-type)。 | [绑定](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-bind-data)连接定义与来源。 | ontology 与 semantic_model 分层，用 mappings 连接；内嵌映射已弃用。 |
 | 继承 | [Interface](https://www.palantir.com/docs/foundry/interfaces/interface-overview) 是抽象接口，不等于具体对象单父继承。 | [单父继承](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-inheritance)不继承普通关系与绑定。 | extends 支持更宽表达；本平台只保留单父。 |
-| 指标 | [对象集合聚合](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)；同构独立指标资源未核实。 | [定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)有 explicit 等 Metric。 | [开放语义交换规范 OSI（Open Semantic Interchange）中的指标 Metric，用于交换计算定义](https://github.com/apache/ossie/blob/main/core-spec/spec.yaml)保存表达式。 |
+| 指标 | [对象集合聚合](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)；本体没有同构可复用指标定义。 | [定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)为顶层 model.metrics[]，[操作页](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics)按 measure 所在表对应实体展示。 | [开放语义交换规范 OSI（Open Semantic Interchange）中的指标 Metric，用于交换计算定义](https://github.com/apache/ossie/blob/main/core-spec/spec.yaml)保存表达式。 |
 | 规则 | [Submission criteria](https://www.palantir.com/docs/foundry/action-types/submission-criteria)有执行语义；与本平台只保存的规则不同。 | [业务规则](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-rules)为自然语言上下文。 | requires / derived_by 挂在概念或关系；不支持的语义按例外表报告。 |

@@ -141,17 +141,17 @@
         "id": "00000000-0000-4000-8000-000000006901",
         "name": "账户可用金额",
         "technical_name": "account_available_amount",
-        "description": "统计范围由 accounts 主来源决定，金额取附表；直接聚合附表缺主来源锚点，Ossie 导出按 RT-61 dropped。",
+        "description": "对 account_amounts 的 available_amount 求和，包括不属于 accounts 的孤儿行；如需排除，由 agent 关联主表或清理数据。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001901",
+        "evidence": [],
+        "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002903"
+          "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
+          "column": "available_amount"
         },
-        "filters": [],
-        "evidence": []
+        "filters": []
       }
     ],
     "datasets": [
@@ -162,7 +162,19 @@
         "schema_name": "dw",
         "table_name": "accounts",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "account_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
@@ -171,7 +183,19 @@
         "schema_name": "dw",
         "table_name": "account_amounts",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "available_amount",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "acct_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "e1ee1c80-3d24-507c-bb58-b27fb936bcf8",
@@ -180,7 +204,24 @@
         "schema_name": "dw",
         "table_name": "customers",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

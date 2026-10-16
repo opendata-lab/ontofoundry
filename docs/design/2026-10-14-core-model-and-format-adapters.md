@@ -1,6 +1,6 @@
 # 核心模型与格式适配器设计
 
-日期：2026-10-14 · 修订：2026-10-16（第 15 轮）· 状态：设计定稿，待实施
+日期：2026-10-14 · 修订：2026-10-16（第 19 轮）· 状态：设计定稿，待实施
 
 本文**取代** `docs/plans/2026-10-08-ossie-native-lossless-plan.md` 及其 P1–P4 进度文档、
 `docs/design/2026-10-08-ossie-coverage-matrix.md` 中“Ossie 是模型规范层、必须无损承载”的原则。
@@ -37,8 +37,8 @@ Ossie 在概念上是合理的。本体与数据集分层并用映射连接、�
 | P1 | 核心模型优先 | 核心采用平台需要的编辑结构，以 Ossie 为语义基准；不能承载的语义集中列明，不能把结构简化当作语义已完整保留。 |
 | P2 | 适配器隔离 | `domain/` 不得 import 任何适配器；适配器只依赖核心模型的公开类型。外部格式专用的角色、presence 等语法不出现在适配器之外；数据集方言是平台自己的来源信息。 |
 | P3 | 有损可见 | 导入、导出都产出转换报告，逐项列出“结构改写、丢弃、错误”。 |
-| P4 | 不猜测 | 不擅自解释无法确定的业务含义。指标表达式保留原文，引用或粒度不明时报告待补全，不能因无法结构化而丢弃；其他不支持的构造逐项报告。 |
-| P5 | 无损只靠原生格式 | 平台自己的完整备份和搬迁用 OntoFoundry 原生格式的**完整包**（§4.6，含材料），无损；不含材料的单文件形式会丢失证据，导入报告逐项说明。外部格式只保留其可表达的业务结构和命名，语法合法不等于执行语义等价；逐指标报告连接及过滤风险（§6.5）：核心模型 → 外部格式 → 核心模型时，规则名、实例、证据等可能丢失。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并在导入报告里逐项列出。 |
+| P4 | 不猜测 | 不擅自解释无法确定的业务含义。指标表达式保留原文，引用或统计数据集不明时报告待补全，不能因无法结构化而丢弃；其他不支持的构造逐项报告。 |
+| P5 | 无损只靠原生格式 | 平台自己的完整备份和搬迁用 OntoFoundry 原生格式的**完整包**（§4.6，含材料），无损；不含材料的单文件形式会丢失证据，导入报告逐项说明。外部格式只保留其可表达的业务结构和命名，语法合法不等于执行语义等价；逐指标报告比率分量过滤与时间约定（§6.5）：核心模型 → 外部格式 → 核心模型时，规则名、实例、证据等可能丢失。外部格式 → 核心模型 → 外部格式**不保证**还原原文，但每处差异都必须能归到一条编号规则（§7.1），并在导入报告里逐项列出。 |
 | P6 | 导出必须合法 | 导出的文档必须通过目标格式的官方校验。缺的信息优先省略或由模型推导，不往受校验的字段里塞占位字符串（见 §4.4）。 |
 
 ---
@@ -144,11 +144,13 @@ Ossie 在概念上是合理的。本体与数据集分层并用映射连接、�
 }
 ```
 
-simple 的 conditions 非空，采用 §3.6 的 Condition 和值类型校验，分支内全部 AND；其路径必须指向标量。expression 与 conditions 互斥，表达式非空。数组内各分支取并集；需要同时满足的条件写在同一分支内。空数组表示本层没有派生条件，不表示成员已完整定义。表达式保存文本并解析 AST，按 id 记录引用依赖，沿用指标的引用存储原则，不另建依赖集合；改名按 id 重建显示，不替换字面量。
+simple 的 conditions 非空，采用本节的 PathCondition 和值类型校验，分支内全部 AND；其路径必须指向标量。expression 与 conditions 互斥，表达式非空。数组内各分支取并集；需要同时满足的条件写在同一分支内。空数组表示本层没有派生条件，不表示成员已完整定义。表达式保存文本并解析 AST，按 id 记录引用依赖，与规则一样按引用存储，不另建依赖集合；改名按 id 重建显示，不替换字面量。
 
 引用从直接父对象的有效属性和关系解析，可引用祖先定义且保留原 id。表达式支持 §3.5 的标量、比较、布尔组合、算术、CASE 和受限标量函数，另支持关系存在性 `EXISTS (对象.关系路径)`；路径每跳按关系 id 和 forward 或 reverse 方向记录，文字显示采用关系技术名，反向显示为 `REVERSE(关系技术名)`。同类不同角色以不同关系 id 区分，自关联同样保留方向。EXISTS 显式量化该路径的可达关联实例，找不到关联为 false；存在关联但某属性为空不等同不存在。它是本体成员语义，不接受任意 SQL 子查询、聚合、递归或未定义的角色变量量化。
 
 每层先限定父范围，再判断本层分支的并集；有成员扩展来源时再取交集。多层不得漏掉祖先条件。语义引用不依赖物理列或父绑定就绪；缺绑定只影响问数就绪。普通 derivation Rule 是说明，不自动成为成员条件，同一条件不重复存 Rule。导入不能完整闭合时保留整个成员定义原文并待补全，不把可解析片段当成完整定义或覆盖已有定义。
+
+**Path 与 PathCondition（仅用于成员派生和本体规则）**：Path 从上下文对象出发，使用 `{ "links": [{"link_type_id": "<关系 id>", "direction": "forward"}], "property_id": "<属性 id>" }`；links 为空时引用自身属性，每跳方向为 forward 或 reverse。PathCondition 是 `{ "path": <Path>, "operator": <运算符>, "values": [...] }`。operator 使用 eq、ne、gt、ge、lt、le、in、not_in、between、is_null、not_null；between 两个值，in/not_in 至少一个，is_null/not_null 零个，其余一个，not_in 不含 null，值须匹配属性 value_kind。关系导航必须解析为标量；涉及集合时使用受支持的显式量化（例如成员表达式 EXISTS），不能将集合当标量。指标不使用 Path 或 PathCondition。
 
 #### 文档事实的显示与搜索
 
@@ -199,7 +201,7 @@ simple 的 conditions 非空，采用 §3.6 的 Condition 和值类型校验，�
 
 例：订单外键无业务属性时，用订单表作映射表，`source_columns=[order_id]` 指源映射键，`target_columns=[customer_id]` 指目标映射键；订单客户编码已建属性时，可直接关联客户 `unique` 的编码属性。选课表用独立映射表；复合键按位置逐列 AND。
 
-对象指标、问数从显式统计对象出发保留未匹配对象，基础 SQL 参考默认 LEFT JOIN；浏览关联实例只列匹配关系。具体 SQL 的连接与过滤安排由 agent 保证语义等价，不把执行写法作为核心模型字段。按**声明的基数**给方向和重复计算风险提示；数据库未声明约束、脏键或重复映射表行仍可能增行，平台不做运行时基数校验，也不保证标签能够防重。
+对象问数从查询对象出发保留未匹配对象，基础 SQL 参考默认 LEFT JOIN；浏览关联实例只列匹配关系。具体 SQL 的连接与过滤安排由 agent 保证语义等价，不把执行写法作为核心模型字段。按声明的基数给重复计算风险提示；数据库未声明约束、脏键或重复映射表行仍可能增行，平台不做运行时基数校验。
 
 ### 3.5 规则 `Rule`
 
@@ -208,7 +210,7 @@ simple 的 conditions 非空，采用 §3.6 的 Condition 和值类型校验，�
 v3 的规则引用列表不保留，普通规则只存在 `rules` 集合；ObjectType.derived_by 是成员判定定义，不是 Rule id 列表。
 
 **表达式写法**：受限 SQL 表达式 + 本体路径，用文字路径引用：`对象.属性`、`对象.关系.属性`，第一段是规则所属的对象
-（属性、关系上的规则，第一段是其所属对象），每一段的含义与指标的路径（§3.6）相同。平台不执行规则，只检查路径中的对象、关系、属性都存在。
+（属性、关系上的规则，第一段是其所属对象），每一段按 §3.2 的 Path 解析。平台不执行规则，只检查路径中的对象、关系、属性都存在。
 规则保留文本并解析用于识别表达式结构的抽象语法树 AST（Abstract Syntax Tree）及 id 依赖；不是任意 ANSI SQL。允许常量、比较、布尔组合、算术、CASE、受限标量函数及本体路径，不允许 SELECT、子查询、聚合或窗口。属性 owner 以属性所属对象为上下文，关系 owner 以源对象为上下文；继承规则沿用父上下文。规则描述业务条件，不自动变成属性计算绑定。改技术名时按 id 依赖在同一提案组重写路径，不能全局替换字符串、字面量和参数；引用不能解析则拒绝规则。例：
 
 ```sql
@@ -218,156 +220,87 @@ sales_order.amount > 0
 sales_order.customer.region <> '华东' OR sales_order.salesperson.employee_no IS NOT NULL
 ```
 
-不使用 Ossie 的角色写法（如 `Person.parent_of(descendant)`）。规则语法的关系导航与指标同义，但不沿用指标“只走向一”的聚合限制；涉及集合必须有显式的、后续语法支持的量化形式，不能把集合当标量。
+不使用 Ossie 的角色写法（如 `Person.parent_of(descendant)`）。规则语法的关系导航按上下文和显式方向解析；涉及集合必须有显式的、后续语法支持的量化形式，不能把集合当标量。
 
 
 
 ### 3.6 指标 `Metric`（结构化与表达式）
 
-指标作为独立顶层元素，便于统一治理、独立寻址和复用；只在语义视图筛选查看，对象弹窗没有指标标签或其他指标入口。simple、expression 的统计对象显式保存为 `base_type_id` 或 `base_dataset_id`，二选一，任何时候都不通过数据集绑定反查对象：同一数据集可能绑定多个对象。界面称“统计对象”。simple、expression 显式保存统计对象；ratio 不保存 base 字段，读取时从两个 simple 分量推导，分量必须引用同一对象或同一数据集，缺失或不一致时报依赖未闭合。
-指标优先用结构化字段描述聚合、对象属性路径或数据集列及固定过滤；结构化形式表达不了的口径，使用 `expression` 保存一条 SQL 聚合表达式。核心承载语义，模型校验只检查表达式的引用是否存在，问数时的执行和方言调整交给 agent；平台界面的数值预览另按 §8A 的受限编译与只读执行流程处理。
+指标是独立顶层语义元素，只挂在数据集上，与本体对象、属性、关系不建立关联。simple、expression 显式保存 `dataset_id`；ratio 不保存 dataset_id，读取时从两个 simple 分量解析，两者必须是同一数据集。指标在语义视图中查看；对象详情是否按数据集绑定推导展示“相关指标”，由工程实施和原型阶段决定，模型不保存或规定这种展示关联。
+
+常见口径用 simple 或 ratio，复杂口径用 expression 保存一条 SQL 聚合表达式。**我们给的是语义**：模型校验引用，agent 负责完整查询与方言调整；平台数值预览另按 §8A 受限编译并只读执行。
 
 #### 字段
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id`、`name`、`technical_name`、`description`、`synonyms`、`evidence` | | |
+| `id`、`name`、`technical_name`、`description`、`synonyms`、`evidence` | | 通用元数据 |
 | `kind` | `simple` / `ratio` / `expression` | 简单聚合、比率或 SQL 聚合表达式 |
-| `value_kind` | enum / null | simple 和 ratio 仅在读取时推导，原生输入不得填写：计数为 integer，sum、min、max 沿用度量值类型，avg 和 median 为 decimal，比率为 decimal。expression 使用声明的七种语义类型之一，不做 SQL 类型推断；外部未提供时可为空并提示待补全 |
-| **各类指标的统计对象** | | |
-| `base_type_id` | UUID / null | 对象粒度时引用对象，与 base_dataset_id 二选一；仅适用于 simple、expression。 |
-| `base_dataset_id` | UUID / null | 数据集粒度时引用登记数据集，与 base_type_id 二选一；仅适用于 simple、expression，不反查对象。 |
-| **简单指标** | | |
-| `aggregation` | enum | `sum / avg / median / min / max / count / count_distinct` |
-| `measure` | Path 或 ColumnReference / null | 对象粒度引用属性路径；数据集粒度引用列。count 时为空，分别数对象实例或数据集行；其余必填。 |
-| `filters` | list[Condition] | 过滤条件，全部同时满足（AND）；可为空 |
-| **比率指标** | | |
-| `numerator_id`、`denominator_id` | UUID | 分子、分母各引用一个简单指标，两者必须引用同一对象或同一数据集，ratio 读取时沿用这一统计对象，不单独持久化。ratio 不存 time_field，分子、分母各按自己的时间字段统计同一查询周期，允许采用不同业务时间。比率按**小数**相除：精度与物理类型由 agent 按目标引擎处理，分母为 0 时结果为空；只读推导的 `value_kind` 为 `decimal`。MCP 的基础 SQL 与 Ossie 导出都保留小数除法和零分母为空的语义，避免两边都是计数时发生整数除法（1 / 2 得 0） |
-| **表达式指标** | | |
-| `expression` | str | 一条 SQL 聚合表达式，例如 `COUNT(DISTINCT customer.region \|\| '::' \|\| customer.category)`。对象粒度使用本体路径，或在对象上下文中使用属性技术名；数据集粒度直接使用 dataset.column 列引用，不沿本体关系导航。平台保留业务算法，引用按 id 生成当前显示后交给 agent |
+| `dataset_id` | UUID | simple、expression 必填，引用已登记数据集，说明唯一统计来源；所有列引用均限该数据集。ratio 输入不收此字段，读取时从分量解析 |
+| `value_kind` | enum / null | simple、ratio 只读推导，原生输入不填：count、count_distinct 为 integer，sum、min、max 沿用度量值类型，avg、median、ratio 为 decimal。expression 声明七种语义类型之一，外部未提供时可空并待补全，不做 SQL 类型推断 |
+| **simple** | | |
+| `aggregation` | enum | sum / avg / median / min / max / count / count_distinct |
+| `measure` | ColumnReference / null | count 不填，数数据集行；其他聚合必填，仅引用 dataset_id 所指数据集的列 |
+| `filters` | list[Condition] | 本数据集列的固定条件，全部 AND，可空；不支持 OR，复杂条件用 expression |
+| **ratio** | | |
+| `numerator_id`、`denominator_id` | UUID | 两个数值型 simple，必须同一数据集；各自保留过滤和时间字段。小数相除，分母为零时为空，总计按分量重算。精度及物理类型交给 agent，不发生整数截断 |
+| **expression** | | |
+| `expression` | str | 一条 SQL 聚合表达式，只以 dataset.column 引用 dataset_id 所指数据集的登记列；保留算法、字面量与 NULL 行为，不使用本体路径，不接受 SELECT、FROM、JOIN 或额外查询作用域 |
 | **时间字段** | | |
-| `time_field` | Path 或 ColumnReference / null | 仅 simple 和 expression 可填，ratio 不保存此字段。此字段决定按哪个时间把数据归到周期（例如订单金额按下单时间还是支付时间归月）。对象粒度引用日期类属性，数据集粒度引用日期类列，快照日期列也可以选。可空，见下文“时间口径” |
+| `time_field` | ColumnReference / null | simple、expression 可选日期类列，包含快照日期列。simple、expression 均限 dataset_id 所指数据集；ratio 不保存，分别使用分量时间字段归周期，允许不同业务时间 |
 
-expression 不套用 simple 的聚合枚举、AND 条件或路径基数限制，也不因此获得任意 SQL 执行器。模型校验只检查引用本体元素或数据集列存在，不验证函数可执行性、物理类型、连接基数或公式等价性；数值预览另须通过 §8A 的执行白名单。新建表达式的引用必须存在；导入无法闭合的表达式保留原文和待补全状态，不伪造属性。本体引用单向按 id 记录依赖，数据集引用按 dataset id 与列名记录；表达式文本按这些引用重新生成显示，改名不影响口径且不替换字面量。业务算法变更须展示提案。导入原文仍保留在材料中，不保存反查属性的 reference_bindings。只有用户或 AI 提案改挂对象时，才显式把列引用换为属性路径。
-
-**依赖变更**：删除被指标引用的对象、属性或关系，或调整关系基数使原路径不再合法时，校验列出直接及经 ratio 分量间接受影响的指标；修订/删除指标与本体变更提案放入同一依赖组，组的最终图通过校验才能一起接受，不留下悬空引用。提案区分语义和范围保持的物理换绑，以及可能改变属性、关系含义或成员、实例、时间范围的修改。对派生条件、成员扩展来源、主来源及快照声明等后者，沿引用、继承、成员派生及 ratio 分量列出受影响指标和原因。无法确认等价的换绑列出潜在影响，不扫描数据库证明等价，不新增语义版本开关。删除数据集同样检查挂在该数据集上的指标及表达式列引用，并把相关修订放入同一依赖组。
-
-**Path（路径）**：从粒度对象出发，沿关系走到某个属性。
+**ColumnReference 与 Condition**：
 
 ```json
 {
-  "links": [
-    {
-      "link_type_id": "<关系 id>",
-      "direction": "forward"
-    }
-  ],
-  "property_id": "<属性 id>"
-}
-```
-
-- `links` 为空表示粒度对象自己的属性；每跳显式 `direction=forward|reverse`。允许正向多对一、一对一、反向一对一；反向多对一和任意多对多不能作首版指标路径。自关联同样靠方向区分。限制依据是声明的基数，不是实际数据唯一性的证明；MCP 提醒潜在重复计算风险，不做运行时校验。
-
-- 用 id 引用，对象、关系、属性改名后指标不受影响。界面和导出时显示为 `sales_order.customer.region` 这样的文字路径。
-
-**ColumnReference（列引用）**：
-
-```json
-{
-  "dataset_id": "<数据集 id>",
-  "column": "commit_count"
-}
-```
-
-数据集粒度的 measure 使用此结构，条件用 `column` 替代 `path`：`{"column":{"dataset_id":"<数据集 id>","column":"repo"},"operator":"eq","values":["core"]}`。两者都只能引用 base_dataset_id 登记的列，不含 links，不沿关系走。平台检查列存在于 Dataset.columns；清单为空或缺省时标为待补全，不臆造列或属性，也不提供伪就绪 SQL。expression 直接写列，引用同样对照登记列清单校验；不通过数据集反查对象。
-
-**Condition（条件）**：
-
-```json
-{
-  "path": {
-    "links": [],
-    "property_id": "<地区属性 id>"
-  },
-  "operator": "eq",
-  "values": [
-    "华东"
+  "measure": {"dataset_id": "<数据集 id>", "column": "amount"},
+  "filters": [
+    {"column": {"dataset_id": "<数据集 id>", "column": "status"}, "operator": "eq", "values": ["已完成"]}
   ]
 }
 ```
 
-`operator` 为 `eq / ne / gt / ge / lt / le / in / not_in / between / is_null / not_null`；`values` 的个数由运算符决定
-（`between` 两个，`in / not_in` 至少一个，`is_null / not_null` 零个），对象路径的值须与属性的 `value_kind` 一致；数据集列按登记元数据核对，无法确定的列类型或结果类型标为待补全，物理类型适配交给 agent。
-simple 的条件列表只支持 AND；含 OR 的口径使用 expression。有重叠的几个指标相加不等价于 OR。比较按 SQL 三值逻辑，`is_null` 匹配属性为空（不等同关系不存在），`not_in` 的值列表不能包含 null。`count_distinct` 精确去重且不计 null；SUM 空集为 null、COUNT 空集为 0；比率总计按分子分母重新计算，不加总分组比率。
+operator 为 eq / ne / gt / ge / lt / le / in / not_in / between / is_null / not_null；between 两个值，in/not_in 至少一个，is_null/not_null 零个，其余比较一个，not_in 不含 null。值类型按 Dataset.columns 登记元数据核对；清单空或类型未知时待补全，已知清单不存在该列时修订引用，不臆造列、属性或就绪 SQL。物理类型适配交给 agent。
 
-ratio 的时间口径完全来自两个分量。例如退款率 = 退款金额（按退款时间）÷ 销售金额（按下单时间），2 月结果就是 2 月退款金额除以 2 月销售金额。想按别的时间统计，应换用相应的分子或分母指标；ratio 不提供第三个时间字段，也不要求两者的 time_field 相同。分量时间字段变更时，依赖的 ratio 同步展示变更后的两套口径，不自动改写另一个分量。
+比较遵循 SQL 三值逻辑，is_null 匹配列为空。count_distinct 精确去重且不计 null；SUM 空集为 null、COUNT 空集为 0。ratio 的过滤留在各自分量，不能把分子过滤放到公共 WHERE。
+
+**所有指标只引用单个数据集**：simple 的度量、固定条件和时间字段，expression 的全部列和时间字段，以及 ratio 的两个分量，均限于自己的 dataset_id 所指数据集。expression 允许本数据集聚合、算术、CASE 和标量函数，不接受 SELECT、FROM、JOIN 或额外查询作用域；不能借同一数据集的不同角色绕过此边界。模型没有数据集之间的关系，指标也不引用本体，不能从本体关系推出指标的连接。
+
+**需要其他数据集的条件在查询时处理**：例如只定义 orders 上的“订单金额” `SUM(orders.amount)`。用户问“华东区订单金额”时，agent 在查询时沿订单到客户的本体关系筛选客户地区，再按订单金额口径聚合。地区筛选和查询连接是 agent 回答问题时的行为，不是指标定义的一部分；有歧义或重复计算风险时由 agent 处理，必要时澄清。
+
+expression 不套用 simple 的 AND 和聚合枚举。模型检查本数据集列引用及表达式边界，不验证函数执行、物理类型或公式等价性。保存文本并解析 AST，引用按 dataset id 与列名记录；数据集改名时只重建引用显示，不替换字面量。新建引用必须闭合；导入未闭合则保留原文待补全，数值预览另须通过执行白名单。
+
+**依赖变更**：删除数据集、删除或改名列、调整来源位置或快照声明时，检查直接引用与经 ratio 分量间接依赖的指标，列出影响及原因；修订与数据集变更归同一依赖组，最终图合法才能接受。范围与含义保持的来源搬迁只更新 SQL 参考，无法确认等价时列潜在影响，不扫描数据库证明等价。本体对象、属性、关系及 derived_by 的变更不触发指标定义依赖检查。
+
+ratio 例如退款率＝退款金额（按退款时间）÷销售金额（按下单时间），两个分量均在同一订单数据集，2 月值为 2 月退款除以 2 月销售。改变时间口径须换分量；分量时间字段变化时展示新口径，不自动改写另一分量。
 
 #### 例子
 
-对象 `sales_order`（订单，标识属性 `order_no`，属性 `amount`、`status`），对象 `customer`（客户，标识属性 `customer_no`，属性 `region`），
-关系 `sales_order.customer`（订单 → 客户，多对一）。路径按文字形式书写，实际存的是 id。
+以下数据集与列均为虚构登记；orders 每行是一张订单，包含 amount、status、customer_id、created_at，customers 每行是一名客户，包含 customer_id、region。
 
-| 指标 | kind | 粒度 | aggregation | measure | filters |
-|---|---|---|---|---|---|
-| 订单金额 | simple | 订单 | sum | `sales_order.amount` | |
-| 订单数 | simple | 订单 | count | — | |
-| 已完成订单数 | simple | 订单 | count | — | `sales_order.status eq 已完成` |
-| 华东区订单金额 | simple | 订单 | sum | `sales_order.amount` | `sales_order.customer.region eq 华东` |
-| 下单客户数 | simple | 订单 | count_distinct | `sales_order.customer.customer_no` | |
-| 客户数 | simple | 客户 | count | — | |
-| 客单价 | ratio | 订单 | — | 分子：订单金额，分母：下单客户数 | |
-
-存储形式（华东区订单金额）：
+| 指标 | kind | 数据集 | 算法 |
+|---|---|---|---|
+| 订单金额 | simple | orders | sum(amount) |
+| 订单数 | simple | orders | count，measure=null |
+| 已完成订单数 | simple | orders | count，固定过滤 status='已完成' |
+| 下单客户数 | simple | orders | count_distinct(customer_id)，示例外键有效 |
+| 客户数 | simple | customers | count |
+| 客单价 | ratio | 从分量解析为 orders | 订单金额÷下单客户数 |
 
 ```json
 {
   "kind": "simple",
-  "name": "华东区订单金额",
-  "technical_name": "east_order_amount",
-  "base_type_id": "<sales_order>",
+  "name": "订单金额",
+  "technical_name": "order_amount",
+  "dataset_id": "<订单数据集 id>",
   "aggregation": "sum",
-  "measure": {
-    "links": [],
-    "property_id": "<sales_order.amount>"
-  },
-  "filters": [
-    {
-      "path": {
-        "links": [
-          {
-            "link_type_id": "<sales_order.customer>",
-            "direction": "forward"
-          }
-        ],
-        "property_id": "<customer.region>"
-      },
-      "operator": "eq",
-      "values": [
-        "华东"
-      ]
-    }
-  ]
+  "measure": {"dataset_id": "<订单数据集 id>", "column": "amount"},
+  "filters": [],
+  "time_field": {"dataset_id": "<订单数据集 id>", "column": "created_at"}
 }
 ```
 
-数据集例子：“代码行日统计”一行代表一个仓库一天的统计，提交数 = SUM(commit_count)，显式挂该数据集，不创建或反查对象。完整登记、列条件、ratio 与 expression 见[示例 13](core-1-examples/13-dataset-metrics.json)。
-
-```json
-{
-  "kind": "simple",
-  "name": "提交数",
-  "technical_name": "commit_count",
-  "base_dataset_id": "<代码行日统计数据集 id>",
-  "aggregation": "sum",
-  "measure": {
-    "dataset_id": "<代码行日统计数据集 id>",
-    "column": "commit_count"
-  },
-  "filters": []
-}
-```
-
-两行 commit_count 为 3 和 5，提交数为 8；COUNT(*) 为 2，仅代表统计行数。该日统计是事件汇总，提交数按整个范围求和，不因为带日期就声明快照。
+代码行日统计每行代表一个仓库一天的统计，提交数为 SUM(commit_count)；两行值为 3 和 5 时结果 8，COUNT(*) 则为 2。无需对象绑定，完整列条件、ratio 与 expression 见[示例 13](core-1-examples/13-dataset-metrics.json)。
 
 #### 时间口径：快照与事件
 
@@ -437,15 +370,15 @@ ratio 的时间口径完全来自两个分量。例如退款率 = 退款金额�
 
 Fabric [新体验定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)公开 explicit、enrichment、projected Metric；explicit 有自己的 expression，支持 SQL、KQL（Kusto Query Language，用于日志和分析查询的 Kusto 查询语言）等方言，另外两类依赖源 measure。以上核查日期为 2026-10-15。共同方向是聚合类型与表达式或代码配合；各产品的执行能力并不相同。
 
-**MCP 契约**：返回指标定义。simple 和 ratio 在对象绑定或数据集来源及列就绪时可额外给一条基础 SQL 参考；expression 保留算法，引用按 id 生成当前显示后交给 agent，不要求平台编译任意 SQL。只读 MCP 可附推导 value_kind 和 ratio 的统计对象，这些不是原生输入字段；表单预览从当前分量解析统计对象。分组、查询时间范围、附加条件和物理类型适配由 agent 处理。agent 不得改动固定聚合、过滤或表达式算法；比率总计按分子分母重新计算。
+**MCP 契约**：返回指标定义和数据集列引用，不返回对象归属。simple、ratio 在数据集来源、列及权限就绪时可附基础 SQL 参考；expression 保留算法交给 agent。simple、ratio 可附只读推导 value_kind，ratio 可附从分量解析的 dataset_id，原生输入不收这些推导字段。分组、查询范围、其他数据集的筛选和物理适配由 agent 在查询时处理，不能改变固定算法与条件。
 
-例如“完成率 = 已完成订单数 / 全部订单数”，一单完成、一单取消，结果是 0.5。不能把“已完成”移到公共 WHERE，否则分母也只剩完成订单而得到 1。各分量的过滤和连接分别保留。
+例如“完成率 = 已完成订单数 / 全部订单数”，一单完成、一单取消，结果是 0.5。不能把“已完成”移到公共 WHERE，否则分母也只剩完成订单而得到 1。各分量的过滤和时间口径分别保留。
 
 ### 3.7 数据集登记与数据映射
 
 #### 数据集 `Dataset`
 
-新增顶层 `datasets`，用轻量、扁平的登记表示可引用的数据来源。同一数据集可以被对象主表、附表、关系映射表及数据集指标复用，位置和快照声明只维护一份。
+新增顶层 `datasets`，用轻量、扁平的登记表示可引用的数据来源。数据集是登记单位，背后可以是表或视图；指标只引用单个数据集的列，不关心其物理形态。同一数据集可以被对象主表、附表、关系映射表及数据集指标复用，位置和快照声明只维护一份。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -453,7 +386,7 @@ Fabric [新体验定义协议](https://learn.microsoft.com/en-us/rest/api/fabric
 | `name` | str | 数据集名称，在本模型内唯一；不是对象技术名，不要求与对象同名 |
 | `dialect` | str / null | mysql、doris、postgresql 等引擎方言；导入材料无法确定时为空并标记待补全，不能把 ANSI_SQL 当成数据库引擎 |
 | `schema_name` | str / null | 表的命名空间，按方言可含 database/schema 限定；MCP 结合服务端元数据解析 database 与 schema，空值使用来源默认值，无法定位则未完成 |
-| `table_name` | str | 表名，不存任意 source query 或递归来源树 |
+| `table_name` | str | 来源表名或视图名，不存任意 source query 或递归来源树 |
 | `description` | str | 来源说明，也可承载供 agent 理解的上下文 |
 | `snapshot_date_column` | str / null | 快照日期列。只给每日全量快照表填写（每行是某天的状态，常见后缀 `_df`）；每日增量分区表（每行是某天发生的事，常见后缀 `_di`）的日期列只是业务时间，不填。非空时，每周期按该数据集最后有数据的日期选行，实例浏览默认取最新一天（§3.6） |
 | `columns` | list / null | 可选的元数据快照列清单，每项为 `{name, physical_type, comment}`；不是本体字段节点，不自动生成属性，空或缺省表示未提供清单 |
@@ -506,13 +439,13 @@ Fabric 的 [Overview](https://learn.microsoft.com/en-us/fabric/iq/ontology/overv
 
 #### 数据集快照与关联提示
 
-快照只在 Dataset.snapshot_date_column 上声明；MappingSource 不再保存 snapshot。对象绑定快照数据集时，实例浏览和 agent 查询明细默认只取该数据集最新一天，也可以指定日期查看当时的状态。历史物理行常以实体键和日期共同唯一，但选定数据集日期后，实例关联键仍可使用实体键。不要把时点内唯一误写成历史全表唯一，也不要从逻辑键自动推导跨数据集日期相等。业务时间属性描述指标含义，数据集日期列描述来源快照，二者不必由同一物理字段承载所有来源的日期。
+快照只在 Dataset.snapshot_date_column 上声明；MappingSource 不再保存 snapshot。对象绑定快照数据集时，实例浏览和 agent 查询明细默认只取该数据集最新一天，也可以指定日期查看当时的状态。历史物理行常以实体键和日期共同唯一，但选定数据集日期后，实例关联键仍可使用实体键。不要把时点内唯一误写成历史全表唯一，也不要从逻辑键自动推导不同数据集日期相等。业务时间属性描述指标含义，数据集日期列描述来源快照，二者不必由同一物理字段承载所有来源的日期。
 
 给 agent 的提示：历史表只连实体键可能让多天记录交叉配对，应先理解数据集日期和问题时点，避免把多个日期当成同一天。日期一致时可以同日关联；日期不一致时如何关联或说明、空周期如何展示由 agent 处理，核心不强制同日，不指定主来源决定日期，不增加自动回退规则。
 
 #### 成员定义与物理绑定
 
-成员条件保存在 ObjectType.derived_by，引用本体属性和关系；物理列改名或换绑不改条件的 id 依赖。成员扩展来源仍由 membership_source_id 声明。物理换绑若可能改变成员范围或属性、关系含义，按 §3.6 列出潜在影响；权限筛选不替代业务成员定义。
+成员条件保存在 ObjectType.derived_by，引用本体属性和关系；物理列改名或换绑不改条件的 id 依赖。成员扩展来源仍由 membership_source_id 声明。可能改变成员范围或属性、关系含义的换绑须展示对象语义影响；权限筛选不替代成员定义。指标独立引用数据集列，不随对象成员定义改变。
 
 ### 3.8 草稿顶层
 
@@ -539,11 +472,11 @@ metrics, datasets, mappings, material_objects, material_links
 - `data_join` 按 kind 校验：direct 两端属性引用有效、目标属性组为声明唯一键；具体 JOIN 就绪还需两端有列绑定；mapping_table 列数匹配引用键（mapping_key 或 properties）；任一端未映射时不得提供具体 SQL JOIN；可保留未就绪 direct 的有效属性引用，或保留语义关系并令 data_join=null。跨连接标记仅供语义，不提供单 SQL。
 
 - inherited_link_bindings 只能引用本对象从虚拟祖先继承的关系 id，按本对象有效来源校验相应 DataJoin；有绑定父对象的继承绑定不得覆写，字段与关系的本地绑定不改变原定义归属。
-- simple、expression 必须显式保存 base_type_id 或 base_dataset_id，恰好一项非空；ratio 不得输入 base 字段，从同统计对象的分量推导，不由绑定反查对象。对象粒度 simple 的 measure 和 filters.path 从该对象出发，只走正向多对一、一对一或反向一对一；数据集粒度使用 measure 列引用及 filters.column，不允许路径，列必须属于该数据集登记的列清单，清单空时待补全。
-- simple 的 count 是行计数，不填 measure，不能把忽略 NULL 的 COUNT(列) 或条件 COUNT(列) 直接转为 count；导入边界见 §5.6。其他聚合必填；sum、avg、median 需要数值，min、max 允许数值、string、date、datetime，不允许 boolean。对象类型按属性声明推导；列类型和结果类型依据登记元数据，无法确定则待补全，不臆造语义类型。条件值数量、类型须匹配运算符及属性或列。ratio 两个分量须是数值型 simple，且彼此统计对象一致（同一对象或同一数据集）；MIN 日期不能作为分量。
-- expression 校验本体 id 引用或数据集列引用，不推断 SQL 类型，不套用 simple 的 AND 或对象路径基数限制；数据集粒度不能沿关系走。导入引用不闭合时保留原文并待补全，不能给出伪就绪 SQL。
-- 本体改名按 id 重新生成表达式显示；删除被引用对象、属性、关系或改基数导致路径失效，列出受影响指标及 ratio 依赖，相关提案归入同一依赖组并校验最终图。提案区分语义和范围保持的物理换绑，以及可能改变属性、关系含义或成员、实例、时间范围的修改。对派生条件、成员扩展来源、主来源及快照声明等后者，沿引用、继承、成员派生及 ratio 分量列出受影响指标和原因。无法确认等价的换绑列出潜在影响，不扫描数据库证明等价，不新增语义版本开关。删除数据集同样检查数据集指标及表达式引用，禁止留下悬空依赖。
-- 数据集快照日期列和指标时间字段必须可定位；对象粒度的时间字段是有效的 date 或 datetime 属性（可经允许方向的路径），数据集粒度的时间字段对照列清单校验。time_field 只属于 simple 和 expression，ratio 出现该字段时校验拒绝；ratio 按两分量各自时间字段归周期，不要求二者相同。派生条件引用有效父属性和关系，按 §3.2 校验分支及两种表示互斥，扩展属性可引用扩展来源。平台不检查数据集日期是否一致，不查询数据验证快照完整性。
+- simple、expression 必须保存有效 dataset_id；ratio 输入不收 dataset_id，从两个同数据集数值型 simple 分量解析。simple 的 measure、filters.column、time_field 和 expression 的全部列引用及 time_field 均限本数据集列。
+- count 不填 measure，其他聚合必填；sum、avg、median 要求数值，min、max 允许数值、string、date、datetime，不允许 boolean。列类型和结果类型按登记元数据，未知则待补全。ratio 分量必须同一数据集且是数值型 simple。COUNT 可空列不得误转行计数，条件值数量和类型须匹配运算符及列。
+- expression 的全部列引用必须属于 dataset_id；不接受本体路径、SELECT、FROM、JOIN 或额外查询作用域，不推断 SQL 类型，不套用 simple 的 AND 限制。不能从本体绑定补出指标连接。
+- 数据集改名按 id 重建指标引用显示。删除数据集或列、调整来源位置及快照声明须检查直接引用与 ratio 间接依赖，修订归同一依赖组，最终图须合法。本体增删改和成员变化不触发指标定义依赖检查。
+- 数据集快照日期列和指标时间字段必须可定位，time_field 为日期类列引用；simple、expression 均限自己的 dataset_id 所指数据集列。ratio 出现 time_field 时拒绝，按两个分量各自时间字段归周期，允许不同。派生条件按 §3.2 校验，与指标独立。平台不检查数据集日期一致性或快照完整性。
 - `inverse_name` 非空时不得与 `name` 相同。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
 - **标识只由属性组成**：对象的标识是它全部 `identifier=true` 的属性（含从父对象继承的），组合起来唯一。关系不参与标识，只负责连接对象。
@@ -890,30 +823,27 @@ Ossie derived concept 的成员从父范围导出，`Employee extends Person`、
 
 ### 5.6 指标
 
-Ossie 导入的指标一律挂数据集（base_dataset_id），不通过数据集绑定反查对象，也不要求数据集已有对象映射。仅当表达式引用能够唯一确定统计数据集时，才采用该数据集；不能把对象映射或文件中数据集排列当作来源声明。当前 Ossie Metric 没有独立统计数据集字段。跨多个数据集或无列的 COUNT(*) 又未声明来源时，保留原文、来源候选与材料定位为待补全导入条目，阻断该指标提案，用户选择数据集后才能形成满足二选一约束的指标；不猜第一个来源，不生成空粒度的已接受指标。对应已有指标保持不动，平台导入只生成新增和修改提案（§4.5）。其他可独立成立的导入提案照常处理。
+只引用一个数据集且符合 §3.6 表达式边界的 OSI semantic_model.metrics 指标，与核心 Metric 一一对应，计算定义直接按该数据集的登记字段导入导出；不建立到本体对象或属性的映射。simple、ratio 是常见公式的可编辑写法，expression 承载其余本数据集算法。支持范围内保持算法与列引用，不承诺空白、大小写等原文格式。快照、time_field 和物理元数据等无同构字段的声明仍按 RT-60、RT-66 报告，不宣称完整核心模型无损往返。
 
-用 SQL AST 识别确定等价的固定形式，其余保存为 expression。外部逻辑字段先按其字段定义定位到登记数据集的物理列，只替换已解析的引用标识符并报告转换（RT-47），不反查属性或辅助对象键。计算字段不能把逻辑字段名伪装为登记列；不能按列结构化时保留 expression 原文和字段定义定位，引用待补全，不编造列。列只对照登记数据集的列清单。清单空时仍保留定义，但列校验及 SQL 参考为待补全；不臆造。固定形式接受括号、大小写和空白差异。
+导入统一使用 dataset_id，先检查全部字段的最终数据集来源及表达式边界。只引用一个数据集且没有 SELECT、FROM、JOIN 或额外查询作用域时才继续转换。超出该边界的 OSI 指标首版不承载：按 RT-69 本项 error，原文、完整片段、来源清单和材料定位保留在转换报告，completion_status=available，target_element_ids=[]，不形成残缺核心指标、不猜来源；用户可将其改写为本数据集指标后再提案，业务改写不称为等价转换。已有定义保持不动，其他独立提案照常处理。裸 COUNT(*) 没有列来源时保留原文与候选，待用户选择一个数据集；选定后转为该数据集的 simple count，导出沿用 §6.5 的行计数编译规范式，不根据对象绑定推测。
+
+用 SQL AST 识别确定等价的固定形式。逻辑字段按其定义解析为登记数据集列，只改写已解析标识符并按 RT-47 报告，不改变运算、常量、分隔符或 NULL 行为。计算字段不能冒充物理列；不能按列结构化时保留 expression 及字段定义定位，待引用补全。列清单空或类型未知时待补全，不编造列或就绪 SQL。
 
 | 外部表达式 | 导入结果 |
 |---|---|
-| `SUM/AVG/MEDIAN/MIN/MAX(ds.f)` | 转数据集 simple，measure 引用该数据集列；MEDIAN 对应 median。 |
-| `COUNT(DISTINCT ds.f)` | 转数据集 count_distinct，保留列去重与忽略 NULL 的含义；即使 f 是对象键也不改成 count（RT-50）。 |
-| `SUM/AVG/MEDIAN/MIN/MAX(CASE WHEN <条件> THEN ds.f END)` | 仅限这五种聚合；条件属于结构化子集且引用同一数据集时，拆为列 measure 和列 filters。 |
-| `COUNT(DISTINCT CASE WHEN <条件> THEN ds.f END)` | 同上拆过滤，聚合仍为 count_distinct。 |
-| 固定的 CAST、NULLIF 比率 | 两侧均可转同一数据集 simple 时转 ratio；分量各保留过滤，ratio 从两个分量推导统计数据集，不保存 base 字段（RT-55）。 |
-| `COUNT(DISTINCT a \|\| '::' \|\| b)` | 保存数据集 expression（RT-56），保留分隔符、NULL 和字符串算法。 |
-| 裸 `COUNT(*)` | 无数据集引用，原文保留为待选择数据集的 expression 条目；用户确认后才能创建数据集指标，不能由对象映射推测。 |
-| ELSE 0、OR、多个 WHEN、复杂函数、子查询、跨数据集引用等其他形式 | 保留 expression（RT-49）；粒度须显式为数据集，来源不明时阻断待补全提案。 |
+| SUM / AVG / MEDIAN / MIN / MAX(ds.f) | simple，measure 为 ds.f，MEDIAN 对应 median |
+| COUNT(DISTINCT ds.f) | simple count_distinct，保持列去重及忽略 NULL（RT-50） |
+| 上述五种聚合的单 WHEN、缺省或 NULL ELSE CASE | 条件为 AND 子集且全部引用同一数据集时拆为 measure、filters |
+| COUNT(DISTINCT CASE WHEN 条件 THEN ds.f END) | 独立识别为 count_distinct 和固定过滤 |
+| COUNT(CASE WHEN ds.f IS NULL THEN 1 ELSE 1 END) | simple count；两分支均为非空常量，等价行计数，不依赖 f 非空或唯一 |
+| COUNT(CASE WHEN 固定条件 THEN CASE WHEN ds.f IS NULL THEN 1 ELSE 1 END END) | 固定条件属于同数据集 AND 子集时转 count 加 filters |
+| 固定 CAST、NULLIF 比率 | 两侧对应已登记的同数据集数值型 simple 时复用其 id 转 ratio（RT-55）；否则保留一条 expression，不为一条外部指标额外生成分量指标 |
+| 本数据集拼接复合去重、OR、ELSE 0、多个 WHEN、复杂函数 | expression，保持完整算法（RT-49、RT-56） |
+| 裸 COUNT(*) | 选择来源后转 simple count，导出沿用 §6.5 的行计数编译规范式；不能凭对象键改成去重计数 |
 
-`COUNT(ds.f)` 与 `COUNT(CASE WHEN <条件> THEN ds.f END)` 保留为 expression，不转行计数；可空列的 NULL 不计数。COUNT DISTINCT 只按上表独立规则处理，不能套用五种聚合的泛化识别。
+COUNT(ds.f) 和 COUNT(CASE WHEN 条件 THEN ds.f END) 保留 expression，不能转行计数：两行列值为 NULL、10 时列计数为 1，行计数为 2。上表行计数规范形式须精确匹配两分支均为 1 的结构，不能扩大为所有 CASE COUNT。
 
-结构化条件仍只接受 §3.6 运算符与 AND，CASE 只接受一组 WHEN，ELSE 缺省或 NULL。expression 直接保留数据集列表达式及按 dataset id 记录的引用依赖，不创建 reference_bindings，不自动改成本体属性路径。
-
-导入之后，用户可以编辑或点击 AI 补全，以提案改挂到对象，同时把列引用换成显式属性路径，不能只改 base 字段。汇总表登记成数据集，直接在其上建数据集指标；查询时用不用汇总表由 agent 决定，并保留固定算法、可用维度和时间口径。
-
-Ossie 字段类型与七种核心类型不匹配时仍按 D5 报告；不因此丢弃整条指标。只有非 ANSI 方言时也保留表达式及来源方言说明，报告转换风险，agent 负责运行时调整。导出必须遵守目标格式允许的方言与引用校验，不能把未知方言标成 ANSI_SQL。
-
-导出 expression 时保留业务算法和核心原文，引用输出规则见 §6.5。dataset 按登记一一输出，能定位的旧 field 引用可在同一个 dataset 内生成字段别名，保留表达式文本，不额外复制 dataset。对象粒度 expression 中的对象路径与数据集 expression 中的已解析列引用，在导出时只替换已解析的标识符为登记 dataset 与逻辑字段名，按 RT-47 报 converted；运算、常量、分隔符和 NULL 行为保持不变，不全局替换文本。无法确定的引用保留待补全，导出时报 error，不交付悬空文件，也不丢指标。
+所有导入指标同样遵守 §3.6 的单数据集边界，不能把不支持的算法直接放进 expression。原文留报告不等于核心承载。不创建 reference_bindings，不改成本体路径。非 ANSI 指标保留表达式及来源方言说明，不把未知方言标成 ANSI_SQL；引用未闭合时保留待补全，导出时报 error。字段类型不匹配仍按 D5 报告，不因此丢掉整条指标。
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
@@ -1028,7 +958,7 @@ Ossie 字段类型与七种核心类型不匹配时仍按 D5 报告；不因此�
 - primary_key 来自可一致确定的非空来源键，快照数据集使用实体键加本数据集快照日期的完整历史键；同一 Dataset 的多个键声明冲突时不任取其一，省略该键并按 RT-64 报告依赖影响。附表星形连接只在键能合法表达时输出。
 - ObjectType.derived_by 按 RT-67 输出父概念属性、关系路径，完整等价转换者报 converted。membership_source_id 成员扩展绑定和额外继承绑定按 RT-57 报损失；保留父子定义与全部 Dataset，不输出残缺条件或为子类复制 dataset。虚拟父对象无自己的 dataset，具体子对象可输出已绑定继承定义，多态并集约定按 RT-65 报告。
 
-- 非快照数据集引用非主键 unique 属性时，可输出对应 dataset.unique_keys。快照时点内唯一不能当作历史全表唯一，完整历史键可由实体键和本数据集快照日期构成；不能据此自动给跨数据集连接增加日期相等。时间选择、时点唯一性或连接无法按标准结构表达时按 RT-60、RT-64 报告，不伪造历史唯一键。
+- 非快照数据集引用非主键 unique 属性时，可输出对应 dataset.unique_keys。快照时点内唯一不能当作历史全表唯一，完整历史键可由实体键和本数据集快照日期构成；不能据此自动给不同数据集的连接增加日期相等。时间选择、时点唯一性或连接无法按标准结构表达时按 RT-60、RT-64 报告，不伪造历史唯一键。
 - 数据集引擎方言和元数据快照列类型未必有同构外部字段；能正确表达的照常输出，其余在 dataset 描述中说明并按 RT-66 报损失，不能从 ANSI_SQL 保证恢复引擎或元数据采集来源。
 - `concept_mappings`：
   - 只有一个标识属性：`object_mappings` 为 `[{"expression": "dataset.标识属性字段"}]`。例如登记名为 persons 的数据集中写 `persons.id_card_no`，与 `identify_by: ["id_card_no"]` 一致。
@@ -1041,52 +971,26 @@ Ossie 字段类型与七种核心类型不匹配时仍按 D5 报告；不因此�
 - 多对多 mapping_table 引用已输出的登记 dataset 并生成到两端引用键的物理 relationships；source_key/target_key 是 properties 时按该组顺序写，mapping_key 时按主来源 key_columns。业务 link_mappings 根与子节点同样需要两端完整业务标识可表达，否则只导出物理连接并报告业务映射缺失。
 - 物理关系只在同一个 OntologyMap（同连接）内导出，跨连接只留本体关系定义并报绑定 dropped。平行边必须同时写对应业务 link_mapping 与精确列组以便 §5.5 匹配；缺少一一对应协议时不能承诺回读绑定。
 
-**所有对象指标的共同前提：完整对象范围可表达。** simple、ratio 的每个分量及对象 expression 都须保留主来源决定的实例集合、祖先和本层派生条件（本层分支取并集、逐层取交集）、成员扩展来源的存在性，以及每条关系路径到达的子类范围。单独输出子概念 derived_by 或在描述中说明范围，不能代替聚合表达式中的范围限定。
+**单个数据集上的指标一一导出**。每个核心 Metric 恰好输出一条 OSI semantic_model.metrics，不复制 Dataset，不创建辅助指标。simple 编译固定聚合与本数据集过滤；ratio 展开两个同数据集 simple 的完整公式；expression 保留算法、字面量与 NULL 行为，将已解析引用转换为同一登记 dataset.field（RT-47）；含 COUNT(*) 的表达式还可按下文等价规范化其中的行计数以保留来源。旧逻辑字段名可在同一 Dataset 内保留字段别名。导出前复查所有列及 time_field 均属于该指标数据集，且 expression 符合 §3.6；不合法核心输入报 RT-61 error，不交付伪有效文件，不从对象映射补连接。
 
-先解析属性与计算绑定的实际来源，再检查聚合表达式是否有统计对象的主来源锚点；shared_parent 沿祖先解析，不能仅凭 Path.links 为空就认定引用了主来源。能在目标允许的表达式与无歧义连接中等价写入完整范围时，将范围并入聚合条件，并保留用户过滤、NULL、行保留和比率分量语义；不得为了锚点改换 measure、加总无关字段或改变算法。成员扩展来源不能靠普通 LEFT JOIN 自动限定成员，路径到达子类的条件也不能挪到公共 WHERE 而删掉基对象。无法完整表达时沿用 RT-61：结构化本项 dropped，expression 本项 error，核心定义保留；ratio 任一分量不满足则该 ratio dropped。
-
-**表达式指标**写入 semantic_model.metrics，不套用下面的结构化编译形式限制。导出还须检查统计对象范围、每条关系路径的角色和方向是否保留，包括自关联、平行边、同表多对象、多层路径及派生子类范围。重复引用同一语义角色可以导出；目标构造能证明保留不同角色时也可以。买方.地区与卖方.地区若都落到 companies.region 而无法区分，本条 expression 报 error，不输出改错的表达式，核心指标保留；整份文件要求包含该指标时不交付缺项文件。核心保存表达式与按 id 记录的引用依赖；导出优先保留已有 dataset.field 引用，旧字段名可在同一 dataset 内增加逻辑字段别名。对象粒度的本体路径或数据集粒度的列引用按解析出的 id 转成登记 dataset.field（RT-47），引用改写只替换标识符，不改业务算法或字面量；对象指标的隐含成员范围还须按上述共同前提等价显式化，不能表达则 error，不为表达式复制数据集。例如核心 `SUM(sales_order.amount)` 在粒度来源登记为 orders 时可输出 `SUM(orders.amount)`。引用或粒度无法定位而导致非法表达式时报告 error，不交付文件，也不丢指标；来源方言正确标注，不能仅因平台不执行函数就删除指标。
-
-**数据集粒度结构化指标**直接按登记 dataset 与列编译，不依赖对象映射或本体关系；MCP 的 count 参考 SQL 使用 COUNT(*)；Ossie 裸 COUNT(*) 没有数据集锚点，无法显式表达统计来源时按 RT-61 dropped，不借对象键改算法。count_distinct 保留列去重，条件使用同数据集列。ratio 两个分量必须是同一数据集。登记来源或列无法定位时报 RT-61 dropped；清单空时先待补全，不交付伪就绪文件。对象粒度导出后再次导入会成为数据集指标，不自动恢复对象粒度或属性路径，此差异按 RT-50 报告。
-
-**对象粒度结构化指标**编译成 `ANSI_SQL`。先满足上述完整对象范围前提，再检查以下三条；任一不满足即按 RT-61 dropped。expression 同样受完整范围、角色和方向检查约束：
-
-1. **按实际绑定解析后，表达式必须有粒度对象主来源的锚点**，以此表明统计范围。
-   - 以下编译形式先合入完整成员范围，再合入指标过滤；不能只聚合父全集。`count` 编译为 `COUNT(DISTINCT 粒度.主键字段)`，带条件时为 `COUNT(DISTINCT CASE WHEN … THEN 粒度.主键字段 END)`。
-     按声明的基数设计为不增行，但平台不验证实际数据；去重计数数的是基对象键，不把它宣称为对脏 JOIN 也与 COUNT(*) 等价，同时写明了粒度。粒度对象是复合主键时无法这样写，`dropped`。
-   - 其他聚合按 measure、条件和计算绑定实际解析到的来源判断。对象自身属性也可能只来自附表：示例 11 的空路径金额实际落在 account_amounts，直接 `SUM(account_amounts.available_amount)` 没有 accounts 主来源锚点，不能保留账户集合，本例 dropped。全部引用经过关系落在别的对象时（例如以订单为粒度的“下单客户数” `COUNT(DISTINCT customer.customer_no)`），缺主来源锚点同样 dropped。仅有主来源引用还不够，派生及成员范围也必须完整写入聚合。
-2. **每条路径在语义模型里必须唯一**：路径改写为“落脚对象的 dataset.字段”，消费者只能靠 `relationships` 从粒度 dataset 找到落脚 dataset。
-   因此在**整个语义模型的关系图**里（不只是本指标用到的关系），从粒度 dataset 按声明可导航方向（含反向一对一）到落脚 dataset 必须恰好只有一条路径；对象自身主、附表星形连接也纳入检查。
-   - 示例 05 的交易同时有“买方”“卖方”两条关系指向公司：哪怕指标只用了买方，`company.region` 也分不清经过哪条，`dropped`。
-   - 自关联落回粒度自己的 dataset（如 `employee.manager.name` → `employee.name`），与粒度自身的字段无法区分，`dropped`。
-   - 还存在另一条多跳路径能到同一 dataset（如订单 → 客户，以及订单 → 门店 → 客户），`dropped`。
-3. 路径上每个对象都已映射且绑定可定位，同一连接，必要键非空；否则逐项报告。
-
-**执行约定与逐指标报告（D6）**：Ossie 规范没有统一规定指标的连接方式。可以表达的指标照常导出，执行约定写入报告，不因口径风险直接丢弃。
-
-| 情况 | 报告与消费者应遵守的语义 |
+| 指标 | OSI 表达式示意 |
 |---|---|
-| 使用关系或附表 | 逐指标说明 LEFT JOIN 依赖，从粒度对象保留行 |
-| 经关系判断 is_null | 说明“关联属性为空”和“没有关联对象”的区别 |
-| 比率分量有不同过滤或连接 | 各分量分别过滤和聚合，再做小数除法；零分母结果为空。不能用全局 INNER JOIN 删掉分母行，也不能把分子过滤放到公共 WHERE |
-| 单表且未使用关系 | 不附无关的 JOIN 警告 |
-| 结构化指标无法表达完整对象范围、主来源锚点、路径、跨连接或复合 count | 属于结构表达缺失，按 RT-61 报 dropped；不与上述执行风险混为一谈 |
+| sum、avg、median、min、max | 对应函数，例如 SUM(orders.amount) |
+| 带固定条件 | SUM(CASE WHEN orders.status='已完成' THEN orders.amount END) |
+| count | COUNT(CASE WHEN orders.order_id IS NULL THEN 1 ELSE 1 END) |
+| 带条件 count | COUNT(CASE WHEN orders.status='已完成' THEN CASE WHEN orders.order_id IS NULL THEN 1 ELSE 1 END END) |
+| count_distinct | COUNT(DISTINCT orders.customer_id) |
+| ratio | 各分量分别保留过滤，小数除法，零分母为空 |
 
-前三项按 RT-58 记 converted，并附 warning；expression 保留算法及核心原文、导出只转换已解析引用的规则不变。
+count 的规范表达式通过任一登记列明确数据集来源，但不要求列唯一或非空；两分支均返回 1，保留 COUNT(*) 的行计数含义，不借业务对象键改算法。回读按 §5.6 精确识别。无列引用的 expression（包括原生输入）也必须在导出公式中保留 dataset_id 已声明的统计来源，不能直接输出无来源公式并算成功。含 COUNT(*) 的表达式可将其中的行计数等价规范化为上述带本数据集登记列的 COUNT(CASE WHEN … IS NULL THEN 1 ELSE 1 END)，保持其余算法、字面量与 NULL 行为，不创建辅助指标。没有可引用登记列、无法等价表达统计来源，或其他列、来源无法定位、引用无法合法输出时，按 RT-61 本项 error 待补全，保留核心定义；不静默丢指标，不交付缺少必需指标的文件。median 方言及小数类型由执行 agent 调整。
 
-  | 指标 | 编译结果 |
-  |---|---|
-  | sum、avg、median、min、max，无条件 | 使用对应聚合函数，如 `SUM(orders.amount)`、`MEDIAN(orders.amount)` |
-  | 带条件 | `SUM(CASE WHEN customers.region = '华东' THEN orders.amount END)` |
-  | count，无条件 / 带条件 | `COUNT(DISTINCT orders.order_no)` / `COUNT(DISTINCT CASE WHEN orders.status = '已完成' THEN orders.order_no END)` |
-  | count_distinct（`measure` 在粒度对象上） | `COUNT(DISTINCT orders.status)` |
-  | ratio | 按小数相除且零分母为空，不固定精度或 SQL 类型；分子、分母都满足上面的前提才导出 |
+用户问题需要其他数据集的条件时，由 agent 在查询阶段沿本体关系组织筛选和连接；这些查询条件不写入指标，也不随指标导出。
 
-median 使用表达中位数的 SQL 聚合形式，目标方言差异在报告中说明，agent 执行时调整。
+**执行约定与逐指标报告（D6）**：只对实际涉及的情况附 RT-58 converted + warning：ratio 两个分量分别过滤、归周期并聚合后相除，零分母为空。算法、字面量和 NULL 行为必须保留，不为指标附加本体连接约定。
 
 Ossie 没有快照字段。每个 Dataset 的 snapshot_date_column 和“各数据集独立取最新日或周期内末日，同一数据集所有行使用同一天”写入该 dataset 的 description；simple、expression 的时间字段写入指标描述。以上均按 RT-60 逐项列出结构化声明损失，保留原描述在前，不能宣称再导入能自动从说明文字恢复字段。
 
-再导入时（§5.6）一律成为数据集指标，COUNT DISTINCT（含固定 CASE）保留 count_distinct，不因列是对象映射键而还原对象 count（RT-50）。过滤与固定比率按数据集列回读。
+再导入按 §5.6 回读数据集列与算法；固定过滤、列去重、行计数及同数据集比率按固定形式识别，不能把列去重改成行计数。
 
 ### 6.6 平台扩展块
 
@@ -1142,7 +1046,7 @@ title_properties 按本对象有效属性技术名解析为 id，不存在时报
 | `material_objects` / `material_links` | Ossie 没有实例数据 | `dropped` |
 | 规则名、技术名、描述 | Ossie 规则只有表达式 | 不逐项报告，文档级说明一次 |
 | 没有标识或标识属性未映射的对象的 `concept_mappings`；目标业务标识不能由引用列直接表达时的外键子节点；两端业务标识不能由映射表引用列表达时的多对多业务链接映射（物理连接照常导出） | | `dropped` |
-| 引用未映射对象的结构化指标 | 无法生成合法表达式，RT-61 | `dropped`；expression 不按此规则丢弃 |
+
 
 Ossie 的必填字段优先从核心推导；无法推导或无法合法表达时按 §4.4 报 error，不交付无效文件。
 
@@ -1193,8 +1097,9 @@ Ossie 的必填字段优先从核心推导；无法推导或无法合法表达�
 | 多个 object_mappings | 只接受同主来源等价身份的规范化，其他 dropped | 不生成多个对象身份映射 |
 | 嵌套 referent、多层 children | ❌ dropped | — |
 | Metric（单个 dataset 上的 SUM / AVG / MEDIAN / MIN / MAX / COUNT DISTINCT） | ✅ → 数据集列结构化指标 | ✅ |
-| Metric 固定 CASE（SUM / AVG / MEDIAN / MIN / MAX，COUNT DISTINCT 独立处理）、CAST-NULLIF 同数据集比率 | ✅ 按 §5.6，过滤分别归属分量 | ✅，按 §6.5 报执行约定 |
-| Metric 其他表达式、拼接复合去重、COUNT(*) | ✅ 数据集 expression；来源或列引用不明时原文保留为待补全条目 | 算法保留，必要时按 RT-47 转换已解析引用；引用无法合法输出时报 error |
+| Metric 固定 CASE（SUM / AVG / MEDIAN / MIN / MAX，COUNT DISTINCT 独立处理）、行计数规范式、CAST-NULLIF 同数据集比率 | ✅ 按 §5.6；ratio 复用已登记分量，否则单条 expression | ✅，按 §6.5 报执行约定 |
+| Metric 裸 COUNT(*) | 待用户选定来源后转 simple count（§5.6） | 按 §6.5 的行计数规范式保留来源；无法表达时 RT-61 error |
+| Metric 其他本数据集表达式、拼接复合去重 | ✅ 本数据集 expression；来源或列引用不明时原文保留待补全，超出 §3.6 边界者按 RT-69 不承载，见下表 | 算法与统计来源保留，按 RT-47 转换已解析引用；含 COUNT(*) 的表达式可等价规范化行计数，无法合法输出时报 RT-61 error |
 | 各处 `ai_context.instructions` | 能确定对应对象时并入 description（RT-59） | 不还原为独立 instructions |
 | 其他 `ai_context`、`custom_extensions` | 未支持内容报 dropped | — |
 | （平台）显示名、反向名称、同义词、标签、必填、标题属性 | 从扩展块读 | 写入扩展块 |
@@ -1221,7 +1126,7 @@ Ossie 的必填字段优先从核心推导；无法推导或无法合法表达�
 | 映射表达范围 | 新独立 mapping documents、嵌套 referent、多层 children、非支持字段方言、值类型映射、歧义身份或业务边、多来源不能折叠、跨来源计算 | 不支持入口 error；绑定 dropped 或 error，任意查询来源 RT-63 error；保留定义、Dataset 及原文 | RT-43、RT-45、RT-52、RT-53、RT-54、RT-63 |
 | 字段与物理元数据 | dimension、label、datatype、未使用 unique_keys、未承载逻辑字段及引擎元数据 | 报损失，说明文字不能自动恢复结构，原文保留 | RT-46、RT-66 |
 | 成员、快照与继承绑定 | 成员扩展来源、多态并集、父覆盖不兼容子表、快照时间、时点键、跨期连接 | 逐项报告绑定及范围差异，不能因 derived_by 已转换而省略，原文保留 | RT-57、RT-60、RT-64、RT-65 |
-| 指标 | 数据集导入不恢复对象路径，count 变列去重；算法引用改写、角色或范围不可表达 | 按条目报转换或损失，expression 角色合并 error，原文保留 | RT-47、RT-49、RT-50、RT-55、RT-56、RT-58、RT-61 |
+| 指标 | 跨数据集（spanning datasets）的 OSI 指标，以及含子查询、显式连接或额外查询作用域的指标；来源/列未闭合、未承载时间和物理元数据 | 超出单数据集表达式边界者 RT-69 error，原文及来源清单保留报告并标待补全，用户可改写为单个数据集上的指标；其余逐项报告 | RT-47、RT-49、RT-50、RT-55、RT-56、RT-58、RT-60、RT-61、RT-66、RT-69 |
 
 非法输入另行报告 error：多元 OneToOne、实体继承值类型均违反 Ossie 规范，不属于上表未承载的合法能力，不设计转换或补全分支。
 
@@ -1275,28 +1180,28 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 | 编号 | 差异 | 原文件 | 再导出 |
 |---|---|---|---|
-| RT-40 | 字段按属性技术名规范化，dataset 名按登记保留 | dataset ORD_T 的字段 AMT 映射到属性 amount | dataset 仍为 ORD_T，字段可为 amount；expression 所需旧字段名可同表保留别名 |
+| RT-40 | 字段按属性技术名规范化，dataset 名按登记保留 | dataset ORD_T 的字段 AMT 映射到属性 amount | dataset 仍为 ORD_T，字段可为 amount；expression 所需旧字段名可在同一数据集内保留别名 |
 | RT-41 | OntologyMap 和 semantic_model 分组及说明规范化 | 原 name / description | 按可确定来源作用域生成，不保存分组语法树 |
 | RT-42 | （不再使用；dataset 描述由登记保留，快照说明追加按 RT-60） | | |
 | RT-43 | 不支持的映射消失（§5.5 不支持清单） | 嵌套 referent、不支持的计算表达式等 | 不出现 |
 | RT-44 | （不再使用；没有被本体引用的 dataset 也一一登记和输出） | | |
 | RT-45 | 字段只保留 ANSI_SQL；指标非 ANSI 表达式保留并报告方言，不能误标 | `"dialects": [{"dialect": "ANSI_SQL", ...}, {"dialect": "SNOWFLAKE", ...}]` | 只有 `ANSI_SQL` |
 | RT-46 | 字段的 `dimension`、`label`、`datatype`，未使用的 dataset unique_keys 丢失 | | 不出现 |
-| RT-47 | 指标引用按 id 改写并检查角色、方向和范围 | 买方华东且卖方华南 | 若都变成 companies.region 则 expression 本项 error；可证明角色保留时 converted，算法与字面量不变 |
+| RT-47 | 单个数据集内的指标登记字段引用规范化 | 同一数据集的逻辑字段或旧 dataset 名 | 仅重写解析后的列引用，保留算法、字面量和 NULL 行为；超出单数据集边界另按 RT-69 |
 | RT-48 | 语义层未支持的上下文和扩展丢失；能够归属对象的 instructions 按 RT-59 合并 | | 不出现 |
-| RT-49 | 非固定形式指标转为 expression，报 converted；引用不明时另报待补全 | `SUM(CASE WHEN ... THEN amount ELSE 0 END)` | 原样表达式，指标保留 |
-| RT-50 | 外部指标一律数据集粒度，不恢复对象计数或路径 | 对象 count 导出为 `COUNT(DISTINCT orders.order_no)` | 再导入为 orders 数据集 count_distinct；不反查对象。对象粒度与路径损失逐项报告，后续以提案改挂。 |
+| RT-49 | 单个数据集上的非固定形式指标转为 expression，报 converted；引用不明另报待补全 | `SUM(CASE WHEN ... THEN amount ELSE 0 END)` | 保持原算法；不涵盖 RT-69 不承载项 |
+| RT-50 | 列去重保持列语义 | COUNT(DISTINCT ds.f) | 同数据集 count_distinct，不改成行计数，不依赖对象键 |
 | RT-51 | 没有属性映射的键列、外键列以辅助字段出现，字段名 = 列名 | dataset 原有的字段名 | `{"name": "customer_id", "expression": …}` |
 | RT-52 | 多来源按平铺协议改写 | 同实体星形多来源 | 一个主身份 + 跨来源属性 children + 唯一键星形连接；歧义绑定 dropped |
 | RT-53 | 业务关系、物理连接匹配歧义 | 平行边、同表多对象无法唯一配对 | 只丢该绑定，不任取第一条 |
 | RT-54 | 跨来源计算作用域风险 | 拼接后同行表达式 | 表达式可导出；回读不确定则 dropped，报告原文 |
-| RT-55 | 固定过滤、同数据集比率规范化 | 自导出 CASE、CAST/NULLIF | 数据集 simple 分量及从分量推导统计对象的 ratio；不持久化 ratio.base，过滤各归各；跨数据集保留 expression |
+| RT-55 | 固定过滤及同数据集比率规范化 | CASE、CAST/NULLIF | 分量已登记且同数据集时复用为 ratio，否则保留单条 expression；不额外造分量指标 |
 | RT-56 | 拼接去重转 expression，不改变去重算法 | COUNT DISTINCT(a \|\| '::' \|\| b) | 保留原表达式，不再 dropped |
 | RT-57 | 成员扩展来源及额外继承绑定无法机械往返 | membership_source_id、本地扩展绑定 | 派生定义可独立按 RT-67 转换；不等于外部已恢复扩展成员约束，逐项报告并保留全部 Dataset |
-| RT-58 | 导出执行约定 | LEFT JOIN、关系 is_null、比率分量依赖 | 指标保留，逐指标 converted + warning |
+| RT-58 | 逐指标执行约定 | 同数据集比率分量的过滤与时间 | 保留指标，附 converted + warning，分别聚合后相除，零分母为空；不附指标连接约定 |
 | RT-59 | 对象上下文说明并入 description，报 converted | 可确定归属的 `ai_context.instructions` | 原描述后附空行及说明；不再输出独立 instructions |
 | RT-60 | 快照和指标时间字段无同构标准字段 | Dataset.snapshot_date_column、simple/expression 的 time_field | 快照写入对应 dataset 描述，其余写指标描述，逐项报告结构化声明损失，不自动回读 |
-| RT-61 | 指标目标表达能力不足 | 完整对象范围（主来源、祖先及本层派生、成员扩展、路径子类）不可表达，实际来源缺主锚点，或路径、绑定、角色、方向不满足前提 | 结构化本项 dropped；expression 本项 error，核心保留，不交付必需指标缺项的文件 |
+| RT-61 | 核心指标无法合法导出 | 来源/列未闭合、无可引用登记列、无列引用 expression 的已声明统计来源无法等价表达，或输入违反单数据集表达式边界 | 本项 error 待补全，核心保留，不交付必需指标缺项的文件；OSI 不承载项的导入另按 RT-69 |
 | RT-62 | 数据集一一登记及名称冲突规范化 | 多个 OntologyMap 有同名 dataset | 每项各有核心 id，必要时限定名称；导出每个核心 Dataset 恰好一项，不按对象复制 |
 | RT-63 | 数据集来源无法表示为表位置 | 任意 source query 或无法解析的来源 | error，不静默删数据集或冒充 table_name |
 | RT-64 | 数据集键声明无法统一或时点唯一性无法按外部结构表达 | 同表键冲突、快照键与跨期连接 | 数据集保留，省略无法成立的键或物理连接并报告依赖影响，不强加日期相等 |
@@ -1304,6 +1209,7 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 | RT-66 | 来源引擎和物理元数据不能保证自动往返 | Dataset.dialect、元数据快照列类型及采集来源 | 无同构标准字段者写数据集描述并报告损失，不能从 ANSI_SQL 猜引擎或伪造元数据快照 |
 | RT-67 | 成员派生定义按本体 id 转换 | 简单条件或关系 EXISTS，多分支并集、多层逐级限定 | 完整解析且等价输出者 converted；不能闭合的整项 RT-31 error 待补全，不取部分分支，不重复建 Rule |
 | RT-68 | 子类首选属性标识不能改写已有父身份 | Person.person_no；Employee extends Person，identify_by 为 employee_no | Employee 沿用 person_no；employee_no 为普通 unique 属性，原首选标识 dropped，逐项报告且原文保留；依赖该标识且不能等价改写的映射 error 待补全 |
+| RT-69 | OSI 指标超出单数据集表达式边界 | 引用多个数据集，或含 SELECT、FROM、JOIN、额外查询作用域 | 首版不承载；本项 error，原文、来源及定位保留转换报告并标待补全，不生成核心指标；用户可改写为单个数据集上的指标 |
 
 **支持范围内保持不变的部分**：实体概念名（RT-12 除外）、实体继承（RT-34 除外）、实体描述（RT-59 合并说明除外）、属性和二元关系的名字与指向、二元关系的基数、
 `identify_by`（RT-30、RT-32、RT-33、RT-68 除外）、可解析的规则表达式（RT-28 改写、RT-31 待补全、RT-67 转成员条件除外）、
@@ -1347,17 +1253,17 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 
 采用资源管理器加图，资源管理器包含对象、关系、指标、数据集四类，可筛选只看本体（对象和关系）、指标或数据集。指标不是本体元素，是与其并列的一类语义元素；关系图里不画指标节点。
 
-点击元素打开对应弹窗，对象、关系、指标、数据集各有弹窗。对象弹窗没有任何指标标签或入口；指标只在语义视图筛选查看。指标弹窗直接展示描述、同义词、口径（统计对象、计算方式、字段、条件或表达式全文）、时间和 SQL 参考。它只显示关联的本体：显式统计对象为业务对象时显示该对象，或显示路径及引用属性所属对象；没有这些引用就省略该项，不显示“未关联本体”等标签，不依据数据集的对象绑定反查。ratio 汇总两个分量的显式对象及属性引用。SQL 参考依来源就绪状态及权限展示，expression 展示原文；通过预览编译时可展示参考 SQL，不能编译时说明原因，不编造 SQL。ratio 的时间展示分别来自两个分量。
+点击元素打开对应弹窗，对象、关系、指标、数据集各有弹窗。指标在语义视图中查看；指标弹窗展示描述、同义词、数据集、算法、列、条件或 expression 全文、时间及授权 SQL 参考，不显示对象归属。ratio 展示分量数据集及各自时间口径。对象弹窗或详情是否按绑定推导展示“相关指标”，由工程实施和原型阶段决定，不在模型中存储或承诺入口。expression 能通过预览编译时展示参考 SQL，否则解释原因，不编造 SQL。
 
 **新建指标（原型阶段确认）**
 
-**统计对象与算法。** 在语义视图筛选到“指标”后使用“新建指标”。表单包含名称、同义词、统计对象、计算方式、字段、条件、SQL 参考和数值预览。统计对象下拉分“业务对象”“数据集”两组，选后展示“一行 = 一张订单”或“一行 = 一个代码仓库一天的统计”等说明；界面不使用“粒度”。计算方式提供计数、求和、平均、最大、最小、去重计数、中位数、比率、写表达式。对象字段从统计对象出发，只展开允许的正向多对一、一对一及反向一对一方向；数据集只列登记列。比率选择两个同统计对象的简单指标。
+**数据集与算法。** 在语义视图筛选“指标”后使用“新建指标”。表单包含名称、同义词、数据集选择、计算方式、列、条件、SQL 参考和数值预览。数据集选择后按其说明展示“一行 = 一张订单”或“一行 = 一个代码仓库一天的统计”，只列登记列。计算方式含计数、求和、平均、最大、最小、去重计数、中位数、比率、写表达式；ratio 选择同数据集的两个 simple，expression 也只能从所选数据集的列中选择。
 
-**时间。** simple 和 expression 的“时间字段”下拉只列日期类属性或列，包含快照日期列，可以不选。ratio 不显示时间选择框，分别展示分子和分母的时间口径；要改变口径就换相应分量。快照选行由各数据集自身声明决定。
+**时间。** simple、expression 的时间字段只列可引用的日期类列，含快照日期列，可以不选；simple、expression 均只列所选数据集的日期类列。ratio 不显示时间选择框，分别展示分量时间口径；改变口径就换相应分量。快照选行由数据集声明决定。
 
-**维度。** 指标不另存一份可切分维度清单。对象指标沿允许方向可达的属性可用于分组和筛选，数据集指标使用本数据集登记列。
+**维度。** 不另存可切分维度清单；表单只使用所选数据集登记列。用户问题涉及其他数据集的分组或筛选时由 agent 在查询阶段沿本体关系组织，不写入指标。
 
-**预览。** 平台自己执行，不经过 DataAgent。使用当前表单的完整定义、ratio 分量定义、授权来源和预览时间范围，编译成表单中展示的参考 SQL，用统计对象所绑定的已登记连接只读执行一次并显示结果；数据集指标直接使用 base_dataset_id 对应的登记连接，无需对象绑定。有时间字段时，按月再执行一次小趋势；ratio 按分子、分母各自时间字段归月后相除。预览只用于界面自查，不写入模型。改表单后须基于新定义重新预览，不能把已保存旧定义的结果当成当前值。
+**预览。** 平台使用当前完整表单、ratio 分量、授权数据集及时间范围，编译并展示参考 SQL，使用数据集对应的已登记连接只读执行，不经过 DataAgent。有时间字段时再按月执行小趋势，ratio 分量各自归月。公式无法在支持的引擎中执行时显示“无法预览”及原因。预览不写模型，表单变更须重新执行，不能复用旧定义结果。
 
 复用 `apps/api/src/ontofoundry_api/services/metric_query.py` 的编译、sqlglot 白名单检查和只读执行能力，改写为接受尚未保存的 core-1 完整定义；连接与权限沿用 `instance_query.py` 所用的路径及映射、实例读取权限。复用的是执行能力，不是实例分页明细；不能分页拉取实例再由前端聚合。表达式未通过白名单、引擎不支持、缺来源绑定或登记连接、列清单待补全、权限不足、查询失败时显示“无法预览”及原因，不伪造数值；不支持预览不等于否定已通过引用校验的 expression 语义。MCP 仍只提供语义和参考，agent 答题时自己写 SQL；平台表单自查预览是独立的界面能力，不增加 MCP 执行工具。
 
@@ -1367,7 +1273,9 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 
 ### 数据映射页
 
-去掉“语义模型”标签。“数据源与资产”改名为“数据集”。数据集展示登记表、快照日期列和说明，通过“浏览数据目录”登记新表；这部分标为“原型阶段确认”。“本体映射”标签保留为全部绑定总览，也标为“原型阶段确认”。两个入口引用同一份 Dataset 登记与核心绑定，不产生平行模型。
+去掉“语义模型”标签。“数据源与资产”改名为“数据集”。数据集展示已登记的表或视图、快照日期列和说明，通过“浏览数据目录”登记新数据集；这部分标为“原型阶段确认”。“本体映射”标签保留为全部绑定总览，也标为“原型阶段确认”。两个入口引用同一份 Dataset 登记与核心绑定，不产生平行模型。
+
+**数据集引用计数（后续功能，原型阶段确认）**：数据集页面分开显示“被 N 个对象、K 个关系、M 个指标引用”，三类可分别展开查看引用者。N 从对象绑定 DataMapping 的主来源、附表、成员扩展来源推导，按对象 type_id 去重；同一对象通过多个来源引用同一数据集时只计一次。K 从关系绑定中用作映射表的数据集推导（含继承关系的本地绑定），按关系 id 去重；同一关系在多个本地绑定中引用同一数据集时只计一次，不计入 N。M 从指标的 dataset_id 推导，ratio 沿用从两个 simple 分量解析 dataset_id 的规则，按指标 id 去重，ratio 本身也计为一个指标。数量与列表均按现有权限展示，从当前绑定和指标定义实时推导，不新增模型字段。
 
 ### 展示原则
 
@@ -1383,11 +1291,11 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 
 | 内容 | 说明 |
 |---|---|
-| 核心模型 core-1 | §3 的全部元素和校验：二元关系、`unique`、`synonyms`、`inverse_name`、复合主键、新 `data_join`、扁平数据集登记、多来源和计算列、三种继承建法、实例标题、描述合并、结构化及表达式指标、数据集快照与 simple、expression 的时间字段、方向路径规则、派生条件引用检查 |
+| 核心模型 core-1 | §3 的全部元素和校验：二元关系、`unique`、`synonyms`、`inverse_name`、复合主键、新 `data_join`、扁平数据集登记、多来源和计算列、三种继承建法、实例标题、描述合并、结构化及表达式指标、数据集快照与 simple、expression 的时间字段、成员派生的路径与引用检查 |
 | 清空数据 | 数据库迁移清空本体相关数据（§8） |
 | 增删改查 | 提案、草稿、合并、发布、元素编辑全部基于核心模型；前端删除角色、读法编辑器，增加反向名称、同义词、指标表单和数据集登记编辑，主附表、关系表统一选择 dataset；页面和弹窗结构遵守 §8A |
 | 查询 | 实例浏览按新 `data_join` 生成 JOIN（含多对多 join 表、复合主键）；结构化指标提供基础 SQL 参考（改写 `metric_query.py`），完整查询由 agent 组装；父绑定完整覆盖、虚拟父实例并集及成员扩展表同时验收 |
-| 指标数值预览 | 平台以当前表单完整定义和时间范围编译并展示同一份参考 SQL，经 sqlglot 白名单后，使用已登记连接只读执行总值，有时间字段时再按月执行小趋势；复用 metric_query.py 的编译与执行能力及 instance_query.py 的连接、权限路径，支持对象与数据集指标，失败显示“无法预览”及原因，不经过 DataAgent，不使用实例分页聚合（§8A） |
+| 指标数值预览 | 平台以当前表单完整定义和时间范围编译并展示同一份参考 SQL，经 sqlglot 白名单后，使用已登记连接只读执行总值，有时间字段时再按月执行小趋势；复用 metric_query.py 的编译与执行能力及 instance_query.py 的连接、权限路径，支持数据集指标，失败显示“无法预览”及原因，不经过 DataAgent，不使用实例分页聚合（§8A） |
 | MCP | 精简为 4 个工具；`get_ontology` 返回授权物理绑定、结构化指标或 expression；绑定就绪的结构化指标可附基础 SQL 参考，授权 Dataset 提供方言与 database/schema，虚拟父列出实例来源（§14） |
 | AI 建模 | 技能 `md2ossie` 改写为 `ontofoundry-modeling`；轮次提示词精简；提案合同 `target_kind` 调整（§13.3） |
 | 问数 agent | 系统提示词按 §14.4 重写 |
@@ -1403,24 +1311,24 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 内容 | 说明 |
 |---|---|
 | 适配器接口 | 只需导入函数：文件 → 核心模型与转换报告（§4.1、§4.2） |
-| Ossie 导入 | 概念、属性、二元关系、值概念折叠、一元 / 多元转换、规则、扩展块（§5.1–5.4、§5.7）；映射：Dataset 一一登记（含未引用者）、对象、属性列、外键、多对多映射表、复合键、多来源、计算列、唯一属性键、派生子概念成员条件互译及继承绑定冲突报告（§5.5）；指标一律挂数据集，固定聚合、CASE 过滤和同数据集比率按列结构化，其余保留 expression（§5.6） |
+| Ossie 导入 | 概念、属性、二元关系、值概念折叠、一元 / 多元转换、规则、扩展块（§5.1–5.4、§5.7）；映射：Dataset 一一登记（含未引用者）、对象、属性列、外键、多对多映射表、复合键、多来源、计算列、唯一属性键、派生子概念成员条件互译及继承绑定冲突报告（§5.5）；指标只引用自己的数据集，固定聚合、CASE 过滤和同数据集比率按列结构化，其余本数据集算法保留 expression；超出边界按 RT-69 留报告待补全（§5.6） |
 | 导入走提案 | 新建会话、按技术名对比生成提案、复用提案面板和发布（§4.5）；只新增和修改，从不生成 delete 提案，转换失败条目保留原文等待补全；原文件保存为材料，提案证据指向原文行号 |
 | 导入报告 | 按条目列出改写和丢弃，标注 RT 编号、原文路径、行号 |
 | 原生格式导入 | 单文件形式（§4.6） |
 
-验收：Ossie 样例 A/B 可机械导入支持子集，原生示例逐个导入（见 README 矩阵）；导入报告做快照，固定 CASE 和比率必须回读，复杂指标原文必须保留。AI 补全另期验收，不混作机械导入成果。
+验收：Ossie 样例 A/B 可机械导入支持子集，原生示例逐个导入（见 README 矩阵）；导入报告做快照，固定 CASE、行计数与比率算法必须回读；比率无已登记分量时保留一条 expression，复杂指标原文必须保留；RT-69 不承载项不形成核心指标。AI 补全另期验收，不混作机械导入成果。
 
 ### 第三部分：导出
 
 | 内容 | 说明 |
 |---|---|
 | 适配器接口 | 导出函数：核心模型 → 文件 + 转换报告 |
-| Ossie 导出 | 概念、属性、关系、规则、扩展块（§6.1–6.4、§6.6）；映射：Dataset 一一输出、逻辑与辅助字段、计算字段、多来源属性、复合键、唯一属性外键、多对多映射表，快照说明写入数据集描述、RT-67 可完整转换的派生子概念；指标：对象结构化指标检查三条前提后编译，数据集指标按登记列编译，expression 保留算法并按登记转换已解析引用、检查合法性（§6.5） |
+| Ossie 导出 | 概念、属性、关系、规则、扩展块（§6.1–6.4、§6.6）；映射：Dataset 一一输出、逻辑与辅助字段、计算字段、多来源属性、复合键、唯一属性外键、多对多映射表，快照说明写入数据集描述、RT-67 可完整转换的派生子概念；单个数据集上的指标与 OSI 一一对应，按本数据集登记列编译，expression 保留算法、作用域和引用，检查合法性（§6.5） |
 | 官方校验 | 每份导出跑 Ossie 官方 schema 和语义校验，不通过不交付（§6.8） |
 | 原生格式导出 | 单文件形式（§4.6） |
 
 验收：README 矩阵的可导出示例文件通过官方校验；09 空模型稳定 error，不交付文件；导出报告列出损失和逐指标执行约定；
-核心模型 → Ossie → 核心模型：支持转换的内容在技术名匹配下保持约定的语义；指标回读为数据集粒度，原对象粒度和路径不自动恢复，跨数据集未声明来源的表达式留待选择，按 RT-50 报告；不支持的内容按导出报告和差异规则丢失，不要求无损。
+核心模型 → Ossie → 核心模型：单个数据集上的指标按本数据集列与算法一一转换；ratio 若没有可复用的已登记分量则回读为一条 expression，不制造额外指标。未能确定统计数据集时留待用户选择；快照、时间字段及其他不支持的内容按报告与 RT 说明，不承诺完整模型无损。
 
 ### 以后的扩展（不在三部分之内）
 
@@ -1428,6 +1336,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 
 | 项目 | 设计位置 | 什么时候做 |
 |---|---|---|
+| 数据集引用计数与引用者展开列表 | §8A | 后续功能，原型阶段确认；分开显示“被 N 个对象、K 个关系、M 个指标引用”，三类可分别展开。N 从主来源、附表、成员扩展来源按对象 type_id 去重，K 从映射表数据集（含继承关系的本地绑定）按关系 id 去重，M 从指标 dataset_id（ratio 从分量解析）按指标 id 去重；实时推导，不新增字段，不在上述三部分交付内 |
 | 原生格式完整包（打包材料、跨环境搬迁） | §4.6 | 出现跨环境搬迁需求时；之前备份靠数据库备份 |
 | 完整往返 diff 分类器 | §7.2 | 全自动分类可后补；每个已支持 RT 的最小定向往返回归与适配器同时交付 |
 | 导入后的 AI 补全 | §13.4 | 第二部分跑通、看到真实导入会丢什么之后 |
@@ -1463,15 +1372,15 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 20 | 内置名冲突 | 对象与 Ossie 内置概念同名时本期导出报错，不自动改名（§6.2） |
 | 21 | 上下文说明 | 上下文说明并入 description，导入按 RT-59 转换，不新增 instructions 或前端独立入口（§3.2、§5.1、§11） |
 | 22 | 已计算比率列 | 覆盖率等逐行比率作为属性，总体比率须有分子分母，不能直接求和或平均（§3.6） |
-| 23 | 反向一对一路径 | 指标允许正向多对一、一对一及反向一对一，按声明基数提示风险而不执行基数检查（§3.6） |
+| 23 | 反向一对一路径 | **已被第 17 轮取代**。 指标允许正向多对一、一对一及反向一对一，按声明基数提示风险而不执行基数检查（§3.6） |
 | 24 | 关系引用唯一属性 | 关系可连单个 unique 属性或完整标识，无须限定为物理主键（§3.4） |
 | 25 | 实例标题 | 删除 MaterialObject.name，文档事实按标题属性、完整标识、可见 quote 开头、UUID 推导只读 display_text；0 和 false 有值，搜索覆盖显示与属性值；数据库仍可回退物理键（§3.2） |
 | 26 | 权限裁剪 | 元数据、数据集、SQL、表达式和嵌套提示统一按映射读取权限裁剪，事实及证据按实例权限裁剪（§14.3） |
 | 27 | 界面结构 | 全局采用无连线的立体分层概览；语义工作台列对象、关系、指标、数据集，关系图不画指标；数据映射页改用数据集登记与全部绑定总览，原型确认项见 §8A |
-| 28 | 指标统计对象 | simple、expression 显式二选一保存 base；ratio 仅从同统计对象的 simple 分量推导，避免重复状态；缺分量或不一致拒绝，不能反查对象（§3.6） |
-| 29 | Ossie 指标导入 | 一律挂数据集，按列结构化或保留 expression；改挂对象由用户/AI 提案并确认（§5.6） |
-| 30 | 指标依赖变化 | 改名按 id 重建显示；删引用、改基数及数据集删除按依赖组处理；区分语义和范围保持的物理换绑与可能改含义、成员或时间范围的变更，后者沿继承、派生、ratio 列出影响指标；不扫描证明等价（§3.6） |
-| 31 | 指标交互 | 对象弹窗无指标入口，指标只在语义视图筛选；新建表单使用“统计对象”，simple、expression 可选时间字段，ratio 展示两个分量的时间口径；维度由对象路径或数据集列决定，平台编译参考 SQL 并只读执行数值预览，不经过 DataAgent，标原型阶段确认（§8A） |
+| 28 | 指标统计对象 | **指标关联部分已被第 17 轮取代**。 simple、expression 显式二选一保存 base；ratio 仅从同统计对象的 simple 分量推导，避免重复状态；缺分量或不一致拒绝，不能反查对象（§3.6） |
+| 29 | Ossie 指标导入 | **已被第 17 轮取代**。 一律挂数据集，按列结构化或保留 expression；改挂对象由用户/AI 提案并确认（§5.6） |
+| 30 | 指标依赖变化 | **已被第 17 轮取代**。 改名按 id 重建显示；删引用、改基数及数据集删除按依赖组处理；区分语义和范围保持的物理换绑与可能改含义、成员或时间范围的变更，后者沿继承、派生、ratio 列出影响指标；不扫描证明等价（§3.6） |
+| 31 | 指标交互 | **指标关联部分已被第 17 轮取代**。 对象弹窗无指标入口，指标只在语义视图筛选；新建表单使用“统计对象”，simple、expression 可选时间字段，ratio 展示两个分量的时间口径；维度由对象路径或数据集列决定，平台编译参考 SQL 并只读执行数值预览，不经过 DataAgent，标原型阶段确认（§8A） |
 | 32 | 删除预聚合提示 | 第 10 轮删除 Metric.pre_aggregations 与 PreAggregationHint（含 dimensions 的 path / column_reference 形式）。它属于执行优化而非语义，Ossie 没有此概念，原设计源自 Cube 的 pre_aggregations，首版删除。汇总表登记成数据集，直接在其上建数据集指标；查询时用不用汇总表由 agent 决定（§3.6） |
 | 33 | 删除导入替换模式 | 第 10 轮删除“以文件为准”模式及 source_inventory 源身份清单、保留集合、权威删除范围、删除依赖组和 total_rows 防误删验收。判断“文件确实缺席”不可靠且复杂，首版删除。平台导入只新增和修改，从不生成 delete 提案；要删除就在会话里手动操作，或让 agent 提删除提案并走正常审阅。转换失败条目仍保留原文，等待 AI 补全或用户选择（§4.5） |
 | D1 | 主附表 | 同连接主表决定实例集合，附表按声明唯一键横向补属性，每属性明示来源，普通纵向映射与联邦延期（§3.7） |
@@ -1480,7 +1389,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | D3b | 继承定义与绑定 | 继承全部属性、普通关系和规则，成员定义放 ObjectType.derived_by，分支取并集，每层限定父范围；同时有扩展表还须取交集；有绑定父对象的子类用派生条件或扩展表，虚拟父的具体子类可绑定继承定义，不重复创建父关系（§3.2、§3.7） |
 | D4 | 派生属性 | 派生属性是本对象来源上的同行计算列，平台只校验引用，MCP 将表达式交给 agent（§3.7） |
 | D5 | 类型 | 仅用七种内置语义类型，不新增单位、精度、时区或复杂值，不支持类型须报告而非默转字符串（§3.3） |
-| D6 | 指标导出 | 能表达的指标照常导出，连接、空值和比率分量风险逐指标报告；expression 同样检查角色、方向及范围，不能保留时报本项 error，避免算法未变而统计含义已变（§6.5） |
+| D6 | 指标导出 | **指标关联部分已被第 17 轮取代**。 能表达的指标照常导出，连接、空值和比率分量风险逐指标报告；expression 同样检查角色、方向及范围，不能保留时报本项 error，避免算法未变而统计含义已变（§6.5） |
 | 34 | Ossie 语义基准 | 尽量无损保留 Ossie 语义，未承载能力集中列 §7；派生定义、元组标识、值类型约束仅成功完整转换的具体条目按 converted，其余原文待补全，避免夸大能力 |
 | 35 | 单父与属性标识 | 保留文件首父，其他父类及影响逐项报告；派生条件或关系仅是需审阅的业务改写建议，不等价、不自动生成关系；含关系的 identify_by 整组待补全，避免改变身份（§5.2） |
 | 36 | 多元关系标识 | 按基数确定构键角色，复合标识逐项生成 required 编号属性；角色 direct 使用同组编号，不另加一致性规则；仅有对应证据才绑外键，否则保留原角色映射并待补编号绑定，缺决定角色标识不裁剪键（§5.3） |
@@ -1488,13 +1397,17 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 38 | 派生成员定义 | 删除 row_filter，改为 ObjectType.derived_by；simple 条件与 expression 互斥，空数组无本层条件，多项为并集，多层逐级限定并与成员扩展来源同时限定。按 id 保留角色方向和 EXISTS，普通 Rule 不参与成员定义（§3.2、§5.5） |
 | 39 | 精简重复字段与限制 | 删除 DataMapping.primary_source_id，independent 固定 main、shared_parent 沿父；simple、ratio.value_kind 只读推导、输入不收，expression 仍声明类型；删除固定 DECIMAL(38,10) 和 SQL 保留字禁用，精度和引号交给 agent（§3.6–3.9） |
 | 40 | 报告与补全 | 删除 placeholder outcome 及占位串机制，仅 converted、dropped、error；删持久化 blocked，按实际依赖实时算阻断，保留原文与历史报告；通用解析、版本和原生证据错误 rule_id 可空，避免假编号（§4.2–4.5） |
-| 41 | 导出角色与匹配 | expression 也检查角色、方向、统计范围，买卖角色被合并时报本项 error；映射在对象 id 重写后按 type_id 一对一匹配，事实、链接、证据仅 UUID；补 Dataset、生成编号及约束 UUID5 键，避免身份漂移（§4.5、§5.8、§6.5） |
+| 41 | 导出角色与匹配 | **指标关联部分已被第 17 轮取代**。 expression 也检查角色、方向、统计范围，买卖角色被合并时报本项 error；映射在对象 id 重写后按 type_id 一对一匹配，事实、链接、证据仅 UUID；补 Dataset、生成编号及约束 UUID5 键，避免身份漂移（§4.5、§5.8、§6.5） |
 | 42 | 阅读顺序 | 指标概念页先给三行输入数据再给计算结果，便于核对，业务口径不变 |
-| 43 | 第 15 轮：完整指标范围 | 所有对象指标先检查主来源、全部派生成员条件、成员扩展及路径子类范围；按实际绑定判断主来源锚点，等价写入聚合才导出，不能时 RT-61 结构化 dropped、expression error；示例 11 金额 dropped（§6.5、§14.6） |
+| 43 | 第 15 轮：完整指标范围 | **指标关联部分已被第 17 轮取代**。 所有对象指标先检查主来源、全部派生成员条件、成员扩展及路径子类范围；按实际绑定判断主来源锚点，等价写入聚合才导出，不能时 RT-61 结构化 dropped、expression error；示例 11 金额 dropped（§6.5、§14.6） |
 | 44 | 第 15 轮：继承标识 | 父已有标识则子沿用；子类自有首选编号保留普通 unique 属性，原首选标识损失及不能转换的映射逐项报告、原文留存，列 RT-68（§5.2、§7） |
 | 45 | 第 15 轮：多元与非法输入 | 建模指引采用 §5.3 的完整角色构键规则，含值角色和实体完整标识，事件按实际身份建键；多元 OneToOne、实体继承值类型均输入 error，不设计转换或补全（§5.2–5.3、§13.3） |
 | 46 | 第 15 轮：CASE 与示例精简 | CASE 结构化只限 SUM、AVG、MEDIAN、MIN、MAX，COUNT DISTINCT 独立处理，COUNT 可空列保留 expression；示例 08 客户等级仅留计算绑定，删除重复 Rule；标识页删除旧调用载荷，概念图删除残边，映射说明更新锚点（§5.6） |
 | 47 | 第 15 轮：文档事实审阅与读取 | 不同文档各提新建；同类型同完整业务标识只提示重复，由人选择都接受、只接受一条或改更新追加证据；读取按已接受 UUID，继承展开只对同 UUID 去重，业务实体数另按业务标识统计（§4.5、§14.2–14.3） |
+| 48 | 第 17 轮：指标只挂数据集 | 推翻原“统计对象可选业务对象”、对象路径与附带依赖及导出检查。simple、expression 只存 dataset_id，ratio 分量须同数据集。**第 17、18 轮允许跨数据集 expression、由本体绑定推出连接、同一数据集多角色显式连接及保留导入子查询的部分，均被第 19 轮第 49 项取代**。对象详情是否按绑定推导展示相关指标仍由工程和原型决定（§3.6、§8A、§12） |
+| 49 | 第 19 轮：指标只引用单个数据集 | simple、ratio、expression 一律只引用自己的 dataset_id 所指数据集的列；expression 不允许子查询或显式连接。模型没有数据集之间的关系，指标与本体及本体关系完全无关，从本体推连接会重新耦合。跨数据集条件不建指标，例如仅定义订单金额，华东地区由 agent 查询时沿本体关系筛选。Ossie 单数据集指标一一导入导出，跨数据集或额外查询作用域首版不承载，按 RT-69 原文留报告待补全，可由用户改写为单个数据集上的指标。对照 dbt 在一个语义模型上定义指标、Snowflake 指标聚合同一逻辑表的列、Fabric 按定义所在表在实体下展示；不引入数据集级关系，不让指标引用本体（§3.6、§3.9、§5.6、§6.5、§7、§8A、§14） |
+| 50 | 第 20 轮：指标措辞统一为单个数据集 | 数据集是登记单位，背后可以是表或视图，指标只引用单个数据集的列，不关心其物理形态。主设计、概念页、示例说明及第 49 项统一采用单数据集边界措辞；表达式与导入导出边界不变，确指物理表的映射说明保留（§3.6、§3.7、§5.6、§6.5） |
+| 51 | 第 20 轮：数据集引用计数（第 22 轮修正口径） | 后续功能，原型阶段确认。数据集页分开显示“被 N 个对象、K 个关系、M 个指标引用”，三类可分别展开。N 从对象绑定的主来源、附表、成员扩展来源按对象 type_id 去重，K 从关系绑定的映射表数据集（含继承关系的本地绑定）按关系 id 去重，M 从指标 dataset_id 按指标 id 去重；ratio 从分量解析数据集，自身也计一个指标。实时推导，不新增模型字段，列为后续交付项（§8A、§9） |
 | 边界 | 只给语义 | SQL、日期不齐的关联、空周期展示和物理类型转换交给 agent，核心不做完整查询编译或运行时基数校验（§2、§3.6、§14） |
 
 指标采用“结构化 + 表达式”的理由是常见口径需要可编辑字段，复杂口径需要保留原算法；MetricFlow、Cube、LookML 都有类型与表达式结合的做法，Fabric 的 [explicit Metric 定义](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)也有自己的 expression，支持 SQL 等方言（§3.6、§12）。这只作为设计依据，不承诺各产品执行能力或字段完全相同。
@@ -1542,12 +1455,25 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 多来源 | [MDO](https://www.palantir.com/docs/foundry/object-permissioning/multi-datasource-objects)：column-wise，非 row-wise；每属性一个来源（主键例外） | [绑定](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-bind-data) 有 primary/secondary 操作，但同页仍写单 static 限制，官方内部矛盾，不能据此承诺全部组合可用 |
 | 计算属性 | [Derived properties](https://www.palantir.com/docs/foundry/object-link-types/derived-properties) 与本平台范围不直接等同 | [新体验概览](https://learn.microsoft.com/en-us/fabric/iq/ontology/overview#alignment-with-power-bi-semantic-models) 承接源 calculated columns；本体独立定义协议未核实，详见 §3.7 |
 | Rule | [Submission criteria](https://www.palantir.com/docs/foundry/action-types/submission-criteria) 有执行语义，不能等同不执行规则 | [Business rule](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-rules)：自然语言业务规则、可关联概念，本体不执行；与 core 受限 SQL 路径不同 |
-| Metric | [对象集合聚合 API](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)支持聚合与分组；[Function](https://www.palantir.com/docs/foundry/functions/create-custom-aggregation)可用代码计算自定义聚合。未核实与本平台同构的独立指标资源 | [Metric](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics) 显示于对应 entity，操作页说明引用源语义模型并读取 DAX；[定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)还公开顶层表达式 Metric。两种入口都围绕表达式，不能概括成只有源 DAX 代理 |
+| Metric | [对象集合聚合 API](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)是查询调用，本体没有同构的可复用指标定义 | [操作页](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics)按 measure 所在表对应的实体展示；[定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)为顶层 model.metrics[]，展示位置不表示对象归属 |
 | 实例标题 | [Title key](https://www.palantir.com/docs/foundry/object-link-types/property-metadata)，与主键分开 | [旧绑定体验](https://learn.microsoft.com/en-us/fabric/iq/ontology/old-experience/how-to-bind-data#add-static-data) 可选 display-name property；不把旧步骤当新体验完整保证 |
 
 二元关系和对象、属性、链接分离是参考方向。本平台选择主表决定实例集合、完整继承普通关系与规则、支持复合标识；有绑定父对象从父表完整读取，虚拟父对象按具体子对象实例并集查询。
 
-指标选择结构化与表达式并存，是综合以下官方资料后的取舍，不是完整照搬某个产品。
+核查日期：2026-10-16。指标放在数据集上，与以下分层一致；产品能力和字段不因此完全相同。
+
+| 产品 | 定义与展示 |
+|---|---|
+| [Ossie / OSI](https://github.com/apache/ossie/blob/main/core-spec/spec.yaml) | 指标在 semantic_model.metrics 中引用数据集字段，没有指向本体概念的关系；core-1 只承载符合单数据集边界的部分，例外见 §7 |
+| [Fabric IQ 操作页](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics)与[定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition) | 定义为顶层 model.metrics[]。操作页说明 measure 按其定义所在表对应的实体展示；“显示在实体下”不能视为模型上的对象归属。explicit 有自身表达式，其他类型可引用源 measure |
+| [Palantir 对象集合聚合](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate) | 提供对象集合聚合和分组；本体没有与这里 Metric 对应的可复用指标定义，不能把一次聚合调用当作独立指标资源 |
+| [dbt 语义模型](https://docs.getdbt.com/docs/build/semantic-models) | simple 指标写在一个表对应的语义模型上，使用该模型的列 |
+| [Snowflake 语义视图](https://docs.snowflake.com/en/sql-reference/sql/create-semantic-view) | 可在一个逻辑表上对该表的列定义聚合指标；这里对照在单个数据集上聚合的用法 |
+| [Looker measure](https://docs.cloud.google.com/looker/docs/reference/param-measure-types) | measure 写在视图中，聚合类型配合 SQL 表达式 |
+
+core-1 保留 simple、ratio 便于编辑常见口径，expression 保留复杂算法；均只引用自己的 dataset_id 所指数据集的列。用户问题中的其他数据集条件由 agent 查询时沿本体关系筛选，不写入指标。对象详情是否按绑定展示相关指标由原型决定，不是持久化关联。
+
+指标选择结构化与表达式并存，也参考以下官方资料。
 
 | 资料 | 已核实的依据 |
 |---|---|
@@ -1612,7 +1538,7 @@ integrations/dataagent/skills/ontofoundry-modeling/
 | 自关联 | 源和目标是同一对象，例如“员工 汇报给 员工” |
 | 继承、多分类 | 单父 is-a 表达实例包含，子对象可用派生条件或扩展数据定义；只写本地定义，继承定义只读。既是学生又是男生等分类用属性筛选，或人＋学生＋员工角色对象及一对一关系；不为分类堆继承，不重复创建父关系 |
 | 受约束的值（Ossie 的 ValueType） | 属性的 `value_kind` + 规则，例如“币种代码是 3 位大写字母”写成该属性上的约束规则 |
-| 指标 | 显式选择对象或数据集粒度；数据集只用列，对象才用属性路径。常见口径用 simple 或 ratio，支持 median；其他 SQL 聚合口径用 expression，不改写为近似的简单指标。结构化路径允许正向多对一、一对一及反向一对一 |
+| 指标 | 只选一个数据集，simple、expression 的全部列和时间字段限本数据集，ratio 分量必须同数据集；不存本体归属或路径，其他数据集的条件在 agent 查询时处理 |
 | 已计算的比率列 | 覆盖率、密度、百分比列建成属性。需要指标时找到原分子与分母做比率；缺分量时先说明不能据此推导总体比率 |
 | 快照与趋势 | 在 Dataset 登记快照日期列（仅每日全量快照表），simple 和 expression 按需选时间字段，ratio 使用两分量各自时间字段；各数据集独立选日期且所有行使用同一天，日期不齐的关联与空周期展示交给 agent |
 | 汇总表与窗口 | 汇总表登记成数据集，直接在其上建数据集指标；查询时用不用汇总表由 agent 决定。已计算的不同窗口作为不同属性或来源，解释窗口含义，不能相加 |
@@ -1666,7 +1592,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 | 值概念上的关系、引用 Any 的关系等合法但未承载的构造 | RT-29 | 判断业务含义，能用核心模型表达的就提出对应元素 | create，或在回答中说明无法表达 |
 | 文档级上下文没有明确对象归属 | RT-02 | 参考原文分配同义词到 synonyms，说明并入对应对象 description；能够确定归属的说明已由 RT-59 机械合并 | update 对象 |
 | 文档级 `requires` 被丢弃 | RT-04 | 表达式只涉及某一个对象或关系时，改写成该元素上的规则；其余在回答中说明 | create 规则 |
-| 指标挂数据集，列引用或统计来源待补全，或用户希望改挂对象 | RT-49 / RT-50 | 补登记列或显式数据集；改挂对象时将列替换为属性路径；汇总表直接建数据集指标，不改原算法 | create / update 指标；必要时补属性与绑定 |
+| 指标列引用、统计数据集或表达式边界待补全 | RT-47 / RT-49 / RT-61 / RT-69 | 引用不明时补登记数据集和列；超出单数据集边界的原文保留报告，由用户改写为单个数据集上的指标，不建立本体关联 | create / update 指标与数据集；RT-69 改写不是等价转换 |
 | 不支持的表达式、嵌套 referent 等映射被丢弃 | RT-43 | 可确认是同行运算时提出 expression 绑定；其余说明边界 | update 映射，或说明 |
 | 字段的 `label`、`dimension` 等被丢弃 | RT-46 | `label` 可作为属性显示名或同义词 | update 属性 |
 
@@ -1706,7 +1632,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 
 | 工具 | 参数 | 行为及结果 |
 |---|---|---|
-| `search_ontology` | `query, kinds?, cursor?, limit?` | 按名称和同义词检索对象、属性、关系、规则或指标。返回 id、种类、归属、摘要和命中的同义词；候选分页 |
+| `search_ontology` | `query, kinds?, cursor?, limit?` | 按名称和同义词检索对象、属性、关系、规则或指标。返回 id、种类、摘要和命中的同义词；本体元素按定义带归属，指标只带数据集，不带对象归属；候选分页 |
 | `get_ontology` | `ids?, kinds?, include?, cursor?, limit?` | 省略 ids 时返回轻量目录及数量；ids 非空时批量读取定义和授权绑定。ids=[] 报 invalid_arguments。include 默认 semantic，可选择 physical、rules、adjacency，服务端仍裁剪权限 |
 | `search_objects` | `type_id?, q?, cursor?, limit?` | 只检索已接受且获授权的文档事实的推导显示文本和属性值，不访问数据库。按事实 UUID 返回并保留实际 type_id；父类型按继承范围展开，只对同一 UUID 去重，不按业务标识合并；分页及数量按事实条目计算 |
 | `get_object` | `id, include?, cursor?, limit?` | 按事实 UUID 读取该条已接受事实的只读 display_text、属性及授权证据；直接邻接保留该事实的端点，按关系和方向分页，不递归展开邻居全文，不合并同业务标识的其他事实 |
@@ -1819,7 +1745,7 @@ limit 默认 20、最大 100，批量 ids 最多 100。嵌套属性、规则和�
 | 路由 | 每个授权 Dataset 给出 dialect、database/schema 和 table；schema 未填写时由服务端来源配置解析默认值，无法确定则未完成。mysql 使用 mysql.query，doris 使用 doris.query，postgresql 等只在 agent 有对应工具时执行，不能伪装成已有工具 |
 | 来源 | 返回主附表 dataset 引用、键、成员条件或扩展来源及 Dataset 快照日期列；虚拟父对象明示具体实例来源。计算属性返回其表达式。未绑定为 unbound，缺键为 missing_key，跨连接为 cross_connection，元数据过期为 metadata_stale；权限不足为 forbidden |
 | 关系 | 返回端点、方向、绑定和声明基数提示。两端是快照数据集时提示各自日期语义和多日期交叉配对风险，不强加同日连接。同连接且绑定可用时才提供 JOIN 参考；内部连接身份只用于判断能否连接，不传给 agent |
-| 指标 | 返回 simple、ratio 或 expression 定义及引用依赖，附只读推导结果类型；ratio 的统计对象从当前分量解析，核心输入不保存；simple、expression 包含可选 time_field，ratio 返回分子、分母各自时间口径，来源分别附数据集的快照声明。结构化指标在绑定就绪时可给基础 sql_reference，含 SQL、字面量参数、dialect、database 和说明。expression 保留算法并按 id 生成当前引用显示，引用未闭合时给待补全原因；统计数据集无法确定的导入条目在选择前不形成已接受指标，不编造 SQL |
+| 指标 | 返回 simple、ratio、expression 及数据集列依赖，不返回对象归属；simple、ratio 可附只读结果类型，ratio 的 dataset_id 从同数据集分量解析，原生输入不保存。simple、expression 返回可选 time_field，ratio 返回分量时间；各来源附快照声明。授权来源就绪的结构化指标可附 sql_reference（SQL、字面量参数、dialect、database、说明）；expression 保留算法与引用作用域交给 agent，来源未定条目不形成已接受指标 |
 | 元数据 | 物理类型与注释来自可定位的元数据快照，明示快照 id 及采集时间；业务说明来自本体。这里的元数据快照与业务日快照是不同概念 |
 
 DataAgent 的 `core/tool_runtime.py` 已核对（2026-10-15）：内置查询工具是 `mysql.query(database, sql)` 和 `doris.query(database, sql)`，另有各自可选参数；没有 connection_alias 参数。若多条连接解析到相同的方言和 database，现有 resolver 报多集群歧义，须由来源配置收敛唯一来源；不向 MCP 增加连接别名。
@@ -1827,10 +1753,10 @@ DataAgent 的 `core/tool_runtime.py` 已核对（2026-10-15）：内置查询工
 ### 14.4 问数 agent 的流程
 
 1. 搜索语义定义，按需读取对象、关系、指标和授权绑定。结果记录 version_id；多次读取若返回了不同版本，或发生 cursor_invalid，就从当前版本重新获取依赖定义，不能混用新旧定义，也不能自行指定旧版本。
-2. 有已定义指标时采用它的口径。simple 保留聚合和固定条件，ratio 分别保留分子分母的时间字段、过滤和连接，expression 保留算法；无指标时才组合已有语义。已计算百分比列只当属性，不能凭它编造总体比率。
+2. 有已定义指标时采用它的口径。simple 保留聚合和固定条件，ratio 分别保留分子分母的时间字段和过滤，expression 保留算法；无指标时才组合已有语义。已计算百分比列只当属性，不能凭它编造总体比率。
 3. 有绑定父对象只查完整父表；子对象逐级按派生条件筛选，同时有成员扩展来源时还须存在扩展记录，继承项仍用父绑定。虚拟父对象展开具体子对象的实例并集，保留类型和实例键，具体查询编排交给 agent。
 4. 按 §3.6 的计算规则处理来源：快照数据集每周期独立选最后有数据的日期，同一数据集所有行使用同一天，不按实例或分组各取最近值；其他数据集取周期内全部行，再按指标算法整体重算，不能把每日去重数、均值或比率相加。ratio 两个分量各按自己的时间字段归周期；日期不齐的关联和空周期展示由 agent 根据问题处理并说明，已有窗口不能跨窗口相加；查询时用不用汇总表由 agent 决定，须保留粒度与口径。
-5. 对象指标从显式统计对象出发拼 SQL，默认 LEFT JOIN；数据集指标直接使用显式数据集列，不通过绑定反查对象，并注意声明基数与重复计算风险。关系路径按方向分配别名；跨连接不能伪装成一条 SQL 联邦查询。
+5. 指标只使用自己的数据集列。用户问“华东区订单金额”时，读取 orders 上的订单金额，再沿订单到客户的本体关系筛选客户地区；这是 agent 查询时的行为，不是指标定义的一部分。对象查询按关系方向组织连接，有歧义时处理或澄清，并避免连接重复行放大聚合；跨连接不能伪装成一条 SQL 联邦查询。
 6. 根据 dialect 选择 mysql.query 或 doris.query，传入 database 和 sql，按引擎调整物理类型和方言。聚合由数据库完成，不拉回全部明细自己统计。
 7. 用业务语言说明口径、来源和快照日期。文档事实从 search_objects、get_object 取得，并注明证据。
 
@@ -1847,12 +1773,12 @@ DataAgent 的 `core/tool_runtime.py` 已核对（2026-10-15）：内置查询工
 | 来源绑定 | 主附表、关系表、数据集指标统一引用 Dataset，位置只登记一次，列清单可空；一个对象挂二十多张汇总和快照表；逻辑键不依赖数据库主键；附表缺键有明确状态；主表缺附表行仍保留；唯一非主键关联及复合键顺序 |
 | 继承 | 父表覆盖全部子实例，语义派生条件与成员扩展表两种限定并可同时使用；虚拟父无映射并按具体子对象实例并集查询，事实同步展开；两个独立对象不继承；拒绝父表之外的独立子实例；继承关系 id 不复制 |
 | 计算列 | 数量乘单价、CASE、未知列与跨对象引用；MCP 返回计算表达式 |
-| 指标 | 显式对象或数据集二选一、同统计对象 ratio；退款金额按退款时间、销售金额按下单时间时 2 月退款率等于 2 月退款除以 2 月销售，ratio 携带 time_field 拒绝，分量变更后显示各自新口径；数据集列清单空与未知列、无对象反查；本体删除/改基数及数据集删除的依赖组、改名显示、范围保持换绑的 SQL 参考及可能改变成员或时间范围时的影响传播；median、复杂 expression、拼接去重、不同固定过滤的完成率、零分母、空集和 NULL；正向及反向一对一路径；不增加运行时基数检查 |
+| 指标 | simple、expression 全部列及时间字段限 dataset_id，ratio 两分量同数据集；拒绝其他数据集列、SELECT、FROM、JOIN 和额外查询作用域；数据集/列删除与快照变化的依赖组，不受本体删除、改名、基数或成员变化影响；ratio 时间、零分母、NULL、空集、median、复杂本数据集表达式与拼接去重 |
 | 平台预览 | 示例 13 无对象绑定时提交数为 10；使用未保存的新表单定义和所选时间范围，总值与按月趋势分别只读执行；ratio 保留分量时间；表达式白名单失败、引擎不支持、缺绑定或权限时显示“无法预览”及原因，不伪造数值 |
 | 时间 | 各 Dataset 独立取最新日或周期末日，普通主表和快照附表各按所在表声明选行；事件表按范围整体重算，有提交仓库数两日为 1、2，全周期为 2，不能相加成 3；同一数据集末日排除停在旧日的实例；成员条件不改变数据集日期；日期不齐与空周期交给 agent；不强加日期相等；窗口与汇总表保持原口径 |
 | MCP | 同类型同完整业务标识的文档事实只提示重复，由人选择接受或改更新追加证据；只返回已接受事实，UUID 寻址、分页，继承展开仅同 UUID 去重，业务实体数另按业务标识统计；所有层级都不返回连接别名；四工具无版本入参；建模固定版本，问数当前发布版本；发布或权限变化使旧 cursor 失效；物理与实例权限裁剪；分页边界 |
 | 导入 | 只新增和修改，文件中没有的已有元素保持不动，平台导入从不生成 delete 提案；转换失败保留原文和待补全状态，等待用户选择或点击 AI 补全；删除由用户在会话里手动操作，或让 agent 提出删除提案并走正常审阅；原子技术名交换、依赖闭包、多父 RT-34、七类型 RT-35、规则引用重写、平行边唯一匹配；RT-49 和 RT-56 保留 expression，RT-59 合并说明 |
-| 本轮语义边界 | 多分支并集、多层派生加成员表交集、正反关系 EXISTS；决定角色与最后角色缺标识分开；复合编号 direct 逐项对齐、物理外键不冒充业务号；值约束祖先去重、绑定变量和多元值角色；事实名回退与搜索、0 和 false、缺 quote；ratio 输入 base 和 simple/ratio 输入 value_kind 拒绝；范围变更沿派生和分量列指标；映射 UUID 锁定与 type_id 自然匹配冲突、事实和证据仅 UUID；多作用域同名 Dataset UUID5；非 Ossie 错误 rule_id=null；补齐依赖实时解除阻断 |
-| 往返 | 对象 simple、ratio 的完整范围（简单派生、分支并集、多层派生、成员扩展交集及路径子类）定向验收，主表无 A3 而附表有 A3 时金额必须为100或 RT-61 dropped，不能导出1000；COUNT 可空列及条件 COUNT 不转行计数；Person/Employee 不生成非法组合键，原首选标识不得报完整转换；多元 OneToOne、实体继承值类型报输入 error；固定 CASE、CAST 和 NULLIF、数据集列去重计数、计算列、多来源、unique 非主键；expression 只转换已解析引用且保持算法；RT-60 时间声明损失；RT-61 结构化导出限制；RT-62 数据集一一对应及复用；RT-63 来源错误；RT-64 键与快照连接边界；RT-65 继承边界；RT-66 来源方言与物理元数据边界；RT-67 完整成员定义等价转换、拒绝部分转换，未支持语法保留原文待补全；买方华东且卖方华南金额 100，合并到同一地区会变 0，expression 必须 error；09 空模型及 13 仅数据集指标的 Ossie 导出 error |
+| 本轮语义边界 | 多分支并集、多层派生加成员表交集及 EXISTS 仍属对象语义，与指标独立；决定角色缺标识不裁剪键，最后角色单独报告；编号 direct 逐项对齐，值约束传播；ratio 输入 dataset_id/time_field、simple/ratio 输入 value_kind 拒绝；映射 UUID 锁定、事实及证据仅 UUID；Dataset UUID5；非 Ossie 错误 rule_id 可空；补齐依赖实时解除阻断 |
+| 往返 | 单个数据集上的指标与 OSI 一一对应，数据集列与算法保持，ratio 无已登记分量时保留单条 expression；条件行计数规范形式、可空列 COUNT 不转行计数、CASE、CAST/NULLIF；同一作用域同时含 orders、customers，裸 COUNT(*) 待用户选定 orders 后转 simple count，导出带 orders 列的行计数规范式，再导入来源仍唯一为 orders（改选 customers 时同理）；原生无列引用 expression 保留已声明来源，含 COUNT(*) 的表达式可等价规范化行计数，无法表达来源时 RT-61 error；超出单数据集边界的 OSI 指标 RT-69 error，原文留报告待补全，不生成核心指标；RT-60 时间声明、RT-61 非法核心指标导出、RT-62 数据集复用、RT-63 来源、RT-64 键与快照、RT-65 继承、RT-66 元数据、RT-67 成员定义、RT-68 子类标识；多元 OneToOne 与实体继承值类型 error；09 空模型及 13 仅数据集指标的完整 Ossie 导出 error |
 
 此表是后续实施的验收要求，不代表 core-1 schema、适配器、产品 UI 或数据库查询已经通过测试。本轮示例只做静态核查，边界见 README。

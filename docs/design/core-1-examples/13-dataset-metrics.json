@@ -17,7 +17,6 @@
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
-        "base_dataset_id": "00000000-0000-4000-8000-000000013001",
         "evidence": [],
         "aggregation": "sum",
         "measure": {
@@ -28,7 +27,8 @@
         "time_field": {
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
-        }
+        },
+        "dataset_id": "00000000-0000-4000-8000-000000013001"
       },
       {
         "id": "00000000-0000-4000-8000-000000013102",
@@ -37,7 +37,6 @@
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
-        "base_dataset_id": "00000000-0000-4000-8000-000000013001",
         "evidence": [],
         "aggregation": "sum",
         "measure": {
@@ -59,7 +58,8 @@
         "time_field": {
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
-        }
+        },
+        "dataset_id": "00000000-0000-4000-8000-000000013001"
       },
       {
         "id": "00000000-0000-4000-8000-000000013103",
@@ -79,7 +79,6 @@
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
-        "base_dataset_id": "00000000-0000-4000-8000-000000013001",
         "evidence": [],
         "aggregation": "count_distinct",
         "measure": {
@@ -101,7 +100,8 @@
         "time_field": {
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
-        }
+        },
+        "dataset_id": "00000000-0000-4000-8000-000000013001"
       },
       {
         "id": "00000000-0000-4000-8000-000000013105",
@@ -111,13 +111,13 @@
         "synonyms": [],
         "kind": "expression",
         "value_kind": "integer",
-        "base_dataset_id": "00000000-0000-4000-8000-000000013001",
         "evidence": [],
         "expression": "SUM(CASE WHEN code_lines_daily.repo = 'core' OR code_lines_daily.repo = 'web' THEN code_lines_daily.commit_count ELSE 0 END)",
         "time_field": {
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
-        }
+        },
+        "dataset_id": "00000000-0000-4000-8000-000000013001"
       },
       {
         "id": "00000000-0000-4000-8000-000000013106",
@@ -126,7 +126,6 @@
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
-        "base_dataset_id": "00000000-0000-4000-8000-000000013001",
         "evidence": [],
         "aggregation": "count",
         "measure": null,
@@ -134,7 +133,8 @@
         "time_field": {
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
-        }
+        },
+        "dataset_id": "00000000-0000-4000-8000-000000013001"
       }
     ],
     "datasets": [

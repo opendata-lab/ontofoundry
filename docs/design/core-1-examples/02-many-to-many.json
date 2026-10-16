@@ -262,14 +262,14 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001103",
         "aggregation": "avg",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002121"
+          "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f",
+          "column": "score"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
       },
       {
         "id": "00000000-0000-4000-8000-000000006102",
@@ -278,40 +278,11 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001103",
         "aggregation": "count",
         "measure": null,
         "filters": [],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006103",
-        "name": "高学分课程选课人次",
-        "technical_name": "high_credit_enrollments",
-        "description": "",
-        "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001103",
-        "aggregation": "count",
-        "measure": null,
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003103",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002113"
-            },
-            "operator": "ge",
-            "values": [
-              4
-            ]
-          }
-        ],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
       }
     ],
     "datasets": [
@@ -322,7 +293,19 @@
         "schema_name": "edu",
         "table_name": "students",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "student_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "a34b0f35-6332-552a-9fe6-3cfd01952d89",
@@ -331,7 +314,24 @@
         "schema_name": "edu",
         "table_name": "courses",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "course_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "title",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "credit",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "58d9eae4-7d13-5946-bf56-53576e3ae72f",
@@ -340,7 +340,29 @@
         "schema_name": "edu",
         "table_name": "enrollments",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "student_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "course_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "score",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "enrolled_on",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

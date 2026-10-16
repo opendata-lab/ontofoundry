@@ -209,18 +209,18 @@
         "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000011101",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000021103"
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "quantity"
         },
         "filters": [],
         "evidence": [],
         "time_field": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000021102"
-        }
+          "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
+          "column": "snapshot_date"
+        },
+        "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
       },
       {
         "id": "00000000-0000-4000-8000-000000061201",
@@ -229,24 +229,24 @@
         "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000011201",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000021203"
+          "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf",
+          "column": "stock_quantity"
         },
         "filters": [],
         "evidence": [],
         "time_field": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000021202"
-        }
+          "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf",
+          "column": "snapshot_date"
+        },
+        "dataset_id": "1411465a-966b-5695-b7e1-b467074a73cf"
       },
       {
         "id": "00000000-0000-4000-8000-000000061102",
         "name": "数量表期末合计",
         "technical_name": "dataset_closing_quantity",
-        "description": "显式挂 component_daily；不根据该表的对象绑定反查组件。",
+        "description": "显式挂 component_daily；不根据该数据集的对象绑定反查组件。",
         "synonyms": [],
         "kind": "simple",
         "aggregation": "sum",
@@ -260,7 +260,7 @@
           "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd",
           "column": "snapshot_date"
         },
-        "base_dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
+        "dataset_id": "d87c134f-d101-5fae-8841-427b309a61cd"
       }
     ],
     "datasets": [
@@ -302,7 +302,34 @@
         "schema_name": "snapshot_demo",
         "table_name": "component_state_daily",
         "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
-        "snapshot_date_column": "snapshot_date"
+        "snapshot_date_column": "snapshot_date",
+        "columns": [
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "coverage_ratio",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "usage_1m",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "usage_3m",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "component_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "1411465a-966b-5695-b7e1-b467074a73cf",
@@ -311,7 +338,24 @@
         "schema_name": "snapshot_demo",
         "table_name": "warehouse_daily",
         "description": "每日全量快照：每行是某个组件或仓库在某天的状态。",
-        "snapshot_date_column": "snapshot_date"
+        "snapshot_date_column": "snapshot_date",
+        "columns": [
+          {
+            "name": "warehouse_code",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "snapshot_date",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "stock_quantity",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

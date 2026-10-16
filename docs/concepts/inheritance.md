@@ -266,7 +266,7 @@ WHERE c.customer_level = 'VIP';
 
 虚拟父对象自身没有 DataMapping，不接受直接文档事实；普通无绑定叶对象仍是待补全。实例覆盖与具体子类型互斥由建模者声明，平台不扫描数据库证明。
 
-ObjectType.derived_by 默认空数组，派生数组非空时 extends 必须非空。每项是 `{kind: simple, conditions: [...]}` 或 `{kind: expression, expression: "..."}`，conditions 与 expression 互斥；simple 非空条件列表按 AND，条件采用[指标](metrics.md)的 Condition 形状并且路径须为标量。多条分支取并集，需要同时成立写在同一分支。空数组仅表示本层无条件，不等于成员定义完整。
+ObjectType.derived_by 默认空数组，派生数组非空时 extends 必须非空。每项是 `{kind: simple, conditions: [...]}` 或 `{kind: expression, expression: "..."}`，conditions 与 expression 互斥；simple 非空条件列表按 AND，条件采用本体成员专用 PathCondition：`{path: {links: [{link_type_id, direction}], property_id}, operator, values}`；links 为空表示上下文属性，方向为 forward 或 reverse，路径须为标量，运算符和值类型按[主设计 §3.2](../design/2026-10-14-core-model-and-format-adapters.md)校验，与指标列条件独立。多条分支取并集，需要同时成立写在同一分支。空数组仅表示本层无条件，不等于成员定义完整。
 
 引用从直接父对象的有效属性和关系解析到 id，可引用祖先定义，保留原 id。表达式支持受限标量、比较、布尔组合、算术、CASE、受限标量函数，另支持 `EXISTS (person.earns)` 的显式关系存在性；每跳保存关系 id 与 forward 或 reverse 方向，文字反向写作 `REVERSE(关系技术名)`。同类不同角色以关系 id 区分，自关联同样保留方向。找不到关联与存在关联但属性为空有区别；不扩展到任意 SQL 子查询、聚合、递归或未定义的变量量化。文本按 AST 和 id 依赖重新生成显示，改技术名不替换字面量，物理列改名不改变条件。
 
@@ -280,7 +280,7 @@ ObjectType.derived_by 默认空数组，派生数组非空时 extends 必须非�
 
 Ossie 多父仅保留文件顺序第一个父类，报告其余父类以及因此不能闭合的继承引用和派生条件，原文留材料。可建议改写成派生条件或关系，但这是需用户审阅的业务改写，不保证等价，不自动生成关系。第二父自身的对象与定义仍可正常导入。
 
-提案区分语义和范围保持的物理换绑，与可能改变属性、关系含义或成员、实例、时间范围的修改。派生条件、成员扩展来源、主来源和快照声明等后者，须沿引用、继承、成员派生及 ratio 分量列出受影响指标和原因。不能确认等价的换绑列潜在影响，不扫描数据库证明等价。
+删除数据集或列、调整来源位置和快照声明时，列出直接引用与 ratio 间接依赖的指标，相关修订归同一依赖组。范围保持的来源搬迁只更新 SQL 参考，不能确认等价则列潜在影响，不扫描数据证明等价。对象成员、继承、属性或关系定义的变化不触发指标定义修订。
 
 ## 6. 与 Palantir Foundry、Microsoft Fabric IQ、Apache Ossie 的对照
 

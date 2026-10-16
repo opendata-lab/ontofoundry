@@ -298,98 +298,30 @@
         "id": "00000000-0000-4000-8000-000000006301",
         "name": "销量",
         "technical_name": "units_sold",
-        "description": "",
+        "description": "全部订单明细的数量合计，不限定订单状态。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001302",
+        "evidence": [],
+        "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002312"
+          "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+          "column": "qty"
         },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003301",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002302"
-            },
-            "operator": "eq",
-            "values": [
-              "已完成"
-            ]
-          }
-        ],
-        "evidence": []
-      },
-      {
-        "id": "00000000-0000-4000-8000-000000006302",
-        "name": "咖啡器具销量",
-        "technical_name": "brewer_units",
-        "description": "",
-        "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001302",
-        "aggregation": "sum",
-        "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002312"
-        },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003302",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002322"
-            },
-            "operator": "eq",
-            "values": [
-              "咖啡器具"
-            ]
-          }
-        ],
-        "evidence": []
+        "filters": []
       },
       {
         "id": "00000000-0000-4000-8000-000000006303",
-        "name": "已完成订单的发货单数",
-        "technical_name": "shipments_of_completed_orders",
-        "description": "",
+        "name": "发货单数",
+        "technical_name": "shipment_count",
+        "description": "发货表全部记录的行数，不限定订单状态或明细匹配情况。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001304",
+        "evidence": [],
+        "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6",
         "aggregation": "count",
         "measure": null,
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003303",
-                  "direction": "forward"
-                },
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003301",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002302"
-            },
-            "operator": "eq",
-            "values": [
-              "已完成"
-            ]
-          }
-        ],
-        "evidence": []
+        "filters": []
       },
       {
         "id": "00000000-0000-4000-8000-000000006330",
@@ -397,15 +329,11 @@
         "technical_name": "line_sales_amount",
         "description": "",
         "synonyms": [],
-        "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001302",
-        "aggregation": "sum",
-        "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002330"
-        },
-        "filters": [],
-        "evidence": []
+        "kind": "expression",
+        "evidence": [],
+        "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
+        "expression": "SUM(order_lines.qty * order_lines.unit_price)",
+        "value_kind": "decimal"
       }
     ],
     "datasets": [
@@ -416,7 +344,19 @@
         "schema_name": "dw",
         "table_name": "orders",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "status",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
@@ -425,7 +365,34 @@
         "schema_name": "dw",
         "table_name": "order_lines",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "line_no",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "qty",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "unit_price",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "sku",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "03785b10-53fc-5d05-9c8b-4d55e139104d",
@@ -434,7 +401,19 @@
         "schema_name": "dw",
         "table_name": "products",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "sku",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "category",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "1cf49f63-2949-534c-8821-3514c9314ac6",
@@ -443,7 +422,29 @@
         "schema_name": "dw",
         "table_name": "shipments",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "shipment_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "shipped_at",
+            "physical_type": "datetime",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "order_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "line_no",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

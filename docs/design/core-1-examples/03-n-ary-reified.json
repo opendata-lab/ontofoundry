@@ -310,35 +310,19 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006201",
-        "name": "示例项目甲供货量",
-        "technical_name": "project_a_supply_quantity",
-        "description": "",
+        "name": "供货量",
+        "technical_name": "supply_quantity",
+        "description": "供货表全部记录的数量合计。",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001204",
+        "evidence": [],
+        "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
         "aggregation": "sum",
         "measure": {
-          "links": [],
-          "property_id": "00000000-0000-4000-8000-000000002231"
+          "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
+          "column": "qty"
         },
-        "filters": [
-          {
-            "path": {
-              "links": [
-                {
-                  "link_type_id": "00000000-0000-4000-8000-000000003203",
-                  "direction": "forward"
-                }
-              ],
-              "property_id": "00000000-0000-4000-8000-000000002222"
-            },
-            "operator": "eq",
-            "values": [
-              "示例项目甲"
-            ]
-          }
-        ],
-        "evidence": []
+        "filters": []
       },
       {
         "id": "00000000-0000-4000-8000-000000006202",
@@ -347,19 +331,14 @@
         "description": "",
         "synonyms": [],
         "kind": "simple",
-        "base_type_id": "00000000-0000-4000-8000-000000001204",
         "aggregation": "count_distinct",
         "measure": {
-          "links": [
-            {
-              "link_type_id": "00000000-0000-4000-8000-000000003201",
-              "direction": "forward"
-            }
-          ],
-          "property_id": "00000000-0000-4000-8000-000000002201"
+          "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
+          "column": "supplier_id"
         },
         "filters": [],
-        "evidence": []
+        "evidence": [],
+        "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb"
       }
     ],
     "datasets": [
@@ -370,7 +349,19 @@
         "schema_name": "scm",
         "table_name": "suppliers",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "supplier_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "46d14171-aab1-5f09-ae32-411724292ebe",
@@ -379,7 +370,19 @@
         "schema_name": "scm",
         "table_name": "parts",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "part_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "77c0c4f2-c3bc-5250-9492-736fa774214a",
@@ -388,7 +391,19 @@
         "schema_name": "scm",
         "table_name": "projects",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "project_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          }
+        ]
       },
       {
         "id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
@@ -397,7 +412,34 @@
         "schema_name": "scm",
         "table_name": "supplies",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "supplier_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "part_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "project_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "qty",
+            "physical_type": "integer",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "supplied_on",
+            "physical_type": "date",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [
