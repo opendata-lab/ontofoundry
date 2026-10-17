@@ -888,3 +888,152 @@ def test_confirmation_error_priority_is_independent_of_order(client, defect):
         )
         assert client.get(ONTOLOGY + "/version").json() == before_version
         assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session
+
+
+@pytest.mark.parametrize("existing_parent", [False, True])
+@pytest.mark.parametrize("target_name", ["person", "vip_party", "device"])
+def test_example06_old_session_imports_effective_inheritance_and_bindings(
+    client, target_name, existing_parent
+):
+    from core1_fixtures import example_draft_json
+    from test_modeling import publish
+
+    from ontofoundry_api.domain.bindings import resolve_binding
+    from ontofoundry_api.domain.canonical import element_sha256
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.graph import DraftIndex
+    from ontofoundry_api.domain.models import COLLECTIONS
+    from ontofoundry_api.domain.validation import validate_core_graph
+    from ontofoundry_api.services.element_save import calculate_element_save, element_scope
+
+    initial = create_session(client)
+    latest = example_draft_json("06-inheritance")
+    latest["workspace_id"] = initial["workspace_id"]
+    for collection in COLLECTIONS.values():
+        for element in latest[collection]:
+            if "evidence" in element:
+                element["evidence"] = []
+    if target_name == "vip_party" and not existing_parent:
+        from uuid import uuid4
+
+        root = next(o for o in latest["object_types"] if o["technical_name"] == "party")
+        middle = {
+            **deepcopy(root),
+            "id": str(uuid4()),
+            "name": "登记参与方",
+            "technical_name": "registered_party",
+            "extends": root["id"],
+            "title_property_id": None,
+        }
+        latest["object_types"].append(middle)
+        next(o for o in latest["object_types"] if o["technical_name"] == target_name)[
+            "extends"
+        ] = middle["id"]
+    target = next(o for o in latest["object_types"] if o["technical_name"] == target_name)
+    unrelated = next(o for o in latest["object_types"] if o["technical_name"] == "supplier")
+    base = {**latest, **{c: [] for c in COLLECTIONS.values()}}
+    base["object_types"] = [
+        {**o, "extends": None, "derived_by": [], "title_property_id": None}
+        for o in (target, unrelated)
+    ]
+    parent = next(o for o in latest["object_types"] if o["id"] == target["extends"])
+    if existing_parent:
+        base["object_types"].append(
+            {
+                **parent,
+                "extends": None,
+                "derived_by": [],
+                "title_property_id": None,
+                "description": "保留已有父类型草稿",
+            }
+        )
+    response = save(client, initial, base)
+    assert response.status_code == 200, response.text
+    assert publish(client, response.json()).status_code == 200
+    old, newer = create_session(client), create_session(client)
+    base = deepcopy(old["draft"])
+    response = save(client, newer, latest)
+    assert response.status_code == 200, response.text
+    assert publish(client, response.json()).status_code == 200
+    old["draft"]["object_types"][1]["description"] = "保留供应商草稿"
+    response = save(client, old, old["draft"])
+    assert response.status_code == 200, response.text
+    old = response.json()
+    candidate = deepcopy(old["draft"])
+    candidate["object_types"][0]["description"] = "仅修改当前对象说明"
+    body = save_body(client, old, candidate, target_id=target["id"])
+    confirmations = preflight_confirmations(client, body)
+    current = client.get(ROOT + "/published-snapshot").json()
+    calculation = calculate_element_save(
+        base, current, old["draft"], candidate, "object_type", target["id"]
+    )
+    assert {c["target_id"] for c in confirmations} == {
+        c["target_id"] for c in calculation.affected_items
+    }
+    local_scope = element_scope(calculation.session_draft, "object_type", target["id"])
+    imported = {
+        e["id"]: (collection, e)
+        for collection in COLLECTIONS.values()
+        for e in calculation.session_draft[collection]
+        if e["id"] not in {old_e["id"] for old_e in old["draft"][collection]}
+        and e["id"] not in local_scope[collection]
+    }
+    assert imported
+    assert set(imported) == {c["target_id"] for c in confirmations}
+    for entry in confirmations:
+        collection, element = imported[entry["target_id"]]
+        published = next(e for e in current[collection] if e["id"] == element["id"])
+        assert entry["expected_target_hash"] == element_sha256(
+            published, collection=collection
+        )
+    for items, status, code in [
+        (confirmations[:-1], 422, "ELEMENT_SCOPE_INVALID"),
+        (
+            [{**confirmations[0], "expected_target_hash": "0" * 64}, *confirmations[1:]],
+            409,
+            "VERSION_CHANGED",
+        ),
+    ]:
+        response = client.post(
+            ROOT + "/element-saves", json={**body, "affected_items": items}
+        )
+        assert response.status_code == status, response.text
+        assert response.json()["error"]["code"] == code
+    response = client.post(
+        ROOT + "/element-saves", json={**body, "affected_items": confirmations}
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    expected = CoreDraft.model_validate(result["draft"])
+    synced = validate_core_graph(CoreDraft.model_validate(result["session"]["draft"]))
+    target_id = next(o.id for o in expected.object_types if str(o.id) == target["id"])
+    for graph in (expected, synced):
+        index = DraftIndex(graph)
+        expected_index = DraftIndex(expected)
+        for definitions in (
+            "effective_properties",
+            "effective_links",
+            "effective_rules",
+            "identifier",
+        ):
+            assert {item.id: item for item in getattr(index, definitions)(target_id)} == {
+                item.id: item for item in getattr(expected_index, definitions)(target_id)
+            }
+        assert resolve_binding(graph, target_id) == resolve_binding(expected, target_id)
+    assert not synced.metrics and not synced.material_objects and not synced.material_links
+    assert not {"organization", "vehicle", "channel_partner"} & {
+        o.technical_name for o in synced.object_types
+    }
+    assert (
+        next(o for o in synced.object_types if str(o.id) == unrelated["id"]).description
+        == "保留供应商草稿"
+    )
+    assert (
+        next(o for o in expected.object_types if str(o.id) == unrelated["id"]).description
+        != "保留供应商草稿"
+    )
+    if existing_parent:
+        assert (
+            next(o for o in synced.object_types if str(o.id) == parent["id"]).description
+            == "保留已有父类型草稿"
+        )

@@ -3,7 +3,7 @@
 import pytest
 from core1_fixtures import example_draft
 
-from ontofoundry_api.domain.core import Aggregation, ExpressionMetric
+from ontofoundry_api.domain.core import Aggregation, ExpressionMetric, ValueKind
 from ontofoundry_api.domain.dependencies import (
     affected_metrics,
     reference_index,
@@ -188,3 +188,70 @@ def test_exact_final_property_swap_rewrite_is_not_interpreted_again():
                 current.values[renamed.technical_name]
                 == previous.values[prop.technical_name]
             )
+
+
+@pytest.mark.parametrize(
+    ("left_kind", "left", "right_kind", "right"),
+    [
+        ("boolean", True, "integer", 1),
+        ("boolean", False, "integer", 0),
+        ("integer", 1, "float", 1.0),
+        ("integer", 0, "decimal", 0.0),
+    ],
+)
+def test_final_fact_swap_requires_identical_scalar_types(
+    left_kind, left, right_kind, right
+):
+    from ontofoundry_api.domain.dependencies import rewrite_references
+    from ontofoundry_api.domain.validation import validate_core_graph
+
+    before = example_draft("07-instances-and-evidence")
+    first, second = [
+        next(p for p in before.properties if p.technical_name == name)
+        for name in ("name", "is_vip")
+    ]
+    first.value_kind, second.value_kind = ValueKind(left_kind), ValueKind(right_kind)
+    for fact in before.material_objects:
+        if fact.type_id == first.owner_type_id:
+            fact.values[first.technical_name] = left
+            fact.values[second.technical_name] = right
+    validate_core_graph(before)
+    candidate = before.model_copy(deep=True)
+    a, b = [
+        next(p for p in candidate.properties if p.id == old.id) for old in (first, second)
+    ]
+    a.technical_name, b.technical_name = b.technical_name, a.technical_name
+    final = validate_candidate_graph(before, candidate)
+    for fact in final.material_objects:
+        if fact.type_id == first.owner_type_id:
+            assert type(fact.values[b.technical_name]) is type(right)
+            assert type(fact.values[a.technical_name]) is type(left)
+            assert fact.values[a.technical_name] == left
+            assert fact.values[b.technical_name] == right
+    assert rewrite_references(before, final).model_dump_json() == final.model_dump_json()
+    assert candidate.model_dump_json() != final.model_dump_json()
+
+
+def test_ambiguous_binding_swap_is_accepted_as_exact_final_form_first():
+    before = example_draft("01-basic-sales")
+    candidate = before.model_copy(deep=True)
+    first, second = [
+        p for p in candidate.properties if p.owner_type_id == candidate.object_types[0].id
+    ][:2]
+    first.technical_name, second.technical_name = (
+        second.technical_name,
+        first.technical_name,
+    )
+    final = validate_candidate_graph(before, candidate)
+    # These same submitted fields could mean a manual binding swap in the old
+    # namespace. The contract deliberately gives the exact final form priority.
+    submitted = final.model_copy(deep=True)
+    result = validate_candidate_graph(before, submitted)
+    assert result.mappings == final.mappings
+    # A binding revision after the rename is an unambiguous second save.
+    mapping = next(m for m in submitted.mappings if m.type_id == first.owner_type_id)
+    mapping.fields[first.technical_name], mapping.fields[second.technical_name] = (
+        mapping.fields[second.technical_name],
+        mapping.fields[first.technical_name],
+    )
+    assert validate_candidate_graph(final, submitted).mappings == submitted.mappings

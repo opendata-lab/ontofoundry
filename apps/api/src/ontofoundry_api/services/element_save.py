@@ -4,6 +4,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from uuid import UUID
 
+from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.canonical import element_sha256
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.dependencies import (
@@ -11,6 +12,7 @@ from ontofoundry_api.domain.dependencies import (
     reference_index,
     rewrite_references,
 )
+from ontofoundry_api.domain.graph import DraftIndex
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.errors import ServiceError
@@ -111,7 +113,12 @@ class ElementSaveCalculation:
 
 def _include_missing_upstream(synced, merged, kind, element_id):
     """Import missing dependencies without replacing existing session drafts."""
-    refs = reference_index(CoreDraft.model_validate(merged))
+    graph = CoreDraft.model_validate(merged)
+    index = DraftIndex(graph)
+    refs = reference_index(graph)
+    inheritance_owners = (
+        set(index.lineage(UUID(element_id))) if kind == "object_type" else set()
+    )
     available = {
         UUID(e["id"]) for collection in COLLECTIONS.values() for e in synced[collection]
     }
@@ -129,14 +136,23 @@ def _include_missing_upstream(synced, merged, kind, element_id):
         if owner in visited:
             continue
         visited.add(owner)
-        for ref in refs[owner]:
-            if ref.target_id in available:
+        dependencies = {ref.target_id for ref in refs[owner]}
+        if owner in inheritance_owners:
+            # Inheritance exposes definitions and effective bindings even when
+            # no expression explicitly references them. Never import descendants.
+            dependencies.update(index.ancestors(owner))
+            dependencies.update(p.id for p in index.effective_properties(owner))
+            dependencies.update(link.id for link in index.effective_links(owner))
+            dependencies.update(rule.id for rule in index.effective_rules(owner))
+            dependencies.update(m.id for m in resolve_binding(graph, owner).mappings)
+        for dependency in sorted(dependencies, key=str):
+            pending.append(dependency)
+            if dependency in available:
                 continue
-            collection, element = published[ref.target_id]
+            collection, element = published[dependency]
             synced[collection].append(deepcopy(element))
-            available.add(ref.target_id)
+            available.add(dependency)
             imported.add(element["id"])
-            pending.append(ref.target_id)
     return imported
 
 
