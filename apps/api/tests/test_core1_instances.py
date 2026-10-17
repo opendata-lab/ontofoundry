@@ -252,3 +252,74 @@ def test_reverse_virtual_parent_expands_concrete_local_bindings(tmp_path, monkey
         }
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("dialect_name", ["postgresql", "mysql"])
+@pytest.mark.parametrize("modulo", [False, True])
+def test_expression_like_literals_use_driver_safe_parameters(dialect_name, modulo):
+    from sqlalchemy import column, select, table
+    from sqlalchemy.dialects import mysql, postgresql
+    from sqlglot import parse_one
+
+    from ontofoundry_api.services.instance_plan import ResolvedScalar
+
+    party = table("party", column("phone"), column("party_no"))
+    expression = "phone LIKE '1%'"
+    if modulo:
+        expression += " AND phone % 2 = 1"
+    scalar = ResolvedScalar(parse_one(expression), {"phone": party.c.phone})
+    statement = select(party.c.party_no).where(scalar, party.c.party_no == "P1")
+    dialect = {"postgresql": postgresql.dialect, "mysql": mysql.dialect}[dialect_name]()
+    compiled = statement.compile(dialect=dialect)
+    sql = str(compiled)
+    assert "'1%'" not in sql
+    assert "1%" in compiled.params.values()
+    assert "P1" in compiled.params.values()
+    # Simulate only the driver's percent formatting, without a connection.
+    parameters = (
+        tuple(compiled.params[name] for name in compiled.positiontup)
+        if compiled.positional
+        else compiled.params
+    )
+    rendered = sql % parameters
+    assert "1%" in rendered and "P1" in rendered
+    if modulo:
+        assert " % 2" in rendered
+    inlined = str(
+        statement.compile(dialect=dialect, compile_kwargs={"literal_binds": True})
+    )
+    assert "'1%%'" in inlined
+
+
+@pytest.mark.parametrize("neighborhood", [False, True])
+def test_virtual_parent_exact_key_requires_concrete_type(monkeypatch, neighborhood):
+    from types import SimpleNamespace
+
+    from core1_fixtures import example_draft
+
+    from ontofoundry_api.services.instance_neighborhood import database_neighborhood
+
+    draft = example_draft("06-inheritance")
+    virtual_id = query(draft, "asset")
+    key = [{"type": "string", "value": "missing-asset"}]
+
+    def unexpected_source(*args, **kwargs):
+        pytest.fail("Virtual parent exact lookup must fail before any source lookup")
+
+    monkeypatch.setattr(
+        "ontofoundry_api.services.instance_plan.resolve_dataset", unexpected_source
+    )
+    with pytest.raises(ServiceError) as error:
+        if neighborhood:
+            database_neighborhood(
+                None,
+                str(draft.workspace_id),
+                draft,
+                SimpleNamespace(type_id=virtual_id, key=key, depth=1, snapshot_date=None),
+                None,
+            )
+        else:
+            query_instances(None, str(draft.workspace_id), draft, virtual_id, None, key=key)
+    assert error.value.status_code == 422
+    assert error.value.code == "INVALID_OBJECT_REF"
+    assert "具体类型" in error.value.message

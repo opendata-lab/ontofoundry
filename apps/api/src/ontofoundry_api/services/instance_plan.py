@@ -14,6 +14,7 @@ from sqlalchemy import (
     cast,
     exists,
     func,
+    literal,
     or_,
     select,
 )
@@ -147,6 +148,15 @@ def compile_resolved_scalar(element, compiler, **kwargs):
     base = Dialect.get_or_raise(dialect).generator_class
 
     class ScalarGenerator(base):
+        def literal_sql(self, expression):
+            if expression.is_string:
+                return compiler.process(literal(expression.this), **kwargs)
+            return super().literal_sql(expression)
+
+        def mod_sql(self, expression):
+            operator = "%%" if compiler.preparer._double_percents else "%"
+            return self.binary(expression, operator)
+
         def column_sql(self, expression):
             value = element.values[expression.name]
             return "(" + compiler.process(value, **kwargs) + ")"
@@ -489,6 +499,8 @@ def query_instances(
     if binding.main is None:
         if not binding.virtual_types:
             fail("对象尚无可用来源", "MAPPING_REQUIRED")
+        if key is not None:
+            fail("虚拟父类型不能精确定位实例，请指定具体类型", "INVALID_OBJECT_REF")
         items, dates = [], []
         for concrete in binding.virtual_types:
             data = query_instances(

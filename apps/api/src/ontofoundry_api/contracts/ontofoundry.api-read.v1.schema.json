@@ -1,0 +1,675 @@
+{
+  "$defs": {
+    "AffectedItemImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_target_hash": {
+          "title": "Expected Target Hash",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "expected_target_hash",
+        "reason"
+      ],
+      "title": "AffectedItemImpact",
+      "type": "object"
+    },
+    "BindingMode": {
+      "enum": [
+        "independent",
+        "shared_parent"
+      ],
+      "title": "BindingMode",
+      "type": "string"
+    },
+    "ColumnBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "kind": {
+          "const": "column",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "source_id",
+        "column"
+      ],
+      "title": "ColumnBinding",
+      "type": "object"
+    },
+    "DerivedExpression": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "DerivedExpression",
+      "type": "object"
+    },
+    "DerivedSimple": {
+      "additionalProperties": false,
+      "description": "One membership branch: every condition must hold (AND).",
+      "properties": {
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/PathCondition"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        },
+        "kind": {
+          "const": "simple",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "conditions"
+      ],
+      "title": "DerivedSimple",
+      "type": "object"
+    },
+    "DirectJoin": {
+      "additionalProperties": false,
+      "description": "Source properties equal target properties, pair by pair.",
+      "properties": {
+        "kind": {
+          "const": "direct",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Property Ids",
+          "type": "array"
+        },
+        "target_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "source_property_ids",
+        "target_property_ids"
+      ],
+      "title": "DirectJoin",
+      "type": "object"
+    },
+    "EffectiveBindingRead": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "column": "#/$defs/ColumnBinding",
+                "expression": "#/$defs/ExpressionBinding"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ColumnBinding"
+              },
+              {
+                "$ref": "#/$defs/ExpressionBinding"
+              }
+            ]
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/EffectiveLinkRead"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "memberships": {
+          "items": {
+            "$ref": "#/$defs/MembershipRead"
+          },
+          "title": "Memberships",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/MappingSource"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type_id",
+        "sources",
+        "fields",
+        "memberships"
+      ],
+      "title": "EffectiveBindingRead",
+      "type": "object"
+    },
+    "EffectiveLinkRead": {
+      "additionalProperties": false,
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "direct": "#/$defs/DirectJoin",
+                  "mapping_table": "#/$defs/MappingTableJoin"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/DirectJoin"
+                },
+                {
+                  "$ref": "#/$defs/MappingTableJoin"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Data Join"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        },
+        "source_type_id": {
+          "format": "uuid",
+          "title": "Source Type Id",
+          "type": "string"
+        },
+        "target_type_id": {
+          "format": "uuid",
+          "title": "Target Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "link_type_id",
+        "source_type_id",
+        "target_type_id",
+        "data_join"
+      ],
+      "title": "EffectiveLinkRead",
+      "type": "object"
+    },
+    "ElementSaveImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_items": {
+          "items": {
+            "$ref": "#/$defs/AffectedItemImpact"
+          },
+          "title": "Affected Items",
+          "type": "array"
+        },
+        "current_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Version Id"
+        },
+        "session_revision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Session Revision"
+        }
+      },
+      "required": [
+        "current_version_id",
+        "session_revision",
+        "affected_items"
+      ],
+      "title": "ElementSaveImpact",
+      "type": "object"
+    },
+    "ExpressionBinding": {
+      "additionalProperties": false,
+      "description": "A same-row expression over this object's own sources (`source.column`).",
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "ExpressionBinding",
+      "type": "object"
+    },
+    "LinkStep": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "link_type_id",
+        "direction"
+      ],
+      "title": "LinkStep",
+      "type": "object"
+    },
+    "MappingKey": {
+      "additionalProperties": false,
+      "description": "The end object's main source `key_columns`.",
+      "properties": {
+        "kind": {
+          "const": "mapping_key",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "MappingKey",
+      "type": "object"
+    },
+    "MappingSource": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Key Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "dataset_id"
+      ],
+      "title": "MappingSource",
+      "type": "object"
+    },
+    "MappingTableJoin": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "mapping_table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Columns",
+          "type": "array"
+        },
+        "source_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Source Key"
+        },
+        "target_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Columns",
+          "type": "array"
+        },
+        "target_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Target Key"
+        }
+      },
+      "required": [
+        "kind",
+        "dataset_id",
+        "source_columns",
+        "target_columns",
+        "source_key",
+        "target_key"
+      ],
+      "title": "MappingTableJoin",
+      "type": "object"
+    },
+    "MembershipRead": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_mode": {
+          "$ref": "#/$defs/BindingMode"
+        },
+        "derived_by": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "expression": "#/$defs/DerivedExpression",
+                "simple": "#/$defs/DerivedSimple"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DerivedSimple"
+              },
+              {
+                "$ref": "#/$defs/DerivedExpression"
+              }
+            ]
+          },
+          "title": "Derived By",
+          "type": "array"
+        },
+        "mapping_id": {
+          "format": "uuid",
+          "title": "Mapping Id",
+          "type": "string"
+        },
+        "membership_source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Membership Source Id"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type_id",
+        "mapping_id",
+        "binding_mode",
+        "membership_source_id",
+        "derived_by"
+      ],
+      "title": "MembershipRead",
+      "type": "object"
+    },
+    "Operator": {
+      "enum": [
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "in",
+        "not_in",
+        "between",
+        "is_null",
+        "not_null"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "Path": {
+      "additionalProperties": false,
+      "description": "From a context object, through links, to one property. Ontology rules and\nmembership conditions only; metrics never use paths.",
+      "properties": {
+        "links": {
+          "items": {
+            "$ref": "#/$defs/LinkStep"
+          },
+          "maxItems": 8,
+          "title": "Links",
+          "type": "array"
+        },
+        "property_id": {
+          "format": "uuid",
+          "title": "Property Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "property_id"
+      ],
+      "title": "Path",
+      "type": "object"
+    },
+    "PathCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "operator"
+      ],
+      "title": "PathCondition",
+      "type": "object"
+    },
+    "PropertiesKey": {
+      "additionalProperties": false,
+      "description": "A single unique property or the end object's complete identifier.",
+      "properties": {
+        "kind": {
+          "const": "properties",
+          "title": "Kind",
+          "type": "string"
+        },
+        "property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "property_ids"
+      ],
+      "title": "PropertiesKey",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.api-read.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/MembershipRead"
+    },
+    {
+      "$ref": "#/$defs/EffectiveLinkRead"
+    },
+    {
+      "$ref": "#/$defs/EffectiveBindingRead"
+    },
+    {
+      "$ref": "#/$defs/ElementSaveImpact"
+    }
+  ],
+  "title": "OntoFoundry interface read models v1"
+}

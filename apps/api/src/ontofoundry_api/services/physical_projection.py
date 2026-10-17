@@ -2,42 +2,14 @@
 
 from uuid import UUID
 
-from pydantic import Field
-
-from ontofoundry_api.domain.bindings import resolve_binding
-from ontofoundry_api.domain.core import (
-    BindingMode,
-    DataJoin,
-    DerivedBranch,
-    FieldBinding,
-    MappingSource,
-    RatioMetric,
-    Strict,
+from ontofoundry_api.contracts.read_models import (
+    EffectiveBindingRead,
+    EffectiveLinkRead,
+    MembershipRead,
 )
+from ontofoundry_api.domain.bindings import resolve_binding
+from ontofoundry_api.domain.core import RatioMetric
 from ontofoundry_api.domain.graph import DraftIndex
-
-
-class MembershipRead(Strict):
-    type_id: UUID
-    mapping_id: UUID
-    binding_mode: BindingMode
-    membership_source_id: str | None
-    derived_by: list[DerivedBranch]
-
-
-class EffectiveLinkRead(Strict):
-    link_type_id: UUID
-    source_type_id: UUID
-    target_type_id: UUID
-    data_join: DataJoin | None
-
-
-class EffectiveBindingRead(Strict):
-    type_id: UUID
-    sources: list[MappingSource]
-    fields: dict[str, FieldBinding]
-    memberships: list[MembershipRead]
-    links: list[EffectiveLinkRead] = Field(default_factory=list)
 
 
 def physical_projection(draft, kind, identity, dataset_views):

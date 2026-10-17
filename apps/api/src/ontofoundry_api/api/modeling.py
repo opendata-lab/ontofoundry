@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
 from ontofoundry_api.api.auth import Principal, current_principal
+from ontofoundry_api.contracts.read_models import AffectedItem, ElementSaveImpact
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
@@ -27,9 +28,8 @@ from ontofoundry_api.domain.snapshot import (
 )
 from ontofoundry_api.services.element_diff import element_changes
 from ontofoundry_api.services.element_save import (
+    calculate_element_save,
     preview_element_save,
-    scoped_draft,
-    sync_saved_scope,
 )
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
@@ -58,12 +58,6 @@ from ontofoundry_api.services.workspaces import (
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"])
 
 
-class AffectedItem(Strict):
-    target_kind: str
-    target_id: str
-    expected_target_hash: str
-
-
 class ElementSave(Strict):
     target_kind: Literal["object_type", "link_type", "metric", "dataset", "mapping"]
     target_id: str
@@ -72,16 +66,6 @@ class ElementSave(Strict):
     expected_session_revision: int | None = None
     draft: dict
     affected_items: list[AffectedItem] = Field(default_factory=list)
-
-
-class AffectedItemImpact(AffectedItem):
-    reason: str
-
-
-class ElementSaveImpact(Strict):
-    current_version_id: str | None
-    session_revision: int | None
-    affected_items: list[AffectedItemImpact]
 
 
 @router.post("/element-saves/preview", response_model=ElementSaveImpact)
@@ -151,18 +135,16 @@ def save_element(
             now=utc_now(),
         )
         base = version_snapshot(db, workspace_id, item.base_version_id) if item else latest
-        scoped = scoped_draft(
-            base, original, edited, body.target_kind, body.target_id, body.affected_items
+        calculation = calculate_element_save(
+            base,
+            latest,
+            original,
+            edited,
+            body.target_kind,
+            body.target_id,
+            affected_items=body.affected_items,
         )
-        merge = three_way(base, latest, scoped, workspace_id)
-        if merge.conflicts:
-            raise ServiceError(
-                "此元素与最新内容存在冲突，请重新打开后核对",
-                code="MERGE_CONFLICTS",
-                status_code=409,
-                details={"conflicts": merge.conflicts},
-            )
-        model = OntologyDraft.model_validate(merge.merged)
+        model = OntologyDraft.model_validate(calculation.merged)
         from ontofoundry_api.services.join_validation import validate_join_columns
 
         validate_join_columns(
@@ -181,12 +163,7 @@ def save_element(
             commit=False,
         )
         if item:
-            # Keep unrelated draft changes, while displaying the actual merged
-            # values of the element just saved (latest may add untouched fields).
-            merged = model.model_dump(mode="json")
-            updated_draft = sync_saved_scope(
-                edited, merged, body.target_kind, body.target_id, body.affected_items
-            )
+            updated_draft = calculation.session_draft
             # CAS also protects SQLite and a proposal decision racing this request.
             changed = db.execute(
                 update(ModelingSessionRecord)
