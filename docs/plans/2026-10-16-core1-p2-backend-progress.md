@@ -320,3 +320,22 @@ env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG \
 未设置数据库变量时跳过 PostgreSQL 切换迁移 3、并发提案决定 4、并发发布 2、真实指标聚合 2，以及 MySQL 真实指标聚合 2；这 13 项均已在带配置的全量检查中实际通过。pytest 仅有既有 Starlette/httpx 和 anyio 的 2 项依赖弃用提示。相较原有 495 项，本轮新增 34 项回归。
 
 数据库连通性先以 `SELECT 1` 核对；真实执行只使用指定的 PostgreSQL 55460 和 MySQL 配置文件中的 33070 端口，未连接其他本机数据库端口。测试按既有一次性库/唯一表机制清理资源，无需环境恢复。没有 commit/push。本人只编辑允许的后端与两份文档；同事并行产生的前端和前端进度文档修改保持原样，已有未跟踪 node_modules 保留。最终测试结束后仅补本节验证记录并检查 diff，未再修改实现。
+
+## PR #23 第四轮评审修正
+
+- F2：事实精确最终改写改用类型严格的深比较，区分 true/1、false/0、整数/浮点数，覆盖旧引用与最终引用的名称交换及提案共用校验路径。
+- F3：会话同步按目标继承链补齐全部属性、普通关系、规则及有效映射，再遍历其显式依赖；已有草稿保留，不补无关子类、指标和事实。所有补入项进入同一预检/保存确认计算，hash 沿用当前会话优先、缺失时最新发布版的规则。补例 06 有绑定父、成员扩展、虚拟父本地继承绑定、多层父链和已有父草稿回归。
+- A1：API 契约明确映射/事实键的精确最终形式优先及先改名再改绑定的两次保存边界，增加歧义解释及第二次换绑的说明性测试。
+
+验证在 `apps/api` 执行，`PYTHONPATH="$PWD/src"`，python/ruff 使用 `../../../backend/apps/api/.venv/bin/`，并设置指定 PostgreSQL URL 与 `ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"`：
+
+| 命令 | 最终结果 |
+|---|---|
+| `python -m ontofoundry_api.contracts.export_schema --check` | 退出码 0 |
+| `ruff check src tests` | 退出码 0 |
+| `ruff format --check src tests` | 退出码 0，143 个文件已格式化 |
+| `python -m pytest -q -rs` | 540 passed、0 failed、0 errors、0 skipped；55.47 秒 |
+| `python -m pytest -q ../../integrations/dataagent/skills/ontofoundry-modeling/tests` | 3 passed、0 failed、0 errors、0 skipped |
+| 仓库根 `git diff --check` | 退出码 0 |
+
+相较前轮增加 11 项回归。首轮新增例 06 断言误将集合内容按列表顺序比较，已改为按 UUID 比较完整定义，最终全量通过；仅余既有 Starlette/httpx、anyio 两项依赖弃用提示。数据库先以 SELECT 1 核对，只连接指定 PostgreSQL 55460 与配置文件中的 MySQL 33070，无需环境恢复。不启动应用服务，不 commit/push。

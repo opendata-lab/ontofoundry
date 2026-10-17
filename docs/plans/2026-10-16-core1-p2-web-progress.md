@@ -217,3 +217,21 @@
 ## PR #23 第三轮评审修正
 
 **R5 工作区页签重复 ID（`components/WorkspaceTabs.tsx`、`components/WorkspaceTabs.test.tsx`）**：上一轮在渲染后删除 Ant Design 内部空面板的属性，但未访问过的页签首次激活时面板才挂载，会再次出现与实际页面相同的 ID。改为把实际页面作为 `Tabs` 各项的 `children` 交给 Ant Design 渲染：面板的 `id`、`role="tabpanel"`、`aria-labelledby` 与页签的 `aria-controls` 由组件生成并天然对应；面板在首次激活时挂载、隐藏时保持挂载（保活、输入和滚动位置不变），未访问的页签不挂载。去掉另外渲染的页面区和事后清理 DOM 的逻辑；关闭提示条放入 `renderTabBar` 与页签条一起渲染；页签条样式只作用于页签条容器，内容区只用子选择器，避免影响页面内部的 `Tabs`。新增用例：恢复两个页签后首次切换到未访问页签，`aria-controls` 指向的 ID 在文档中唯一且是可见页面。
+
+## PR #23 第四轮评审修正
+
+- F1：弹窗编辑期按属性 UUID 保存绑定；临时技术名重复时不生成冲突键，最终名称唯一后统一重建映射字典，重复时暂停绑定编辑。缓存随编辑生命周期清理，跨页签仍保留。补逐字输入 n → na → nam → name → name2 后预检与保存均保持两项绑定的 Vitest 回归。
+- F4：指标与属性条件共用 Ant Design 类型化值编辑器；文本保留原文与前导零，布尔使用选择控件，数值使用 InputNumber，日期沿用 DatePicker 的日期字符串/时间 ISO 约定。切列保留已有值并重新校验，类型不符阻止保存。补文本 001、布尔 true/false、多值、数值范围、日期和切列回归。
+
+在 `apps/web` 先执行 `. ~/.nvm/nvm.sh && nvm use 22.19.0`，再执行完整命令 `npx vitest --run && npx tsc -b && npm run lint && npm run check:core-types && npm run build`，最终退出码 0：
+
+| 检查 | 最终结果 |
+|---|---|
+| Vitest | 34 个文件、162 passed、0 failed、0 errors、0 skipped |
+| `tsc -b` | 通过 |
+| lint | 通过，0 errors、0 warnings |
+| `check:core-types` | 核心类型与 Schema 一致 |
+| build | 通过 |
+| 仓库根 `git diff --check` | 退出码 0 |
+
+相较前轮增加 9 项回归。旧 region 文本列测试原先期望数字，已修正为原文字符串；最终全量通过。测试仍有既有 Ant Design Spin 提示，构建仍提示大包体积，不影响通过。按本任务限制不启动服务，不做局域网浏览器访问，不 commit/push。
