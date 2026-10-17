@@ -24,6 +24,8 @@
 - 业务数据源只读；SQL 经 sqlglot 解析和白名单检查后执行。
 - 表结构变化必须新增 Alembic 迁移；设计决定不迁移数据时，不临时加迁移分支。
 - 前端（`apps/web/src/`）：控件用 Ant Design 5，布局用 Tailwind CSS v4，`styles/tokens.css` 是唯一的设计变量来源；不再新增手写控件和零散 CSS 文件，旧页面改到哪里替换到哪里。接口调用统一走 `api/client.ts`。
+- 界面只用 `components/layout/` 和 Ant Design 控件拼装，视觉数值只改 `styles/tokens.css`，规则见 `docs/design/2026-10-17-ui-visual-consistency.md`；新布局模式先补该文档第 4 节。
+- 界面改动提交前，对受影响页面在 1440×900 下截图，与基准或改前截图对比，按设计第 3 节检查容器层级、对齐线、字号档位、状态显示和表格密度；运行 `npm run test:visual`。
 - 生成 id 用 `lib/id.ts` 的 `newId()`，不直接用 `crypto.randomUUID`：现场部署通过局域网 IP 的 HTTP 访问，是非安全上下文。前端或部署改动要用局域网 IP 验证一次。
 
 ## DataAgent 集成

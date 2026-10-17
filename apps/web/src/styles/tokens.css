@@ -19,10 +19,12 @@
   --color-accent-ink: #ffffff;
   --color-accent-soft: #e8f4ff;
   --color-focus: #0055d4;
-  --color-success: oklch(43% 0.128 151);
-  --color-success-soft: oklch(94% 0.035 151);
-  --color-danger: oklch(48% 0.17 26);
-  --color-danger-soft: oklch(95% 0.034 26);
+  --color-success: #156d3b;
+  --color-success-soft: #e3f5ea;
+  --color-warning: #94600b;
+  --color-warning-soft: #fef4e6;
+  --color-danger: #ba2b1d;
+  --color-danger-soft: #fdeae7;
   --color-object: #1261d2;
   --color-object-soft: #e9f2ff;
   --color-relation: #117c99;
@@ -36,25 +38,40 @@
   --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-md: 1.125rem;
-  --text-lg: 1.375rem;
-  --text-xl: 1.75rem;
+  /* Strictly 3 font-size tiers: 12px (aux/table header), 13px (body/control), 16px (page title) */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 16px;
+  --text-md: var(--text-sm);
+  --text-lg: var(--text-base);
+  --text-xl: var(--text-base);
 
-  --space-3xs: 0.125rem;
-  --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
+  --leading-tight: 1.35;
+  --leading-base: 1.45;
 
+  /* Fixed 4px-multiple spacing scale: 4, 8, 12, 16, 20, 24 */
+  --space-3xs: 4px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+  --space-2xl: 24px;
+
+  /* Uniform small border radii */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
+
+  /* Compact control heights and table cell density */
+  --control-height-sm: 28px;
+  --control-height: 32px;
+  --control-height-lg: 36px;
+  --table-cell-py: 10px;
+  --table-cell-px: 16px;
+  --table-cell-py-sm: 8px;
+  --table-cell-px-sm: 12px;
 
   --dur-micro: 120ms;
   --dur-short: 220ms;
@@ -102,6 +119,8 @@
   --color-focus: var(--color-focus);
   --color-success: var(--color-success);
   --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
   --color-object: var(--color-object);
@@ -112,6 +131,7 @@
   --color-attribute-soft: var(--color-attribute-soft);
   --color-graph-edge: var(--color-graph-edge);
   --color-shadow: var(--color-shadow);
+  --shadow-panel: var(--shadow-panel);
 
   --text-xs: var(--text-xs);
   --text-sm: var(--text-sm);
