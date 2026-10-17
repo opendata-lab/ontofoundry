@@ -265,3 +265,58 @@ env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYT
 定向 PostgreSQL 检查包含切换迁移 4 项（SQLite 带数据 1、PostgreSQL 空库/旧 head 2、新增 PostgreSQL 带数据 1）、并发/幂等提案决定 4 项、并发发布 2 项、真实指标聚合 1 项；全部执行通过。未配置数据库的全量检查按预期跳过 PostgreSQL 切换迁移 3、提案决定 4、并发发布 2、指标聚合 1，以及 MySQL 来源行为 1；这些 skip 不算通过，其中全部 PostgreSQL 项目已在本次定向检查真实执行。两次 pytest 均只有既有 Starlette/httpx 与 anyio 的 2 项依赖弃用提示。
 
 验收结论：迁移实际保留/清空范围与主设计 §8 一致，未发现差异；版本指针置空是清除旧本体引用的预期行为。没有修改迁移脚本或迁移语义。最终只补本节验证结果并检查 diff；未启动应用服务，未 commit/push，保留已有第二轮评审修正。
+
+## PR #23 第三轮评审修正
+
+本轮限定后端实现、回归测试和 API 契约说明，不改前端，不新增模型字段或迁移。
+
+实施计划：R1 对已有成员跨聚合移入、移出进行对称检查，保留删除语义；R2 对照旧图推导最终引用，识别客户端已完成的精确改写；R3 同步合并目标所需但会话缺失的上游依赖闭包，将补入项纳入既有 hash 确认；R4 复用表达式的驱动安全标识符渲染；R6 分阶段检查确认集合和 hash。全部实现和测试编辑完成后，统一执行 Schema、ruff 和两轮全量 pytest。真实数据库只使用任务指定的一次性 PostgreSQL 和 MySQL 配置。
+
+### 改动与回归覆盖
+
+| 评审项 | 修正 | 回归断言 |
+|---|---|---|
+| R1 | 对当前会话和历史发布基线分别做已有成员跨聚合的对称检查；成员仍存在于候选图时，移入或移出均拒绝。真正删除成员仍允许。 | 例01 的 Property、Rule、Mapping 分别覆盖移入/移出，以及未暂存/已暂存两种候选；预检和保存均为 `422 ELEMENT_SCOPE_INVALID`，版本和会话不变。单独删除客户 region 属性和绑定保存成功。 |
+| R2 | 按旧图 UUID 推导最终绑定/事实值字典，先识别客户端已提交的精确最终改写，避免名称交换后再解释一次旧键。所有转换在副本上执行。 | 例01 交换 customer_no/name：未改写候选与已改写候选的保存计算完全相同；两种请求实际保存后，发布图和会话图按属性 UUID 核对绑定不变；输入不变。例07 核对事实值按属性 UUID 保持，以及精确最终改写再次处理的结果不变。 |
+| R3 | 从合法合并图按稳定 UUID 计算目标所需的缺失上游依赖闭包，仅补缺失元素，不覆盖已有会话草稿。补入项加入必要确认清单，沿用会话优先、最新发布版回退的 hash 基线。 | 例13 旧会话仅改 ratio 说明、最新版本换新分子保存成功；进一步覆盖新分子/分母依赖新 Dataset 的两层闭包。例01 覆盖映射换新 Dataset。核对确认集合/hash、缺项 422、过期 hash 409、失败原子性、两侧完整图合法以及无关草稿保留。 |
+| R4 | `MetricCompiler.identifier()` 复用 expression 的驱动安全渲染，统一列、表、schema 中 `%` 的转义，不处理已生成的参数占位符。 | PostgreSQL/MySQL 各覆盖 SUM/COUNT DISTINCT、普通时间/快照、总值/趋势；列名、表名和 schema 均含 `%`，绑定值也含 `%`，核对占位符保留及驱动格式化；PostgreSQL 另走 psycopg 参数转换。两种数据库的真实 ratio 聚合新增 `%` 列名/表名变体，期望值均为 0.8，PostgreSQL 同时核对趋势。 |
+| R6 | 两阶段验证：完整核对 `(kind, UUID)` 集合、重复、缺失、多余，然后比较全部 hash。 | 同一真实必要清单混入过期 hash 与重复/缺项/多余/错误种类，排列错误项与有效项顺序，统一返回 422；只有 hash 错误时各排列统一返回 409。均核对版本、会话未改变。 |
+
+API 契约同步补充上述聚合边界、一次改写、上游补入和错误码优先级；没有改变请求/响应字段或模型 Schema。
+
+首轮全量结果为 517 passed、6 failed、0 errors、0 skipped。六项失败均是新增 R1 测试将创建响应的带时区时间戳与 SQLite 重读后的不带时区时间戳直接比较，实际拒绝行为正确；已改为比较操作前后的读取响应。随后补齐历史基线对暂存跨聚合移动的检查及六项回归，再统一执行最终检查。
+
+### 最终检查结果
+
+全部代码和测试编辑完成后，工作目录为 `apps/api`，Python/ruff 使用指定的相邻后端虚拟环境；命令如下（没有启动应用服务）：
+
+```sh
+export PYTHONPATH="$PWD/src"
+PR23_PYTHON=../../../backend/apps/api/.venv/bin/python
+PR23_RUFF=../../../backend/apps/api/.venv/bin/ruff
+
+"$PR23_PYTHON" -m ontofoundry_api.contracts.export_schema --check
+"$PR23_RUFF" check src tests
+"$PR23_RUFF" format --check src tests
+
+ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://of:of@127.0.0.1:55460/of_test' \
+ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json" \
+"$PR23_PYTHON" -m pytest -q -rs
+
+env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG \
+"$PR23_PYTHON" -m pytest -q
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| Schema `--check` | 退出码 0；核心、提案和接口读 Schema 无漂移 |
+| `ruff check src tests` | 退出码 0；All checks passed |
+| `ruff format --check src tests` | 退出码 0；143 files already formatted |
+| R1 成员边界定向回归 | 退出码 0；12 passed、0 failed、0 errors、0 skipped（其余 31 项未选）；11.87 秒 |
+| 配置两个一次性数据库的 `pytest -q -rs` | 退出码 0；**529 passed、0 failed、0 errors、0 skipped**；240.61 秒 |
+| 不设置数据库变量的 `pytest -q` | 退出码 0；**516 passed、0 failed、0 errors、13 skipped**；54.26 秒 |
+| `git diff --check` | 退出码 0；补完最终记录后复核 |
+
+未设置数据库变量时跳过 PostgreSQL 切换迁移 3、并发提案决定 4、并发发布 2、真实指标聚合 2，以及 MySQL 真实指标聚合 2；这 13 项均已在带配置的全量检查中实际通过。pytest 仅有既有 Starlette/httpx 和 anyio 的 2 项依赖弃用提示。相较原有 495 项，本轮新增 34 项回归。
+
+数据库连通性先以 `SELECT 1` 核对；真实执行只使用指定的 PostgreSQL 55460 和 MySQL 配置文件中的 33070 端口，未连接其他本机数据库端口。测试按既有一次性库/唯一表机制清理资源，无需环境恢复。没有 commit/push。本人只编辑允许的后端与两份文档；同事并行产生的前端和前端进度文档修改保持原样，已有未跟踪 node_modules 保留。最终测试结束后仅补本节验证记录并检查 diff，未再修改实现。

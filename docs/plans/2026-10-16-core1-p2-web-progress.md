@@ -213,3 +213,7 @@
 - **lint**：通过（0 errors，0 warnings）。
 - **check:core-types**：通过（0 errors）。
 - **build**：通过（`vite build` 产物正常）。
+
+## PR #23 第三轮评审修正
+
+**R5 工作区页签重复 ID（`components/WorkspaceTabs.tsx`、`components/WorkspaceTabs.test.tsx`）**：上一轮在渲染后删除 Ant Design 内部空面板的属性，但未访问过的页签首次激活时面板才挂载，会再次出现与实际页面相同的 ID。改为把实际页面作为 `Tabs` 各项的 `children` 交给 Ant Design 渲染：面板的 `id`、`role="tabpanel"`、`aria-labelledby` 与页签的 `aria-controls` 由组件生成并天然对应；面板在首次激活时挂载、隐藏时保持挂载（保活、输入和滚动位置不变），未访问的页签不挂载。去掉另外渲染的页面区和事后清理 DOM 的逻辑；关闭提示条放入 `renderTabBar` 与页签条一起渲染；页签条样式只作用于页签条容器，内容区只用子选择器，避免影响页面内部的 `Tabs`。新增用例：恢复两个页签后首次切换到未访问页签，`aria-controls` 指向的 ID 在文档中唯一且是可见页面。
