@@ -13,9 +13,11 @@ import {
   metricValueKind,
   physicalValueKind,
 } from "../../lib/coreModel";
-import { OPERATORS, operatorArity } from "../../lib/derivedEditing";
+import { OPERATORS } from "../../lib/derivedEditing";
 import { METRIC_KINDS, metricErrors, newFilter, ratioChoices, switchKind } from "../../lib/metricEditing";
 import { datasetLabel } from "../../lib/datasetEditing";
+
+import { ConditionValueInput } from "./ConditionValueInput";
 
 const { Text, Title } = Typography;
 
@@ -67,57 +69,6 @@ function ColumnSelect({
       options={columnOptions(dataset, accept)}
       onChange={(v?: string) => onChange(v ?? null)}
       notFoundContent="没有可选的列"
-    />
-  );
-}
-
-function FilterValues({ condition, onChange, label }: { condition: Condition; onChange: (c: Condition) => void; label: string }) {
-  const arity = operatorArity(condition.operator);
-  const values = condition.values ?? [];
-  const parse = (text: string) => (text.trim() !== "" && !Number.isNaN(Number(text)) && /^-?\d/.test(text.trim()) ? Number(text) : text);
-  if (arity === 0) return <Input disabled aria-label={label} />;
-  if (arity === 2) {
-    const setBound = (index: 0 | 1, raw: string) => {
-      const next = [values[0] ?? "", values[1] ?? ""];
-      next[index] = raw === "" ? "" : parse(raw);
-      onChange({ ...condition, values: next });
-    };
-    return (
-      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-        <Input
-          aria-label={`${label}起`}
-          placeholder="起"
-          value={values[0] === undefined || values[0] === null ? "" : String(values[0])}
-          onChange={(e) => setBound(0, e.target.value)}
-        />
-        <Text type="secondary">至</Text>
-        <Input
-          aria-label={`${label}止`}
-          placeholder="止"
-          value={values[1] === undefined || values[1] === null ? "" : String(values[1])}
-          onChange={(e) => setBound(1, e.target.value)}
-        />
-      </div>
-    );
-  }
-  if (arity === "many")
-    return (
-      <Select
-        mode="tags"
-        aria-label={label}
-        open={false}
-        placeholder="可填多个值，输入后回车"
-        value={values.map(String)}
-        tokenSeparators={[",", "，"]}
-        onChange={(next: string[]) => onChange({ ...condition, values: next.map(parse) })}
-      />
-    );
-  return (
-    <Input
-      aria-label={label}
-      placeholder="值"
-      value={values[0] === undefined || values[0] === null ? "" : String(values[0])}
-      onChange={(e) => onChange({ ...condition, values: e.target.value === "" ? [] : [parse(e.target.value)] })}
     />
   );
 }
@@ -380,7 +331,7 @@ export function MetricForm({
             {metric.filters.map((filter, i) => {
               const set = (next: Condition) =>
                 onChange({ ...metric, filters: metric.filters.map((f, j) => (j === i ? next : f)) });
-              const error = errors[`filter.${i}`];
+              const error = errors[`filter.${i}`] ?? (filter.values?.length ? metricErrors(draft, metric)[`filter.${i}`] : undefined);
               const kind = filter.column.column ? columnKind(dataset, filter.column.column) : null;
               return (
                 <Form.Item
@@ -403,7 +354,7 @@ export function MetricForm({
                       options={Object.entries(OPERATORS).map(([value, label]) => ({ value, label }))}
                       onChange={(operator: Operator) => set({ ...filter, operator, values: [] })}
                     />
-                    <FilterValues condition={filter} label={`条件 ${i + 1} 的值`} onChange={set} />
+                    <ConditionValueInput kind={kind} operator={filter.operator} values={filter.values ?? []} label={`条件 ${i + 1} 的值`} onChange={(values) => set({ ...filter, values })} />
                     <Button
                       type="text"
                       aria-label={`删除条件 ${i + 1}`}

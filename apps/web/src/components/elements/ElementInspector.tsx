@@ -28,6 +28,7 @@ import {
   type ElementTab,
 } from "../../lib/elementInspector";
 import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
+import { preservePropertyBindings, type PropertyBindingEdits } from "../../lib/propertyBindingEditing";
 import { newId } from "../../lib/id";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
@@ -271,6 +272,7 @@ function Inspector({
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const draftRef = useRef<Draft | null>(null);
+  const propertyBindings = useRef<PropertyBindingEdits>(new Map());
   draftRef.current = draft;
   const [editing, setEditing] = useState(
     !previewHash && (creating || params.get("inspectMode") === "edit") && !!workspace.role,
@@ -322,6 +324,7 @@ function Inspector({
         value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
+        propertyBindings.current.clear();
         draftRef.current = value;
         setLoaded(source);
         setDraft(value);
@@ -396,6 +399,7 @@ function Inspector({
   }, [loaded, selectedTab, id]);
 
   const discard = () => {
+    propertyBindings.current.clear();
     const nextDraft = loaded?.draft ?? null;
     draftRef.current = nextDraft;
     flushSync(() => {
@@ -461,6 +465,7 @@ function Inspector({
     draftRef.current = next.draft;
     flushSync(() => {
       setLoaded(next);
+      propertyBindings.current.clear();
       setDraft(next.draft);
       setImpactPreview(null);
       setDirty(false);
@@ -599,6 +604,7 @@ function Inspector({
     }
   };
   const change = (next: Draft) => {
+    if (draftRef.current) next = preservePropertyBindings(draftRef.current, next, propertyBindings.current);
     draftRef.current = next;
     setDraft(next);
     setDirty(true);

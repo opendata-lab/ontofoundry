@@ -8,9 +8,11 @@ import type {
   RatioMetric,
   SimpleMetric,
   UUID,
+  Scalar,
+  ValueKind,
 } from "../api/types";
 import { NUMERIC_KINDS, byId, isRatio, isSimple, physicalValueKind, ratioComponents } from "./coreModel";
-import { isEmptyConditionValue, isNumericConditionValue, operatorArity } from "./derivedEditing";
+import { isEmptyConditionValue, operatorArity } from "./derivedEditing";
 
 export const METRIC_KINDS: Record<Metric["kind"], string> = {
   simple: "聚合",
@@ -103,6 +105,20 @@ export function newFilter(datasetId: UUID): Condition {
 
 export type MetricErrors = Partial<Record<"name" | "technical_name" | "dataset" | "measure" | "numerator" | "denominator" | "expression" | `filter.${number}`, string>>;
 
+function conditionValueMatches(value: Scalar, kind: ValueKind): boolean {
+  if (kind === "string") return typeof value === "string";
+  if (kind === "boolean") return typeof value === "boolean";
+  if (NUMERIC_KINDS.has(kind))
+    return typeof value === "number" && Number.isFinite(value) && (kind !== "integer" || Number.isInteger(value));
+  if (typeof value !== "string") return false;
+  if (kind === "date") {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value);
+    return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+  }
+  return /[T ]/.test(value) && !Number.isNaN(Date.parse(value));
+}
+
 export function metricErrors(draft: Draft, metric: Metric): MetricErrors {
   const errors: MetricErrors = {};
   if (!metric.name.trim()) errors.name = "请填写名称";
@@ -138,8 +154,12 @@ export function metricErrors(draft: Draft, metric: Metric): MetricErrors {
     else if (arity === 1 && values.length !== 1) errors[`filter.${i}`] = "请填写一个值";
     else if (arity === 2 && values.length !== 2) errors[`filter.${i}`] = "请填写起止两个值";
     else if (arity === "many" && !values.length) errors[`filter.${i}`] = "至少填写一个值";
-    else if (arity !== 0 && colKind && NUMERIC_KINDS.has(colKind) && values.some((v) => !isNumericConditionValue(v)))
+    else if (arity !== 0 && colKind && NUMERIC_KINDS.has(colKind) && values.some((v) => !conditionValueMatches(v, colKind)))
       errors[`filter.${i}`] = "数值列的条件值必须是数字";
+    else if (arity !== 0 && colKind && values.some((v) => !conditionValueMatches(v, colKind)))
+      errors[`filter.${i}`] = "条件值与列类型不匹配，请重新填写";
+    else if (arity !== 0 && colKind === "boolean" && ["gt", "ge", "lt", "le", "between"].includes(f.operator))
+      errors[`filter.${i}`] = "布尔列不能使用大小比较";
   });
   return errors;
 }

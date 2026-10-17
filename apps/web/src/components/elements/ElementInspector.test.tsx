@@ -215,7 +215,7 @@ describe("relation, metric and dataset popups", () => {
       technical_name: "customer_count",
       aggregation: "count",
       measure: null,
-      filters: [{ operator: "between", values: [100, 100] }],
+      filters: [{ operator: "between", values: ["100", "100"] }],
     });
     expect(metric).not.toHaveProperty("value_kind");
   });
@@ -249,6 +249,28 @@ describe("relation, metric and dataset popups", () => {
 });
 
 describe("element save impact preview", () => {
+  it("keeps both UUID bindings when a typed rename passes through another property's name", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.owner_type_id === customer.id && p.technical_name === "customer_no")!;
+    const mapping = draft.mappings.find((m) => m.type_id === customer.id)!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    for (const value of ["n", "na", "nam", "name", "name2"])
+      fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+      const fields = payload.draft.mappings.find((m) => m.id === mapping.id)!.fields;
+      expect(fields.name2).toEqual(mapping.fields.customer_no);
+      expect(fields.name).toEqual(mapping.fields.name);
+      expect(fields).not.toHaveProperty("customer_no");
+    }
+  });
+
   it("previews once and saves directly without a confirmation modal when affected_items is empty", async () => {
     const draft = example("07-instances-and-evidence");
     const customer = draft.object_types.find((o) => o.technical_name === "customer")!;

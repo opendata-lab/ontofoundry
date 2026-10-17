@@ -88,20 +88,11 @@ function BindingEditor({
   );
 }
 
-function renameProperty(draft: Draft, type: ObjectType, property: Property, technical: string): Draft {
-  let next: Draft = {
+function renameProperty(draft: Draft, property: Property, technical: string): Draft {
+  return {
     ...draft,
     properties: draft.properties.map((p) => (p.id === property.id ? { ...p, technical_name: technical } : p)),
   };
-  const mapping = next.mappings.find((m) => m.type_id === type.id);
-  const binding = mapping?.fields[property.technical_name];
-  if (mapping && binding) {
-    const fields = { ...mapping.fields };
-    delete fields[property.technical_name];
-    fields[technical] = binding;
-    next = upsert(next, "mappings", { ...mapping, fields });
-  }
-  return next;
 }
 
 function deleteProperty(draft: Draft, type: ObjectType, property: Property): Draft {
@@ -129,6 +120,8 @@ export function PropertiesPanel(props: PanelProps<ObjectType>) {
     change({ ...draft, properties: draft.properties.map((p) => (p.id === property.id ? { ...p, ...patch } : p)) });
   // A shared child binds only its own properties; inherited ones come from the parent's mapping.
   const bindingReason = (row: MappedProperty): string | null => {
+    if (record.properties.filter((other) => other.property.technical_name === row.property.technical_name).length > 1)
+      return "技术名重复，请先完成改名";
     if (record.mode === "virtual" || (record.mode === "unbound" && !record.mapping))
       return "先在上方选择数据集";
     if (record.mode === "shared_parent" && row.inheritedFrom) return "继承属性使用父对象的数据绑定";
@@ -210,7 +203,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType>) {
                       placeholder="技术名"
                       className="font-mono"
                       value={row.property.technical_name}
-                      onChange={(e) => change(renameProperty(draft, type, row.property, e.target.value.trim()))}
+                      onChange={(e) => change(renameProperty(draft, row.property, e.target.value.trim()))}
                     />
                   </div>
                 ) : (
