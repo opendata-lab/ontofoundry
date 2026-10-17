@@ -182,3 +182,73 @@ def test_runtime_main_order_and_many_sources(tmp_path, monkeypatch):
         assert len(data["items"]) == 2
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("local_condition", [False, True])
+def test_exists_membership_correlates_to_current_party(
+    tmp_path, monkeypatch, local_condition
+):
+    from ontofoundry_api.domain.core import DerivedExpression
+
+    draft, engine = source_database(tmp_path, monkeypatch, "06-inheritance")
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO contracts (contract_id, amount, signer_id) VALUES ('K1', 100, 'P2')"
+            )
+        vip = next(o for o in draft.object_types if o.technical_name == "vip_party")
+        # A/P1 satisfies the local condition but has no contract. Only B/P2 has one.
+        expression = "EXISTS (party.REVERSE(signer))"
+        if local_condition:
+            expression = "party.phone <> '3' AND " + expression
+        vip.derived_by = [DerivedExpression(kind="expression", expression=expression)]
+        result = query_instances(None, str(draft.workspace_id), draft, vip.id, None)
+        assert [r["values"]["party_no"] for r in result["items"]] == ["P2"]
+        assert result["items"][0]["__key"] == [{"type": "string", "value": "P2"}]
+    finally:
+        engine.dispose()
+
+
+def test_reverse_virtual_parent_expands_concrete_local_bindings(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from ontofoundry_api.services.instance_neighborhood import database_neighborhood
+
+    draft, engine = source_database(tmp_path, monkeypatch, "06-inheritance")
+    try:
+        # Both assets have the same local key, but distinct concrete identities.
+        with engine.begin() as conn:
+            conn.exec_driver_sql("UPDATE vehicles SET responsible_id = 'P1'")
+        party = next(o for o in draft.object_types if o.technical_name == "party")
+        responsible = next(
+            relation
+            for relation in draft.link_types
+            if relation.technical_name == "responsible_party"
+        )
+        result = database_neighborhood(
+            None,
+            str(draft.workspace_id),
+            draft,
+            SimpleNamespace(
+                type_id=party.id,
+                key=[{"type": "string", "value": "P1"}],
+                depth=1,
+                snapshot_date=None,
+            ),
+            None,
+        )
+        assert not result["warnings"], result["warnings"]
+        assets = [o for o in result["objects"] if o["type_id"] != str(party.id)]
+        assert {o["type_id"] for o in assets} == {
+            str(o.id)
+            for o in draft.object_types
+            if o.technical_name in {"device", "vehicle"}
+        }
+        assert len(assets) == 2 and len({o["id"] for o in assets}) == 2
+        assert all(o["key"] == [{"type": "string", "value": "1"}] for o in assets)
+        edges = [e for e in result["links"] if e["type_id"] == str(responsible.id)]
+        assert {(e["source_id"], e["target_id"]) for e in edges} == {
+            (o["id"], result["center_id"]) for o in assets
+        }
+    finally:
+        engine.dispose()

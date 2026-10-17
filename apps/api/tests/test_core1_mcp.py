@@ -131,3 +131,136 @@ def test_large_fact_value_is_segmented_and_reassembled(client):
         assert segment["start"] == len(result)
         result += segment["text"]
     assert result == text
+
+
+def test_example06_physical_projection_carries_membership_and_local_inherited_links(client):
+    from pr23_fixtures import example_session
+
+    from ontofoundry_api.services.physical_projection import EffectiveBindingRead
+
+    session = example_session(client, "06-inheritance", published=True)
+    draft = session["draft"]
+    objects = {o["technical_name"]: o for o in draft["object_types"]}
+    responsible = next(
+        relation
+        for relation in draft["link_types"]
+        if relation["technical_name"] == "responsible_party"
+    )
+    detail = call(
+        client,
+        "get_ontology",
+        {
+            "ids": [objects[n]["id"] for n in ("person", "device", "vehicle", "asset")],
+            "include": ["physical", "adjacency"],
+            "limit": 100,
+        },
+    )["structuredContent"]
+    elements = {e["technical_name"]: e for e in detail["elements"]}
+    person = elements["person"]
+    binding = person["effective_bindings"]["items"][0]
+    assert binding["type_id"] == objects["person"]["id"]
+    assert [m["membership_source_id"] for m in binding["memberships"]] == [
+        None,
+        "extension",
+    ]
+    assert binding["memberships"][1]["binding_mode"] == "shared_parent"
+    assert binding["fields"]["id_card_no"]["source_id"] == "extension"
+    assert binding["fields"]["party_no"]["source_id"] == "main"
+    assert {d["table_name"] for d in person["datasets"]["items"]} == {
+        "parties",
+        "person_extensions",
+    }
+    for name in ("device", "vehicle"):
+        element = elements[name]
+        binding = element["effective_bindings"]["items"][0]
+        assert binding["type_id"] == objects[name]["id"]
+        effective = next(
+            relation
+            for relation in binding["links"]
+            if relation["link_type_id"] == responsible["id"]
+        )
+        mapping = next(m for m in draft["mappings"] if m["type_id"] == objects[name]["id"])
+        assert (
+            effective["data_join"] == mapping["inherited_link_bindings"][responsible["id"]]
+        )
+        link = next(
+            relation
+            for relation in element["links"]["items"]
+            if relation["id"] == responsible["id"]
+        )
+        assert (
+            link["data_join"] == effective["data_join"]
+            and link["inherited_from"] == objects["asset"]["id"]
+        )
+    asset = elements["asset"]
+    assert {b["type_id"] for b in asset["effective_bindings"]["items"]} == {
+        objects[n]["id"] for n in ("device", "vehicle")
+    }
+    assert {d["table_name"] for d in asset["datasets"]["items"]} == {"devices", "vehicles"}
+    for element in elements.values():
+        for binding in element["effective_bindings"]["items"]:
+            EffectiveBindingRead.model_validate(binding)
+    args = {"ids": [objects["asset"]["id"]], "include": ["physical"], "limit": 1}
+    first = call(client, "get_ontology", args)["structuredContent"]["elements"][0][
+        "effective_bindings"
+    ]
+    assert first["total"] == 2 and first["next_cursor"]
+    second = call(client, "get_ontology", {**args, "cursor": first["next_cursor"]})[
+        "structuredContent"
+    ]["elements"][0]["effective_bindings"]
+    assert second["items"][0]["type_id"] != first["items"][0]["type_id"]
+    assert second["next_cursor"] is None
+
+
+def test_metric_and_mapping_table_physical_projection_includes_datasets(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "13-dataset-metrics", published=True)
+    ratio = next(m for m in session["draft"]["metrics"] if m["kind"] == "ratio")
+    element = call(client, "get_ontology", {"ids": [ratio["id"]], "include": ["physical"]})[
+        "structuredContent"
+    ]["elements"][0]
+    assert element["datasets"]["total"] == 1
+    dataset = element["datasets"]["items"][0]
+    assert dataset["id"] == element["dataset_id"] == session["draft"]["datasets"][0]["id"]
+    assert dataset["table_name"] == "code_lines_daily"
+    assert {c["name"] for c in dataset["columns"]} == {"repo", "stat_date", "commit_count"}
+    assert element["components"]["numerator"]["id"] == ratio["numerator_id"]
+    assert element["components"]["denominator"]["id"] == ratio["denominator_id"]
+    session = example_session(client, "02-many-to-many", published=True)
+    link = next(
+        relation
+        for relation in session["draft"]["link_types"]
+        if relation["technical_name"] == "courses"
+    )
+    element = call(client, "get_ontology", {"ids": [link["id"]], "include": ["physical"]})[
+        "structuredContent"
+    ]["elements"][0]
+    assert link["data_join"]["dataset_id"] in {
+        d["id"] for d in element["datasets"]["items"]
+    }
+    assert {d["table_name"] for d in element["datasets"]["items"]} == {
+        "students",
+        "courses",
+        "enrollments",
+    }
+
+
+def test_physical_projection_keeps_each_source_snapshot_declaration(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "12-snapshot-and-trends", published=True)
+    component = next(
+        o for o in session["draft"]["object_types"] if o["technical_name"] == "component"
+    )
+    element = call(
+        client, "get_ontology", {"ids": [component["id"]], "include": ["physical"]}
+    )["structuredContent"]["elements"][0]
+    sources = element["effective_bindings"]["items"][0]["sources"]
+    datasets = {d["id"]: d for d in element["datasets"]["items"]}
+    assert len(sources) == 2
+    assert {s["dataset_id"] for s in sources} == set(datasets)
+    assert all(
+        datasets[s["dataset_id"]]["snapshot_date_column"] == "snapshot_date"
+        for s in sources
+    )

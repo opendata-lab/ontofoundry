@@ -8,6 +8,7 @@ are exactly what the user previewed.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
@@ -53,7 +54,18 @@ def three_way(
         if latest is not None
         else empty_snapshot(workspace_id)
     )
-    draft = read_snapshot_json(draft, workspace_id)
+    # Published snapshots are complete graphs; an editing draft can still have
+    # semantic errors. Merge its traversable structure and report those errors
+    # in preview, then enforce the final graph at publication.
+    if draft.get("schema_version") != "core-1" or str(draft.get("workspace_id")) != str(
+        workspace_id
+    ):
+        from ontofoundry_api.services.errors import ServiceError
+
+        raise ServiceError("草稿格式或空间无效", code="VALIDATION_FAILED", status_code=422)
+    draft = deepcopy(draft)
+    for collection in COLLECTIONS.values():
+        draft.setdefault(collection, [])
     merged, raw = merge_snapshots(base, latest, draft, resolutions)
     elements = {
         str(e["id"]): (COLLECTION_KIND[c], e)
@@ -128,9 +140,9 @@ def impacts(changes, merged):
     from ontofoundry_api.domain.core import CoreDraft
     from ontofoundry_api.domain.dependencies import reverse_dependencies
 
-    draft = CoreDraft.model_validate(merged)
     changed = {UUID(c["element_id"]) for c in changes}
     try:
+        draft = CoreDraft.model_validate(merged)
         affected = reverse_dependencies(draft, changed)
     except (ValueError, KeyError):
         return []

@@ -6,7 +6,6 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-import sqlglot
 from sqlalchemy import (
     MetaData,
     String,
@@ -15,10 +14,12 @@ from sqlalchemy import (
     cast,
     exists,
     func,
-    literal_column,
     or_,
     select,
 )
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.elements import ColumnElement
+from sqlglot import Dialect
 
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import (
@@ -121,6 +122,37 @@ def condition(column, operator, values):
     if operator == "is_null":
         return column.is_(None)
     return column.is_not(None)
+
+
+class ResolvedScalar(ColumnElement):
+    """Render resolved scalar syntax inside the enclosing SQLAlchemy context.
+
+    Navigation stays a clause tree until the outer SELECT is compiled, so
+    EXISTS/scalar subqueries can correlate with that SELECT's FROM clauses.
+    """
+
+    inherit_cache = False
+
+    def __init__(self, tree, values):
+        self.tree, self.values = tree, values
+
+    @property
+    def _from_objects(self):
+        return [table for value in self.values.values() for table in value._from_objects]
+
+
+@compiles(ResolvedScalar)
+def compile_resolved_scalar(element, compiler, **kwargs):
+    dialect = "postgres" if compiler.dialect.name == "postgresql" else compiler.dialect.name
+    base = Dialect.get_or_raise(dialect).generator_class
+
+    class ScalarGenerator(base):
+        def column_sql(self, expression):
+            value = element.values[expression.name]
+            return "(" + compiler.process(value, **kwargs) + ")"
+
+    # This also handles a reference occupying the AST root, without node.replace().
+    return ScalarGenerator(dialect=dialect, comments=False).generate(element.tree)
 
 
 class InstancePlan:
@@ -326,28 +358,15 @@ class InstancePlan:
     def compile_expression(self, resolved):
         from sqlglot import exp
 
-        tree = resolved.ast.copy()
-        dialect = (
-            "postgres"
-            if self.connection.dialect.name == "postgresql"
-            else self.connection.dialect.name
-        )
-        for node in list(tree.find_all(exp.Column)):
+        values = {}
+        for node in resolved.ast.find_all(exp.Column):
             reference = node.meta["core_reference"]
-            value = (
+            values[node.name] = (
                 self.source_value(reference.source_id, reference.column)
                 if reference.context == "field"
                 else self.path_value(reference.links, reference.property_id)
             )
-            compiled = str(
-                value.compile(
-                    dialect=self.connection.dialect, compile_kwargs={"literal_binds": True}
-                )
-            )
-            node.replace(sqlglot.parse_one(compiled, read=dialect))
-        # Only the core-resolved scalar AST and server-generated correlated
-        # subqueries are rendered. No client SELECT is admitted here.
-        return literal_column(tree.sql(dialect=dialect))
+        return ResolvedScalar(resolved.ast, values)
 
     def subquery(self):
         return (

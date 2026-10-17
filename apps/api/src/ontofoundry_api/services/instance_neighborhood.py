@@ -113,56 +113,62 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
                     owner = link.source_type_id if forward else link.target_type_id
                     if not index.is_a(type_id, owner):
                         continue
-                    if (
-                        len(nodes) >= 100
-                        or len(edges) >= 300
-                        or queries >= 50
-                        or monotonic() - started > 15
-                    ):
-                        truncated = True
-                        break
-                    target_type = link.target_type_id if forward else link.source_type_id
-                    binding = resolve_binding(draft, type_id)
-                    join = binding.link_bindings.get(link.id, link.data_join)
-                    queries += 1
-                    try:
-                        rows, selected, more = related_rows(
-                            db,
-                            workspace_id,
-                            draft,
-                            settings,
-                            type_id,
-                            target_type,
-                            join,
-                            current["key"],
-                            forward,
-                            body.snapshot_date,
+                    declared = link.target_type_id if forward else link.source_type_id
+                    targets = resolve_binding(draft, declared).virtual_types or (declared,)
+                    for target_type in targets:
+                        if (
+                            len(nodes) >= 100
+                            or len(edges) >= 300
+                            or queries >= 50
+                            or monotonic() - started > 15
+                        ):
+                            truncated = True
+                            break
+                        binding = resolve_binding(draft, type_id)
+                        target_binding = resolve_binding(draft, target_type)
+                        join = binding.link_bindings.get(
+                            link.id,
+                            target_binding.link_bindings.get(link.id, link.data_join),
                         )
-                    except ServiceError as exc:
-                        warnings.add(link.name + "：" + exc.message)
-                        continue
-                    dates += selected
-                    truncated |= more
-                    for node in rows:
-                        if node["id"] not in nodes:
-                            if len(nodes) >= 100:
-                                truncated = True
-                                break
-                            nodes[node["id"]] = node
-                            following.append(node)
-                        a, b = (
-                            (current["id"], node["id"])
-                            if forward
-                            else (node["id"], current["id"])
-                        )
-                        eid = f"{link.id}:{a}:{b}"
-                        edges[eid] = {
-                            "id": eid,
-                            "type_id": str(link.id),
-                            "source_id": a,
-                            "target_id": b,
-                            "evidence": [],
-                        }
+                        queries += 1
+                        try:
+                            rows, selected, more = related_rows(
+                                db,
+                                workspace_id,
+                                draft,
+                                settings,
+                                type_id,
+                                target_type,
+                                join,
+                                current["key"],
+                                forward,
+                                body.snapshot_date,
+                            )
+                        except ServiceError as exc:
+                            warnings.add(link.name + "：" + exc.message)
+                            continue
+                        dates += selected
+                        truncated |= more
+                        for node in rows:
+                            if node["id"] not in nodes:
+                                if len(nodes) >= 100:
+                                    truncated = True
+                                    break
+                                nodes[node["id"]] = node
+                                following.append(node)
+                            a, b = (
+                                (current["id"], node["id"])
+                                if forward
+                                else (node["id"], current["id"])
+                            )
+                            eid = f"{link.id}:{a}:{b}"
+                            edges[eid] = {
+                                "id": eid,
+                                "type_id": str(link.id),
+                                "source_id": a,
+                                "target_id": b,
+                                "evidence": [],
+                            }
         frontier = following
         if not frontier or truncated:
             break

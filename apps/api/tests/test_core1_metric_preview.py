@@ -142,3 +142,156 @@ def test_engine_unsupported_and_zero_denominator_have_no_fake_value(tmp_path, mo
         assert result["value"] is None
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("kind", ["simple", "expression"])
+def test_snapshot_selected_before_grouping_by_launch_month(tmp_path, monkeypatch, kind):
+    from ontofoundry_api.domain.core import ColumnReference, DatasetColumn, ExpressionMetric
+
+    draft, engine = source_database(tmp_path, monkeypatch, "12-snapshot-and-trends")
+    try:
+        metric = draft.metrics[0]
+        dataset = next(d for d in draft.datasets if d.id == metric.dataset_id)
+        dataset.columns.append(DatasetColumn(name="launch_date", physical_type="DATE"))
+        metric.time_field = ColumnReference(dataset_id=dataset.id, column="launch_date")
+        metric.aggregation = "count"
+        metric.measure = None
+        if kind == "expression":
+            metric = ExpressionMetric.model_validate(
+                {
+                    "id": str(metric.id),
+                    "name": metric.name,
+                    "technical_name": metric.technical_name,
+                    "kind": "expression",
+                    "dataset_id": str(dataset.id),
+                    "expression": "COUNT(*)",
+                    "value_kind": "integer",
+                    "time_field": metric.time_field.model_dump(mode="json"),
+                }
+            )
+            draft.metrics[0] = metric
+        with engine.begin() as conn:
+            conn.exec_driver_sql("ALTER TABLE component_daily ADD COLUMN launch_date TEXT")
+            conn.exec_driver_sql("DELETE FROM component_daily")
+            for snapshot, component, launch in [
+                ("2026-12-30", "A", "2026-10-05"),
+                ("2026-12-30", "B", "2026-12-20"),
+                ("2026-12-31", "A", "2026-10-05"),
+                ("2026-12-31", "B", "2026-12-20"),
+                ("2026-12-31", "C", "2026-12-31"),
+            ]:
+                conn.exec_driver_sql(
+                    "INSERT INTO component_daily (snapshot_date, component_id, launch_date) VALUES (?, ?, ?)",
+                    (snapshot, component, launch),
+                )
+        result = execute_metric_preview(
+            None,
+            str(draft.workspace_id),
+            draft,
+            metric,
+            None,
+            time_range={"start": "2026-12-01", "end": "2027-01-01"},
+            trend=True,
+        )
+        assert result["value"] == 3
+        assert result["trend"] == [
+            {"period": "2026-10-01", "value": 1},
+            {"period": "2026-12-01", "value": 2},
+        ]
+        assert {d["date"] for d in result["snapshot_dates"]} == {"2026-12-31"}
+    finally:
+        engine.dispose()
+
+
+def test_snapshot_without_business_time_returns_total_and_warning(
+    client, tmp_path, monkeypatch
+):
+    draft, engine = source_database(tmp_path, monkeypatch, "12-snapshot-and-trends")
+    try:
+        s = create_session(client)
+        raw = draft.model_dump(mode="json")
+        raw["workspace_id"] = s["workspace_id"]
+        s = save(client, s, raw).json()
+        metric = draft.metrics[0].model_dump(mode="json")
+        metric["time_field"] = None
+        response = client.post(
+            f"/api/v1/modeling/workspaces/{s['workspace_id']}/metrics/preview",
+            json={
+                "session_id": s["id"],
+                "expected_session_revision": s["revision"],
+                "metric": metric,
+                "trend_grain": "month",
+            },
+        )
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["status"] == "ok" and result["value"] == 10
+        assert result["trend"] is None and result["trend_query"] is None
+        assert result["warnings"] == ["缺少时间字段，仅返回总值，无法生成月趋势"]
+        assert result["snapshot_dates"][0]["date"] == "2026-12-31"
+    finally:
+        engine.dispose()
+
+
+def test_ratio_months_report_actual_snapshot_dates(tmp_path, monkeypatch):
+    draft, engine = source_database(tmp_path, monkeypatch, "13-dataset-metrics")
+    try:
+        draft.datasets[0].snapshot_date_column = "stat_date"
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                "INSERT INTO code_lines_daily (repo, stat_date, commit_count) VALUES ('core', '2026-11-29', 99), ('core', '2026-11-30', 10), ('web', '2026-11-30', 10)"
+            )
+        ratio = next(m for m in draft.metrics if m.kind == "ratio")
+        result = execute_metric_preview(
+            None, str(draft.workspace_id), draft, ratio, None, trend=True
+        )
+        assert float(result["value"]) == pytest.approx(0.5)
+        assert [float(p["value"]) for p in result["trend"]] == pytest.approx([5 / 7, 0.5])
+        assert result["snapshot_dates"] == [
+            {"dataset_id": str(draft.datasets[0].id), "period": None, "date": "2026-11-30"},
+            {
+                "dataset_id": str(draft.datasets[0].id),
+                "period": "2026-10-01",
+                "date": "2026-10-02",
+            },
+            {
+                "dataset_id": str(draft.datasets[0].id),
+                "period": "2026-11-01",
+                "date": "2026-11-30",
+            },
+        ]
+    finally:
+        engine.dispose()
+
+
+def test_same_simple_component_covers_both_ratio_references(client, tmp_path, monkeypatch):
+    draft, engine = source_database(tmp_path, monkeypatch, "13-dataset-metrics")
+    try:
+        s = create_session(client)
+        raw = draft.model_dump(mode="json")
+        raw["workspace_id"] = s["workspace_id"]
+        s = save(client, s, raw).json()
+        ratio = next(m.model_dump(mode="json") for m in draft.metrics if m.kind == "ratio")
+        ratio["denominator_id"] = ratio["numerator_id"]
+        component = next(
+            m.model_dump(mode="json")
+            for m in draft.metrics
+            if str(m.id) == ratio["numerator_id"]
+        )
+        body = {
+            "session_id": s["id"],
+            "expected_session_revision": s["revision"],
+            "metric": ratio,
+            "components": [component],
+            "trend_grain": "month",
+        }
+        path = f"/api/v1/modeling/workspaces/{s['workspace_id']}/metrics/preview"
+        response = client.post(path, json=body)
+        assert response.status_code == 200, response.text
+        assert response.json()["status"] == "ok" and float(response.json()["value"]) == 1
+        assert [float(p["value"]) for p in response.json()["trend"]] == [1]
+        for components in ([], [component, component]):
+            invalid = client.post(path, json={**body, "components": components})
+            assert invalid.status_code == 422, invalid.text
+    finally:
+        engine.dispose()

@@ -50,12 +50,13 @@ def _after_schema(kind):
     schema = TypeAdapter(ELEMENT_MODELS[kind]).json_schema(ref_template="#/$defs/{model}")
     defs = schema.pop("$defs", {})
 
-    def transform(node):
+    def transform(node, *, preserve_id=False):
         if not isinstance(node, dict):
             return
         for key, value in list(node.items()):
             if key == "properties":
-                value.pop("id", None)
+                if not preserve_id:
+                    value.pop("id", None)
                 for name, definition in list(value.items()):
                     if name == "inherited_link_bindings":
                         value[name] = {
@@ -72,7 +73,7 @@ def _after_schema(kind):
                         }
                     elif name != "evidence":
                         references(definition)
-            elif key == "required":
+            elif key == "required" and not preserve_id:
                 node[key] = [x for x in value if x != "id"]
             elif isinstance(value, dict):
                 transform(value)
@@ -95,7 +96,9 @@ def _after_schema(kind):
     transform(schema)
     for name, definition in defs.items():
         if name not in ("ManualEvidence", "MaterialEvidence", "EvidenceLocator"):
-            transform(definition)
+            # MappingSource.id is a caller-defined local source name, not a
+            # server-assigned core element UUID.
+            transform(definition, preserve_id=name == "MappingSource")
     # Evidence IDs may be assigned by the receiver; authorship is checked separately.
     if "MaterialEvidence" in defs:
         defs["MaterialEvidence"]["required"].remove("id")
@@ -407,10 +410,21 @@ def group_items(draft, items):
         owner = element.get(
             "owner_type_id", element.get("source_type_id", element.get("owner_id"))
         )
+        if kind in {"property", "link_type"}:
+            return ("property_link", owner)
+        if kind == "rule":
+            return (kind, element["owner_kind"], owner)
         return (kind, owner)
 
     for item in items:
-        if item.after is None:
+        if item.after is None or item.target_kind not in {
+            "object_type",
+            "property",
+            "link_type",
+            "rule",
+            "metric",
+            "dataset",
+        }:
             continue
         for other in items:
             previous = original.get(other.target_id)
@@ -421,10 +435,16 @@ def group_items(draft, items):
             ):
                 continue
             fields = (
-                ("name",) if item.target_kind == "dataset" else ("name", "technical_name")
+                ("name",)
+                if item.target_kind == "dataset"
+                else ("technical_name",)
+                if item.target_kind == "rule"
+                else ("name", "technical_name")
             )
             if any(
-                str(item.after.get(k, "")).casefold() == str(previous.get(k, "")).casefold()
+                k in item.after
+                and k in previous
+                and str(item.after[k]).casefold() == str(previous[k]).casefold()
                 for k in fields
             ):
                 union(item.id, other.id)

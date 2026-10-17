@@ -100,3 +100,90 @@ def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(clien
     assert len(accepted["material_objects"]) == 2
     updated = next(o for o in accepted["material_objects"] if o["id"] == customer["id"])
     assert updated["evidence"][0]["id"] == evidence["id"]
+
+
+def test_fact_revision_migrates_pending_upstream_and_preserves_both_endpoints(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "07-instances-and-evidence")
+    customer = next(
+        o for o in session["draft"]["material_objects"] if "customer_no" in o["values"]
+    )
+    returns = next(
+        o
+        for o in session["draft"]["object_types"]
+        if o["technical_name"] == "return_request"
+    )
+    link = session["draft"]["link_types"][0]
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "duplicate_customer",
+                "material_object",
+                {
+                    "type_id": customer["type_id"],
+                    "values": customer["values"],
+                    "evidence": [],
+                },
+            ),
+            create(
+                "new_return",
+                "material_object",
+                {
+                    "type_id": returns["id"],
+                    "values": {"return_no": "RT-0201", "refund": 200},
+                    "evidence": [],
+                },
+            ),
+            create(
+                "return_customer",
+                "material_link",
+                {
+                    "type_id": link["id"],
+                    "source_id": {"client_ref": "new_return"},
+                    "target_id": {"client_ref": "duplicate_customer"},
+                    "evidence": [],
+                },
+            ),
+        ],
+    )
+    customer_item = batch["items"][0]
+    response = client.post(
+        ROOT + f"/sessions/{session['id']}/proposal-items/{customer_item['id']}/revision",
+        json={
+            "expected_session_revision": session["revision"],
+            "target_id": customer["id"],
+            "expected_target_hash": element_sha256(customer, collection="material_objects"),
+            "after": customer,
+        },
+    )
+    assert response.status_code == 200, response.text
+    revision = response.json()
+    assert len(revision["items"]) == 3
+    revised_customer, new_return, adjacency = revision["items"]
+    assert (
+        revised_customer["operation"] == "update"
+        and revised_customer["target_id"] == customer["id"]
+    )
+    assert set(adjacency["depends_on"]) == {revised_customer["id"], new_return["id"]}
+    assert adjacency["after"]["source_id"] == new_return["target_id"]
+    assert adjacency["after"]["target_id"] == customer["id"]
+    old = client.get(
+        ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}"
+    ).json()
+    assert {i["stored_status"] for i in old["items"]} == {"superseded"}
+    accepted = decide(client, session, [(i["id"], "accept") for i in revision["items"]])
+    assert accepted.status_code == 200, accepted.text
+    graph = accepted.json()["session"]["draft"]
+    assert len(graph["material_objects"]) == len(session["draft"]["material_objects"]) + 1
+    assert len(graph["material_links"]) == len(session["draft"]["material_links"]) + 1
+    assert (
+        next(
+            relation
+            for relation in graph["material_links"]
+            if relation["source_id"] == new_return["target_id"]
+        )["target_id"]
+        == customer["id"]
+    )

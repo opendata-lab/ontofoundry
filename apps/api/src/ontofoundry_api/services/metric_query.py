@@ -309,14 +309,14 @@ class MetricCompiler:
         snap = self.column(self.snapshot_column) if self.snapshot_column else None
         if self.time_range and not time and not snap:
             raise invalid("指标没有时间字段，无法应用范围", "time_field_required")
-        period = self.month(snap or time) if trend and (snap or time) else None
+        period = self.month(time) if trend and time else None
         if trend and period is None:
             raise invalid("指标没有时间字段，无法生成趋势", "time_field_required")
         if snap:
             global_column = self.identifier(self.snapshot_column)
             selection = self.range_predicate(global_column)
             selection_sql = " WHERE " + " AND ".join(selection) if selection else ""
-            if trend:
+            if trend and metric.time_field.column == self.snapshot_column:
                 global_month = self.month(global_column)
                 where.append(
                     f"{snap} IN (SELECT MAX({global_column}) FROM {table}{selection_sql} GROUP BY {global_month})"
@@ -346,7 +346,12 @@ class MetricCompiler:
             ]
             numerator, denominator = [self.component(m, trend) for m in components]
             if trend:
-                sql = f"WITH n AS ({numerator}), d AS ({denominator}), periods AS (SELECT period FROM n UNION SELECT period FROM d) SELECT periods.period, 1.0*n.value/NULLIF(d.value,0) AS value FROM periods LEFT JOIN n ON n.period=periods.period LEFT JOIN d ON d.period=periods.period ORDER BY periods.period"
+                dates = (
+                    ", n.snapshot_date AS numerator_snapshot_date, d.snapshot_date AS denominator_snapshot_date"
+                    if self.snapshot_column
+                    else ""
+                )
+                sql = f"WITH n AS ({numerator}), d AS ({denominator}), periods AS (SELECT period FROM n UNION SELECT period FROM d) SELECT periods.period, 1.0*n.value/NULLIF(d.value,0) AS value{dates} FROM periods LEFT JOIN n ON n.period=periods.period LEFT JOIN d ON d.period=periods.period ORDER BY periods.period"
             else:
                 sql = (
                     f"WITH n AS ({numerator}), d AS ({denominator}) SELECT 1.0*n.value/NULLIF(d.value,0) AS value"
@@ -427,14 +432,19 @@ def execute_metric_preview(
     for period, row in [(None, r) for r in rows] + [
         (str(r["period"])[:10], r) for r in trend_rows
     ]:
-        if "snapshot_date" in row:
-            result["snapshot_dates"].append(
-                {
+        for column in (
+            "snapshot_date",
+            "numerator_snapshot_date",
+            "denominator_snapshot_date",
+        ):
+            if column in row and row[column] is not None:
+                chosen = {
                     "dataset_id": str(dataset_for(draft, metric).id),
                     "period": period,
-                    "date": scalar(row["snapshot_date"]),
+                    "date": scalar(row[column]),
                 }
-            )
+                if chosen not in result["snapshot_dates"]:
+                    result["snapshot_dates"].append(chosen)
     return result
 
 

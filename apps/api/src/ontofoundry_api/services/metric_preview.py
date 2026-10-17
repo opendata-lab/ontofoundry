@@ -10,7 +10,6 @@ from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.access import can_read_instances, can_read_mappings
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.metric_query import (
-    dataset_for,
     execute_metric_preview,
     value_kind,
 )
@@ -118,11 +117,7 @@ def preview_metric(db, workspace_id, user, body, settings):
     metric_components = components if components else [body.metric]
     trend = body.trend_grain is not None
     warnings = []
-    if (
-        trend
-        and not dataset_for(candidate, body.metric).snapshot_date_column
-        and any(not c.time_field for c in metric_components)
-    ):
+    if trend and any(not c.time_field for c in metric_components):
         trend = False
         warnings.append("缺少时间字段，仅返回总值，无法生成月趋势")
     try:

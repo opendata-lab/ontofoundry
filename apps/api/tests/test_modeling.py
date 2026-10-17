@@ -91,3 +91,64 @@ def test_two_sessions_merge_and_conflict(client):
     )
     assert resolved.status_code == 200, resolved.text
     assert publish(client, resolved.json()).status_code == 200
+
+
+def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
+    from pr23_fixtures import example_session
+    from test_t4_proposal_decisions import decide, seed_batch, update
+
+    session = example_session(client, "01-basic-sales", published=True)
+    metric = session["draft"]["metrics"][0]
+    batch = seed_batch(
+        client, session, [update("metric", metric, description="待接受的口径说明")]
+    )
+    incomplete = deepcopy(session["draft"])
+    incomplete["object_types"][1]["technical_name"] = incomplete["object_types"][0][
+        "technical_name"
+    ]
+    response = save(client, session, incomplete)
+    assert response.status_code == 200, response.text
+    stashed = response.json()
+    assert stashed["revision"] == session["revision"] + 1
+    assert not stashed["validation"]["publishable"]
+    assert any("技术名重复" in e["message"] for e in stashed["validation"]["errors"])
+    assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == incomplete
+    refused = decide(client, stashed, [(batch["items"][0]["id"], "accept")])
+    assert (
+        refused.status_code == 422
+        and refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    )
+    version = client.get(ONTOLOGY + "/version").json()["version_id"]
+    invalid_preview = preview(client, stashed)
+    assert invalid_preview.status_code == 200, invalid_preview.text
+    assert not invalid_preview.json()["validation"]["publishable"]
+    refused = publish(client, stashed)
+    assert (
+        refused.status_code == 422
+        and refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    )
+    assert client.get(ONTOLOGY + "/version").json()["version_id"] == version
+    fixed = save(client, stashed, session["draft"])
+    assert fixed.status_code == 200 and fixed.json()["validation"]["publishable"]
+    assert publish(client, fixed.json()).status_code == 200
+
+
+def test_stash_checks_known_source_columns_with_specific_error(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "01-basic-sales")
+    invalid = deepcopy(session["draft"])
+    invalid["mappings"][0]["sources"][0]["key_columns"] = ["missing_customer_key"]
+    response = save(client, session, invalid)
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "JOIN_COLUMN_NOT_FOUND"
+    assert (
+        client.get(ROOT + f"/sessions/{session['id']}").json()["revision"]
+        == session["revision"]
+    )
+    # A dangling semantic reference is reportable, not a structural/source error.
+    invalid = deepcopy(session["draft"])
+    invalid["link_types"][0]["target_type_id"] = "00000000-0000-4000-8000-000000099999"
+    response = save(client, session, invalid)
+    assert response.status_code == 200, response.text
+    assert not response.json()["validation"]["publishable"]

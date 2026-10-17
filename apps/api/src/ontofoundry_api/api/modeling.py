@@ -26,7 +26,11 @@ from ontofoundry_api.domain.snapshot import (
     empty_snapshot,
 )
 from ontofoundry_api.services.element_diff import element_changes
-from ontofoundry_api.services.element_save import scoped_draft
+from ontofoundry_api.services.element_save import (
+    preview_element_save,
+    scoped_draft,
+    sync_saved_scope,
+)
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.ontology_query import (
@@ -68,6 +72,27 @@ class ElementSave(Strict):
     expected_session_revision: int | None = None
     draft: dict
     affected_items: list[AffectedItem] = Field(default_factory=list)
+
+
+class AffectedItemImpact(AffectedItem):
+    reason: str
+
+
+class ElementSaveImpact(Strict):
+    current_version_id: str | None
+    session_revision: int | None
+    affected_items: list[AffectedItemImpact]
+
+
+@router.post("/element-saves/preview", response_model=ElementSaveImpact)
+def preview_element(
+    workspace_id: str,
+    body: ElementSave,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    return preview_element_save(db, workspace_id, body)
 
 
 @router.post("/element-saves")
@@ -159,8 +184,8 @@ def save_element(
             # Keep unrelated draft changes, while displaying the actual merged
             # values of the element just saved (latest may add untouched fields).
             merged = model.model_dump(mode="json")
-            updated_draft = scoped_draft(
-                edited, merged, merged, body.target_kind, body.target_id
+            updated_draft = sync_saved_scope(
+                edited, merged, body.target_kind, body.target_id, body.affected_items
             )
             # CAS also protects SQLite and a proposal decision racing this request.
             changed = db.execute(
@@ -649,11 +674,9 @@ def save_session(
         )
     except EvidenceError as exc:
         raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
-    from ontofoundry_api.services.join_validation import validate_join_columns
+    from ontofoundry_api.services.join_validation import validate_source_columns
 
-    validate_join_columns(
-        db, workspace_id, session_draft(item), draft, request.app.state.settings
-    )
+    validate_source_columns(draft)
     values = {"draft_json": draft}
     if body.title is not None:
         values["title"] = body.title
@@ -777,7 +800,9 @@ def publish_session(
     try:
         model = OntologyDraft.model_validate(merged)
     except ValidationError as exc:
-        raise HTTPException(422, str(exc)) from exc
+        raise ServiceError(
+            "发布草稿校验失败：" + str(exc), code="VALIDATION_FAILED", status_code=422
+        ) from exc
     try:
         version = publish_draft(
             db,

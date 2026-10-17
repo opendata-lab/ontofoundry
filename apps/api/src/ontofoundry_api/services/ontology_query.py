@@ -107,11 +107,19 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
     draft = CoreDraft.model_validate(snapshot)
     index = DraftIndex(draft)
 
+    def project(value):
+        if isinstance(value, dict):
+            return {
+                key: project(entry)
+                for key, entry in value.items()
+                if instances or key != "evidence"
+            }
+        if isinstance(value, list):
+            return [project(entry) for entry in value]
+        return value
+
     def dump(item):
-        result = item.model_dump(mode="json")
-        if not instances:
-            result.pop("evidence", None)
-        return result
+        return project(item.model_dump(mode="json"))
 
     items = []
     for obj in draft.object_types:
@@ -148,7 +156,12 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
                 "inherited_from": str(owner) if owner != obj.id else None,
                 "binding_status": status,
             }
-            if not mappings:
+            if mappings:
+                effective_join = binding.link_bindings.get(link.id, link.data_join)
+                link_view["data_join"] = (
+                    effective_join.model_dump(mode="json") if effective_join else None
+                )
+            else:
                 link_view.pop("data_join", None)
             links.append(link_view)
         definition = {
@@ -192,8 +205,7 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
     for metric in draft.metrics:
         if mappings:
             definition = metric_projection(draft, metric, db=db, workspace_id=workspace_id)
-            if not instances:
-                definition.pop("evidence", None)
+            definition = project(definition)
         else:
             definition = {
                 k: v

@@ -96,9 +96,24 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
             if i.atomic_group_id in groups
             or any(d in selected for d in dependencies.get(i.id, []))
         )
+        # Migrate pending upstream proposals needed by the selected downstream
+        # graph. Already accepted dependencies remain satisfied in the session.
+        selected.update(
+            d
+            for identity in tuple(selected)
+            for d in dependencies.get(identity, [])
+            if statuses[d][0] == "pending"
+        )
         changed = selected != old
     if any(i.status != "pending" for i in items if i.id in selected):
         fail("PROPOSAL_CONFLICT", "不能部分修订已决定的依赖组")
+    if any(
+        statuses[d][0] != "accepted"
+        for identity in selected
+        for d in dependencies.get(identity, [])
+        if d not in selected
+    ):
+        fail("PROPOSAL_CONFLICT", "修订依赖已失效，请先处理依赖提案")
     batch_id = str(uuid4())
     parsed = []
     id_map = {i.id: str(uuid5(UUID(batch_id), i.id)) for i in items if i.id in selected}
@@ -136,7 +151,8 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
                 i.evidence_json or [],
                 body.reason or i.reason or "",
                 item_fingerprint(operation, i.target_kind, target_id, new_after),
-                [id_map.get(d, d) for d in dependencies.get(i.id, []) if d in selected],
+                # Accepted upstream changes already live in the session baseline.
+                [id_map[d] for d in dependencies.get(i.id, []) if d in selected],
             )
         )
     try:

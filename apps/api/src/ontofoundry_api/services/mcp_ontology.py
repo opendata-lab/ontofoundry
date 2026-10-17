@@ -176,6 +176,22 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
         db=db if mappings else None,
         workspace_id=workspace_id,
     )
+    if mappings and name == "get_ontology" and "physical" in args.include:
+        from ontofoundry_api.services.physical_projection import physical_projection
+
+        datasets = [r["definition"] for r in resources if r["kind"] == "dataset"]
+        for resource in resources:
+            if resource["kind"] not in {"object_type", "link_type", "metric"}:
+                continue
+            definition = resource["definition"]
+            definition.update(
+                physical_projection(draft, resource["kind"], definition["id"], datasets)
+            )
+            if resource["kind"] == "object_type":
+                binding = resolve_binding(draft, UUID(definition["id"]))
+                definition["sources"] = [
+                    s.model_dump(mode="json") for s in binding.sources.values()
+                ]
     lookup = {r["definition"]["id"]: r for r in resources if r["kind"] != "dataset"}
     for kind, collection in (("property", "properties"), ("rule", "rules")):
         for e in snapshot[collection]:
@@ -276,25 +292,17 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 if mappings and "physical" in args.include:
                     if "sql_reference" in d:
                         element["sql_reference"] = d["sql_reference"]
-                    if r["kind"] == "object_type":
-                        binding = resolve_binding(draft, UUID(identity))
-                        element["sources"] = page(
-                            [s.model_dump(mode="json") for s in binding.sources.values()],
-                            [len(values), "sources"],
-                        )
-                        datasets = {str(s.dataset_id) for s in binding.sources.values()}
-                        element["datasets"] = page(
-                            [
-                                r["definition"]
-                                for r in resources
-                                if r["kind"] == "dataset"
-                                and r["definition"]["id"] in datasets
-                            ],
-                            [len(values), "datasets"],
-                        )
-                        element["instance_source_type_ids"] = d.get(
-                            "instance_source_type_ids", []
-                        )
+                    for key in ("sources", "datasets", "effective_bindings"):
+                        if key in d:
+                            element[key] = page(d[key], [len(values), key])
+                    for key in (
+                        "instance_source_type_ids",
+                        "components",
+                        "dataset_id",
+                        "value_kind",
+                    ):
+                        if key in d:
+                            element[key] = d[key]
             values.append(element)
         if section and section["kind"] == "list":
             path = section["path"]
@@ -302,19 +310,6 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             n, key = path
             d = lookup[values[n]["id"]]["definition"]
             raw = d.get(key)
-            if raw is None and key in {"sources", "datasets"}:
-                binding = resolve_binding(draft, UUID(values[n]["id"]))
-                raw = (
-                    [s.model_dump(mode="json") for s in binding.sources.values()]
-                    if key == "sources"
-                    else [
-                        r["definition"]
-                        for r in resources
-                        if r["kind"] == "dataset"
-                        and UUID(r["definition"]["id"])
-                        in {s.dataset_id for s in binding.sources.values()}
-                    ]
-                )
             values[n][key] = page(raw, path, offset)
             return {
                 **envelope,

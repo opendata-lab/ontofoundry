@@ -581,6 +581,13 @@
             }
           ]
         },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
         "key_columns": {
           "items": {
             "maxLength": 240,
@@ -593,6 +600,7 @@
         }
       },
       "required": [
+        "id",
         "dataset_id"
       ],
       "title": "MappingSource",
