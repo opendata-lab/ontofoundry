@@ -162,7 +162,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType>) {
       <Checkbox
         aria-label={`${row.property.name || "属性"}${label}`}
         checked={row.property[field]}
-        disabled={!editable}
+        disabled={!editable || undefined}
         onChange={(e) => setProperty(row.property, { [field]: e.target.checked })}
       />
     );

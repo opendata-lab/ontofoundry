@@ -1,4 +1,4 @@
-import { Alert, Button, Input, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
+import { Alert, Button, ConfigProvider, Input, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
 import { Box, Check, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
@@ -270,6 +270,8 @@ function Inspector({
   const owner = params.get("inspectOwner");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const draftRef = useRef<Draft | null>(null);
+  draftRef.current = draft;
   const [editing, setEditing] = useState(
     !previewHash && (creating || params.get("inspectMode") === "edit") && !!workspace.role,
   );
@@ -320,6 +322,7 @@ function Inspector({
         value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
+        draftRef.current = value;
         setLoaded(source);
         setDraft(value);
       }
@@ -393,13 +396,15 @@ function Inspector({
   }, [loaded, selectedTab, id]);
 
   const discard = () => {
+    const nextDraft = loaded?.draft ?? null;
+    draftRef.current = nextDraft;
     flushSync(() => {
       setDirty(false);
       setEditing(false);
       setError(null);
       setShowErrors(false);
       setImpactPreview(null);
-      setDraft(loaded?.draft ?? null);
+      setDraft(nextDraft);
     });
     reportElement?.({ dirty: false, busy: false });
   };
@@ -419,14 +424,26 @@ function Inspector({
       inspectorHref(createPath(location), { ...request, sessionId, previewHash: previewHash ?? undefined }),
     );
   };
-  const buildCandidate = (): { candidate: ElementSave; problem: string | null } | null => {
-    if (!draft || !element || !loaded || !member || previewHash) return null;
-    const value = kind === "metric" ? upsert(draft, "metrics", storedMetric(element as Metric)) : draft;
+  const buildCandidate = (
+    sourceDraft: Draft | null = draftRef.current,
+  ): { candidate: ElementSave; problem: string | null; signature: string } | null => {
+    if (!sourceDraft || !loaded || !member || previewHash) return null;
+    const currentResolved = resolve(sourceDraft, requestedKind, effectiveId);
+    const currentKind: InspectKind =
+      currentResolved?.kind ??
+      (NEW_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
+    const currentElement = currentResolved?.element;
+    if (!currentElement) return null;
+    const value =
+      currentKind === "metric"
+        ? upsert(sourceDraft, "metrics", storedMetric(currentElement as Metric))
+        : sourceDraft;
     return {
-      problem: saveProblem(value, kind, element),
+      problem: saveProblem(value, currentKind, currentElement),
+      signature: JSON.stringify(value),
       candidate: {
-        target_kind: kind,
-        target_id: element.id,
+        target_kind: currentKind,
+        target_id: currentElement.id,
         expected_current_version_id: loaded.versionId,
         session_id: loaded.session?.id ?? null,
         expected_session_revision: loaded.session?.revision ?? null,
@@ -441,6 +458,7 @@ function Inspector({
       session: result.session,
       versionId: result.version.version_id,
     };
+    draftRef.current = next.draft;
     flushSync(() => {
       setLoaded(next);
       setDraft(next.draft);
@@ -459,35 +477,54 @@ function Inspector({
       { replace: true },
     );
   };
-  const save = async () => {
-    if (busy) return;
-    const built = buildCandidate();
-    if (!built) return;
-    if (built.problem) {
+  const runPreviewAndSave = async () => {
+    let current = buildCandidate();
+    if (!current) return;
+    if (current.problem) {
       setShowErrors(true);
-      setError(built.problem);
+      setError(current.problem);
       return;
     }
     setBusy(true);
     setError(null);
     setNotice("");
     try {
-      const impact = await modelingApi.previewElementSave(workspace.id, built.candidate);
-      if (impact.affected_items.length > 0) {
-        setImpactPreview({
-          candidate: built.candidate,
-          signature: JSON.stringify(built.candidate.draft),
-          items: impact.affected_items,
-        });
+      while (current) {
+        const requestSignature = current.signature;
+        const impact = await modelingApi.previewElementSave(workspace.id, current.candidate);
+        const latest = buildCandidate();
+        if (!latest) return;
+        if (latest.problem) {
+          setImpactPreview(null);
+          setShowErrors(true);
+          setError(latest.problem);
+          return;
+        }
+        if (latest.signature !== requestSignature) {
+          current = latest;
+          continue;
+        }
+        if (impact.affected_items.length > 0) {
+          setImpactPreview({
+            candidate: latest.candidate,
+            signature: latest.signature,
+            items: impact.affected_items,
+          });
+          return;
+        }
+        await performSave(latest.candidate);
         return;
       }
-      await performSave(built.candidate);
     } catch (e) {
       setImpactPreview(null);
       setError(errorText(e));
     } finally {
       setBusy(false);
     }
+  };
+  const save = async () => {
+    if (busy) return;
+    await runPreviewAndSave();
   };
   const confirmSave = async () => {
     if (!impactPreview || busy) return;
@@ -499,9 +536,9 @@ function Inspector({
       setError(built.problem);
       return;
     }
-    if (JSON.stringify(built.candidate.draft) !== impactPreview.signature) {
+    if (built.signature !== impactPreview.signature) {
       setImpactPreview(null);
-      await save();
+      await runPreviewAndSave();
       return;
     }
     const affected_items: AffectedItem[] = impactPreview.items.map(
@@ -524,7 +561,7 @@ function Inspector({
     }
   };
   const beginEdit = () => {
-    if (!loaded || !draft || !member || previewHash) return;
+    if (!loaded || !draft || !member || previewHash || busy) return;
     setEditing(true);
     setNotice("");
   };
@@ -562,6 +599,7 @@ function Inspector({
     }
   };
   const change = (next: Draft) => {
+    draftRef.current = next;
     setDraft(next);
     setDirty(true);
     setNotice("");
@@ -673,12 +711,12 @@ function Inspector({
               </Text>
             )}
             {!editing && member && !previewHash && element && (
-              <Button size="small" onClick={beginEdit} disabled={!loaded}>
+              <Button size="small" onClick={beginEdit} disabled={!loaded || busy}>
                 编辑
               </Button>
             )}
             {element && !creating && (
-              <Button size="small" onClick={() => void copy()}>
+              <Button size="small" disabled={busy} onClick={() => void copy()}>
                 复制链接
               </Button>
             )}
@@ -686,6 +724,7 @@ function Inspector({
               <Button
                 size="small"
                 type="text"
+                disabled={busy}
                 aria-label={expanded ? "还原弹窗" : "展开弹窗"}
                 icon={expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
                 onClick={() => setExpanded(!expanded)}
@@ -701,9 +740,10 @@ function Inspector({
             size="small"
             className="sticky top-0 z-10 !mb-0 bg-surface"
             activeKey={selectedTab}
-            onChange={(key) => selectTab(key as ElementTab)}
+            onChange={(key) => !busy && selectTab(key as ElementTab)}
             items={tabs.map((tab) => ({
               key: tab.key,
+              disabled: busy,
               label: (
                 <span>
                   {tab.label}
@@ -733,7 +773,13 @@ function Inspector({
           </div>
         )}
         {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
-        {content && <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">{content}</fieldset>}
+        {content && (
+          <ConfigProvider componentDisabled={busy}>
+            <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+              {content}
+            </fieldset>
+          </ConfigProvider>
+        )}
       </div>
       {impactPreview && draft && (
         <Modal

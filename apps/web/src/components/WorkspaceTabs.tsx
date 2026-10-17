@@ -91,7 +91,7 @@ const TabPanel = memo(function TabPanel({
   return (
     <section
       className="h-full min-w-0 overflow-auto"
-      id={`panel-${tab.id}`}
+      id={`workspace-panel-${tab.id}`}
       role="tabpanel"
       aria-labelledby={`workspace-tab-${tab.id}`}
       hidden={!active}
@@ -199,10 +199,20 @@ export function WorkspaceTabs({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
   useLayoutEffect(() => {
-    strip.current
-      ?.querySelector('[aria-selected="true"]')
+    const root = strip.current;
+    if (!root) return;
+    root.querySelector('[role="tablist"]')?.setAttribute("aria-label", "已打开的页面");
+    root
+      .querySelectorAll<HTMLElement>(".ant-tabs-content-holder .ant-tabs-tabpane")
+      .forEach((pane) => {
+        pane.removeAttribute("id");
+        pane.removeAttribute("role");
+        pane.removeAttribute("aria-labelledby");
+      });
+    root
+      .querySelector('[aria-selected="true"]')
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [state.active]);
+  }, [state.tabs, state.active]);
   const update = useCallback((id: string, meta: PageTabMeta) => {
     setState((current) => {
       const tab = current.tabs.find((t) => t.id === id);

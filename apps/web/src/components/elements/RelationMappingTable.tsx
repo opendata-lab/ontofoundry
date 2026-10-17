@@ -124,7 +124,7 @@ export function RelationsPanel(props: PanelProps<ObjectType>) {
               <Button onClick={() => setBinding(null)}>取消</Button>
               <Button
                 type="primary"
-                disabled={!!joinProblem(binding.join)}
+                disabled={!!joinProblem(binding.join) || undefined}
                 onClick={() => {
                   change(setInheritedLinkBinding(draft, type.id, binding.relation.definition.id, binding.join));
                   setBinding(null);

@@ -83,7 +83,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
       <div className="flex flex-wrap items-center gap-3">
         <Button
           icon={running ? <Spin size="small" /> : preview ? <RefreshCw size={15} /> : <Play size={15} />}
-          disabled={!!invalid}
+          disabled={!!invalid || undefined}
           onClick={() => void run()}
         >
           {running ? "预览中…" : preview ? "重新预览" : "预览数值"}

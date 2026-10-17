@@ -33,7 +33,7 @@ function KeyColumns({
     <Select
       mode={columns.length ? "multiple" : "tags"}
       aria-label={label}
-      disabled={!onChange}
+      disabled={!onChange || undefined}
       placeholder={columns.length ? "按顺序选择键列" : "未登记列清单，输入列名"}
       value={value}
       options={columns.map((c) => ({ value: c, label: c }))}

@@ -20,6 +20,7 @@ export type LinkType = Stored<Core.LinkType>;
 export type Rule = Stored<Core.Rule>;
 export type Dataset = Stored<Core.Dataset>;
 export type DatasetColumn = Core.DatasetColumn;
+export type BindingMode = Core.BindingMode;
 export type DataMapping = Stored<Core.DataMapping>;
 export type MappingSource = Stored<Core.MappingSource>;
 export type ColumnBinding = Core.ColumnBinding;
@@ -211,7 +212,7 @@ export type DatasetRead = Dataset & {
   observed_at?: ISOTime | null;
 };
 
-export type MetricRead =
+export type MetricRead = (
   | (SimpleMetric & {
       value_kind: ValueKind | null;
       binding_status: BindingStatus;
@@ -224,7 +225,11 @@ export type MetricRead =
       components: { numerator: SimpleMetric; denominator: SimpleMetric };
       sql_reference?: SQLReference;
     })
-  | (ExpressionMetric & { binding_status: BindingStatus; sql_reference?: SQLReference });
+  | (ExpressionMetric & { binding_status: BindingStatus; sql_reference?: SQLReference })
+) & {
+  datasets?: DatasetRead[];
+  effective_bindings?: EffectiveBindingRead[];
+};
 
 export type ForbiddenMetricRead = {
   id: UUID;
@@ -240,7 +245,31 @@ export type PropertyRead = Effective<Property> & {
   binding?: FieldBinding;
   physical_type?: string | null;
 };
-export type LinkRead = Effective<LinkType> & { direction: "forward" | "reverse" };
+export type MembershipRead = {
+  type_id: UUID;
+  mapping_id: UUID;
+  binding_mode: BindingMode;
+  membership_source_id: string | null;
+  derived_by: DerivedBranch[];
+};
+export type EffectiveLinkRead = {
+  link_type_id: UUID;
+  source_type_id: UUID;
+  target_type_id: UUID;
+  data_join: DataJoin | null;
+};
+export type EffectiveBindingRead = {
+  type_id: UUID;
+  sources: MappingSource[];
+  fields: Record<string, FieldBinding>;
+  memberships: MembershipRead[];
+  links: EffectiveLinkRead[];
+};
+export type LinkRead = Effective<LinkType> & {
+  direction: "forward" | "reverse";
+  effective_bindings?: EffectiveBindingRead[];
+  datasets?: DatasetRead[];
+};
 export type MappingRead = DataMapping & { binding_status: BindingStatus };
 
 export type ObjectTypeRead = ObjectType & {
@@ -251,6 +280,9 @@ export type ObjectTypeRead = ObjectType & {
   binding_status: BindingStatus;
   mapping?: MappingRead | null;
   instance_source_type_ids?: UUID[];
+  effective_bindings?: EffectiveBindingRead[];
+  datasets?: DatasetRead[];
+  sources?: MappingSource[];
 };
 
 /** The outer kind names the resource; definition.kind keeps the metric union. */
@@ -687,3 +719,128 @@ export type Member = {
 };
 export type Scope = "ontology:read" | "mappings:read" | "instances:read";
 export type ServiceToken = { id: UUID; name: string; created_at: ISOTime; scopes: Scope[] };
+
+// --- MCP read projection --------------------------------------------------
+
+export type ToolName = "search_ontology" | "get_ontology" | "search_objects" | "get_object";
+export type MCPMeta = { _meta?: Record<string, Json> };
+export type ToolArguments =
+  | { name: "search_ontology"; arguments: SearchOntologyArgs }
+  | { name: "get_ontology"; arguments: GetOntologyArgs }
+  | { name: "search_objects"; arguments: SearchObjectsArgs }
+  | { name: "get_object"; arguments: GetObjectArgs };
+export type MCPRequest = { jsonrpc: "2.0"; id: string | number } & (
+  | {
+      method: "initialize";
+      params: MCPMeta & {
+        protocolVersion: string;
+        capabilities: Record<string, Json>;
+        clientInfo: { name: string; version: string };
+      };
+    }
+  | { method: "tools/list" | "ping" | "server/discover"; params?: MCPMeta }
+  | { method: "tools/call"; params: MCPMeta & ToolArguments }
+);
+export type MCPNotification = {
+  jsonrpc: "2.0";
+  method: "notifications/initialized";
+  params?: MCPMeta;
+};
+export type ToolDescription = {
+  name: ToolName;
+  description: string;
+  inputSchema: Record<string, Json>;
+  annotations: { readOnlyHint: true; destructiveHint: false };
+};
+export type MCPResponse<T> = { jsonrpc: "2.0"; id: string | number | null } & (
+  | { result: T }
+  | { error: { code: number; message: string; data?: Json } }
+);
+export type OntologyKind = "object_type" | "property" | "link_type" | "rule" | "metric";
+export type Paging = { cursor?: string; limit?: number };
+export type SearchOntologyArgs = Paging & { query: string; kinds?: OntologyKind[] };
+export type GetOntologyArgs = Paging & {
+  ids?: UUID[];
+  kinds?: OntologyKind[];
+  include?: ("semantic" | "physical" | "rules" | "adjacency")[];
+};
+export type SearchObjectsArgs = Paging & { type_id?: UUID; q?: string };
+export type GetObjectArgs = Paging & {
+  id: UUID;
+  include?: ("properties" | "evidence" | "adjacency")[];
+};
+export type FieldSegment = {
+  element_id: UUID;
+  field: string;
+  start: number;
+  end: number;
+  total: number;
+  text: string;
+  next_cursor: string | null;
+};
+export type MCPEnvelope = {
+  workspace_id: UUID;
+  version_id: UUID | null;
+  field_segments?: FieldSegment[];
+};
+export type OntologyHit = {
+  id: UUID;
+  kind: OntologyKind;
+  name: string;
+  technical_name: string;
+  summary: string;
+  matched_synonyms: string[];
+  owner_kind?: "object_type" | "property" | "link_type";
+  owner_id?: UUID;
+  dataset?: Pick<Dataset, "id" | "name">;
+};
+export type MCPList<T> = MCPEnvelope & Page<T>;
+export type MCPObjectHit = Pick<DocumentFactRead, "id" | "type_id" | "display_text"> & {
+  values: Record<string, Scalar>;
+};
+export type MCPAdjacency = {
+  link_type_id: UUID;
+  direction: "forward" | "reverse";
+  source_id: UUID;
+  target_id: UUID;
+};
+export type MCPObject = MCPObjectHit & {
+  properties?: Page<{ property_id: UUID; value: Scalar }>;
+  evidence?: Page<EvidenceView>;
+  adjacency?: Page<MCPAdjacency>;
+};
+export type MCPElement = {
+  id: UUID;
+  kind: OntologyKind;
+  name: string;
+  technical_name: string;
+  description?: string;
+  synonyms?: string[];
+  definition?: CoreElement;
+  binding_status?: BindingStatus;
+  inherited_from?: UUID | null;
+  properties?: Page<PropertyRead>;
+  rules?: Page<Effective<Rule>>;
+  links?: Page<LinkRead>;
+  child_types?: Page<Pick<ObjectType, "id" | "name" | "technical_name">>;
+  datasets?: Page<DatasetRead>;
+  sources?: Page<MappingSource>;
+  effective_bindings?: Page<EffectiveBindingRead>;
+  components?: { numerator: SimpleMetric; denominator: SimpleMetric };
+  dataset_id?: UUID;
+  value_kind?: ValueKind | null;
+  instance_source_type_ids?: UUID[];
+  sql_reference?: SQLReference;
+};
+export type MCPGetOntology = MCPEnvelope & {
+  total: number;
+  elements: MCPElement[];
+  missing: UUID[];
+  next_cursor: string | null;
+  field_segments?: FieldSegment[];
+};
+export type MCPCallResult<T> = {
+  content: { type: "text"; text: string }[];
+  structuredContent: T;
+  isError?: boolean;
+};

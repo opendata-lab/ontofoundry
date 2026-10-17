@@ -301,7 +301,7 @@ function ObjectInstances({
           }}
           options={[
             { value: "document", label: `文档事实 ${facts.length}` },
-            { value: "database", label: "数据库", disabled: !databaseReady },
+            { value: "database", label: "数据库", disabled: !databaseReady || undefined },
           ]}
         />
         <Input.Search
@@ -357,12 +357,12 @@ function ObjectInstances({
             locale={{ emptyText: <Empty description="没有匹配的实例" /> }}
           />
           <div className="flex justify-end gap-2">
-            <Button size="small" disabled={page === 0 || busy} onClick={() => setPage(page - 1)}>
+            <Button size="small" disabled={page === 0 || busy || undefined} onClick={() => setPage(page - 1)}>
               上一页
             </Button>
             <Button
               size="small"
-              disabled={!hasNext || busy}
+              disabled={!hasNext || busy || undefined}
               onClick={() => {
                 if (!sessionId && list?.next_cursor) {
                   setCursors((prev) => {

@@ -76,7 +76,7 @@ function show(path = "/workspaces/w/view") {
   renderWithProviders(<RouterProvider router={router} />);
   return router;
 }
-const tabs = () => within(screen.getByRole("tablist"));
+const tabs = () => within(screen.getByRole("tablist", { name: "已打开的页面" }));
 const tabItems = () =>
   tabs()
     .getAllByRole("tab")
@@ -114,6 +114,14 @@ describe("页签交互", () => {
     expect(tabA).toHaveAttribute("aria-selected", "false");
     fireEvent.click(tabA);
     expect(tabA).toHaveAttribute("aria-selected", "true");
+    expect(tabA.getAttribute("aria-controls")).toMatch(/^workspace-panel-/);
+    expect(screen.getByRole("tabpanel")).toHaveAttribute(
+      "id",
+      tabA.getAttribute("aria-controls"),
+    );
+    expect(document.getElementById(tabA.getAttribute("aria-controls")!)).toBe(
+      screen.getByRole("tabpanel"),
+    );
     expect(input()).toBe(original);
     expect(input()).toHaveValue("尚未保存");
     expect(scroll.scrollTop).toBe(123);
@@ -160,7 +168,7 @@ describe("页签交互", () => {
     expect(tabItems()).toHaveLength(1);
     await act(() => router.navigate("/workspaces/w/view"));
     expect(tabItems()).toHaveLength(2);
-    expect(document.querySelectorAll('section[role="tabpanel"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体对象" }));
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(tabItems()).toHaveLength(1);

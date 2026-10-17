@@ -136,7 +136,7 @@ export function LinkJoinEditor({
                 <Button
                   type="text"
                   aria-label={`删除第 ${i + 1} 组对应`}
-                  disabled={value.source_property_ids.length === 1}
+                  disabled={value.source_property_ids.length === 1 || undefined}
                   icon={<Trash2 size={15} />}
                   onClick={() =>
                     onChange({

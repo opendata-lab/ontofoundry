@@ -271,7 +271,7 @@ export function DerivedConditionEditor({
             type="dashed"
             icon={<Plus size={15} />}
             className="ml-12 self-start"
-            disabled={!context.properties.length && !context.links.length}
+            disabled={(!context.properties.length && !context.links.length) || undefined}
             onClick={() => update({ ...form, rows: [...form.rows, newPropertyRow(context.properties[0])] })}
           >
             添加条件

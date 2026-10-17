@@ -354,4 +354,96 @@ describe("element save impact preview", () => {
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
     expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
   });
+
+  it("disables Ant Design controls while busy and re-runs preview instead of saving stale candidate when Select changes during delayed preview", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    let resolveFirstPreview!: (value: {
+      current_version_id: string | null;
+      session_revision: number | null;
+      affected_items: [];
+    }) => void;
+    let resolveSecondPreview!: (value: {
+      current_version_id: string | null;
+      session_revision: number | null;
+      affected_items: [];
+    }) => void;
+    vi.mocked(modelingApi.previewElementSave)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstPreview = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecondPreview = resolve;
+          }),
+      );
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const cell = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    const row = cell.closest("tr")!;
+
+    const techInput = within(row).getByRole("textbox", { name: "属性技术名" });
+    const valueKindSelect = within(row).getByRole("combobox", { name: `${customerNo.name}类型` });
+    const requiredCheckbox = within(row).getByRole("checkbox", { name: `${customerNo.name}必填` });
+    const otherSelect = within(dialog).getByRole("combobox", { name: "名称类型" });
+
+    // Open the Select dropdown before clicking Save so its portal option is mounted, then click Save
+    fireEvent.mouseDown(valueKindSelect);
+    const integerOption = await screen.findByTitle("整数");
+    fireEvent.change(techInput, { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1));
+
+    // While preview is in flight (busy), Ant Design Select, Checkbox, and Input controls must be disabled
+    expect(techInput).toBeDisabled();
+    expect(valueKindSelect).toBeDisabled();
+    expect(valueKindSelect.closest(".ant-select")).toHaveClass("ant-select-disabled");
+    expect(requiredCheckbox).toBeDisabled();
+    expect(otherSelect).toBeDisabled();
+    fireEvent.mouseDown(otherSelect);
+    expect(otherSelect.closest(".ant-select")).not.toHaveClass("ant-select-open");
+
+    // Simulate a late Select change arriving from the pre-opened portal while the first preview is still pending
+    fireEvent.click(integerOption);
+
+    // Resolve the first preview with no affected items (the direct-save branch)
+    resolveFirstPreview({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [],
+    });
+
+    // Must NOT save the old candidate; instead must re-run preview with the updated Select value
+    await waitFor(() => expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2));
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+
+    const [, firstPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, secondPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
+    expect(firstPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("string");
+    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("integer");
+    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe(
+      "customer_code",
+    );
+
+    resolveSecondPreview({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [],
+    });
+
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const savedProp = savePayload.draft.properties.find((p) => p.id === customerNo.id);
+    expect(savedProp?.technical_name).toBe("customer_code");
+    expect(savedProp?.value_kind).toBe("integer");
+  });
 });

@@ -418,7 +418,7 @@ export function MetricForm({
               type="dashed"
               icon={<Plus size={15} />}
               className="self-start"
-              disabled={!metric.dataset_id}
+              disabled={!metric.dataset_id || undefined}
               onClick={() => onChange({ ...metric, filters: [...metric.filters, newFilter(metric.dataset_id)] })}
             >
               添加条件（同时满足）
