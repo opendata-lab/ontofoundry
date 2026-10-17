@@ -75,6 +75,10 @@ core-1 P0 起前端改用 Ant Design 5 + Tailwind CSS v4。功能迁移完成后
 | `PanelToolbar` | 面板顶部单行工具栏：左侧页签或主筛选，右侧状态筛选与搜索 |
 | `StatusMark` | 唯一的状态显示方式 |
 | `SectionTitle` | 面板或弹窗内的 13px 小节标题，可带附注和右侧操作 |
+| `ApplicationFrame` | U1 应用框架：顶栏、可收起侧栏和剩余高度的页面区域；沿用原有窄屏整体缩放 |
+| `AsyncSurface` | U1 加载与错误反馈的 24px 内边距；整页路由错误居中，不额外嵌套面板 |
+
+U1 框架页签采用 Ant Design editable-card Tabs，页面仍通过 items.children 渲染。仅页签条使用 `workspace-tab-bar` tokens 类，内容区只以直接子选择器约束剩余高度；页面内 Tabs 不继承框架的尺寸与颜色。框架页签为 12px 辅助字号，侧栏为 13px 正文字号，品牌字为 16px；品牌图形保留原有四块菱形构造，装饰尺寸集中在 tokens 中。导航链接仍使用路由链接以保留浏览器链接行为，操作按钮使用 Ant Design。
 
 推广中如需新的布局模式（如详情弹窗的键值区、空状态），先加入本节并获确认，再在页面中使用。
 

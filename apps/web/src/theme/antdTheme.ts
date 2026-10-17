@@ -243,6 +243,11 @@ export function antdTheme(read: TokenReader = readRoot): ThemeConfig {
         paddingLG: spaceMd,
         padding: spaceMd,
       }),
+      Result: defined({
+        titleFontSize: textBase,
+        subtitleFontSize: textSm,
+        extraMargin: spaceMd !== undefined ? `${spaceMd}px 0 0` : undefined,
+      }),
       Progress: defined({
         defaultColor: success,
         remainingColor: rule,

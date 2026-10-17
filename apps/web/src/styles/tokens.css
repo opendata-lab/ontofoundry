@@ -92,12 +92,40 @@
   --color-rule-label-soft: #f2edf9;
   --color-step-wash: #e7f8ff;
   --ref-sidebar: clamp(184px, 14.4vw, 208px);
+
+  /* U1 application chrome and the unchanged decorative brand geometry. */
+  --app-min-width: 1100px;
+  --app-header-height: 52px;
+  --app-sidebar-collapsed: 56px;
+  --app-search-max-height: 420px;
+  --workspace-tab-title-width: 180px;
+  --workspace-tab-dirty-size: 4px;
+  --workspace-tab-confirm-width: 420px;
+  --brand-tile-size: 7px;
+  --brand-tile-gap: 2px;
+  --brand-mark-rotation: 45deg;
+  --brand-muted-opacity: 0.58;
+  --icon-size: 16px;
+  --icon-size-sm: 14px;
+  --icon-size-xs: 12px;
 }
 
 /* Expose the tokens above to Tailwind utilities (bg-surface, text-muted,
    rounded-sm, font-sans …). `inline` makes utilities reference these
    variables directly; the :root values above stay the single source. */
 @theme inline {
+  --spacing: var(--space-3xs);
+  --spacing-control-sm: var(--control-height-sm);
+  --spacing-control-lg: var(--control-height-lg);
+  --spacing-tab-dirty: var(--workspace-tab-dirty-size);
+  --spacing-icon: var(--icon-size);
+  --container-tab-title: var(--workspace-tab-title-width);
+  --container-tab-confirm: min(var(--workspace-tab-confirm-width), calc(100vw - var(--space-xl) - var(--space-xs)));
+  --spacing-app-search: var(--app-search-max-height);
+  --spacing-icon-sm: var(--icon-size-sm);
+  --spacing-icon-xs: var(--icon-size-xs);
+  --leading-base: var(--leading-base);
+  --leading-tight: var(--leading-tight);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
 
@@ -144,3 +172,37 @@
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
 }
+
+/* Application geometry has no Ant Design counterpart. Control overrides use
+   Tailwind token utilities, so their cascade stays above the Ant Design layer. */
+.app-shell {
+  display: grid;
+  width: max(100%, var(--app-min-width));
+  height: calc(100dvh / var(--app-scale, 1));
+  zoom: var(--app-scale, 1);
+  grid-template-rows: var(--app-header-height) minmax(0, 1fr);
+  grid-template-columns: var(--ref-sidebar) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--color-surface);
+
+  & > header { z-index: var(--z-raised); }
+  & .app-sidebar { padding-inline: var(--space-sm); }
+  &[data-collapsed="true"] {
+    grid-template-columns: var(--app-sidebar-collapsed) minmax(0, 1fr);
+    & .app-sidebar { padding-inline: var(--space-3xs); }
+    & .app-nav-link { justify-content: center; padding-inline: 0; }
+  }
+}
+
+.brand-mark {
+  display: grid;
+  grid-template-columns: repeat(2, var(--brand-tile-size));
+  gap: var(--brand-tile-gap);
+  transform: rotate(var(--brand-mark-rotation));
+}
+.brand-tile {
+  display: block;
+  height: var(--brand-tile-size);
+  background: var(--color-accent);
+}
+.brand-tile-muted { opacity: var(--brand-muted-opacity); }

@@ -32,6 +32,16 @@
 
 `AppShell`、`WorkspaceTabs`、`Brand`、`AsyncState`、`TagList`：顶栏、侧栏、页面页签条与加载/空状态。框架影响所有页面，单独一批。
 
+### U1 完成记录（2026-10-17）
+
+- 改造 `AppShell`、`WorkspaceTabs`、`Brand`、`AsyncState`、`TagList`。新增 `ApplicationFrame` 和 `AsyncSurface`，先在设计第 4 节记录现有框架与异步反馈布局；其他页面代码未修改。
+- 顶栏、侧栏、品牌装饰、页签标题截断宽度及图标尺寸集中到 `tokens.css`；侧栏改为 6px 圆角，品牌文字使用 16px 档位，页签使用 12px、28px 高度和统一语义色。品牌四块菱形构造保留。页签条通过引用 tokens 的 Tailwind 工具类控制，移除任意值、强制覆盖和内联样式，选择器局限于独立的条区域；页面仍作为 Tabs items.children 渲染，内容高度仅约束直接子元素。路由错误 Result 的字号通过 Ant Design 主题统一。
+- 五个文件全部加入 lint error 清单。当前 **0 error、223 warn，分布在 33 个文件**；比 U0 记录减少 28 warn。
+- 新增框架功能测试，覆盖导航当前项、收起/展开、访客可见范围、搜索快捷键与空结果、加载失败后重试。已有页签功能测试保持通过，覆盖唯一 aria-controls、首次激活、保活、滚动位置、未保存关闭保护、离开空间保护和后台忙碌提示。
+- 视觉用例复用原有虚构数据与接口拦截，保留数据映射两个页签，新增本体发布页及“三个页面打开 + 一个后台未保存页签”。新用例还检查内部 Tabs 样式不随框架页签切换改变、每个已访问页签的 aria-controls 唯一对应、设置表单与滚动位置保留，以及关闭未保存页签可取消。
+- 检查：`vitest --run` 34 个文件、157 项通过；`tsc -b`、`lint`、`check:core-types`、`build`、`git diff --check` 通过。构建仍提示已有大体积 chunk。按本次运行环境要求，仅使用 Playwright webServer 的本机回环端口与接口拦截，未连接数据库或进行局域网验证。
+- 截图验收：更新基准后 `test:visual` 连续两次通过（4 个用例）。页签条用例改为按 `[role=tab][aria-selected]` 计数，因为 rc-tabs 的关闭按钮也带 `role="tab"`。基准图已人工查看：框架与数据映射页、本体发布页一致，页面内部 Tabs 不受页签条样式影响。
+
 ## U2 列表与设置类页面
 
 `TypeCatalogPage`（本体对象目录）、`ConnectionsPage` 与 `DataConnections`、`SettingsPage`、`WorkspaceDirectoryPage`、`DeliveryPage`。都是“页头 + 面板 + 表格/表单”结构，直接套用数据映射页的模式。
