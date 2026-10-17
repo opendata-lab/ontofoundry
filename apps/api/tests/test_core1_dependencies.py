@@ -156,3 +156,35 @@ def test_simple_definition_change_affects_its_ratio_without_dataset_edits():
     component = next(m for m in candidate.metrics if m.id == ratio.numerator_id)
     component.aggregation = Aggregation.AVG
     assert affected_metrics(before, candidate) == {component.id, ratio.id}
+
+
+def test_exact_final_property_swap_rewrite_is_not_interpreted_again():
+    from ontofoundry_api.domain.dependencies import rewrite_references
+
+    before = example_draft("07-instances-and-evidence")
+    candidate = before.model_copy(deep=True)
+    first, second = [
+        p for p in candidate.properties if p.technical_name in {"customer_no", "name"}
+    ][:2]
+    first.technical_name, second.technical_name = (
+        second.technical_name,
+        first.technical_name,
+    )
+    final = validate_candidate_graph(before, candidate)
+    saved = final.model_copy(deep=True)
+    assert rewrite_references(before, final) == final
+    assert validate_candidate_graph(before, final) == final
+    assert final == saved
+    for previous in before.material_objects:
+        current = next(f for f in final.material_objects if f.id == previous.id)
+        for prop in before.properties:
+            if (
+                prop.owner_type_id != previous.type_id
+                or prop.technical_name not in previous.values
+            ):
+                continue
+            renamed = next(p for p in final.properties if p.id == prop.id)
+            assert (
+                current.values[renamed.technical_name]
+                == previous.values[prop.technical_name]
+            )

@@ -573,3 +573,318 @@ def test_rename_rewrites_newly_published_facts_against_latest(client):
     ]
     assert {f["values"]["customer_code"] for f in facts} == {"C001", "C002"}
     assert all("customer_no" not in f["values"] for f in facts)
+
+
+@pytest.mark.parametrize("member_kind", ["property", "rule", "mapping"])
+@pytest.mark.parametrize("direction", ["in", "out"])
+@pytest.mark.parametrize("staged", [False, True])
+def test_existing_members_cannot_cross_aggregate_boundaries(
+    client, member_kind, direction, staged
+):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "01-basic-sales", published=True)
+    candidate = deepcopy(session["draft"])
+    customer, order = candidate["object_types"]
+    if member_kind == "property":
+        member = next(p for p in candidate["properties"] if p["technical_name"] == "region")
+        source, destination = customer, order
+        member["owner_type_id"] = destination["id"]
+        candidate["mappings"][0]["fields"].pop("region")
+    elif member_kind == "rule":
+        member = candidate["rules"][0]
+        source, destination = order, customer
+        member.update(
+            owner_kind="object_type", owner_id=destination["id"], expression="1 > 0"
+        )
+    else:
+        member = candidate["mappings"][0]
+        source, destination = customer, order
+        member["type_id"] = destination["id"]
+    target = destination if direction == "in" else source
+    if staged:
+        if member_kind == "mapping":
+            # Keep physical columns applicable so staging reaches the scope guard.
+            member["fields"] = deepcopy(candidate["mappings"][1]["fields"])
+            member["sources"] = deepcopy(candidate["mappings"][1]["sources"])
+        response = save(client, session, candidate)
+        assert response.status_code == 200, response.text
+        session = response.json()
+    body = save_body(client, session, candidate, target_id=target["id"])
+    before_session = client.get(ROOT + f"/sessions/{session['id']}").json()
+    before_published = client.get(ROOT + "/published-snapshot").json()
+    for suffix in ("/preview", ""):
+        response = client.post(ROOT + "/element-saves" + suffix, json=body)
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "ELEMENT_SCOPE_INVALID"
+    assert client.get(ROOT + "/published-snapshot").json() == before_published
+    assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session
+
+
+def test_customer_property_can_be_deleted_without_moving_it(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "01-basic-sales", published=True)
+    candidate = deepcopy(session["draft"])
+    prop = next(p for p in candidate["properties"] if p["technical_name"] == "region")
+    candidate["properties"].remove(prop)
+    candidate["mappings"][0]["fields"].pop("region")
+    body = save_body(client, session, candidate, target_id=prop["owner_type_id"])
+    assert preflight_confirmations(client, body) == []
+    response = client.post(ROOT + "/element-saves", json=body)
+    assert response.status_code == 200, response.text
+    for raw in (response.json()["draft"], response.json()["session"]["draft"]):
+        assert all(p["id"] != prop["id"] for p in raw["properties"])
+        assert "region" not in raw["mappings"][0]["fields"]
+
+
+@pytest.mark.parametrize("already_rewritten", [False, True])
+def test_property_swap_keeps_bindings_by_uuid_for_both_candidate_forms(
+    client, already_rewritten
+):
+    from pr23_fixtures import example_session
+
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.dependencies import rewrite_references
+    from ontofoundry_api.services.element_save import calculate_element_save
+
+    session = example_session(client, "01-basic-sales", published=True)
+    original = session["draft"]
+    candidate = deepcopy(original)
+    customer_id = candidate["object_types"][0]["id"]
+    props = [p for p in candidate["properties"] if p["owner_type_id"] == customer_id]
+    first, second = props[:2]
+    first["technical_name"], second["technical_name"] = (
+        second["technical_name"],
+        first["technical_name"],
+    )
+    final = rewrite_references(
+        CoreDraft.model_validate(original), CoreDraft.model_validate(candidate)
+    ).model_dump(mode="json")
+    before_inputs = deepcopy((original, candidate, final))
+    unrewritten = calculate_element_save(
+        original, original, original, candidate, "object_type", customer_id
+    )
+    rewritten = calculate_element_save(
+        original, original, original, final, "object_type", customer_id
+    )
+    assert unrewritten == rewritten
+    assert (original, candidate, final) == before_inputs
+    body = save_body(
+        client, session, final if already_rewritten else candidate, target_id=customer_id
+    )
+    assert preflight_confirmations(client, body) == []
+    response = client.post(ROOT + "/element-saves", json=body)
+    assert response.status_code == 200, response.text
+    original_fields = original["mappings"][0]["fields"]
+    bindings_by_uuid = {
+        p["id"]: original_fields[p["technical_name"]]
+        for p in original["properties"]
+        if p["owner_type_id"] == customer_id
+    }
+    for raw in (response.json()["draft"], response.json()["session"]["draft"]):
+        mapping = next(m for m in raw["mappings"] if m["type_id"] == customer_id)
+        assert {
+            p["id"]: mapping["fields"][p["technical_name"]]
+            for p in raw["properties"]
+            if p["owner_type_id"] == customer_id
+        } == bindings_by_uuid
+
+
+@pytest.mark.parametrize("new_dataset", [False, True])
+def test_old_ratio_session_imports_missing_upstream_closure(client, new_dataset):
+    from uuid import uuid4
+
+    from pr23_fixtures import example_session
+    from test_modeling import publish
+
+    from ontofoundry_api.domain.canonical import element_sha256
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.validation import validate_core_graph
+
+    old = example_session(client, "13-dataset-metrics", published=True)
+    newer = create_session(client)
+    latest = newer["draft"]
+    ratio = next(m for m in latest["metrics"] if m["kind"] == "ratio")
+    component = deepcopy(
+        next(m for m in latest["metrics"] if m["id"] == ratio["numerator_id"])
+    )
+    component.update(
+        id=str(uuid4()), technical_name="new_core_commits", name="新核心提交数"
+    )
+    latest["metrics"].append(component)
+    ratio["numerator_id"] = component["id"]
+    imported = [component]
+    if new_dataset:
+        dataset = deepcopy(latest["datasets"][0])
+        dataset.update(id=str(uuid4()), name="new_code_daily", table_name="new_code_daily")
+        latest["datasets"].append(dataset)
+        denominator = deepcopy(
+            next(m for m in latest["metrics"] if m["id"] == ratio["denominator_id"])
+        )
+        denominator.update(
+            id=str(uuid4()), technical_name="new_all_commits", name="新全部提交数"
+        )
+        latest["metrics"].append(denominator)
+        ratio["denominator_id"] = denominator["id"]
+        for metric in (component, denominator):
+            metric["dataset_id"] = dataset["id"]
+            metric["measure"]["dataset_id"] = dataset["id"]
+            metric["time_field"]["dataset_id"] = dataset["id"]
+            for condition in metric["filters"]:
+                condition["column"]["dataset_id"] = dataset["id"]
+        imported += [denominator, dataset]
+    response = save(client, newer, latest)
+    assert response.status_code == 200, response.text
+    response = publish(client, response.json())
+    assert response.status_code == 200, response.text
+    unrelated = next(m for m in old["draft"]["metrics"] if m["kind"] == "expression")
+    unrelated["description"] = "保留的无关指标草稿"
+    response = save(client, old, old["draft"])
+    assert response.status_code == 200, response.text
+    old = response.json()
+    candidate = deepcopy(old["draft"])
+    next(m for m in candidate["metrics"] if m["id"] == ratio["id"])["description"] = (
+        "旧会话只修改占比说明"
+    )
+    body = save_body(client, old, candidate, kind="metric", target_id=ratio["id"])
+    confirmations = preflight_confirmations(client, body)
+    assert {c["target_id"] for c in confirmations} == {e["id"] for e in imported}
+    for element in imported:
+        collection = "datasets" if "table_name" in element else "metrics"
+        assert next(c for c in confirmations if c["target_id"] == element["id"])[
+            "expected_target_hash"
+        ] == element_sha256(element, collection=collection)
+    before_version = client.get(ONTOLOGY + "/version").json()
+    before_session = client.get(ROOT + f"/sessions/{old['id']}").json()
+    for items, status, code in [
+        (confirmations[:-1], 422, "ELEMENT_SCOPE_INVALID"),
+        (
+            [{**confirmations[0], "expected_target_hash": "0" * 64}, *confirmations[1:]],
+            409,
+            "VERSION_CHANGED",
+        ),
+    ]:
+        response = client.post(
+            ROOT + "/element-saves", json={**body, "affected_items": items}
+        )
+        assert response.status_code == status, response.text
+        assert response.json()["error"]["code"] == code
+        assert client.get(ONTOLOGY + "/version").json() == before_version
+        assert client.get(ROOT + f"/sessions/{old['id']}").json() == before_session
+    response = client.post(
+        ROOT + "/element-saves", json={**body, "affected_items": confirmations}
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    for raw in (result["draft"], result["session"]["draft"]):
+        validate_core_graph(CoreDraft.model_validate(raw))
+        synced_ratio = next(m for m in raw["metrics"] if m["id"] == ratio["id"])
+        assert synced_ratio["numerator_id"] == component["id"]
+        assert synced_ratio["description"] == "旧会话只修改占比说明"
+        assert all(
+            e in raw["datasets" if "table_name" in e else "metrics"] for e in imported
+        )
+    assert (
+        next(
+            m for m in result["session"]["draft"]["metrics"] if m["id"] == unrelated["id"]
+        )["description"]
+        == unrelated["description"]
+    )
+    assert (
+        next(m for m in result["draft"]["metrics"] if m["id"] == unrelated["id"])[
+            "description"
+        ]
+        != unrelated["description"]
+    )
+
+
+def test_old_mapping_session_imports_new_dataset_and_preserves_other_drafts(client):
+    from uuid import uuid4
+
+    from pr23_fixtures import example_session
+    from test_modeling import publish
+
+    from ontofoundry_api.domain.canonical import element_sha256
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.validation import validate_core_graph
+
+    old = example_session(client, "01-basic-sales", published=True)
+    newer = create_session(client)
+    dataset = deepcopy(newer["draft"]["datasets"][0])
+    dataset.update(id=str(uuid4()), name="new_customers", table_name="new_customers")
+    newer["draft"]["datasets"].append(dataset)
+    newer["draft"]["mappings"][0]["sources"][0]["dataset_id"] = dataset["id"]
+    response = save(client, newer, newer["draft"])
+    assert response.status_code == 200, response.text
+    response = publish(client, response.json())
+    assert response.status_code == 200, response.text
+    old["draft"]["datasets"][1]["description"] = "保留订单数据集草稿"
+    old = save(client, old, old["draft"]).json()
+    candidate = deepcopy(old["draft"])
+    customer = candidate["object_types"][0]
+    customer["description"] = "旧会话客户说明"
+    body = save_body(client, old, candidate, target_id=customer["id"])
+    confirmations = preflight_confirmations(client, body)
+    assert confirmations == [
+        {
+            "target_kind": "dataset",
+            "target_id": dataset["id"],
+            "expected_target_hash": element_sha256(dataset, collection="datasets"),
+        }
+    ]
+    response = client.post(
+        ROOT + "/element-saves", json={**body, "affected_items": confirmations}
+    )
+    assert response.status_code == 200, response.text
+    for raw in (response.json()["draft"], response.json()["session"]["draft"]):
+        validate_core_graph(CoreDraft.model_validate(raw))
+        assert dataset in raw["datasets"]
+        assert raw["mappings"][0]["sources"][0]["dataset_id"] == dataset["id"]
+    assert (
+        response.json()["session"]["draft"]["datasets"][1]["description"]
+        == "保留订单数据集草稿"
+    )
+
+
+@pytest.mark.parametrize("defect", ["duplicate", "missing", "extra", "kind", "hash"])
+def test_confirmation_error_priority_is_independent_of_order(client, defect):
+    from itertools import permutations
+
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "13-dataset-metrics", published=True)
+    candidate = deepcopy(session["draft"])
+    candidate["datasets"][0]["snapshot_date_column"] = "stat_date"
+    body = save_body(
+        client, session, candidate, kind="dataset", target_id=candidate["datasets"][0]["id"]
+    )
+    confirmations = preflight_confirmations(client, body)
+    bad_hash = {**confirmations[0], "expected_target_hash": "0" * 64}
+    rest = confirmations[1:]
+    if defect == "duplicate":
+        tail = [confirmations[0]]
+    elif defect == "missing":
+        rest = rest[:-1]
+        tail = []
+    elif defect == "extra":
+        tail = [{**confirmations[0], "target_id": candidate["datasets"][0]["id"]}]
+    elif defect == "kind":
+        tail = [{**rest.pop(), "target_kind": "dataset"}]
+    else:
+        tail = []
+    # Move the stale hash before/after every structural defect and valid entry.
+    groups = [[bad_hash], rest, tail]
+    before_version = client.get(ONTOLOGY + "/version").json()
+    before_session = client.get(ROOT + f"/sessions/{session['id']}").json()
+    for order in permutations(groups):
+        items = [item for group in order for item in group]
+        response = client.post(
+            ROOT + "/element-saves", json={**body, "affected_items": items}
+        )
+        assert response.status_code == (409 if defect == "hash" else 422), response.text
+        assert response.json()["error"]["code"] == (
+            "VERSION_CHANGED" if defect == "hash" else "ELEMENT_SCOPE_INVALID"
+        )
+        assert client.get(ONTOLOGY + "/version").json() == before_version
+        assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session

@@ -6,7 +6,11 @@ from uuid import UUID
 
 from ontofoundry_api.domain.canonical import element_sha256
 from ontofoundry_api.domain.core import CoreDraft
-from ontofoundry_api.domain.dependencies import affected_metrics, rewrite_references
+from ontofoundry_api.domain.dependencies import (
+    affected_metrics,
+    reference_index,
+    rewrite_references,
+)
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.errors import ServiceError
@@ -38,6 +42,17 @@ def _scope_error():
         code="ELEMENT_SCOPE_INVALID",
         status_code=422,
     )
+
+
+def _check_member_boundaries(before, after, kind, element_id):
+    start, end = [element_scope(s, kind, element_id) for s in (before, after)]
+    # Existing members may be deleted, but cannot cross aggregate boundaries.
+    for collection in COLLECTIONS.values():
+        existing = {e["id"] for e in before[collection]} & {
+            e["id"] for e in after[collection]
+        }
+        if (start[collection] ^ end[collection]) & existing:
+            _scope_error()
 
 
 def _copy_target(destination, source, kind, element_id):
@@ -72,10 +87,7 @@ def _target_candidate(original, edited, kind, element_id):
             "没有找到要保存的元素", code="ELEMENT_NOT_FOUND", status_code=422
         )
     start, end = [element_scope(s, kind, element_id) for s in (original, edited)]
-    # Moving another aggregate's member into this aggregate is still an outside edit.
-    for c in COLLECTIONS.values():
-        if (end[c] - start[c]) & {e["id"] for e in original[c]}:
-            _scope_error()
+    _check_member_boundaries(original, edited, kind, element_id)
     expected = _rewrite(original, _copy_target(original, edited, kind, element_id))
     for c in COLLECTIONS.values():
         old, submitted, required = (
@@ -97,6 +109,37 @@ class ElementSaveCalculation:
     affected_items: list[dict]
 
 
+def _include_missing_upstream(synced, merged, kind, element_id):
+    """Import missing dependencies without replacing existing session drafts."""
+    refs = reference_index(CoreDraft.model_validate(merged))
+    available = {
+        UUID(e["id"]) for collection in COLLECTIONS.values() for e in synced[collection]
+    }
+    published = {
+        UUID(e["id"]): (collection, e)
+        for collection in COLLECTIONS.values()
+        for e in merged[collection]
+    }
+    scope = element_scope(merged, kind, element_id)
+    pending = [UUID(identity) for ids in scope.values() for identity in ids]
+    imported = set()
+    visited = set()
+    while pending:
+        owner = pending.pop()
+        if owner in visited:
+            continue
+        visited.add(owner)
+        for ref in refs[owner]:
+            if ref.target_id in available:
+                continue
+            collection, element = published[ref.target_id]
+            synced[collection].append(deepcopy(element))
+            available.add(ref.target_id)
+            imported.add(element["id"])
+            pending.append(ref.target_id)
+    return imported
+
+
 def calculate_element_save(
     base, latest, original, edited, kind, element_id, *, affected_items=None
 ):
@@ -106,6 +149,8 @@ def calculate_element_save(
     Confirmations never grant edit permission: only server-derived rewrites do.
     """
     candidate = _target_candidate(original, edited, kind, element_id)
+    # Staging a reassignment must not authorize it for bounded publication.
+    _check_member_boundaries(base, candidate, kind, element_id)
     # Merge only the aggregate first. Derive external rewrites against latest,
     # including dependencies introduced after the session's historical base.
     scoped = _copy_target(base, candidate, kind, element_id)
@@ -125,6 +170,7 @@ def calculate_element_save(
     synced = _copy_target(
         _rewrite(candidate, synchronized_target), synchronized_target, kind, element_id
     )
+    imported = _include_missing_upstream(synced, merged, kind, element_id)
     validate_core_graph(CoreDraft.model_validate(synced))
     scopes = [element_scope(s, kind, element_id) for s in (original, candidate, synced)]
     dataset_metrics = (
@@ -153,6 +199,7 @@ def calculate_element_save(
                 (identity not in after or previous == after[identity])
                 and current.get(identity) == published.get(identity)
                 and UUID(identity) not in dataset_metrics
+                and identity not in imported
             ):
                 continue
             required.append(
@@ -174,16 +221,19 @@ def calculate_element_save(
 def _check_confirmations(required, submitted):
     expected = {(e["target_kind"], e["target_id"]): e for e in required}
     seen = set()
+    entries = []
     for item in submitted:
         entry = item.model_dump() if hasattr(item, "model_dump") else item
         identity = (entry["target_kind"], entry["target_id"])
         if identity in seen or identity not in expected:
             _scope_error()
         seen.add(identity)
-        if entry["expected_target_hash"] != expected[identity]["expected_target_hash"]:
-            raise ServiceError("受影响项已变化", code="VERSION_CHANGED", status_code=409)
+        entries.append((identity, entry))
     if seen != expected.keys():
         _scope_error()
+    for identity, entry in entries:
+        if entry["expected_target_hash"] != expected[identity]["expected_target_hash"]:
+            raise ServiceError("受影响项已变化", code="VERSION_CHANGED", status_code=409)
 
 
 def preview_element_save(db, workspace_id, body):

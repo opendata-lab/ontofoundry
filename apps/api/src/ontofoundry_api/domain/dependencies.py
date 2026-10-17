@@ -237,12 +237,11 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
                 resolve_metric_expression(before, previous), result
             )
     old_mappings = {m.id: m for m in before.mappings}
-    for mapping in result.mappings:
-        previous = old_mappings.get(mapping.id)
-        if previous is None:
-            continue
+
+    def rewrite_fields(previous, fields):
         rewritten = {}
-        for name, binding in mapping.fields.items():
+        for name, original_binding in fields.items():
+            binding = original_binding.model_copy(deep=True)
             prop = old.property_by_name(previous.type_id, name)
             if prop and prop.id in new.properties and name in previous.fields:
                 name = new.properties[prop.id].technical_name
@@ -257,21 +256,45 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
             if name in rewritten:
                 raise ValueError("属性改名后的绑定键冲突")
             rewritten[name] = binding
-        mapping.fields = rewritten
-    old_facts = {fact.id: fact for fact in before.material_objects}
-    for fact in result.material_objects:
-        previous = old_facts.get(fact.id)
+        return rewritten
+
+    for mapping in result.mappings:
+        previous = old_mappings.get(mapping.id)
         if previous is None:
             continue
+        # Recognize the exact final rewrite before interpreting any submitted key
+        # in the old namespace. In a swap every final name is also an old name.
+        try:
+            final_fields = rewrite_fields(previous, previous.fields)
+        except ValueError:
+            # An explicit removal/revision may eliminate an obsolete reference.
+            # Only rewriting the submitted definition is authoritative then.
+            final_fields = None
+        if mapping.fields != final_fields:
+            mapping.fields = rewrite_fields(previous, mapping.fields)
+
+    def rewrite_values(previous, values):
         rewritten = {}
-        for name, value in fact.values.items():
+        for name, value in values.items():
             prop = old.property_by_name(previous.type_id, name)
             if prop and prop.id in new.properties and name in previous.values:
                 name = new.properties[prop.id].technical_name
             if name in rewritten:
                 raise ValueError("属性改名后的事实值键冲突")
             rewritten[name] = value
-        fact.values = rewritten
+        return rewritten
+
+    old_facts = {fact.id: fact for fact in before.material_objects}
+    for fact in result.material_objects:
+        previous = old_facts.get(fact.id)
+        if previous is None:
+            continue
+        try:
+            final_values = rewrite_values(previous, previous.values)
+        except ValueError:
+            final_values = None
+        if fact.values != final_values:
+            fact.values = rewrite_values(previous, fact.values)
     return result
 
 

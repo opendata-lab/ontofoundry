@@ -216,7 +216,7 @@ class MetricCompiler:
         self.known = {c.name for c in self.dataset.columns}
 
     def identifier(self, name):
-        return exp.to_identifier(name, quoted=True).sql(dialect=self.dialect)
+        return serialize(exp.to_identifier(name, quoted=True), self.dialect)
 
     def column(self, name):
         if name not in self.known:

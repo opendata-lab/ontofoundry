@@ -16,20 +16,35 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_unsaved_ratio_aggregates_and_readonly_timeout_path(pg_client):
+@pytest.mark.parametrize("percent_names", [False, True])
+def test_unsaved_ratio_aggregates_and_readonly_timeout_path(pg_client, percent_names):
     app = pg_client.app
     url = make_url(app.state.settings.database_url)
     draft = example_draft("13-dataset-metrics")
     for ds in draft.datasets:
         ds.dialect = "postgresql"
         ds.schema_name = "public"
+        if percent_names:
+            ds.table_name = "code%lines_daily"
+            next(c for c in ds.columns if c.name == "commit_count").name = "amount%"
+    if percent_names:
+        for metric in draft.metrics:
+            if (
+                metric.kind == "simple"
+                and metric.measure
+                and metric.measure.column == "commit_count"
+            ):
+                metric.measure.column = "amount%"
+    table = '"code%%lines_daily"' if percent_names else "code_lines_daily"
+    column = '"amount%%"' if percent_names else "commit_count"
     wid = pg_client.get("/api/v1/workspaces").json()["items"][0]["id"]
     with app.state.engine.begin() as c:
         c.exec_driver_sql(
-            "CREATE TABLE code_lines_daily(repo text,stat_date date,commit_count integer)"
+            f"CREATE TABLE {table}(repo text,stat_date date,{column} integer)", {}
         )
         c.exec_driver_sql(
-            "INSERT INTO code_lines_daily VALUES ('core','2026-10-01',3),('core','2026-10-02',5),('web','2026-10-02',2)"
+            f"INSERT INTO {table} VALUES ('core','2026-10-01',3),('core','2026-10-02',5),('web','2026-10-02',2)",
+            {},
         )
     with app.state.session_factory() as db:
         db.add(
