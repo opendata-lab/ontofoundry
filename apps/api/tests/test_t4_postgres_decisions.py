@@ -99,7 +99,39 @@ def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
     )
 
     assert sorted(r.status_code for r in results) == [200, 409], [r.text for r in results]
-    draft = pg_client.get(ROOT + f"/sessions/{session['id']}").json()["draft"]
-    assert sum(t["technical_name"] == "purchase_order" for t in draft["object_types"]) == 1
-    assert sum(p["technical_name"] == "order_no" for p in draft["properties"]) == 1
-    assert sum(link["technical_name"] == "supplied_by" for link in draft["link_types"]) == 1
+    after = pg_client.get(ROOT + f"/sessions/{session['id']}").json()
+    assert after["revision"] == session["revision"] + 1
+    draft = after["draft"]
+    assert (
+        sum(
+            t["id"] == po["target_id"] and t["technical_name"] == "purchase_order"
+            for t in draft["object_types"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            p["owner_type_id"] == po["target_id"] and p["technical_name"] == "order_no"
+            for p in draft["properties"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            item["id"] == prop["target_id"]
+            and item["owner_type_id"] == po["target_id"]
+            and item["technical_name"] == "order_no"
+            for item in draft["properties"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            item["id"] == link["target_id"]
+            and item["technical_name"] == "supplied_by"
+            and item["source_type_id"] == po["target_id"]
+            and item["target_type_id"] == session["draft"]["object_types"][0]["id"]
+            for item in draft["link_types"]
+        )
+        == 1
+    )
