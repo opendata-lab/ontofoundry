@@ -1,6 +1,6 @@
-import { Alert, Button, Card, Empty, List, Table, Tabs, Tag, Typography } from "antd";
-import { PageBody, PageHeader } from "../components/PageHeader";
-import { Check, CheckCircle2, Copy, Rocket } from "lucide-react";
+import { Alert, Button, Empty, Table, Tabs, Typography } from "antd";
+import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle, StatusMark } from "../components/layout";
+import { Check, Copy, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
@@ -13,7 +13,7 @@ import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 type PageTab = "publish" | "history" | "service";
 
@@ -101,105 +101,125 @@ export function DeliveryPage() {
     <div className="flex h-full min-h-0 flex-col bg-canvas">
       <PageHeader
         title="本体发布"
-        note={
-          workspace.current_version && (
-            <Tag color="success" className="!m-0" icon={<CheckCircle2 size={12} className="mr-1 inline" />}>
-              当前 v{workspace.current_version}
-            </Tag>
-          )
-        }
+        note={workspace.current_version && <StatusMark state="mapped" label={`当前 v${workspace.current_version}`} />}
       />
-      <PageBody className="!gap-3">
-      <Tabs
-        activeKey={tab}
-        onChange={(key) => setTab(key as PageTab)}
-        items={[
-          ...(workspace.role
-            ? [
-                {
-                  key: "publish",
-                  label: "发布",
-                  children: (
-                    <div className="flex flex-col gap-3">
-                      {result && <Alert type="success" showIcon message={result} />}
-                      {publish}
-                      {model.error && <Alert type="error" showIcon message={model.error} />}
-                    </div>
-                  ),
-                },
-              ]
-            : []),
-          {
-            key: "history",
-            label: "版本历史",
-            children: (
-              <div className="flex flex-col gap-3">
-                {workspace.role && versions.length > 0 && (
-                  <HistoryComparison workspaceId={workspace.id} versions={versions} />
-                )}
-                <Table
-                  size="middle"
-                  rowKey="version_id"
-                  dataSource={versions}
-                  pagination={versions.length > 20 ? { pageSize: 20 } : false}
-                  locale={{ emptyText: <Empty description="还没有已发布版本" /> }}
-                  columns={[
-                    { title: "版本", key: "version", width: 80, render: (_, v) => `v${v.version}` },
-                    { title: "说明", key: "message", render: (_, v) => v.message || <Text type="secondary">—</Text> },
+      <PageBody>
+        <Panel>
+          <Tabs
+            activeKey={tab}
+            onChange={(key) => setTab(key as PageTab)}
+            renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
+            items={[
+              ...(workspace.role
+                ? [
                     {
-                      title: "对象 / 关系 / 指标",
-                      key: "counts",
-                      render: (_, v) => `${v.counts.object_types} / ${v.counts.link_types} / ${v.counts.metrics}`,
+                      key: "publish",
+                      label: "发布",
+                      children: (
+                        <div className="flex flex-col gap-3 p-4">
+                          {result && (
+                            <div role="status">
+                              <StatusMark state="mapped" label={result} />
+                            </div>
+                          )}
+                          {publish}
+                          {model.error && <Alert type="error" showIcon message={model.error} />}
+                        </div>
+                      ),
                     },
-                    {
-                      title: "发布时间",
-                      key: "published",
-                      render: (_, v) => new Date(v.published_at).toLocaleString("zh-CN", { hour12: false }),
-                    },
-                  ]}
-                />
-              </div>
-            ),
-          },
-          {
-            key: "service",
-            label: "服务接入",
-            children: (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Card title="REST API" size="small">
-                  <code className="block break-all">{serviceRoot}/types</code>
-                  <div className="mt-3 flex gap-2">
-                    <CopyButton text={serviceRoot + "/types"} label="复制地址" />
-                    <Button size="small" href="/docs" target="_blank">
-                      查看接口文档
-                    </Button>
-                  </div>
-                </Card>
-                <Card title="MCP" size="small">
-                  <code className="block break-all">{serviceRoot}/mcp</code>
-                  <div className="mt-3">
-                    <CopyButton text={serviceRoot + "/mcp"} label="复制地址" />
-                  </div>
-                  <Paragraph type="secondary" className="!mt-3 !mb-1 text-xs">
-                    使用服务令牌（Bearer）调用，只读，提供四个工具：
-                  </Paragraph>
-                  <List
-                    size="small"
-                    split={false}
-                    dataSource={[...MCP_TOOLS]}
-                    renderItem={([name, text]) => (
-                      <List.Item key={name} className="!justify-start gap-2 !py-0.5 text-sm">
-                        <code>{name}</code>
-                        <Text type="secondary">{text}</Text>
-                      </List.Item>
+                  ]
+                : []),
+              {
+                key: "history",
+                label: "版本历史",
+                children: (
+                  <div className="flex flex-col gap-3">
+                    {workspace.role && versions.length > 0 && (
+                      <div className="px-4 pt-4">
+                        <HistoryComparison workspaceId={workspace.id} versions={versions} />
+                      </div>
                     )}
-                  />
-                </Card>
-              </div>
-            ),
-          },
-        ]}
-      />
+                    <Table
+                      size="middle"
+                      onHeaderRow={() => ({ className: "text-xs" })}
+                      rowKey="version_id"
+                      dataSource={versions}
+                      pagination={versions.length > 20 ? { pageSize: 20 } : false}
+                      locale={{ emptyText: <Empty description="还没有已发布版本" /> }}
+                      columns={[
+                        { title: "版本", key: "version", width: 80, render: (_, v) => `v${v.version}` },
+                        {
+                          title: "说明",
+                          key: "message",
+                          render: (_, v) => v.message || <Text type="secondary">—</Text>,
+                        },
+                        {
+                          title: "对象 / 关系 / 指标",
+                          key: "counts",
+                          render: (_, v) => `${v.counts.object_types} / ${v.counts.link_types} / ${v.counts.metrics}`,
+                        },
+                        {
+                          title: "发布时间",
+                          key: "published",
+                          render: (_, v) => new Date(v.published_at).toLocaleString("zh-CN", { hour12: false }),
+                        },
+                      ]}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: "service",
+                label: "服务接入",
+                children: (
+                  <div className="flex flex-col">
+                    <section className="flex flex-col gap-3 border-b border-rule p-4">
+                      <SectionTitle title="REST API" />
+                      <code className="break-all text-xs">{serviceRoot}/types</code>
+                      <div className="flex gap-2">
+                        <CopyButton text={serviceRoot + "/types"} label="复制地址" />
+                        <Button size="small" href="/docs" target="_blank">
+                          查看接口文档
+                        </Button>
+                      </div>
+                    </section>
+                    <section>
+                      <div className="flex flex-col gap-3 p-4">
+                        <SectionTitle title="MCP" />
+                        <code className="break-all text-xs">{serviceRoot}/mcp</code>
+                        <div>
+                          <CopyButton text={serviceRoot + "/mcp"} label="复制地址" />
+                        </div>
+                        <Text type="secondary" className="text-xs">
+                          使用服务令牌（Bearer）调用，只读，提供四个工具：
+                        </Text>
+                      </div>
+                      <Table
+                        size="middle"
+                        rowKey={([name]) => name}
+                        showHeader={false}
+                        pagination={false}
+                        dataSource={[...MCP_TOOLS]}
+                        columns={[
+                          {
+                            title: "工具",
+                            key: "name",
+                            render: (_, [name]) => <code className="text-xs">{name}</code>,
+                          },
+                          {
+                            title: "用途",
+                            key: "description",
+                            render: (_, [, text]) => <Text type="secondary">{text}</Text>,
+                          },
+                        ]}
+                      />
+                    </section>
+                  </div>
+                ),
+              },
+            ]}
+          />
+        </Panel>
       </PageBody>
     </div>
   );

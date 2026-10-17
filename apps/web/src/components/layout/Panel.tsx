@@ -16,7 +16,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`flex flex-col overflow-hidden rounded-md border border-rule bg-surface shadow-panel ${className}`.trim()}
+      className={`flex flex-none flex-col overflow-hidden rounded-md border border-rule bg-surface shadow-panel ${className}`.trim()}
     >
       {children}
       {footer && (

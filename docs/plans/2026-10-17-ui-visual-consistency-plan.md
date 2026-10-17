@@ -46,6 +46,16 @@
 
 `TypeCatalogPage`（本体对象目录）、`ConnectionsPage` 与 `DataConnections`、`SettingsPage`、`WorkspaceDirectoryPage`、`DeliveryPage`。都是“页头 + 面板 + 表格/表单”结构，直接套用数据映射页的模式。
 
+### U2 完成记录（2026-10-17）
+
+- 改造上述六个文件。本体对象与关系目录、数据连接、工作空间目录统一为面板内的 Ant Design Table；目录筛选与搜索移入 `PanelToolbar`。保留继承属性与关系统计、映射与文档实例计数、关系端点及基数、标签筛选、详情链接、新建、发布、连接测试与保存、空间创建、成员管理和权限边界。
+- 设置页使用同宽的并列面板，标题、说明、表单与表格首列统一按 16px 对齐；发布页将内部页签收进面板顶部，服务接入以分割线分区。状态改用 `StatusMark`，表头为 12px、正文为 13px，表格统一使用主题定义的 10px × 16px 单元格内边距。六个文件均移除任意值、强制覆盖、内联样式及状态色 Tag。
+- 在设计第 4 节补充目录框架、设置表单及发布页分区模式；新增 `DirectoryFrame`，目录与设置的最大宽度集中到 `tokens.css`。`Panel` 保持内容高度，滚动交由 `PageBody`；`PanelToolbar` 新增 `tabBar` 插槽，避免额外包装破坏 Ant Design 页签导航条的父级选择器。其他页面代码未修改。
+- 六个文件全部加入 lint error 清单。当前 **0 error、184 warn，分布在 28 个文件**；比 U1 减少 39 warn，剩余项属于后续批次。
+- 新增 7 个视觉用例、8 个截图断言：对象目录、关系目录、数据连接、空间设置（顶部及连通性检查区）、工作空间目录、版本历史、服务接入；更新已有发布页用例，检查当前版本与内部页签。复用 `fixtures.ts`，补齐固定的虚构空间、连接、成员、连通性检查及版本数据。拦截仅匹配以 `/api/` 开头的路径；框架页签计数继续使用 `[role=tab][aria-selected]`。
+- 新增 7 项功能测试，覆盖目录搜索、继承统计与会话详情链接、关系端点、连接测试、数据库类型切换后的默认端口、连接保存、成员可见操作及工作空间创建；更新设置页状态断言。检查：`vitest --run` 37 个文件、164 项通过；`tsc -b`（含截图用例）、`lint`、`check:core-types`、`build`、`git diff --check` 通过。构建仍提示已有大体积 chunk。
+- 按设计第 3 节静态核对容器层级、对齐线、字号档位、状态显示与表格密度。本轮按运行环境要求未启动服务、未连接数据库、未访问局域网，未运行 `test:visual` / `test:visual:update`，未生成截图。**截图基准更新、1440×900 截图对比及浏览器视觉验收待协调者在沙箱外运行。** 未 commit 或 push。
+
 ## U3 发布与提案
 
 `PublishPanel`、`ConflictResolver`、`ReleaseReview`、`ProposalPanel`、`ProposalCard`、`ProposalDetail`、`EvidencePopover`、`ModelResults`。

@@ -105,6 +105,9 @@
   --brand-tile-gap: 2px;
   --brand-mark-rotation: 45deg;
   --brand-muted-opacity: 0.58;
+  /* U2 directory and settings content bounds. */
+  --directory-max-width: 1080px;
+  --settings-max-width: 880px;
   --icon-size: 16px;
   --icon-size-sm: 14px;
   --icon-size-xs: 12px;
@@ -121,6 +124,9 @@
   --spacing-icon: var(--icon-size);
   --container-tab-title: var(--workspace-tab-title-width);
   --container-tab-confirm: min(var(--workspace-tab-confirm-width), calc(100vw - var(--space-xl) - var(--space-xs)));
+  --spacing-app-header: var(--app-header-height);
+  --container-directory: var(--directory-max-width);
+  --container-settings: var(--settings-max-width);
   --spacing-app-search: var(--app-search-max-height);
   --spacing-icon-sm: var(--icon-size-sm);
   --spacing-icon-xs: var(--icon-size-xs);

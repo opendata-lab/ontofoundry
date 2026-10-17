@@ -9,6 +9,10 @@ test("delivery page and its own tabs fit below the application strip", async ({ 
   await page.goto(`/workspaces/${WORKSPACE_ID}/delivery`);
   await expect(page.getByRole("heading", { name: "本体发布" })).toBeVisible();
   await expect(page.getByText("选择待发布的本体", { exact: true })).toBeVisible();
+  await expect(page.getByText("当前 v3", { exact: true })).toBeVisible();
+  const strip = page.getByRole("tablist", { name: "已打开的页面" });
+  await expect(strip.locator("[role=tab][aria-selected]")).toHaveCount(1);
+  await expect(page.getByRole("tab", { name: "版本历史", exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("delivery.png", { fullPage: true });
 });

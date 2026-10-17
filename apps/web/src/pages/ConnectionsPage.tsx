@@ -1,17 +1,12 @@
 import { Button } from "antd";
-import { PageBody, PageHeader } from "../components/PageHeader";
+import { PageBody, PageHeader } from "../components/layout";
 import { Plus } from "lucide-react";
 import { useRef } from "react";
 import { DataConnections } from "../components/DataConnections";
 import { usePageTab } from "../hooks/usePageTab";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 
-/**
- * 数据连接。
- *
- * 独立成页而不是挂在数据映射下：连接是一次性配置且承载数据库凭据，映射是随本体
- * 演进的建模产物。两者放在一页时，每次改映射都要越过一块几乎不变的区域。
- */
+/** Connections are managed separately from the evolving ontology mappings. */
 export function ConnectionsPage() {
   const { workspace } = useWorkspaceContext();
   const openDialog = useRef<(() => void) | null>(null);
@@ -26,7 +21,7 @@ export function ConnectionsPage() {
         )}
       </PageHeader>
       <PageBody>
-      <DataConnections onReady={(open) => (openDialog.current = open)} />
+        <DataConnections onReady={(open) => (openDialog.current = open)} />
       </PageBody>
     </div>
   );

@@ -77,8 +77,11 @@ core-1 P0 起前端改用 Ant Design 5 + Tailwind CSS v4。功能迁移完成后
 | `SectionTitle` | 面板或弹窗内的 13px 小节标题，可带附注和右侧操作 |
 | `ApplicationFrame` | U1 应用框架：顶栏、可收起侧栏和剩余高度的页面区域；沿用原有窄屏整体缩放 |
 | `AsyncSurface` | U1 加载与错误反馈的 24px 内边距；整页路由错误居中，不额外嵌套面板 |
+| `DirectoryFrame` | U2 工作空间目录的独立顶栏与居中主体，主体内继续使用 `PageHeader` / `PageBody`，宽度与顶栏高度引用 tokens |
 
 U1 框架页签采用 Ant Design editable-card Tabs，页面仍通过 items.children 渲染。仅页签条使用 `workspace-tab-bar` tokens 类，内容区只以直接子选择器约束剩余高度；页面内 Tabs 不继承框架的尺寸与颜色。框架页签为 12px 辅助字号，侧栏为 13px 正文字号，品牌字为 16px；品牌图形保留原有四块菱形构造，装饰尺寸集中在 tokens 中。导航链接仍使用路由链接以保留浏览器链接行为，操作按钮使用 Ant Design。
+
+U2 列表统一使用 `PanelToolbar` 与 Ant Design Table；目录的名称仍用路由链接进入详情。设置页各小节为同宽的并列 `Panel`，标题放入 `PanelToolbar`，表单区使用 16px 内边距；表格直接贴合面板边缘，保持首列与标题对齐。发布页使用一个 `Panel`，通过 Tabs 的 `renderTabBar` 将页签条放入 `PanelToolbar` 的 `tabBar` 插槽，保持原有页签内容与保活行为；该插槽不增加内部包装，保留 Ant Design 对导航条直接父级的选择器约束。服务接入按分割线分区，各区使用 `SectionTitle`，不再嵌套卡片。目录主体和设置面板的最大宽度集中在 tokens；面板不沿页面纵向收缩，溢出由 `PageBody` 滚动承接。
 
 推广中如需新的布局模式（如详情弹窗的键值区、空状态），先加入本节并获确认，再在页面中使用。
 

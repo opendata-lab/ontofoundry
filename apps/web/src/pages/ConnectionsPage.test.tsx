@@ -1,0 +1,75 @@
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { catalogApi, workspaceRequest } from "../api/client";
+import { workspace } from "../test/apiRecords";
+import { renderWithProviders } from "../test/renderWithProviders";
+import { ConnectionsPage } from "./ConnectionsPage";
+
+const context = vi.hoisted(() => ({ workspace: { id: "w1", role: "admin" as string | null } }));
+vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => context }));
+vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn() }));
+vi.mock("../api/client", () => ({ catalogApi: { connections: vi.fn() }, workspaceRequest: vi.fn() }));
+
+const connection = {
+  id: "conn-demo",
+  name: "星河只读库",
+  kind: "postgresql",
+  host: "db.example.invalid",
+  port: 5432,
+  database: "xinghe_demo",
+  username: "demo_reader",
+} as const;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  context.workspace = workspace();
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection] });
+  vi.mocked(workspaceRequest).mockResolvedValue({});
+});
+afterEach(cleanup);
+
+it("tests the selected connection and announces its result", async () => {
+  renderWithProviders(<ConnectionsPage />);
+  expect(await screen.findByRole("cell", { name: "星河只读库" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "测试" }));
+  expect(await screen.findByRole("status")).toHaveTextContent("星河只读库：连接正常");
+  expect(workspaceRequest).toHaveBeenCalledWith("w1", "/connections/conn-demo/test", {});
+});
+
+it("opens the admin form, updates the default port and saves the connection", async () => {
+  vi.mocked(workspaceRequest).mockResolvedValue({
+    ...connection,
+    id: "conn-new",
+    name: "云杉分析库",
+    kind: "mysql",
+    port: 3306,
+  });
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(screen.getByRole("button", { name: "添加连接" }));
+  expect(screen.getByRole("spinbutton", { name: "端口" })).toHaveValue("5432");
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "数据库类型" }));
+  fireEvent.click(await screen.findByText("MySQL", { selector: ".ant-select-item-option-content" }));
+  expect(screen.getByRole("spinbutton", { name: "端口" })).toHaveValue("3306");
+  for (const [name, value] of [
+    ["连接名称", "云杉分析库"],
+    ["主机", "db.example.invalid"],
+    ["数据库名称", "yunshan_demo"],
+    ["查询用户名", "demo_reader"],
+  ])
+    fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } });
+  fireEvent.click(screen.getByRole("button", { name: "测试并保存" }));
+  expect(await screen.findByRole("cell", { name: "云杉分析库" })).toBeInTheDocument();
+  expect(workspaceRequest).toHaveBeenCalledWith(
+    "w1",
+    "/connections",
+    expect.objectContaining({ name: "云杉分析库", kind: "mysql", port: 3306 }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+});
+
+it("keeps connections readable for members and hides the admin add action", async () => {
+  context.workspace = workspace({ role: "member" });
+  renderWithProviders(<ConnectionsPage />);
+  expect(await screen.findByRole("cell", { name: "星河只读库" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "添加连接" })).not.toBeInTheDocument();
+});

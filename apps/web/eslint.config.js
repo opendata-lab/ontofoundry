@@ -131,10 +131,16 @@ export default tseslint.config(
       ],
     },
   },
-  // Migrated U0 and U1 files enforce all visual consistency rules as errors.
+  // Migrated U0, U1 and U2 files enforce all visual consistency rules as errors.
   {
     files: [
       "src/pages/MappingsPage.tsx",
+      "src/pages/TypeCatalogPage.tsx",
+      "src/pages/ConnectionsPage.tsx",
+      "src/components/DataConnections.tsx",
+      "src/pages/SettingsPage.tsx",
+      "src/pages/WorkspaceDirectoryPage.tsx",
+      "src/pages/DeliveryPage.tsx",
       "src/components/AppShell.tsx",
       "src/components/WorkspaceTabs.tsx",
       "src/components/Brand.tsx",
