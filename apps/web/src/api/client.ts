@@ -8,6 +8,7 @@ import type {
   DecisionResult,
   Draft,
   ElementSave,
+  ElementSaveImpact,
   ElementSaveResult,
   FactProposalRevision,
   ISODate,
@@ -210,6 +211,9 @@ export const modelingApi = {
     request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft, ...extra })),
   validate: (s: ModelingSession) => request<ValidationReport>(sessionPath(s) + "/validate", json("POST", {})),
   snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  /** Previews cross-aggregate impact read-only before saving an element. */
+  previewElementSave: (id: string, payload: ElementSave) =>
+    workspaceRequest<ElementSaveImpact>(id, "/element-saves/preview", payload),
   /** Saves one aggregate and publishes it right away (current-version CAS). */
   saveElement: (id: string, payload: ElementSave) =>
     workspaceRequest<ElementSaveResult>(id, "/element-saves", payload),

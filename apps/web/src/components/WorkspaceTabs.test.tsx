@@ -76,8 +76,11 @@ function show(path = "/workspaces/w/view") {
   renderWithProviders(<RouterProvider router={router} />);
   return router;
 }
-const tabs = () =>
-  within(screen.getByRole("tablist", { name: "已打开的页面" }));
+const tabs = () => within(screen.getByRole("tablist"));
+const tabItems = () =>
+  tabs()
+    .getAllByRole("tab")
+    .filter((el) => el.hasAttribute("aria-selected"));
 const input = () =>
   within(screen.getByRole("tabpanel")).getByRole("textbox", {
     name: "页面输入",
@@ -114,10 +117,10 @@ describe("页签交互", () => {
     expect(input()).toBe(original);
     expect(input()).toHaveValue("尚未保存");
     expect(scroll.scrollTop).toBe(123);
-    expect(tabs().getAllByRole("tab")).toHaveLength(2);
+    expect(tabItems()).toHaveLength(2);
     await act(() => router.navigate(-1));
     expect(input()).toHaveValue("B 的内容");
-    expect(tabs().getAllByRole("tab")).toHaveLength(2);
+    expect(tabItems()).toHaveLength(2);
   });
   it("未保存关闭可取消，确认后移除且回到其他页", async () => {
     const router = show();
@@ -132,7 +135,7 @@ describe("页签交互", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/workspaces/w/view"),
     );
-    expect(tabs().getAllByRole("tab")).toHaveLength(1);
+    expect(tabItems()).toHaveLength(1);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
   it("离开空间和刷新均保护后台草稿，取消不会丢失，确认后可离开", async () => {
@@ -154,13 +157,13 @@ describe("页签交互", () => {
     const router = show();
     await act(() => router.navigate("/workspaces/w/objects"));
     fireEvent.click(screen.getByRole("link", { name: "其他空间" }));
-    expect(tabs().getAllByRole("tab")).toHaveLength(1);
+    expect(tabItems()).toHaveLength(1);
     await act(() => router.navigate("/workspaces/w/view"));
-    expect(tabs().getAllByRole("tab")).toHaveLength(2);
-    expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
+    expect(tabItems()).toHaveLength(2);
+    expect(document.querySelectorAll('section[role="tabpanel"]')).toHaveLength(1);
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体对象" }));
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
-    expect(tabs().getAllByRole("tab")).toHaveLength(1);
+    expect(tabItems()).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
   });
   it("后台页签忙碌时仍可切换和发布，但不可关闭该页签或离开空间", async () => {

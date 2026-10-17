@@ -1,4 +1,4 @@
-import { Alert, Button, Modal } from "antd";
+import { Alert, Button, Modal, Tabs } from "antd";
 import {
   memo,
   Suspense,
@@ -93,7 +93,7 @@ const TabPanel = memo(function TabPanel({
       className="h-full min-w-0 overflow-auto"
       id={`panel-${tab.id}`}
       role="tabpanel"
-      aria-labelledby={`tab-${tab.id}`}
+      aria-labelledby={`workspace-tab-${tab.id}`}
       hidden={!active}
       inert={!active}
     >
@@ -234,7 +234,7 @@ export function WorkspaceTabs({
       });
     setClosing(null);
     strip.current
-      ?.querySelector<HTMLButtonElement>(`#tab-${next.active}`)
+      ?.querySelector<HTMLElement>(`#workspace-tab-${next.active}`)
       ?.focus();
   };
   const requestClose = (tab: PageTab) => {
@@ -252,83 +252,68 @@ export function WorkspaceTabs({
   const target = state.tabs.find((t) => t.id === closing);
   return (
     <div className="flex h-full flex-col">
-      <div
-        className="flex min-w-0 flex-[0_0_36px] gap-[3px] overflow-x-auto border-b border-rule-soft bg-[#f3f5f7] px-2.5 pt-1 [scrollbar-width:thin]"
-        ref={strip}
-        role="tablist"
-        aria-label="已打开的页面"
-        onKeyDown={(e) => {
-          if (
-            !(e.target instanceof HTMLElement) ||
-            e.target.getAttribute("role") !== "tab"
-          )
-            return;
-          const targetId = e.target.id;
-          const index = state.tabs.findIndex((t) => `tab-${t.id}` === targetId);
-          const nextIndex =
-            e.key === "ArrowRight"
-              ? (index + 1) % state.tabs.length
-              : e.key === "ArrowLeft"
-                ? (index - 1 + state.tabs.length) % state.tabs.length
-                : e.key === "Home"
-                  ? 0
-                  : e.key === "End"
-                    ? state.tabs.length - 1
-                    : -1;
-          if (nextIndex >= 0) {
-            e.preventDefault();
-            const tab = state.tabs[nextIndex];
-            void navigate(tab.href);
-            strip.current
-              ?.querySelector<HTMLButtonElement>(`#tab-${tab.id}`)
-              ?.focus();
-          } else if (e.key === "Delete") {
-            e.preventDefault();
-            requestClose(state.tabs[index]);
-          }
-        }}
-      >
-        {state.tabs.map((tab) => {
-          const area = new URL(tab.href, "http://local").pathname.split("/")[3];
-          const Icon =
-            {
-              view: Network,
-              relations: GitBranch,
-              builder: Sparkles,
-              mappings: Database,
-              delivery: Rocket,
-              settings: Settings,
-            }[area] ?? Box;
-          return (
-            <div
-              key={tab.id}
-              className={`flex flex-none items-center rounded-t-xs border border-b-0 ${state.active === tab.id ? "border-rule-soft bg-surface text-accent" : "border-transparent text-muted hover:bg-[#eaf0f6]"}`}
-            >
-              <button
-                id={`tab-${tab.id}`}
-                role="tab"
-                aria-controls={`panel-${tab.id}`}
-                aria-selected={state.active === tab.id}
-                tabIndex={state.active === tab.id ? 0 : -1}
-                title={tab.title + (tab.dirty ? " · 未保存" : "")}
-                onClick={() => void navigate(tab.href)}
-                className="flex h-[30px] min-w-0 items-center gap-[7px] border-0 bg-transparent py-0 pr-2 pl-3 text-xs whitespace-nowrap text-inherit focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-              >
-                <Icon size={14} className="flex-none" />
-                <span className="max-w-[180px] truncate">{tab.title}</span>
-                {tab.dirty && <i className="size-[5px] flex-none rounded-full bg-[#d58b20]" aria-label="未保存" />}
-              </button>
-              <button
-                className="mr-[5px] grid size-5 place-items-center rounded-[3px] border-0 bg-transparent p-0 text-muted hover:bg-[#e5eaf0] hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
-                aria-label={`关闭 ${tab.title}`}
-                title="关闭页面"
-                onClick={() => requestClose(tab)}
-              >
-                <X size={12} />
-              </button>
-            </div>
-          );
-        })}
+      <div ref={strip} className="min-w-0 flex-none">
+        <Tabs
+          id="workspace"
+          type="editable-card"
+          size="small"
+          hideAdd
+          activeKey={state.active}
+          tabBarGutter={3}
+          tabBarStyle={{ margin: 0 }}
+          className="[&_.ant-tabs-content-holder]:hidden [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:bg-[#f3f5f7] [&_.ant-tabs-nav]:px-2.5 [&_.ant-tabs-nav]:pt-1 [&_.ant-tabs-tab]:!h-[30px] [&_.ant-tabs-tab]:!px-2.5 [&_.ant-tabs-tab]:!py-0 [&_.ant-tabs-tab]:!text-xs [&_.ant-tabs-tab-remove]:!ml-1 [&_.ant-tabs-tab-remove]:!p-0"
+          onChange={(key) => {
+            const tab = state.tabs.find((t) => t.id === key);
+            if (tab) void navigate(tab.href);
+          }}
+          onEdit={(targetKey, action) => {
+            if (action === "remove" && typeof targetKey === "string") {
+              const tab = state.tabs.find((t) => t.id === targetKey);
+              if (tab) requestClose(tab);
+            }
+          }}
+          items={state.tabs.map((tab) => {
+            const area = new URL(tab.href, "http://local").pathname.split("/")[3];
+            const Icon =
+              {
+                view: Network,
+                relations: GitBranch,
+                builder: Sparkles,
+                mappings: Database,
+                delivery: Rocket,
+                settings: Settings,
+              }[area] ?? Box;
+            return {
+              key: tab.id,
+              style: { display: "none" },
+              label: (
+                <span
+                  title={tab.title + (tab.dirty ? " · 未保存" : "")}
+                  className="inline-flex min-w-0 items-center gap-[7px] text-xs whitespace-nowrap"
+                >
+                  <Icon size={14} className="flex-none" />
+                  <span className="max-w-[180px] truncate">{tab.title}</span>
+                  {tab.dirty && (
+                    <i
+                      className="size-[5px] flex-none rounded-full bg-[#d58b20]"
+                      aria-label="未保存"
+                    />
+                  )}
+                </span>
+              ),
+              closeIcon: (
+                <span
+                  role="button"
+                  aria-label={`关闭 ${tab.title}`}
+                  title="关闭页面"
+                  className="inline-flex size-4 items-center justify-center rounded-[3px]"
+                >
+                  <X size={12} />
+                </span>
+              ),
+            };
+          })}
+        />
       </div>
       {notice && (
         <Alert

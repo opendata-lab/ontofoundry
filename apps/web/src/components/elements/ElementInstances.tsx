@@ -1,4 +1,4 @@
-import { Alert, Button, DatePicker, Descriptions, Empty, Input, Segmented, Table, Tag, Typography } from "antd";
+import { Alert, Button, Card, DatePicker, Descriptions, Empty, Input, Segmented, Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -56,38 +56,40 @@ function InstanceDetail({
   const type = byId(draft.object_types, row.type_id);
   const properties = effectiveProperties(draft, row.type_id).map((p) => p.definition);
   return (
-    <section className="flex flex-col gap-3 rounded-md border border-rule p-4">
-      <div className="flex items-center gap-2">
-        <Text strong className="flex-1">
-          {row.display_text}
-        </Text>
-        {type && <Tag className="!m-0">{type.name}</Tag>}
-        <Button size="small" type="text" onClick={onClose}>
-          收起
-        </Button>
-      </div>
-      <Descriptions
-        size="small"
-        bordered
-        column={2}
-        items={properties.map((p) => ({ key: p.id, label: p.name, children: shown(row.values[p.technical_name]) }))}
-      />
-      {related && (
-        <div className="flex flex-col gap-1">
-          <Text strong>关联实例</Text>
-          {related.length ? (
-            related.map((r) => (
-              <span key={r.id} className="text-sm">
-                <Text type="secondary">{r.label}</Text> {r.other} <Text type="secondary">（{r.typeName}）</Text>
-              </span>
-            ))
-          ) : (
-            <Text type="secondary">没有关联实例</Text>
-          )}
+    <Card size="small">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <Text strong className="flex-1">
+            {row.display_text}
+          </Text>
+          {type && <Tag className="!m-0">{type.name}</Tag>}
+          <Button size="small" type="text" onClick={onClose}>
+            收起
+          </Button>
         </div>
-      )}
-      {row.fact && <EvidenceSection workspaceId={draft.workspace_id} evidence={row.fact.evidence} />}
-    </section>
+        <Descriptions
+          size="small"
+          bordered
+          column={2}
+          items={properties.map((p) => ({ key: p.id, label: p.name, children: shown(row.values[p.technical_name]) }))}
+        />
+        {related && (
+          <div className="flex flex-col gap-1">
+            <Text strong>关联实例</Text>
+            {related.length ? (
+              related.map((r) => (
+                <span key={r.id} className="text-sm">
+                  <Text type="secondary">{r.label}</Text> {r.other} <Text type="secondary">（{r.typeName}）</Text>
+                </span>
+              ))
+            ) : (
+              <Text type="secondary">没有关联实例</Text>
+            )}
+          </div>
+        )}
+        {row.fact && <EvidenceSection workspaceId={draft.workspace_id} evidence={row.fact.evidence} />}
+      </div>
+    </Card>
   );
 }
 

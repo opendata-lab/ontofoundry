@@ -411,6 +411,11 @@ export type ElementSave = {
   draft: Draft;
   affected_items?: AffectedItem[];
 };
+export type ElementSaveImpact = {
+  current_version_id: UUID | null;
+  session_revision: number | null;
+  affected_items: (AffectedItem & { reason: string })[];
+};
 export type ElementSaveResult = {
   version: VersionSummary;
   draft: Draft;

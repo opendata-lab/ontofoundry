@@ -13,7 +13,13 @@ vi.mock("../../api/client", async (importOriginal) => {
   return {
     ...original,
     api: { ...original.api, workspace: vi.fn(), presentation: vi.fn() },
-    modelingApi: { ...original.modelingApi, snapshot: vi.fn(), get: vi.fn(), saveElement: vi.fn() },
+    modelingApi: {
+      ...original.modelingApi,
+      snapshot: vi.fn(),
+      get: vi.fn(),
+      previewElementSave: vi.fn(),
+      saveElement: vi.fn(),
+    },
     catalogApi: { ...original.catalogApi, mappingPreview: vi.fn() },
     metricsApi: { preview: vi.fn() },
   };
@@ -51,6 +57,11 @@ const saved = (draft: Draft): ElementSaveResult => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.workspace).mockResolvedValue(workspace);
+  vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+    current_version_id: "v1",
+    session_revision: null,
+    affected_items: [],
+  });
 });
 afterEach(cleanup);
 
@@ -234,5 +245,113 @@ describe("relation, metric and dataset popups", () => {
     show(draft, `inspect=property:${property.id}`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("属性与映射"));
+  });
+});
+
+describe("element save impact preview", () => {
+  it("previews once and saves directly without a confirmation modal when affected_items is empty", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [],
+    });
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
+    const [, previewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(previewPayload).toEqual(savePayload);
+    expect(savePayload).not.toHaveProperty("affected_items");
+    expect(savePayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe("customer_code");
+  });
+
+  it("shows affected items and reason in a confirmation modal, cancels without saving, and strips reason when confirmed", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customerFact = draft.material_objects.find((f) => f.type_id === customer.id)!;
+    const h = "1".repeat(64);
+    vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [
+        {
+          target_kind: "material_object",
+          target_id: customerFact.id,
+          expected_target_hash: h,
+          reason: "当前元素修改需要同步此依赖的定义或引用",
+        },
+      ],
+    });
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const noticeText = await screen.findByText("确认后这些元素会随本次保存一并改写");
+    const confirmDialog = noticeText.closest<HTMLElement>('[role="dialog"]')!;
+    expect(within(confirmDialog).getByText("确认保存影响")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("文档事实")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("C001")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("当前元素修改需要同步此依赖的定义或引用")).toBeInTheDocument();
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument());
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    const confirmAgain = (await screen.findByText("确认后这些元素会随本次保存一并改写")).closest<HTMLElement>('[role="dialog"]')!;
+    fireEvent.click(within(confirmAgain).getByRole("button", { name: "确认保存" }));
+
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(savePayload.affected_items).toEqual([
+      {
+        target_kind: "material_object",
+        target_id: customerFact.id,
+        expected_target_hash: h,
+      },
+    ]);
+    expect(savePayload.affected_items?.[0]).not.toHaveProperty("reason");
+  });
+
+  it("displays a 409 error from preview without opening the confirmation modal or saving", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    vi.mocked(modelingApi.previewElementSave).mockRejectedValue(
+      new ApiError("当前版本已变化", 409, "VERSION_CHANGED"),
+    );
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
+    expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
   });
 });

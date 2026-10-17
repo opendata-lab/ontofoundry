@@ -1,4 +1,4 @@
-import { Alert, Button, Card, Empty, Table, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Card, Empty, List, Table, Tabs, Tag, Typography } from "antd";
 import { PageBody, PageHeader } from "../components/PageHeader";
 import { Check, CheckCircle2, Copy, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -183,13 +183,17 @@ export function DeliveryPage() {
                   <Paragraph type="secondary" className="!mt-3 !mb-1 text-xs">
                     使用服务令牌（Bearer）调用，只读，提供四个工具：
                   </Paragraph>
-                  <ul className="m-0 flex flex-col gap-1 pl-5 text-sm">
-                    {MCP_TOOLS.map(([name, text]) => (
-                      <li key={name}>
-                        <code>{name}</code> <Text type="secondary">{text}</Text>
-                      </li>
-                    ))}
-                  </ul>
+                  <List
+                    size="small"
+                    split={false}
+                    dataSource={[...MCP_TOOLS]}
+                    renderItem={([name, text]) => (
+                      <List.Item key={name} className="!justify-start gap-2 !py-0.5 text-sm">
+                        <code>{name}</code>
+                        <Text type="secondary">{text}</Text>
+                      </List.Item>
+                    )}
+                  />
                 </Card>
               </div>
             ),

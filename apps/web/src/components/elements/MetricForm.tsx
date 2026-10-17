@@ -381,8 +381,15 @@ export function MetricForm({
               const set = (next: Condition) =>
                 onChange({ ...metric, filters: metric.filters.map((f, j) => (j === i ? next : f)) });
               const error = errors[`filter.${i}`];
+              const kind = filter.column.column ? columnKind(dataset, filter.column.column) : null;
               return (
-                <div key={i} className="flex flex-col gap-1">
+                <Form.Item
+                  key={i}
+                  className="!mb-0 [&_.ant-form-item-explain]:text-xs [&_.ant-form-item-extra]:text-xs"
+                  validateStatus={error ? "error" : undefined}
+                  help={error}
+                  extra={kind ? `${VALUE_KINDS[kind]}列` : undefined}
+                >
                   <div className="grid grid-cols-[minmax(160px,1fr)_120px_minmax(180px,1.4fr)_32px] gap-2">
                     <ColumnSelect
                       dataset={dataset}
@@ -404,17 +411,7 @@ export function MetricForm({
                       onClick={() => onChange({ ...metric, filters: metric.filters.filter((_, j) => j !== i) })}
                     />
                   </div>
-                  {filter.column.column && columnKind(dataset, filter.column.column) && (
-                    <Text type="secondary" className="text-xs">
-                      {VALUE_KINDS[columnKind(dataset, filter.column.column)!]}列
-                    </Text>
-                  )}
-                  {error && (
-                    <Text type="danger" className="text-xs">
-                      {error}
-                    </Text>
-                  )}
-                </div>
+                </Form.Item>
               );
             })}
             <Button

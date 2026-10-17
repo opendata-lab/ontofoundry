@@ -1,4 +1,4 @@
-import { Alert, Button, Collapse, Descriptions, Drawer, Empty, Form, Input, Modal, Segmented, Spin, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Card, Collapse, Descriptions, Drawer, Empty, Form, Input, List, Modal, Segmented, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
 import { ArrowRight, Check, CircleAlert, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
@@ -234,25 +234,13 @@ function elementNames(preview: PublishPreview | null, draft: ModelingSession["dr
 
 const versionLabel = (n: number | null | undefined) => (n ? `v${n}` : "尚未发布");
 
-function Check_({ state, title, detail, children }: { state: "pass" | "fail" | "warn" | "idle"; title: string; detail: ReactNode; children?: ReactNode }) {
-  const icon = {
+function checkIcon(state: "pass" | "fail" | "warn" | "idle") {
+  return {
     pass: <Check size={15} className="text-success" />,
     fail: <X size={15} className="text-danger" />,
     warn: <CircleAlert size={15} className="text-[#d48806]" />,
     idle: <CircleAlert size={15} className="text-muted" />,
   }[state];
-  return (
-    <li className="flex flex-col gap-1 border-b border-rule-soft py-2">
-      <span className="flex flex-wrap items-center gap-2">
-        {icon}
-        <strong>{title}</strong>
-        <Text type="secondary" className="text-xs">
-          {detail}
-        </Text>
-      </span>
-      {children}
-    </li>
-  );
 }
 
 /**
@@ -388,31 +376,37 @@ export function PublishPanel({
   const names = elementNames(preview, session.draft);
   return (
     <div className="flex flex-col gap-3">
-      <header className="flex flex-col gap-2 rounded-md border border-rule bg-surface p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          {picker}
-          <span className="inline-flex items-center gap-1 text-sm">
-            <ArrowRight size={14} aria-hidden /> 当前发布版本 <b>{current}</b>
-          </span>
-          <Button className="ml-auto" type="primary" disabled={!canPublish} title={blocker || undefined} onClick={() => setConfirming(true)}>
-            {preview ? `发布 v${preview.next_version_number}` : "发布"}
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Tag color={status.color} className="!m-0">
-            {status.text}
-          </Tag>
-          {preview && (
-            <span className="inline-flex gap-2 font-mono" aria-label="变更计数">
-              <b className="text-success">+{count("created")}</b>
-              <b className="text-accent">~{count("updated")}</b>
-              <b className="text-danger">−{count("deleted")}</b>
+      <Card size="small">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {picker}
+            <span className="inline-flex items-center gap-1 text-sm">
+              <ArrowRight size={14} aria-hidden /> 当前发布版本 <b>{current}</b>
             </span>
-          )}
-          {behind && <Text type="secondary">{behind}</Text>}
-          {blocker && preview !== null && <Text type="secondary">{blocker}</Text>}
+            <Tooltip title={blocker || undefined}>
+              <span className="ml-auto inline-flex">
+                <Button type="primary" disabled={!canPublish} onClick={() => setConfirming(true)}>
+                  {preview ? `发布 v${preview.next_version_number}` : "发布"}
+                </Button>
+              </span>
+            </Tooltip>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Tag color={status.color} className="!m-0">
+              {status.text}
+            </Tag>
+            {preview && (
+              <span className="inline-flex gap-2 font-mono" aria-label="变更计数">
+                <b className="text-success">+{count("created")}</b>
+                <b className="text-accent">~{count("updated")}</b>
+                <b className="text-danger">−{count("deleted")}</b>
+              </span>
+            )}
+            {behind && <Text type="secondary">{behind}</Text>}
+            {blocker && preview !== null && <Text type="secondary">{blocker}</Text>}
+          </div>
         </div>
-      </header>
+      </Card>
       {notice && <Alert type="info" showIcon message={notice} role="status" />}
       {error && (
         <Alert
@@ -554,46 +548,69 @@ export function PublishPanel({
             ),
             children: (
               <div className="flex flex-col gap-3">
-                <ul className="m-0 list-none p-0">
-                  <Check_
-                    state={conflicts ? "warn" : preview ? "pass" : "idle"}
-                    title="合并冲突"
-                    detail={conflicts ? `${conflicts.items.length} 处待处理` : preview ? "无冲突" : "等待预览"}
-                  />
-                  <Check_
-                    state={!preview ? "idle" : preview.validation.publishable ? "pass" : "fail"}
-                    title="本体校验"
-                    detail={preview ? `${errors.length} 个错误 · ${warnings.length} 个警告` : "等待合并结果"}
-                  >
-                    {errors.length + warnings.length > 0 && (
-                      <ul className="m-0 flex flex-col gap-1 pl-6 text-sm">
-                        {errors.map((issue, i) => (
-                          <li key={"e" + i} className="text-danger" role="alert">
-                            {issue.message}
-                          </li>
-                        ))}
-                        {warnings.map((issue, i) => (
-                          <li key={"w" + i} className="text-muted">
-                            {issue.message}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Check_>
-                  <Check_
-                    state={preview ? "pass" : "idle"}
-                    title="合并基准"
-                    detail={
-                      preview
+                <List
+                  size="small"
+                  dataSource={[
+                    {
+                      key: "conflicts",
+                      state: (conflicts ? "warn" : preview ? "pass" : "idle") as "pass" | "fail" | "warn" | "idle",
+                      title: "合并冲突",
+                      detail: conflicts ? `${conflicts.items.length} 处待处理` : preview ? "无冲突" : "等待预览",
+                    },
+                    {
+                      key: "validation",
+                      state: (!preview ? "idle" : preview.validation.publishable ? "pass" : "fail") as "pass" | "fail" | "warn" | "idle",
+                      title: "本体校验",
+                      detail: preview ? `${errors.length} 个错误 · ${warnings.length} 个警告` : "等待合并结果",
+                      extra:
+                        errors.length + warnings.length > 0 ? (
+                          <List
+                            size="small"
+                            split={false}
+                            className="pl-6"
+                            dataSource={[
+                              ...errors.map((issue, i) => ({ key: "e" + i, message: issue.message, kind: "error" as const })),
+                              ...warnings.map((issue, i) => ({ key: "w" + i, message: issue.message, kind: "warning" as const })),
+                            ]}
+                            renderItem={(issue) => (
+                              <List.Item
+                                key={issue.key}
+                                role={issue.kind === "error" ? "alert" : undefined}
+                                className={`!py-0.5 text-sm ${issue.kind === "error" ? "!text-danger" : "!text-muted"}`}
+                              >
+                                {issue.message}
+                              </List.Item>
+                            )}
+                          />
+                        ) : undefined,
+                    },
+                    {
+                      key: "base",
+                      state: (preview ? "pass" : "idle") as "pass" | "fail" | "warn" | "idle",
+                      title: "合并基准",
+                      detail: preview
                         ? `会话开始于 ${versionLabel(preview.base_version_number)} · 合并到当前发布版本 ${current} · 预览于 ${previewedAt?.toLocaleTimeString("zh-CN", { hour12: false })}`
-                        : "等待预览"
-                    }
-                  >
-                    <Button size="small" type="link" className="self-start !p-0" onClick={() => void load()}>
-                      重新预览
-                    </Button>
-                  </Check_>
-                </ul>
+                        : "等待预览",
+                      extra: (
+                        <Button size="small" type="link" className="self-start !p-0" onClick={() => void load()}>
+                          重新预览
+                        </Button>
+                      ),
+                    },
+                  ]}
+                  renderItem={(item) => (
+                    <List.Item key={item.key} className="!flex-col !items-stretch gap-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        {checkIcon(item.state)}
+                        <strong>{item.title}</strong>
+                        <Text type="secondary" className="text-xs">
+                          {item.detail}
+                        </Text>
+                      </span>
+                      {item.extra}
+                    </List.Item>
+                  )}
+                />
                 <Button className="self-start" disabled={!preview} onClick={() => setShowModel(true)}>
                   查看本次将发布的模型 JSON
                 </Button>

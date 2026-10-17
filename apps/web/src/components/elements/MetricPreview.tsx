@@ -1,4 +1,4 @@
-import { Alert, Button, DatePicker, Spin, Statistic, Table, Tabs, Typography } from "antd";
+import { Alert, Button, Card, DatePicker, Spin, Statistic, Table, Tabs, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import { Play, RefreshCw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -122,15 +122,15 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
       {preview && preview.status === "ok" && (
         <div className={`flex flex-col gap-3 ${stale ? "opacity-50" : ""}`}>
           <div className="grid grid-cols-[220px_1fr] gap-4">
-            <div className="rounded-md bg-surface-soft p-4">
+            <Card size="small" className="bg-surface-soft">
               <Statistic title="总值" value={display(preview.value)} />
               {preview.snapshot_dates.some((s) => s.date && s.period === null) && (
                 <Text type="secondary" className="text-xs">
                   快照日期：{preview.snapshot_dates.filter((s) => s.period === null && s.date).map((s) => s.date).join("、")}
                 </Text>
               )}
-            </div>
-            <div className="rounded-md bg-surface-soft p-4">
+            </Card>
+            <Card size="small" className="bg-surface-soft">
               <Text type="secondary" className="text-xs">
                 按月趋势
               </Text>
@@ -151,7 +151,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
                   {range ? "这个范围内没有趋势数据" : "选择时间范围后显示按月趋势"}
                 </div>
               )}
-            </div>
+            </Card>
           </div>
           {preview.warnings.map((w) => (
             <Alert key={w} type="info" showIcon message={w} />

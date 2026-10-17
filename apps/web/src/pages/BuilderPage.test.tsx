@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { ModelingSession, Workspace } from "../api/types";
+import { modelingApi } from "../api/client";
+import type { Material, ModelingSession, Workspace } from "../api/types";
 import { modelingSession, workspace } from "../test/apiRecords";
 import { renderWithProviders } from "../test/renderWithProviders";
 import type { AgentConversationElement } from "../types/agent-conversation";
@@ -34,6 +35,8 @@ vi.mock("../api/client", () => ({
       connections_configured: false,
       skills: [],
     }),
+    upload: vi.fn(),
+    save: vi.fn(),
   },
   catalogApi: {
     connections: vi.fn().mockResolvedValue({ items: [] }),
@@ -140,6 +143,36 @@ it("keeps 开始建模 disabled without material or a scenario", async () => {
     </MemoryRouter>,
   );
   expect(await screen.findByRole("button", { name: "开始建模" })).toBeDisabled();
+});
+
+it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {
+  const uploaded: Material = {
+    id: "m-new",
+    name: "采购制度.md",
+    byte_size: 128,
+    chunk_count: 3,
+    sha256: "f".repeat(64),
+  };
+  vi.mocked(modelingApi.upload).mockResolvedValue(uploaded);
+  vi.mocked(modelingApi.save).mockResolvedValue({ ...session(), material_ids: ["m-new"] });
+  const { container } = renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("点击或拖拽文件至此上传")).toBeInTheDocument();
+  expect(screen.getByText(/单文件不超过 256 MB/)).toBeInTheDocument();
+
+  const file = new File(["# 采购制度"], "采购制度.md", { type: "text/markdown" });
+  const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+  expect(fileInput).not.toBeNull();
+  expect(fileInput.accept).toBe(".md,.markdown,.txt,.json,.yaml,.yml,.csv");
+
+  fireEvent.change(fileInput, { target: { files: [file] } });
+
+  await waitFor(() => expect(modelingApi.upload).toHaveBeenCalledWith("w1", file));
+  expect(modelingApi.save).toHaveBeenCalled();
+  expect(await screen.findByText("采购制度.md")).toBeInTheDocument();
 });
 
 it("says when the last modeling run is waiting for the user's reply", async () => {

@@ -1,4 +1,4 @@
-import { Button, Descriptions, Empty, Form, Input, Select, Table, Tag, TreeSelect, Typography } from "antd";
+import { Button, Card, Descriptions, Empty, Form, Input, Select, Table, Tag, TreeSelect, Typography } from "antd";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Draft, Evidence, LinkType, ObjectType, Rule } from "../../api/types";
@@ -463,7 +463,7 @@ export function RulesPanel(props: PanelProps) {
       {rules.map((rule) => {
         const local = isLocalRule(draft, type, rule);
         return (
-          <div key={rule.id} data-element-id={rule.id} className="rounded-md border border-rule p-3">
+          <Card key={rule.id} size="small" data-element-id={rule.id}>
             {local ? (
               <Form layout="vertical" component="div">
                 <div className="grid grid-cols-[1fr_1fr_140px_200px_32px] gap-x-3">
@@ -526,7 +526,7 @@ export function RulesPanel(props: PanelProps) {
                 <code className="whitespace-pre-wrap break-all">{rule.expression}</code>
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
       <Button type="dashed" icon={<Plus size={15} />} className="self-start" onClick={addRule}>

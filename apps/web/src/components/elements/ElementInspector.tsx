@@ -1,10 +1,21 @@
-import { Alert, Button, Input, Modal, Spin, Tabs, Tooltip, Typography } from "antd";
+import { Alert, Button, Input, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
 import { Box, Check, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, api, modelingApi, publishApi } from "../../api/client";
-import type { Dataset, Draft, LinkType, Metric, ModelingSession, ObjectType } from "../../api/types";
+import {
+  COLLECTION_BY_KIND,
+  type AffectedItem,
+  type Dataset,
+  type Draft,
+  type ElementSave,
+  type ElementSaveImpact,
+  type LinkType,
+  type Metric,
+  type ModelingSession,
+  type ObjectType,
+} from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
@@ -18,9 +29,11 @@ import {
 } from "../../lib/elementInspector";
 import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
 import { newId } from "../../lib/id";
+import { documentDisplayText } from "../../lib/instanceDisplay";
 import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
 import { objectMapping, shortObjectName } from "../../lib/objectMapping";
 import { newDataset } from "../../lib/datasetEditing";
+import { KIND } from "../proposals/elementMeta";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
 import { LinkBasicPanel, ObjectBasicPanel, RulesPanel } from "./ElementPanels";
@@ -38,6 +51,11 @@ type InspectKind = "object_type" | "link_type" | "metric" | "dataset";
 type Element = ObjectType | LinkType | Metric | Dataset;
 type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null };
 type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
+type ImpactPreview = {
+  candidate: ElementSave;
+  signature: string;
+  items: ElementSaveImpact["affected_items"];
+};
 
 const KINDS = new Set([
   "object_type",
@@ -142,6 +160,50 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
   return null;
 }
 
+function affectedElementName(
+  draft: Draft,
+  base: Draft,
+  item: Pick<AffectedItem, "target_kind" | "target_id">,
+): string {
+  const { target_kind: kind, target_id: id } = item;
+  switch (kind) {
+    case "object_type":
+    case "property":
+    case "link_type":
+    case "rule":
+    case "metric":
+    case "dataset": {
+      const collection = COLLECTION_BY_KIND[kind];
+      const found =
+        byId(draft[collection] as { id: string; name?: string }[], id) ??
+        byId(base[collection] as { id: string; name?: string }[], id);
+      return found?.name?.trim() || id;
+    }
+    case "mapping": {
+      const mapping = byId(draft.mappings, id) ?? byId(base.mappings, id);
+      const owner = mapping
+        ? (byId(draft.object_types, mapping.type_id) ?? byId(base.object_types, mapping.type_id))
+        : undefined;
+      return owner?.name?.trim() || id;
+    }
+    case "material_object": {
+      const baseFact = byId(base.material_objects, id);
+      if (baseFact) return documentDisplayText(base, baseFact);
+      const fact = byId(draft.material_objects, id);
+      return fact ? documentDisplayText(draft, fact) : id;
+    }
+    case "material_link": {
+      const link = byId(base.material_links, id) ?? byId(draft.material_links, id);
+      if (!link) return id;
+      const src = byId(base.material_objects, link.source_id) ?? byId(draft.material_objects, link.source_id);
+      const tgt = byId(base.material_objects, link.target_id) ?? byId(draft.material_objects, link.target_id);
+      const srcText = src ? documentDisplayText(base, src) : link.source_id;
+      const tgtText = tgt ? documentDisplayText(base, tgt) : link.target_id;
+      return `${srcText} → ${tgtText}`;
+    }
+  }
+}
+
 function errorText(e: unknown): ReactNode {
   if (e instanceof ApiError) {
     const details = e.errors.map((issue) => issue.message).filter(Boolean);
@@ -216,6 +278,7 @@ function Inspector({
   const [error, setError] = useState<ReactNode>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [copyFallback, setCopyFallback] = useState(false);
+  const [impactPreview, setImpactPreview] = useState<ImpactPreview | null>(null);
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -335,6 +398,7 @@ function Inspector({
       setEditing(false);
       setError(null);
       setShowErrors(false);
+      setImpactPreview(null);
       setDraft(loaded?.draft ?? null);
     });
     reportElement?.({ dirty: false, busy: false });
@@ -355,48 +419,104 @@ function Inspector({
       inspectorHref(createPath(location), { ...request, sessionId, previewHash: previewHash ?? undefined }),
     );
   };
-  const save = async () => {
-    if (!draft || !element || !loaded || busy || !member || previewHash) return;
+  const buildCandidate = (): { candidate: ElementSave; problem: string | null } | null => {
+    if (!draft || !element || !loaded || !member || previewHash) return null;
     const value = kind === "metric" ? upsert(draft, "metrics", storedMetric(element as Metric)) : draft;
-    const problem = saveProblem(value, kind, element);
-    if (problem) {
-      setShowErrors(true);
-      setError(problem);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setNotice("");
-    try {
-      const result = await modelingApi.saveElement(workspace.id, {
+    return {
+      problem: saveProblem(value, kind, element),
+      candidate: {
         target_kind: kind,
         target_id: element.id,
         expected_current_version_id: loaded.versionId,
         session_id: loaded.session?.id ?? null,
         expected_session_revision: loaded.session?.revision ?? null,
         draft: value,
-      });
-      const next: Loaded = {
-        draft: result.session?.draft ?? result.draft,
-        session: result.session,
-        versionId: result.version.version_id,
-      };
-      flushSync(() => {
-        setLoaded(next);
-        setDraft(next.draft);
-        setDirty(false);
-        setEditing(false);
-        setShowErrors(false);
-        setBusy(false);
-      });
-      reportElement?.({ dirty: false, busy: false });
-      notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
-      refresh();
-      setNotice("已保存");
-      void navigate(
-        inspectorHref(createPath(location), { kind, id: element.id, tab: selectedTab, sessionId }),
-        { replace: true },
-      );
+      },
+    };
+  };
+  const performSave = async (payload: ElementSave) => {
+    const result = await modelingApi.saveElement(workspace.id, payload);
+    const next: Loaded = {
+      draft: result.session?.draft ?? result.draft,
+      session: result.session,
+      versionId: result.version.version_id,
+    };
+    flushSync(() => {
+      setLoaded(next);
+      setDraft(next.draft);
+      setImpactPreview(null);
+      setDirty(false);
+      setEditing(false);
+      setShowErrors(false);
+      setBusy(false);
+    });
+    reportElement?.({ dirty: false, busy: false });
+    notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
+    refresh();
+    setNotice("已保存");
+    void navigate(
+      inspectorHref(createPath(location), { kind, id: payload.target_id, tab: selectedTab, sessionId }),
+      { replace: true },
+    );
+  };
+  const save = async () => {
+    if (busy) return;
+    const built = buildCandidate();
+    if (!built) return;
+    if (built.problem) {
+      setShowErrors(true);
+      setError(built.problem);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice("");
+    try {
+      const impact = await modelingApi.previewElementSave(workspace.id, built.candidate);
+      if (impact.affected_items.length > 0) {
+        setImpactPreview({
+          candidate: built.candidate,
+          signature: JSON.stringify(built.candidate.draft),
+          items: impact.affected_items,
+        });
+        return;
+      }
+      await performSave(built.candidate);
+    } catch (e) {
+      setImpactPreview(null);
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const confirmSave = async () => {
+    if (!impactPreview || busy) return;
+    const built = buildCandidate();
+    if (!built) return;
+    if (built.problem) {
+      setImpactPreview(null);
+      setShowErrors(true);
+      setError(built.problem);
+      return;
+    }
+    if (JSON.stringify(built.candidate.draft) !== impactPreview.signature) {
+      setImpactPreview(null);
+      await save();
+      return;
+    }
+    const affected_items: AffectedItem[] = impactPreview.items.map(
+      ({ target_kind, target_id, expected_target_hash }) => ({
+        target_kind,
+        target_id,
+        expected_target_hash,
+      }),
+    );
+    setBusy(true);
+    setError(null);
+    setNotice("");
+    try {
+      setImpactPreview(null);
+      await performSave({ ...built.candidate, affected_items });
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -445,6 +565,7 @@ function Inspector({
     setDraft(next);
     setDirty(true);
     setNotice("");
+    setImpactPreview(null);
   };
   const panel: PanelProps | null =
     draft && (object || link)
@@ -503,8 +624,8 @@ function Inspector({
     <Modal
       open={active}
       onCancel={close}
-      maskClosable={!busy && !dirty}
-      keyboard={!busy}
+      maskClosable={!busy && !dirty && !impactPreview}
+      keyboard={!busy && !impactPreview}
       width={expanded ? "96vw" : 1180}
       centered
       destroyOnHidden={false}
@@ -614,6 +735,41 @@ function Inspector({
         {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
         {content && <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">{content}</fieldset>}
       </div>
+      {impactPreview && draft && (
+        <Modal
+          open
+          title="确认保存影响"
+          okText="确认保存"
+          cancelText="取消"
+          okButtonProps={{ loading: busy }}
+          cancelButtonProps={{ disabled: busy }}
+          onOk={() => void confirmSave()}
+          onCancel={() => !busy && setImpactPreview(null)}
+          destroyOnHidden
+        >
+          <div className="flex flex-col gap-3">
+            <Text type="secondary">确认后这些元素会随本次保存一并改写</Text>
+            <List
+              size="small"
+              bordered
+              dataSource={impactPreview.items}
+              renderItem={(item) => (
+                <List.Item key={`${item.target_kind}:${item.target_id}`} className="!flex-col !items-start gap-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <Tag color={KIND[item.target_kind].color} className="!m-0">
+                      {KIND[item.target_kind].label}
+                    </Tag>
+                    <strong>{affectedElementName(draft, loaded?.draft ?? draft, item)}</strong>
+                  </span>
+                  <Text type="secondary" className="text-xs">
+                    {item.reason}
+                  </Text>
+                </List.Item>
+              )}
+            />
+          </div>
+        </Modal>
+      )}
       {copyFallback && (
         <InspectorDialog title="复制链接" onClose={() => setCopyFallback(false)}>
           <Input aria-label="元素链接" autoFocus readOnly value={elementLink} onFocus={(e) => e.currentTarget.select()} />

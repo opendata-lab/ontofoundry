@@ -1,13 +1,13 @@
 import {
   FileText,
-  Upload,
+  Upload as UploadIcon,
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
   Rocket,
   Sparkles,
 } from "lucide-react";
-import { Alert, Button, Checkbox, Form, Input, Segmented, Tooltip, Typography } from "antd";
+import { Alert, Button, Checkbox, Form, Input, Segmented, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { modelingApi } from "../api/client";
@@ -50,7 +50,6 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
-  const input = useRef<HTMLInputElement>(null);
   const conversation = useRef<AgentConversationElement>(null);
   const navigate = useNavigate();
   usePageTab({
@@ -134,7 +133,6 @@ export function BuilderPage() {
         await attach(await modelingApi.upload(workspace.id, file));
     });
     setUploading(false);
-    if (input.current) input.current.value = "";
   };
 
   // The element owns the network; the page only reacts to what it reports.
@@ -310,35 +308,30 @@ export function BuilderPage() {
                   ]}
                 />
                 {materialMode === "upload" && (
-                  <button
-                    type="button"
-                    className="flex w-full cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-rule-strong bg-surface-raised px-4 py-6 text-center text-ink-2 hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  <Upload.Dragger
                     aria-label="上传业务知识材料"
+                    accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"
+                    multiple
+                    showUploadList={false}
                     disabled={uploading || running}
-                    onClick={() => input.current?.click()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (!running) void upload(e.dataTransfer.files);
+                    beforeUpload={(file, fileList) => {
+                      if (!fileList.length || file === fileList[0]) {
+                        void upload(fileList.length ? fileList : [file]);
+                      }
+                      return false;
                     }}
                   >
-                    <Upload size={23} className="text-accent" />
-                    <strong className="text-[13px]">{uploading ? "正在上传…" : "点击或拖拽文件至此上传"}</strong>
-                    <small className="text-xs leading-5 text-muted">
-                      支持 Markdown、TXT、JSON、YAML、CSV · UTF-8
-                      <br />
-                      单文件不超过 {capabilities?.max_file_mb ?? 256} MB
-                    </small>
-                  </button>
+                    <div className="flex flex-col items-center gap-2 px-2 py-2 text-center text-ink-2">
+                      <UploadIcon size={23} className="text-accent" />
+                      <strong className="text-[13px]">{uploading ? "正在上传…" : "点击或拖拽文件至此上传"}</strong>
+                      <small className="text-xs leading-5 text-muted">
+                        支持 Markdown、TXT、JSON、YAML、CSV · UTF-8
+                        <br />
+                        单文件不超过 {capabilities?.max_file_mb ?? 256} MB
+                      </small>
+                    </div>
+                  </Upload.Dragger>
                 )}
-                <input
-                  ref={input}
-                  type="file"
-                  accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"
-                  multiple
-                  hidden
-                  onChange={(e) => e.target.files && void upload(e.target.files)}
-                />
                 {materialMode === "library" && (
                   <div className="flex flex-col gap-1">
                     {!materials.length && (

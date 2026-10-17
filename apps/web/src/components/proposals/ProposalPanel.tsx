@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Dropdown, Empty, Input, Modal, Segmented, Select, Typography } from "antd";
+import { Alert, Button, Checkbox, Dropdown, Empty, Input, Modal, Segmented, Select, Tooltip, Typography } from "antd";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
@@ -236,15 +236,18 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
               </Button>
             </>
           ) : (
-            <Button
-              size="small"
-              type="primary"
-              disabled={busy || !acceptable.length}
-              title={acceptable.length ? "接受全部可接受且无冲突的待审提案，不受当前筛选影响" : "没有可接受的无冲突待审提案"}
-              onClick={() => void submit(acceptable.map((item) => item.id), "accept")}
-            >
-              全部接受（{acceptable.length}）
-            </Button>
+            <Tooltip title={acceptable.length ? "接受全部可接受且无冲突的待审提案，不受当前筛选影响" : "没有可接受的无冲突待审提案"}>
+              <span className="inline-flex">
+                <Button
+                  size="small"
+                  type="primary"
+                  disabled={busy || !acceptable.length}
+                  onClick={() => void submit(acceptable.map((item) => item.id), "accept")}
+                >
+                  全部接受（{acceptable.length}）
+                </Button>
+              </span>
+            </Tooltip>
           )}
           <Dropdown
             trigger={["click"]}

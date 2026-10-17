@@ -153,7 +153,8 @@ export function previewRequest(
 ): MetricPreviewRequest {
   const request: MetricPreviewRequest = { ...context, metric: storedMetric(metric) };
   if (isRatio(metric)) {
-    request.components = [metric.numerator_id, metric.denominator_id]
+    // One component may cover both references when numerator and denominator are the same metric.
+    request.components = [...new Set([metric.numerator_id, metric.denominator_id])]
       .map((id) => byId(draft.metrics, id))
       .filter((m): m is SimpleMetric => !!m && isSimple(m))
       .map((m) => storedMetric(m) as SimpleMetric);

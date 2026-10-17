@@ -20,6 +20,10 @@ describe("metric form helpers", () => {
     const ranged = previewRequest(draft, ratio, { expected_current_version_id: null }, { start: "2026-01-01", end: "2026-04-01" });
     expect(ranged.trend_grain).toBe("month");
   });
+  it("sends a metric used as both numerator and denominator once", () => {
+    const same = { ...ratio, denominator_id: ratio.numerator_id };
+    expect(previewRequest(draft, same, { expected_current_version_id: null }).components?.map((m) => m.id)).toEqual([ratio.numerator_id]);
+  });
   it("checks names, the dataset, measures and filter values", () => {
     const blank = newMetric("m", null);
     expect(Object.keys(metricErrors(draft, blank)).sort()).toEqual(["dataset", "name", "technical_name"]);

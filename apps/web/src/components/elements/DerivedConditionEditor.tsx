@@ -1,4 +1,4 @@
-import { Alert, Button, DatePicker, Input, InputNumber, Segmented, Select, Typography } from "antd";
+import { Alert, Button, DatePicker, Form, Input, InputNumber, Segmented, Select, Typography } from "antd";
 import dayjs from "dayjs";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -207,8 +207,14 @@ export function DerivedConditionEditor({
           )}
           {form.rows.map((row, i) => {
             const property = row.kind === "property" ? byId(draft.properties, row.propertyId) : undefined;
+            const error = errors[row.key];
             return (
-              <div key={row.key} className="flex flex-col gap-1">
+              <Form.Item
+                key={row.key}
+                className="!mb-0 [&_.ant-form-item-explain]:pl-12 [&_.ant-form-item-explain]:text-xs"
+                validateStatus={error ? "error" : undefined}
+                help={error}
+              >
                 <div className="grid grid-cols-[40px_minmax(140px,1.2fr)_110px_minmax(160px,2fr)_32px] items-center gap-2">
                   <Text type="secondary" className="text-right">
                     {i === 0 ? "当" : "并且"}
@@ -258,12 +264,7 @@ export function DerivedConditionEditor({
                     onClick={() => update({ ...form, rows: form.rows.filter((r) => r.key !== row.key) })}
                   />
                 </div>
-                {errors[row.key] && (
-                  <Text type="danger" className="pl-12 text-xs">
-                    {errors[row.key]}
-                  </Text>
-                )}
-              </div>
+              </Form.Item>
             );
           })}
           <Button
