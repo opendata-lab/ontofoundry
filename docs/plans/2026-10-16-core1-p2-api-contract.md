@@ -4,7 +4,7 @@
 
 本文件供 P2 后端 P2-01～14 与前端 P2-15～21 在不同分支并行实现。它描述切换后的接口，不表示基线代码已经支持。依据为[主设计](../design/2026-10-14-core-model-and-format-adapters.md) §3、§8A、§14、决定 49～51，[实施计划](2026-10-14-core-model-and-format-adapters-plan.md) §2.4、§2.5、§5、§9，以及 [P1 记录](2026-10-16-core1-p1-backend-progress.md)。已对照 `api/*.py`、`api/client.ts`、`api/types.ts` 与 `api/core.generated.ts`。
 
-只使用现有 REST 路径，以及计划允许的事实提案修订、当前指标表单预览两条新路径。不新增 Dataset CRUD、映射树、数据集引用计数或 MCP 执行接口。下文补齐的请求 envelope、读投影和错误名称是本次协调约定，不是核心模型字段；尚需双方确认的具体选择集中在 §10。P2 必须完整集成后部署；不运行旧版本兼容转换。
+只使用现有 REST 路径，以及计划允许的事实提案修订、当前指标表单预览，以及 PR #23 修正增加的只读元素保存影响预检路径。不新增 Dataset CRUD、映射树、数据集引用计数或 MCP 执行接口。下文补齐的请求 envelope、读投影和错误名称是本次协调约定，不是核心模型字段；尚需双方确认的具体选择集中在 §10。P2 必须完整集成后部署；不运行旧版本兼容转换。
 
 ## 1. 通用约定
 
@@ -386,6 +386,10 @@ type ElementSave = {
   session_id?: UUID | null; expected_session_revision?: number | null;
   draft: Draft; affected_items?: AffectedItem[];
 };
+type ElementSaveImpact = {
+  current_version_id: UUID | null; session_revision: number | null;
+  affected_items: (AffectedItem & { reason: string })[];
+};
 type ElementSaveResult = {
   version: VersionSummary; draft: Draft; session: ModelingSession | null;
 };
@@ -398,6 +402,7 @@ type ElementSaveResult = {
 | GET `S` | — | `ModelingSession` | G、Auth | M13 |
 | PUT `S` | `SessionSave` | `ModelingSession`，含本次 validation | G、Auth、V、Evidence；409 SESSION_REVISION_CHANGED | M14 |
 | POST `S/validate` | —；可发 `{}` | `ValidationReport` | G、Auth；校验不通过为 200 publishable=false | M15 |
+| POST `W/element-saves/preview` | `ElementSave`；只读候选预检 | `ElementSaveImpact` | G、Auth、E、V | M35 |
 | POST `W/element-saves` | `ElementSave` | `ElementSaveResult` | G、Auth、E、V、Pub、Evidence、Data | M16 |
 
 `save_session` 仍保存**整个会话草稿**，不发布；revision 是现有请求字段，不换名为 expected_session_revision。它拒绝旧 schema/旧字段和结构错误；编辑中可暂存可遍历但语义未完整的草稿，返回 validation，最终接受提案/发布必须通过最终图校验。空键、未采集列不等于结构错误。已知不存在的引用不得作为就绪绑定使用。
@@ -413,6 +418,12 @@ type ElementSaveResult = {
 | mapping | 该条 DataMapping | 对象定义、其他映射和 Dataset；绑定继承关系只写允许的 inherited_link_bindings |
 
 `affected_items` 是计划 P2-03 的“显式带受影响项/校验 hash”的 envelope：按九类目标和 UUID 列出需要联动改写的已有元素，hash 对照服务器当前编辑基线。只允许从服务器解析的依赖图得到的必要改写，不允许借它扩大任意保存范围。技术名改写按旧图 UUID 引用重建；Dataset 删除/删列/改来源/快照展示直接依赖与 ratio 间接影响，最终图合法。新增多元素、删除目标本身或无法在单聚合合法表达的改动，使用完整会话保存、预览、发布或提案原子组，不添加批量删除路由。等价搬迁不强造指标算法修改；本体改动不触发指标修订。
+
+前端跨聚合改名先调用 `POST W/element-saves/preview`：输入与保存完全相同的候选 `ElementSave`（无需先提交受影响项），服务端基于会话当前 revision 的草稿；没有会话则基于当前发布版，按 UUID 解析改写并计算必要的跨聚合确认清单。响应只返回 `AffectedItem` 的三项及中文 reason；前端展示确认后去掉 reason，把清单原样放入保存请求的 affected_items，不计算 hash。预检自身不写会话、不盖章证据、不发布；传入的 affected_items 不代表用户确认，也不会扩大预检范围。独立无关修改仍报 ELEMENT_SCOPE_INVALID，版本/revision 过时报对应 409；无法形成合法保存图报 ELEMENT_VALIDATION_FAILED。Dataset 变更同时列明指标直接及 ratio 间接影响，即使算法文本未变化。保存再次核对版本、revision 与所有 hash；预检不是写锁或授权令牌。预检和保存之间内容有变必须重新预检。
+
+提案 after 中的 MappingSource.id 必填且保留本地来源名（例如 main），它不是由服务端分配的元素 UUID；inherited_link_bindings 仍按既有提案 wire 的条目数组提交，不把核心字典直接回传。PR #23 同步修正提案 JSON Schema，核心 Schema 不变。
+
+保存成功时，将目标聚合和确认清单全部同步回会话；合并后的会话图仍须合法，保留其他未发布修改。会话暂存只阻断结构、证据与可适用的已登记来源列问题：JOIN_COLUMN_NOT_FOUND 仅表示已知来源列不存在；名称重复或悬空语义引用进入 validation，不伪报物理列错误。接受和发布继续阻断完整图错误。
 
 `revise` 是后端内部 CAS/hash 边界，**不是 REST 路由**。保存、决定、冲突解决等写会话复用它或等价事务能力，不能回退旧版本，不接 legacy_mappings/legacy_joins/semantic_changes。proposals 运行中允许人工改草稿，受影响提案实时变 stale；发布仍按现有运行状态限制。
 
@@ -724,6 +735,20 @@ type MCPObject = MCPObjectHit & {
   evidence?: Page<EvidenceView>;
   adjacency?: Page<MCPAdjacency>;
 };
+// Read-only execution projection derived from the existing core definitions.
+type MembershipRead = {
+  type_id: UUID; mapping_id: UUID; binding_mode: DataMapping["binding_mode"];
+  membership_source_id: string | null; derived_by: NonNullable<ObjectType["derived_by"]>;
+};
+type EffectiveLinkRead = {
+  link_type_id: UUID; source_type_id: UUID; target_type_id: UUID;
+  data_join: DataJoin | null;
+};
+type EffectiveBindingRead = {
+  type_id: UUID; sources: MappingSource[];
+  fields: Record<string, ColumnBinding | ExpressionBinding>;
+  memberships: MembershipRead[]; links: EffectiveLinkRead[];
+};
 type MCPElement = {
   id: UUID; kind: OntologyKind; name: string; technical_name: string;
   description?: string; synonyms?: string[];
@@ -733,6 +758,9 @@ type MCPElement = {
   links?: Page<LinkRead>;
   child_types?: Page<Pick<ObjectType, "id" | "name" | "technical_name">>;
   datasets?: Page<DatasetRead>; sources?: Page<MappingSource>;
+  effective_bindings?: Page<EffectiveBindingRead>;
+  components?: { numerator: SimpleMetric; denominator: SimpleMetric };
+  dataset_id?: UUID; value_kind?: ValueKind | null;
   instance_source_type_ids?: UUID[]; sql_reference?: SQLReference;
 };
 type FieldSegment = {
@@ -759,6 +787,8 @@ type MCPCallResult<T> = {
 
 limit 默认20、1～100；get_ontology include 默认 semantic。Dataset/Mapping 仅作为 physical 投影，不是独立 kinds/tool。get_ontology 的 definition 是核心定义，外侧 properties/rules/links 是有效继承项；无物理权限不得借 definition 泄露 data_join、expression、Dataset 或证据。只输出可见字段，不能依赖 frontend 再裁剪。
 
+physical 的 `effective_bindings` 是现有定义推导的只读 DTO，不属于核心模型：对象按实际具体 type_id 返回完整有效 sources/fields、从根到当前的成员声明及有效关系绑定。`memberships` 明确保留每层 membership_source_id 与 derived_by；继承属性不丢归属，具体子对象的 inherited_link_bindings 覆盖此视角的关系 data_join，原 LinkType 定义仍可为 null。虚拟父返回所有可查询具体绑定，并以 instance_source_type_ids 指明展开。关系元素返回两端有效绑定；`datasets` 覆盖有效来源与关系映射表，指标（包括 ratio）也返回完整 DatasetRead 和列清单，ratio 的 components 保留各分量固定条件和时间字段。每个 DatasetRead 保留自身 snapshot_date_column，不能用主来源的快照声明覆盖附来源。sources 是兼容的平铺有效来源；需要恢复成员语义必须读 effective_bindings。分页续取 datasets/effective_bindings 与其他嵌套列表使用同工具签名游标。后端通过 EffectiveBindingRead/MembershipRead/EffectiveLinkRead 校验输出。
+
 `POST O/mcp` 无查询参数，请求 `MCPRequest | MCPNotification`。普通响应为 `MCPResponse<T>`，tools/list 的 T 为 `{tools:ToolDescription[]}`，tools/call 的 T 为上面的 `MCPCallResult<工具结果>`；ping 返回空对象，initialize 返回 `{protocolVersion:string;capabilities:Record<string,Json>;serverInfo:{name:string;version:string};instructions:string}`，server/discover 返回 `{supportedVersions:string[];capabilities:Record<string,Json>;instructions:string}`。notification 为202空响应。G/Auth 适用于传输认证；协议失败沿用 JSON-RPC 数字错误，不强行改成 ServiceError。
 
 沿用基线 MCP 2026-07-28 与现有旧协议协商：Accept 包含 application/json 与 text/event-stream；当前协议要求 Mcp-Protocol-Version、Mcp-Method（等于 method）、tools/call 的 Mcp-Name（等于工具名），以及 params._meta 中的 io.modelcontextprotocol/protocolVersion、clientCapabilities。不能把“旧协议协商”删掉当成 core-1 模型清理。请求超过256KiB为413；解析/参数/方法错误沿用 -32700/-32600/-32602/-32601，头不匹配 -32020、不支持的协议 -32022。
@@ -767,7 +797,7 @@ limit 默认20、1～100；get_ontology include 默认 semantic。Dataset/Mappin
 
 cursor 签名绑定 workspace、解析版本、工具、filters、projection、权限指纹和 section/偏移；问数发布或授权变化后 cursor_invalid，重新开始；固定建模版本不随发布改变。嵌套列表也用 total/items/next_cursor，同工具带 section 游标续取；总预算256KiB，按元素分页，超大表达式/描述明确字段分段，不硬截断字符串。超大字段从当前定义体省略，用 field_segments 明确其 JSON Pointer、Unicode 字符半开范围、总长度和 next_cursor；继续用同一工具续取。该命名为 §10 待确认项，未拼齐不能当成可编辑的完整定义。
 
-无 can_read_mappings：不返回数据集名称/说明/数量、表列、物理类型、JOIN、元数据采集标识/时间、SQL/params、含来源的 expression；semantic 摘要可保留 forbidden。无 can_read_instances：不返回事实、证据、quote。目录、总数、嵌套和缓存用同一授权投影，所有层级无 connection_alias。DataAgent 通过 mysql.query/doris.query 自己查询数据库，MCP 不提供 query_metric 或数据库实例工具。
+无 can_read_mappings：不返回数据集名称/说明/数量、表列、物理类型、JOIN、元数据采集标识/时间、SQL/params、含来源的 expression；semantic 摘要可保留 forbidden。无 can_read_instances：不返回事实、证据、quote；包括 REST MetricRead 以及 MCP ratio.components 的所有嵌套分量。目录、总数、嵌套和缓存用同一授权投影，所有层级无 connection_alias。DataAgent 通过 mysql.query/doris.query 自己查询数据库，MCP 不提供 query_metric 或数据库实例工具。
 
 ## 7. 删除或 P2 下线的路由
 
@@ -1143,3 +1173,83 @@ mock 必须按 source/date/version/权限隔离，并补无法预览、过期响
 | 错误标准化范围 | 当前不少路由仍抛 HTTPException，旧 PublishValidationError.code 为 OSSIE_VALIDATION_FAILED | 新/改业务路径按 §1.2 ServiceError；未改周边保留旧错误兜底。新错误代码名与 OpenAPI 在后端实现时逐项核对，不宣称本文件等于已实现的 OpenAPI |
 
 仅文档交付不运行迁移、不清库、不改 JSON Schema/Pydantic/TS、不发布 DataAgent、不 commit。P2 实现时按计划同步 schema、生成类型、客户端、技能及服务端响应校验；此处引用生成核心类型不代替最终漂移检查。
+
+
+### PR #23：M35 保存影响预检与例06物理投影 mock
+
+以下沿用 §8 的初始化变量；M35 单独使用例07的已发布编辑场景。候选将 customer_no 改成 customer_code，而事实仍为旧键，服务端根据旧图 UUID 重写。h 仅为 mock 占位，真实 hash 来自服务器规范化的当前编辑基线。
+
+```ts
+const customerNumber = d07.properties.find(p => p.technical_name === "customer_no")!;
+const M35Request: ElementSave = {
+  target_kind: "object_type", target_id: customerNumber.owner_type_id,
+  expected_current_version_id: vid, session_id: sid, expected_session_revision: 2,
+  draft: { ...d07, properties: d07.properties.map(p => p.id === customerNumber.id
+    ? { ...p, technical_name: "customer_code" } : p) },
+};
+const M35: ElementSaveImpact = {
+  current_version_id: vid, session_revision: 2,
+  affected_items: [{ target_kind: "material_object", target_id: d07.material_objects[0].id,
+    expected_target_hash: h, reason: "当前元素修改需要同步此依赖的定义或引用" }],
+};
+const confirmedSave: ElementSave = { ...M35Request,
+  affected_items: M35.affected_items.map(({ reason, ...item }) => item) };
+```
+
+例06的 `get_ontology` 请求 person/device/vehicle/asset，并带 physical、adjacency。以下 mock 从同一份设计示例构造有效绑定和 DatasetRead；不手写第二份本体。设备与车辆可以有相同来源键 `"1"`，实例响应仍返回各自实际 type_id 与 TypedKey，反向负责人边从具体设备/车辆指向当事人，按具体 ref 去重。
+
+```ts
+import example06 from "../../docs/design/core-1-examples/06-inheritance.json";
+const d06 = example06.draft as unknown as Draft;
+const page06 = <T,>(items: T[]): Page<T> => ({ total: items.length, items, next_cursor: null });
+const obj06 = (name: string) => d06.object_types.find(o => o.technical_name === name)!;
+const mapping06 = (name: string) => d06.mappings.find(m => m.type_id === obj06(name).id)!;
+const binding06 = (name: string): EffectiveBindingRead => {
+  const own = mapping06(name);
+  const chain = own.binding_mode === "shared_parent" ? [mapping06("party"), own] : [own];
+  return {
+    type_id: obj06(name).id,
+    sources: chain.flatMap(m => m.sources ?? []),
+    fields: Object.assign({}, ...chain.map(m => m.fields)),
+    memberships: chain.map(m => ({ type_id: m.type_id, mapping_id: m.id,
+      binding_mode: m.binding_mode, membership_source_id: m.membership_source_id ?? null,
+      derived_by: d06.object_types.find(o => o.id === m.type_id)!.derived_by ?? [] })),
+    links: d06.link_types.filter(l =>
+      l.source_type_id === obj06(name).id || l.target_type_id === obj06(name).id ||
+      (name === "person" && (l.source_type_id === obj06("party").id || l.target_type_id === obj06("party").id)) ||
+      (["device", "vehicle"].includes(name) && l.source_type_id === obj06("asset").id)
+    ).map(l => ({ link_type_id: l.id, source_type_id: l.source_type_id,
+      target_type_id: l.target_type_id,
+      data_join: own.inherited_link_bindings?.[l.id] ?? l.data_join ?? null })),
+  };
+};
+const physical06 = (names: string[]) => {
+  const bindings = names.map(binding06);
+  const ids = new Set(bindings.flatMap(b => b.sources.map(s => s.dataset_id)));
+  return {
+    effective_bindings: page06(bindings),
+    datasets: page06(d06.datasets.filter(d => ids.has(d.id)).map(d =>
+      ({ ...d, binding_status: "unbound" as const }))),
+  };
+};
+const person06 = obj06("person");
+const asset06 = obj06("asset");
+const mcp06: MCPGetOntology = {
+  workspace_id: d06.workspace_id, version_id: vid, total: 4, missing: [], next_cursor: null,
+  elements: [{ id: person06.id, kind: "object_type", name: person06.name,
+    technical_name: person06.technical_name, definition: person06, ...physical06(["person"]) },
+  { id: asset06.id, kind: "object_type", name: asset06.name,
+    technical_name: asset06.technical_name, definition: asset06,
+    instance_source_type_ids: [obj06("device").id, obj06("vehicle").id],
+    ...physical06(["device", "vehicle"]) },
+  ...["device", "vehicle"].map((name): MCPElement => ({
+    id: obj06(name).id, kind: "object_type", name: obj06(name).name,
+    technical_name: obj06(name).technical_name, definition: obj06(name),
+    ...physical06([name]),
+  }))],
+};
+```
+
+person 的 memberships 依次包含 party 的 independent 和 person 的 shared_parent（membership_source_id="extension"）；sources 同时有 main 与 extension。asset 的 effective_bindings 分为 device/vehicle 两项，两者 responsible_party 的 data_join 都取各自本地 inherited_link_bindings，datasets 分别为 devices/vehicles。单独请求 device/vehicle 时，同一个有效 join 同时出现在 adjacency.links 的 data_join 中，inherited_from 仍为 asset；不能把本地绑定归属伪装成新关系定义。
+
+快照与 ratio 预览补充：只有明确的业务 time_field 才生成趋势；缺字段时 trend/trend_query 为 null，warnings 提示仅返回总值。按快照日期看趋势逐周期选末日，按上线日期看分组先选快照再归月（主设计 §3.6：10月1、12月2）。snapshot_dates 保留总值与各趋势周期实际选日；ratio 两分量同数据集但时间字段不同导致同一业务周期使用不同日期时，可有同 dataset_id/period 的多条实际 date，相同日期去重。分子分母同一 UUID 时 components 只提交一个唯一 simple 项，同时覆盖两个引用；重复提交仍 422。

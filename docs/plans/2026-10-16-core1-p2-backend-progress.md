@@ -64,7 +64,7 @@
 
 Python 3.13 虚拟环境沿用 `apps/api/.venv`；生成类型检查使用 Node 22.19.0。两个可丢弃外部数据库配置 `ONTOFOUNDRY_TEST_POSTGRES_URL` / `ONTOFOUNDRY_TEST_MYSQL_CONFIG` 均未提供；没有连接 `127.0.0.1:55441` 或其他非临时数据库，没有启动/重启外部服务。
 
-最初按计划尝试 `UV_CACHE_DIR=/private/tmp/core1-p2-uv uv run --offline --python 3.13 ...`，uv 在启动时因 macOS `system-configuration` 的 `Attempted to create a NULL object` panic 返回 101，schema/lint/pytest 均未开始执行。随后直接调用现有虚拟环境内相同的 Python/ruff 完成全部检查，没有据此记为测试失败或跳过。
+最初按计划尝试 `UV_CACHE_DIR=<临时目录> uv run --offline --python 3.13 ...`，uv 在启动时因 macOS `system-configuration` 的 `Attempted to create a NULL object` panic 返回 101，schema/lint/pytest 均未开始执行。随后直接调用现有虚拟环境内相同的 Python/ruff 完成全部检查，没有据此记为测试失败或跳过。
 
 以下 Python/ruff 命令均在 `apps/api` 目录执行，其余命令在仓库根目录执行：
 
@@ -110,3 +110,69 @@ SQLite 切换清空、保留平台配置及重入测试已通过；这不能替�
 - 前端测试/tsc/lint/build、localhost 与局域网 IP HTTP 页面及弹层交互验收由前端/集成分支完成；本分支只执行生成核心类型检查，没有部署服务或修改前端实现。
 - 六份 10-08 历史文档的顶部替代标记已在集成分支补上。
 - 适配器导入、翻译报告与导出往返属于 P3～P5；P2 旧导入/导出入口继续下线。
+
+## PR #23 评审修正
+
+### 修正计划与边界
+
+以当前主设计 §3.2、§3.6、§3.9、§14.3 和本轮 API 契约为依据，修复 S1–S7、G1–G7、A1；不变更核心模型或持久化表结构。本节兼作评审修正计划，避免超出本任务限定的文档归属新增设计文件。
+
+1. 查询与读投影：统一嵌套证据裁剪；保留 SQLAlchemy 相关子查询；分离快照选日和业务时间归组；展开虚拟父具体目标；按有效绑定补齐 MCP 物理 DTO。
+2. 保存与提案：同步确认的受影响项并校验会话；提供只读元素保存影响预检；暂存只阻断结构、证据及适用来源错误；修正名称分组和事实修订依赖闭包。
+3. 使用设计示例及临时 SQLite 补实际结果回归；固定 PostgreSQL 并发双方预览，未配置可丢弃库则 skip。全部编辑结束后统一执行 schema、ruff、完整 pytest、技能测试和 ZIP 构建；不连接开发库、不启动服务、不提交。
+
+### 逐项修复与结果回归
+
+| 项目 | 修复与结果断言 |
+|---|---|
+| S1 | resource_items 统一递归裁剪 evidence，覆盖 ratio 两个分量。test_core1_permissions 使用例13、实际仅 mappings:read 的服务令牌读取 REST 和 MCP；高权限能看到人工说明及真实上传的材料引文，低权限仍得到正确分量 UUID，但全部嵌套 evidence、说明、quote 均消失。 |
+| S2 | 以 ResolvedScalar 保留 SQLAlchemy 子查询到外层 SELECT 编译时，避免提前序列化导致相关性丢失；根引用由同一生成器处理。test_core1_instances 基于例06只有 B/P2 有合同、A/P1 无合同，分别执行单独 EXISTS 和本地条件 AND EXISTS，结果严格只有 P2。 |
+| S3 | 元素保存后同步目标聚合和全部已确认 affected_items 回会话，校验同步后的完整图后再提交。test_element_save 基于例07将 customer_no 改成 customer_code：发布事实和会话事实均为 C001、新键生效、旧键消失，两份图均合法，后续预览合法；无关会话描述修改保留且未发布。 |
+| S4 | 名称碰撞仅检查实际具有名称命名空间的种类及存在的字段；属性与关系共用所属对象命名空间，规则只比较同归属技术名。test_core1_lifecycle 对例07事实及例01映射的两个独立更新断言无 atomic_group_id，接受/撤销一项不会决定或修改另一项。该测试同时发现并修正提案 after Schema 错误剥除 MappingSource.id 的问题，恢复必填本地来源名；核心 Schema 不变。 |
+| S5 | 快照选日与业务月份分离：时间字段为快照列时逐周期选末日；按上线日期统计时先选定快照，再归业务月份。test_core1_metric_preview 用例12来源扩展主设计 §3.6 的五行组件数据，simple/expression 均得到总值3、10月1、12月2；无 time_field 的快照指标返回总值10、trend/trend_query=null 和明确 warning。 |
+| S6 | 邻接按虚拟目标的具体子类型展开，双向查询取得当前端及目标端有效本地 inherited_link_bindings；物理查询预算按具体查询计数，按实际具体 ref 去重。例06当事人反查负责人测试得到设备、车辆各一项，二者同键字符串1但实际 type_id/ref 不同，负责人边方向均为具体资产→当事人，无 warning。 |
+| S7 + A1 | 新增只读 EffectiveBindingRead/MembershipRead/EffectiveLinkRead DTO，并校验生成结果。MCP physical 返回有效来源、字段、每层成员绑定、有效关系、虚拟父具体展开，以及指标/映射表/各来源完整 DatasetRead（含各自快照声明）；继承关系读视图使用本地有效 join，原核心 LinkType 不变。test_core1_mcp 覆盖例06成员与设备/车辆绑定及分段续读、例13 ratio 的数据集/列/分量、例02映射表数据集、例12两来源快照声明；低权限回归确认不会借新 DTO 泄露物理或证据。 |
+| G1 | 需要只读保存影响预检：新增 POST W/element-saves/preview，输入候选 ElementSave，返回 current_version_id、session_revision、带 reason 的 AffectedItem[]。服务端从当前编辑基线推导必要引用改写及规范化 hash；Dataset 变更补齐直接指标和间接 ratio 影响，不把不相关编辑纳入范围。test_element_save 验证例07清单/hash、预检零写入、确认后保存、未确认拒绝、hash过期拒绝、版本/revision过期及无关修改拒绝；例13覆盖全部指标影响及服务端 hash。 |
+| G2 | 暂存仅校验 JSON 结构、证据和可适用的已知来源列；缺元数据/悬空语义引用/重复名称进入 validation。发布预览合并可编辑草稿结构，完整图错误作为 publishable=false 返回，避免把它误读成合法发布快照而500；接受及发布仍阻断完整图错误。test_modeling 覆盖重复技术名可暂存/重读/预览、接受与发布422 VALIDATION_FAILED、修好后发布成功；已知不存在的物理键列独立返回 JOIN_COLUMN_NOT_FOUND，悬空关系引用仅使 validation 不通过。 |
+| G3 | 事实修订迭代扩展原子组、下游和所需 pending 上游到完整闭包，新批次重建依赖并重写重复事实端点；已接受上游已在会话基线，无需重建，失效依赖明确拒绝。test_core1_fact_revision 在例07同时创建重复客户、新退货单和关联：修订重建三项、关联保留两项新依赖，旧三项 superseded；接受后新增退货与邻接都保留并指向原客户。原追加真实材料证据测试继续通过。 |
+| G4 | ratio 趋势保留分子/分母 snapshot_date 并汇总实际 dataset_id/period/date，同日期去重。例13扩展快照数据实际执行，断言10月5/7、11月1/2及各周期10-02、11-30，保留总值使用的11-30。 |
+| G5 | 后端覆盖检查按唯一 UUID 集合，已有规则允许一个 simple 项覆盖同一 ratio 的两个引用，保留这一行为。结果测试验证只传一个分量时总值及趋势均为1；空分量或重复同一分量仍422。 |
+| G6 | 去掉邻接测试的 if rows 空通过；六个场景严格比较全部关系的端点类型、键、关系类型和方向，覆盖反向、映射表、复合键、自关联、平行关系及多来源，并断言无 warning/截断。 |
+| G7 | PostgreSQL 并发双方先固定同一版本的预览，再同时提交；独立修改预期一个200、一个409 PREVIEW_OUTDATED，失败方重新预览发布后版本连续到3并保留两项描述修改。冲突场景也复用固定预览。未提供可丢弃库，本轮两项明确 skip，未声称真实并发已验收。 |
+
+### 契约变化与前端配合
+
+已同步 `2026-10-16-core1-p2-api-contract.md` 的 §4.2、§6 和 mock：
+
+- 新接口 `POST /api/v1/workspaces/{workspace_id}/element-saves/preview`，请求 `ElementSave`，响应 `ElementSaveImpact`；新增 M35 请求、响应与确认后保存 mock，列明结构/范围错误和版本/revision过期错误。前端编辑器需要先预检，展示 `affected_items[].reason` 供确认，再将去掉 reason 的三字段 AffectedItem 原样带入保存；不得在浏览器自行计算 expected_target_hash。预检后内容变化须重做预检，保存仍核对全部基线。
+- MCPElement 新增 `effective_bindings?: Page<EffectiveBindingRead>` 以及 ratio 的 `components`、推导 `dataset_id/value_kind`；datasets 扩展至指标、映射表与有效具体绑定来源。DTO 包含 `type_id/sources/fields/memberships/links`，membership 保存 `mapping_id/type_id/binding_mode/membership_source_id/derived_by`，有效关系保存 `link_type_id/source_type_id/target_type_id/data_join`。契约补例06 person/device/vehicle/asset 的响应构造、来源快照和权限规则。前端若声明/消费这些读 DTO，需同步对应可选字段。
+- 前端 ratio 预览按 UUID 去重 components；同一 simple 可覆盖分子分母。无业务时间字段时保留服务端总值与 warning，不绘制趋势；逐周期快照按响应原样展示。上述为前端配合项，本轮没有改 apps/web。
+- 提案 Schema 仅修正 `AfterMappingSource.id` 的必填本地来源名；生成文件在 `apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json`。无核心模型字段、核心 JSON Schema 或数据库结构变化，无迁移；无需运行 scripts/generate_core_types.mjs，未改 core.generated.ts。新增预检/读 DTO 属于既有定义的交互及查询投影，删除它们不改变语义模型，但会丢失服务器影响确认能力或有效绑定读取信息。
+- integrations 源码及 Agent 提示词未修改；按要求重建技能 ZIP 并校验完整性，未上传、复制技能目录、发布 Agent 或重启 DataAgent。
+
+### 统一验证记录
+
+所有初始修复和结果用例完成后统一执行。第一轮完整 pytest：453 passed、2 failed、10 skipped；失败揭示上述 G2 预览严格快照读取及 S4 嵌套来源 id Schema 问题，修正实现/Schema后保留并加强断言，重新执行完整检查。最终结果如下。
+
+在 `apps/api` 使用的可执行文件与环境（所有 Python 验证均显式移除外部数据库测试配置，未尝试连接外部数据库）：
+
+```sh
+export PYTHONPATH=<集成工作区>/apps/api/src
+PR23_PYTHON=<后端工作区>/apps/api/.venv/bin/python
+PR23_RUFF=<后端工作区>/apps/api/.venv/bin/ruff
+```
+
+| 执行命令 | 最终结果 |
+|---|---|
+| `env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYTHON" -m ontofoundry_api.contracts.export_schema --check` | passed，退出码0；核心及提案 Schema 无漂移 |
+| `"$PR23_RUFF" check src tests` | passed，0 lint errors |
+| `"$PR23_RUFF" format --check src tests` | passed，141 files already formatted |
+| `env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYTHON" -m pytest -q -rs` | **455 passed、0 failed、0 errors、10 skipped**；共465项，34.41秒 |
+| `env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYTHON" -m pytest -q -rs ../../integrations/dataagent/skills/ontofoundry-modeling/tests` | **3 passed、0 failed、0 errors、0 skipped**；0.06秒 |
+| 仓库根 `make -C integrations/dataagent zip` | passed，生成 dist/ontofoundry-modeling.zip（忽略的构建产物） |
+| 仓库根 `unzip -t integrations/dataagent/dist/ontofoundry-modeling.zip` | passed，ZIP 无损坏，顶层为 ontofoundry-modeling/ |
+| 仓库根 `git diff --check` | passed；最终文档追加后核对 |
+
+10项 skipped：PostgreSQL切换迁移2、真实指标聚合1、并发发布2、并发提案决定4，MySQL来源行为1。均因未提供可丢弃配置；skip不等于通过，评审A2的真实迁移保留范围验收仍待外部条件。完整测试仅有原有 Starlette/httpx 与 anyio 两项依赖弃用提示。
+
+本轮未连接 127.0.0.1:55441 或任何非临时数据库，未启动服务、commit或push；未触碰其他人的 apps/web 修改。最终测试通过后只追加本记录并检查 diff，未再改实现。

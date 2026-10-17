@@ -144,5 +144,48 @@
 
 1. **真实数据与智能体链路验收**：本次浏览器验收未连接业务数据库与 DataAgent；数据库实例浏览、指标真实取数、建模提案生成与审阅需在部署环境连接数据源和 DataAgent 后验收。
 2. **导入与导出功能**：Ossie 与原生单文件导入三步对话框按计划在 P4（`P4-05`）恢复，导出在 P5 恢复。
-3. **跨聚合改名联动（`affected_items`）**：契约 §4.2 的受影响项 envelope 需要服务器提供受影响元素及其 `expected_target_hash`，前端目前没有 hash 来源，元素保存未携带该字段；跨聚合技术名改写（例如父对象属性被具体子对象映射引用）目前由服务器校验拒绝，需与后端协调后补。
+3. **跨聚合改名联动（`affected_items`）**（已完成）：已接入 `POST W/element-saves/preview` 只读预检接口，元素保存前先用候选 `ElementSave` 调预检，有受影响元素时弹窗展示种类、名称与服务端 `reason` 供用户确认，确认后将去掉 `reason` 的 `affected_items` 原样带入保存请求（详见下方“保存影响预检”一节）。
 4. **成员条件多跳路径与多分支**：编辑器的“按条件”模式只覆盖一层直接父对象条件；含多跳路径或多个分支的已有条件以表达式显示和编辑，语义不变但不再保持结构化分支。
+
+## 控件补齐
+
+在 PR #23 收尾阶段，将剩余手写控件与容器统一替换为 Ant Design 5 控件（保持 13px 主题基准与紧凑布局，不新增 CSS 文件）：
+
+1. **工作区页签栏（`components/WorkspaceTabs.tsx`、`components/WorkspaceTabs.test.tsx`）**：由手写 `<button>` 与自定义方向键切换改为 Ant Design `Tabs`（`type="editable-card"`、`hideAdd`、`size="small"`），隐藏 `Tabs` 自带内容区，继续由现有 `TabPanel` 挂载与保活各页面；保留点击导航、`requestClose` 关闭拦截（忙碌提示、未保存确认）、页签图标、标题截断、未保存圆点与 `aria-label="关闭 {标题}"`，维持 12px 字号与约 30px 紧凑高度。
+2. **上传业务知识拖拽区（`pages/BuilderPage.tsx`、`pages/BuilderPage.test.tsx`）**：由原生 `<button>` + 隐藏 `<input type="file">` + 手写拖拽事件改为 Ant Design `Upload.Dragger`（`multiple`、`accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"`、`showUploadList={false}`、`beforeUpload` 走现有 `upload` 逻辑并返回 `false`），保留禁用态、上传中文案、支持格式与单文件大小说明，并新增上传交互单测。
+3. **条件行级校验错误（`components/elements/DerivedConditionEditor.tsx`、`components/elements/MetricForm.tsx`）**：派生条件编辑器与指标过滤条件行的行下红色 `Text` 改为 `Form.Item` 的 `validateStatus` 与 `help` 承载，保留原有错误文案。
+4. **禁用按钮原因提示（`components/publish/PublishPanel.tsx`、`components/proposals/ProposalPanel.tsx`）**：“发布 vN”与“全部接受”按钮去掉禁用态下浏览器不显示的原生 `title`，改为外包 `<span>` 的 Ant Design `Tooltip`。
+5. **边框与底色容器卡片化（`components/elements/ElementPanels.tsx`、`components/elements/ElementInstances.tsx`、`components/publish/PublishPanel.tsx`、`components/elements/MetricPreview.tsx`、`components/proposals/EvidencePopover.tsx`）**：规则编辑块、实例详情块、发布面板顶部信息框、指标预览总值与按月趋势框、证据条目统一改为 `Card`（`size="small"`），紧凑内边距保持原有视觉密度。
+6. **证据来源标识描述列表（`components/proposals/EvidencePopover.tsx`）**：“来源标识”手写 `<dl>` 改为 Ant Design `Descriptions`（`size="small"`、`column={1}`）。
+7. **检查项与说明列表（`components/publish/PublishPanel.tsx`、`pages/DeliveryPage.tsx`）**：发布检查页的检查项列表（合并冲突 / 本体校验 / 合并基准，带状态图标）与错误/警告列表、交付页的 MCP 工具说明列表统一改为 Ant Design `List`（`size="small"`）。
+
+### 控件补齐后测试与构建结果
+
+在 `apps/web` 下使用 Node `v22.19.0` 执行 `npx vitest --run && npx tsc -b && npm run lint && npm run build`：
+
+- **Vitest**：33 个测试文件全部通过，**148 passed / 0 failed / 0 skipped**。
+- **tsc -b**：通过（0 errors）。
+- **lint**：通过（0 errors，0 warnings）。
+- **build**：通过（`vite build` 产物正常，CSS 约 58.21 kB / gzip 11.48 kB）。
+
+## 保存影响预检
+
+配合 PR #23 G1 与更新后的接口契约 §4.2 / §9，前端接入只读元素保存影响预检：
+
+1. **契约类型与接口客户端（`api/types.ts`、`api/client.ts`）**：新增 `ElementSaveImpact = { current_version_id: UUID | null; session_revision: number | null; affected_items: (AffectedItem & { reason: string })[] }`；在 `modelingApi` 新增 `previewElementSave(workspaceId, payload: ElementSave)` 调用 `POST /api/v1/workspaces/{id}/element-saves/preview`。
+2. **元素弹窗保存预检与确认流程（`components/elements/ElementInspector.tsx`）**：
+   - 点击保存后，先用与保存一致的候选 `ElementSave` 调用 `modelingApi.previewElementSave`；若 `affected_items` 为空则直接调用 `saveElement`（不携带 `affected_items` 字段）。
+   - 若 `affected_items` 非空，弹出 Ant Design `Modal`（含 `List`、`Tag`）列出每个受影响元素的种类中文名、元素名称（从草稿按 `target_id` 解析，未命中时回退显示 ID）与服务端 `reason`，说明“确认后这些元素会随本次保存一并改写”。确认后剥离 `reason`，原样将服务端返回的 `{ target_kind, target_id, expected_target_hash }` 数组作为 `affected_items` 传入 `saveElement`；取消则关闭确认框、不保存并保留编辑内容。
+   - 预检与确认保存之间若草稿内容发生变化，自动失效当前预检结果并在保存时重新触发预检；浏览器端不自行计算 `expected_target_hash`。
+   - 预检返回的 409 版本/revision 过期或 422 范围/校验错误按既有保存错误横幅展示，不进入确认框。
+3. **指标预览分量去重确认（`lib/metricEditing.ts`）**：确认 `previewRequest` 中比率指标的 `components` 已按唯一 UUID 去重。
+4. **单测补充（`components/elements/ElementInspector.test.tsx`）**：基于 `example("07-instances-and-evidence")` 将客户属性 `customer_no` 改名为 `customer_code` 的场景，补充 3 项用例（无受影响项直接保存且不弹框；有受影响项展示 `reason`、取消不保存、确认后带上去掉 `reason` 的 `affected_items` 保存；预检报 409 时展示错误且不保存）。
+
+### 保存影响预检测试与构建结果
+
+在 `apps/web` 下使用 Node `v22.19.0` 执行 `npx vitest --run && npx tsc -b && npm run lint && npm run build`：
+
+- **Vitest**：33 个测试文件全部通过，**151 passed / 0 failed / 0 skipped**。
+- **tsc -b**：通过（0 errors）。
+- **lint**：通过（0 errors，0 warnings）。
+- **build**：通过（`vite build` 产物正常，CSS 约 58.26 kB / gzip 11.48 kB）。
