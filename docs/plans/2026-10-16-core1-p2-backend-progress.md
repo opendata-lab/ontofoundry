@@ -176,3 +176,92 @@ PR23_RUFF=<后端工作区>/apps/api/.venv/bin/ruff
 10项 skipped：PostgreSQL切换迁移2、真实指标聚合1、并发发布2、并发提案决定4，MySQL来源行为1。均因未提供可丢弃配置；skip不等于通过，评审A2的真实迁移保留范围验收仍待外部条件。完整测试仅有原有 Starlette/httpx 与 anyio 两项依赖弃用提示。
 
 本轮未连接 127.0.0.1:55441 或任何非临时数据库，未启动服务、commit或push；未触碰其他人的 apps/web 修改。最终测试通过后只追加本记录并检查 diff，未再改实现。
+
+## PR #23 第二轮评审修正
+
+### 修正计划与边界
+
+本节依据 API 契约 §4.2、§4.6 记录本轮设计与实施计划；遵照本任务路径限制，不新增设计文档，不改变核心语义模型或数据库结构。仅处理 N1、N2、N3、N4、N6、N7 的后端部分。
+
+1. 元素保存：从目标聚合单独推导必要引用改写，候选依赖只能保持原值或等于必要改写；预检与事务内保存共用范围推导、三方合并、完整图校验及会话同步计算，严格核对确认集合。
+2. 查询：字符串字面量交给 SQLAlchemy 绑定；虚拟父精确定位明确要求具体类型，返回 422。
+3. 读契约：独立导出四种接口 DTO 的 JSON Schema，纳入 export_schema --check，并列出前端所需字段。
+4. 补结果回归与双方言纯编译回归；全部编辑结束后统一运行指定四项检查，移除 PostgreSQL/MySQL 外部测试配置，不启动服务、不连接外部数据库、不 commit/push。
+
+### 改动、回归与验证结果
+
+| 项目 | 实现文件 | 回归测试与结果断言 |
+|---|---|---|
+| N1 | `apps/api/src/ontofoundry_api/services/element_save.py`、`api/modeling.py` | `test_element_save.py`：例13六项指标确认，省略全部、部分、重复、额外 UUID、错误 kind 均 422 且版本/会话不变；完整清单顺序无关且成功发布。未暂存/已暂存两种 Dataset 修改均覆盖；旧会话还必须确认最新发布版新增的第七项指标。既有 hash 过期回归仍要求 409 VERSION_CHANGED。 |
+| N2 | 同上 | `test_element_save.py`：例07对象描述夹带关系描述在预检和保存均为 ELEMENT_SCOPE_INVALID；必要事实键改名可以显式提交，但夹带 C001→C999 被拒，恢复原值后成功。服务端只应用目标聚合，合并后从最新版本推导必要外部改写，确认不赋予额外编辑权限。 |
+| N3 | 同上 | `test_element_save.py`：改名后第二次只改描述，预检无需重复确认且保存成功；旧会话遇到最新改名，预检列出事实键同步，确认后发布/会话两图合法，无关草稿保留且未发布。补基线后新增事实也随改名改写的回归。共用计算在副本上完成三方合并、发布图校验、必要确认集合与会话同步校验，预检不写入。 |
+| N4 | `apps/api/src/ontofoundry_api/services/instance_plan.py` | `test_core1_instances.py`：PostgreSQL/MySQL 的 LIKE '1%' 字面量进入 SQLAlchemy 参数，实例键参数仍保留；模拟驱动百分号格式处理成功；字面量内联编译正确转义，另覆盖与取模操作组合。纯编译不连接数据库，既有 EXISTS 相关查询结果测试保留。 |
+| N6 | 同上 | `test_core1_instances.py`：虚拟父传不存在 TypedKey 的直接定位和邻接均为 422 INVALID_OBJECT_REF，提示具体类型，且在数据源解析之前失败。契约 §4.6 明确具体类型定位要求。 |
+| N7 | `apps/api/src/ontofoundry_api/contracts/read_models.py`、`export_schema.py`、`services/physical_projection.py`、`api/modeling.py` | `test_read_contracts.py`：独立读 Schema 产物与模型一致，故意漂移能被 --check 拒绝；13份例子的有效绑定/成员/关系实际投影通过对应 Schema 校验；实际六项保存影响通过 Schema，缺 hash 被拒。 |
+
+接口读 Schema 路径：`apps/api/src/ontofoundry_api/contracts/ontofoundry.api-read.v1.schema.json`，与核心及提案 Schema 分开，三者都纳入 `export_schema --check`。权威 DTO 在 `contracts/read_models.py`，原 API 和物理投影均改为引用它们，无核心语义字段/数据库结构变化。
+
+| DTO | 前端需同步的字段 |
+|---|---|
+| MembershipRead | type_id、mapping_id、binding_mode、membership_source_id（可 null）、derived_by |
+| EffectiveLinkRead | link_type_id、source_type_id、target_type_id、data_join（可 null） |
+| EffectiveBindingRead | type_id、sources、fields、memberships、links（默认 []） |
+| ElementSaveImpact | current_version_id（可 null）、session_revision（可 null）、affected_items；每项 target_kind、target_id、expected_target_hash、reason |
+
+前端同事负责以上类型及 `MCPElement.effective_bindings?: Page<EffectiveBindingRead>`；本任务未编辑 apps/web 或前端进度文档。
+
+### 本轮统一检查结果
+
+全部实现、Schema、测试及契约编辑完成后统一执行指定检查。第一轮为 482 passed、10 skipped；复核发现旧会话必须覆盖最新版本新增依赖，补充对应实现及两个结果测试后，重新执行全部四项检查，最终结果如下。
+
+工作目录 `apps/api`，Python/ruff 均使用相邻后端工作区已有虚拟环境；每项检查显式移除外部数据库测试配置，并设置本 worktree 的 `PYTHONPATH`：
+
+```sh
+export PYTHONPATH="$PWD/src"
+PR23_PYTHON=../../../backend/apps/api/.venv/bin/python
+PR23_RUFF=../../../backend/apps/api/.venv/bin/ruff
+
+env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYTHON" -m ontofoundry_api.contracts.export_schema --check
+env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_RUFF" check src tests
+env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_RUFF" format --check src tests
+env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG "$PR23_PYTHON" -m pytest -q
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| `python -m ontofoundry_api.contracts.export_schema --check` | 退出码 0；核心、提案和接口读 Schema 均无漂移 |
+| `ruff check src tests` | 退出码 0；All checks passed |
+| `ruff format --check src tests` | 退出码 0；143 files already formatted |
+| `pytest -q` | 退出码 0；**484 passed、0 failed、0 errors、10 skipped**，共 494 项，35.68 秒；2 项既有依赖弃用提示 |
+| `git diff --check` | 退出码 0；最终文档记录后复核 |
+
+10 项跳过原因与上一轮相同：PostgreSQL 切换迁移 2、真实指标聚合 1、并发发布 2、并发提案决定 4，MySQL 来源行为 1；均未提供外部可丢弃库配置。A2 的 PostgreSQL 带数据迁移/保留范围与真实并发验收仍待外部条件，不能把 skip 视为通过。
+
+本轮未启动服务、未连接外部数据库、未 commit/push；只改本任务允许的后端和两份文档路径，未编辑 apps/web 或前端进度文档。最终检查完成后仅补本验证记录并检查 diff，未再修改实现。
+
+### A2 PostgreSQL 迁移验收
+
+新增 `test_core1_cutover.py::test_postgres_populated_cutover_preserves_platform_rows`，沿用环境变量 opt-in 和独立库 CREATE/DROP 方式。先升级到旧 head `20261009_000001`，通过 SQL 向全部 17 张业务表写入虚构数据，再升级到 head `20261016_000001`；随后重复 `upgrade head`，验证数据、结构和 revision 均不变。PostgreSQL 17 验收仅使用获准的一次性数据库端口 55460；测试库在 finally 中删除。
+
+| 范围 | 表与断言 |
+|---|---|
+| 保留（9 张） | `users`、`workspaces`、`workspace_members`、`materials`、`material_chunks`、`data_connections`、`service_tokens`、`service_token_scopes`、`metadata_snapshots`。比较迁移前后行数及所有字段，覆盖归档材料、分块正文、连接配置和密文、令牌 hash/多个 scope、元数据 JSON 与时间。工作空间仅允许 `current_version_id` 从已写入的旧版本 id 置空，其他字段完全不变。 |
+| 清空（8 张） | `ontology_versions`、`ontology_element_identities`、`modeling_sessions`、`proposal_batches`、`proposal_items`、`proposal_item_dependencies`、`proposal_decision_requests`、`proposal_decision_items`。迁移前逐表断言非空，迁移后逐表断言零行；覆盖版本/草稿、导入候选及材料清单、两条关联提案、依赖和决定记录的外键链。 |
+| 结构与重入 | 表集合不变，`ontology_versions.ossie_json` 删除，`proposal_items.atomic_group_id` 新增为可空 `VARCHAR(36)`；其余两表列集合不变。两次升级后 revision 均为 head，第二次全库行快照与第一次完全相同。 |
+
+依据主设计 §8 和已确认决定第 5 项，切换清空测试本体内容，保留平台配置；本次不修改迁移脚本。旧 head 已由前序 `20261009_000001` 删除 `modeling_session_migrations`（以及可能存在的 `proposal_item_migrations`），因此不人为重建退役表；当前旧 head 也没有独立导入记录表，导入候选/清单在旧会话及提案中覆盖。切换本身不新增业务表，只新增上述列。
+
+同时修正 `test_t4_postgres_decisions.py::test_a_three_level_group_is_accepted_atomically_under_a_race`：`order_no` 只按新建 `purchase_order` 的 owner 统计为 1，并核对本次提案生成的属性 id、对象 id 和关系 id/两端；保留竞争结果严格为一方 200、一方 409，增加 revision 只增长 1 的断言。
+
+全部编辑结束后统一执行以下检查（工作目录 `apps/api`；设置本 worktree 的 `PYTHONPATH="$PWD/src"`；Python/ruff 使用 `../../../backend/apps/api/.venv/bin/`）。所有命令均移除 MySQL 测试配置；仅定向 PostgreSQL 命令设置获准的数据库变量，全量命令移除两个外部数据库测试变量。
+
+| 命令 | 结果 |
+|---|---|
+| `ruff check src tests` | 退出码 0；All checks passed |
+| `ruff format --check src tests` | 退出码 0；143 files already formatted |
+| `pytest -q -rs tests/test_core1_cutover.py tests/test_t4_postgres_decisions.py tests/test_t0_postgres_publish.py tests/test_core1_metric_postgres.py`（设置 `ONTOFOUNDRY_TEST_POSTGRES_URL`） | 退出码 0；**11 passed、0 failed、0 errors、0 skipped**，共 11 项，9.04 秒 |
+| `pytest -q`（不设置外部数据库测试变量） | 退出码 0；**484 passed、0 failed、0 errors、11 skipped**，共 495 项，38.68 秒 |
+
+定向 PostgreSQL 检查包含切换迁移 4 项（SQLite 带数据 1、PostgreSQL 空库/旧 head 2、新增 PostgreSQL 带数据 1）、并发/幂等提案决定 4 项、并发发布 2 项、真实指标聚合 1 项；全部执行通过。未配置数据库的全量检查按预期跳过 PostgreSQL 切换迁移 3、提案决定 4、并发发布 2、指标聚合 1，以及 MySQL 来源行为 1；这些 skip 不算通过，其中全部 PostgreSQL 项目已在本次定向检查真实执行。两次 pytest 均只有既有 Starlette/httpx 与 anyio 的 2 项依赖弃用提示。
+
+验收结论：迁移实际保留/清空范围与主设计 §8 一致，未发现差异；版本指针置空是清除旧本体引用的预期行为。没有修改迁移脚本或迁移语义。最终只补本节验证结果并检查 diff；未启动应用服务，未 commit/push，保留已有第二轮评审修正。

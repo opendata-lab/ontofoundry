@@ -189,3 +189,27 @@
 - **tsc -b**：通过（0 errors）。
 - **lint**：通过（0 errors，0 warnings）。
 - **build**：通过（`vite build` 产物正常，CSS 约 58.26 kB / gzip 11.48 kB）。
+
+## PR #23 第二轮评审修正
+
+围绕 PR #23 第二轮评审中的前端问题（N5、A3，以及 N7 的前端类型部分）完成修正与回归测试：
+
+1. **N5（`ElementInspector` 忙碌态禁用与预检返回时候选一致性校验）**：
+   - 在 `components/elements/ElementInspector.tsx` 中用 Ant Design `ConfigProvider componentDisabled={busy}` 包裹编辑内容区（并保留 `<fieldset disabled={busy}>` 与页签/头部按钮禁用），同时将子组件（`PropertyMappingTable.tsx`、`ObjectTablePicker.tsx`、`LinkMappingPanel.tsx`、`RelationMappingTable.tsx`、`MetricForm.tsx`、`DerivedConditionEditor.tsx`、`MetricPreview.tsx`、`ElementInstances.tsx`）中动态布尔 `disabled` 写法统一改为 `|| undefined`，避免显式 `disabled={false}` 覆盖 `DisabledContext`，确保预检或保存进行中所有 `Select`、`Checkbox`、`Input` 等控件真正不可操作。
+   - 通过 `draftRef` 同步追踪最新草稿，在 `previewElementSave` 响应后的所有分支（包括 `affected_items` 为空直接保存分支和有受影响项弹窗分支）均重新构建当前候选并与请求发起时的候选签名比较；若不一致则不保存旧候选、不展示过期影响列表，而是立即用最新候选重新发起预检。
+   - 在 `components/elements/ElementInspector.test.tsx` 补充回归测试：验证预检进行中 `Select`、`Checkbox`、`Input` 均处于禁用态，且预检延迟期间若 `Select` 发生变更（即使首次预检返回 `affected_items: []`），不会保存旧候选，而是对新候选重新预检并最终保存最新修改。
+2. **A3（`WorkspaceTabs` 页签无障碍关联与名称恢复）**：
+   - 在 `components/WorkspaceTabs.tsx` 中将实际页面面板 `<section>` 的 `id` 统一为 `workspace-panel-${tab.id}`，与 Ant Design `Tabs`（`id="workspace"`）生成的 `aria-controls` 一致；清理隐藏 `.ant-tabs-content-holder .ant-tabs-tabpane` 上的重复 `id`/`role="tabpanel"`，并在 `useLayoutEffect` 中同步为 `role="tablist"` 恢复可访问名称“已打开的页面”；忙碌与未保存关闭保护保持不变。
+   - 在 `components/WorkspaceTabs.test.tsx` 中恢复 `getByRole("tablist", { name: "已打开的页面" })` 与 `querySelectorAll('[role="tabpanel"]')` 断言，并新增 `aria-controls` 精确指向当前可见 `tabpanel` 元素的断言。
+3. **N7（前端物理执行投影与 MCP 读类型补齐）**：
+   - 在 `api/types.ts` 中严格按后端 `physical_projection.py` 的 Pydantic 定义新增 `BindingMode`、`MembershipRead`、`EffectiveLinkRead`、`EffectiveBindingRead`，并在 `ObjectTypeRead`、`LinkRead`、`MetricRead` 及新增的 MCP 读协议类型（`MCPElement`、`MCPGetOntology` 等）中声明 `effective_bindings`、`datasets`、`sources` 等字段。
+
+### PR #23 第二轮评审修正检查结果
+
+在 `apps/web` 下使用 Node `v22.19.0` 执行 `npx vitest --run && npx tsc -b && npm run lint && npm run check:core-types && npm run build`：
+
+- **Vitest**：33 个测试文件全部通过，**152 passed / 0 failed / 0 skipped**。
+- **tsc -b**：通过（0 errors）。
+- **lint**：通过（0 errors，0 warnings）。
+- **check:core-types**：通过（0 errors）。
+- **build**：通过（`vite build` 产物正常）。

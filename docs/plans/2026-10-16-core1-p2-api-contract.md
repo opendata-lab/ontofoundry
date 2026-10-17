@@ -423,7 +423,11 @@ type ElementSaveResult = {
 
 提案 after 中的 MappingSource.id 必填且保留本地来源名（例如 main），它不是由服务端分配的元素 UUID；inherited_link_bindings 仍按既有提案 wire 的条目数组提交，不把核心字典直接回传。PR #23 同步修正提案 JSON Schema，核心 Schema 不变。
 
-保存成功时，将目标聚合和确认清单全部同步回会话；合并后的会话图仍须合法，保留其他未发布修改。会话暂存只阻断结构、证据与可适用的已登记来源列问题：JOIN_COLUMN_NOT_FOUND 仅表示已知来源列不存在；名称重复或悬空语义引用进入 validation，不伪报物理列错误。接受和发布继续阻断完整图错误。
+保存在事务内重新推导必要确认集合，严格比较每项 kind、UUID、hash；缺项、多余项、重复项及种类或 UUID 不符均为 422 ELEMENT_SCOPE_INVALID，hash 过期为 409 VERSION_CHANGED。候选中的依赖项可以保持原值，或恰好等于服务端从目标聚合推导的必要引用改写；依赖项夹带其他修改仍为 ELEMENT_SCOPE_INVALID，显式确认也不能扩大范围。
+
+预检与保存复用同一纯计算流程：限制目标聚合、推导引用改写、与最新版本三方合并、校验最终发布图、模拟会话同步及完整图校验。只读预检在副本上执行，不仅校验历史基线上的局部图；合并冲突使用 409 MERGE_CONFLICTS。历史基线仍旧的会话在第二次保存时不重复确认已同步的改写；旧会话遇到最新发布版改名时，同步所必需的引用改写也进入确认集合，hash 取当前会话编辑基线；若依赖项是基线之后由最新发布版新增，使用该发布版元素的 hash。Dataset 确认覆盖本次发布和会话同步两侧的影响，已暂存的 Dataset 修改也不能绕过确认。
+
+保存成功时，将合并后的目标聚合及必要引用改写同步回会话；合并后的会话图仍须合法，保留其他未发布修改（包括依赖项上与引用改写无关的既有草稿字段）。会话暂存只阻断结构、证据与可适用的已登记来源列问题：JOIN_COLUMN_NOT_FOUND 仅表示已知来源列不存在；名称重复或悬空语义引用进入 validation，不伪报物理列错误。接受和发布继续阻断完整图错误。
 
 `revise` 是后端内部 CAS/hash 边界，**不是 REST 路由**。保存、决定、冲突解决等写会话复用它或等价事务能力，不能回退旧版本，不接 legacy_mappings/legacy_joins/semantic_changes。proposals 运行中允许人工改草稿，受影响提案实时变 stale；发布仍按现有运行状态限制。
 
@@ -598,7 +602,7 @@ type NeighborhoodRequest = {
 | GET `O/objects/{ref}/neighborhood` | `VersionQuery & {depth?:number;snapshot_date?:ISODate}` | `InstanceEnvelope & InstanceNeighborhood` | G、Auth、Read、Data | M30 |
 | POST `W/instance-neighborhood` | `NeighborhoodRequest` | `InstanceNeighborhood` | G、Auth、V、Read、Data | M31 |
 
-默认 source=document、q=""、limit=20（1～100）、depth=1（1～3）。数据库搜索必须指定 type_id；虚拟父返回实际具体 type_id。文档仍按事实 UUID 检索/去重，display_text 按标题 → 完整标识 → 可见材料引文前80字 → UUID；0/false 有值，manual.note 不代引文。文档搜索包含 display_text 和属性值，材料事实删独立 name；`values.name` 这种属性技术名合法。REST 文档 ref 保持 `doc.<事实UUID>`，MCP 使用裸事实 UUID。
+默认 source=document、q=""、limit=20（1～100）、depth=1（1～3）。数据库搜索必须指定 type_id；虚拟父返回实际具体 type_id。精确定位（含详情和邻接中心）必须使用具体类型和 TypedKey；虚拟父带 key 请求返回 422 INVALID_OBJECT_REF，提示指定具体类型，不忽略键条件或猜测具体实例。文档仍按事实 UUID 检索/去重，display_text 按标题 → 完整标识 → 可见材料引文前80字 → UUID；0/false 有值，manual.note 不代引文。文档搜索包含 display_text 和属性值，材料事实删独立 name；`values.name` 这种属性技术名合法。REST 文档 ref 保持 `doc.<事实UUID>`，MCP 使用裸事实 UUID。
 
 数据库 ref 的建议字节协议（§10 待双方确认后锁定）：`db.` + **UTF-8 JSON 的 base64url，无末尾 =**。JSON payload 为 `[具体type_id, TypedKey]`，key 次序是有效主来源 key_columns 次序。例04的 `["O100",1]` 为 `[{type:"string",value:"O100"},{type:"integer",value:"1"}]`；整数/decimal 用规范十进制字符串保精度、float 必须有限、null 键不可定位。`"1"` 与整数1、两个子类型相同局部键都不同。拒绝旧 `[type_id,String(key)]`，不接受分隔符拼接，也不把 ref 当业务标识。服务端生成，前端仅转传和 URL 编码；数据库 id 与 ref 统一使用这个 ref，邻接端点指相同 id。文档邻接端点仍是事实 UUID。
 
@@ -1253,3 +1257,16 @@ const mcp06: MCPGetOntology = {
 person 的 memberships 依次包含 party 的 independent 和 person 的 shared_parent（membership_source_id="extension"）；sources 同时有 main 与 extension。asset 的 effective_bindings 分为 device/vehicle 两项，两者 responsible_party 的 data_join 都取各自本地 inherited_link_bindings，datasets 分别为 devices/vehicles。单独请求 device/vehicle 时，同一个有效 join 同时出现在 adjacency.links 的 data_join 中，inherited_from 仍为 asset；不能把本地绑定归属伪装成新关系定义。
 
 快照与 ratio 预览补充：只有明确的业务 time_field 才生成趋势；缺字段时 trend/trend_query 为 null，warnings 提示仅返回总值。按快照日期看趋势逐周期选末日，按上线日期看分组先选快照再归月（主设计 §3.6：10月1、12月2）。snapshot_dates 保留总值与各趋势周期实际选日；ratio 两分量同数据集但时间字段不同导致同一业务周期使用不同日期时，可有同 dataset_id/period 的多条实际 date，相同日期去重。分子分母同一 UUID 时 components 只提交一个唯一 simple 项，同时覆盖两个引用；重复提交仍 422。
+
+### PR #23 第二轮：接口读模型 Schema 交付
+
+独立接口读契约产物：`apps/api/src/ontofoundry_api/contracts/ontofoundry.api-read.v1.schema.json`。权威 Pydantic 定义在同目录 `read_models.py`；不进入核心语义 Schema。根 anyOf 引用以下四种 DTO，嵌套定义位于 `$defs`；`python -m ontofoundry_api.contracts.export_schema --check` 同时检查核心、提案和本接口读 Schema 的漂移。
+
+| DTO | 序列化字段（与前端同步） |
+|---|---|
+| MembershipRead | 必填 type_id、mapping_id（UUID），binding_mode，membership_source_id（string 或 null），derived_by（DerivedBranch[]） |
+| EffectiveLinkRead | 必填 link_type_id、source_type_id、target_type_id（UUID），data_join（DataJoin 或 null） |
+| EffectiveBindingRead | 必填 type_id（UUID）、sources（MappingSource[]）、fields（Record<string, FieldBinding>）、memberships（MembershipRead[]）；links（EffectiveLinkRead[]）默认空数组，运行时输出包含此字段 |
+| ElementSaveImpact | 必填 current_version_id（string 或 null）、session_revision（integer 或 null）、affected_items（AffectedItemImpact[]）；每项必填 target_kind、target_id、expected_target_hash、reason（均 string） |
+
+这些 DTO 承载现有定义推导的只读绑定和保存交互信息，不新增语义字段或执行优化状态。前端同时补齐四种类型及 `MCPElement.effective_bindings?: Page<EffectiveBindingRead>`；本轮后端任务不编辑 apps/web。
