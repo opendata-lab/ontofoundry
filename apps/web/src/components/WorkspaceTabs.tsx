@@ -43,7 +43,9 @@ import { WorkspaceRoutes } from "./WorkspaceRoutes";
 
 // Each panel reads its own location, fixed to the tab's href. The router's
 // context changes on every navigation; without this every open page, hidden
-// or not, re-rendered on each menu switch.
+// or not, re-rendered on each menu switch. Ant Design renders the surrounding
+// tabpanel (id, role, aria-labelledby), mounting it on first activation and
+// keeping it mounted while hidden.
 const TabPanel = memo(function TabPanel({
   tab,
   active,
@@ -89,14 +91,7 @@ const TabPanel = memo(function TabPanel({
     [tab.href, tab.id],
   );
   return (
-    <section
-      className="h-full min-w-0 overflow-auto"
-      id={`workspace-panel-${tab.id}`}
-      role="tabpanel"
-      aria-labelledby={`workspace-tab-${tab.id}`}
-      hidden={!active}
-      inert={!active}
-    >
+    <div className="h-full min-w-0 overflow-auto" inert={!active}>
       <LocationContext.Provider value={location}>
         <PageTabContext.Provider value={context}>
           <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
@@ -104,9 +99,14 @@ const TabPanel = memo(function TabPanel({
           </Suspense>
         </PageTabContext.Provider>
       </LocationContext.Provider>
-    </section>
+    </div>
   );
 });
+
+const TAB_BAR =
+  "flex-none [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:bg-[#f3f5f7] [&_.ant-tabs-nav]:px-2.5 [&_.ant-tabs-nav]:pt-1 [&_.ant-tabs-tab]:!h-[30px] [&_.ant-tabs-tab]:!px-2.5 [&_.ant-tabs-tab]:!py-0 [&_.ant-tabs-tab]:!text-xs [&_.ant-tabs-tab-remove]:!ml-1 [&_.ant-tabs-tab-remove]:!p-0";
+const TAB_PANES =
+  "h-full [&>.ant-tabs-content-holder]:min-h-0 [&>.ant-tabs-content-holder>.ant-tabs-content]:h-full [&>.ant-tabs-content-holder>.ant-tabs-content>.ant-tabs-tabpane]:h-full";
 
 export function WorkspaceTabs({
   workspaceId,
@@ -154,6 +154,7 @@ export function WorkspaceTabs({
   });
   useEffect(() => preloadWorkspacePages(), []);
   const strip = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
   const busy = state.tabs.some((t) => t.busy);
@@ -199,18 +200,11 @@ export function WorkspaceTabs({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
   useLayoutEffect(() => {
-    const root = strip.current;
-    if (!root) return;
-    root.querySelector('[role="tablist"]')?.setAttribute("aria-label", "已打开的页面");
-    root
-      .querySelectorAll<HTMLElement>(".ant-tabs-content-holder .ant-tabs-tabpane")
-      .forEach((pane) => {
-        pane.removeAttribute("id");
-        pane.removeAttribute("role");
-        pane.removeAttribute("aria-labelledby");
-      });
-    root
-      .querySelector('[aria-selected="true"]')
+    const nav = bar.current;
+    // rc-tabs offers no prop for naming its tablist; the node itself is stable.
+    nav?.querySelector('[role="tablist"]')?.setAttribute("aria-label", "已打开的页面");
+    nav
+      ?.querySelector('[aria-selected="true"]')
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [state.tabs, state.active]);
   const update = useCallback((id: string, meta: PageTabMeta) => {
@@ -262,7 +256,7 @@ export function WorkspaceTabs({
   const target = state.tabs.find((t) => t.id === closing);
   return (
     <div className="flex h-full flex-col">
-      <div ref={strip} className="min-w-0 flex-none">
+      <div ref={strip} className="min-h-0 min-w-0 flex-1">
         <Tabs
           id="workspace"
           type="editable-card"
@@ -271,7 +265,25 @@ export function WorkspaceTabs({
           activeKey={state.active}
           tabBarGutter={3}
           tabBarStyle={{ margin: 0 }}
-          className="[&_.ant-tabs-content-holder]:hidden [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:bg-[#f3f5f7] [&_.ant-tabs-nav]:px-2.5 [&_.ant-tabs-nav]:pt-1 [&_.ant-tabs-tab]:!h-[30px] [&_.ant-tabs-tab]:!px-2.5 [&_.ant-tabs-tab]:!py-0 [&_.ant-tabs-tab]:!text-xs [&_.ant-tabs-tab-remove]:!ml-1 [&_.ant-tabs-tab-remove]:!p-0"
+          // Child combinators only: pages rendered inside the panes have Tabs too.
+          className={TAB_PANES}
+          renderTabBar={(props, DefaultTabBar) => (
+            // The bar holds only the strip and its notice, so these descendant
+            // selectors cannot reach a page's own Tabs.
+            <div ref={bar} className={TAB_BAR}>
+              <DefaultTabBar {...props} />
+              {notice && (
+                <Alert
+                  banner
+                  type="warning"
+                  role="status"
+                  message={notice}
+                  closable={{ closeIcon: true, "aria-label": "关闭提示" }}
+                  onClose={() => setNotice("")}
+                />
+              )}
+            </div>
+          )}
           onChange={(key) => {
             const tab = state.tabs.find((t) => t.id === key);
             if (tab) void navigate(tab.href);
@@ -295,7 +307,9 @@ export function WorkspaceTabs({
               }[area] ?? Box;
             return {
               key: tab.id,
-              style: { display: "none" },
+              children: tab.visited ? (
+                <TabPanel tab={tab} active={state.active === tab.id} update={update} />
+              ) : null,
               label: (
                 <span
                   title={tab.title + (tab.dirty ? " · 未保存" : "")}
@@ -324,28 +338,6 @@ export function WorkspaceTabs({
             };
           })}
         />
-      </div>
-      {notice && (
-        <Alert
-          banner
-          type="warning"
-          role="status"
-          message={notice}
-          closable={{ closeIcon: true, "aria-label": "关闭提示" }}
-          onClose={() => setNotice("")}
-        />
-      )}
-      <div className="relative min-h-0 min-w-0 flex-1">
-        {state.tabs
-          .filter((t) => t.visited)
-          .map((tab) => (
-            <TabPanel
-              key={tab.id}
-              tab={tab}
-              active={state.active === tab.id}
-              update={update}
-            />
-          ))}
       </div>
       <Modal
         open={!!closing || blocked}

@@ -106,7 +106,7 @@ describe("页签交互", () => {
       expect(router.state.location.pathname).toBe("/workspaces/w/objects/b"),
     );
     expect(screen.getByRole("tabpanel")).toHaveTextContent("b / s2");
-    expect(document.querySelector('[role="tabpanel"][hidden]')).toHaveTextContent(
+    expect(document.querySelector('[role="tabpanel"][aria-hidden="true"]')).toHaveTextContent(
       "a / s1",
     );
     fireEvent.change(input(), { target: { value: "B 的内容" } });
@@ -174,12 +174,31 @@ describe("页签交互", () => {
     expect(tabItems()).toHaveLength(1);
     expect(router.state.location.pathname).toBe("/workspaces/w/view");
   });
+  it("恢复的页签首次切换时，aria-controls 唯一指向可见页面", async () => {
+    sessionStorage.setItem(
+      "ontofoundry:page-tabs:u:w",
+      JSON.stringify([
+        { href: "/workspaces/w/view", title: "本体视图" },
+        { href: "/workspaces/w/mappings", title: "数据映射" },
+      ]),
+    );
+    show();
+    expect(tabItems()).toHaveLength(2);
+    fireEvent.click(tabs().getByRole("tab", { name: "数据映射" }));
+    const tab = tabs().getByRole("tab", { name: "数据映射" });
+    await waitFor(() => expect(tab).toHaveAttribute("aria-selected", "true"));
+    const id = tab.getAttribute("aria-controls")!;
+    expect(document.querySelectorAll(`[id="${id}"]`)).toHaveLength(1);
+    expect(document.getElementById(id)).toBe(screen.getByRole("tabpanel"));
+    expect(screen.getByRole("tabpanel")).toHaveTextContent("列表 / published");
+    expect(document.querySelectorAll('[role="tabpanel"]')).toHaveLength(2);
+  });
   it("后台页签忙碌时仍可切换和发布，但不可关闭该页签或离开空间", async () => {
     const router = show();
     fireEvent.click(screen.getByRole("button", { name: "切换忙碌" }));
     await act(() => router.navigate("/workspaces/w/delivery"));
     expect(router.state.location.pathname).toBe("/workspaces/w/delivery");
-    expect(document.querySelector('[role="tabpanel"][hidden]')).toHaveTextContent("列表");
+    expect(document.querySelector('[role="tabpanel"][aria-hidden="true"]')).toHaveTextContent("列表");
     fireEvent.click(tabs().getByRole("button", { name: "关闭 本体视图" }));
     expect(screen.getByRole("status")).toHaveTextContent("本体视图」的操作正在进行");
     const closeAlertBtn = screen.getByRole("button", { name: "关闭提示" });
