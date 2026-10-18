@@ -14,7 +14,7 @@ from ontofoundry_api.contracts.proposals import (
 )
 from ontofoundry_api.db_models import ModelingSessionRecord, ProposalItemRecord, utc_now
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
-from ontofoundry_api.domain.evidence import reconcile_draft_evidence
+from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.proposals import (
@@ -75,13 +75,16 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
     candidate["material_objects"] = [
         after if e["id"] == body.target_id else e for e in candidate["material_objects"]
     ]
-    candidate = reconcile_draft_evidence(
-        session.draft_json,
-        candidate,
-        lookup=material_lookup(db, settings, workspace_id),
-        actor_id=actor.id,
-        now=utc_now(),
-    )
+    try:
+        candidate = reconcile_draft_evidence(
+            session.draft_json,
+            candidate,
+            lookup=material_lookup(db, settings, workspace_id),
+            actor_id=actor.id,
+            now=utc_now(),
+        )
+    except EvidenceError as exc:
+        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
     after = next(e for e in candidate["material_objects"] if e["id"] == body.target_id)
     selected = {item.id}
     changed = True

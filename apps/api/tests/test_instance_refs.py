@@ -2,17 +2,21 @@
 
 import base64
 import json
+from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 from core1_fixtures import example_draft_json
-from test_modeling import ONTOLOGY, ROOT
+from test_modeling import ONTOLOGY, ROOT, create_session
 
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
-from ontofoundry_api.services.instance_neighborhood import database_neighborhood
-from ontofoundry_api.services.instance_plan import query_instances
+from ontofoundry_api.services.instance_neighborhood import (
+    database_neighborhood,
+    related_rows,
+)
+from ontofoundry_api.services.instance_plan import key_values, query_instances
 from ontofoundry_api.services.instance_query import (
     ObjectSearch,
     db_ref,
@@ -25,8 +29,8 @@ from ontofoundry_api.services.instance_query import (
 KEY = [{"type": "string", "value": "C001"}]
 
 
-def encoded_ref(type_id):
-    payload = json.dumps([type_id, KEY]).encode()
+def encoded_ref(type_id, key=KEY):
+    payload = json.dumps([type_id, key]).encode()
     return "db." + base64.urlsafe_b64encode(payload).decode().rstrip("=")
 
 
@@ -52,6 +56,113 @@ def test_valid_ref_normalizes_uuid_and_preserves_key():
         str(type_id),
         KEY,
     )
+
+
+INVALID_NUMERIC_KEYS = [
+    pytest.param([{"type": "decimal", "value": "abc"}], id="malformed-decimal"),
+    pytest.param([{"type": "float", "value": 10**400}], id="overflowing-float"),
+    *[
+        pytest.param([{"type": "decimal", "value": value}], id=f"decimal-{value}")
+        for value in ("NaN", "sNaN", "Infinity", "-Infinity")
+    ],
+]
+
+
+@pytest.mark.parametrize("key", INVALID_NUMERIC_KEYS)
+@pytest.mark.parametrize(
+    "entry",
+    ["key", "encode", "parse", "detail", "neighborhood", "query", "direct", "related"],
+)
+def test_invalid_numeric_keys_return_422_before_source_access(monkeypatch, key, entry):
+    from ontofoundry_api.services import instance_neighborhood, instance_plan
+
+    def unexpected_source(*args, **kwargs):
+        pytest.fail("Invalid numeric keys must fail before binding or source access")
+
+    for module in (instance_plan, instance_neighborhood):
+        monkeypatch.setattr(module, "resolve_binding", unexpected_source)
+        monkeypatch.setattr(module, "connect_readonly", unexpected_source)
+    raw = example_draft_json("07-instances-and-evidence")
+    draft = CoreDraft.model_validate(raw)
+    type_id = draft.object_types[0].id
+    ref = encoded_ref(str(type_id), key)
+    with pytest.raises(ServiceError) as error:
+        if entry == "key":
+            key_values(key)
+        elif entry == "encode":
+            db_ref(type_id, key)
+        elif entry == "parse":
+            parse_ref(ref)
+        elif entry == "detail":
+            get_object(None, None, ref, None)
+        elif entry == "neighborhood":
+            object_neighborhood(None, None, ref, 1, None)
+        elif entry == "query":
+            query_instances(None, str(draft.workspace_id), draft, type_id, None, key=key)
+        elif entry == "direct":
+            database_neighborhood(
+                None,
+                str(draft.workspace_id),
+                draft,
+                SimpleNamespace(type_id=type_id, key=key, depth=1, snapshot_date=None),
+                None,
+            )
+        else:
+            related_rows(
+                None,
+                str(draft.workspace_id),
+                draft,
+                None,
+                type_id,
+                type_id,
+                None,
+                key,
+                True,
+                None,
+            )
+    assert error.value.status_code == 422
+    assert error.value.code == "INVALID_OBJECT_REF"
+    assert error.value.message == "实例键类型无效"
+
+
+def test_finite_numeric_keys_keep_decimal_precision_and_ref_identity():
+    key = [
+        {"type": "integer", "value": str(10**400)},
+        {"type": "decimal", "value": "12345678901234567890.0123456789"},
+        {"type": "float", "value": 1.5},
+        {"type": "float", "value": 10**300},
+    ]
+    assert key_values(key) == [
+        10**400,
+        Decimal("12345678901234567890.0123456789"),
+        1.5,
+        10**300,
+    ]
+    type_id = str(uuid4())
+    assert parse_ref(db_ref(type_id, key)) == ("database", type_id, key)
+
+
+@pytest.mark.parametrize("key", INVALID_NUMERIC_KEYS)
+@pytest.mark.parametrize("suffix", ["", "/neighborhood"])
+def test_object_routes_return_invalid_numeric_key_error(client, key, suffix):
+    response = client.get(ONTOLOGY + f"/objects/{encoded_ref(str(uuid4()), key)}" + suffix)
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "INVALID_OBJECT_REF"
+
+
+@pytest.mark.parametrize("key", INVALID_NUMERIC_KEYS)
+def test_direct_neighborhood_route_returns_invalid_numeric_key_error(client, key):
+    session = create_session(client)
+    response = client.post(
+        ROOT + "/instance-neighborhood",
+        json={
+            "session_id": session["id"],
+            "type_id": session["draft"]["object_types"][0]["id"],
+            "key": key,
+        },
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "INVALID_OBJECT_REF"
 
 
 @pytest.mark.parametrize("entry", ["query", "detail", "neighborhood", "direct", "search"])

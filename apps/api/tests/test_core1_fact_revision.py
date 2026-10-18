@@ -1,12 +1,159 @@
 """Explicit duplicate fact revision appends real evidence and rewrites pending endpoints."""
 
 from copy import deepcopy
+from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+from core1_fixtures import example_draft_json
 from test_modeling import ROOT, create_session, save
 from test_t4_proposal_decisions import create, decide, seed_batch
 
+from ontofoundry_api.api.proposals import FactProposalRevision
 from ontofoundry_api.domain.canonical import element_sha256
+from ontofoundry_api.domain.evidence import EvidenceError
+from ontofoundry_api.services.errors import ServiceError
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    ["missing-material", "wrong-hash", "outside-lines", "wrong-quote", "duplicate"],
+)
+def test_revision_converts_evidence_errors_without_database_or_mutation(
+    monkeypatch, invalid
+):
+    from ontofoundry_api.services import fact_revision
+
+    draft = example_draft_json("07-instances-and-evidence")
+    for elements in draft.values():
+        if isinstance(elements, list):
+            for element in elements:
+                if "evidence" in element:
+                    element["evidence"] = []
+    actor = SimpleNamespace(id=str(uuid4()))
+    target = draft["material_objects"][0]
+    target["evidence"] = [
+        {
+            "id": str(uuid4()),
+            "kind": "manual",
+            "note": "已核对虚构客户记录",
+            "created_by": actor.id,
+            "created_at": "2026-10-18T00:00:00Z",
+        }
+    ]
+    other = draft["material_objects"][1]
+    other["evidence"] = [{**deepcopy(target["evidence"][0]), "id": str(uuid4())}]
+    material_id = str(uuid4())
+    evidence = {
+        "id": str(uuid4()),
+        "kind": "material",
+        "material_id": material_id,
+        "material_sha256": "a" * 64,
+        # Persisted proposal evidence includes defaults emitted by the request model.
+        "locator": {"heading": None, "line_start": 1, "line_end": 1},
+        "quote": "星港商店",
+    }
+    proposal_after = {**deepcopy(target), "id": str(uuid4()), "evidence": [evidence]}
+    session_id, proposal_id = str(uuid4()), str(uuid4())
+    session = SimpleNamespace(revision=3, draft_json=draft)
+    item = SimpleNamespace(
+        id=proposal_id,
+        workspace_id=draft["workspace_id"],
+        session_id=session_id,
+        batch_id=str(uuid4()),
+        target_kind="material_object",
+        operation="create",
+        target_id=proposal_after["id"],
+        after_json=proposal_after,
+        status="pending",
+    )
+
+    class MemoryRecords:
+        def scalar(self, statement):
+            return session
+
+        def get(self, model, identity):
+            assert identity == proposal_id
+            return item
+
+        def commit(self):
+            pytest.fail("Invalid evidence must not commit a revision")
+
+    monkeypatch.setattr(fact_revision, "batch_items", lambda *args: [item])
+    monkeypatch.setattr(fact_revision, "dependency_map", lambda *args: {item.id: []})
+    monkeypatch.setattr(
+        fact_revision,
+        "material_lookup",
+        lambda *args: (
+            lambda identity: ("a" * 64, ["星港商店"]) if identity == material_id else None
+        ),
+    )
+
+    def unexpected_store(*args, **kwargs):
+        pytest.fail("Invalid evidence must fail before storing any revision batch")
+
+    monkeypatch.setattr(fact_revision, "store_batch", unexpected_store)
+    extra = deepcopy(evidence)
+    extra["id"] = str(uuid4())
+    if invalid == "missing-material":
+        extra["material_id"] = str(uuid4())
+    elif invalid == "wrong-hash":
+        extra["material_sha256"] = "b" * 64
+    elif invalid == "outside-lines":
+        extra["locator"]["line_end"] = 2
+    elif invalid == "wrong-quote":
+        extra["quote"] = "不存在的虚构引文"
+    else:
+        # Same-element duplicates fail request validation; a cross-element UUID
+        # reaches reconciliation while preserving all target and proposal evidence.
+        extra = deepcopy(other["evidence"][0])
+    after = {
+        **deepcopy(target),
+        "evidence": [*deepcopy(target["evidence"]), evidence, extra],
+    }
+    body = FactProposalRevision.model_validate(
+        {
+            "expected_session_revision": 3,
+            "target_id": target["id"],
+            "expected_target_hash": element_sha256(target, collection="material_objects"),
+            "after": after,
+        }
+    )
+    previous_draft, previous_item = deepcopy(draft), deepcopy(vars(item))
+    with pytest.raises(ServiceError) as error:
+        fact_revision.revise_fact(
+            MemoryRecords(),
+            draft["workspace_id"],
+            session_id,
+            proposal_id,
+            body,
+            actor,
+            None,
+        )
+    assert error.value.status_code == 422
+    assert error.value.code == (
+        "EVIDENCE_ID_DUPLICATE" if invalid == "duplicate" else "EVIDENCE_INVALID"
+    )
+    assert isinstance(error.value.__cause__, EvidenceError)
+    assert error.value.code == error.value.__cause__.code
+    assert error.value.message == str(error.value.__cause__)
+    if invalid == "duplicate":
+        assert error.value.message == "证据 UUID 不能转移到其他元素"
+    else:
+        where = f"material_objects[{target['id']}].evidence[2]"
+        assert (
+            error.value.message
+            == {
+                "missing-material": f"{where}：材料 {extra['material_id']} 不属于当前空间",
+                "wrong-hash": f"{where}：材料哈希缺失或与已保存的材料不一致",
+                "outside-lines": f"{where}：证据行号超出材料范围",
+                "wrong-quote": f"{where}：引用原文与材料第 1–1 行不符",
+            }[invalid]
+        )
+    assert draft == previous_draft
+    assert session.draft_json == previous_draft
+    assert vars(item) == previous_item
+    assert session.revision == 3
 
 
 def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(client):
@@ -85,6 +232,19 @@ def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(clien
     }
     stale = client.post(url, json={**body, "expected_target_hash": "0" * 64})
     assert stale.status_code == 409 and stale.json()["error"]["code"] == "PROPOSAL_STALE"
+    batch_url = ROOT + f"/sessions/{session['id']}/proposal-batches"
+    before_batches = client.get(batch_url).json()
+    before_session = client.get(ROOT + f"/sessions/{session['id']}").json()
+    missing = {**deepcopy(evidence), "id": str(uuid4()), "material_id": str(uuid4())}
+    invalid = client.post(
+        url, json={**body, "after": {**after, "evidence": [evidence, missing]}}
+    )
+    assert invalid.status_code == 422, invalid.text
+    assert invalid.json()["error"]["code"] == "EVIDENCE_INVALID"
+    assert "不属于当前空间" in invalid.json()["error"]["message"]
+    assert client.get(batch_url).json() == before_batches
+    assert client.get(batch_url + f"/{batch['id']}").json() == batch
+    assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session
     revised = client.post(url, json=body)
     assert revised.status_code == 200, revised.text
     revision = revised.json()

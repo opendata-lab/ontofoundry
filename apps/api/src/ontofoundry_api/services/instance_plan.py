@@ -3,7 +3,7 @@
 import hashlib
 import math
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from sqlalchemy import (
@@ -78,6 +78,8 @@ def key_values(parts):
                 if not isinstance(value, str):
                     raise ValueError()
                 value = int(value) if kind == "integer" else Decimal(value)
+                if kind == "decimal" and not value.is_finite():
+                    raise ValueError()
             elif kind == "date":
                 value = date.fromisoformat(value)
             elif kind == "datetime":
@@ -95,7 +97,7 @@ def key_values(parts):
                 raise ValueError()
             values.append(value)
         return values
-    except (ValueError, TypeError, KeyError) as exc:
+    except (ValueError, TypeError, KeyError, InvalidOperation, OverflowError) as exc:
         raise ServiceError(
             "实例键类型无效", code="INVALID_OBJECT_REF", status_code=422
         ) from exc
@@ -500,6 +502,7 @@ def query_instances(
         fail("对象类型引用无效", "INVALID_OBJECT_REF")
     if type_id not in DraftIndex(draft).objects:
         raise NotFoundError("对象类型不存在")
+    values = key_values(key) if key is not None else None
     binding = resolve_binding(draft, type_id)
     if binding.main is None:
         if not binding.virtual_types:
@@ -550,7 +553,6 @@ def query_instances(
             .where(*plan.where)
         )
         if key is not None:
-            values = key_values(key)
             if len(values) != len(plan.keys):
                 fail("实例键宽不匹配", "INVALID_OBJECT_REF")
             query = query.where(

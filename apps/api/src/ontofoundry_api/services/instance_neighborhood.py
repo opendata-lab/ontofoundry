@@ -24,6 +24,7 @@ from ontofoundry_api.services.readonly import connect_readonly
 def related_rows(
     db, wid, draft, settings, type_id, target_type, join, key, forward, snapshot_date
 ):
+    values = key_values(key)
     source = resolve_binding(draft, UUID(str(type_id)))
     if source.main is None:
         raise ServiceError("对象尚无具体绑定", code="BINDING_NOT_READY", status_code=422)
@@ -45,7 +46,6 @@ def related_rows(
             depth=1,
         )
         match, bridge = relation_match(current, target, join, forward)
-        values = key_values(key)
         if len(current.keys) != len(values):
             raise ServiceError("实例键宽不符", code="INVALID_OBJECT_REF", status_code=422)
         where = [c == v for c, v in zip(current.keys, values, strict=True)]
