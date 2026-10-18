@@ -1,4 +1,5 @@
-import { Alert, Button, Card, DatePicker, Spin, Statistic, Table, Tabs, Typography } from "antd";
+import { Alert, Button, DatePicker, Spin, Table, Tabs, Typography } from "antd";
+import { PanelToolbar, SectionTitle } from "../layout";
 import type { Dayjs } from "dayjs";
 import { Play, RefreshCw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -26,7 +27,7 @@ const REASONS: Record<string, string> = {
 function Sql({ query }: { query: SQLReference }) {
   return (
     <div className="flex flex-col gap-1">
-      <pre className="m-0 overflow-auto rounded-md bg-surface-soft p-3 font-mono text-[13px] leading-5 whitespace-pre-wrap">
+      <pre className="m-0 overflow-auto rounded-md bg-surface-soft p-3 font-mono text-sm leading-5 whitespace-pre-wrap">
         {query.sql}
       </pre>
       {Object.keys(query.params).length > 0 && (
@@ -79,7 +80,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
   const stale = !!result && result.key !== key;
   const preview = result?.preview;
   return (
-    <section className="flex max-w-[880px] flex-col gap-3">
+    <section className="flex max-w-settings flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <Button
           icon={running ? <Spin size="small" /> : preview ? <RefreshCw size={15} /> : <Play size={15} />}
@@ -121,19 +122,18 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
       )}
       {preview && preview.status === "ok" && (
         <div className={`flex flex-col gap-3 ${stale ? "opacity-50" : ""}`}>
-          <div className="grid grid-cols-[220px_1fr] gap-4">
-            <Card size="small" className="bg-surface-soft">
-              <Statistic title="总值" value={display(preview.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <section className="flex flex-col gap-2 border-r border-rule pr-4">
+              <SectionTitle title="总值" />
+              <Text strong className="text-base">{display(preview.value)}</Text>
               {preview.snapshot_dates.some((s) => s.date && s.period === null) && (
                 <Text type="secondary" className="text-xs">
                   快照日期：{preview.snapshot_dates.filter((s) => s.period === null && s.date).map((s) => s.date).join("、")}
                 </Text>
               )}
-            </Card>
-            <Card size="small" className="bg-surface-soft">
-              <Text type="secondary" className="text-xs">
-                按月趋势
-              </Text>
+            </section>
+            <section className="min-w-0">
+              <SectionTitle title="按月趋势" />
               {preview.trend?.length ? (
                 <Table
                   size="small"
@@ -151,7 +151,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
                   {range ? "这个范围内没有趋势数据" : "选择时间范围后显示按月趋势"}
                 </div>
               )}
-            </Card>
+            </section>
           </div>
           {preview.warnings.map((w) => (
             <Alert key={w} type="info" showIcon message={w} />
@@ -161,6 +161,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
       {preview && (preview.total_query || preview.trend_query) && (
         <Tabs
           size="small"
+          renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
           items={[
             ...(preview.total_query ? [{ key: "total", label: "总值查询", children: <Sql query={preview.total_query} /> }] : []),
             ...(preview.trend_query ? [{ key: "trend", label: "趋势查询", children: <Sql query={preview.trend_query} /> }] : []),

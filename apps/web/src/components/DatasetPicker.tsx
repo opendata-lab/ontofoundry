@@ -1,11 +1,12 @@
-import { Alert, Button, Empty, Form, Input, Modal, Select, Table, Tag, Typography } from "antd";
-import { RefreshCw } from "lucide-react";
+import { Alert, Button, Empty, Form, Input, Modal, Select, Table, Typography } from "antd";
+import { RefreshCw, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, catalogApi } from "../api/client";
 import type { AssetTable, Assets, DataConnection, Dataset, Draft, ElementSaveResult, Workspace } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
 import { datasetFromTable, registerDataset, sameLocation } from "../lib/datasetEditing";
+import { StatusMark } from "./layout";
 
 const { Text } = Typography;
 
@@ -72,13 +73,13 @@ function RegisterForm({
         </Text>
         {duplicates.length > 0 && (
           <Alert
-            className="!mt-3"
+            className="mt-3"
             type="info"
             showIcon
             message={`这张表已登记为：${duplicates.map((d) => d.name).join("、")}。同一张表可以按不同用途登记多次。`}
           />
         )}
-        {error && <Alert className="!mt-3" type="error" showIcon message={error} />}
+        {error && <Alert className="mt-3" type="error" showIcon message={error} />}
       </Form>
     </Modal>
   );
@@ -190,7 +191,7 @@ export function DatasetPicker({
           <div className="flex flex-wrap items-center gap-2">
             <Select
               aria-label="数据源"
-              className="min-w-[200px]"
+              className="w-48"
               placeholder="选择数据源"
               value={connectionId}
               options={(connections ?? []).map((c) => ({ value: c.id, label: c.name }))}
@@ -202,7 +203,7 @@ export function DatasetPicker({
             />
             <Select
               aria-label="Schema"
-              className="min-w-[180px]"
+              className="w-44"
               showSearch
               allowClear
               placeholder="默认 schema"
@@ -210,11 +211,13 @@ export function DatasetPicker({
               options={schemas.map((s) => ({ value: s, label: s }))}
               onChange={(value?: string) => setSchema(value ?? "")}
             />
-            <Input.Search
+            <Input
+              type="search"
               allowClear
+              prefix={<Search size={14} className="text-muted" />}
               aria-label="搜索数据表"
               placeholder="表名或注释"
-              className="max-w-[260px]"
+              className="w-60"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -287,7 +290,7 @@ export function DatasetPicker({
                     </div>
                   ),
                 },
-                { title: "列", key: "columns", width: 80, render: (_, t) => (t.missing ? <Tag color="error">表已缺失</Tag> : t.columns.length) },
+                { title: "列", key: "columns", width: 80, render: (_, t) => (t.missing ? <StatusMark state="error" label="表已缺失" /> : t.columns.length) },
                 {
                   title: "已登记",
                   key: "datasets",
@@ -295,7 +298,7 @@ export function DatasetPicker({
                     t.datasets.length ? (
                       <span className="flex flex-wrap gap-x-3">
                         {t.datasets.map((d) => (
-                          <Button key={d.id} type="link" size="small" className="!h-auto !p-0" onClick={() => onOpenDataset(d.id)}>
+                          <Button key={d.id} type="link" size="small" className="h-auto p-0" onClick={() => onOpenDataset(d.id)}>
                             {d.name}
                           </Button>
                         ))}

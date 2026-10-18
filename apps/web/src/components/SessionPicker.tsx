@@ -1,20 +1,21 @@
-import { Button, Input, Popover, Table, Tag } from "antd";
+import { Button, Input, Popover, Table } from "antd";
+import { StatusMark, type StatusState } from "./layout";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ModelingSession, ModelingSessionSummary } from "../api/types";
 
 const ACTIVE_STATUSES = new Set(["submitting", "queued", "running", "waiting_input", "waiting_permission"]);
 
-const STATUS: Record<string, { text: string; color: string }> = {
-  idle: { text: "未开始", color: "default" },
-  submitting: { text: "提交中", color: "processing" },
-  queued: { text: "排队中", color: "processing" },
-  running: { text: "运行中", color: "processing" },
-  waiting_input: { text: "等待输入", color: "warning" },
-  waiting_permission: { text: "等待确认", color: "warning" },
-  finished: { text: "已完成", color: "success" },
-  failed: { text: "失败", color: "error" },
-  cancelled: { text: "已取消", color: "default" },
+const STATUS: Record<string, { text: string; state: StatusState }> = {
+  idle: { text: "未开始", state: "unmapped" },
+  submitting: { text: "提交中", state: "info" },
+  queued: { text: "排队中", state: "info" },
+  running: { text: "运行中", state: "info" },
+  waiting_input: { text: "等待输入", state: "partial" },
+  waiting_permission: { text: "等待确认", state: "partial" },
+  finished: { text: "已完成", state: "mapped" },
+  failed: { text: "失败", state: "error" },
+  cancelled: { text: "已取消", state: "unmapped" },
 };
 
 function timestamp(value: string) {
@@ -58,7 +59,7 @@ export function SessionPicker({
       placement="bottomLeft"
       destroyOnHidden
       content={
-        <div className="flex w-[520px] flex-col gap-2" role="dialog" aria-label="选择建模会话">
+        <div className="flex w-review-code max-w-full flex-col gap-2" role="dialog" aria-label="选择建模会话">
           <Input.Search
             autoFocus
             allowClear
@@ -94,9 +95,7 @@ export function SessionPicker({
                 key: "status",
                 width: 96,
                 render: (_, item) => (
-                  <Tag color={STATUS[item.task_status]?.color ?? "default"} className="!m-0">
-                    {STATUS[item.task_status]?.text ?? item.task_status}
-                  </Tag>
+                  <StatusMark state={STATUS[item.task_status]?.state ?? "unmapped"} label={STATUS[item.task_status]?.text ?? item.task_status} />
                 ),
               },
               { title: "最近更新时间", key: "updated", width: 120, render: (_, item) => timestamp(item.updated_at) },
@@ -105,7 +104,7 @@ export function SessionPicker({
         </div>
       }
     >
-      <Button aria-haspopup="dialog" aria-expanded={open} className="max-w-[320px]">
+      <Button aria-haspopup="dialog" aria-expanded={open} className="max-w-xs">
         <span className="truncate">{session?.title ?? (sessionId ? "正在加载会话…" : "选择建模会话")}</span>
         <ChevronDown size={14} aria-hidden="true" />
       </Button>

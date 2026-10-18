@@ -1,10 +1,11 @@
-import { Alert, Button, Form, Input, Progress, Radio, Tag, Typography } from "antd";
+import { Alert, Button, Form, Input, Progress, Radio, Typography } from "antd";
 import { useState } from "react";
 import { ApiError, publishApi } from "../../api/client";
 import type { Json, MergeConflict, ModelingSession, Resolution } from "../../api/types";
+import { SectionTitle, StatusMark } from "../layout";
 import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 function show(value: unknown) {
   if (value === null || value === undefined) return "（无）";
@@ -120,29 +121,25 @@ export function ConflictResolver({
   };
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="review-conflicts">
         <aside className="flex flex-col gap-1" aria-label="冲突列表">
-          <Text strong>冲突</Text>
+          <SectionTitle title="冲突" />
           {conflicts.map((c, i) => (
             <Button
               key={c.key}
               type={i === index ? "primary" : "text"}
               ghost={i === index}
               aria-current={i === index ? "true" : undefined}
-              className="!flex !h-auto !justify-between !py-1.5 !text-left"
+              className="flex h-auto justify-between gap-2 py-2 text-left"
               onClick={() => setIndex(i)}
             >
               <span className="truncate">{title(c)}</span>
-              <Tag color={choices[c.key] ? "success" : "warning"} className="!m-0">
-                {choices[c.key] ? "已选择" : "待处理"}
-              </Tag>
+              <StatusMark state={choices[c.key] ? "mapped" : "partial"} label={choices[c.key] ? "已选择" : "待处理"} className="shrink-0" />
             </Button>
           ))}
         </aside>
         <section className="flex min-w-0 flex-col gap-3" aria-label="解决冲突">
-          <Title level={5} className="!m-0">
-            {title(conflict)}
-          </Title>
+          <SectionTitle title={title(conflict)} />
           <div className="grid grid-cols-3 gap-2">
             {(
               [
@@ -175,7 +172,7 @@ export function ConflictResolver({
           </Radio.Group>
           {choices[conflict.key]?.choice === "custom" && (
             <Form layout="vertical" component="div">
-              <Form.Item label="合并后的内容" className="!mb-0">
+              <Form.Item label="合并后的内容" className="mb-0">
                 <Input.TextArea
                   aria-label="合并后的内容"
                   className="font-mono"
@@ -197,10 +194,8 @@ export function ConflictResolver({
         </section>
       </div>
       <footer className="flex flex-wrap items-center gap-3 border-t border-rule pt-3">
-        <span>
-          已解决 {resolved} / {conflicts.length}
-        </span>
-        <Progress className="!m-0 max-w-[200px]" percent={Math.round((100 * resolved) / conflicts.length)} size="small" showInfo={false} />
+        <StatusMark state={resolved === conflicts.length ? "mapped" : "partial"} label={`已解决 ${resolved} / ${conflicts.length}`} />
+        <Progress className="m-0 w-14" percent={Math.round((100 * resolved) / conflicts.length)} size={{ height: 4 }} showInfo={false} />
         {error && <Alert type="error" showIcon message={error} />}
         <Button className="ml-auto" type="primary" loading={busy} disabled={resolved < conflicts.length} onClick={() => void submit()}>
           应用到会话并重新预览

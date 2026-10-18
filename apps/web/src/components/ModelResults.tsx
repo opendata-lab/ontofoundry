@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Empty, Input, Segmented, Table, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Empty, Input, Segmented, Table, Tabs, Typography } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Draft, ElementChange, ModelingSession, TargetKind, TypeGraph } from "../api/types";
@@ -9,6 +9,7 @@ import { documentDisplayText } from "../lib/instanceDisplay";
 import { METRIC_KINDS } from "../lib/metricEditing";
 import { BINDING_MODES } from "../lib/objectMapping";
 import { draftGraph } from "../lib/semanticExplorer";
+import { Panel as ResultPanel, PanelToolbar, StatusMark, type StatusState } from "./layout";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
 
@@ -17,10 +18,10 @@ const { Text } = Typography;
 
 type Row = { id: string; kind: TargetKind; name: string; technical: string; description: string; deleted?: boolean };
 
-const CHANGE: Record<ElementChange["change"], { text: string; color: string }> = {
-  created: { text: "新增", color: "success" },
-  updated: { text: "已修改", color: "processing" },
-  deleted: { text: "待删除", color: "error" },
+const CHANGE: Record<ElementChange["change"], { text: string; state: StatusState }> = {
+  created: { text: "新增", state: "mapped" },
+  updated: { text: "已修改", state: "info" },
+  deleted: { text: "待删除", state: "error" },
 };
 
 const CATEGORIES: { key: TargetKind; text: string }[] = [
@@ -150,140 +151,143 @@ export function ModelResults({
   const warnings = session?.result_warnings ?? [];
   const graph = draft ? (session?.graph?.nodes.length ? (session.graph as TypeGraph) : draftGraph(draft)) : null;
   return (
-    <aside className="flex min-h-0 flex-col gap-2 overflow-hidden">
+    <aside className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       {warnings.map((text) => (
         <Alert key={text} type="warning" showIcon message={text} />
       ))}
-      <Tabs
-        size="small"
-        activeKey={tab}
-        onChange={(key) => setTab(key as Panel)}
-        className="min-h-0 flex-1 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
-        items={[
-          ...(proposals
-            ? [
-                {
-                  key: "proposals",
-                  label: (
-                    <Badge count={pending} size="small" offset={[8, -2]}>
-                      提案
-                    </Badge>
-                  ),
-                  children: <ProposalPanel session={session} proposals={proposals} running={running} onRemodel={onRemodel} />,
-                },
-              ]
-            : []),
-          {
-            key: "draft",
-            label: (
-              <Badge count={fresh ? `+${fresh}` : 0} size="small" color="green" offset={[10, -2]}>
-                本体草稿
-              </Badge>
-            ),
-            children: (
-              <div className="flex h-full min-h-0 flex-col gap-2">
-                <Segmented
-                  size="small"
-                  className="self-start"
-                  value={kind}
-                  onChange={(value) => setKind(value as TargetKind)}
-                  options={CATEGORIES.map((c) => ({ value: c.key, label: `${c.text} ${count(c.key)}` }))}
-                />
-                <Input.Search
-                  allowClear
-                  size="small"
-                  aria-label="搜索模型"
-                  placeholder="搜索名称、技术名、描述"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <Table
-                    size="small"
-                    rowKey="id"
-                    pagination={visible.length > 50 ? { pageSize: 50, size: "small" } : false}
-                    dataSource={visible}
-                    locale={{ emptyText: <Empty description={query ? "没有匹配的模型" : draft ? "暂无此类模型" : "暂无构建结果"} /> }}
-                    columns={[
-                      {
-                        title: "名称",
-                        key: "name",
-                        render: (_, r) => (
-                          <div className={`flex flex-col ${r.deleted ? "line-through opacity-60" : ""}`}>
-                            {session && !r.deleted ? (
-                              <Button
-                                type="link"
-                                size="small"
-                                className="!h-auto self-start !p-0"
-                                onClick={() => inspector.open({ kind: r.kind, id: r.id, sessionId: session.id })}
-                              >
-                                {r.name || "未命名"}
-                              </Button>
-                            ) : (
-                              <span>{r.name}</span>
-                            )}
-                            {r.technical && <code className="text-xs text-muted">{r.technical}</code>}
-                          </div>
-                        ),
-                      },
-                      {
-                        title: "说明",
-                        key: "description",
-                        render: (_, r) => (
-                          <Text type="secondary" className="text-xs">
-                            {r.description || "—"}
-                          </Text>
-                        ),
-                      },
-                      {
-                        title: "",
-                        key: "change",
-                        width: 72,
-                        render: (_, r) => {
-                          const change = r.deleted ? "deleted" : diff.get(r.id)?.change;
-                          return change ? (
-                            <Tag color={CHANGE[change].color} className="!m-0">
-                              {CHANGE[change].text}
-                            </Tag>
-                          ) : null;
+      <ResultPanel fill>
+        <Tabs
+          size="small"
+          renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
+          activeKey={tab}
+          onChange={(key) => setTab(key as Panel)}
+          className="review-tabs min-h-0 flex-1"
+          items={[
+            ...(proposals
+              ? [
+                  {
+                    key: "proposals",
+                    label: (
+                      <span className="inline-flex items-center gap-2">提案 {pending > 0 && <StatusMark state="pending" label={pending} />}</span>
+                    ),
+                    children: <ProposalPanel session={session} proposals={proposals} running={running} onRemodel={onRemodel} />,
+                  },
+                ]
+              : []),
+            {
+              key: "draft",
+              label: (
+                <span className="inline-flex items-center gap-2">本体草稿 {fresh > 0 && <StatusMark state="mapped" label={`+${fresh}`} />}</span>
+              ),
+              children: (
+                <div className="flex h-full min-h-0 flex-col">
+                  <PanelToolbar
+                    extra={
+                      <Input.Search
+                        allowClear
+                        size="small"
+                        aria-label="搜索模型"
+                        placeholder="搜索名称、技术名、描述"
+                        className="w-60"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                    }
+                  >
+                    <Segmented
+                      size="small"
+                      className="min-w-0 self-start overflow-x-auto"
+                      value={kind}
+                      onChange={(value) => setKind(value as TargetKind)}
+                      options={CATEGORIES.map((c) => ({ value: c.key, label: `${c.text} ${count(c.key)}` }))}
+                    />
+                  </PanelToolbar>
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <Table
+                      size="small"
+                      rowKey="id"
+                      pagination={visible.length > 50 ? { pageSize: 50, size: "small" } : false}
+                      dataSource={visible}
+                      locale={{ emptyText: <Empty description={query ? "没有匹配的模型" : draft ? "暂无此类模型" : "暂无构建结果"} /> }}
+                      columns={[
+                        {
+                          title: "名称",
+                          key: "name",
+                          render: (_, r) => (
+                            <div className={`flex flex-col ${r.deleted ? "line-through opacity-60" : ""}`}>
+                              {session && !r.deleted ? (
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  className="h-auto self-start p-0"
+                                  onClick={() => inspector.open({ kind: r.kind, id: r.id, sessionId: session.id })}
+                                >
+                                  {r.name || "未命名"}
+                                </Button>
+                              ) : (
+                                <span>{r.name}</span>
+                              )}
+                              {r.technical && <code className="text-xs text-muted">{r.technical}</code>}
+                            </div>
+                          ),
                         },
-                      },
-                    ]}
-                  />
+                        {
+                          title: "说明",
+                          key: "description",
+                          render: (_, r) => (
+                            <Text type="secondary" className="text-xs">
+                              {r.description || "—"}
+                            </Text>
+                          ),
+                        },
+                        {
+                          title: "",
+                          key: "change",
+                          width: 72,
+                          render: (_, r) => {
+                            const change = r.deleted ? "deleted" : diff.get(r.id)?.change;
+                            return change ? (
+                              <StatusMark state={CHANGE[change].state} label={CHANGE[change].text} />
+                            ) : null;
+                          },
+                        },
+                      ]}
+                    />
+                  </div>
+                  {session && (
+                    <Text type="secondary" className="border-t border-rule bg-surface-raised px-4 py-2 text-xs">
+                      本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
+                    </Text>
+                  )}
                 </div>
-                {session && (
-                  <Text type="secondary" className="text-xs">
-                    本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
-                  </Text>
-                )}
-              </div>
-            ),
-          },
-          {
-            key: "graph",
-            label: "语义图谱",
-            children: (
-              <div className="relative h-full min-h-[420px] overflow-hidden rounded-md border border-rule">
-                {graph?.nodes.length ? (
-                  <OntologyGraph
-                    graph={graph}
-                    query=""
-                    onSelect={(selected) => {
-                      if (!selected || !session) return;
-                      if (selected.category === "node")
-                        inspector.open({ kind: "object_type", id: selected.item.id, sessionId: session.id, tab: "properties" });
-                      else if (selected.item.kind === "link_type")
-                        inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: session.id });
-                    }}
-                  />
-                ) : (
-                  <Empty className="mt-16" description="暂无构建结果" />
-                )}
-              </div>
-            ),
-          },
-        ]}
-      />
+              ),
+            },
+            {
+              key: "graph",
+              label: "语义图谱",
+              children: (
+                <div className="relative h-full min-h-review-graph overflow-hidden">
+                  {graph?.nodes.length ? (
+                    <OntologyGraph
+                      graph={graph}
+                      query=""
+                      onSelect={(selected) => {
+                        if (!selected || !session) return;
+                        if (selected.category === "node")
+                          inspector.open({ kind: "object_type", id: selected.item.id, sessionId: session.id, tab: "properties" });
+                        else if (selected.item.kind === "link_type")
+                          inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: session.id });
+                      }}
+                    />
+                  ) : (
+                    <Empty className="m-0 p-6" description="暂无构建结果" />
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
+      </ResultPanel>
     </aside>
   );
 }

@@ -1,4 +1,5 @@
-import { Button, Card, Descriptions, Empty, Form, Input, Select, Table, Tag, TreeSelect, Typography } from "antd";
+import { Button, Descriptions, Empty, Form, Input, Select, Table, Tag, TreeSelect, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { Draft, Evidence, LinkType, ObjectType, Rule } from "../../api/types";
@@ -28,9 +29,9 @@ export function EvidenceSection({ workspaceId, evidence }: { workspaceId: string
   if (!evidence.length) return null;
   return (
     <section className="flex flex-col gap-2">
-      <Text strong>来源证据</Text>
+      <SectionTitle title="来源证据" />
       {evidence.map((ev) => (
-        <div key={ev.id} className="flex flex-col gap-1 rounded-sm bg-surface-soft px-3 py-2 text-sm">
+        <div key={ev.id} className="flex flex-col gap-1 border-l border-rule pl-3 text-sm">
           {"material_id" in ev ? (
             <>
               <a
@@ -60,7 +61,7 @@ export function TagsText({ items }: { items: string[] }) {
   return items.length ? (
     <span className="flex flex-wrap gap-1">
       {items.map((item) => (
-        <Tag key={item} className="!m-0">
+        <Tag key={item} className="m-0">
           {item}
         </Tag>
       ))}
@@ -72,7 +73,7 @@ export function TagsText({ items }: { items: string[] }) {
 
 export function ElementLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
-    <Button type="link" size="small" className="!h-auto !p-0" onClick={onClick}>
+    <Button type="link" size="small" className="h-auto p-0" onClick={onClick}>
       {children}
     </Button>
   );
@@ -151,7 +152,7 @@ function ObjectBasicEditor(props: PanelProps<ObjectType>) {
   };
   const titleChoices = effectiveProperties(draft, type.id).map((p) => ({ value: p.definition.id, label: p.definition.name }));
   return (
-    <Form layout="vertical" component="div" className="max-w-[860px]">
+    <Form layout="vertical" component="div" className="max-w-settings">
       <IdentityFields value={type} onChange={update} tags={{ value: type.tags, onChange: (tags) => update({ tags }) }} />
       <div className="grid grid-cols-2 gap-x-4">
         <Form.Item label="父对象" extra="子对象继承父对象的属性、关系和规则。">
@@ -256,14 +257,14 @@ export function ObjectBasicPanel(props: PanelProps<ObjectType>) {
       : []),
   ];
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <div className="flex min-w-0 flex-col gap-4">
         {type.description ? (
-          <Paragraph className="!m-0 whitespace-pre-wrap">{type.description}</Paragraph>
+          <Paragraph className="m-0 whitespace-pre-wrap">{type.description}</Paragraph>
         ) : (
           <Text type="secondary">暂无描述</Text>
         )}
-        <Descriptions size="small" column={2} bordered items={items} />
+        <Descriptions size="small" column={2} items={items} />
         <EvidenceSection workspaceId={draft.workspace_id} evidence={type.evidence} />
       </div>
       <ObjectRelationGraph {...props} />
@@ -276,7 +277,7 @@ function LinkBasicEditor(props: PanelProps<LinkType>) {
   const update = (patch: Partial<LinkType>) => changeType(props, patch);
   const objects = draft.object_types.map((o) => ({ value: o.id, label: o.name || o.technical_name }));
   return (
-    <Form layout="vertical" component="div" className="max-w-[860px]">
+    <Form layout="vertical" component="div" className="max-w-settings">
       <IdentityFields value={type} onChange={update} tags={{ value: type.tags, onChange: (tags) => update({ tags }) }} />
       <div className="grid grid-cols-3 gap-x-4">
         <Form.Item label="来源对象" required>
@@ -327,16 +328,15 @@ export function LinkBasicPanel(props: PanelProps<LinkType>) {
   const endpoint = (object: ObjectType | undefined) =>
     object ? <ElementLink onClick={() => open({ kind: "object_type", id: object.id })}>{object.name}</ElementLink> : "?";
   return (
-    <div className="flex max-w-[960px] flex-col gap-4">
+    <div className="flex max-w-full flex-col gap-4">
       {type.description ? (
-        <Paragraph className="!m-0 whitespace-pre-wrap">{type.description}</Paragraph>
+        <Paragraph className="m-0 whitespace-pre-wrap">{type.description}</Paragraph>
       ) : (
         <Text type="secondary">暂无描述</Text>
       )}
       <Descriptions
         size="small"
         column={2}
-        bordered
         items={[
           { key: "technical", label: "技术名", children: <code>{type.technical_name}</code> },
           { key: "multiplicity", label: "基数", children: MULTIPLICITY[type.multiplicity] },
@@ -431,7 +431,7 @@ export function RulesPanel(props: PanelProps) {
               </div>
             ),
           },
-          { title: "类型", key: "kind", width: 96, render: (_, r) => <Tag className="!m-0">{RULE_KINDS[r.rule_kind]}</Tag> },
+          { title: "类型", key: "kind", width: 96, render: (_, r) => <Tag className="m-0">{RULE_KINDS[r.rule_kind]}</Tag> },
           {
             title: "所属",
             key: "owner",
@@ -459,18 +459,18 @@ export function RulesPanel(props: PanelProps) {
       <Empty description="没有规则" />
     );
   return (
-    <div className="flex max-w-[960px] flex-col gap-3">
+    <div className="flex max-w-full flex-col gap-3">
       {rules.map((rule) => {
         const local = isLocalRule(draft, type, rule);
         return (
-          <Card key={rule.id} size="small" data-element-id={rule.id}>
+          <section key={rule.id} className="border-b border-rule pb-4" data-element-id={rule.id}>
             {local ? (
               <Form layout="vertical" component="div">
-                <div className="grid grid-cols-[1fr_1fr_140px_200px_32px] gap-x-3">
-                  <Form.Item label="名称" required className="!mb-2">
+                <div className="flex flex-wrap items-end gap-x-3">
+                  <Form.Item label="名称" required className="mb-2 min-w-36 flex-1">
                     <Input aria-label="规则名称" value={rule.name} onChange={(e) => setRule({ ...rule, name: e.target.value })} />
                   </Form.Item>
-                  <Form.Item label="技术名" required className="!mb-2">
+                  <Form.Item label="技术名" required className="mb-2 min-w-36 flex-1">
                     <Input
                       aria-label="规则技术名"
                       className="font-mono"
@@ -478,7 +478,7 @@ export function RulesPanel(props: PanelProps) {
                       onChange={(e) => setRule({ ...rule, technical_name: e.target.value.trim() })}
                     />
                   </Form.Item>
-                  <Form.Item label="类型" className="!mb-2">
+                  <Form.Item label="类型" className="mb-2 min-w-36 flex-1">
                     <Select
                       aria-label="规则类型"
                       value={rule.rule_kind}
@@ -486,7 +486,7 @@ export function RulesPanel(props: PanelProps) {
                       onChange={(rule_kind: Rule["rule_kind"]) => setRule({ ...rule, rule_kind })}
                     />
                   </Form.Item>
-                  <Form.Item label="所属" className="!mb-2">
+                  <Form.Item label="所属" className="mb-2 min-w-36 flex-1">
                     <Select
                       aria-label="规则所属"
                       value={`${rule.owner_kind}:${rule.owner_id}`}
@@ -499,13 +499,13 @@ export function RulesPanel(props: PanelProps) {
                   </Form.Item>
                   <Button
                     type="text"
-                    className="mt-7"
+                    className="mb-2 size-8 flex-none self-end"
                     aria-label={`删除规则 ${rule.name}`}
                     icon={<Trash2 size={15} />}
                     onClick={() => change({ ...draft, rules: draft.rules.filter((r) => r.id !== rule.id) })}
                   />
                 </div>
-                <Form.Item label="表达式" required className="!mb-2">
+                <Form.Item label="表达式" required className="mb-2 min-w-36 flex-1">
                   <Input.TextArea
                     aria-label="规则表达式"
                     className="font-mono"
@@ -514,7 +514,7 @@ export function RulesPanel(props: PanelProps) {
                     onChange={(e) => setRule({ ...rule, expression: e.target.value })}
                   />
                 </Form.Item>
-                <Form.Item label="说明" className="!mb-0">
+                <Form.Item label="说明" className="mb-0">
                   <Input aria-label="规则说明" value={rule.description} onChange={(e) => setRule({ ...rule, description: e.target.value })} />
                 </Form.Item>
               </Form>
@@ -526,7 +526,7 @@ export function RulesPanel(props: PanelProps) {
                 <code className="whitespace-pre-wrap break-all">{rule.expression}</code>
               </div>
             )}
-          </Card>
+          </section>
         );
       })}
       <Button type="dashed" icon={<Plus size={15} />} className="self-start" onClick={addRule}>

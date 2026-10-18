@@ -103,11 +103,6 @@ const TabPanel = memo(function TabPanel({
   );
 });
 
-const TAB_BAR =
-  "flex-none [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:bg-[#f3f5f7] [&_.ant-tabs-nav]:px-2.5 [&_.ant-tabs-nav]:pt-1 [&_.ant-tabs-tab]:!h-[30px] [&_.ant-tabs-tab]:!px-2.5 [&_.ant-tabs-tab]:!py-0 [&_.ant-tabs-tab]:!text-xs [&_.ant-tabs-tab-remove]:!ml-1 [&_.ant-tabs-tab-remove]:!p-0";
-const TAB_PANES =
-  "h-full [&>.ant-tabs-content-holder]:min-h-0 [&>.ant-tabs-content-holder>.ant-tabs-content]:h-full [&>.ant-tabs-content-holder>.ant-tabs-content>.ant-tabs-tabpane]:h-full";
-
 export function WorkspaceTabs({
   workspaceId,
   userId,
@@ -263,14 +258,17 @@ export function WorkspaceTabs({
           size="small"
           hideAdd
           activeKey={state.active}
-          tabBarGutter={3}
-          tabBarStyle={{ margin: 0 }}
           // Child combinators only: pages rendered inside the panes have Tabs too.
-          className={TAB_PANES}
+          className="h-full [&>.ant-tabs-content-holder]:min-h-0 [&>.ant-tabs-content-holder>.ant-tabs-content]:h-full [&>.ant-tabs-content-holder>.ant-tabs-content>.ant-tabs-tabpane]:h-full"
           renderTabBar={(props, DefaultTabBar) => (
             // The bar holds only the strip and its notice, so these descendant
             // selectors cannot reach a page's own Tabs.
-            <div ref={bar} className={TAB_BAR}>
+            <div ref={bar} className="workspace-tab-bar flex-none
+                [&>.ant-tabs-nav]:h-control-lg [&>.ant-tabs-nav]:mb-0 [&>.ant-tabs-nav]:bg-surface-soft [&>.ant-tabs-nav]:px-3 [&>.ant-tabs-nav]:pt-1 [&>.ant-tabs-nav]:before:border-rule-soft
+                [&_.ant-tabs-tab]:h-control-sm [&_.ant-tabs-tab]:m-0 [&_.ant-tabs-tab]:rounded-t-xs [&_.ant-tabs-tab]:rounded-b-none [&_.ant-tabs-tab]:border-transparent [&_.ant-tabs-tab]:bg-transparent [&_.ant-tabs-tab]:px-2 [&_.ant-tabs-tab]:py-0 [&_.ant-tabs-tab]:text-xs [&_.ant-tabs-tab]:leading-tight
+                [&_.ant-tabs-tab+.ant-tabs-tab]:ml-1 [&_.ant-tabs-tab:not(.ant-tabs-tab-active):hover]:bg-rule-soft
+                [&_.ant-tabs-tab.ant-tabs-tab-active]:border-rule-soft [&_.ant-tabs-tab.ant-tabs-tab-active]:border-b-surface [&_.ant-tabs-tab.ant-tabs-tab-active]:bg-surface
+                [&_.ant-tabs-tab-remove]:ml-1 [&_.ant-tabs-tab-remove]:inline-flex [&_.ant-tabs-tab-remove]:items-center [&_.ant-tabs-tab-remove]:p-0 [&_.ant-tabs-tab-remove]:text-muted [&_.ant-tabs-tab-remove:hover]:text-ink">
               <DefaultTabBar {...props} />
               {notice && (
                 <Alert
@@ -313,13 +311,13 @@ export function WorkspaceTabs({
               label: (
                 <span
                   title={tab.title + (tab.dirty ? " · 未保存" : "")}
-                  className="inline-flex min-w-0 items-center gap-[7px] text-xs whitespace-nowrap"
+                  className="inline-flex min-w-0 items-center gap-2 text-xs whitespace-nowrap"
                 >
-                  <Icon size={14} className="flex-none" />
-                  <span className="max-w-[180px] truncate">{tab.title}</span>
+                  <Icon className="size-icon-sm flex-none" />
+                  <span className="max-w-tab-title truncate">{tab.title}</span>
                   {tab.dirty && (
                     <i
-                      className="size-[5px] flex-none rounded-full bg-[#d58b20]"
+                      className="size-tab-dirty flex-none rounded-full bg-warning"
                       aria-label="未保存"
                     />
                   )}
@@ -330,9 +328,9 @@ export function WorkspaceTabs({
                   role="button"
                   aria-label={`关闭 ${tab.title}`}
                   title="关闭页面"
-                  className="inline-flex size-4 items-center justify-center rounded-[3px]"
+                  className="inline-flex size-4 items-center justify-center rounded-xs"
                 >
-                  <X size={12} />
+                  <X className="size-icon-xs" />
                 </span>
               ),
             };
@@ -341,7 +339,7 @@ export function WorkspaceTabs({
       </div>
       <Modal
         open={!!closing || blocked}
-        width={420}
+        className="max-w-tab-confirm"
         title={blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
         onCancel={cancel}
         footer={
@@ -364,7 +362,7 @@ export function WorkspaceTabs({
           </div>
         }
       >
-        <p className="text-[13px] leading-[1.7]">
+        <p className="text-sm leading-base">
           {blockingBusy
             ? "请等待当前操作完成后再离开空间。"
             : target

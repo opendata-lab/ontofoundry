@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { catalogApi } from "../api/client";
 import type { DataConnection, DataTable, Material } from "../api/types";
+import { PanelToolbar, SectionTitle } from "./layout";
 import { HintIcon } from "./HintIcon";
 
 const { Text } = Typography;
@@ -59,8 +60,8 @@ export function TableMaterialPicker({
   }, [workspaceId, connectionId]);
   if (connections && !connections.length)
     return (
-      <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-rule-strong p-3">
-        <strong className="text-[13px]">还没有数据连接</strong>
+      <div className="flex flex-col items-start gap-2">
+        <SectionTitle title="还没有数据连接" />
         <Link to="../connections">
           <Button size="small" icon={<Database size={14} />}>
             新增数据连接
@@ -98,7 +99,7 @@ export function TableMaterialPicker({
       <Modal
         open={open}
         title="选择业务数据表"
-        width={640}
+        width="var(--review-dialog-width)"
         onCancel={() => !busy && close()}
         closable={{ "aria-label": "关闭选择数据表" }}
         footer={
@@ -113,10 +114,11 @@ export function TableMaterialPicker({
         }
       >
         <div className="flex flex-col gap-3">
-          <div className="flex gap-2">
+          <PanelToolbar className="px-0">
             <Select
+              size="small"
               aria-label="数据连接"
-              className="min-w-[200px]"
+              className="w-52 flex-none"
               placeholder="选择数据连接"
               value={connectionId || undefined}
               disabled={busy}
@@ -124,13 +126,14 @@ export function TableMaterialPicker({
               onChange={setConnectionId}
             />
             <Input.Search
+              size="small"
               allowClear
               aria-label="搜索数据表"
               placeholder="搜索表名"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-          </div>
+          </PanelToolbar>
           {connectionId && (
             <div className="flex items-center gap-2">
               <Text type="secondary" className="text-xs">
@@ -149,7 +152,7 @@ export function TableMaterialPicker({
               </Button>
             </div>
           )}
-          <div className="flex max-h-[360px] flex-col gap-1 overflow-auto" role="group" aria-label="选择数据表">
+          <div className="flex max-h-review-code flex-col gap-1 overflow-auto" role="group" aria-label="选择数据表">
             {!connectionId && <Text type="secondary">先选择数据连接</Text>}
             {connectionId && !tables && <Spin />}
             {tables && !visible.length && <Empty description="没有匹配的数据表" />}
@@ -163,7 +166,7 @@ export function TableMaterialPicker({
                   disabled={busy}
                   onChange={() => toggle(t.name)}
                 >
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-2">
                     <Table2 size={14} aria-hidden="true" />
                     <span>{t.name}</span>
                     {/* The list endpoint may omit columns; never show a misleading "0 列". */}

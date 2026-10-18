@@ -1,19 +1,20 @@
 import { Alert, Button, Result, Skeleton } from "antd";
 import { RefreshCw } from "lucide-react";
+import { AsyncSurface } from "./layout";
 import { isRouteErrorResponse, useRouteError } from "react-router-dom";
 
 export function LoadingSurface({ label = "正在读取…" }: { label?: string }) {
   return (
-    <div className="p-6" role="status" aria-live="polite" aria-label={label}>
+    <AsyncSurface role="status" aria-live="polite" aria-label={label}>
       <Skeleton active paragraph={{ rows: 3 }} />
       <span className="sr-only">{label}</span>
-    </div>
+    </AsyncSurface>
   );
 }
 
 export function ErrorSurface({ message, retry }: { message: string; retry?: () => void }) {
   return (
-    <div className="p-6">
+    <AsyncSurface>
       <Alert
         type="error"
         showIcon
@@ -22,13 +23,13 @@ export function ErrorSurface({ message, retry }: { message: string; retry?: () =
         description={`${message}。请检查 API 服务后重试。`}
         action={
           retry && (
-            <Button size="small" icon={<RefreshCw size={14} />} onClick={retry}>
+            <Button size="small" icon={<RefreshCw className="size-icon-sm" />} onClick={retry}>
               重新加载
             </Button>
           )
         }
       />
-    </div>
+    </AsyncSurface>
   );
 }
 
@@ -42,7 +43,7 @@ export function RouteErrorSurface() {
       ? error.message
       : String(error);
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas" role="alert">
+    <AsyncSurface fullPage role="alert">
       <Result
         status="error"
         title="页面出错了"
@@ -53,7 +54,7 @@ export function RouteErrorSurface() {
           </>
         }
         extra={[
-          <Button key="reload" icon={<RefreshCw size={14} />} onClick={() => window.location.reload()}>
+          <Button key="reload" icon={<RefreshCw className="size-icon-sm" />} onClick={() => window.location.reload()}>
             重新加载
           </Button>,
           <Button key="home" href="/">
@@ -61,6 +62,6 @@ export function RouteErrorSurface() {
           </Button>,
         ]}
       />
-    </div>
+    </AsyncSurface>
   );
 }

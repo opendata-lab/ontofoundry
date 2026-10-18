@@ -38,7 +38,7 @@ function KeyColumns({
       value={value}
       options={columns.map((c) => ({ value: c, label: c }))}
       onChange={onChange}
-      className="min-w-[220px]"
+      className="min-w-0 flex-1"
     />
   );
 }
@@ -78,7 +78,6 @@ export function MappingSources({
     return (
       <Descriptions
         size="small"
-        bordered
         column={1}
         items={[
           { key: "mode", label: "实例来源", children: BINDING_MODES[mode] },
@@ -89,7 +88,7 @@ export function MappingSources({
               <span className="flex flex-wrap items-center gap-2">
                 {datasetLabel(s.dataset)}
                 {s.key_columns.length > 0 && <Text type="secondary">键列：{s.key_columns.join(", ")}</Text>}
-                {s.dataset?.snapshot_date_column && <Tag className="!m-0">每日快照</Tag>}
+                {s.dataset?.snapshot_date_column && <Tag className="m-0">每日快照</Tag>}
                 {s.ownerTypeId !== type.id && (
                   <Text type="secondary">来自{byId(draft.object_types, s.ownerTypeId)?.name}</Text>
                 )}
@@ -107,10 +106,11 @@ export function MappingSources({
   const main = own.find((s) => s.id === MAIN_SOURCE);
   const sides = own.filter((s) => s.id !== MAIN_SOURCE);
   const sourceRow = (s: ResolvedSource, title: string, removable: boolean) => (
-    <div key={s.id} className="grid grid-cols-[96px_minmax(200px,1fr)_minmax(220px,1fr)_32px] items-center gap-2">
-      <Text type="secondary">{title}</Text>
+    <div key={s.id} className="flex items-center gap-2">
+      <Text type="secondary" className="w-24 flex-none">{title}</Text>
       <Select
         aria-label={`${title}数据集`}
+        className="min-w-0 flex-1"
         showSearch
         optionFilterProp="label"
         value={s.dataset_id}
@@ -144,7 +144,7 @@ export function MappingSources({
           onClick={() => change(removeSource(draft, type.id, s.id))}
         />
       ) : (
-        <span />
+        <span className="w-8 flex-none" />
       )}
     </div>
   );
@@ -158,8 +158,8 @@ export function MappingSources({
         />
       )}
       {inherited.map((s) => (
-        <div key={`${s.ownerTypeId}:${s.id}`} className="grid grid-cols-[96px_1fr] items-center gap-2">
-          <Text type="secondary">{sourceLabel(s)}</Text>
+        <div key={`${s.ownerTypeId}:${s.id}`} className="flex items-center gap-2">
+          <Text type="secondary" className="w-24 flex-none">{sourceLabel(s)}</Text>
           <Text>
             {datasetLabel(s.dataset)} <Text type="secondary">· 来自{byId(draft.object_types, s.ownerTypeId)?.name}</Text>
           </Text>
@@ -169,9 +169,10 @@ export function MappingSources({
         (main ? (
           sourceRow(main, "主表", false)
         ) : (
-          <div className="grid grid-cols-[96px_minmax(200px,1fr)] items-center gap-2">
-            <Text type="secondary">主表</Text>
+          <div className="flex items-center gap-2">
+            <Text type="secondary" className="w-24 flex-none">主表</Text>
             <Select
+              className="min-w-0 flex-1"
               aria-label="主表数据集"
               showSearch
               optionFilterProp="label"
@@ -196,7 +197,7 @@ export function MappingSources({
             }
             value={null}
             options={datasets}
-            className="min-w-[240px]"
+            className="min-w-60"
             onChange={(datasetId: string) => change(addSource(draft, type.id, datasetId).draft)}
           />
         )}
@@ -207,7 +208,7 @@ export function MappingSources({
               aria-label="成员扩展表"
               allowClear
               placeholder="不限定"
-              className="min-w-[200px]"
+              className="min-w-48"
               value={membership ?? undefined}
               options={sides.map((s) => ({ value: s.id, label: datasetLabel(s.dataset) }))}
               onChange={(sourceId?: string) => change(setMembershipSource(draft, type.id, sourceId ?? null))}

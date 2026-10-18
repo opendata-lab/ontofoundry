@@ -1,9 +1,10 @@
-import { Button, Tooltip, Typography } from "antd";
+import { Button, Tooltip } from "antd";
 import { Maximize, Minus, Plus } from "lucide-react";
 import { useId, useState } from "react";
 import type { ObjectType } from "../../api/types";
 import { byId, effectiveLinks } from "../../lib/coreModel";
 import type { PanelProps } from "../../lib/elementModel";
+import { SectionTitle } from "../layout";
 import { shortObjectName } from "../../lib/objectMapping";
 
 type Group = { names: string[]; incoming: boolean; outgoing: boolean };
@@ -48,28 +49,27 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
         markerEnd={group.outgoing ? `url(#${marker}-end)` : undefined}
       />
       {group.names.length === 1 && !crowded && (
-        <text x={x} y={y - 16} textAnchor="middle" className="fill-muted text-[12px]">
+        <text x={x} y={y - 16} textAnchor="middle" className="fill-muted text-xs">
           {group.names[0]}
         </text>
       )}
       <circle cx={x} cy={y} r={11} className="fill-surface stroke-rule-strong" />
-      <text x={x} y={y + 4} textAnchor="middle" className="fill-ink-2 text-[11px]">
+      <text x={x} y={y + 4} textAnchor="middle" className="fill-ink-2 text-xs">
         {group.names.length}
       </text>
     </g>
   );
   return (
     <section className="flex min-w-0 flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <Typography.Text strong>关系</Typography.Text>
+      <SectionTitle title="关系">
         {links.length > 0 && (
           <Button type="link" size="small" onClick={() => open({ kind: "object_type", id: type.id, tab: "relations" })}>
             全部关系
           </Button>
         )}
-      </div>
+      </SectionTitle>
       <div className="relative overflow-hidden rounded-md border border-rule bg-surface-raised">
-        <svg className="block h-[320px] w-full" viewBox={`0 0 ${width} ${height}`} aria-label={`${shortObjectName(type)}的关系图`}>
+        <svg className="block h-80 w-full" viewBox={`0 0 ${width} ${height}`} aria-label={`${shortObjectName(type)}的关系图`}>
           <defs>
             {(["end", "start"] as const).map((side) => (
               <marker
@@ -120,7 +120,7 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
                   >
                     <title>{name}</title>
                     <rect x={x - 50} y={y - 17} width={100} height={34} rx={6} className="fill-surface stroke-rule-strong" />
-                    <text x={x} y={y + 4} textAnchor="middle" className="fill-ink text-[13px]">
+                    <text x={x} y={y + 4} textAnchor="middle" className="fill-ink text-sm">
                       {name.length > 7 ? name.slice(0, 7) + "…" : name}
                     </text>
                   </g>
@@ -137,7 +137,7 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
               )}
             <g>
               <rect x={cx - 59} y={cy - 25} width={118} height={50} rx={7} className="fill-object-soft stroke-object" />
-              <text x={cx} y={cy + 4} textAnchor="middle" className="fill-object text-[14px] font-semibold">
+              <text x={cx} y={cy + 4} textAnchor="middle" className="fill-object text-sm font-semibold">
                 {shortObjectName(type)}
               </text>
             </g>

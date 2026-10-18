@@ -1,37 +1,28 @@
-import { Tag, Tooltip } from "antd";
+import { Tooltip } from "antd";
 import { Lock } from "lucide-react";
 import type { BindingStatus } from "../../api/types";
 import { BINDING_STATUS } from "../../lib/objectMapping";
+import { StatusMark, type StatusState } from "../layout/StatusMark";
 
-const MAPPING_STATE = {
-  mapped: { color: "success", text: "已映射" },
-  partial: { color: "warning", text: "部分映射" },
-  unmapped: { color: "default", text: "未映射" },
-} as const;
+const COLOR_STATE: Record<string, StatusState> = {
+  success: "mapped",
+  warning: "partial",
+  error: "error",
+};
 
 export function MappingStatusIcon({
   state,
   label,
 }: {
-  state: "mapped" | "partial" | "unmapped";
+  state: StatusState;
   label?: string;
 }) {
-  const { color, text } = MAPPING_STATE[state];
-  return (
-    <Tag color={color} className="!m-0">
-      {label ?? text}
-    </Tag>
-  );
+  return <StatusMark state={state} label={label} />;
 }
-
 
 export function BindingStatusTag({ status }: { status: BindingStatus }) {
   const { color, text } = BINDING_STATUS[status];
-  return (
-    <Tag color={color} className="!m-0">
-      {text}
-    </Tag>
-  );
+  return <StatusMark state={COLOR_STATE[color] ?? "unmapped"} label={text} />;
 }
 
 

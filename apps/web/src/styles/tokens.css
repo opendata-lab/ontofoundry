@@ -19,10 +19,12 @@
   --color-accent-ink: #ffffff;
   --color-accent-soft: #e8f4ff;
   --color-focus: #0055d4;
-  --color-success: oklch(43% 0.128 151);
-  --color-success-soft: oklch(94% 0.035 151);
-  --color-danger: oklch(48% 0.17 26);
-  --color-danger-soft: oklch(95% 0.034 26);
+  --color-success: #156d3b;
+  --color-success-soft: #e3f5ea;
+  --color-warning: #94600b;
+  --color-warning-soft: #fef4e6;
+  --color-danger: #ba2b1d;
+  --color-danger-soft: #fdeae7;
   --color-object: #1261d2;
   --color-object-soft: #e9f2ff;
   --color-relation: #117c99;
@@ -36,25 +38,40 @@
   --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-md: 1.125rem;
-  --text-lg: 1.375rem;
-  --text-xl: 1.75rem;
+  /* Strictly 3 font-size tiers: 12px (aux/table header), 13px (body/control), 16px (page title) */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 16px;
+  --text-md: var(--text-sm);
+  --text-lg: var(--text-base);
+  --text-xl: var(--text-base);
 
-  --space-3xs: 0.125rem;
-  --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
-  --space-2xl: 3rem;
+  --leading-tight: 1.35;
+  --leading-base: 1.45;
 
+  /* Fixed 4px-multiple spacing scale: 4, 8, 12, 16, 20, 24 */
+  --space-3xs: 4px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+  --space-2xl: 24px;
+
+  /* Uniform small border radii */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
+
+  /* Compact control heights and table cell density */
+  --control-height-sm: 28px;
+  --control-height: 32px;
+  --control-height-lg: 36px;
+  --table-cell-py: 10px;
+  --table-cell-px: 16px;
+  --table-cell-py-sm: 8px;
+  --table-cell-px-sm: 12px;
 
   --dur-micro: 120ms;
   --dur-short: 220ms;
@@ -75,12 +92,60 @@
   --color-rule-label-soft: #f2edf9;
   --color-step-wash: #e7f8ff;
   --ref-sidebar: clamp(184px, 14.4vw, 208px);
+
+  /* U1 application chrome and the unchanged decorative brand geometry. */
+  --app-min-width: 1100px;
+  --app-header-height: 52px;
+  --app-sidebar-collapsed: 56px;
+  --app-search-max-height: 420px;
+  --workspace-tab-title-width: 180px;
+  --workspace-tab-dirty-size: 4px;
+  --workspace-tab-confirm-width: 420px;
+  --brand-tile-size: 7px;
+  --brand-tile-gap: 2px;
+  --brand-mark-rotation: 45deg;
+  --brand-muted-opacity: 0.58;
+  /* U2 directory and settings content bounds. */
+  --directory-max-width: 1080px;
+  --settings-max-width: 880px;
+  /* U3 existing review overlay and preview bounds. */
+  --review-code-height: 360px;
+  --review-detail-height: 64vh;
+  --review-detail-width: 860px;
+  --review-dialog-width: 720px;
+  --review-evidence-width: 420px;
+  --review-conflict-width: 280px;
+  --review-filter-width: 152px;
+  --review-graph-height: 420px;
+  --icon-size: 16px;
+  --icon-size-sm: 14px;
+  --icon-size-xs: 12px;
 }
 
 /* Expose the tokens above to Tailwind utilities (bg-surface, text-muted,
    rounded-sm, font-sans …). `inline` makes utilities reference these
    variables directly; the :root values above stay the single source. */
 @theme inline {
+  --spacing: var(--space-3xs);
+  --spacing-review-code: var(--review-code-height);
+  --spacing-review-detail: var(--review-detail-height);
+  --spacing-review-evidence: var(--review-evidence-width);
+  --spacing-review-filter: var(--review-filter-width);
+  --spacing-review-graph: var(--review-graph-height);
+  --spacing-control-sm: var(--control-height-sm);
+  --spacing-control-lg: var(--control-height-lg);
+  --spacing-tab-dirty: var(--workspace-tab-dirty-size);
+  --spacing-icon: var(--icon-size);
+  --container-tab-title: var(--workspace-tab-title-width);
+  --container-tab-confirm: min(var(--workspace-tab-confirm-width), calc(100vw - var(--space-xl) - var(--space-xs)));
+  --spacing-app-header: var(--app-header-height);
+  --container-directory: var(--directory-max-width);
+  --container-settings: var(--settings-max-width);
+  --spacing-app-search: var(--app-search-max-height);
+  --spacing-icon-sm: var(--icon-size-sm);
+  --spacing-icon-xs: var(--icon-size-xs);
+  --leading-base: var(--leading-base);
+  --leading-tight: var(--leading-tight);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
 
@@ -102,6 +167,8 @@
   --color-focus: var(--color-focus);
   --color-success: var(--color-success);
   --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
   --color-danger: var(--color-danger);
   --color-danger-soft: var(--color-danger-soft);
   --color-object: var(--color-object);
@@ -112,6 +179,7 @@
   --color-attribute-soft: var(--color-attribute-soft);
   --color-graph-edge: var(--color-graph-edge);
   --color-shadow: var(--color-shadow);
+  --shadow-panel: var(--shadow-panel);
 
   --text-xs: var(--text-xs);
   --text-sm: var(--text-sm);
@@ -123,4 +191,50 @@
   --radius-xs: var(--radius-xs);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
+}
+
+/* Application geometry has no Ant Design counterpart. Control overrides use
+   Tailwind token utilities, so their cascade stays above the Ant Design layer. */
+.app-shell {
+  display: grid;
+  width: max(100%, var(--app-min-width));
+  height: calc(100dvh / var(--app-scale, 1));
+  zoom: var(--app-scale, 1);
+  grid-template-rows: var(--app-header-height) minmax(0, 1fr);
+  grid-template-columns: var(--ref-sidebar) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--color-surface);
+
+  & > header { z-index: var(--z-raised); }
+  & .app-sidebar { padding-inline: var(--space-sm); }
+  &[data-collapsed="true"] {
+    grid-template-columns: var(--app-sidebar-collapsed) minmax(0, 1fr);
+    & .app-sidebar { padding-inline: var(--space-3xs); }
+    & .app-nav-link { justify-content: center; padding-inline: 0; }
+  }
+}
+
+.brand-mark {
+  display: grid;
+  grid-template-columns: repeat(2, var(--brand-tile-size));
+  gap: var(--brand-tile-gap);
+  transform: rotate(var(--brand-mark-rotation));
+}
+.brand-tile {
+  display: block;
+  height: var(--brand-tile-size);
+  background: var(--color-accent);
+}
+.brand-tile-muted { opacity: var(--brand-muted-opacity); }
+
+/* Retained result tabs fill the workbench without reaching nested Tabs. */
+.review-tabs {
+  & > .ant-tabs-content-holder { min-height: 0; flex: 1; }
+  & > .ant-tabs-content-holder > .ant-tabs-content,
+  & > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane { height: 100%; }
+}
+.review-conflicts {
+  display: grid;
+  grid-template-columns: minmax(0, var(--review-conflict-width)) minmax(0, 1fr);
+  gap: var(--space-md);
 }

@@ -1,11 +1,25 @@
 import { Button, Checkbox, Popover, Tag, Tooltip, Typography } from "antd";
-import { Copy, FileText } from "lucide-react";
-import type { ProposalItem } from "../../api/types";
-import { KIND, OPERATION, STATUS, STATUS_COLOR } from "./elementMeta";
+import { FileText } from "lucide-react";
+import type { ProposalItem, ProposalStatus } from "../../api/types";
+import { OPERATION, STATUS } from "./elementMeta";
+import { StatusMark, type StatusState } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { REVIEW_FIELD_LABELS, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
+
+const REVIEW_STATE: Record<ProposalStatus, StatusState> = {
+  pending: "pending",
+  accepted: "mapped",
+  rejected: "unmapped",
+  stale: "partial",
+  conflict: "error",
+  superseded: "unmapped",
+};
+
+export function ProposalStatusMark({ status }: { status: ProposalStatus }) {
+  return <StatusMark state={REVIEW_STATE[status]} label={STATUS[status]} />;
+}
 
 export type CardActions = {
   accept: (item: ProposalItem) => void;
@@ -95,7 +109,7 @@ export function ProposalCard({
       tabIndex={0}
       data-row={item.id}
       aria-label={`${reviewKindName(item.target_kind)} ${technical}，${OPERATION[item.operation]}，${STATUS[item.status]}。按 Enter 查看详情`}
-      className={`grid cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-x-2 gap-y-1 border-b border-rule-soft px-3 py-2 outline-none hover:bg-surface-soft focus-visible:bg-accent-soft ${selected ? "bg-accent-soft" : ""} ${isBlocked ? "border-l-2 border-l-danger" : ""}`}
+      className={`flex cursor-pointer items-start gap-2 border-b border-rule-soft px-4 py-2 outline-none hover:bg-surface-soft focus-visible:bg-accent-soft ${selected ? "bg-accent-soft" : ""} ${isBlocked ? "border-l-2 border-l-danger" : ""}`}
       onClick={(event) => {
         if (!(event.target as HTMLElement).closest("button,input,label,.ant-popover")) actions.open(item);
       }}
@@ -107,30 +121,26 @@ export function ProposalCard({
       }}
     >
       <Checkbox checked={selected} aria-label={`选择 ${item.display_name}`} onChange={(e) => onSelect(e.target.checked)} />
-      <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
-          <Tag color={KIND[item.target_kind].color} className="!m-0">
+          <Tag className="m-0">
             {reviewKindName(item.target_kind)}
           </Tag>
           <code className="truncate text-xs" title={technical}>
             {technical}
           </code>
-          <Tag className="!m-0">{OPERATION[item.operation]}</Tag>
+          <Tag className="m-0">{OPERATION[item.operation]}</Tag>
           {item.status !== "pending" && (
-            <Tag color={STATUS_COLOR[item.status]} className="!m-0">
-              {STATUS[item.status]}
-            </Tag>
+            <ProposalStatusMark status={item.status} />
           )}
           {deps.length > 0 && (
             <Tooltip title={depNames}>
-              <Tag className="!m-0">联动 {deps.length} 项</Tag>
+              <Tag className="m-0">联动 {deps.length} 项</Tag>
             </Tooltip>
           )}
           {item.duplicate_candidates.length > 0 && item.status === "pending" && (
             <Tooltip title="可能与已有事实重复，打开详情可改为更新已有事实">
-              <Tag color="warning" icon={<Copy size={11} className="mr-1 inline" />} className="!m-0">
-                可能重复
-              </Tag>
+              <StatusMark state="partial" label="可能重复" />
             </Tooltip>
           )}
           <Popover
@@ -138,7 +148,7 @@ export function ProposalCard({
             placement="bottomLeft"
             title="材料证据"
             content={
-              <div className="max-h-[360px] w-[420px] overflow-auto">
+              <div className="max-h-review-code w-review-evidence max-w-full overflow-auto">
                 <ReviewEvidence evidence={item.evidence} />
               </div>
             }
@@ -157,7 +167,7 @@ export function ProposalCard({
           className="flex min-w-0 items-center gap-1 text-xs"
           title={`${REVIEW_FIELD_LABELS[change?.path ?? "name"] ?? change?.path ?? "名称"}：${before} → ${after}`}
         >
-          <Text type="secondary" className="max-w-[40%] truncate line-through">
+          <Text type="secondary" className="max-w-2/5 truncate line-through">
             {before}
           </Text>
           <Text type="secondary">→</Text>
@@ -175,7 +185,7 @@ export function ProposalCard({
           </Text>
         )}
       </div>
-      <div className="flex gap-1">
+      <div className="flex shrink-0 gap-1">
         <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} />
       </div>
     </article>

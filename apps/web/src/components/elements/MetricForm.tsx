@@ -1,4 +1,5 @@
 import { Alert, Button, Descriptions, Form, Input, Segmented, Select, Tag, Tooltip, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import { Plus, Trash2 } from "lucide-react";
 import type { Aggregation, Condition, Dataset, Draft, Metric, Operator, ValueKind } from "../../api/types";
 import {
@@ -19,7 +20,7 @@ import { datasetLabel } from "../../lib/datasetEditing";
 
 import { ConditionValueInput } from "./ConditionValueInput";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 const columnKind = (dataset: Dataset | undefined, column: string): ValueKind | null =>
   physicalValueKind(dataset?.columns?.find((c) => c.name === column)?.physical_type ?? null);
@@ -60,6 +61,7 @@ function ColumnSelect({
     );
   return (
     <Select
+      className="w-full"
       aria-label={label}
       showSearch
       allowClear={allowClear}
@@ -114,7 +116,7 @@ export function MetricForm({
     </Form.Item>
   ) : null;
   return (
-    <Form layout="vertical" component="div" requiredMark className="max-w-[880px]">
+    <Form layout="vertical" component="div" requiredMark className="max-w-settings">
       <div className="grid grid-cols-2 gap-x-4">
         <Form.Item label="名称" required {...status("name")}>
           <Input aria-label="指标名称" value={metric.name} placeholder="例如：已完成订单金额" onChange={(e) => onChange({ ...metric, name: e.target.value })} />
@@ -231,7 +233,7 @@ export function MetricForm({
               </Form.Item>
             )}
           </div>
-          {metric.aggregation === "count" && <Alert className="!mb-4" type="info" showIcon message="计数统计满足条件的行数，不需要选择列。" />}
+          {metric.aggregation === "count" && <Alert className="mb-4" type="info" showIcon message="计数统计满足条件的行数，不需要选择列。" />}
         </>
       )}
       {isRatio(metric) && (
@@ -268,7 +270,7 @@ export function MetricForm({
           </div>
           {byId(draft.metrics, metric.numerator_id) && byId(draft.metrics, metric.denominator_id) && (
             <Alert
-              className="!mb-4"
+              className="mb-4"
               type="info"
               showIcon
               message={`${metric.name || "比率"} = ${byId(draft.metrics, metric.numerator_id)!.name} ÷ ${byId(draft.metrics, metric.denominator_id)!.name}`}
@@ -323,9 +325,7 @@ export function MetricForm({
       )}
       {isSimple(metric) && (
         <>
-          <Title level={5} className="!mt-2">
-            条件
-          </Title>
+          <SectionTitle title="条件" className="mb-3 border-t border-rule pt-4" />
           <div className="mb-4 flex flex-col gap-2">
             {!metric.filters.length && <Text type="secondary">没有条件，统计全部行</Text>}
             {metric.filters.map((filter, i) => {
@@ -336,25 +336,30 @@ export function MetricForm({
               return (
                 <Form.Item
                   key={i}
-                  className="!mb-0 [&_.ant-form-item-explain]:text-xs [&_.ant-form-item-extra]:text-xs"
+                  className="mb-0"
                   validateStatus={error ? "error" : undefined}
                   help={error}
                   extra={kind ? `${VALUE_KINDS[kind]}列` : undefined}
                 >
-                  <div className="grid grid-cols-[minmax(160px,1fr)_120px_minmax(180px,1.4fr)_32px] gap-2">
-                    <ColumnSelect
-                      dataset={dataset}
-                      label={`条件 ${i + 1} 的列`}
-                      value={filter.column.column}
-                      onChange={(column) => set({ ...filter, column: { dataset_id: metric.dataset_id, column: column ?? "" } })}
-                    />
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <ColumnSelect
+                        dataset={dataset}
+                        label={`条件 ${i + 1} 的列`}
+                        value={filter.column.column}
+                        onChange={(column) => set({ ...filter, column: { dataset_id: metric.dataset_id, column: column ?? "" } })}
+                      />
+                    </div>
                     <Select
+                      className="w-28 flex-none"
                       aria-label={`条件 ${i + 1} 的运算`}
                       value={filter.operator}
                       options={Object.entries(OPERATORS).map(([value, label]) => ({ value, label }))}
                       onChange={(operator: Operator) => set({ ...filter, operator, values: [] })}
                     />
-                    <ConditionValueInput kind={kind} operator={filter.operator} values={filter.values ?? []} label={`条件 ${i + 1} 的值`} onChange={(values) => set({ ...filter, values })} />
+                    <div className="min-w-0 flex-1">
+                      <ConditionValueInput kind={kind} operator={filter.operator} values={filter.values ?? []} label={`条件 ${i + 1} 的值`} onChange={(values) => set({ ...filter, values })} />
+                    </div>
                     <Button
                       type="text"
                       aria-label={`删除条件 ${i + 1}`}

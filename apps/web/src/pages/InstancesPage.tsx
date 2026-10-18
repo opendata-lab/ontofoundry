@@ -1,11 +1,12 @@
 import { Alert, Breadcrumb, Button, DatePicker, Descriptions, Empty, Input, Select, Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
-import { Box, FileText, Network } from "lucide-react";
+import { FileText, Network } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { catalogApi, instancesApi } from "../api/client";
 import type { Draft, InstanceList, InstanceNeighborhood, MappingPreview, Scalar, TypedKey } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
+import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
 import { EvidenceSection } from "../components/elements/ElementPanels";
 import { OntologyGraph } from "../components/OntologyGraph";
 import { usePageTab } from "../hooks/usePageTab";
@@ -16,7 +17,7 @@ import { documentDisplayText, documentSearchText } from "../lib/instanceDisplay"
 import { instanceCanvas, instanceNeighborhood, type InstanceEdge, type InstanceNode } from "../lib/instanceGraph";
 import { ensureMapping } from "../lib/objectMappingEditing";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 const PAGE_SIZE = 20;
 
 type Shown = InstanceNode & {
@@ -31,7 +32,11 @@ const cell = (value: Scalar | undefined) =>
   value === null || value === undefined || value === "" ? (
     <Text type="secondary">—</Text>
   ) : typeof value === "boolean" ? (
-    value ? "是" : "否"
+    value ? (
+      "是"
+    ) : (
+      "否"
+    )
   ) : (
     String(value)
   );
@@ -45,9 +50,7 @@ export function InstancesPage() {
   const keyParam = params.get("key");
   const refParam =
     params.get("ref") ??
-    (objectId && objectId !== "database" && (params.get("source") === "database" || objectId.startsWith("db."))
-      ? objectId
-      : null);
+    (objectId && objectId !== "database" && (params.get("source") === "database" || objectId.startsWith("db.")) ? objectId : null);
   const databaseDetail = (objectId === "database" && (keyParam !== null || refParam !== null)) || Boolean(refParam);
   const snapshotDate = params.get("date");
   const { draft, error, load, suffix } = useSnapshot(workspace);
@@ -254,9 +257,7 @@ export function InstancesPage() {
         })
         .filter((r) => r.other)
     : [];
-  const neighborhoodGraph = object
-    ? instanceNeighborhood(availableObjects, availableLinks, object.id, depth)
-    : { objects: [], links: [] };
+  const neighborhoodGraph = object ? instanceNeighborhood(availableObjects, availableLinks, object.id, depth) : { objects: [], links: [] };
   const showTypeColumn =
     mode === "shared_parent" ||
     mode === "virtual" ||
@@ -285,220 +286,220 @@ export function InstancesPage() {
       { replace: true },
     );
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-auto bg-canvas px-6 py-5">
-      <Breadcrumb
-        items={[
-          { title: <Link to={"../objects" + suffix}>本体对象</Link> },
-          { title: <Link to={`../objects${suffix ? suffix + "&" : "?"}inspect=object_type:${type.id}`}>{type.name}</Link> },
-          { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
-          ...(object ? [{ title: object.display_text }] : []),
-        ]}
-      />
-      <div className="flex items-center gap-3">
-        <span className="flex size-10 items-center justify-center rounded-sm bg-object-soft text-object">
-          <Box size={22} />
-        </span>
-        <div className="flex flex-col">
-          <Title level={5} className="!m-0">
-            {object?.display_text ?? type.name}
-          </Title>
-          <Text type="secondary" className="text-xs">
-            {byId(draft.object_types, object?.type_id ?? typeId)?.name} / {type.technical_name}
-          </Text>
-        </div>
+    <div className="flex h-full min-h-0 flex-col bg-canvas">
+      <div className="px-6 pt-4">
+        <Breadcrumb
+          items={[
+            { title: <Link to={"../objects" + suffix}>本体对象</Link> },
+            { title: <Link to={`../objects${suffix ? suffix + "&" : "?"}inspect=object_type:${type.id}`}>{type.name}</Link> },
+            { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
+            ...(object ? [{ title: object.display_text }] : []),
+          ]}
+        />
+      </div>
+      <PageHeader
+        title={object?.display_text ?? type.name}
+        note={`${byId(draft.object_types, object?.type_id ?? typeId)?.name} / ${type.technical_name}`}
+      >
         {object && (
           <Button type="primary" className="ml-auto" icon={<Network size={14} />} onClick={() => setGraphOpen(!graphOpen)}>
             {graphOpen ? "返回详情" : "实例图谱"}
           </Button>
         )}
-      </div>
-      {objectId && dbError && <Alert type="error" showIcon message={dbError} />}
-      {databaseDetail && neighborhood?.warnings.map((w) => <Alert key={w} type="info" showIcon message={w} />)}
-      {neighborhood?.truncated && (
-        <Alert type="warning" showIcon message="已达到查询范围上限，当前结果仅为部分关系。请缩小范围或选择新的中心实例。" />
-      )}
-      {databaseDetail && neighborhood?.snapshot_dates.some((s) => s.date) && (
-        <Text type="secondary" className="text-xs">
-          数据日期：{[...new Set(neighborhood.snapshot_dates.map((s) => s.date).filter(Boolean))].join("、")}
-        </Text>
-      )}
-      {!objectId ? (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select
-              aria-label="实例来源"
-              value={source}
-              className="w-[180px]"
-              onChange={(value: typeof source) => {
-                setSource(value);
-                resetPage();
-              }}
-              options={[
-                { value: "document", label: "文档实例" },
-                { value: "database", label: databaseReady ? "数据库实例" : "数据库实例（未映射）", disabled: !databaseReady },
-              ]}
-            />
-            <Input.Search
-              allowClear
-              aria-label="搜索实例"
-              placeholder="显示名称或属性值"
-              className="w-[280px]"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                resetPage();
-              }}
-            />
-            {source === "database" && snapshotted && (
-              <DatePicker
-                aria-label="数据日期"
-                placeholder="最新日期"
-                value={snapshotDate ? dayjs(snapshotDate) : null}
-                onChange={(d) => {
-                  setDate(d ? d.format("YYYY-MM-DD") : null);
-                  resetPage();
+      </PageHeader>
+      <PageBody>
+        <Panel>
+          {objectId && dbError && <Alert type="error" showIcon message={dbError} />}
+          {databaseDetail && neighborhood?.warnings.map((w) => <Alert key={w} type="info" showIcon message={w} />)}
+          {neighborhood?.truncated && (
+            <Alert type="warning" showIcon message="已达到查询范围上限，当前结果仅为部分关系。请缩小范围或选择新的中心实例。" />
+          )}
+          {databaseDetail && neighborhood?.snapshot_dates.some((s) => s.date) && (
+            <Text type="secondary" className="text-xs">
+              数据日期：{[...new Set(neighborhood.snapshot_dates.map((s) => s.date).filter(Boolean))].join("、")}
+            </Text>
+          )}
+          {!objectId ? (
+            <>
+              <PanelToolbar>
+                <Select
+                  size="small"
+                  aria-label="实例来源"
+                  value={source}
+                  className="w-44"
+                  onChange={(value: typeof source) => {
+                    setSource(value);
+                    resetPage();
+                  }}
+                  options={[
+                    { value: "document", label: "文档实例" },
+                    { value: "database", label: databaseReady ? "数据库实例" : "数据库实例（未映射）", disabled: !databaseReady },
+                  ]}
+                />
+                <Input.Search
+                  size="small"
+                  allowClear
+                  aria-label="搜索实例"
+                  placeholder="显示名称或属性值"
+                  className="w-72"
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    resetPage();
+                  }}
+                />
+                {source === "database" && snapshotted && (
+                  <DatePicker
+                    size="small"
+                    aria-label="数据日期"
+                    placeholder="最新日期"
+                    value={snapshotDate ? dayjs(snapshotDate) : null}
+                    onChange={(d) => {
+                      setDate(d ? d.format("YYYY-MM-DD") : null);
+                      resetPage();
+                    }}
+                  />
+                )}
+                {source === "database" && snapshotDates.some((s) => s.date) && (
+                  <Text type="secondary" className="text-xs">
+                    数据日期：{[...new Set(snapshotDates.map((s) => s.date).filter(Boolean))].join("、")}
+                  </Text>
+                )}
+              </PanelToolbar>
+              {dbError && <Alert type="error" showIcon message={dbError} />}
+              {source === "document" ? (
+                <Table
+                  size="middle"
+                  rowKey="id"
+                  dataSource={documentRows}
+                  columns={columns}
+                  pagination={{ pageSize: PAGE_SIZE, showTotal: (total) => `共 ${total} 条`, hideOnSinglePage: true }}
+                  locale={{ emptyText: <Empty description="暂无文档实例，可从建模材料中抽取" /> }}
+                />
+              ) : (
+                <>
+                  <Table
+                    size="middle"
+                    rowKey="id"
+                    loading={loading}
+                    dataSource={databaseRows}
+                    columns={columns}
+                    pagination={false}
+                    locale={{ emptyText: <Empty description="没有匹配的实例" /> }}
+                  />
+                  <div className="flex items-center justify-end gap-2 border-t border-rule px-4 py-2">
+                    <Text type="secondary" className="text-xs">
+                      按需查询 · 每页 {PAGE_SIZE} 条
+                    </Text>
+                    <Button size="small" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
+                      上一页
+                    </Button>
+                    <span className="tabular-nums">{page + 1}</span>
+                    <Button
+                      size="small"
+                      disabled={!hasNext || loading}
+                      onClick={() => {
+                        if (!sessionId && list?.next_cursor) {
+                          setCursors((prev) => {
+                            const next = prev.slice(0, page + 1);
+                            next[page + 1] = list.next_cursor ?? undefined;
+                            return next;
+                          });
+                        }
+                        setPage(page + 1);
+                      }}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : loading ? (
+            <LoadingSurface label="正在查询实例及关联关系…" />
+          ) : !object ? (
+            <Empty description="此实例不存在" />
+          ) : graphOpen ? (
+            <div className="relative h-review-graph overflow-hidden">
+              <OntologyGraph
+                query=""
+                graph={{
+                  workspace_id: workspace.id,
+                  version_id: "instances",
+                  version_sha256: "",
+                  version_content_sha256: "",
+                  normalized_snapshot_sha256: "",
+                  ...instanceCanvas(neighborhoodGraph.objects, neighborhoodGraph.links, draft.object_types, draft.link_types),
+                }}
+                onSelect={(selected) => {
+                  if (selected?.category !== "node") return;
+                  const next = availableObjects.find((o) => o.id === selected.item.id);
+                  if (next && next.id !== object.id) navigate(linkTo(next));
                 }}
               />
-            )}
-            {source === "database" && snapshotDates.some((s) => s.date) && (
-              <Text type="secondary" className="text-xs">
-                数据日期：{[...new Set(snapshotDates.map((s) => s.date).filter(Boolean))].join("、")}
-              </Text>
-            )}
-          </div>
-          {dbError && <Alert type="error" showIcon message={dbError} />}
-          {source === "document" ? (
-            <Table
-              size="middle"
-              rowKey="id"
-              dataSource={documentRows}
-              columns={columns}
-              pagination={{ pageSize: PAGE_SIZE, showTotal: (total) => `共 ${total} 条`, hideOnSinglePage: true }}
-              locale={{ emptyText: <Empty description="暂无文档实例，可从建模材料中抽取" /> }}
-            />
-          ) : (
-            <>
-              <Table
-                size="middle"
-                rowKey="id"
-                loading={loading}
-                dataSource={databaseRows}
-                columns={columns}
-                pagination={false}
-                locale={{ emptyText: <Empty description="没有匹配的实例" /> }}
-              />
-              <div className="flex items-center justify-end gap-2">
-                <Text type="secondary" className="text-xs">
-                  按需查询 · 每页 {PAGE_SIZE} 条
-                </Text>
-                <Button size="small" disabled={page === 0 || loading} onClick={() => setPage(page - 1)}>
-                  上一页
-                </Button>
-                <span className="tabular-nums">{page + 1}</span>
-                <Button
+              <div className="absolute top-3 left-3 flex items-center gap-2 rounded-md border border-rule bg-surface px-3 py-1 text-xs text-muted">
+                {databaseDetail ? "数据库关联" : "文档实例"} · 展开范围
+                <Select
                   size="small"
-                  disabled={!hasNext || loading}
-                  onClick={() => {
-                    if (!sessionId && list?.next_cursor) {
-                      setCursors((prev) => {
-                        const next = prev.slice(0, page + 1);
-                        next[page + 1] = list.next_cursor ?? undefined;
-                        return next;
-                      });
-                    }
-                    setPage(page + 1);
-                  }}
-                >
-                  下一页
-                </Button>
+                  aria-label="实例图谱深度"
+                  value={depth}
+                  onChange={setDepth}
+                  options={[1, 2, 3].map((d) => ({ value: d, label: `${d} 跳` }))}
+                />
+                · 点击其他节点设为中心
               </div>
-            </>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 p-4">
+              <SectionTitle title="全部属性" />
+              <Descriptions
+                size="small"
+                column={2}
+                items={effectiveProperties(draft, object.type_id).map((p) => ({
+                  key: p.definition.id,
+                  label: p.definition.name,
+                  children: cell(object.values[p.definition.technical_name]),
+                }))}
+              />
+              <div className="grid grid-cols-1 gap-4 border-t border-rule pt-4 lg:grid-cols-2">
+                <section className="flex flex-col gap-2">
+                  <SectionTitle title="关联关系" />
+                  {related.length ? (
+                    related.map((r) => (
+                      <Link key={r.id} to={linkTo(r.other!)} className="inline-flex items-center gap-2">
+                        <Network size={15} />
+                        <Text type="secondary">{r.label}</Text>
+                        {r.other!.display_text}
+                        <Tag className="m-0">{byId(draft.object_types, r.other!.type_id)?.name}</Tag>
+                      </Link>
+                    ))
+                  ) : (
+                    <Text type="secondary">暂无关联关系</Text>
+                  )}
+                </section>
+                <section className="flex flex-col gap-2">
+                  {databaseDetail ? (
+                    <>
+                      <SectionTitle title="来源" />
+                      <span className="inline-flex items-center gap-2 text-sm">
+                        <FileText size={14} />
+                        数据库实时查询，没有全量同步或写回源系统。
+                      </span>
+                    </>
+                  ) : object.evidence?.length ? (
+                    <EvidenceSection workspaceId={workspace.id} evidence={object.evidence} />
+                  ) : (
+                    <>
+                      <SectionTitle title="来源证据" />
+                      <Text type="secondary">暂无文档证据</Text>
+                    </>
+                  )}
+                </section>
+              </div>
+            </div>
           )}
-        </>
-      ) : loading ? (
-        <LoadingSurface label="正在查询实例及关联关系…" />
-      ) : !object ? (
-        <Empty description="此实例不存在" />
-      ) : graphOpen ? (
-        <div className="relative h-[560px] overflow-hidden rounded-md border border-rule">
-          <OntologyGraph
-            query=""
-            graph={{
-              workspace_id: workspace.id,
-              version_id: "instances",
-              version_sha256: "",
-              version_content_sha256: "",
-              normalized_snapshot_sha256: "",
-              ...instanceCanvas(neighborhoodGraph.objects, neighborhoodGraph.links, draft.object_types, draft.link_types),
-            }}
-            onSelect={(selected) => {
-              if (selected?.category !== "node") return;
-              const next = availableObjects.find((o) => o.id === selected.item.id);
-              if (next && next.id !== object.id) navigate(linkTo(next));
-            }}
-          />
-          <div className="absolute top-3 left-3 flex items-center gap-2 rounded-md border border-rule bg-surface px-3 py-1 text-xs text-muted">
-            {databaseDetail ? "数据库关联" : "文档实例"} · 展开范围
-            <Select
-              size="small"
-              aria-label="实例图谱深度"
-              value={depth}
-              onChange={setDepth}
-              options={[1, 2, 3].map((d) => ({ value: d, label: `${d} 跳` }))}
-            />
-            · 点击其他节点设为中心
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <Descriptions
-            size="small"
-            bordered
-            column={2}
-            title="全部属性"
-            items={effectiveProperties(draft, object.type_id).map((p) => ({
-              key: p.definition.id,
-              label: p.definition.name,
-              children: cell(object.values[p.definition.technical_name]),
-            }))}
-          />
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <section className="flex flex-col gap-2">
-              <Text strong>关联关系</Text>
-              {related.length ? (
-                related.map((r) => (
-                  <Link key={r.id} to={linkTo(r.other!)} className="inline-flex items-center gap-2">
-                    <Network size={15} />
-                    <Text type="secondary">{r.label}</Text>
-                    {r.other!.display_text}
-                    <Tag className="!m-0">{byId(draft.object_types, r.other!.type_id)?.name}</Tag>
-                  </Link>
-                ))
-              ) : (
-                <Text type="secondary">暂无关联关系</Text>
-              )}
-            </section>
-            <section className="flex flex-col gap-2">
-              {databaseDetail ? (
-                <>
-                  <Text strong>来源</Text>
-                  <span className="inline-flex items-center gap-2 text-sm">
-                    <FileText size={14} />
-                    数据库实时查询，没有全量同步或写回源系统。
-                  </span>
-                </>
-              ) : object.evidence?.length ? (
-                <EvidenceSection workspaceId={workspace.id} evidence={object.evidence} />
-              ) : (
-                <>
-                  <Text strong>来源证据</Text>
-                  <Text type="secondary">暂无文档证据</Text>
-                </>
-              )}
-            </section>
-          </div>
-        </div>
-      )}
+        </Panel>
+      </PageBody>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Collapse, Descriptions, Drawer, Empty, Form, Input, List, Modal, Segmented, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
-import { ArrowRight, Check, CircleAlert, X } from "lucide-react";
+import { Alert, Button, Collapse, Descriptions, Drawer, Empty, Form, Input, List, Modal, Segmented, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
+import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
 import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, TargetKind, VersionSummary } from "../../api/types";
@@ -8,14 +8,15 @@ import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
 import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
 import { FieldDiff } from "../proposals/FieldDiff";
+import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
 import { ConflictResolver } from "./ConflictResolver";
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
-const CHANGE: Record<ElementChange["change"], { text: string; color: string }> = {
-  created: { text: "新增", color: "success" },
-  updated: { text: "修改", color: "processing" },
-  deleted: { text: "删除", color: "error" },
+const CHANGE: Record<ElementChange["change"], { text: string; state: StatusState }> = {
+  created: { text: "新增", state: "mapped" },
+  updated: { text: "修改", state: "info" },
+  deleted: { text: "删除", state: "error" },
 };
 const KIND_ORDER: TargetKind[] = [
   "object_type",
@@ -72,7 +73,7 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
   const right = JSON.stringify(after, null, 2).split("\n");
   const { removed, added } = lineDiff(left, right);
   const side = (lines: string[], marks: boolean[], cls: string) => (
-    <pre className="m-0 max-h-[360px] overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs leading-5">
+    <pre className="m-0 max-h-review-code overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs leading-base">
       {lines.map((line, i) => (
         <span key={i} className={`block ${marks[i] ? cls : ""}`}>
           {line || " "}
@@ -109,7 +110,6 @@ function FieldList({ value, names }: { value: Record<string, unknown>; names: Ma
   return (
     <Descriptions
       size="small"
-      bordered
       column={1}
       items={rows.map(([key, v]) => ({
         key,
@@ -138,7 +138,7 @@ function ChangeBody({ change, names }: { change: ElementChange; names: Map<strin
         change.change === "updated" ? (
           <JsonSplit before={change.before} after={change.after} />
         ) : (
-          <pre className="m-0 max-h-[360px] overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs">
+          <pre className="m-0 max-h-review-code overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs">
             {JSON.stringify(change.change === "created" ? change.after : change.before, null, 2)}
           </pre>
         )
@@ -174,6 +174,7 @@ function ChangeList({
   useEffect(() => setActive(open), [open]);
   return (
     <Collapse
+      ghost
       size="small"
       activeKey={active}
       onChange={(keys) => setActive(keys as string[])}
@@ -181,10 +182,8 @@ function ChangeList({
         key: c.element_id,
         label: (
           <span className="flex flex-wrap items-center gap-2" aria-label={`${KIND[c.element_kind].label} ${changeLabel(c)}`}>
-            <Tag color={CHANGE[c.change].color} className="!m-0">
-              {CHANGE[c.change].text}
-            </Tag>
-            <Tag color={KIND[c.element_kind].color} className="!m-0">
+            <StatusMark state={CHANGE[c.change].state} label={CHANGE[c.change].text} />
+            <Tag className="m-0">
               {KIND[c.element_kind].label}
             </Tag>
             <strong>{changeLabel(c)}</strong>
@@ -234,14 +233,12 @@ function elementNames(preview: PublishPreview | null, draft: ModelingSession["dr
 
 const versionLabel = (n: number | null | undefined) => (n ? `v${n}` : "尚未发布");
 
-function checkIcon(state: "pass" | "fail" | "warn" | "idle") {
-  return {
-    pass: <Check size={15} className="text-success" />,
-    fail: <X size={15} className="text-danger" />,
-    warn: <CircleAlert size={15} className="text-[#d48806]" />,
-    idle: <CircleAlert size={15} className="text-muted" />,
-  }[state];
-}
+const CHECK_STATE: Record<"pass" | "fail" | "warn" | "idle", StatusState> = {
+  pass: "mapped",
+  fail: "error",
+  warn: "partial",
+  idle: "pending",
+};
 
 /**
  * Publish tab, laid out like a pull request: which session merges into the
@@ -363,20 +360,20 @@ export function PublishPanel({
           ? "本会话不会改变当前发布版本"
           : "";
   const canPublish = !blocker && !disabled && !busy;
-  const status = conflicts
-    ? { color: "warning", text: "有冲突" }
+  const status: { state: StatusState; text: string } = conflicts
+    ? { state: "partial", text: "有冲突" }
     : !preview
-      ? { color: "default", text: error ? "预览失败" : "计算中" }
+      ? { state: "unmapped", text: error ? "预览失败" : "计算中" }
       : !preview.validation.publishable
-        ? { color: "error", text: "校验未通过" }
+        ? { state: "error", text: "校验未通过" }
         : !total
-          ? { color: "default", text: "无变更" }
-          : { color: "success", text: "可发布" };
+          ? { state: "unmapped", text: "无变更" }
+          : { state: "mapped", text: "可发布" };
   const shown = filter === "all" ? changes : changes.filter((c) => c.change === filter);
   const names = elementNames(preview, session.draft);
   return (
     <div className="flex flex-col gap-3">
-      <Card size="small">
+      <section className="border-b border-rule pb-4">
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-3">
             {picker}
@@ -392,9 +389,7 @@ export function PublishPanel({
             </Tooltip>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <Tag color={status.color} className="!m-0">
-              {status.text}
-            </Tag>
+            <StatusMark state={status.state} label={status.text} />
             {preview && (
               <span className="inline-flex gap-2 font-mono" aria-label="变更计数">
                 <b className="text-success">+{count("created")}</b>
@@ -406,7 +401,7 @@ export function PublishPanel({
             {blocker && preview !== null && <Text type="secondary">{blocker}</Text>}
           </div>
         </div>
-      </Card>
+      </section>
       {notice && <Alert type="info" showIcon message={notice} role="status" />}
       {error && (
         <Alert
@@ -421,6 +416,7 @@ export function PublishPanel({
         />
       )}
       <Tabs
+        renderTabBar={(props, DefaultTabBar) => <PanelToolbar className="px-0" tabBar={<DefaultTabBar {...props} />} />}
         activeKey={tab}
         onChange={(key) => setTab(key as typeof tab)}
         items={[
@@ -446,13 +442,11 @@ export function PublishPanel({
                 }}
               />
             ) : !preview ? (
-              !error && <Spin tip="正在计算合并结果…" />
+              !error && <Spin tip="正在计算合并结果…"><div className="p-6" /></Spin>
             ) : total ? (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <Title level={5} className="!m-0">
-                    本次发布将改变的内容
-                  </Title>
+                  <SectionTitle title="本次发布将改变的内容" />
                   <Segmented
                     size="small"
                     value={filter}
@@ -536,14 +530,11 @@ export function PublishPanel({
               <span className="inline-flex items-center gap-1">
                 检查
                 {preview ? (
-                  preview.validation.publishable ? (
-                    <Check size={13} className="text-success" aria-label="通过" />
-                  ) : (
-                    <X size={13} className="text-danger" aria-label="未通过" />
-                  )
-                ) : conflicts ? (
-                  <CircleAlert size={13} aria-label="待处理" />
-                ) : null}
+                  <StatusMark
+                    state={preview.validation.publishable ? "mapped" : "error"}
+                    label={preview.validation.publishable ? "通过" : "未通过"}
+                  />
+                ) : conflicts ? <StatusMark state="partial" label="待处理" /> : null}
               </span>
             ),
             children: (
@@ -576,9 +567,9 @@ export function PublishPanel({
                               <List.Item
                                 key={issue.key}
                                 role={issue.kind === "error" ? "alert" : undefined}
-                                className={`!py-0.5 text-sm ${issue.kind === "error" ? "!text-danger" : "!text-muted"}`}
+                                className="py-1 text-sm"
                               >
-                                {issue.message}
+                                <Text type={issue.kind === "error" ? "danger" : "secondary"}>{issue.message}</Text>
                               </List.Item>
                             )}
                           />
@@ -592,17 +583,16 @@ export function PublishPanel({
                         ? `会话开始于 ${versionLabel(preview.base_version_number)} · 合并到当前发布版本 ${current} · 预览于 ${previewedAt?.toLocaleTimeString("zh-CN", { hour12: false })}`
                         : "等待预览",
                       extra: (
-                        <Button size="small" type="link" className="self-start !p-0" onClick={() => void load()}>
+                        <Button size="small" type="link" className="self-start p-0" onClick={() => void load()}>
                           重新预览
                         </Button>
                       ),
                     },
                   ]}
                   renderItem={(item) => (
-                    <List.Item key={item.key} className="!flex-col !items-stretch gap-1">
+                    <List.Item key={item.key} className="block">
                       <span className="flex flex-wrap items-center gap-2">
-                        {checkIcon(item.state)}
-                        <strong>{item.title}</strong>
+                        <StatusMark state={CHECK_STATE[item.state]} label={item.title} />
                         <Text type="secondary" className="text-xs">
                           {item.detail}
                         </Text>
@@ -651,7 +641,7 @@ export function PublishPanel({
               <Alert type="success" showIcon message="校验通过 · 0 错误 0 警告" />
             )}
             <Form layout="vertical" component="div">
-              <Form.Item label="版本说明" className="!mb-0">
+              <Form.Item label="版本说明" className="mb-0">
                 <Input.TextArea
                   aria-label="版本说明"
                   rows={3}
@@ -666,8 +656,8 @@ export function PublishPanel({
           </div>
         )}
       </Modal>
-      <Drawer open={showModel} width={720} title="本次将发布的模型" onClose={() => setShowModel(false)} destroyOnHidden>
-        <pre className="m-0 font-mono text-xs leading-5 whitespace-pre-wrap">{JSON.stringify(preview?.merged_model, null, 2)}</pre>
+      <Drawer open={showModel} width="var(--review-dialog-width)" title="本次将发布的模型" onClose={() => setShowModel(false)} destroyOnHidden>
+        <pre className="m-0 font-mono text-xs leading-base whitespace-pre-wrap">{JSON.stringify(preview?.merged_model, null, 2)}</pre>
       </Drawer>
     </div>
   );

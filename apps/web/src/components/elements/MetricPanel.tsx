@@ -1,4 +1,5 @@
-import { Descriptions, Divider, Typography } from "antd";
+import { Descriptions, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import type { Draft, Metric } from "../../api/types";
 import {
   AGGREGATIONS,
@@ -17,7 +18,7 @@ import { ElementLink, EvidenceSection, TagsText } from "./ElementPanels";
 import { MetricForm } from "./MetricForm";
 import { MetricPreview, type PreviewContext } from "./MetricPreview";
 
-const { Text, Paragraph, Title } = Typography;
+const { Text, Paragraph } = Typography;
 
 function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; open: (r: ElementRequest) => void }) {
   const dataset = byId(draft.datasets, metricDatasetId(draft, metric));
@@ -68,13 +69,13 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
     { key: "synonyms", label: "同义词", children: <TagsText items={metric.synonyms} /> },
   ];
   return (
-    <div className="flex max-w-[880px] flex-col gap-4">
+    <div className="flex max-w-settings flex-col gap-4">
       {metric.description ? (
-        <Paragraph className="!m-0 whitespace-pre-wrap">{metric.description}</Paragraph>
+        <Paragraph className="m-0 whitespace-pre-wrap">{metric.description}</Paragraph>
       ) : (
         <Text type="secondary">暂无说明</Text>
       )}
-      <Descriptions size="small" bordered column={2} items={items} />
+      <Descriptions size="small" column={2} items={items} />
       <EvidenceSection workspaceId={draft.workspace_id} evidence={metric.evidence} />
     </div>
   );
@@ -113,13 +114,10 @@ export function MetricPanel({
         <MetricSummary draft={draft} metric={metric} open={open} />
       )}
       {canPreview && (
-        <>
-          <Divider className="!my-4" />
-          <Title level={5} className="!mt-0">
-            数值预览
-          </Title>
+        <section className="mt-4 flex flex-col gap-3 border-t border-rule pt-4">
+          <SectionTitle title="数值预览" />
           <MetricPreview draft={draft} metric={metric} context={context} />
-        </>
+        </section>
       )}
     </div>
   );

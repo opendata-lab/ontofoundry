@@ -1,9 +1,10 @@
-import { Button, Card, Statistic, Tooltip, Typography } from "antd";
+import { Button, Tooltip, Typography } from "antd";
 import { ArrowUpRight, LockKeyhole, Maximize, Minus, Plus } from "lucide-react";
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { WorkspaceOverview } from "../api/types";
 import { useElementInspector } from "../hooks/useElementInspector";
+import { SectionTitle, StatusMark } from "./layout";
 import type { SelectedGraphItem } from "./OntologyGraph";
 
 const { Text } = Typography;
@@ -15,9 +16,6 @@ const layers: { id: Layer; title: string; y: number; width: number; height: numb
   { id: "instance", title: "实例与证据层", y: 385, width: 580, height: 130, color: "--color-attribute", fill: "--color-attribute-soft" },
   { id: "mapping", title: "数据映射层", y: 540, width: 630, height: 150, color: "--color-relation", fill: "--color-relation-soft" },
 ];
-const layerStyle = (layer: (typeof layers)[number]) =>
-  ({ "--layer-color": `var(${layer.color})`, "--layer-fill": `var(${layer.fill})` }) as CSSProperties;
-
 function point(layer: (typeof layers)[number], u: number, v: number) {
   return { x: 470 + ((u - v) * layer.width) / 2, y: layer.y + ((u + v - 1) * layer.height) / 2 };
 }
@@ -37,9 +35,9 @@ function positions(items: { id: string }[], layer: (typeof layers)[number]) {
 }
 
 const NODE =
-  "cursor-pointer fill-[var(--layer-color)] outline-none active:opacity-60 [&:focus-visible_.hit]:stroke-focus [&:focus-visible_.hit]:[stroke-width:2] [&:hover_.hit]:fill-[var(--layer-fill)] [&:hover_.hit]:stroke-[var(--layer-color)]";
-const LABEL = "fill-ink-2 font-sans text-[12px]";
-const EMPTY = "fill-muted font-sans text-[12px] [text-anchor:middle]";
+  "cursor-pointer fill-current outline-none active:opacity-60 [&:focus-visible_.hit]:stroke-focus [&:hover_.hit]:fill-surface-soft [&:hover_.hit]:stroke-current";
+const LABEL = "fill-ink-2 font-sans text-xs";
+const EMPTY = "fill-muted font-sans text-xs";
 
 function DataNode({
   x,
@@ -112,14 +110,7 @@ export function OntologyOverview({
   const typeName = (id: string) => types.find((t) => t.id === id)?.label ?? "对象";
   const line = (id: string, from?: { x: number; y: number }, to?: { x: number; y: number }) =>
     from && to ? (
-      <line
-        key={id}
-        className="stroke-[var(--layer-color)] [stroke-opacity:0.45] [stroke-width:1]"
-        x1={from.x}
-        y1={from.y}
-        x2={to.x}
-        y2={to.y}
-      />
+      <line key={id} className="stroke-current" strokeOpacity={0.45} strokeWidth={1} x1={from.x} y1={from.y} x2={to.x} y2={to.y} />
     ) : null;
   const stats: Record<Layer, { title: string; value: number | string }[]> = {
     service: [
@@ -148,7 +139,7 @@ export function OntologyOverview({
   const action: Record<Layer, ReactNode> = {
     service: <Link to="../delivery">本体发布</Link>,
     semantic: (
-      <Button type="link" size="small" className="!h-auto !p-0" onClick={onSemantic}>
+      <Button type="link" size="small" className="h-auto p-0" onClick={onSemantic}>
         进入语义视图
       </Button>
     ),
@@ -156,34 +147,34 @@ export function OntologyOverview({
     mapping: details ? <Link to="../mappings">管理映射</Link> : null,
   };
   return (
-    <section
-      className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)] gap-4 bg-surface px-6 py-5 text-ink"
-      aria-label="已发布本体分层总览"
-    >
-      <div className="flex min-h-0 flex-col justify-center gap-3" aria-label="本体层级">
+    <section className="flex h-full min-h-0 gap-4 bg-surface p-4 text-ink" aria-label="已发布本体分层总览">
+      <div className="flex min-h-0 w-60 flex-none flex-col justify-center overflow-auto" aria-label="本体层级">
         {layers.map((layer) => {
           const restricted = !details && (layer.id === "instance" || layer.id === "mapping");
           return (
-            <Card
+            <div
               key={layer.id}
-              size="small"
-              style={layerStyle(layer)}
-              className={`cursor-pointer border-l-4! border-l-[var(--layer-color)]! ${active === layer.id ? "bg-[var(--layer-fill)]!" : ""}`}
+              className={`cursor-pointer border-b border-rule px-4 py-4 ${active === layer.id ? "bg-surface-soft" : ""}`}
               onClick={() => setActive((current) => (current === layer.id ? null : layer.id))}
               aria-pressed={active === layer.id}
               role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setActive((current) => (current === layer.id ? null : layer.id));
+                }
+              }}
             >
-              <div className="flex items-center justify-between">
-                <Text strong className="text-[var(--layer-color)]!">
-                  {layer.title}
-                </Text>
+              <SectionTitle title={layer.title}>
                 {!restricted && action[layer.id] && (
-                  <span className="inline-flex items-center gap-0.5 text-xs" onClick={(e) => e.stopPropagation()}>
+                  <span className="inline-flex items-center gap-1 text-xs" onClick={(e) => e.stopPropagation()}>
                     {action[layer.id]}
                     <ArrowUpRight size={12} />
                   </span>
                 )}
-              </div>
+              </SectionTitle>
               {restricted ? (
                 <Text type="secondary" className="mt-1 inline-flex items-center gap-1 text-xs">
                   <LockKeyhole size={12} />
@@ -192,24 +183,26 @@ export function OntologyOverview({
               ) : (
                 <div className="mt-1 flex flex-wrap gap-x-4">
                   {stats[layer.id].map((s) => (
-                    <Statistic
-                      key={s.title}
-                      title={<span className="text-xs">{s.title}</span>}
-                      value={s.value}
-                      valueStyle={{ fontSize: 16 }}
-                    />
+                    <div key={s.title} className="flex flex-col gap-1">
+                      <span className="text-xs text-muted">{s.title}</span>
+                      {typeof s.value === "string" ? (
+                        <StatusMark state="mapped" label={s.value} />
+                      ) : (
+                        <span className="text-base font-semibold text-ink">{s.value}</span>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
-            </Card>
+            </div>
           );
         })}
       </div>
-      <div className="relative min-h-0 min-w-0 overflow-clip">
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-clip">
         <svg className="block size-full" viewBox="0 0 880 640" role="group" aria-label="服务、语义模型、实例与证据、数据映射四层图">
           <defs>
             <pattern id={pattern} width="12" height="12" patternUnits="userSpaceOnUse">
-              <path d="M12 0H0V12" className="fill-none stroke-rule-strong [stroke-width:0.4]" />
+              <path d="M12 0H0V12" className="fill-none stroke-rule-strong" strokeWidth={0.4} />
             </pattern>
           </defs>
           <g transform={`translate(${440 * (1 - zoom)} ${320 * (1 - zoom)}) scale(${zoom})`}>
@@ -228,17 +221,21 @@ export function OntologyOverview({
                 <g
                   key={layer.id}
                   data-layer={layer.id}
-                  style={layerStyle(layer)}
+                  color={`var(${layer.color})`}
                   className={`transition-opacity duration-100 ${muted ? "[&_.plane]:opacity-30" : ""}`}
                 >
                   <polygon
                     points={points}
-                    className="plane fill-[var(--layer-fill)] stroke-[var(--layer-color)] [fill-opacity:0.6] [stroke-opacity:0.55] [stroke-width:1]"
+                    className="plane stroke-current"
+                    fill={`var(${layer.fill})`}
+                    fillOpacity={0.6}
+                    strokeOpacity={0.55}
+                    strokeWidth={1}
                   />
-                  <polygon points={points} fill={`url(#${pattern})`} className="plane opacity-[0.22]" />
+                  <polygon points={points} fill={`url(#${pattern})`} className="plane opacity-20" />
                   {layer.id === "service" &&
                     ["REST API", "MCP"].map((name, i) => (
-                      <g key={name} className="fill-[var(--layer-color)]" transform={`translate(${410 + i * 118} 95)`}>
+                      <g key={name} className="fill-current" transform={`translate(${410 + i * 118} 95)`}>
                         <circle r="5" />
                         <text x="12" y="4" className={LABEL}>
                           {name}
@@ -264,7 +261,7 @@ export function OntologyOverview({
                         );
                       })}
                       {types.length > shownTypes.length && (
-                        <text className={EMPTY} x="470" y={layer.y + 68}>
+                        <text textAnchor="middle" className={EMPTY} x="470" y={layer.y + 68}>
                           概览展示 {shownTypes.length} / {types.length} 个对象，进入语义视图查看全部
                         </text>
                       )}
@@ -273,9 +270,7 @@ export function OntologyOverview({
                   {layer.id === "instance" && (
                     <>
                       <g aria-hidden="true" className="plane">
-                        {(details?.links ?? []).map((r) =>
-                          line(r.id, objectPositions.get(r.source_id), objectPositions.get(r.target_id)),
-                        )}
+                        {(details?.links ?? []).map((r) => line(r.id, objectPositions.get(r.source_id), objectPositions.get(r.target_id)))}
                       </g>
                       {objects.map((o) => (
                         <DataNode
@@ -288,12 +283,12 @@ export function OntologyOverview({
                         />
                       ))}
                       {!objects.length && (
-                        <text className={EMPTY} x="470" y={layer.y + 4}>
+                        <text textAnchor="middle" className={EMPTY} x="470" y={layer.y + 4}>
                           {details ? "暂无已发布文档实例" : "仅空间成员可见"}
                         </text>
                       )}
                       {details && (details.object_count ?? 0) > objects.length && (
-                        <text className={EMPTY} x="470" y={layer.y + 78}>
+                        <text textAnchor="middle" className={EMPTY} x="470" y={layer.y + 78}>
                           概览展示 {objects.length} / {details.object_count} 个实例
                         </text>
                       )}
@@ -313,12 +308,12 @@ export function OntologyOverview({
                         />
                       ))}
                       {!mappings.length && (
-                        <text className={EMPTY} x="470" y={layer.y + 4}>
+                        <text textAnchor="middle" className={EMPTY} x="470" y={layer.y + 4}>
                           {details ? "暂无已发布数据映射" : "仅空间成员可见"}
                         </text>
                       )}
                       {details && (details.mapping_count ?? 0) > mappings.length && (
-                        <text className={EMPTY} x="470" y={layer.y + 88}>
+                        <text textAnchor="middle" className={EMPTY} x="470" y={layer.y + 88}>
                           概览展示 {mappings.length} / {details.mapping_count} 条映射
                         </text>
                       )}
@@ -335,7 +330,6 @@ export function OntologyOverview({
         >
           <Tooltip title="放大">
             <Button
-              size="small"
               type="text"
               aria-label="放大全局图"
               disabled={zoom >= 1.6}
@@ -343,10 +337,9 @@ export function OntologyOverview({
               onClick={() => setZoom((v) => Math.min(1.6, +(v + 0.2).toFixed(1)))}
             />
           </Tooltip>
-          <span className="min-w-[34px] text-center text-[11px] tabular-nums">{Math.round(zoom * 100)}%</span>
+          <span className="min-w-9 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
           <Tooltip title="缩小">
             <Button
-              size="small"
               type="text"
               aria-label="缩小全局图"
               disabled={zoom <= 0.6}
@@ -356,7 +349,6 @@ export function OntologyOverview({
           </Tooltip>
           <Tooltip title="适配">
             <Button
-              size="small"
               type="text"
               aria-label="适配全局图"
               icon={<Maximize size={14} />}

@@ -1,11 +1,11 @@
-import { Alert, Button, Card, Empty, Form, Input, InputNumber, Modal, Select, Typography } from "antd";
+import { Alert, Button, Empty, Form, Input, InputNumber, Modal, Select, Table } from "antd";
 import { Database, PlugZap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { catalogApi, workspaceRequest } from "../api/client";
 import type { DataConnection } from "../api/types";
+import { Panel, PanelToolbar, SectionTitle, StatusMark } from "./layout";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 
-const { Text } = Typography;
 const PORTS: Record<DataConnection["kind"], number> = { postgresql: 5432, mysql: 3306, doris: 9030 };
 
 type ConnectionForm = {
@@ -18,12 +18,7 @@ type ConnectionForm = {
   password?: string;
 };
 
-/**
- * 数据连接管理。
- *
- * 只负责内容，不含标题——标题归页面。新建弹窗由组件持有（表单状态在这里），
- * 触发按钮通过 onReady 交给页面工具栏，和其他页的主操作位置保持一致。
- */
+/** Owns the connection form and exposes its opener to the page header. */
 export function DataConnections({ onReady }: { onReady?: (open: () => void) => void }) {
   const { workspace } = useWorkspaceContext();
   const [connections, setConnections] = useState<DataConnection[]>([]);
@@ -57,26 +52,62 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
   };
   return (
     <section className="flex flex-col gap-4">
-      <Text type="secondary">使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。</Text>
       {error && !open && <Alert type="error" showIcon message={error} />}
-      {status && <Alert type="success" showIcon role="status" message={status} />}
-      {connections.length ? (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-          {connections.map((c) => (
-            <Card key={c.id} size="small">
-              <div className="flex items-start gap-3">
-                <Database size={23} className="flex-none text-accent" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <Text strong className="truncate">
-                    {c.name}
-                  </Text>
-                  <Text className="text-xs">
-                    {c.kind} · {c.database}
-                  </Text>
-                  <Text type="secondary" className="text-xs">
-                    {c.host}:{c.port}
-                  </Text>
-                </div>
+      {status && (
+        <div role="status">
+          <StatusMark state="mapped" label={status} />
+        </div>
+      )}
+      <Panel footer="使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。">
+        <PanelToolbar>
+          <SectionTitle title="连接列表" note={`${connections.length} 个连接`} />
+        </PanelToolbar>
+        <Table
+          size="middle"
+          onHeaderRow={() => ({ className: "text-xs" })}
+          rowKey="id"
+          dataSource={connections}
+          pagination={connections.length > 20 ? { pageSize: 20 } : false}
+          locale={{
+            emptyText: (
+              <Empty
+                image={<Database size={40} className="mx-auto text-muted" />}
+                description={
+                  <>
+                    <strong>尚未添加数据连接</strong>
+                    <br />
+                    添加 MySQL、PostgreSQL 或 Doris 连接后，即可在数据映射里登记数据集。
+                  </>
+                }
+              />
+            ),
+          }}
+          columns={[
+            {
+              title: "连接名称",
+              key: "name",
+              render: (_, c) => (
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <Database size={14} className="flex-none text-accent" />
+                  {c.name}
+                </span>
+              ),
+            },
+            { title: "数据库类型", dataIndex: "kind" },
+            { title: "数据库", key: "database", render: (_, c) => <code className="text-xs">{c.database}</code> },
+            {
+              title: "地址",
+              key: "host",
+              render: (_, c) => (
+                <code className="text-xs text-muted">
+                  {c.host}:{c.port}
+                </code>
+              ),
+            },
+            {
+              title: "操作",
+              key: "action",
+              render: (_, c) => (
                 <Button
                   size="small"
                   icon={<PlugZap size={14} />}
@@ -89,22 +120,11 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
                 >
                   测试
                 </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Empty
-          image={<Database size={40} className="mx-auto text-muted" />}
-          description={
-            <>
-              <strong>尚未添加数据连接</strong>
-              <br />
-              添加 MySQL、PostgreSQL 或 Doris 连接后，即可在数据映射里登记数据集。
-            </>
-          }
+              ),
+            },
+          ]}
         />
-      )}
+      </Panel>
       <Modal
         open={open}
         title="添加数据连接"
@@ -138,12 +158,17 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               ]}
             />
           </Form.Item>
-          <div className="grid grid-cols-[1fr_140px] gap-x-3">
-            <Form.Item name="host" label="主机" rules={[{ required: true, message: "请填写主机" }]}>
+          <div className="grid grid-cols-3 gap-x-3">
+            <Form.Item
+              className="col-span-2"
+              name="host"
+              label="主机"
+              rules={[{ required: true, message: "请填写主机" }]}
+            >
               <Input aria-label="主机" />
             </Form.Item>
             <Form.Item name="port" label="端口" rules={[{ required: true, message: "请填写端口" }]}>
-              <InputNumber aria-label="端口" min={1} max={65535} className="!w-full" />
+              <InputNumber aria-label="端口" min={1} max={65535} className="w-full" />
             </Form.Item>
           </div>
           <Form.Item name="database" label="数据库名称" rules={[{ required: true, message: "请填写数据库名称" }]}>

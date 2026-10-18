@@ -30,12 +30,12 @@ import { WorkspaceContextProvider } from "../hooks/useWorkspaceContext";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
+import { ApplicationFrame } from "./layout";
 
 const SEARCH_ICONS = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database };
 const SEARCH_PAGES = { object_type: "objects", link_type: "relations", metric: "view", dataset: "mappings" };
 
-// 本体管理 / 数据管理 / 空间设置。本体管理按“看 → 建 → 发布”排列；
-// 数据管理里先接数据源再做映射，跟着实际操作顺序走。
+// Follow the workflow: inspect, build and publish; connect data before mapping.
 const navigation = [
   {
     group: "本体管理",
@@ -81,10 +81,12 @@ export function AppShell() {
   }, [workspaceId]);
   useEffect(load, [load]);
   useEffect(() => {
+    const minimumWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-min-width"));
+    if (!minimumWidth) return;
     const fit = () =>
       document.documentElement.style.setProperty(
         "--app-scale",
-        String(Math.min(1, window.innerWidth / 1100)),
+        String(Math.min(1, window.innerWidth / minimumWidth)),
       );
     fit();
     window.addEventListener("resize", fit);
@@ -115,80 +117,82 @@ export function AppShell() {
   if (!workspace || workspace.id !== workspaceId || !user)
     return <LoadingSurface label="正在读取工作空间…" />;
   return (
-    <div
-      className={`grid h-dvh w-full grid-rows-[52px_minmax(0,1fr)] overflow-hidden bg-surface max-[1100px]:h-[calc(100dvh/var(--app-scale))] max-[1100px]:w-[1100px] max-[1100px]:[zoom:var(--app-scale)] ${collapsed ? "grid-cols-[56px_minmax(0,1fr)]" : "grid-cols-[clamp(184px,14.4vw,208px)_minmax(0,1fr)] max-[1100px]:grid-cols-[184px_minmax(0,1fr)]"}`}
-    >
-      <header className="z-[5] col-span-full flex items-center justify-between border-b border-rule-soft bg-surface px-5">
-        <Link to="/" className="flex items-center gap-5 text-inherit">
-          <Brand />
-        </Link>
-        <div className="flex items-center gap-5 text-xs">
-          <Tooltip title="搜索本体 ⌘K">
-            <Button type="text" aria-label="搜索本体" icon={<Search size={17} />} onClick={openSearch} />
-          </Tooltip>
-          <Link to="/" className="flex items-center gap-2 text-inherit">
-            <Globe size={16} className="text-accent" />
-            {workspace.name}
-            <ChevronDown size={13} />
+    <ApplicationFrame
+      collapsed={collapsed}
+      header={
+        <>
+          <Link to="/" className="flex items-center gap-5 text-inherit">
+            <Brand />
           </Link>
-          <span className="flex items-center gap-2">
-            <Avatar size={24} className="!bg-accent !text-[11px]">
-              {user.display_name.slice(0, 1).toUpperCase() || "A"}
-            </Avatar>
-            {user.display_name}
-          </span>
-        </div>
-      </header>
-      <aside className={`flex min-h-0 flex-col border-r border-rule-soft bg-surface pt-5 pb-3 ${collapsed ? "px-1.5" : "px-3"}`}>
-        <nav aria-label="工作空间导航" className="flex flex-col gap-4">
-          {navigation.map(({ group, items }) => {
-            const visible = items.filter((n) => workspace.role || READER_PAGES.includes(n.to));
-            if (!visible.length) return null;
-            // A group of one item needs no heading: the item names itself.
-            const heading = visible.length > 1 || visible[0].label !== group;
-            return (
-              <div
-                className="flex flex-col gap-1 [&+&]:border-t [&+&]:border-rule-soft [&+&]:pt-3"
-                key={group}
-                role="group"
-                aria-label={group}
-              >
-                {heading && !collapsed && <h2 className="m-0 px-3.5 pb-1 text-xs font-medium text-muted">{group}</h2>}
-                {visible.map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={`/workspaces/${workspaceId}/${to}`}
-                    title={collapsed ? label : undefined}
-                    className={({ isActive }) =>
-                      `flex min-h-10 items-center gap-3 rounded-[22px] px-3.5 text-[13px] ${isActive ? "bg-accent-soft font-semibold !text-accent" : "!text-ink-2 hover:bg-surface-soft"} ${collapsed ? "px-3" : ""}`
-                    }
-                  >
-                    <Icon size={17} className="flex-none" />
-                    {!collapsed && <span>{label}</span>}
-                  </NavLink>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
-        <div className="mt-auto flex justify-center border-t border-rule-soft pt-3">
-          <Button
-            type="text"
-            size="small"
-            className="!text-xs !text-muted"
-            onClick={() => setCollapsed(!collapsed)}
-            aria-label={collapsed ? "展开导航" : "收起导航"}
-            icon={collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-          >
-            {!collapsed && "收起导航"}
-          </Button>
-        </div>
-      </aside>
-      <main className="min-h-0 min-w-0 overflow-hidden" key={workspaceId}>
-        <WorkspaceContextProvider.Provider value={{ workspace, user, refresh: load }}>
-          <WorkspaceTabs key={`${user.id}:${workspaceId}`} workspaceId={workspaceId} userId={user.id} />
-        </WorkspaceContextProvider.Provider>
-      </main>
+          <div className="flex items-center gap-5 text-xs">
+            <Tooltip title="搜索本体 ⌘K">
+              <Button type="text" aria-label="搜索本体" icon={<Search className="size-icon" />} onClick={openSearch} />
+            </Tooltip>
+            <Link to="/" className="flex items-center gap-2 text-inherit">
+              <Globe className="size-icon text-accent" />
+              {workspace.name}
+              <ChevronDown className="size-icon" />
+            </Link>
+            <span className="flex items-center gap-2">
+              <Avatar className="size-6 bg-accent text-xs leading-6 text-accent-ink">
+                {user.display_name.slice(0, 1).toUpperCase() || "A"}
+              </Avatar>
+              {user.display_name}
+            </span>
+          </div>
+        </>
+      }
+      sidebar={
+        <>
+          <nav aria-label="工作空间导航" className="flex flex-col gap-4">
+            {navigation.map(({ group, items }) => {
+              const visible = items.filter((n) => workspace.role || READER_PAGES.includes(n.to));
+              if (!visible.length) return null;
+              // A group of one item needs no heading: the item names itself.
+              const heading = visible.length > 1 || visible[0].label !== group;
+              return (
+                <div
+                  className="flex flex-col gap-1 [&+&]:border-t [&+&]:border-rule-soft [&+&]:pt-3"
+                  key={group}
+                  role="group"
+                  aria-label={group}
+                >
+                  {heading && !collapsed && <h2 className="m-0 px-3 pb-1 text-xs font-medium text-muted">{group}</h2>}
+                  {visible.map(({ to, label, icon: Icon }) => (
+                    <NavLink
+                      key={to}
+                      to={`/workspaces/${workspaceId}/${to}`}
+                      title={collapsed ? label : undefined}
+                      className={({ isActive }) =>
+                        `app-nav-link flex min-h-10 items-center gap-3 rounded-sm px-3 text-sm ${isActive ? "bg-accent-soft font-semibold text-accent hover:text-accent" : "text-ink-2 hover:bg-surface-soft hover:text-ink"}`
+                      }
+                    >
+                      <Icon className="size-icon flex-none" />
+                      {!collapsed && <span>{label}</span>}
+                    </NavLink>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+          <div className="mt-auto flex justify-center border-t border-rule-soft pt-3">
+            <Button
+              type="text"
+              size="small"
+              className="text-xs text-muted"
+              onClick={() => setCollapsed(!collapsed)}
+              aria-label={collapsed ? "展开导航" : "收起导航"}
+              icon={collapsed ? <PanelLeftOpen className="size-icon" /> : <PanelLeftClose className="size-icon" />}
+            >
+              {!collapsed && "收起导航"}
+            </Button>
+          </div>
+        </>
+      }
+    >
+      <WorkspaceContextProvider.Provider value={{ workspace, user, refresh: load }}>
+        <WorkspaceTabs key={`${user.id}:${workspaceId}`} workspaceId={workspaceId} userId={user.id} />
+      </WorkspaceContextProvider.Provider>
       <Modal
         open={searching}
         onCancel={() => setSearching(false)}
@@ -199,13 +203,13 @@ export function AppShell() {
         <Input
           autoFocus
           allowClear
-          prefix={<Search size={15} />}
+          prefix={<Search className="size-icon" />}
           aria-label="搜索关键词"
           placeholder="名称、技术名、描述或同义词"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="mt-3 flex max-h-[420px] flex-col overflow-auto">
+        <div className="mt-3 flex max-h-app-search flex-col overflow-auto">
           {results
             .filter((r) => {
               const d = r.definition as { name: string; technical_name?: string; description?: string; synonyms?: string[] };
@@ -220,7 +224,7 @@ export function AppShell() {
                 <Button
                   key={r.kind + r.definition.id}
                   type="text"
-                  className="!flex !h-auto !justify-start !gap-2 !py-2 text-left"
+                  className="h-auto justify-start gap-2 py-2 text-left whitespace-normal"
                   onClick={() => {
                     setSearching(false);
                     navigate(
@@ -228,7 +232,7 @@ export function AppShell() {
                     );
                   }}
                 >
-                  <Icon size={16} />
+                  <Icon className="size-icon" />
                   <span>{r.definition.name}</span>
                   <code className="text-xs text-muted">
                     {"technical_name" in r.definition ? r.definition.technical_name : ""}
@@ -239,6 +243,6 @@ export function AppShell() {
           {!results.length && <Empty description="暂无已发布本体" />}
         </div>
       </Modal>
-    </div>
+    </ApplicationFrame>
   );
 }

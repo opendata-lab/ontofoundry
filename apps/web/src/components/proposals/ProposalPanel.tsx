@@ -3,6 +3,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
+import { PanelToolbar } from "../layout";
 import { ProposalCard, type CardActions } from "./ProposalCard";
 import { ProposalDetail } from "./ProposalDetail";
 import { acceptanceBlock, decisionIds, reviewKindName, searchText, technicalName, type ReviewDecision } from "./reviewMeta";
@@ -38,7 +39,7 @@ const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
 
 export function ProposalPanel(props: Props) {
   if (!props.session || (!props.proposals.batches.length && !props.running))
-    return <Empty className="mt-12" description="向智能体描述场景并开始建模，提案会出现在这里" />;
+    return <Empty className="m-0 p-6" description="向智能体描述场景并开始建模，提案会出现在这里" />;
   return (
     <ProposalReview key={`${props.session.id}:${props.proposals.detail?.id ?? "loading"}`} {...props} session={props.session} />
   );
@@ -148,7 +149,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
       return next;
     });
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2" aria-label="提案审核面板" aria-busy={busy}>
+    <div className="flex h-full min-h-0 flex-col" aria-label="提案审核面板" aria-busy={busy}>
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
       {drifted && <Alert type="warning" showIcon message="草稿已更新，部分提案需要重新确认" />}
       {detail?.status === "failed" && (
@@ -164,42 +165,47 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
         />
       )}
       {proposals.error && <Alert type="error" showIcon message={proposals.error} />}
-      <Segmented
-        size="small"
-        className="self-start"
-        value={status}
-        onChange={(value) => setStatus(value as StatusFilter)}
-        options={statusChoices.map((tab) => ({
-          value: tab.key,
-          label: `${tab.label} ${statusBase.filter((item) => matchesStatus(item, tab.key)).length}`,
-        }))}
-      />
-      <div className="flex gap-2">
-        <Input.Search
-          allowClear
+      <PanelToolbar
+        extra={
+          <>
+            <Select
+              mode="multiple"
+              size="small"
+              allowClear
+              aria-label="元素类型"
+              placeholder="全部类型"
+              maxTagCount={1}
+              className="min-w-review-filter"
+              value={kindFilter}
+              onChange={setKindFilter}
+              options={kinds.map((kind) => ({
+                value: kind,
+                label: `${reviewKindName(kind)} ${items.filter((i) => i.target_kind === kind && matchesStatus(i, status)).length}`,
+              }))}
+            />
+            <Input.Search
+              allowClear
+              size="small"
+              aria-label="搜索提案名称"
+              placeholder="搜索名称、技术名或所属对象…"
+              className="w-60"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </>
+        }
+      >
+        <Segmented
           size="small"
-          aria-label="搜索提案名称"
-          placeholder="搜索名称、技术名或所属对象…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <Select
-          mode="multiple"
-          size="small"
-          allowClear
-          aria-label="元素类型"
-          placeholder="全部类型"
-          maxTagCount={1}
-          className="min-w-[150px]"
-          value={kindFilter}
-          onChange={setKindFilter}
-          options={kinds.map((kind) => ({
-            value: kind,
-            label: `${reviewKindName(kind)} ${items.filter((i) => i.target_kind === kind && matchesStatus(i, status)).length}`,
+          value={status}
+          onChange={(value) => setStatus(value as StatusFilter)}
+          options={statusChoices.map((tab) => ({
+            value: tab.key,
+            label: `${tab.label} ${statusBase.filter((item) => matchesStatus(item, tab.key)).length}`,
           }))}
         />
-      </div>
-      <div className="flex flex-wrap items-center gap-2 px-3">
+      </PanelToolbar>
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2">
         <Checkbox
           aria-label="选择当前筛选的全部提案"
           disabled={!visible.length}
@@ -260,7 +266,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
           </Dropdown>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto rounded-md border border-rule bg-surface" role="list">
+      <div className="min-h-0 flex-1 overflow-auto" role="list">
         {visible.length ? (
           visible.map((item) => (
             <ProposalCard
@@ -277,17 +283,17 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
             />
           ))
         ) : (
-          <Empty className="py-8" description={hasFilters ? "没有符合条件的提案" : "当前没有待审提案"}>
+          <Empty className="py-6" description={hasFilters ? "没有符合条件的提案" : "当前没有待审提案"}>
             {hasFilters && <Button onClick={clearFilters}>清除筛选</Button>}
           </Empty>
         )}
       </div>
-      <div className="flex items-center gap-2 text-xs text-muted">
+      <div className="flex items-center gap-2 border-t border-rule bg-surface-raised px-4 py-2 text-xs text-muted">
         <span>
           显示 {visible.length} / {items.length} 条
         </span>
         {hasFilters && (
-          <Button type="link" size="small" className="!h-auto !p-0 text-xs" onClick={clearFilters}>
+          <Button type="link" size="small" className="h-auto p-0 text-xs" onClick={clearFilters}>
             清除筛选
           </Button>
         )}

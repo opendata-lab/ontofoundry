@@ -89,6 +89,8 @@ describe("空间设置", () => {
       await screen.findByText("DataAgent 上找不到该 Agent"),
     ).toBeInTheDocument();
     expect(screen.getByText("创建 agent_id=missing-agent")).toBeInTheDocument();
+    expect(screen.getAllByText("通过", { exact: true })).toHaveLength(3);
+    expect(screen.getByText("需处理", { exact: true })).toBeInTheDocument();
     expect(modelingApi.capabilities).not.toHaveBeenCalled();
     expect(workspaceRequest).toHaveBeenCalledWith("w1", "/members");
     expect(workspaceRequest).toHaveBeenCalledWith(

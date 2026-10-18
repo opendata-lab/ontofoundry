@@ -381,6 +381,38 @@ describe("element save impact preview", () => {
     expect(savePayload.affected_items?.[0]).not.toHaveProperty("reason");
   });
 
+  it("invalidates the impact confirmation when a late draft change arrives and previews the new draft again", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [{
+        target_kind: "material_object",
+        target_id: draft.material_objects.find((f) => f.type_id === customer.id)!.id,
+        expected_target_hash: "1".repeat(64),
+        reason: "当前元素修改需要同步此依赖的定义或引用",
+      }],
+    });
+    show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    const name = await within(dialog).findByRole("textbox", { name: "名称" });
+    fireEvent.change(name, { target: { value: "星河客户" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await screen.findByText("确认后这些元素会随本次保存一并改写");
+
+    // A queued input event may arrive after the confirmation was opened.
+    fireEvent.change(name, { target: { value: "星河重点客户" } });
+    await waitFor(() => expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument());
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await screen.findByText("确认后这些元素会随本次保存一并改写");
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
+    const [, payload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
+    expect(payload.draft.object_types.find((o) => o.id === customer.id)?.name).toBe("星河重点客户");
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+  });
+
   it("displays a 409 error from preview without opening the confirmation modal or saving", async () => {
     const draft = example("07-instances-and-evidence");
     const customer = draft.object_types.find((o) => o.technical_name === "customer")!;

@@ -1,13 +1,13 @@
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-3 whitespace-nowrap" aria-label="OntoFoundry">
-      <span className="grid rotate-45 grid-cols-[repeat(2,7px)] gap-0.5" aria-hidden="true">
-        <i className="block h-[7px] bg-accent" />
-        <i className="block h-[7px] bg-accent opacity-60" />
-        <i className="block h-[7px] bg-accent opacity-60" />
-        <i className="block h-[7px] bg-accent" />
+      <span className="brand-mark" aria-hidden="true">
+        <i className="brand-tile" />
+        <i className="brand-tile brand-tile-muted" />
+        <i className="brand-tile brand-tile-muted" />
+        <i className="brand-tile" />
       </span>
-      {!compact && <span className="text-[15px] font-[650] text-ink">OntoFoundry</span>}
+      {!compact && <span className="text-base font-semibold text-ink">OntoFoundry</span>}
     </span>
   );
 }

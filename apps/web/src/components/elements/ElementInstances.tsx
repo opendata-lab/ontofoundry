@@ -1,4 +1,5 @@
-import { Alert, Button, Card, DatePicker, Descriptions, Empty, Input, Segmented, Table, Tag, Typography } from "antd";
+import { Alert, Button, DatePicker, Descriptions, Empty, Input, Segmented, Table, Tag, Typography } from "antd";
+import { PanelToolbar, SectionTitle } from "../layout";
 import dayjs from "dayjs";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -56,26 +57,22 @@ function InstanceDetail({
   const type = byId(draft.object_types, row.type_id);
   const properties = effectiveProperties(draft, row.type_id).map((p) => p.definition);
   return (
-    <Card size="small">
+    <section aria-label={`${row.display_text}的实例详情`} className="border-t border-rule pt-4">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-2">
-          <Text strong className="flex-1">
-            {row.display_text}
-          </Text>
-          {type && <Tag className="!m-0">{type.name}</Tag>}
+        <SectionTitle title={row.display_text}>
+          {type && <Tag className="m-0">{type.name}</Tag>}
           <Button size="small" type="text" onClick={onClose}>
             收起
           </Button>
-        </div>
+        </SectionTitle>
         <Descriptions
           size="small"
-          bordered
           column={2}
           items={properties.map((p) => ({ key: p.id, label: p.name, children: shown(row.values[p.technical_name]) }))}
         />
         {related && (
           <div className="flex flex-col gap-1">
-            <Text strong>关联实例</Text>
+            <SectionTitle title="关联实例" />
             {related.length ? (
               related.map((r) => (
                 <span key={r.id} className="text-sm">
@@ -89,7 +86,7 @@ function InstanceDetail({
         )}
         {row.fact && <EvidenceSection workspaceId={draft.workspace_id} evidence={row.fact.evidence} />}
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -274,7 +271,7 @@ function ObjectInstances({
       title: "实例",
       key: "display",
       render: (_: unknown, row: Row) => (
-        <Button type="link" size="small" className="!h-auto !p-0" onClick={() => void select(row)}>
+        <Button type="link" size="small" className="h-auto p-0" onClick={() => void select(row)}>
           {row.display_text}
         </Button>
       ),
@@ -291,47 +288,51 @@ function ObjectInstances({
   const hasNext = sessionId ? Boolean(preview?.has_more) : Boolean(list?.next_cursor);
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Segmented
-          value={source}
-          onChange={(v) => {
-            setSource(v as typeof source);
-            resetPage();
-            setSelected(null);
-          }}
-          options={[
-            { value: "document", label: `文档事实 ${facts.length}` },
-            { value: "database", label: "数据库", disabled: !databaseReady || undefined },
-          ]}
-        />
-        <Input.Search
-          allowClear
-          aria-label="搜索实例"
-          placeholder="搜索显示名称或属性值"
-          className="max-w-[320px]"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            resetPage();
-          }}
-        />
-        {source === "database" && snapshotted && (
-          <DatePicker
-            aria-label="数据日期"
-            placeholder="最新日期"
-            value={snapshotDate ? dayjs(snapshotDate) : null}
-            onChange={(d) => {
-              setSnapshotDate(d ? d.format("YYYY-MM-DD") : null);
+      <PanelToolbar className="px-0">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented
+            size="small"
+            value={source}
+            onChange={(v) => {
+              setSource(v as typeof source);
+              resetPage();
+              setSelected(null);
+            }}
+            options={[
+              { value: "document", label: `文档事实 ${facts.length}` },
+              { value: "database", label: "数据库", disabled: !databaseReady || undefined },
+            ]}
+          />
+          <Input.Search
+            size="small"
+            allowClear
+            aria-label="搜索实例"
+            placeholder="搜索显示名称或属性值"
+            className="max-w-80"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
               resetPage();
             }}
           />
-        )}
-        {source === "database" && snapshotDates.some((s) => s.date) && (
-          <Text type="secondary" className="text-xs">
-            数据日期：{[...new Set(snapshotDates.map((s) => s.date).filter(Boolean))].join("、")}
-          </Text>
-        )}
-      </div>
+          {source === "database" && snapshotted && (
+            <DatePicker
+              aria-label="数据日期"
+              placeholder="最新日期"
+              value={snapshotDate ? dayjs(snapshotDate) : null}
+              onChange={(d) => {
+                setSnapshotDate(d ? d.format("YYYY-MM-DD") : null);
+                resetPage();
+              }}
+            />
+          )}
+          {source === "database" && snapshotDates.some((s) => s.date) && (
+            <Text type="secondary" className="text-xs">
+              数据日期：{[...new Set(snapshotDates.map((s) => s.date).filter(Boolean))].join("、")}
+            </Text>
+          )}
+        </div>
+      </PanelToolbar>
       {Boolean(sessionId) && mode === "virtual" && source === "document" && !facts.length && (
         <Alert type="info" showIcon message="虚拟父对象的实例来自子对象，请打开子对象查看数据库实例。" />
       )}
