@@ -14,6 +14,7 @@ from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
+    ImportRecord,
     MaterialChunkRecord,
     MaterialRecord,
     ModelingSessionRecord,
@@ -47,6 +48,15 @@ def material_references(db: Session, workspace_id: str, material_id: str) -> lis
     material for another.
     """
     found = []
+    if db.scalar(
+        select(ImportRecord.id)
+        .where(
+            ImportRecord.workspace_id == workspace_id,
+            ImportRecord.material_id == material_id,
+        )
+        .limit(1)
+    ):
+        found.append("导入报告")
     for label, rows in (
         (
             "提案",
@@ -105,44 +115,9 @@ def material_references(db: Session, workspace_id: str, material_id: str) -> lis
 
 
 def store_text_material(db: Session, settings, workspace_id: str, name: str, text: str):
-    """Save generated Markdown exactly like an upload: same dedupe by content,
-    same line-numbered chunks, so evidence can cite it the same way."""
-    data = text.encode("utf-8")
-    sha = hashlib.sha256(data).hexdigest()
-    existing = db.scalar(
-        select(MaterialRecord).where(
-            MaterialRecord.workspace_id == workspace_id, MaterialRecord.sha256 == sha
-        )
-    )
-    if existing:
-        return existing
-    item = MaterialRecord(
-        id=str(uuid4()),
-        workspace_id=workspace_id,
-        name=Path(name).name,
-        sha256=sha,
-        byte_size=len(data),
-    )
-    db.add(item)
-    db.flush()
-    count, line = 0, 1
-    for start in range(0, len(text), 12000):
-        chunk = text[start : start + 12000]
-        end = line + chunk.count("\n")
-        db.add(
-            MaterialChunkRecord(
-                material_id=item.id,
-                ordinal=count,
-                line_start=line,
-                line_end=end,
-                text=chunk,
-            )
-        )
-        count, line = count + 1, end
-    item.chunk_count = count
-    destination = settings.data_dir.resolve() / workspace_id / (sha + ".md")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(data)
+    from ontofoundry_api.services.material_store import store_text_material as store
+
+    item = store(db, settings, workspace_id, name, text)
     db.commit()
     return item
 

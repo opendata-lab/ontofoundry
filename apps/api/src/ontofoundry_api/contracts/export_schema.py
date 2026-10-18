@@ -6,6 +6,8 @@ from pathlib import Path
 
 from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
+from ontofoundry_api.contracts.exports import exports_schema
+from ontofoundry_api.contracts.imports import imports_schema
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.contracts.read_models import read_models_schema
 
@@ -27,6 +29,24 @@ def export(*, check=False):
             raise SystemExit("core schema 与模型不一致")
     else:
         CORE_TARGET.write_text(schema_text())
+    export_target = Path(__file__).with_name("ontofoundry.exports.v1.schema.json")
+    export_payload = (
+        json.dumps(exports_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    )
+    if check:
+        if not export_target.exists() or export_target.read_text() != export_payload:
+            raise SystemExit("导出接口 schema 与模型不一致，请重新生成")
+    else:
+        export_target.write_text(export_payload)
+    import_target = Path(__file__).with_name("ontofoundry.imports.v1.schema.json")
+    import_payload = (
+        json.dumps(imports_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    )
+    if check:
+        if not import_target.exists() or import_target.read_text() != import_payload:
+            raise SystemExit("导入接口 schema 与模型不一致，请重新生成")
+    else:
+        import_target.write_text(import_payload)
     read_payload = (
         json.dumps(read_models_schema(), ensure_ascii=False, indent=2, sort_keys=True)
         + "\n"

@@ -1,0 +1,64 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "fictional_supply",
+  "ontology": [
+    {
+      "concept": "supplier",
+      "type": "EntityType",
+      "identify_by": [
+        "code"
+      ],
+      "relationships": [
+        {
+          "name": "code",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "multiplicity": "OneToOne",
+          "verbalizes": [
+            "{supplier} code {String}"
+          ]
+        },
+        {
+          "name": "supply",
+          "roles": [
+            {
+              "concept": "part"
+            },
+            {
+              "concept": "Integer",
+              "name": "quantity"
+            }
+          ],
+          "multiplicity": "ManyToOne",
+          "verbalizes": [
+            "{supplier} supplies {part} in {Integer:quantity}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "part",
+      "type": "EntityType",
+      "identify_by": [
+        "code"
+      ],
+      "relationships": [
+        {
+          "name": "code",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "multiplicity": "OneToOne",
+          "verbalizes": [
+            "{part} code {String}"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -338,11 +338,15 @@ def apply_items(draft, items):
     return candidate
 
 
-def group_items(draft, items):
+def group_items(draft, items, *, references_resolved=False):
     """Group cyclic references and edits requiring simultaneous final-graph validation."""
     before = CoreDraft.model_validate(draft)
-    candidate = validate_candidate_graph(
-        before, CoreDraft.model_validate(apply_items(draft, items))
+    candidate = (
+        OntologyDraft.model_validate(apply_items(draft, items))
+        if references_resolved
+        else validate_candidate_graph(
+            before, CoreDraft.model_validate(apply_items(draft, items))
+        )
     )
     final = {
         str(e.id): e.model_dump(mode="json")

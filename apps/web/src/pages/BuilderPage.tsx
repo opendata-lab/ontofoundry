@@ -7,6 +7,7 @@ import type { Capabilities, Material } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import type { AgentConversationElement, CompleteDetail, ErrorDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
+import { ImportDialog } from "../components/ImportDialog";
 import { ModelResults } from "../components/ModelResults";
 import { BuilderConversationEmpty } from "../components/BuilderConversationEmpty";
 import { TableMaterialPicker } from "../components/TableMaterialPicker";
@@ -31,6 +32,7 @@ export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
+  const [importOpen, setImportOpen] = useState(false);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [scenario, setScenario] = useState("");
@@ -209,6 +211,7 @@ export function BuilderPage() {
             }
           />
         </Tooltip>
+        <Button disabled={busy} onClick={() => setImportOpen(true)}>导入文件</Button>
         {/* Only missing configuration requires user action. */}
         {capabilities && !capabilities.agent_configured && <Link to="../settings">DataAgent 未配置，查看连通性</Link>}
         <Button
@@ -220,6 +223,7 @@ export function BuilderPage() {
           发布本体
         </Button>
       </PageHeader>
+      <ImportDialog open={importOpen} workspaceId={workspace.id} maxFileMb={capabilities?.max_file_mb} onClose={() => setImportOpen(false)} onConfirmed={(result) => { setImportOpen(false); navigate(`../builder?session=${result.session_id}&panel=proposals`); model.reload(); }} />
       <PageBody>
         {error && (
           <Alert

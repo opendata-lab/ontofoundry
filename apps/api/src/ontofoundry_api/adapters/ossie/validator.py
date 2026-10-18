@@ -474,6 +474,20 @@ def identifier_issues(
     concept_paths: dict[str, str],
     relationships: dict[str, dict[str, dict[str, Any]]],
 ) -> list[Issue]:
+    def inherited_relationship(concept_name, identifier, visited):
+        if concept_name in visited:
+            return None
+        visited = visited | {concept_name}
+        own = relationships.get(concept_name, {}).get(identifier)
+        if own is not None:
+            return own
+        for parent in concepts.get(concept_name, {}).get("extends", []):
+            if isinstance(parent, str):
+                found = inherited_relationship(parent, identifier, visited)
+                if found is not None:
+                    return found
+        return None
+
     result: list[Issue] = []
     for concept_name, concept in concepts.items():
         identifiers = concept.get("identify_by") or []
@@ -500,7 +514,7 @@ def identifier_issues(
             if not isinstance(identifier, str):
                 continue
             path = f"{concept_paths[concept_name]}.identify_by[{identifier_position}]"
-            relationship = relationships.get(concept_name, {}).get(identifier)
+            relationship = inherited_relationship(concept_name, identifier, set())
             if relationship is None:
                 result.append(
                     issue(

@@ -1,4 +1,10 @@
 import type {
+  ExportPreview,
+  ImportPreview,
+  ImportSource,
+  ImportConfirm,
+  ImportConfirmed,
+  ImportCompletionRequest,
   Assets,
   Capabilities,
   Comparison,
@@ -325,4 +331,21 @@ export const metricsApi = {
   /** Runs the unsaved form definition read-only; nothing is stored. */
   preview: (workspaceId: string, payload: MetricPreviewRequest) =>
     request<MetricPreview>(`/api/v1/modeling/workspaces/${workspaceId}/metrics/preview`, json("POST", payload)),
+};
+
+const importPath = (workspaceId: string, adapter: string, importId?: string) =>
+  `/api/v1/modeling/workspaces/${encodeURIComponent(workspaceId)}/imports/${encodeURIComponent(adapter)}${importId ? `/${encodeURIComponent(importId)}` : ""}`;
+export const importApi = {
+  preview: (workspaceId: string, adapter: string, file: File) =>
+    request<ImportPreview>(`${importPath(workspaceId, adapter)}?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file, headers: { "Content-Type": "application/json" } }),
+  get: (workspaceId: string, source: ImportSource) => request<ImportPreview>(importPath(workspaceId, source.adapter, source.report_id)),
+  confirm: (workspaceId: string, adapter: string, importId: string, body: ImportConfirm) =>
+    request<ImportConfirmed>(`${importPath(workspaceId, adapter, importId)}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+  complete: (workspaceId: string, source: ImportSource, body: ImportCompletionRequest) =>
+    request<ImportConfirmed>(`${importPath(workspaceId, source.adapter, source.report_id)}/completions`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+};
+
+export const exportApi = {
+  preview: (workspaceId: string, adapter: string, versionId: string) =>
+    request<ExportPreview>(`/api/v1/modeling/workspaces/${encodeURIComponent(workspaceId)}/exports/${encodeURIComponent(adapter)}?version_id=${encodeURIComponent(versionId)}`),
 };

@@ -1,4 +1,4 @@
-import { Alert, Collapse, Select, Spin, Table, Typography } from "antd";
+import { Alert, Button, Collapse, Select, Spin, Table, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "./layout";
 import { api } from "../api/client";
@@ -43,7 +43,7 @@ function Changes({ value }: { value: Comparison }) {
   );
 }
 
-function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versions: VersionSummary[] }) {
+function ComparisonBody({ workspaceId, versions, onExport }: { workspaceId: string; versions: VersionSummary[]; onExport?: (versionId: string) => void }) {
   const [left, setLeft] = useState("");
   const [chosen, setChosen] = useState("");
   const right = chosen || versions[0]?.version_id || "";
@@ -69,7 +69,7 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
         <span className="inline-flex items-center gap-2">
           基线
           <Select
-            aria-label="比较基线"
+            showSearch optionFilterProp="label" aria-label="比较基线"
             className="w-30"
             value={left}
             options={[{ value: "", label: "空基线" }, ...options]}
@@ -78,8 +78,9 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
         </span>
         <span className="inline-flex items-center gap-2">
           目标
-          <Select aria-label="比较目标" className="w-30" value={right} options={options} onChange={setChosen} />
+          <Select showSearch optionFilterProp="label" aria-label="比较目标" className="w-30" value={right} options={options} onChange={setChosen} />
         </span>
+        {onExport && <Button size="small" disabled={!right} onClick={() => onExport(right)}>导出目标版本</Button>}
       </PanelToolbar>
       {left === right ? (
         <Text type="secondary">请选择不同版本。</Text>
@@ -94,13 +95,13 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
   );
 }
 
-export function HistoryComparison({ workspaceId, versions }: { workspaceId: string; versions: VersionSummary[] }) {
+export function HistoryComparison({ workspaceId, versions, onExport }: { workspaceId: string; versions: VersionSummary[]; onExport?: (versionId: string) => void }) {
   return (
     <Collapse
       ghost
       size="small"
       destroyOnHidden
-      items={[{ key: "compare", label: <SectionTitle title="比较历史版本" />, children: <ComparisonBody workspaceId={workspaceId} versions={versions} /> }]}
+      items={[{ key: "compare", label: <SectionTitle title="比较历史版本" />, children: <ComparisonBody workspaceId={workspaceId} versions={versions} onExport={onExport} /> }]}
     />
   );
 }

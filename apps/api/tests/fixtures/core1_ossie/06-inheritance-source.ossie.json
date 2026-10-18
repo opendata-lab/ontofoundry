@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0.dev0",
+  "name": "fictional_membership",
+  "ontology": [
+    {
+      "concept": "party",
+      "type": "EntityType",
+      "relationships": [
+        {
+          "name": "level",
+          "roles": [
+            {
+              "concept": "String"
+            }
+          ],
+          "multiplicity": "ManyToOne",
+          "verbalizes": [
+            "{party} level {String}"
+          ]
+        },
+        {
+          "name": "contact",
+          "roles": [
+            {
+              "concept": "party",
+              "name": "related"
+            }
+          ],
+          "verbalizes": [
+            "{party} contacts {party:related}"
+          ]
+        }
+      ]
+    },
+    {
+      "concept": "vip",
+      "type": "EntityType",
+      "extends": [
+        "party"
+      ],
+      "derived_by": [
+        "party.level = 'VIP'",
+        "EXISTS (party.REVERSE(contact))"
+      ]
+    }
+  ]
+}

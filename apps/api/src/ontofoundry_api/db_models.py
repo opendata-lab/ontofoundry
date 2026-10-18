@@ -411,3 +411,40 @@ class ProposalDecisionItemRecord(Base):
     batch_id: Mapped[str] = mapped_column(String(36))
     item_id: Mapped[str] = mapped_column(String(36))
     decision: Mapped[str] = mapped_column(String(8))
+
+
+class ImportRecord(Base):
+    """Immutable import preview; confirmation and completion history are separate."""
+
+    __tablename__ = "ontology_imports"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "session_id"],
+            ["modeling_sessions.workspace_id", "modeling_sessions.id"],
+        ),
+        UniqueConstraint("session_id", name="uq_import_session"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    adapter: Mapped[str] = mapped_column(String(64))
+    filename: Mapped[str] = mapped_column(String(240))
+    raw_sha256: Mapped[str] = mapped_column(String(64))
+    raw_artifact: Mapped[str] = mapped_column(Text)
+    material_id: Mapped[str | None] = mapped_column(
+        ForeignKey("materials.id"), nullable=True
+    )
+    formatted_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    report_json: Mapped[dict] = mapped_column(JSON)
+    converted_json: Mapped[dict] = mapped_column(JSON)
+    preview_json: Mapped[dict] = mapped_column(JSON)
+    content_sha256: Mapped[str] = mapped_column(String(64))
+    base_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    base_version_sha256: Mapped[str] = mapped_column(String(64))
+    session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    batch_id: Mapped[str | None] = mapped_column(
+        ForeignKey("proposal_batches.id"), nullable=True
+    )
+    confirmation_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    completions_json: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

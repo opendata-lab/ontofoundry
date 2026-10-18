@@ -194,7 +194,9 @@ def reverse_dependencies(
     return found
 
 
-def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
+def rewrite_references(
+    before: CoreDraft, candidate: CoreDraft, *, explicit_ids: frozenset[UUID] = frozenset()
+) -> CoreDraft:
     """Rewrite unchanged definitions using the old graph, supporting name swaps.
 
     Explicitly edited expression text is resolved only in the final candidate;
@@ -205,12 +207,16 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
     new = DraftIndex(result)
     old_rules = {r.id: r for r in before.rules}
     for rule in result.rules:
+        if rule.id in explicit_ids:
+            continue
         previous = old_rules.get(rule.id)
         if previous and rule.expression == previous.expression:
             rule.expression = render_references(
                 resolve_rule_expression(before, previous), result
             )
     for obj in result.object_types:
+        if obj.id in explicit_ids:
+            continue
         previous = old.objects.get(obj.id)
         if previous:
             for i, branch in enumerate(obj.derived_by):
@@ -227,6 +233,8 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
                     )
     old_metrics = {m.id: m for m in before.metrics}
     for metric in result.metrics:
+        if metric.id in explicit_ids:
+            continue
         previous = old_metrics.get(metric.id)
         if (
             isinstance(metric, ExpressionMetric)
@@ -259,6 +267,8 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
         return rewritten
 
     for mapping in result.mappings:
+        if mapping.id in explicit_ids:
+            continue
         previous = old_mappings.get(mapping.id)
         if previous is None:
             continue
@@ -286,6 +296,8 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
 
     old_facts = {fact.id: fact for fact in before.material_objects}
     for fact in result.material_objects:
+        if fact.id in explicit_ids:
+            continue
         previous = old_facts.get(fact.id)
         if previous is None:
             continue
