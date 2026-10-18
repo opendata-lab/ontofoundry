@@ -278,3 +278,9 @@ npx vitest --run && npx tsc -b && npm run lint && npm run check:core-types && np
 首轮与后端并行执行时，既有 PublishPanel 长列表测试和 ElementInspector 指标创建测试触发 5 秒超时，结果为 164 passed、2 failed。待后端结束后，保持原命令、超时和全部断言不变，独立重跑整套检查全部通过；两项分别用时 641 毫秒与 1210 毫秒。测试仍有既有 Ant Design Spin/日期控件提示，构建仅有大于 500 kB 的分包提示。无需恢复环境，最终测试后只补文档结果并检查 diff。
 
 仓库根 `git diff --check` 最终退出码 0。
+
+
+## PR #23 第七轮评审修正
+
+- N6、N7 均为后端错误契约缺口，修正后分别返回 422 `INVALID_OBJECT_REF` 和原 Evidence code/中文消息；前端沿用现有错误处理与类型，无需修改产品代码。保留全部既有组件断言。
+- 本轮统一运行 Node v22.19.0 下的 Vitest、TypeScript、lint、核心类型一致性检查及构建，结果待下方记录。按任务限制不启动应用服务、不访问局域网、不 commit/push，保留已有未跟踪 node_modules。

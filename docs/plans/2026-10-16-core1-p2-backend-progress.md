@@ -402,3 +402,34 @@ export ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"
 新增 91 项回归，另扩展已有 4 组提案批次回归的合并结果断言，既有断言未放宽。数据库先通过 SELECT 1 核对，只使用指定 PostgreSQL 55460 与 MySQL 配置中的 33070；无需环境恢复。后端仅有既有 Starlette/httpx、anyio 两项弃用提示。最终测试后只补文档结果并检查 diff，未改实现。
 
 仓库根 `git diff --check` 最终退出码 0。
+
+
+## PR #23 第七轮评审修正
+
+- N6：TypedKey 数值解析统一将 decimal 转换错误和超大整数的 float 有限性检查溢出转换为 422 `INVALID_OBJECT_REF`，并显式拒绝非有限 decimal。公共精确查询和邻接关联查询在绑定/来源访问前校验键；详情、REST 邻接、直接数据库邻接及 ref 生成复用相同保护。补报告两条复现、NaN/sNaN/正负 Infinity、合法高精度数值及进程内 HTTP 响应回归。
+- N7：事实提案修订捕获 `EvidenceError`，保留原 code 和中文消息，转换为 422 `ServiceError`。补不依赖数据库的不存在材料、错误哈希、越界行号、引文不符及跨元素证据 UUID 回归，核对原提案/草稿/revision 不变且不存批次、不提交；进程内 HTTP 回归验证无效证据不改变批次和会话，随后有效修订仍迁移完整依赖并可接受。
+- 未调整模型或接口契约，未放宽已有断言；全量检查包含既有提案缺项拒绝、完整批次解析/应用及严格类型合并回归。只使用指定 PostgreSQL 55460 与 MySQL 配置中的 33070；不启动应用服务、不访问局域网、不 commit/push，保留已有未跟踪 node_modules。
+
+N7 测试补齐提案材料证据持久化格式中的 `locator.heading: null`，使请求模型序列化后仍与原证据内容一致，五个参数均真正进入 `reconcile_draft_evidence` 并触发预期 `EvidenceError`。逐项核对 422、原 code、精确中文消息和异常链，确认草稿、提案、revision 不变且不存批次、不提交。保留全部五个场景；同元素 UUID 重复由请求模型提前拒绝，因此 UUID 场景使用跨元素证据，并在测试注释中说明。
+
+全部实现和测试编辑完成后，在 `apps/api` 统一执行以下检查；格式首检指出新增消息断言需要排版，格式化该测试后复查通过，再运行全量测试：
+
+```sh
+export PYTHONPATH="$PWD/src"
+export ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://of:of@127.0.0.1:55460/of_test'
+export ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"
+../../../backend/apps/api/.venv/bin/python -m ontofoundry_api.contracts.export_schema --check
+../../../backend/apps/api/.venv/bin/ruff check src tests
+../../../backend/apps/api/.venv/bin/ruff format --check src tests
+../../../backend/apps/api/.venv/bin/python -m pytest -q -rs
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| Schema `--check` | 退出码 0 |
+| `ruff check src tests` | 退出码 0 |
+| `ruff format --check src tests` | 退出码 0，146 个文件已格式化 |
+| `pytest -q -rs` | **726 passed、0 failed、0 errors、0 skipped**；69.67 秒 |
+| 仓库根 `git diff --check` | 退出码 0 |
+
+数据库先通过 `SELECT 1` 验证，只连接指定 PostgreSQL 55460 和配置中的 MySQL 33070，无需环境恢复。仅余既有 Starlette/httpx、anyio 两项弃用提示。最终测试后只更新本节检查结果并检查 diff，未修改实现、模型或接口契约，未启动应用服务、commit 或 push。
