@@ -255,3 +255,26 @@
 | `git diff --check`、`git diff --check origin/main` | 退出码 0，当前工作树相对主分支也无末尾空行问题 |
 
 本轮增加 4 项回归，未放宽既有断言。最终只补验证记录，未改实现。
+
+## PR #23 第六轮评审修正
+
+- N4、N5 均为后端合并和实例引用校验修正，前端继续使用既有契约，产品代码无需调整。后端补充发布结果和实例错误响应回归，保留前端现有组件断言。
+- 本轮没有新增建议项。统一执行 Node v22.19.0 下的 Vitest、TypeScript、lint、核心类型一致性检查和构建，结果在下方记录。遵守任务限制，不启动应用服务、不访问局域网、不 commit/push；保留已有未跟踪 node_modules。
+
+在 `apps/web` 执行 `. ~/.nvm/nvm.sh && nvm use 22.19.0` 后，完整运行：
+
+```sh
+npx vitest --run && npx tsc -b && npm run lint && npm run check:core-types && npm run build
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| Vitest | **35 个文件、166 passed、0 failed、0 errors、0 skipped**；15.45 秒 |
+| `tsc -b` | 退出码 0 |
+| `npm run lint` | 退出码 0 |
+| `npm run check:core-types` | 退出码 0，核心类型与 Schema 一致 |
+| `npm run build` | 退出码 0 |
+
+首轮与后端并行执行时，既有 PublishPanel 长列表测试和 ElementInspector 指标创建测试触发 5 秒超时，结果为 164 passed、2 failed。待后端结束后，保持原命令、超时和全部断言不变，独立重跑整套检查全部通过；两项分别用时 641 毫秒与 1210 毫秒。测试仍有既有 Ant Design Spin/日期控件提示，构建仅有大于 500 kB 的分包提示。无需恢复环境，最终测试后只补文档结果并检查 diff。
+
+仓库根 `git diff --check` 最终退出码 0。

@@ -371,3 +371,34 @@ export ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"
 | 根目录 `git diff --check`、`git diff --check origin/main` | 退出码 0 |
 
 相较前轮增加 23 项回归，既有断言未放宽。首轮全量为 555 passed、8 failed：新增导航测试误把继承入边端点当作无关对象；按现有双向关系继承语义改为精确核对完整对象集合后，最终全量通过，两侧实际查询仍严格断言只返回 P1。仅有既有 Starlette/httpx、anyio 两项弃用提示，无需恢复环境。最终测试后仅补文档结果并检查 diff，没有改实现。
+
+## PR #23 第六轮评审修正
+
+- N4：三方合并的三个快速分支统一复用严格深比较，区分布尔、整数和浮点数；保留 MISSING 与 null 的区别，合并保留双方的列表去重也使用严格比较。补充标量/嵌套列表/字典快速分支与冲突、缺失值、元素保存及提案批次完整性回归；缺少事实的提案仍在接收阶段拒绝，完整批次应用后与另一会话说明合并保持事实类型。例 07 覆盖属性类型与事实值同时修改、另一会话先发布无关说明的实际预览/发布，断言最终图合法、事实类型和值及预览 hash 与持久化一致。
+- N5：数据库 ref 解码后明确检查类型 ID 是字符串和合法 UUID；公共实例查询先校验类型存在，再解析绑定和访问来源。非法 UUID 返回 422 INVALID_OBJECT_REF，已删除类型返回 404 NOT_FOUND，详情、REST 邻接与直接数据库邻接共用该保护。补充不依赖数据库的解析/服务边界测试，以及进程内 HTTP 状态码与错误码回归。
+- 本轮没有新增建议项，不修改模型或接口契约，不放宽既有断言。全部实现和测试编辑完成后统一运行指定检查，结果在下方记录；不启动应用服务、不 commit/push。
+
+在 `apps/api` 执行，`PYTHONPATH="$PWD/src"`，使用指定相邻虚拟环境，并设置两个一次性数据库变量：
+
+```sh
+export PYTHONPATH="$PWD/src"
+export ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://of:of@127.0.0.1:55460/of_test'
+export ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"
+../../../backend/apps/api/.venv/bin/python -m ontofoundry_api.contracts.export_schema --check
+../../../backend/apps/api/.venv/bin/ruff check src tests
+../../../backend/apps/api/.venv/bin/ruff format --check src tests
+../../../backend/apps/api/.venv/bin/python -m pytest -q -rs
+../../../backend/apps/api/.venv/bin/python -m pytest -q ../../integrations/dataagent/skills/ontofoundry-modeling/tests
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| Schema `--check` | 退出码 0 |
+| `ruff check src tests` | 退出码 0 |
+| `ruff format --check src tests` | 退出码 0，146 个文件已格式化 |
+| `pytest -q -rs` | **654 passed、0 failed、0 errors、0 skipped**；97.79 秒 |
+| 建模技能测试 | **3 passed、0 failed、0 errors、0 skipped**；0.06 秒 |
+
+新增 91 项回归，另扩展已有 4 组提案批次回归的合并结果断言，既有断言未放宽。数据库先通过 SELECT 1 核对，只使用指定 PostgreSQL 55460 与 MySQL 配置中的 33070；无需环境恢复。后端仅有既有 Starlette/httpx、anyio 两项弃用提示。最终测试后只补文档结果并检查 diff，未改实现。
+
+仓库根 `git diff --check` 最终退出码 0。
