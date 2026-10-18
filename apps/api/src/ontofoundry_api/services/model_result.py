@@ -1,18 +1,14 @@
-"""Consume a completed DataAgent result as a complete version draft.
-
-The generated ontology replaces the modeling session's draft as one atomic
-snapshot.  Publishing remains a separate, explicit user action.
-"""
+"""Consume proposal-only DataAgent results with leases and idempotent storage."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import secrets
+from contextlib import suppress
 from datetime import timedelta
 from typing import Any
 
-from pydantic import ValidationError
 from sqlalchemy import and_, or_, select, update
 
 from ontofoundry_api.contracts.proposals import (
@@ -21,15 +17,10 @@ from ontofoundry_api.contracts.proposals import (
     parse_result,
 )
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
-from ontofoundry_api.domain.snapshot import draft_sha256
-from ontofoundry_api.ossie.importer import OssieImportError, import_ossie
-from ontofoundry_api.ossie.validator import validate_schema
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.model_review import (
     build_proposal_repair_request,
-    build_repair_request,
-    review_conventions,
 )
 from ontofoundry_api.services.proposals import (
     proposal_header,
@@ -37,7 +28,6 @@ from ontofoundry_api.services.proposals import (
     store_failed_batch,
 )
 
-RESULT_SCHEMA_VERSION = "ontofoundry.model-result/v1"
 RESULT_LEASE = timedelta(minutes=5)
 
 
@@ -77,37 +67,6 @@ def _guarded_result_values(
         return changed.rowcount == 1
 
 
-def _result_warnings(import_report: dict[str, Any]) -> list[str]:
-    """Everything the import could not carry over, in one list for the user.
-
-    Only `notes` used to be kept, which dropped exactly the actionable half:
-    `skipped` is where "this relation has no data join because that concept has
-    no mapping" lives. Without it the draft silently came back smaller than the
-    agent described and nothing said why.
-    """
-    warnings = [str(note) for note in import_report.get("notes") or []]
-    for item in import_report.get("skipped") or []:
-        reason = str(item.get("reason") or "").strip()
-        path = str(item.get("path") or "").strip()
-        text = f"{path}：{reason}" if path and reason else reason or path
-        if text and text not in warnings:
-            warnings.append(text)
-    return warnings
-
-
-def _first_validation_message(exc: ValidationError) -> str:
-    """The one line worth showing a user out of a pydantic error report.
-
-    The raw report repeats the whole rejected document, which for an ontology is
-    thousands of characters of noise around a one-sentence reason.
-    """
-    for error in exc.errors():
-        message = str(error.get("msg") or "").removeprefix("Value error, ").strip()
-        if message:
-            return message
-    return "草稿校验未通过"
-
-
 def _current_result_state(app: Any, session_id: str) -> str:
     with app.state.session_factory() as db:
         item = db.get(ModelingSessionRecord, session_id)
@@ -126,9 +85,7 @@ def _finish_failure(
     values: dict[str, Any] = {"result_state": state, "task_detail": detail}
     if state == "failed_permanent":
         values["task_status"] = "failed"
-    if _guarded_result_values(
-        app, session_id, task_id, claimed_at, **values
-    ):
+    if _guarded_result_values(app, session_id, task_id, claimed_at, **values):
         return state
     return _current_result_state(app, session_id)
 
@@ -160,10 +117,10 @@ async def _request_repair(
     next_token = secrets.token_hex(16)
     result_path = f"output/ontofoundry-result-{next_token}.json"
     next_manifest = {**manifest, "run_token": next_token} if manifest else None
-    content = (
-        build_proposal_repair_request(problems, proposal_header(next_manifest), result_path)
-        if next_manifest
-        else build_repair_request(problems, next_token, result_path)
+    if next_manifest is None:
+        return None
+    content = build_proposal_repair_request(
+        problems, proposal_header(next_manifest), result_path
     )
     try:
         submitted = await _client(app, workspace_id, session_id).deliver(
@@ -246,8 +203,7 @@ async def reconcile_run(
                     ModelingSessionRecord.result_state == "failed_retriable",
                     and_(
                         ModelingSessionRecord.result_state == "processing",
-                        ModelingSessionRecord.result_claimed_at
-                        < claimed_at - RESULT_LEASE,
+                        ModelingSessionRecord.result_claimed_at < claimed_at - RESULT_LEASE,
                     ),
                 ),
             )
@@ -265,23 +221,22 @@ async def reconcile_run(
 
         topic_id = str(item.dataagent_topic_id or "")
         run_token = str(item.dataagent_run_token or "")
-        revision = item.revision
         manifest = dict(item.run_manifest_json or {})
 
     result_path = f"output/ontofoundry-result-{run_token}.json"
     try:
-        content, _content_type = await _client(
-            app, workspace_id, session_id
-        ).download(topic_id, result_path)
+        content, _content_type = await _client(app, workspace_id, session_id).download(
+            topic_id, result_path
+        )
     except DataAgentError as exc:
         if exc.status_code == 404:
             # Only an explicit marker for this run means the agent is waiting.
             needs_input_path = f"output/ontofoundry-needs-input-{run_token}.json"
             marker = None
             try:
-                marker_content, _ = await _client(
-                    app, workspace_id, session_id
-                ).download(topic_id, needs_input_path)
+                marker_content, _ = await _client(app, workspace_id, session_id).download(
+                    topic_id, needs_input_path
+                )
             except DataAgentError as marker_exc:
                 if _is_retriable_download(marker_exc.status_code):
                     return _finish_failure(
@@ -302,12 +257,10 @@ async def reconcile_run(
                         detail=_permanent_detail(marker_exc),
                     )
             else:
-                try:
+                with suppress(UnicodeDecodeError, json.JSONDecodeError, TypeError):
                     marker = json.loads(marker_content)
-                except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
-                    pass
 
-            what = "提案" if manifest.get("result_contract") == "proposals" else "建模结果"
+            what = "提案"
             if not (
                 isinstance(marker, dict)
                 and marker.get("run_token") == run_token
@@ -351,158 +304,16 @@ async def reconcile_run(
             detail=_permanent_detail(exc),
         )
 
-    if manifest.get("result_contract") == "proposals":
-        return await _consume_proposals(
-            app,
-            workspace_id,
-            session_id,
-            task_id,
-            claimed_at,
-            topic_id=topic_id,
-            manifest=manifest,
-            content=content,
-        )
-
-    try:
-        payload = json.loads(content)
-    except (UnicodeDecodeError, json.JSONDecodeError, TypeError):
-        return _finish_failure(
-            app,
-            session_id,
-            task_id,
-            claimed_at,
-            state="failed_permanent",
-            detail="建模结果不是有效的 JSON 文件",
-        )
-
-    detail = ""
-    if not isinstance(payload, dict):
-        detail = "建模结果 JSON 顶层必须是对象"
-    elif payload.get("schema_version") != RESULT_SCHEMA_VERSION:
-        detail = f"建模结果 schema_version 必须是 {RESULT_SCHEMA_VERSION}"
-    elif payload.get("run_token") != run_token:
-        detail = "建模结果 run_token 与当前会话不符"
-    elif not isinstance(payload.get("ontology"), dict):
-        detail = "建模结果缺少完整的 Apache Ossie ontology 对象"
-    if detail:
-        return _finish_failure(
-            app,
-            session_id,
-            task_id,
-            claimed_at,
-            state="failed_permanent",
-            detail=detail,
-        )
-
-    # A blocking problem is one the platform cannot work around. The agent wrote
-    # the document, so it is also the only thing that can fix it — ask, within
-    # budget, before giving up on the run.
-    blocking: list[str] = []
-    version_draft: dict[str, Any] | None = None
-    import_report: dict[str, Any] = {}
-
-    schema_issues = validate_schema(payload["ontology"])
-    if schema_issues:
-        blocking = [
-            "结果不符合 Apache Ossie 0.2.0.dev0 schema："
-            + str(issue.get("message") or issue)
-            for issue in schema_issues[:10]
-        ]
-
-    if not blocking:
-        try:
-            version_draft, import_report = import_ossie(
-                payload["ontology"],
-                workspace_id=workspace_id,
-                mode="replace",
-            )
-        except OssieImportError as exc:
-            blocking = [f"结果无法导入为本体草稿：{exc}", *review_conventions(payload["ontology"])]
-        except ValidationError as exc:
-            blocking = [f"结果不满足草稿约束：{_first_validation_message(exc)}"]
-
-    if blocking:
-        repaired = await _request_repair(
-            app,
-            workspace_id,
-            session_id,
-            task_id,
-            claimed_at,
-            topic_id=topic_id,
-            problems=blocking,
-        )
-        if repaired is not None:
-            return repaired
-        return _finish_failure(
-            app,
-            session_id,
-            task_id,
-            claimed_at,
-            state="failed_permanent",
-            detail=f"建模结果校验未通过：{blocking[0]}",
-        )
-
-    assert version_draft is not None
-
-    # Advisory problems: the draft is usable, it just ignores something the
-    # prompt asked for. Worth one correction round, never worth discarding a
-    # working model — so if the budget is gone this falls through to success
-    # with the complaints recorded as warnings.
-    advisory = review_conventions(payload["ontology"])
-    if advisory:
-        repaired = await _request_repair(
-            app,
-            workspace_id,
-            session_id,
-            task_id,
-            claimed_at,
-            topic_id=topic_id,
-            problems=advisory,
-        )
-        if repaired is not None:
-            return repaired
-        import_report = {
-            **import_report,
-            "notes": [*(import_report.get("notes") or []), *advisory],
-        }
-
-    with app.state.session_factory() as db:
-        changed = db.execute(
-            update(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == task_id,
-                ModelingSessionRecord.last_result_task_id == task_id,
-                ModelingSessionRecord.result_state == "processing",
-                ModelingSessionRecord.result_claimed_at == claimed_at,
-                ModelingSessionRecord.revision == revision,
-            )
-            .values(
-                draft_json=version_draft,
-                draft_sha256=draft_sha256(version_draft, workspace_id),
-                candidates_json=[],
-                result_warnings=_result_warnings(import_report),
-                result_state="done",
-                task_status="finished",
-                task_detail="完整建模结果已生成，请预览差异后发布新版本",
-                revision=revision + 1,
-                updated_at=utc_now(),
-            )
-        )
-        db.commit()
-        if changed.rowcount != 1:
-            state = _current_result_state(app, session_id)
-            if state == "processing":
-                return _finish_failure(
-                    app,
-                    session_id,
-                    task_id,
-                    claimed_at,
-                    state="failed_permanent",
-                    detail="新版本草稿写入前会话已更新，请重新运行建模",
-                )
-            return state
-    return "done"
+    return await _consume_proposals(
+        app,
+        workspace_id,
+        session_id,
+        task_id,
+        claimed_at,
+        topic_id=topic_id,
+        manifest=manifest,
+        content=content,
+    )
 
 
 async def _consume_proposals(
@@ -548,11 +359,15 @@ async def _consume_proposals(
         if repaired is not None:
             return repaired
         with app.state.session_factory() as db:
-            current = db.scalar(select(ModelingSessionRecord).where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == task_id,
-                ModelingSessionRecord.result_claimed_at == claimed_at,
-            ).with_for_update())
+            current = db.scalar(
+                select(ModelingSessionRecord)
+                .where(
+                    ModelingSessionRecord.id == session_id,
+                    ModelingSessionRecord.dataagent_task_id == task_id,
+                    ModelingSessionRecord.result_claimed_at == claimed_at,
+                )
+                .with_for_update()
+            )
             if current is None:
                 return _current_result_state(app, session_id)
             store_failed_batch(
@@ -576,11 +391,15 @@ async def _consume_proposals(
         )
 
     with app.state.session_factory() as db:
-        current = db.scalar(select(ModelingSessionRecord).where(
-            ModelingSessionRecord.id == session_id,
-            ModelingSessionRecord.dataagent_task_id == task_id,
-            ModelingSessionRecord.result_claimed_at == claimed_at,
-        ).with_for_update())
+        current = db.scalar(
+            select(ModelingSessionRecord)
+            .where(
+                ModelingSessionRecord.id == session_id,
+                ModelingSessionRecord.dataagent_task_id == task_id,
+                ModelingSessionRecord.result_claimed_at == claimed_at,
+            )
+            .with_for_update()
+        )
         if current is None:
             return _current_result_state(app, session_id)
         store_batch(

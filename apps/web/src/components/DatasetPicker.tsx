@@ -1,304 +1,339 @@
-import { Database, Search } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
-import { modelingApi } from "../api/client";
-import type {
-  DataConnection,
-  DataTable,
-  LegacyDraft,
-  NativeDraft,
-  SemanticDataset,
-} from "../api/types";
-import { objectMapping, sourceColumns } from "../lib/objectMapping";
-import { useElementInspector } from "../hooks/useElementInspector";
-import { InspectorDialog } from "./elements/InspectorDialog";
-import { InfoButton, ReadonlyIcon } from "./elements/MappingWidgets";
+import { Alert, Button, Empty, Form, Input, Modal, Select, Table, Tag, Typography } from "antd";
+import { RefreshCw } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { ApiError, catalogApi } from "../api/client";
+import type { AssetTable, Assets, DataConnection, Dataset, Draft, ElementSaveResult, Workspace } from "../api/types";
+import { usePageActive } from "../hooks/usePageTab";
+import { datasetFromTable, registerDataset, sameLocation } from "../lib/datasetEditing";
 
-export function DatasetPicker({
-  workspaceId,
-  open,
-  onClose,
-  onSelect,
-  onSelectDataset,
-  datasets = [],
+const { Text } = Typography;
+
+const CHANGES: Record<string, string> = { added: "新增", removed: "删除", changed: "变更" };
+
+
+
+function RegisterForm({
+  connection,
+  table,
   draft,
-  nativeDraft,
-  extraContent,
-  selectionReason,
-  onOpenObject,
+  busy,
+  error,
+  onCancel,
+  onSubmit,
 }: {
-  workspaceId: string;
-  open: boolean;
-  onClose: () => void;
-  onSelect?: (connection: DataConnection, table: DataTable) => void;
-  onSelectDataset?: (dataset: SemanticDataset) => void;
-  datasets?: SemanticDataset[];
-  draft?: LegacyDraft;
-  nativeDraft?: NativeDraft;
-  extraContent?: ReactNode;
-  selectionReason?: string;
-  onOpenObject?: (id: string) => void;
+  connection: DataConnection;
+  table: AssetTable;
+  draft: Draft;
+  busy: boolean;
+  error: string;
+  onCancel: () => void;
+  onSubmit: (dataset: Dataset) => void;
 }) {
-  if (!open) return null;
+  const [dataset, setDataset] = useState(() => datasetFromTable(connection, table, table.comment || table.name));
+  const duplicates = sameLocation(draft, dataset);
+  const dates = (dataset.columns ?? []).filter((c) => /date|time/i.test(c.physical_type ?? ""));
   return (
-    <TableBrowser
-      key={workspaceId}
-      {...{
-        workspaceId,
-        onClose,
-        onSelect,
-        onSelectDataset,
-        datasets,
-        draft,
-        nativeDraft,
-        extraContent,
-        selectionReason,
-        onOpenObject,
-      }}
-    />
+    <Modal
+      open
+      title={`登记数据集：${[table.schema, table.name].filter(Boolean).join(".")}`}
+      onCancel={onCancel}
+      okText="登记"
+      cancelText="取消"
+      okButtonProps={{ loading: busy, disabled: !dataset.name.trim() }}
+      onOk={() => onSubmit(dataset)}
+      destroyOnHidden
+    >
+      <Form layout="vertical" component="div" requiredMark>
+        <Form.Item label="名称" required>
+          <Input aria-label="数据集名称" value={dataset.name} onChange={(e) => setDataset({ ...dataset, name: e.target.value })} />
+        </Form.Item>
+        <Form.Item label="描述">
+          <Input.TextArea
+            aria-label="数据集描述"
+            autoSize={{ minRows: 2, maxRows: 5 }}
+            placeholder="一行代表什么、数据范围和更新方式"
+            value={dataset.description}
+            onChange={(e) => setDataset({ ...dataset, description: e.target.value })}
+          />
+        </Form.Item>
+        <Form.Item label="每日快照日期列" extra="表里每天保存一份全量时选择">
+          <Select
+            aria-label="每日快照日期列"
+            allowClear
+            placeholder="不是快照表"
+            value={dataset.snapshot_date_column ?? undefined}
+            options={dates.map((c) => ({ value: c.name, label: c.comment ? `${c.comment}（${c.name}）` : c.name }))}
+            onChange={(column?: string) => setDataset({ ...dataset, snapshot_date_column: column ?? null })}
+          />
+        </Form.Item>
+        <Text type="secondary" className="text-xs">
+          将带入 {dataset.columns?.length ?? 0} 个列的名称、类型和注释。
+        </Text>
+        {duplicates.length > 0 && (
+          <Alert
+            className="!mt-3"
+            type="info"
+            showIcon
+            message={`这张表已登记为：${duplicates.map((d) => d.name).join("、")}。同一张表可以按不同用途登记多次。`}
+          />
+        )}
+        {error && <Alert className="!mt-3" type="error" showIcon message={error} />}
+      </Form>
+    </Modal>
   );
 }
-function TableBrowser({
-  workspaceId,
-  onClose,
-  onSelect,
-  onSelectDataset,
-  datasets,
+
+/** Browse a connection's collected structure and register tables as datasets. */
+export function DatasetPicker({
+  workspace,
   draft,
-  nativeDraft,
-  extraContent,
-  selectionReason,
-  onOpenObject,
-}: Omit<Parameters<typeof DatasetPicker>[0], "open"> & {
-  datasets: SemanticDataset[];
+  sessionId,
+  open,
+  onClose,
+  onRegistered,
+  onOpenDataset,
+}: {
+  workspace: Workspace;
+  draft: Draft | null;
+  sessionId: string | null;
+  open: boolean;
+  onClose: () => void;
+  onRegistered: (result: ElementSaveResult, dataset: Dataset) => void;
+  onOpenDataset: (id: string) => void;
 }) {
-  const inspector = useElementInspector();
-  const [connections, setConnections] = useState<DataConnection[]>([]);
-  const [connectionId, setConnectionId] = useState("");
-  const [tables, setTables] = useState<DataTable[]>([]);
+  const active = usePageActive();
+  const [connections, setConnections] = useState<DataConnection[] | null>(null);
+  const [connectionId, setConnectionId] = useState<string>();
+  const [schemas, setSchemas] = useState<string[]>([]);
+  const [schema, setSchema] = useState("");
+  const [assets, setAssets] = useState<Assets | null>(null);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [fields, setFields] = useState<string[] | null>(null);
-  const initialConnection = useState(!datasets.length || !!onSelect)[0];
+  const [error, setError] = useState("");
+  const [registering, setRegistering] = useState<AssetTable | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const request = useRef(0);
   useEffect(() => {
-    let live = true;
-    modelingApi
-      .connections(workspaceId)
-      .then((result) => {
-        if (!live) return;
-        setConnections(result.items);
-        if (initialConnection)
-          setConnectionId(result.items[0]?.id ?? "");
+    if (!open || connections) return;
+    catalogApi
+      .connections(workspace.id)
+      .then((r) => {
+        setConnections(r.items);
+        setConnectionId((current) => current ?? r.items[0]?.id);
       })
-      .catch((e: Error) => {
-        if (live) setError(e.message);
-      });
+      .catch((e: Error) => setError(e.message));
+  }, [open, connections, workspace.id]);
+  useEffect(() => {
+    if (!open || !connectionId) return;
+    let live = true;
+    catalogApi
+      .schemas(workspace.id, connectionId)
+      .then((r) => live && setSchemas(r.items))
+      .catch(() => live && setSchemas([]));
     return () => {
       live = false;
     };
-  }, [workspaceId, initialConnection]);
-  useEffect(() => {
+  }, [open, connectionId, workspace.id]);
+  const load = (refresh = false) => {
     if (!connectionId) return;
-    let live = true;
+    const id = ++request.current;
     setLoading(true);
     setError("");
-    setTables([]);
-    modelingApi
-      .tables(workspaceId, connectionId)
-      .then((result) => {
-        if (live) setTables(result.items);
-      })
-      .catch((e: Error) => {
-        if (live) setError(e.message);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
-    return () => {
-      live = false;
-    };
-  }, [workspaceId, connectionId]);
-  const selecting = !!onSelect || !!onSelectDataset;
-  const rows = [
-    ...datasets.map((dataset) => ({
-      id: dataset.id,
-      source: dataset.source,
-      dataset,
-      table: undefined as DataTable | undefined,
-      columns: sourceColumns(dataset),
-    })),
-    ...tables
-      .filter(
-        (table) =>
-          !datasets.some(
-            (d) =>
-              d.source === [table.schema, table.name].filter(Boolean).join("."),
-          ),
-      )
-      .map((table) => ({
-        id: [connectionId, table.schema, table.name].join(":"),
-        source: [table.schema, table.name].filter(Boolean).join("."),
-        dataset: undefined as SemanticDataset | undefined,
-        table,
-        columns: table.columns.map((c) => c.name),
-      })),
-  ].filter((row) =>
-    [row.source, ...row.columns]
-      .join(" ")
-      .toLowerCase()
-      .includes(query.toLowerCase()),
+    const params = { schema_name: schema };
+    (refresh ? catalogApi.refreshAssets(workspace.id, connectionId, params) : catalogApi.assets(workspace.id, connectionId, params))
+      .then((result) => id === request.current && setAssets(result))
+      .catch((e: Error) => id === request.current && setError(e.message))
+      .finally(() => id === request.current && setLoading(false));
+  };
+  useEffect(() => {
+    if (open && connectionId) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, connectionId, schema]);
+  const connection = connections?.find((c) => c.id === connectionId);
+  const normalized = query.trim().toLowerCase();
+  const tables = (assets?.items ?? []).filter(
+    (t) => !normalized || `${t.name} ${t.comment ?? ""}`.toLowerCase().includes(normalized),
   );
+  const register = async (dataset: Dataset) => {
+    if (!draft) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const result = await registerDataset(workspace, draft, sessionId, dataset);
+      setRegistering(null);
+      onRegistered(result, dataset);
+    } catch (e) {
+      setSaveError(e instanceof ApiError || e instanceof Error ? e.message : "登记失败");
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
-    <InspectorDialog
-      title={selecting ? "选择表" : "浏览数据目录"}
-      wide
-      onClose={onClose}
+    <Modal
+      open={open && active}
+      onCancel={() => !saving && onClose()}
+      title="从数据目录登记数据集"
+      width={1040}
+      footer={null}
+      destroyOnHidden={false}
     >
-      <div className="om-toolbar">
-        <label className="om-search">
-          <Search size={16} />
-          <input
-            autoFocus
-            placeholder="搜索表或字段"
-            aria-label="搜索表或字段"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        {(connections.length > 1 ||
-          (datasets.length > 0 &&
-            connections.length > 0 &&
-            !onSelectDataset)) && (
-          <select
-            aria-label="数据连接"
-            value={connectionId}
-            onChange={(e) => setConnectionId(e.target.value)}
-          >
-            <option value="">语义模型中的表</option>
-            {connections.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        )}
-        <span className="om-push muted">{rows.length} 张表</span>
-      </div>
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
-      {loading && (
-        <p role="status" className="muted">
-          正在读取数据目录…
-        </p>
-      )}
-      <table className="om-table om-assets">
-        <thead>
-          <tr>
-            <th>表</th>
-            <th>映射对象</th>
-            <th>{selecting ? "选择" : "字段"}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const objects =
-              draft?.object_types.filter((object) =>
-                objectMapping(draft, object, nativeDraft).tables.some(
-                  (d) => d.source === row.source,
-                ),
-              ) ?? [];
-            return (
-              <tr key={row.id}>
-                <td data-label="表">
-                  <code>{row.source}</code>
-                  <small className="om-sub">
-                    {connections.find((c) => c.id === connectionId)?.name}
-                  </small>
-                </td>
-                <td data-label="映射对象">
-                  {objects.map((object) => (
-                    <div key={object.id}>
-                      <button
-                        type="button"
-                        className="element-text-button"
-                        onClick={() => {
-                          onClose();
-                          if (onOpenObject) onOpenObject(object.id);
-                          else inspector.open({
-                            kind: "object_type",
-                            id: object.id,
-                            tab: "properties",
-                          });
-                        }}
-                      >
-                        {object.name}
-                      </button>
-                    </div>
-                  ))}
-                  {!objects.length && <span className="muted">—</span>}
-                </td>
-                <td data-label={selecting ? "选择" : "字段"}>
-                  {selecting && row.table && !onSelect && (
-                    <ReadonlyIcon
-                      reason={
-                        selectionReason ??
-                        "当前对象保存合同不能新增此数据集，请在「数据映射 › 语义模型」中添加数据集。"
-                      }
-                    />
-                  )}
-                  {selecting ? (
-                    <button
-                      type="button"
-                      className="element-text-button"
-                      disabled={
-                        row.dataset
-                          ? !onSelectDataset
-                          : !onSelect || !connectionId
-                      }
-                      onClick={() => {
-                        if (row.dataset) onSelectDataset?.(row.dataset);
-                        else if (row.table) {
-                          const connection = connections.find(
-                            (c) => c.id === connectionId,
-                          );
-                          if (connection) onSelect?.(connection, row.table);
-                        }
-                      }}
-                    >
-                      选用
-                    </button>
-                  ) : (
-                    <InfoButton
-                      label="字段"
-                      onClick={() => setFields(row.columns)}
-                    />
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          {!rows.length && !loading && (
-            <tr>
-              <td colSpan={3} className="om-blank">
-                <Database size={16} /> 没有匹配的表
-              </td>
-            </tr>
+      {connections && !connections.length ? (
+        <Empty description="暂无数据连接">
+          <Link to="../connections">
+            <Button type="primary">添加数据连接</Button>
+          </Link>
+        </Empty>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              aria-label="数据源"
+              className="min-w-[200px]"
+              placeholder="选择数据源"
+              value={connectionId}
+              options={(connections ?? []).map((c) => ({ value: c.id, label: c.name }))}
+              onChange={(id: string) => {
+                setConnectionId(id);
+                setSchema("");
+                setAssets(null);
+              }}
+            />
+            <Select
+              aria-label="Schema"
+              className="min-w-[180px]"
+              showSearch
+              allowClear
+              placeholder="默认 schema"
+              value={schema || undefined}
+              options={schemas.map((s) => ({ value: s, label: s }))}
+              onChange={(value?: string) => setSchema(value ?? "")}
+            />
+            <Input.Search
+              allowClear
+              aria-label="搜索数据表"
+              placeholder="表名或注释"
+              className="max-w-[260px]"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <Button className="ml-auto" icon={<RefreshCw size={14} />} loading={loading} disabled={!connectionId} onClick={() => load(true)}>
+              刷新表结构
+            </Button>
+          </div>
+          {assets?.observed_at && (
+            <Text type="secondary" className="text-xs">
+              结构采集于 {new Date(assets.observed_at).toLocaleString("zh-CN", { hour12: false })}
+              {assets.status === "stale" && " · 可能已过期"}
+            </Text>
           )}
-        </tbody>
-      </table>
-      {extraContent}
-      {fields && (
-        <InspectorDialog title="字段" onClose={() => setFields(null)}>
-          {fields.map((field) => (
-            <div className="om-entry" key={field}>
-              <code>{field}</code>
-            </div>
-          ))}
-        </InspectorDialog>
+          {(error || assets?.error) && (
+            <Alert type="error" showIcon message={error || assets?.error} description={assets?.observed_at ? "展示上次成功采集的结构" : undefined} />
+          )}
+          {!!assets?.changes.length && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`本次结构变化 ${assets.changes.length} 项`}
+              description={assets.changes
+                .slice(0, 12)
+                .map((c) => `${c.table}${c.column ? "." + c.column : ""} ${CHANGES[c.kind] ?? c.kind}`)
+                .join("；")}
+            />
+          )}
+          {assets?.status === "unobserved" ? (
+            <Empty description="还没有采集表结构">
+              <Button loading={loading} onClick={() => load(true)}>
+                采集表结构
+              </Button>
+            </Empty>
+          ) : (
+            <Table
+              size="small"
+              rowKey={(t) => `${t.schema ?? ""}.${t.name}`}
+              loading={loading}
+              dataSource={tables}
+              pagination={tables.length > 12 ? { pageSize: 12, size: "small" } : false}
+              expandable={{
+                expandedRowRender: (t) => (
+                  <Table
+                    size="small"
+                    rowKey="name"
+                    pagination={false}
+                    dataSource={t.columns}
+                    columns={[
+                      { title: "列", dataIndex: "name", render: (v: string) => <code>{v}</code> },
+                      { title: "类型", dataIndex: "type" },
+                      {
+                        title: "主键 / 可空",
+                        key: "flags",
+                        render: (_, c) =>
+                          c.primary_key ? "主键" : c.nullable === null || c.nullable === undefined ? "—" : c.nullable ? "可空" : "非空",
+                      },
+                      { title: "注释", dataIndex: "comment", render: (v?: string | null) => v || "—" },
+                    ]}
+                  />
+                ),
+              }}
+              columns={[
+                {
+                  title: "表",
+                  key: "name",
+                  render: (_, t) => (
+                    <div className="flex flex-col">
+                      <code>{[t.schema, t.name].filter(Boolean).join(".")}</code>
+                      {t.comment && <Text type="secondary" className="text-xs">{t.comment}</Text>}
+                    </div>
+                  ),
+                },
+                { title: "列", key: "columns", width: 80, render: (_, t) => (t.missing ? <Tag color="error">表已缺失</Tag> : t.columns.length) },
+                {
+                  title: "已登记",
+                  key: "datasets",
+                  render: (_, t) =>
+                    t.datasets.length ? (
+                      <span className="flex flex-wrap gap-x-3">
+                        {t.datasets.map((d) => (
+                          <Button key={d.id} type="link" size="small" className="!h-auto !p-0" onClick={() => onOpenDataset(d.id)}>
+                            {d.name}
+                          </Button>
+                        ))}
+                      </span>
+                    ) : (
+                      <Text type="secondary">未登记</Text>
+                    ),
+                },
+                {
+                  title: "",
+                  key: "action",
+                  width: 110,
+                  render: (_, t) =>
+                    workspace.role ? (
+                      <Button size="small" disabled={t.missing || !draft || !connection} onClick={() => setRegistering(t)}>
+                        登记
+                      </Button>
+                    ) : null,
+                },
+              ]}
+            />
+          )}
+        </div>
       )}
-    </InspectorDialog>
+      {registering && connection && draft && (
+        <RegisterForm
+          connection={connection}
+          table={registering}
+          draft={draft}
+          busy={saving}
+          error={saveError}
+          onCancel={() => {
+            setRegistering(null);
+            setSaveError("");
+          }}
+          onSubmit={(dataset) => void register(dataset)}
+        />
+      )}
+    </Modal>
   );
 }

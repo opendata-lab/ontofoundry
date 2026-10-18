@@ -29,17 +29,23 @@ class EvidenceError(ValueError):
 def check_material_evidence(evidence: dict, lookup: MaterialLookup, where: str) -> None:
     found = lookup(str(evidence["material_id"]))
     if found is None:
-        raise EvidenceError("EVIDENCE_INVALID", f"{where}：材料 {evidence['material_id']} 不属于当前空间")
+        raise EvidenceError(
+            "EVIDENCE_INVALID", f"{where}：材料 {evidence['material_id']} 不属于当前空间"
+        )
     sha, lines = found
     if evidence.get("material_sha256") != sha:
-        raise EvidenceError("EVIDENCE_INVALID", f"{where}：材料哈希缺失或与已保存的材料不一致")
+        raise EvidenceError(
+            "EVIDENCE_INVALID", f"{where}：材料哈希缺失或与已保存的材料不一致"
+        )
     start, end = evidence["locator"]["line_start"], evidence["locator"]["line_end"]
     if end > len(lines):
         raise EvidenceError("EVIDENCE_INVALID", f"{where}：证据行号超出材料范围")
     quote = " ".join((evidence.get("quote") or "").split())
     window = " ".join(" ".join(lines[start - 1 : end]).split())
     if quote and quote not in window:
-        raise EvidenceError("EVIDENCE_INVALID", f"{where}：引用原文与材料第 {start}–{end} 行不符")
+        raise EvidenceError(
+            "EVIDENCE_INVALID", f"{where}：引用原文与材料第 {start}–{end} 行不符"
+        )
 
 
 def _evidence_by_element(draft: dict[str, Any]) -> dict[str, dict[str, dict]]:
@@ -61,23 +67,35 @@ def reconcile_draft_evidence(
     """Check a draft about to be saved against the stored one; stamp new
     manual evidence with the author and time. Returns the draft to store."""
     before = _evidence_by_element(previous)
+    owners = {eid: owner for owner, entries in before.items() for eid in entries}
     for collection in COLLECTIONS.values():
         for element in draft.get(collection) or []:
             element_id = str(element["id"])
             old = before.get(element_id, {})
             ids = [str(e["id"]) for e in element.get("evidence") or []]
             if len(ids) != len(set(ids)):
-                raise EvidenceError("EVIDENCE_ID_DUPLICATE", f"{collection}[{element_id}]：证据 id 重复")
+                raise EvidenceError(
+                    "EVIDENCE_ID_DUPLICATE", f"{collection}[{element_id}]：证据 id 重复"
+                )
             kept_ids = set()
             for position, evidence in enumerate(element.get("evidence") or []):
                 evidence_id = str(evidence["id"])
+                if evidence_id in owners and owners[evidence_id] != element_id:
+                    raise EvidenceError(
+                        "EVIDENCE_ID_DUPLICATE", "证据 UUID 不能转移到其他元素"
+                    )
                 kept_ids.add(evidence_id)
                 where = f"{collection}[{element_id}].evidence[{position}]"
-                unchanged = evidence_id in old and canonical(old[evidence_id]) == canonical(evidence)
+                unchanged = evidence_id in old and canonical(old[evidence_id]) == canonical(
+                    evidence
+                )
                 if evidence.get("kind") == "manual":
                     if evidence_id in old:
                         if not unchanged:
-                            raise EvidenceError("MANUAL_EVIDENCE_IMMUTABLE", f"{where}：人工证据保存后不能修改")
+                            raise EvidenceError(
+                                "MANUAL_EVIDENCE_IMMUTABLE",
+                                f"{where}：人工证据保存后不能修改",
+                            )
                         continue
                     evidence["created_by"] = actor_id
                     evidence["created_at"] = now.isoformat()

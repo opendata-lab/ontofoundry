@@ -7,11 +7,11 @@ import json
 from copy import deepcopy
 from types import SimpleNamespace
 from typing import Any, Literal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -32,7 +32,8 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
-from ontofoundry_api.domain.canonical import LEGACY_HASH_ALGORITHM, element_sha256
+from ontofoundry_api.domain.canonical import element_sha256
+from ontofoundry_api.domain.core import MaterialObject, Strict
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
@@ -60,7 +61,9 @@ def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
 
 
 def _counts(items, statuses) -> dict[str, int]:
-    counts = dict.fromkeys(("pending", "accepted", "rejected", "stale", "conflict", "superseded"), 0)
+    counts = dict.fromkeys(
+        ("pending", "accepted", "rejected", "stale", "conflict", "superseded"), 0
+    )
     for item in items:
         counts[statuses[item.id][0]] += 1
     return counts
@@ -99,6 +102,17 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
 def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict[str, Any]:
     element = item.after_json or item.before_json or {}
     status, reason = statuses[item.id]
+    group = set(dependency_group(item.id, dependencies))
+    if item.atomic_group_id:
+        peers = db.scalars(
+            select(ProposalItemRecord.id).where(
+                ProposalItemRecord.workspace_id == workspace_id,
+                ProposalItemRecord.session_id == item.session_id,
+                ProposalItemRecord.atomic_group_id == item.atomic_group_id,
+            )
+        ).all()
+        for peer in peers:
+            group.update(dependency_group(peer, dependencies))
     return {
         "id": item.id,
         "batch_id": item.batch_id,
@@ -124,8 +138,10 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
             [*(item.evidence_json or []), *((item.after_json or {}).get("evidence") or [])],
         ),
         "reason": item.reason or "",
+        "atomic_group_id": item.atomic_group_id,
+        "duplicate_candidates": duplicate_candidates(db, item),
         "depends_on": dependencies.get(item.id, []),
-        "dependency_group": dependency_group(item.id, dependencies),
+        "dependency_group": sorted(group),
         "status": status,
         "stored_status": item.status,
         "status_reason": reason,
@@ -135,8 +151,6 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
 
 
 def _session_elements(draft: dict) -> dict[str, tuple[str, dict]]:
-    from ontofoundry_api.domain.runtime_views import proposal_snapshot
-    draft = proposal_snapshot(draft)
     return {
         str(element["id"]): (kind.value, element)
         for kind, collection in COLLECTIONS.items()
@@ -165,7 +179,11 @@ def list_batches(
     )
     if cursor:
         anchor = db.get(ProposalBatchRecord, cursor)
-        if anchor is None or anchor.session_id != session_id or anchor.workspace_id != workspace_id:
+        if (
+            anchor is None
+            or anchor.session_id != session_id
+            or anchor.workspace_id != workspace_id
+        ):
             raise _fail(422, "INVALID_CURSOR", "游标无效")
         # Keyset paging in (created_at, id) descending order.
         query = query.where(
@@ -204,7 +222,11 @@ def read_batch(
     require_member(db, workspace_id, user.id)
     session = get_modeling_session(db, workspace_id, session_id)
     batch = db.get(ProposalBatchRecord, batch_id)
-    if batch is None or batch.workspace_id != workspace_id or batch.session_id != session_id:
+    if (
+        batch is None
+        or batch.workspace_id != workspace_id
+        or batch.session_id != session_id
+    ):
         raise _fail(404, "BATCH_NOT_FOUND", "提案批次不存在")
     draft = session_draft(session)
     items = _batch_items(db, [batch.id], workspace_id, session_id)
@@ -217,7 +239,9 @@ def read_batch(
                 elements.setdefault(str(element["id"]), (item.target_kind, element))
     return {
         **_batch_summary(batch, items, statuses),
-        "items": [_item_view(db, workspace_id, i, statuses, dependencies, elements) for i in items],
+        "items": [
+            _item_view(db, workspace_id, i, statuses, dependencies, elements) for i in items
+        ],
     }
 
 
@@ -237,45 +261,25 @@ class DecisionRequest(BaseModel):
 
 def _request_sha256(body: DecisionRequest) -> str:
     payload = body.model_dump()
-    payload["decisions"] = sorted(payload["decisions"], key=lambda d: (d["proposal_id"], d["decision"]))
+    payload["decisions"] = sorted(
+        payload["decisions"], key=lambda d: (d["proposal_id"], d["decision"])
+    )
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
 
 
-def _apply(draft: dict, item: ProposalItemRecord | SimpleNamespace) -> None:
+def _apply(draft, item):
     collection = COLLECTIONS[ElementKind(item.target_kind)]
-    elements = draft.setdefault(collection, [])
-    after = deepcopy(item.after_json)
-    if draft.get('schema_version') == '3' and item.target_kind in ('object_type', 'value_type'):
-        contexts = draft['extension_v4']['concept_context']
-        if item.operation == 'delete':
-            contexts.pop(item.target_id, None)
-        elif 'concept_context' in after:
-            context = after.pop('concept_context')
-            if context is None:
-                contexts.pop(item.target_id, None)
-            else:
-                contexts[item.target_id] = context
     if item.operation == "create":
-        elements.append(after)
+        draft[collection].append(deepcopy(item.after_json))
     elif item.operation == "update":
         draft[collection] = [
-            after if str(e["id"]) == item.target_id else e for e in elements
+            deepcopy(item.after_json) if e["id"] == item.target_id else e
+            for e in draft[collection]
         ]
     else:
-        draft[collection] = [e for e in elements if str(e["id"]) != item.target_id]
-    if draft.get("schema_version") == "3" and item.target_kind == "rule":
-        for owner_collection in ("object_types", "value_types", "properties", "link_types"):
-            for owner in draft[owner_collection]:
-                for key, kind in (("requires", "constraint"), ("derived_by", "derivation")):
-                    belongs = item.after_json and item.after_json["owner_id"] == owner["id"] and item.after_json["rule_kind"] == kind
-                    refs = owner.get(key, [])
-                    if belongs and item.target_id not in refs:
-                        owner[key] = [*refs, item.target_id]
-                        owner["native_presence"] = list(dict.fromkeys([*owner.get("native_presence", []), key]))
-                    elif not belongs and item.target_id in refs:
-                        owner[key] = [ref for ref in refs if ref != item.target_id]
+        draft[collection] = [e for e in draft[collection] if e["id"] != item.target_id]
 
 
 def _topological(items: list[ProposalItemRecord], dependencies: dict[str, list[str]]):
@@ -300,80 +304,25 @@ def _decision_response(record: ProposalDecisionRequestRecord) -> dict:
     return {key: value for key, value in record.response_json.items() if key != "_undo"}
 
 
-def _undo_context(db: Session, item: ProposalItemRecord) -> dict:
-    record = db.scalar(
-        select(ProposalDecisionRequestRecord)
-        .join(
-            ProposalDecisionItemRecord,
-            ProposalDecisionItemRecord.request_id == ProposalDecisionRequestRecord.id,
-        )
-        .where(
-            ProposalDecisionItemRecord.workspace_id == item.workspace_id,
-            ProposalDecisionItemRecord.session_id == item.session_id,
-            ProposalDecisionItemRecord.item_id == item.id,
-            ProposalDecisionItemRecord.decision == "accept",
-            ProposalDecisionRequestRecord.result_session_revision == item.accepted_revision,
+def _undo_context(db, item):
+    return {}
+
+
+def _check_undo(draft, item, compatibility, undo_context):
+    found = _session_elements(draft).get(item.target_id)
+    collection = COLLECTIONS[ElementKind(item.target_kind)]
+    unchanged = (
+        found is None
+        if item.operation == "delete"
+        else bool(
+            found
+            and found[0] == item.target_kind
+            and element_sha256(found[1], collection=collection)
+            == element_sha256(item.after_json, collection=collection)
         )
     )
-    if record is None:
-        return {}
-    context = deepcopy(record.response_json.get("_undo", {}).get(item.id, {}))
-    accepted_draft = record.response_json["session"]["draft"]
-    if accepted_draft.get("schema_version") == "3":
-        if item.target_kind in ("object_type", "value_type"):
-            context.setdefault(
-                "produced_context",
-                accepted_draft["extension_v4"]["concept_context"].get(item.target_id),
-            )
-        if item.target_kind == "link_type" and "produced_join" not in context:
-            from ontofoundry_api.domain.runtime_views import legacy_mapping_form
-            context.setdefault("produced_join", legacy_mapping_form(accepted_draft)["joins"].get(item.target_id))
-    return context
-
-
-def _check_undo(
-    draft: dict, item: ProposalItemRecord, compatibility: dict, undo_context: dict,
-) -> None:
-    if item.target_kind == "mapping":
-        element = next((e for e in compatibility["mappings"] if str(e["id"]) == item.target_id), None)
-        found = ("mapping", element) if element else _session_elements(draft).get(item.target_id)
-    else:
-        found = _session_elements(draft).get(item.target_id)
-    unchanged = found is None if item.operation == "delete" else False
-    if item.operation != "delete" and found and found[0] == item.target_kind:
-        after = deepcopy(item.after_json)
-        context = after.pop("concept_context", ...) if draft.get("schema_version") == "3" else ...
-        join = after.pop("data_join", ...) if item.target_kind == "link_type" and draft.get("schema_version") == "3" else ...
-        algorithm = draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM
-        collection = COLLECTIONS[ElementKind(item.target_kind)]
-        unchanged = element_sha256(
-            found[1], hash_algorithm=algorithm, collection=collection,
-        ) == element_sha256(after, hash_algorithm=algorithm, collection=collection)
-        if context is not ...:
-            unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == context
-        if join is not ...:
-            unchanged = unchanged and compatibility["joins"].get(item.target_id) == join
-    if "produced_context" in undo_context:
-        unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == undo_context["produced_context"]
-    elif item.operation == "create" and draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
-        unchanged = unchanged and draft["extension_v4"]["concept_context"].get(item.target_id) == item.after_json.get("concept_context")
-    if "produced_join" in undo_context:
-        unchanged = unchanged and compatibility["joins"].get(item.target_id) == undo_context["produced_join"]
-    if draft.get("schema_version") == "3" and item.target_kind == "rule":
-        for collection in ("object_types", "value_types", "properties", "link_types"):
-            for owner in draft[collection]:
-                for key, kind in (("requires", "constraint"), ("derived_by", "derivation")):
-                    belongs = bool(item.after_json and item.after_json["owner_id"] == owner["id"] and item.after_json["rule_kind"] == kind)
-                    unchanged = unchanged and (item.target_id in owner.get(key, [])) == belongs
-    if item.operation == "delete" and draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
-        unchanged = unchanged and item.target_id not in draft["extension_v4"]["concept_context"]
     if not unchanged:
-        raise _fail(
-            409,
-            "PROPOSAL_UNDO_CONFLICT",
-            "该元素在接受后又被修改，不能直接撤销",
-            items=[{"proposal_id": item.id, "reason": "该元素在接受后又被修改，不能直接撤销"}],
-        )
+        raise _fail(409, "PROPOSAL_UNDO_CONFLICT", "该元素在接受后又被修改，不能直接撤销")
 
 
 def _inverse(item: ProposalItemRecord, context: dict) -> SimpleNamespace:
@@ -381,26 +330,13 @@ def _inverse(item: ProposalItemRecord, context: dict) -> SimpleNamespace:
     if after is not None and item.target_kind == "link_type" and "data_join" in context:
         after["data_join"] = context["data_join"]
     return SimpleNamespace(
-        operation={"create": "delete", "update": "update", "delete": "create"}[item.operation],
+        operation={"create": "delete", "update": "update", "delete": "create"}[
+            item.operation
+        ],
         target_kind=item.target_kind,
         target_id=item.target_id,
         after_json=after,
     )
-
-
-def _restore_rule_refs(draft: dict, item: ProposalItemRecord, context: dict) -> None:
-    for before in context.get("rule_owners", []):
-        owner = next((e for e in draft[before["collection"]] if e["id"] == before["id"]), None)
-        if owner is None:
-            continue
-        for key in ("requires", "derived_by"):
-            refs = owner.get(key, [])
-            if item.target_id in before[key] and item.target_id in refs:
-                refs.remove(item.target_id)
-                position = before[key].index(item.target_id)
-                refs.insert(min(position, len(refs)), item.target_id)
-            if key not in before["native_presence"] and not refs:
-                owner["native_presence"] = [p for p in owner.get("native_presence", []) if p != key]
 
 
 @router.post("/proposal-decisions")
@@ -466,13 +402,32 @@ def decide(
     batch_ids = sorted({item.batch_id for item in items.values()})
     batch_items = _batch_items(db, batch_ids, workspace_id, session_id)
     dependencies = dependency_map(db, batch_ids, workspace_id, session_id)
+    explicit = {d.proposal_id: d.decision for d in body.decisions}
+    expanded = dict(explicit)
+    groups = {i.atomic_group_id for i in items.values() if i.atomic_group_id}
+    for group in groups:
+        members = [i for i in batch_items if i.atomic_group_id == group]
+        choices = {explicit[i.id] for i in members if i.id in explicit}
+        if len(choices) != 1:
+            raise _fail(409, "PROPOSAL_CONFLICT", "同一原子组不能收到相反决定")
+        for member in members:
+            expanded[member.id] = next(iter(choices))
+            items[member.id] = member
+    if len(expanded) > 500:
+        raise _fail(422, "DEPENDENCY_INCOMPLETE", "展开后的原子组超过决定数量上限")
+    body = body.model_copy(
+        update={
+            "decisions": [Decision(proposal_id=i, decision=d) for i, d in expanded.items()]
+        }
+    )
     draft = deepcopy(session_draft(session))
     statuses = effective_statuses(batch_items, dependencies, draft)
     by_id = {item.id: item for item in batch_items}
 
     accepts = [d.proposal_id for d in body.decisions if d.decision == "accept"]
     undoes = [
-        d.proposal_id for d in body.decisions
+        d.proposal_id
+        for d in body.decisions
         if d.decision == "reject" and items[d.proposal_id].status == "accepted"
     ]
     problems = []
@@ -482,11 +437,35 @@ def decide(
             code = {"stale": "PROPOSAL_STALE", "conflict": "PROPOSAL_CONFLICT"}.get(
                 status, "PROPOSAL_NOT_DECIDABLE"
             )
-            problems.append((409, code, decision.proposal_id, reason or f"提案当前为 {status}"))
-        elif decision.decision == "reject" and status not in ("pending", "stale", "conflict", "accepted"):
-            problems.append((409, "PROPOSAL_NOT_DECIDABLE", decision.proposal_id, f"提案当前为 {status}"))
-        elif decision.decision == "restore" and items[decision.proposal_id].status != "rejected":
-            problems.append((409, "PROPOSAL_NOT_RESTORABLE", decision.proposal_id, "只有已拒绝的提案可以恢复"))
+            problems.append(
+                (409, code, decision.proposal_id, reason or f"提案当前为 {status}")
+            )
+        elif decision.decision == "reject" and status not in (
+            "pending",
+            "stale",
+            "conflict",
+            "accepted",
+        ):
+            problems.append(
+                (
+                    409,
+                    "PROPOSAL_NOT_DECIDABLE",
+                    decision.proposal_id,
+                    f"提案当前为 {status}",
+                )
+            )
+        elif (
+            decision.decision == "restore"
+            and items[decision.proposal_id].status != "rejected"
+        ):
+            problems.append(
+                (
+                    409,
+                    "PROPOSAL_NOT_RESTORABLE",
+                    decision.proposal_id,
+                    "只有已拒绝的提案可以恢复",
+                )
+            )
     if problems:
         status_code, code = problems[0][0], problems[0][1]
         raise _fail(
@@ -513,7 +492,8 @@ def decide(
 
     for proposal_id in undoes:
         missing_dependents = [
-            dep for dep in dependent_group(proposal_id, dependencies)
+            dep
+            for dep in dependent_group(proposal_id, dependencies)
             if by_id[dep].status == "accepted" and dep not in undoes
         ]
         if missing_dependents:
@@ -521,110 +501,23 @@ def decide(
                 422,
                 "DEPENDENCY_INCOMPLETE",
                 "撤销已接受提案时必须一并拒绝依赖它的已接受提案",
-                items=[{"proposal_id": proposal_id, "reason": "缺少已接受的依赖提案：" + "、".join(missing_dependents)}],
+                items=[
+                    {
+                        "proposal_id": proposal_id,
+                        "reason": "缺少已接受的依赖提案：" + "、".join(missing_dependents),
+                    }
+                ],
             )
 
-    # Undo dependents first, then accept prerequisites first; validate once.
     before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
-    from ontofoundry_api.domain.runtime_views import (
-        apply_legacy_mappings,
-        legacy_mapping_form,
-    )
-    compatibility = legacy_mapping_form(draft)
-    joins = compatibility["joins"]
-    compatibility_changed = False
-    undo_contexts = {}
     undone_items = list(reversed(_topological([items[i] for i in undoes], dependencies)))
+    undo_contexts = {}
     for item in undone_items:
-        context = _undo_context(db, item)
-        _check_undo(draft, item, compatibility, context)
-        if item.target_kind == "rule" and "rule_owners" not in context and (item.after_json or item.before_json)["owner_kind"] != "action":
-            raise _fail(
-                409, "PROPOSAL_UNDO_CONFLICT",
-                "该提案缺少接受前的规则引用记录，不能直接撤销",
-                items=[{"proposal_id": item.id, "reason": "该提案缺少接受前的规则引用记录，不能直接撤销"}],
-            )
-        if item.target_kind == "link_type" and draft.get("schema_version") == "3" and "data_join" not in context:
-            before = item.before_json or {}
-            if item.operation == "update" and "data_join" in (item.after_json or {}) and "data_join" not in before:
-                raise _fail(
-                    409, "PROPOSAL_UNDO_CONFLICT",
-                    "该提案缺少接受前的关系映射记录，不能直接撤销",
-                    items=[{"proposal_id": item.id, "reason": "该提案缺少接受前的关系映射记录，不能直接撤销"}],
-                )
-            if item.operation == "delete":
-                restored = deepcopy(draft)
-                _apply(restored, _inverse(item, {}))
-                context["data_join"] = legacy_mapping_form(restored)["joins"].get(item.target_id)
-            else:
-                context["data_join"] = before.get("data_join", compatibility["joins"].get(item.target_id))
-        inverse = _inverse(item, context)
-        if item.target_kind == "mapping":
-            _apply(compatibility, inverse)
-            if inverse.operation == "delete":
-                # Remove native mapping references before undoing their concept.
-                try:
-                    draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
-                except ValueError as exc:
-                    raise _fail(422, "VALIDATION_FAILED", "映射撤销无效：" + str(exc)) from exc
-            compatibility_changed = True
-            continue
-        if inverse.operation == "delete" and item.target_kind == "link_type" and joins.get(item.target_id):
-            joins[item.target_id] = None
-            try:
-                draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
-            except ValueError as exc:
-                raise _fail(422, "VALIDATION_FAILED", "映射撤销无效：" + str(exc)) from exc
-        _apply(draft, inverse)
-        _restore_rule_refs(draft, item, context)
-        if item.target_kind == "link_type" and "data_join" in context:
-            joins[item.target_id] = context["data_join"] if inverse.after_json else None
-            for link in draft["link_types"]:
-                if link["id"] == item.target_id:
-                    link.pop("data_join", None)
-            compatibility_changed = True
+        _check_undo(draft, item, {}, {})
+        _apply(draft, _inverse(item, {}))
     for item in accepted_items:
-        context = {}
-        if draft.get("schema_version") == "3" and item.target_kind == "rule":
-            owner_ids = {e["owner_id"] for e in (item.before_json, item.after_json) if e}
-            context["rule_owners"] = [
-                {"collection": collection, "id": owner["id"],
-                 "requires": deepcopy(owner.get("requires", [])),
-                 "derived_by": deepcopy(owner.get("derived_by", [])),
-                 "native_presence": deepcopy(owner.get("native_presence", []))}
-                for collection in ("object_types", "value_types", "properties", "link_types")
-                for owner in draft[collection] if owner["id"] in owner_ids
-            ]
-        if draft.get("schema_version") == "3" and item.target_kind in ("object_type", "value_type"):
-            context["produced_context"] = (
-                (item.after_json or {}).get("concept_context", draft["extension_v4"]["concept_context"].get(item.target_id))
-                if item.operation != "delete" else None
-            )
-        if draft.get("schema_version") == "3" and item.target_kind == "link_type":
-            context["data_join"] = deepcopy(joins.get(item.target_id))
-            context["produced_join"] = (
-                deepcopy((item.after_json or {}).get("data_join", joins.get(item.target_id)))
-                if item.operation != "delete" else None
-            )
-        undo_contexts[item.id] = context
-        if item.target_kind == "mapping":
-            _apply(compatibility, item)
-            compatibility_changed = True
-            continue
         _apply(draft, item)
-        if item.target_kind == "link_type" and item.after_json and "data_join" in item.after_json:
-            joins[item.target_id] = item.after_json["data_join"]
-            for link in draft["link_types"]:
-                if link["id"] == item.target_id:
-                    link.pop("data_join", None)
-            compatibility_changed = True
-    if compatibility_changed:
-        try:
-            draft = apply_legacy_mappings(draft, compatibility["mappings"], joins)
-        except ValueError as exc:
-            message = "映射撤销无效：" if undone_items else "映射提案无效："
-            raise _fail(422, "VALIDATION_FAILED", message + str(exc)) from exc
     changed_items = [*undone_items, *accepted_items]
     if changed_items:
         try:
@@ -638,7 +531,14 @@ def decide(
                 items=[{"proposal_id": i.id, "reason": message} for i in changed_items],
             ) from exc
         from ontofoundry_api.services.join_validation import validate_join_columns
-        validate_join_columns(db, workspace_id, before_mapping_write, model.model_dump(mode="json"), request.app.state.settings)
+
+        validate_join_columns(
+            db,
+            workspace_id,
+            before_mapping_write,
+            model.model_dump(mode="json"),
+            request.app.state.settings,
+        )
         check_identities(
             db,
             workspace_id,
@@ -654,10 +554,23 @@ def decide(
     now = utc_now()
     new_revision = session.revision + 1 if changed_items else session.revision
     if changed_items:
-        session.draft_json = draft
-        session.draft_sha256 = draft_sha256(draft, workspace_id)
-        session.revision = new_revision
-        session.updated_at = now
+        changed = db.execute(
+            update(ModelingSessionRecord)
+            .where(
+                ModelingSessionRecord.id == session.id,
+                ModelingSessionRecord.revision == body.expected_session_revision,
+            )
+            .values(
+                draft_json=draft,
+                draft_sha256=draft_sha256(draft),
+                revision=new_revision,
+                updated_at=now,
+            )
+        )
+        if changed.rowcount != 1:
+            db.rollback()
+            raise _fail(409, "SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重新确认")
+        db.refresh(session)
     results = []
     for decision in body.decisions:
         item = items[decision.proposal_id]
@@ -671,17 +584,23 @@ def decide(
         item.decided_by, item.decided_at = user.id, now
     db.flush()
     after_statuses = effective_statuses(
-        _batch_items(db, batch_ids, workspace_id, session_id), dependencies, session.draft_json
+        _batch_items(db, batch_ids, workspace_id, session_id),
+        dependencies,
+        session.draft_json,
     )
     for decision in body.decisions:
         status, reason = after_statuses[decision.proposal_id]
-        results.append({"proposal_id": decision.proposal_id, "status": status, "reason": reason})
+        results.append(
+            {"proposal_id": decision.proposal_id, "status": status, "reason": reason}
+        )
 
     response = jsonable(
         {
             "session": session_response(db, session),
             "results": results,
-            "validation": validate_draft(session_draft(session), _workspace(db, workspace_id)),
+            "validation": validate_draft(
+                session_draft(session), _workspace(db, workspace_id)
+            ),
         }
     )
     record = ProposalDecisionRequestRecord(
@@ -747,17 +666,12 @@ def proposal_metrics(
     """What T8 watches before legacy code can go: legacy runs still active,
     batch outcomes, how often proposals go stale, and what users decide."""
     require_member(db, workspace_id, user.id)
-    from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 
     sessions = db.scalars(
-        select(ModelingSessionRecord).where(ModelingSessionRecord.workspace_id == workspace_id)
+        select(ModelingSessionRecord).where(
+            ModelingSessionRecord.workspace_id == workspace_id
+        )
     ).all()
-    legacy_active = sum(
-        1
-        for s in sessions
-        if s.task_status in ACTIVE_RUN_STATUSES
-        and (s.run_manifest_json or {}).get("result_contract") != "proposals"
-    )
     batches = db.scalars(
         select(ProposalBatchRecord).where(ProposalBatchRecord.workspace_id == workspace_id)
     ).all()
@@ -783,10 +697,75 @@ def proposal_metrics(
     total_batches = len(batches)
     open_items = effective["pending"] + effective["stale"] + effective["conflict"]
     return {
-        "legacy_active_runs": legacy_active,
         "batches": {"total": total_batches, **by_status},
-        "batch_failure_rate": round(by_status.get("failed", 0) / total_batches, 4) if total_batches else 0.0,
+        "batch_failure_rate": round(by_status.get("failed", 0) / total_batches, 4)
+        if total_batches
+        else 0.0,
         "items": effective,
-        "stale_rate": round((effective["stale"] + effective["conflict"]) / open_items, 4) if open_items else 0.0,
+        "stale_rate": round((effective["stale"] + effective["conflict"]) / open_items, 4)
+        if open_items
+        else 0.0,
         "decisions": decisions,
     }
+
+
+def duplicate_candidates(db, item):
+    if (
+        item.target_kind != "material_object"
+        or item.operation != "create"
+        or item.after_json is None
+    ):
+        return []
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.instance_display import (
+        business_identity,
+        document_display_text,
+    )
+
+    draft = CoreDraft.model_validate(
+        get_modeling_session(db, item.workspace_id, item.session_id).draft_json
+    )
+    fact = item.after_json
+    identity = business_identity(draft, UUID(fact["type_id"]), fact["values"])
+    if identity is None:
+        return []
+    return [
+        {
+            "id": str(e.id),
+            "type_id": str(e.type_id),
+            "display_text": document_display_text(draft, e),
+            "expected_target_hash": element_sha256(
+                e.model_dump(mode="json"), collection="material_objects"
+            ),
+        }
+        for e in draft.material_objects
+        if str(e.type_id) == fact["type_id"]
+        and business_identity(draft, e.type_id, e.values) == identity
+    ]
+
+
+class FactProposalRevision(Strict):
+    expected_session_revision: int
+    target_id: str
+    expected_target_hash: str
+    after: MaterialObject
+    reason: str | None = None
+
+
+@router.post("/proposal-items/{proposal_id}/revision")
+def revise_fact_proposal(
+    workspace_id: str,
+    session_id: str,
+    proposal_id: str,
+    body: FactProposalRevision,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    from ontofoundry_api.services.fact_revision import revise_fact
+
+    require_member(db, workspace_id, user.id)
+    batch_id = revise_fact(
+        db, workspace_id, session_id, proposal_id, body, user, request.app.state.settings
+    )
+    return read_batch(workspace_id, session_id, batch_id, db, user)

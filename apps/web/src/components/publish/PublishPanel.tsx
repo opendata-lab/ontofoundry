@@ -1,48 +1,51 @@
-import { ArrowRight, Check, ChevronDown, ChevronRight, CircleAlert, ShieldCheck, X } from "lucide-react";
-import {
-  type KeyboardEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Alert, Button, Card, Collapse, Descriptions, Drawer, Empty, Form, Input, List, Modal, Segmented, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
+import { ArrowRight, Check, CircleAlert, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
-import type {
-  ElementChange,
-  MergeConflict,
-  ModelingSession,
-  PublishPreview,
-  TargetKind,
-  VersionSummary,
-} from "../../api/types";
-import { FieldDiff } from "../proposals/FieldDiff";
-import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
-import { lineDiff } from "../../lib/lineDiff";
-import { ConflictResolver } from "./ConflictResolver";
+import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, TargetKind, VersionSummary } from "../../api/types";
 import { useElementInspector } from "../../hooks/useElementInspector";
+import { documentDisplayText } from "../../lib/instanceDisplay";
+import { lineDiff } from "../../lib/lineDiff";
+import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
+import { FieldDiff } from "../proposals/FieldDiff";
+import { ConflictResolver } from "./ConflictResolver";
 
-const CHANGE_LABEL: Record<ElementChange["change"], string> = {
-  created: "新增",
-  updated: "修改",
-  deleted: "删除",
+const { Text, Title } = Typography;
+
+const CHANGE: Record<ElementChange["change"], { text: string; color: string }> = {
+  created: { text: "新增", color: "success" },
+  updated: { text: "修改", color: "processing" },
+  deleted: { text: "删除", color: "error" },
 };
 const KIND_ORDER: TargetKind[] = [
   "object_type",
   "property",
   "link_type",
   "rule",
-  "action",
+  "metric",
+  "dataset",
+  "mapping",
   "material_object",
   "material_link",
-  "mapping",
 ];
 /** Past this many changes, cards start collapsed. */
 const COLLAPSE_AFTER = 20;
 /** Fields that point at another element; the object view shows its name. */
-const REFERENCE_FIELDS = new Set(["owner_type_id", "source_type_id", "target_type_id", "owner_id", "type_id", "extends"]);
+const REFERENCE_FIELDS = new Set([
+  "owner_type_id",
+  "source_type_id",
+  "target_type_id",
+  "source_id",
+  "target_id",
+  "owner_id",
+  "type_id",
+  "extends",
+  "dataset_id",
+  "numerator_id",
+  "denominator_id",
+  "title_property_id",
+]);
 
-type ViewMode = "object" | "json";
 type Filter = "all" | ElementChange["change"];
 
 function show(value: unknown) {
@@ -68,236 +71,177 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
   const left = JSON.stringify(before, null, 2).split("\n");
   const right = JSON.stringify(after, null, 2).split("\n");
   const { removed, added } = lineDiff(left, right);
-  const side = (lines: string[], marks: boolean[], mark: "removed" | "added") => (
-    <pre className="definition-preview json-lines">
+  const side = (lines: string[], marks: boolean[], cls: string) => (
+    <pre className="m-0 max-h-[360px] overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs leading-5">
       {lines.map((line, i) => (
-        <span key={i} className={marks[i] ? `json-line--${mark}` : undefined}>
-          {line}
+        <span key={i} className={`block ${marks[i] ? cls : ""}`}>
+          {line || " "}
         </span>
       ))}
     </pre>
   );
   return (
-    <div className="json-split">
-      <div>
-        <small>当前发布版本</small>
-        {side(left, removed, "removed")}
+    <div className="grid grid-cols-2 gap-2">
+      <div className="flex min-w-0 flex-col gap-1">
+        <Text type="secondary" className="text-xs">
+          当前发布版本
+        </Text>
+        {side(left, removed, "bg-danger-soft")}
       </div>
-      <div>
-        <small>发布后</small>
-        {side(right, added, "added")}
+      <div className="flex min-w-0 flex-col gap-1">
+        <Text type="secondary" className="text-xs">
+          发布后
+        </Text>
+        {side(right, added, "bg-success-soft")}
       </div>
     </div>
   );
 }
 
 /** The fields of a created or deleted element, minus identity and empty values. */
-function FieldList({
-  value,
-  names,
-  removed = false,
-}: {
-  value: Record<string, unknown>;
-  names: Map<string, string>;
-  removed?: boolean;
-}) {
+function FieldList({ value, names }: { value: Record<string, unknown>; names: Map<string, string> }) {
   const named = (key: string, v: unknown) =>
-    !REFERENCE_FIELDS.has(key)
-      ? v
-      : Array.isArray(v)
-        ? v.map((id) => names.get(String(id)) ?? id)
-        : (names.get(String(v)) ?? v);
+    !REFERENCE_FIELDS.has(key) ? v : Array.isArray(v) ? v.map((id) => names.get(String(id)) ?? id) : (names.get(String(v)) ?? v);
   const rows = Object.entries(value).filter(
-    ([key, v]) =>
-      key !== "id" && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
+    ([key, v]) => key !== "id" && v !== null && v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0),
   );
-  if (!rows.length) return <p className="muted">无字段内容</p>;
+  if (!rows.length) return <Text type="secondary">无字段内容</Text>;
   return (
-    <dl className={"field-list " + (removed ? "field-list--removed" : "field-list--added")}>
-      {rows.map(([key, v]) => (
-        <div key={key}>
-          <dt>{FIELD_LABELS[key] ?? key}</dt>
-          <dd>{readable(key, named(key, v))}</dd>
-        </div>
-      ))}
-    </dl>
+    <Descriptions
+      size="small"
+      bordered
+      column={1}
+      items={rows.map(([key, v]) => ({
+        key,
+        label: FIELD_LABELS[key] ?? key,
+        children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v))}</span>,
+      }))}
+    />
   );
 }
 
-/** Expand or collapse every card at once; `n` changes on each request. */
-type ExpandSignal = { open: boolean; n: number };
-
-/** The shared card frame: header with name and the object/JSON switch. */
-function CardFrame({
-  label,
-  change,
-  kind,
-  icon: Icon,
-  extra,
-  expand,
-  children,
-}: {
-  label: string;
-  change: ElementChange["change"];
-  kind: string;
-  icon: typeof ShieldCheck;
-  extra?: ReactNode;
-  expand: ExpandSignal;
-  children: (mode: ViewMode) => ReactNode;
-}) {
-  const [open, setOpen] = useState(expand.open);
-  const [mode, setMode] = useState<ViewMode>("object");
-  useEffect(() => setOpen(expand.open), [expand]);
+function ChangeBody({ change, names }: { change: ElementChange; names: Map<string, string> }) {
+  const [mode, setMode] = useState<"object" | "json">("object");
   return (
-    <article className="change-card" aria-label={`${kind} ${label}`}>
-      <header>
-        <button
-          type="button"
-          className="change-card-toggle"
-          aria-expanded={open}
-          aria-label={(open ? "收起 " : "展开 ") + label}
-          onClick={() => setOpen(!open)}
-        >
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-        <span className={`tag tag--change-${change}`}>{CHANGE_LABEL[change]}</span>
-        <span className="change-card-kind">
-          <Icon size={14} aria-hidden /> {kind}
-        </span>
-        <strong>{label}</strong>
-        {extra}
-        <span className="view-switch" role="group" aria-label={`${label} 展示方式`}>
-          {(["object", "json"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              aria-pressed={mode === m}
-              onClick={() => {
-                setMode(m);
-                setOpen(true);
-              }}
-            >
-              {m === "object" ? "对象" : "JSON"}
-            </button>
-          ))}
-        </span>
-      </header>
-      {open && children(mode)}
-    </article>
+    <div className="flex flex-col gap-2">
+      <Segmented
+        size="small"
+        className="self-end"
+        value={mode}
+        onChange={(v) => setMode(v as typeof mode)}
+        options={[
+          { value: "object", label: "对象" },
+          { value: "json", label: "JSON" },
+        ]}
+      />
+      {mode === "json" ? (
+        change.change === "updated" ? (
+          <JsonSplit before={change.before} after={change.after} />
+        ) : (
+          <pre className="m-0 max-h-[360px] overflow-auto rounded-sm bg-surface-soft p-2 font-mono text-xs">
+            {JSON.stringify(change.change === "created" ? change.after : change.before, null, 2)}
+          </pre>
+        )
+      ) : change.change === "updated" ? (
+        change.field_changes.length ? (
+          <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
+        ) : (
+          <Text type="secondary">无字段级变化</Text>
+        )
+      ) : (
+        <FieldList value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
+      )}
+    </div>
   );
 }
 
-/** One changed element, like a file in a pull request. */
-function ChangeCard({
-  change,
+function changeLabel(change: ElementChange) {
+  return (change.owner_label && change.element_kind === "property" ? `${change.owner_label}.` : "") + change.label;
+}
+
+function ChangeList({
+  changes,
   names,
-  expand,
+  open,
   onInspect,
 }: {
-  change: ElementChange;
+  changes: ElementChange[];
   names: Map<string, string>;
-  expand: ExpandSignal;
-  onInspect?: () => void;
+  open: string[];
+  onInspect?: (change: ElementChange) => void;
 }) {
-  const label =
-    (change.owner_label && change.element_kind === "property" ? `${change.owner_label}.` : "") + change.label;
+  const [active, setActive] = useState(open);
+  useEffect(() => setActive(open), [open]);
   return (
-    <CardFrame
-      label={label}
-      change={change.change}
-      kind={KIND[change.element_kind].label}
-      icon={KIND[change.element_kind].icon}
-      expand={expand}
-      extra={
-        <>
-          {onInspect && <button type="button" className="button button--text" onClick={onInspect}>查看发布后的元素</button>}
-          {change.element_kind === "action" && <span className="tag">仅定义</span>}
-          {change.change === "updated" && change.field_changes.length > 0 && (
-            <small className="muted">{change.field_changes.length} 个字段</small>
-          )}
-        </>
-      }
-    >
-      {(mode) =>
-        mode === "json" ? (
-          change.change === "updated" ? (
-            <JsonSplit before={change.before} after={change.after} />
-          ) : (
-            <pre className="definition-preview">
-              {JSON.stringify(change.change === "created" ? change.after : change.before, null, 2)}
-            </pre>
-          )
-        ) : change.change === "updated" ? (
-          change.field_changes.length ? (
-            <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" />
-          ) : (
-            <p className="muted">无字段级变化</p>
-          )
-        ) : (
-          <FieldList
-            value={(change.change === "created" ? change.after : change.before) ?? {}}
-            names={names}
-            removed={change.change === "deleted"}
-          />
-        )
-      }
-    </CardFrame>
+    <Collapse
+      size="small"
+      activeKey={active}
+      onChange={(keys) => setActive(keys as string[])}
+      items={changes.map((c) => ({
+        key: c.element_id,
+        label: (
+          <span className="flex flex-wrap items-center gap-2" aria-label={`${KIND[c.element_kind].label} ${changeLabel(c)}`}>
+            <Tag color={CHANGE[c.change].color} className="!m-0">
+              {CHANGE[c.change].text}
+            </Tag>
+            <Tag color={KIND[c.element_kind].color} className="!m-0">
+              {KIND[c.element_kind].label}
+            </Tag>
+            <strong>{changeLabel(c)}</strong>
+            {c.change === "updated" && c.field_changes.length > 0 && (
+              <Text type="secondary" className="text-xs">
+                {c.field_changes.length} 个字段
+              </Text>
+            )}
+          </span>
+        ),
+        extra:
+          onInspect && c.change !== "deleted" ? (
+            <Button
+              size="small"
+              type="link"
+              onClick={(e) => {
+                e.stopPropagation();
+                onInspect(c);
+              }}
+            >
+              查看发布后的元素
+            </Button>
+          ) : undefined,
+        children: <ChangeBody change={c} names={names} />,
+      }))}
+    />
   );
 }
 
-/** Workspace constraints as one more changed item, read-only here. */
-function RequiresCard({
-  change,
-  expand,
-}: {
-  change: NonNullable<PublishPreview["requires_change"]>;
-  expand: ExpandSignal;
-}) {
-  const kept = new Set(change.after);
-  const before = new Set(change.before);
-  return (
-    <CardFrame label="工作空间约束" change="updated" kind="空间" icon={ShieldCheck} expand={expand}>
-      {(mode) =>
-        mode === "json" ? (
-          <JsonSplit before={{ requires: change.before }} after={{ requires: change.after }} />
-        ) : (
-          <ul className="requires-diff">
-            {change.before
-              .filter((rule) => !kept.has(rule))
-              .map((rule) => (
-                <li key={"-" + rule} className="requires-diff--removed">
-                  <del>{rule}</del>
-                </li>
-              ))}
-            {change.after.map((rule) => (
-              <li key={"+" + rule} className={before.has(rule) ? undefined : "requires-diff--added"}>
-                {before.has(rule) ? rule : <ins>{rule}</ins>}
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </CardFrame>
-  );
-}
-
-function sortChanges(changes: ElementChange[]) {
-  return [...changes].sort(
-    (a, b) => KIND_ORDER.indexOf(a.element_kind) - KIND_ORDER.indexOf(b.element_kind),
-  );
+function sortChanges<T extends ElementChange>(changes: T[]) {
+  return [...changes].sort((a, b) => KIND_ORDER.indexOf(a.element_kind) - KIND_ORDER.indexOf(b.element_kind));
 }
 
 /** Element names by id: the preview's labels first, the session's draft as fallback. */
 function elementNames(preview: PublishPreview | null, draft: ModelingSession["draft"]): Map<string, string> {
   const names = new Map<string, string>();
-  for (const key of ["object_types", "properties", "link_types", "rules", "actions"] as const)
-    for (const item of (draft[key] ?? []) as { id: string; name?: string }[])
-      if (item.name) names.set(item.id, item.name);
+  for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
+    for (const item of draft[key] as { id: string; name?: string }[]) if (item.name) names.set(item.id, item.name);
+  for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
+  if (preview?.merged_model) {
+    for (const fact of preview.merged_model.material_objects)
+      names.set(fact.id, documentDisplayText(preview.merged_model, fact));
+  }
   for (const [id, label] of Object.entries(preview?.labels ?? {})) names.set(id, label);
   return names;
 }
 
 const versionLabel = (n: number | null | undefined) => (n ? `v${n}` : "尚未发布");
+
+function checkIcon(state: "pass" | "fail" | "warn" | "idle") {
+  return {
+    pass: <Check size={15} className="text-success" />,
+    fail: <X size={15} className="text-danger" />,
+    warn: <CircleAlert size={15} className="text-[#d48806]" />,
+    idle: <CircleAlert size={15} className="text-muted" />,
+  }[state];
+}
 
 /**
  * Publish tab, laid out like a pull request: which session merges into the
@@ -332,12 +276,9 @@ export function PublishPanel({
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"changes" | "checks">("changes");
   const [filter, setFilter] = useState<Filter>("all");
-  const [expand, setExpand] = useState<ExpandSignal>({ open: true, n: 0 });
+  const [open, setOpen] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
-  const [showOssie, setShowOssie] = useState(false);
-  const confirmDialog = useRef<HTMLDialogElement>(null);
-  const ossie = useRef<HTMLDialogElement>(null);
-  const tabs = useRef<Record<"changes" | "checks", HTMLButtonElement | null>>({ changes: null, checks: null });
+  const [showModel, setShowModel] = useState(false);
   // Only the newest request may land: a slow preview of an older revision
   // must never replace the preview of the current one.
   const sequence = useRef(0);
@@ -353,11 +294,11 @@ export function PublishPanel({
       setPreviewedAt(new Date());
       setFilter("all");
       // A long list starts collapsed, as a large pull request does.
-      setExpand((e) => ({ open: value.changes.length <= COLLAPSE_AFTER, n: e.n + 1 }));
+      setOpen(value.changes.length <= COLLAPSE_AFTER ? value.changes.map((c) => c.element_id) : []);
     } catch (e) {
       if (mine !== sequence.current) return;
       if (e instanceof ApiError && e.code === "MERGE_CONFLICTS") {
-        setConflicts({ items: e.conflicts as MergeConflict[], current: e.currentVersionId });
+        setConflicts({ items: e.conflicts, current: e.currentVersionId });
         setNotice(`当前发布版本已变化，自动合并后仍有 ${e.conflicts.length} 处需要你决定`);
       } else if (e instanceof ApiError && e.code === "SESSION_REVISION_CHANGED") {
         onStale();
@@ -369,19 +310,6 @@ export function PublishPanel({
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    const el = ossie.current;
-    if (!el) return;
-    if (showOssie && !el.open) el.showModal?.();
-    if (!showOssie && el.open) el.close?.();
-  }, [showOssie]);
-  useEffect(() => {
-    const el = confirmDialog.current;
-    if (!el) return;
-    if (confirming && !el.open) el.showModal?.();
-    if (!confirming && el.open) el.close?.();
-  }, [confirming]);
-
   const publish = async () => {
     if (!preview) return;
     setBusy(true);
@@ -405,12 +333,9 @@ export function PublishPanel({
       setBusy(false);
     }
   };
-
   const changes = preview ? sortChanges(preview.changes) : [];
-  const requires = preview?.requires_change ?? null;
-  const count = (kind: ElementChange["change"]) =>
-    changes.filter((c) => c.change === kind).length + (kind === "updated" && requires ? 1 : 0);
-  const total = changes.length + (requires ? 1 : 0);
+  const count = (kind: ElementChange["change"]) => changes.filter((c) => c.change === kind).length;
+  const total = changes.length;
   const errors = preview?.validation.errors ?? [];
   const warnings = preview?.validation.warnings ?? [];
   const current = preview ? versionLabel(preview.current_version_number) : "…";
@@ -439,337 +364,311 @@ export function PublishPanel({
           : "";
   const canPublish = !blocker && !disabled && !busy;
   const status = conflicts
-    ? { cls: "warn", text: "有冲突" }
+    ? { color: "warning", text: "有冲突" }
     : !preview
-      ? { cls: "idle", text: error ? "预览失败" : "计算中" }
+      ? { color: "default", text: error ? "预览失败" : "计算中" }
       : !preview.validation.publishable
-        ? { cls: "error", text: "校验未通过" }
+        ? { color: "error", text: "校验未通过" }
         : !total
-          ? { cls: "idle", text: "无变更" }
-          : { cls: "ok", text: "可发布" };
+          ? { color: "default", text: "无变更" }
+          : { color: "success", text: "可发布" };
   const shown = filter === "all" ? changes : changes.filter((c) => c.change === filter);
-  const showRequires = requires && (filter === "all" || filter === "updated");
   const names = elementNames(preview, session.draft);
-  const switchTab = (next: "changes" | "checks") => {
-    setTab(next);
-    tabs.current[next]?.focus();
-  };
-  const onTabKey = (e: KeyboardEvent) => {
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End") {
-      e.preventDefault();
-      switchTab(tab === "changes" ? "checks" : "changes");
-    }
-  };
-
   return (
-    <div className="publish-panel">
-      <header className="pr-header">
-        <div className="pr-title">
-          {picker}
-          <span className="pr-flow">
-            <ArrowRight size={14} aria-hidden /> 当前发布版本 <b>{current}</b>
-          </span>
-        </div>
-        <div className="pr-actions">
-          <button
-            type="button"
-            className="button button--primary"
-            disabled={!canPublish}
-            title={blocker || undefined}
-            onClick={() => setConfirming(true)}
-          >
-            {preview ? `发布 v${preview.next_version_number}` : "发布"}
-          </button>
-        </div>
-        <p className="pr-meta">
-          <span className={`pr-status pr-status--${status.cls}`}>{status.text}</span>
-          {preview && (
-            <span className="pr-counts" aria-label="变更计数">
-              <b className="count-created">+{count("created")}</b>
-              <b className="count-updated">~{count("updated")}</b>
-              <b className="count-deleted">−{count("deleted")}</b>
+    <div className="flex flex-col gap-3">
+      <Card size="small">
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            {picker}
+            <span className="inline-flex items-center gap-1 text-sm">
+              <ArrowRight size={14} aria-hidden /> 当前发布版本 <b>{current}</b>
             </span>
-          )}
-          {behind && <span>{behind}</span>}
-          {blocker && preview !== null && <span className="muted">{blocker}</span>}
-        </p>
-      </header>
-      {notice && (
-        <p className="publish-notice" role="status">
-          <CircleAlert size={15} aria-hidden /> {notice}
-        </p>
-      )}
+            <Tooltip title={blocker || undefined}>
+              <span className="ml-auto inline-flex">
+                <Button type="primary" disabled={!canPublish} onClick={() => setConfirming(true)}>
+                  {preview ? `发布 v${preview.next_version_number}` : "发布"}
+                </Button>
+              </span>
+            </Tooltip>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <Tag color={status.color} className="!m-0">
+              {status.text}
+            </Tag>
+            {preview && (
+              <span className="inline-flex gap-2 font-mono" aria-label="变更计数">
+                <b className="text-success">+{count("created")}</b>
+                <b className="text-accent">~{count("updated")}</b>
+                <b className="text-danger">−{count("deleted")}</b>
+              </span>
+            )}
+            {behind && <Text type="secondary">{behind}</Text>}
+            {blocker && preview !== null && <Text type="secondary">{blocker}</Text>}
+          </div>
+        </div>
+      </Card>
+      {notice && <Alert type="info" showIcon message={notice} role="status" />}
       {error && (
-        <p className="inline-error" role="alert">
-          {error}{" "}
-          <button type="button" className="button button--text" onClick={() => void load()}>
-            重试
-          </button>
-        </p>
+        <Alert
+          type="error"
+          showIcon
+          message={error}
+          action={
+            <Button size="small" onClick={() => void load()}>
+              重试
+            </Button>
+          }
+        />
       )}
-      <div className="ref-tabs pr-tabs" role="tablist" aria-label="发布内容" onKeyDown={onTabKey}>
-        <button
-          ref={(el) => {
-            tabs.current.changes = el;
-          }}
-          id="pr-tab-changes"
-          role="tab"
-          aria-selected={tab === "changes"}
-          aria-controls="pr-panel-changes"
-          tabIndex={tab === "changes" ? 0 : -1}
-          onClick={() => setTab("changes")}
-        >
-          变更 <small>{preview ? total : conflicts ? conflicts.items.length : ""}</small>
-        </button>
-        <button
-          ref={(el) => {
-            tabs.current.checks = el;
-          }}
-          id="pr-tab-checks"
-          role="tab"
-          aria-selected={tab === "checks"}
-          aria-controls="pr-panel-checks"
-          tabIndex={tab === "checks" ? 0 : -1}
-          onClick={() => setTab("checks")}
-        >
-          检查{" "}
-          {preview ? (
-            preview.validation.publishable ? (
-              <Check size={13} className="check-pass" aria-label="通过" />
-            ) : (
-              <X size={13} className="check-fail" aria-label="未通过" />
-            )
-          ) : conflicts ? (
-            <CircleAlert size={13} className="check-warn" aria-label="待处理" />
-          ) : null}
-        </button>
-      </div>
-      <section
-        id="pr-panel-changes"
-        role="tabpanel"
-        aria-labelledby="pr-tab-changes"
-        className="pr-changes"
-        hidden={tab !== "changes"}
-      >
-        {conflicts ? (
-          <ConflictResolver
-            conflicts={conflicts.items}
-            currentVersionId={conflicts.current}
-            session={session}
-            onResolved={(next) => {
-              setConflicts(null);
-              setNotice("冲突处理已应用到会话，已重新预览");
-              onSession(next);
-            }}
-            onOutdated={() => {
-              // Same rule as an outdated publish: drop what was shown, re-merge.
-              setConflicts(null);
-              setNotice("当前发布版本在你预览后已变化，已重新合并");
-              onStale();
-              void load();
-            }}
-          />
-        ) : !preview ? (
-          !error && <p className="muted">正在计算合并结果…</p>
-        ) : total ? (
-          <>
-            <div className="pr-toolbar">
-              <h2>本次发布将改变的内容</h2>
-              <div className="pr-filter" role="group" aria-label="筛选变更">
-                {(
-                  [
-                    ["all", "全部", total],
-                    ["created", "新增", count("created")],
-                    ["updated", "修改", count("updated")],
-                    ["deleted", "删除", count("deleted")],
-                  ] as [Filter, string, number][]
-                ).map(([key, label, n]) => (
-                  <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)}>
-                    {label} {n}
-                  </button>
-                ))}
+      <Tabs
+        activeKey={tab}
+        onChange={(key) => setTab(key as typeof tab)}
+        items={[
+          {
+            key: "changes",
+            label: `变更 ${preview ? total : conflicts ? conflicts.items.length : ""}`,
+            children: conflicts ? (
+              <ConflictResolver
+                conflicts={conflicts.items}
+                currentVersionId={conflicts.current}
+                session={session}
+                onResolved={(next) => {
+                  setConflicts(null);
+                  setNotice("冲突处理已应用到会话，已重新预览");
+                  onSession(next);
+                }}
+                onOutdated={() => {
+                  // Same rule as an outdated publish: drop what was shown, re-merge.
+                  setConflicts(null);
+                  setNotice("当前发布版本在你预览后已变化，已重新合并");
+                  onStale();
+                  void load();
+                }}
+              />
+            ) : !preview ? (
+              !error && <Spin tip="正在计算合并结果…" />
+            ) : total ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Title level={5} className="!m-0">
+                    本次发布将改变的内容
+                  </Title>
+                  <Segmented
+                    size="small"
+                    value={filter}
+                    onChange={(v) => setFilter(v as Filter)}
+                    options={(
+                      [
+                        ["all", "全部", total],
+                        ["created", "新增", count("created")],
+                        ["updated", "修改", count("updated")],
+                        ["deleted", "删除", count("deleted")],
+                      ] as [Filter, string, number][]
+                    ).map(([value, label, n]) => ({ value, label: `${label} ${n}` }))}
+                  />
+                  <Button
+                    size="small"
+                    type="link"
+                    onClick={() => setOpen(open.length ? [] : shown.map((c) => c.element_id))}
+                  >
+                    {open.length ? "全部收起" : "全部展开"}
+                  </Button>
+                </div>
+                {shown.length ? (
+                  <ChangeList
+                    changes={shown}
+                    names={names}
+                    open={open}
+                    onInspect={(c) =>
+                      inspector.open({
+                        kind: c.element_kind,
+                        id: c.element_id,
+                        sessionId: session.id,
+                        previewHash: preview.merged_snapshot_sha256,
+                      })
+                    }
+                  />
+                ) : (
+                  <Text type="secondary">此筛选下没有变更。</Text>
+                )}
+                {(preview.auto_merged.length > 0 || preview.impacts.length > 0) && (
+                  <Collapse
+                    size="small"
+                    ghost
+                    items={[
+                      ...(preview.auto_merged.length
+                        ? [
+                            {
+                              key: "auto",
+                              label: `会话开始后已发布的变化 ${preview.auto_merged.length} · 已在线，仅用于解释合并结果`,
+                              children: <ChangeList changes={sortChanges(preview.auto_merged)} names={names} open={[]} />,
+                            },
+                          ]
+                        : []),
+                      ...(preview.impacts.length
+                        ? [
+                            {
+                              key: "impacts",
+                              label: `受影响但未修改的元素 ${preview.impacts.length}`,
+                              children: (
+                                <ul className="m-0 flex flex-col gap-1 pl-5 text-sm">
+                                  {preview.impacts.map((i) => (
+                                    <li key={i.element_id}>
+                                      {KIND[i.element_kind].label} · {i.label}：{i.reason}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
+                )}
               </div>
-              <button
-                type="button"
-                className="button button--text"
-                onClick={() => setExpand((e) => ({ open: !e.open, n: e.n + 1 }))}
-              >
-                {expand.open ? "全部收起" : "全部展开"}
-              </button>
-            </div>
-            {shown.map((c) => (
-              <ChangeCard key={c.element_id} change={c} names={names} expand={expand} onInspect={c.change !== "deleted" ? () => inspector.open({ kind: c.element_kind, id: c.element_id, sessionId: session.id, previewHash: preview.merged_snapshot_sha256 }) : undefined} />
-            ))}
-            {showRequires && <RequiresCard change={requires} expand={expand} />}
-            {!shown.length && !showRequires && <p className="muted pr-empty">此筛选下没有变更。</p>}
-            {preview.auto_merged.length > 0 && (
-              <details className="change-extra">
-                <summary>
-                  会话开始后已发布的变化 {preview.auto_merged.length}
-                  <small className="muted"> · 已在线，仅用于解释合并结果</small>
-                </summary>
-                {sortChanges(preview.auto_merged).map((c) => (
-                  <ChangeCard key={c.element_id} change={c} names={names} expand={COLLAPSED} />
-                ))}
-              </details>
-            )}
-            {preview.impacts.length > 0 && (
-              <details className="change-extra">
-                <summary>受影响但未修改的元素 {preview.impacts.length}</summary>
-                <ul>
-                  {preview.impacts.map((i) => (
-                    <li key={i.element_id}>
-                      {KIND[i.element_kind].label} · {i.label}：{i.reason}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            )}
-          </>
-        ) : (
-          <p className="muted pr-empty">本会话不会改变当前发布版本。</p>
-        )}
-      </section>
-      <section
-        id="pr-panel-checks"
-        role="tabpanel"
-        aria-labelledby="pr-tab-checks"
-        className="pr-checks"
-        hidden={tab !== "checks"}
-      >
-        <ul className="check-list">
-          <li>
-            {conflicts ? (
-              <CircleAlert size={15} className="check-warn" />
-            ) : preview ? (
-              <Check size={15} className="check-pass" />
             ) : (
-              <CircleAlert size={15} className="check-idle" />
-            )}
-            <span>合并冲突</span>
-            <small>{conflicts ? `${conflicts.items.length} 处待处理` : preview ? "无冲突" : "等待预览"}</small>
-          </li>
-          <li>
-            {!preview ? (
-              <CircleAlert size={15} className="check-idle" />
-            ) : preview.validation.publishable ? (
-              <Check size={15} className="check-pass" />
-            ) : (
-              <X size={15} className="check-fail" />
-            )}
-            <span>本体校验</span>
-            <small>{preview ? `${errors.length} 个错误 · ${warnings.length} 个警告` : "等待合并结果"}</small>
-            {errors.length + warnings.length > 0 && (
-              <ul className="check-issues">
-                {errors.map((issue, i) => (
-                  <li key={"e" + i} className="inline-error" role="alert">
-                    {(issue as { message: string }).message}
-                  </li>
-                ))}
-                {warnings.map((issue, i) => (
-                  <li key={"w" + i} className="muted">
-                    {(issue as { message: string }).message}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-          <li>
-            {preview ? <Check size={15} className="check-pass" /> : <CircleAlert size={15} className="check-idle" />}
-            <span>合并基准</span>
-            <small>
-              {preview
-                ? `会话开始于 ${versionLabel(preview.base_version_number)} · 合并到当前发布版本 ${current} · 预览于 ${previewedAt?.toLocaleTimeString("zh-CN", { hour12: false })}`
-                : "等待预览"}
-            </small>
-            <button type="button" className="button button--text" onClick={() => void load()}>
-              重新预览
-            </button>
-          </li>
-        </ul>
-        <button
-          type="button"
-          className="button button--text"
-          disabled={!preview?.ossie}
-          onClick={() => setShowOssie(true)}
-        >
-          查看本次将发布的 Ossie JSON
-        </button>
-      </section>
-      <dialog
-        ref={confirmDialog}
-        className="ref-dialog publish-confirm-dialog"
-        aria-labelledby="publish-confirm-title"
-        onClose={() => setConfirming(false)}
+              <Empty description="本会话不会改变当前发布版本" />
+            ),
+          },
+          {
+            key: "checks",
+            label: (
+              <span className="inline-flex items-center gap-1">
+                检查
+                {preview ? (
+                  preview.validation.publishable ? (
+                    <Check size={13} className="text-success" aria-label="通过" />
+                  ) : (
+                    <X size={13} className="text-danger" aria-label="未通过" />
+                  )
+                ) : conflicts ? (
+                  <CircleAlert size={13} aria-label="待处理" />
+                ) : null}
+              </span>
+            ),
+            children: (
+              <div className="flex flex-col gap-3">
+                <List
+                  size="small"
+                  dataSource={[
+                    {
+                      key: "conflicts",
+                      state: (conflicts ? "warn" : preview ? "pass" : "idle") as "pass" | "fail" | "warn" | "idle",
+                      title: "合并冲突",
+                      detail: conflicts ? `${conflicts.items.length} 处待处理` : preview ? "无冲突" : "等待预览",
+                    },
+                    {
+                      key: "validation",
+                      state: (!preview ? "idle" : preview.validation.publishable ? "pass" : "fail") as "pass" | "fail" | "warn" | "idle",
+                      title: "本体校验",
+                      detail: preview ? `${errors.length} 个错误 · ${warnings.length} 个警告` : "等待合并结果",
+                      extra:
+                        errors.length + warnings.length > 0 ? (
+                          <List
+                            size="small"
+                            split={false}
+                            className="pl-6"
+                            dataSource={[
+                              ...errors.map((issue, i) => ({ key: "e" + i, message: issue.message, kind: "error" as const })),
+                              ...warnings.map((issue, i) => ({ key: "w" + i, message: issue.message, kind: "warning" as const })),
+                            ]}
+                            renderItem={(issue) => (
+                              <List.Item
+                                key={issue.key}
+                                role={issue.kind === "error" ? "alert" : undefined}
+                                className={`!py-0.5 text-sm ${issue.kind === "error" ? "!text-danger" : "!text-muted"}`}
+                              >
+                                {issue.message}
+                              </List.Item>
+                            )}
+                          />
+                        ) : undefined,
+                    },
+                    {
+                      key: "base",
+                      state: (preview ? "pass" : "idle") as "pass" | "fail" | "warn" | "idle",
+                      title: "合并基准",
+                      detail: preview
+                        ? `会话开始于 ${versionLabel(preview.base_version_number)} · 合并到当前发布版本 ${current} · 预览于 ${previewedAt?.toLocaleTimeString("zh-CN", { hour12: false })}`
+                        : "等待预览",
+                      extra: (
+                        <Button size="small" type="link" className="self-start !p-0" onClick={() => void load()}>
+                          重新预览
+                        </Button>
+                      ),
+                    },
+                  ]}
+                  renderItem={(item) => (
+                    <List.Item key={item.key} className="!flex-col !items-stretch gap-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        {checkIcon(item.state)}
+                        <strong>{item.title}</strong>
+                        <Text type="secondary" className="text-xs">
+                          {item.detail}
+                        </Text>
+                      </span>
+                      {item.extra}
+                    </List.Item>
+                  )}
+                />
+                <Button className="self-start" disabled={!preview} onClick={() => setShowModel(true)}>
+                  查看本次将发布的模型 JSON
+                </Button>
+              </div>
+            ),
+          },
+        ]}
+      />
+      <Modal
+        open={confirming && !!preview}
+        title={preview ? `发布 v${preview.next_version_number}` : "发布"}
+        onCancel={() => setConfirming(false)}
+        okText="确认发布"
+        cancelText="取消"
+        okButtonProps={{ disabled: !canPublish, loading: busy }}
+        onOk={() => void publish()}
       >
         {preview && (
-          <>
-            <header>
-              <h2 id="publish-confirm-title">发布 v{preview.next_version_number}</h2>
-              <p className="muted">
-                当前发布版本 {current} → 新版本 v{preview.next_version_number} · 新增 {count("created")} · 修改{" "}
-                {count("updated")} · 删除 {count("deleted")}
-              </p>
-            </header>
+          <div className="flex flex-col gap-3">
+            <Text type="secondary">
+              当前发布版本 {current} → 新版本 v{preview.next_version_number} · 新增 {count("created")} · 修改 {count("updated")} · 删除{" "}
+              {count("deleted")}
+            </Text>
             {warnings.length ? (
-              <div className="confirm-warnings">
-                <p>
-                  <CircleAlert size={14} className="check-warn" /> 校验通过，但有 {warnings.length} 个警告：
-                </p>
-                <ul>
-                  {warnings.map((issue, i) => (
-                    <li key={i}>{(issue as { message: string }).message}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <p className="validation-pass">
-                <Check size={14} /> 校验通过 · 0 错误 0 警告
-              </p>
-            )}
-            <label className="section-field">
-              <span>版本说明</span>
-              <textarea
-                rows={3}
-                maxLength={240}
-                placeholder="说明本次模型变化"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
+              <Alert
+                type="warning"
+                showIcon
+                message={`校验通过，但有 ${warnings.length} 个警告`}
+                description={
+                  <ul className="m-0 pl-5">
+                    {warnings.map((issue, i) => (
+                      <li key={i}>{issue.message}</li>
+                    ))}
+                  </ul>
+                }
               />
-            </label>
-            <footer className="row-actions">
-              <button type="button" className="button button--secondary" onClick={() => setConfirming(false)}>
-                取消
-              </button>
-              <button
-                type="button"
-                className="button button--primary"
-                disabled={!canPublish}
-                onClick={() => void publish()}
-              >
-                {busy ? "发布中…" : "确认发布"}
-              </button>
-            </footer>
-          </>
-        )}
-      </dialog>
-      <dialog ref={ossie} className="proposal-drawer" aria-label="Ossie JSON" onClose={() => setShowOssie(false)}>
-        <header>
-          <div>
-            <h2>Ossie JSON</h2>
-            <small>本次将发布的标准定义</small>
+            ) : (
+              <Alert type="success" showIcon message="校验通过 · 0 错误 0 警告" />
+            )}
+            <Form layout="vertical" component="div">
+              <Form.Item label="版本说明" className="!mb-0">
+                <Input.TextArea
+                  aria-label="版本说明"
+                  rows={3}
+                  maxLength={240}
+                  showCount
+                  placeholder="说明本次模型变化"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                />
+              </Form.Item>
+            </Form>
           </div>
-          <button type="button" className="icon-button" aria-label="关闭" onClick={() => setShowOssie(false)}>
-            <X size={16} />
-          </button>
-        </header>
-        <div className="proposal-drawer-body">
-          <pre className="definition-preview">{JSON.stringify(preview?.ossie, null, 2)}</pre>
-        </div>
-      </dialog>
+        )}
+      </Modal>
+      <Drawer open={showModel} width={720} title="本次将发布的模型" onClose={() => setShowModel(false)} destroyOnHidden>
+        <pre className="m-0 font-mono text-xs leading-5 whitespace-pre-wrap">{JSON.stringify(preview?.merged_model, null, 2)}</pre>
+      </Drawer>
     </div>
   );
 }
-
-/** Already-live changes stay folded; a stable value keeps them from re-opening. */
-const COLLAPSED: ExpandSignal = { open: false, n: 0 };

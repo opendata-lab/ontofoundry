@@ -4,6 +4,8 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
+// Controls come from Ant Design; native <select> and <dialog> are not used.
+
 export default tseslint.config(
   { ignores: ["dist"] },
   {
@@ -25,5 +27,21 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ["src/**/*.tsx"],
+    ignores: ["src/**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "JSXOpeningElement[name.name='select']",
+          message: "Use Ant Design Select instead of a native <select>.",
+        },
+        {
+          selector: "JSXOpeningElement[name.name='dialog']",
+          message: "Use Ant Design Modal or Drawer instead of a native <dialog>.",
+        },
+      ],
+    },
+  },
 );
-

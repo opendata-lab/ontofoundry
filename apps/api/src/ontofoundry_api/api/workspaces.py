@@ -3,18 +3,15 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.database import get_db
-from ontofoundry_api.domain.models import PublishRequest, WorkspaceCreate
+from ontofoundry_api.domain.models import WorkspaceCreate
 from ontofoundry_api.services.ontology_query import (
     current_version,
-    version_summary,
     workspace_overview,
 )
 from ontofoundry_api.services.workspaces import (
     create_workspace,
     get_workspace,
     list_workspaces,
-    membership_role,
-    publish_draft,
     workspace_summary,
 )
 
@@ -48,31 +45,20 @@ def get_one(
     return workspace_summary(session, get_workspace(session, workspace_id), principal.id)
 
 
-@router.post("/{workspace_id}/publish", status_code=201)
-def publish(
-    workspace_id: str,
-    payload: PublishRequest,
-    session: Session = Depends(get_db),
-    principal: Principal = Depends(current_principal),
-) -> dict:
-    version = publish_draft(
-        session,
-        workspace_id=workspace_id,
-        draft=payload.draft,
-        user_id=principal.id,
-        message=payload.message,
-    )
-    return version_summary(version)
-
-
 @router.get("/{workspace_id}/overview")
 def overview(
     workspace_id: str,
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
-    version = current_version(session, workspace_id)
+    from ontofoundry_api.services.access import can_read_instances, can_read_mappings
+
+    workspace = get_workspace(session, workspace_id)
+    version = (
+        current_version(session, workspace_id) if workspace.current_version_id else None
+    )
     return workspace_overview(
         version,
-        include_private=membership_role(session, workspace_id, principal.id) is not None,
+        include_mappings=can_read_mappings(session, workspace_id, principal),
+        include_instances=can_read_instances(session, workspace_id, principal),
     )

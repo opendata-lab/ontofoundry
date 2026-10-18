@@ -2,16 +2,16 @@
 # The archive is a build product: skills/ is the source of truth and the only
 # thing under version control, so dist/ is gitignored and regenerated on demand.
 
-SKILL := md2ossie
+SKILL := ontofoundry-modeling
 DIST  := dist
 
 .PHONY: zip clean
 
-## Produce dist/md2ossie.zip with `md2ossie/SKILL.md` at the archive root —
+## Produce dist/ontofoundry-modeling.zip with `ontofoundry-modeling/SKILL.md` at the archive root —
 ## the console expects the skill directory itself to be the top-level entry.
 zip: clean
 	@mkdir -p $(DIST)
-	@cd skills && zip -q -r ../$(DIST)/$(SKILL).zip $(SKILL) -x '*.DS_Store'
+	@cd skills && zip -q -r ../$(DIST)/$(SKILL).zip $(SKILL) -x '*.DS_Store' '*__pycache__*' '*.pyc'
 	@echo "$(DIST)/$(SKILL).zip"
 	@unzip -l $(DIST)/$(SKILL).zip | head -5
 

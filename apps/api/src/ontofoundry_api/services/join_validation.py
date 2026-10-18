@@ -1,120 +1,66 @@
-"""Validate changed executable joins before accepting or saving a draft."""
+"""Check applicable declared source columns separately from final graph validity."""
 
-from pydantic import ValidationError
-from sqlalchemy import inspect, select
-from sqlalchemy.exc import NoSuchTableError
-
-from ontofoundry_api.db_models import ConnectionRecord, MetadataSnapshotRecord
-from ontofoundry_api.domain.models import OntologyDraft
-from ontofoundry_api.domain.semantic_views import SemanticViews, join_columns
+from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.errors import ServiceError
 
 
+def validate_source_columns(draft):
+    """Only known source/column pairs can be checked in an incomplete draft.
+
+    Missing references and member/name constraints belong in validation reports;
+    metadata not collected yet is not evidence of a missing physical column.
+    No business connection or SQL is opened by this check.
+    """
+    datasets = {d["id"]: d for d in draft["datasets"]}
+    objects = {o["id"]: o for o in draft["object_types"]}
+    mappings = {m["type_id"]: m for m in draft["mappings"]}
+
+    def columns(dataset_id, names):
+        dataset = datasets.get(dataset_id)
+        if dataset is None or not dataset.get("columns"):
+            return
+        known = {c["name"] for c in dataset["columns"]}
+        if any(name not in known for name in names):
+            raise ServiceError(
+                "声明的来源列不存在", code="JOIN_COLUMN_NOT_FOUND", status_code=422
+            )
+
+    def join(value):
+        if value and value["kind"] == "mapping_table":
+            columns(value["dataset_id"], value["source_columns"] + value["target_columns"])
+
+    for dataset in datasets.values():
+        if dataset.get("snapshot_date_column"):
+            columns(dataset["id"], [dataset["snapshot_date_column"]])
+    for mapping in draft["mappings"]:
+        sources, visited, current = {}, set(), mapping["type_id"]
+        chain = []
+        while current in objects and current not in visited:
+            visited.add(current)
+            if current in mappings:
+                chain.append(mappings[current])
+            current = objects[current].get("extends")
+        for ancestor in reversed(chain):
+            if ancestor["binding_mode"] == "independent":
+                sources = {}
+            sources.update({s["id"]: s for s in ancestor["sources"]})
+        for source in mapping["sources"]:
+            columns(source["dataset_id"], source["key_columns"])
+        for field in mapping["fields"].values():
+            if field["kind"] == "column" and field["source_id"] in sources:
+                columns(sources[field["source_id"]]["dataset_id"], [field["column"]])
+        for value in mapping.get("inherited_link_bindings", {}).values():
+            join(value)
+    for link in draft["link_types"]:
+        join(link.get("data_join"))
+
+
 def validate_join_columns(db, workspace_id, before, after, settings):
+    validate_source_columns(after)
     try:
-        views = SemanticViews(OntologyDraft.model_validate(after))
-        old = SemanticViews(OntologyDraft.model_validate(before))
-    except ValidationError:
-        # Editing permits incomplete domain drafts; existing domain validation
-        # owns these errors. Executable mapping writes are fully validated.
-        return
-    cache = {}
-
-    def known_columns(mapping):
-        key = (mapping.connection_alias, mapping.schema_name, mapping.table_name)
-        if key in cache:
-            return cache[key]
-        connection = db.scalar(
-            select(ConnectionRecord).where(
-                ConnectionRecord.workspace_id == workspace_id,
-                ConnectionRecord.name == mapping.connection_alias,
-            )
-        )
-        if connection is None:
-            cache[key] = None
-            return None
-        snapshot = db.get(
-            MetadataSnapshotRecord, (connection.id, mapping.schema_name or "")
-        )
-        if snapshot is not None and (
-            snapshot.observed_at or snapshot.snapshot_json.get("tables")
-        ):
-            table = next(
-                (
-                    t
-                    for t in snapshot.snapshot_json.get("tables", [])
-                    if t["name"] == mapping.table_name
-                ),
-                None,
-            )
-            columns = {c["name"] for c in table["columns"]} if table else set()
-        else:
-            from ontofoundry_api.api.connections import connect_readonly
-
-            try:
-                with connect_readonly(connection, settings) as sql:
-                    columns = {
-                        c["name"]
-                        for c in inspect(sql).get_columns(
-                            mapping.table_name, schema=mapping.schema_name
-                        )
-                    }
-            except NoSuchTableError:
-                columns = set()
-            except Exception:
-                # Offline/unconfigured connections provide no known schema.
-                # Never fabricate columns or change the original draft.
-                columns = None
-        cache[key] = columns
-        return columns
-
-    for link in views.draft.link_types:
-        if link.source_type_id is None:
-            continue
-        join = views.join(link.id)
-        if join is None:
-            continue
-        source, target = (
-            views.analyze(link.source_type_id).mapping,
-            views.analyze(link.target_type_id).mapping,
-        )
-        previous = old.join(link.id)
-        if (
-            previous == join
-            and old.analyze(link.source_type_id).mapping == source
-            and old.analyze(link.target_type_id).mapping == target
-        ):
-            continue
-        source_columns, target_columns = join_columns(join)
-        for mapping, columns, side in (
-            (
-                source,
-                source_columns,
-                "owner" if link.endpoint_direction == "forward" else "role",
-            ),
-            (
-                target,
-                target_columns,
-                "role" if link.endpoint_direction == "forward" else "owner",
-            ),
-        ):
-            known = known_columns(mapping)
-            if known is None:
-                continue
-            missing = [column for column in columns if column not in known]
-            if missing:
-                table = (
-                    mapping.schema_name + "." if mapping.schema_name else ""
-                ) + mapping.table_name
-                raise ServiceError(
-                    f"{link.name}：{side} 连接列不存在：{table}." + "、".join(missing),
-                    code="JOIN_COLUMN_NOT_FOUND",
-                    status_code=422,
-                    details={
-                        "link_id": str(link.id),
-                        "side": side,
-                        "table": table,
-                        "columns": missing,
-                        "connection_alias": mapping.connection_alias,
-                    },
-                )
+        validate_core_graph(CoreDraft.model_validate(after))
+    except ValueError as exc:
+        raise ServiceError(
+            "定义引用校验失败：" + str(exc), code="VALIDATION_FAILED", status_code=422
+        ) from exc

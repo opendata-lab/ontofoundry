@@ -328,6 +328,11 @@
             "name": "component_id",
             "physical_type": "varchar",
             "comment": "示例登记列"
+          },
+          {
+            "name": "snapshot_date",
+            "physical_type": "date",
+            "comment": "示例登记列"
           }
         ]
       },

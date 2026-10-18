@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from ontofoundry_api.domain.dependencies import strict_equal
+
 MISSING = object()
 
 
@@ -11,9 +13,9 @@ def merge_snapshots(
     conflicts = []
 
     def merge(b, c, d, path):
-        if c == d or b == d:
+        if strict_equal(c, d) or strict_equal(b, d):
             return deepcopy(c) if c is not MISSING else MISSING
-        if b == c:
+        if strict_equal(b, c):
             return deepcopy(d) if d is not MISSING else MISSING
         if all(isinstance(v, dict) for v in (b, c, d)):
             result = {}
@@ -31,17 +33,9 @@ def merge_snapshots(
             isinstance(x, dict) and "id" in x for values in (b, c, d) for x in values
         ):
             maps = [{x["id"]: x for x in values} for values in (b, c, d)]
-            if path.endswith("/roles"):
-                # Content and order are independent. Position follows the merged
-                # order and is not a second, spurious content conflict.
-                maps = [{key: {k: v for k, v in value.items() if k != "position"}
-                         for key, value in entries.items()} for entries in maps]
-                content = merge(*maps, path)
-                order = merge(*[[x["id"] for x in values] for values in (b, c, d)], path + "/order")
-                order = [key for key in order if key in content]
-                order += [key for key in content if key not in order]
-                return [{**content[key], "position": i} for i, key in enumerate(order)]
-            return list(merge(*maps, path).values())
+            merged = merge(*maps, path)
+            order = dict.fromkeys(x["id"] for values in (c, d, b) for x in values)
+            return [merged[key] for key in order if key in merged]
         side = (resolutions or {}).get(path)
         # Legacy form: "current" | "draft". Current form:
         # {"choice": "latest" | "draft" | "custom" | "both", "value": ...}.
@@ -52,7 +46,9 @@ def merge_snapshots(
         if choice == "custom":
             return deepcopy(side.get("value"))
         if choice == "both" and isinstance(c, list) and isinstance(d, list):
-            return deepcopy(c) + [deepcopy(x) for x in d if x not in c]
+            return deepcopy(c) + [
+                deepcopy(x) for x in d if not any(strict_equal(x, y) for y in c)
+            ]
         conflicts.append(
             {
                 "path": path,

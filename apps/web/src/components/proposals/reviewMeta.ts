@@ -1,16 +1,10 @@
-import type { Draft, FieldChange, ProposalItem, TargetKind } from "../../api/types";
+import type { CoreElement, Draft, FieldChange, MaterialObject, ProposalItem, TargetKind } from "../../api/types";
+import { byId } from "../../lib/coreModel";
+import { documentDisplayText } from "../../lib/instanceDisplay";
 import { FIELD_LABELS, KIND, STATUS } from "./elementMeta";
 
-export const reviewKindName = (kind: TargetKind) => kind === "action" ? "动作" : KIND[kind].label;
-export const REVIEW_FIELD_LABELS: Record<string, string> = {
-  ...FIELD_LABELS,
-  owner_type_id: "所属实体",
-  source_type_id: "源实体",
-  target_type_id: "目标实体",
-  owner_ref: "所属实体",
-  concept: "概念",
-  roles: "角色",
-};
+export const reviewKindName = (kind: TargetKind) => KIND[kind].label;
+export const REVIEW_FIELD_LABELS = FIELD_LABELS;
 
 export function valueText(value: unknown): string {
   if (value == null || value === "" || (Array.isArray(value) && !value.length)) return "（空）";
@@ -18,40 +12,53 @@ export function valueText(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
+const field = (element: CoreElement | null, key: string): unknown =>
+  element ? (element as unknown as Record<string, unknown>)[key] : undefined;
+
 export function reviewChanges(item: ProposalItem): FieldChange[] {
-  const changes = item.operation === "update"
-    ? item.field_changes
-    : Object.entries(item.after ?? item.before ?? {})
-        .filter(([path]) => path !== "id")
-        .map(([path, value]) => ({
-          path,
-          before: item.operation === "create" ? null : value,
-          after: item.operation === "delete" ? null : value,
-        }));
+  const changes =
+    item.operation === "update"
+      ? item.field_changes
+      : Object.entries((item.after ?? item.before ?? {}) as Record<string, unknown>)
+          .filter(([path]) => path !== "id")
+          .map(([path, value]) => ({
+            path,
+            before: item.operation === "create" ? null : (value as FieldChange["before"]),
+            after: item.operation === "delete" ? null : (value as FieldChange["after"]),
+          }));
   return changes.filter((change) => change.path !== "evidence");
 }
 
+/** Technical name of a property's owner object, from the batch or the draft. */
 export function ownerName(item: ProposalItem, items: ProposalItem[], draft: Draft): string {
-  const element = item.before ?? item.after ?? {};
-  const ref = element.owner_ref as { ref?: string; concept?: string } | undefined;
-  const ownerId = ref?.ref ?? element.owner_type_id;
-  const ownerProposal = items.find((candidate) =>
-    ["object_type", "value_type", "link_type"].includes(candidate.target_kind) &&
-    (ownerId ? candidate.target_id === ownerId : candidate.before?.name === item.owner_label),
-  );
-  const owner = ownerProposal?.before ?? ownerProposal?.after;
-  if (owner) return String(owner.technical_name || owner.concept || item.owner_label || "");
-  const draftOwner = [...draft.object_types, ...(draft.value_types ?? []), ...draft.link_types]
-    .find((candidate) => ownerId ? candidate.id === ownerId : candidate.name === item.owner_label);
-  return draftOwner?.technical_name || ref?.concept || item.owner_label || "";
+  if (item.target_kind !== "property") return item.owner_label ?? "";
+  const element = item.after ?? item.before;
+  const ownerId = field(element, "owner_type_id") as string | undefined;
+  const proposal = items.find((c) => c.target_kind === "object_type" && c.target_id === ownerId);
+  const owner = proposal?.after ?? proposal?.before;
+  if (owner) return String(field(owner, "technical_name") ?? item.owner_label ?? "");
+  return byId(draft.object_types, ownerId)?.technical_name ?? item.owner_label ?? "";
 }
 
 export function technicalName(item: ProposalItem, items: ProposalItem[], draft: Draft): string {
-  const value = item.before?.technical_name || item.before?.concept ||
-    item.after?.technical_name || item.after?.concept || item.display_name;
-  const name = typeof value === "string" ? value : item.display_name;
+  const value = field(item.after, "technical_name") ?? field(item.before, "technical_name") ?? item.display_name;
+  const name = typeof value === "string" && value ? value : item.display_name;
   const owner = item.target_kind === "property" ? ownerName(item, items, draft) : "";
   return owner ? `${owner}.${name}` : name;
+}
+
+/** Text a search box matches. */
+export function searchText(item: ProposalItem, items: ProposalItem[], draft: Draft) {
+  return [
+    item.display_name,
+    field(item.before, "name"),
+    field(item.after, "name"),
+    technicalName(item, items, draft),
+    item.owner_label,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLocaleLowerCase();
 }
 
 export function requiredIds(item: ProposalItem): string[] {
@@ -59,19 +66,15 @@ export function requiredIds(item: ProposalItem): string[] {
 }
 
 /** Block missing, rejected or stale dependencies, including transitive groups. */
-export function acceptanceBlock(
-  item: ProposalItem,
-  byId: Map<string, ProposalItem>,
-  visited = new Set<string>(),
-): string {
+export function acceptanceBlock(item: ProposalItem, byIdMap: Map<string, ProposalItem>, visited = new Set<string>()): string {
   if (item.status === "accepted") return "";
   if (item.status !== "pending") return item.status_reason || `提案${STATUS[item.status]}`;
   if (visited.has(item.id)) return "";
   visited.add(item.id);
   for (const id of requiredIds(item)) {
-    const dependency = byId.get(id);
+    const dependency = byIdMap.get(id);
     if (!dependency) return "依赖提案缺失";
-    const blocked = acceptanceBlock(dependency, byId, visited);
+    const blocked = acceptanceBlock(dependency, byIdMap, visited);
     if (blocked) return `依赖项「${dependency.display_name}」${blocked}`;
   }
   return "";
@@ -81,23 +84,25 @@ export type ReviewDecision = "accept" | "reject" | "restore";
 
 /** Share the same dependency expansion for row, modal and bulk decisions. */
 export function decisionIds(items: ProposalItem[], requested: string[], decision: ReviewDecision): string[] {
-  const byId = new Map(items.map((item) => [item.id, item]));
+  const byIdMap = new Map(items.map((item) => [item.id, item]));
   const ids = new Set<string>();
   const accept = (item: ProposalItem) => {
     if (item.status !== "pending" || ids.has(item.id)) return;
     ids.add(item.id);
     for (const id of requiredIds(item)) {
-      const dependency = byId.get(id);
+      const dependency = byIdMap.get(id);
       if (dependency) accept(dependency);
     }
   };
   for (const id of requested) {
-    const item = byId.get(id);
+    const item = byIdMap.get(id);
     if (!item) continue;
     if (decision === "accept") {
-      if (item.status === "pending" && !acceptanceBlock(item, byId)) accept(item);
-    } else if (decision === "restore" ? item.status === "rejected" :
-      ["pending", "stale", "conflict", "accepted"].includes(item.status)) ids.add(id);
+      if (item.status === "pending" && !acceptanceBlock(item, byIdMap)) accept(item);
+    } else if (
+      decision === "restore" ? item.status === "rejected" : ["pending", "stale", "conflict", "accepted"].includes(item.status)
+    )
+      ids.add(id);
   }
   if (decision === "reject") {
     let changed = true;
@@ -112,4 +117,28 @@ export function decisionIds(items: ProposalItem[], requested: string[], decision
     }
   }
   return [...ids];
+}
+
+/** The existing fact with the proposal's non-empty values and new evidence added. */
+export function mergedFact(existing: MaterialObject, proposed: MaterialObject): MaterialObject {
+  const values = { ...existing.values };
+  for (const [key, value] of Object.entries(proposed.values)) {
+    if (value !== null && value !== "") values[key] = value;
+  }
+  const known = new Set(existing.evidence.map((e) => e.id));
+  return {
+    ...existing,
+    values,
+    evidence: [...existing.evidence, ...proposed.evidence.filter((e) => !known.has(e.id))],
+  };
+}
+
+/** Names of draft elements and of elements created in the batch, by id. */
+export function elementNames(draft: Draft, items: ProposalItem[]) {
+  const names = new Map<string, string>();
+  for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
+    for (const element of draft[key] as { id: string; name: string }[]) names.set(element.id, element.name);
+  for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
+  for (const item of items) names.set(item.target_id, item.display_name);
+  return names;
 }

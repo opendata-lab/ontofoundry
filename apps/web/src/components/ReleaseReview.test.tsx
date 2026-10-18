@@ -1,64 +1,77 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { modelingApi } from "../api/client";
-import type { ModelingSession } from "../api/types";
-import { emptyDraft } from "../lib/draftView";
-import { WorkspaceConstraints } from "./ReleaseReview";
+import { api } from "../api/client";
+import type { Comparison } from "../api/types";
+import { versionSummary } from "../test/apiRecords";
+import { example } from "../test/drafts";
+import { renderWithProviders } from "../test/renderWithProviders";
+import { HistoryComparison } from "./ReleaseReview";
 
 vi.mock("../api/client", () => ({
-  workspaceRequest: vi.fn(),
-  modelingApi: { save: vi.fn() },
+  api: { comparison: vi.fn() },
 }));
 afterEach(() => {
   cleanup();
   vi.resetAllMocks();
 });
 
-const session = {
-  id: "s",
-  workspace_id: "w",
-  title: "草稿",
-  revision: 1,
-  base_version_id: null,
-  draft: { ...emptyDraft("w"), ontology_requires: ["original"] },
-  graph: { workspace_id: "w", version_id: "", version_sha256: "", nodes: [], edges: [] },
-  candidates: [],
-  material_ids: [],
-  task_status: "idle",
-  task_detail: "",
-  updated_at: "",
-} as ModelingSession;
+const versions = [versionSummary(2), versionSummary(1)];
+const customer = example("01-basic-sales").object_types.find((o) => o.technical_name === "customer")!;
 
-it("flags unsaved constraints as dirty", () => {
-  const dirty = vi.fn();
-  render(<WorkspaceConstraints session={session} onSaved={vi.fn()} onDirtyChange={dirty} />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "edited" } });
-  expect(dirty).toHaveBeenLastCalledWith(true);
-  expect(screen.getByRole("status")).toHaveTextContent("尚未保存");
+function comparison(extra: Partial<Comparison> = {}): Comparison {
+  return {
+    left: versions[1],
+    right: versions[0],
+    changes: [
+      {
+        path: `object_types/${customer.id}/description`,
+        kind: "changed",
+        before: "企业客户",
+        after: customer.description,
+      },
+    ],
+    impacts: [{ kind: "object_type", id: customer.id, label: customer.name }],
+    ...extra,
+  };
+}
+
+const open = () => fireEvent.click(screen.getByText("比较历史版本"));
+
+it("compares the latest version with an empty baseline when opened", async () => {
+  vi.mocked(api.comparison).mockResolvedValue(comparison({ left: null }));
+  renderWithProviders(<HistoryComparison workspaceId="w1" versions={versions} />);
+  expect(api.comparison).not.toHaveBeenCalled();
+
+  open();
+  await waitFor(() => expect(api.comparison).toHaveBeenCalledWith("w1", "v2", undefined));
+  expect(await screen.findByText("1 项变化 · 1 个模型内依赖")).toBeInTheDocument();
+  expect(screen.getByText(`影响：${customer.name}`)).toBeInTheDocument();
+  const row = screen.getByText(`object_types/${customer.id}/description`).closest("tr")!;
+  expect(within(row).getByText("修改")).toBeInTheDocument();
+  expect(within(row).getByText(`"企业客户"`)).toBeInTheDocument();
+  expect(within(row).getByText(`"${customer.description}"`)).toBeInTheDocument();
 });
 
-it("protects in-flight saves and reports failure without dropping edited rules", async () => {
-  let reject!: (error: Error) => void;
-  vi.mocked(modelingApi.save).mockImplementation(
-    () =>
-      new Promise((_, no) => {
-        reject = no;
-      }),
-  );
-  const busy = vi.fn(),
-    saved = vi.fn();
-  render(<WorkspaceConstraints session={session} onSaved={saved} onBusyChange={busy} />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "  edited  " } });
-  fireEvent.click(screen.getByRole("button", { name: "保存空间约束" }));
-  expect(busy).toHaveBeenLastCalledWith(true);
-  expect(screen.getByRole("textbox")).toBeDisabled();
-  expect(modelingApi.save).toHaveBeenCalledWith(session, {
-    ...session.draft,
-    ontology_requires: ["edited"],
-  });
-  await act(async () => reject(new Error("修订冲突")));
-  expect(busy).toHaveBeenLastCalledWith(false);
-  expect(saved).not.toHaveBeenCalled();
-  expect(screen.getByRole("textbox")).toHaveValue("  edited  ");
-  expect(screen.getByRole("alert")).toHaveTextContent("修订冲突");
+it("compares against the chosen baseline and asks for two different versions", async () => {
+  vi.mocked(api.comparison).mockResolvedValue(comparison());
+  renderWithProviders(<HistoryComparison workspaceId="w1" versions={versions} />);
+  open();
+  await screen.findByText("1 项变化 · 1 个模型内依赖");
+
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "比较基线" }));
+  fireEvent.click(await screen.findByTitle("v1"));
+  await waitFor(() => expect(api.comparison).toHaveBeenLastCalledWith("w1", "v2", "v1"));
+
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "比较目标" }));
+  const targets = await screen.findAllByTitle("v1");
+  fireEvent.click(targets[targets.length - 1]);
+  expect(await screen.findByText("请选择不同版本。")).toBeInTheDocument();
+  expect(api.comparison).toHaveBeenCalledTimes(2);
+});
+
+it("shows why a comparison failed", async () => {
+  vi.mocked(api.comparison).mockRejectedValue(new Error("版本不存在"));
+  renderWithProviders(<HistoryComparison workspaceId="w1" versions={versions} />);
+  open();
+  expect(await screen.findByText("版本不存在")).toBeInTheDocument();
 });

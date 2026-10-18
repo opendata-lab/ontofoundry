@@ -13,15 +13,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
-from ontofoundry_api.domain.snapshot import as_v3_dict
+from ontofoundry_api.domain.models import COLLECTIONS
+from ontofoundry_api.domain.snapshot import empty_snapshot, read_snapshot_json
 
 from .element_diff import element_changes, element_label
 from .merge import merge_snapshots
 
 COLLECTION_KIND = {collection: kind.value for kind, collection in COLLECTIONS.items()}
 # Fields whose values are sets: both sides' additions can be kept together.
-SET_FIELDS = {"tags", "precondition_rule_ids"}
+SET_FIELDS = {"tags", "synonyms"}
 
 
 @dataclass
@@ -44,9 +44,28 @@ def three_way(
     workspace_id: str,
     resolutions: dict[str, Any] | None = None,
 ) -> Merge:
-    base = as_v3_dict(base, workspace_id)
-    latest = as_v3_dict(latest, workspace_id)
-    draft = deepcopy(draft) if draft.get("schema_version") == "3" else as_v3_dict(draft, workspace_id)
+    base = (
+        read_snapshot_json(base, workspace_id)
+        if base is not None
+        else empty_snapshot(workspace_id)
+    )
+    latest = (
+        read_snapshot_json(latest, workspace_id)
+        if latest is not None
+        else empty_snapshot(workspace_id)
+    )
+    # Published snapshots are complete graphs; an editing draft can still have
+    # semantic errors. Merge its traversable structure and report those errors
+    # in preview, then enforce the final graph at publication.
+    if draft.get("schema_version") != "core-1" or str(draft.get("workspace_id")) != str(
+        workspace_id
+    ):
+        from ontofoundry_api.services.errors import ServiceError
+
+        raise ServiceError("草稿格式或空间无效", code="VALIDATION_FAILED", status_code=422)
+    draft = deepcopy(draft)
+    for collection in COLLECTIONS.values():
+        draft.setdefault(collection, [])
     merged, raw = merge_snapshots(base, latest, draft, resolutions)
     elements = {
         str(e["id"]): (COLLECTION_KIND[c], e)
@@ -71,13 +90,17 @@ def _conflict(raw: dict[str, Any], elements: dict[str, tuple[str, dict]]) -> dic
     else:
         kind = "field"
         allowed = ["latest", "draft", "custom"]
-        if field.split("/")[0] in SET_FIELDS or (not element_id and collection in SET_FIELDS):
+        if field.split("/")[0] in SET_FIELDS or (
+            not element_id and collection in SET_FIELDS
+        ):
             allowed.append("both")
     return {
         "key": raw["path"],
         "element_kind": kind_value or None,
         "element_id": element_id or None,
-        "element_label": element_label(kind_value, element, elements) if element else collection,
+        "element_label": element_label(kind_value, element, elements)
+        if element
+        else collection,
         "path": field or collection,
         "kind": kind,
         "base": raw["base"],
@@ -96,14 +119,6 @@ def auto_merged(merge: Merge) -> list[dict[str, Any]]:
     return [{**c, "side": "both" if c["element_id"] in mine else "latest"} for c in theirs]
 
 
-def requires_change(merge: Merge) -> dict[str, list[str]] | None:
-    """The workspace constraints publishing changes, or None. They are a set:
-    reordering alone changes nothing."""
-    before = list(merge.latest.get("ontology_requires") or [])
-    after = list(merge.merged.get("ontology_requires") or [])
-    return None if before == after else {"before": before, "after": after}
-
-
 def element_labels(*snapshots: dict[str, Any]) -> dict[str, str]:
     """Display labels by element id, so the preview names references in any
     of the snapshots, including ones only the latest version or the merge has."""
@@ -119,39 +134,30 @@ def element_labels(*snapshots: dict[str, Any]) -> dict[str, str]:
     return labels
 
 
-def impacts(changes: list[dict[str, Any]], merged: dict[str, Any]) -> list[dict[str, Any]]:
-    """Elements not changed themselves but depending on something that was."""
-    changed = {c["element_id"] for c in changes}
-    result = []
-    references = {
-        ElementKind.PROPERTY.value: ("owner_type_id",),
-        ElementKind.LINK_TYPE.value: ("source_type_id", "target_type_id"),
-        ElementKind.RULE.value: ("owner_id",),
-        ElementKind.ACTION.value: ("input_type_id",),
-        ElementKind.MAPPING.value: ("type_id",),
-        ElementKind.MATERIAL_OBJECT.value: ("type_id",),
+def impacts(changes, merged):
+    from uuid import UUID
+
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.dependencies import reverse_dependencies
+
+    changed = {UUID(c["element_id"]) for c in changes}
+    try:
+        draft = CoreDraft.model_validate(merged)
+        affected = reverse_dependencies(draft, changed)
+    except (ValueError, KeyError):
+        return []
+    labels = element_labels(merged)
+    kinds = {
+        str(e.id): kind.value
+        for kind, collection in COLLECTIONS.items()
+        for e in getattr(draft, collection)
     }
-    labels = {
-        str(e["id"]): (COLLECTION_KIND[c], e)
-        for c in COLLECTIONS.values()
-        for e in merged.get(c) or []
-    }
-    for kind, collection in ((k.value, c) for k, c in COLLECTIONS.items()):
-        for element in merged.get(collection) or []:
-            if str(element["id"]) in changed:
-                continue
-            hits = [
-                labels[str(element.get(field))][1].get("name", "")
-                for field in references.get(kind, ())
-                if str(element.get(field)) in changed and str(element.get(field)) in labels
-            ]
-            if hits:
-                result.append(
-                    {
-                        "element_kind": kind,
-                        "element_id": str(element["id"]),
-                        "label": element_label(kind, element, labels),
-                        "reason": "引用了已变更的 " + "、".join(hits),
-                    }
-                )
-    return result
+    return [
+        {
+            "element_kind": kinds[str(i)],
+            "element_id": str(i),
+            "label": labels[str(i)],
+            "reason": "引用了已变更的定义",
+        }
+        for i in sorted(affected)
+    ]

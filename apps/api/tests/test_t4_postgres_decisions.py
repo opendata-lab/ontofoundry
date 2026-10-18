@@ -29,22 +29,32 @@ def race(calls):
 def test_concurrent_replays_of_one_request_apply_once(pg_client):
     session = create_session(pg_client)
     target = session["draft"]["object_types"][0]
-    (item,) = seed_batch(pg_client, session, [update("object_type", target, description="并发")])["items"]
+    (item,) = seed_batch(
+        pg_client, session, [update("object_type", target, description="并发")]
+    )["items"]
 
-    results = race([lambda: decide(pg_client, session, [(item["id"], "accept")], key="same-key-0001")] * 3)
+    results = race(
+        [lambda: decide(pg_client, session, [(item["id"], "accept")], key="same-key-0001")]
+        * 3
+    )
 
     assert [r.status_code for r in results] == [200, 200, 200], [r.text for r in results]
     assert results[0].json() == results[1].json() == results[2].json()
     after = pg_client.get(ROOT + f"/sessions/{session['id']}").json()
     assert after["revision"] == session["revision"] + 1
     with pg_client.app.state.session_factory() as db:
-        assert db.scalar(sa.select(sa.func.count()).select_from(ProposalDecisionRequestRecord)) == 1
+        assert (
+            db.scalar(sa.select(sa.func.count()).select_from(ProposalDecisionRequestRecord))
+            == 1
+        )
 
 
 def test_a_serial_replay_after_success_returns_the_first_response(pg_client):
     session = create_session(pg_client)
     target = session["draft"]["object_types"][0]
-    (item,) = seed_batch(pg_client, session, [update("object_type", target, description="串行")])["items"]
+    (item,) = seed_batch(
+        pg_client, session, [update("object_type", target, description="串行")]
+    )["items"]
     first = decide(pg_client, session, [(item["id"], "accept")], key="serial-key-01")
     again = decide(pg_client, session, [(item["id"], "accept")], key="serial-key-01")
     assert first.status_code == again.status_code == 200
@@ -54,12 +64,18 @@ def test_a_serial_replay_after_success_returns_the_first_response(pg_client):
 def test_two_different_requests_on_one_item_let_one_win(pg_client):
     session = create_session(pg_client)
     target = session["draft"]["object_types"][0]
-    (item,) = seed_batch(pg_client, session, [update("object_type", target, description="竞争")])["items"]
+    (item,) = seed_batch(
+        pg_client, session, [update("object_type", target, description="竞争")]
+    )["items"]
 
     results = race(
         [
-            lambda: decide(pg_client, session, [(item["id"], "accept")], key="racer-key-a1"),
-            lambda: decide(pg_client, session, [(item["id"], "accept")], key="racer-key-b2"),
+            lambda: decide(
+                pg_client, session, [(item["id"], "accept")], key="racer-key-a1"
+            ),
+            lambda: decide(
+                pg_client, session, [(item["id"], "accept")], key="racer-key-b2"
+            ),
         ]
     )
 
@@ -83,7 +99,39 @@ def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
     )
 
     assert sorted(r.status_code for r in results) == [200, 409], [r.text for r in results]
-    draft = pg_client.get(ROOT + f"/sessions/{session['id']}").json()["draft"]
-    assert sum(t["technical_name"] == "purchase_order" for t in draft["object_types"]) == 1
-    assert sum(p["technical_name"] == "order_no" for p in draft["properties"]) == 1
-    assert sum(link["technical_name"] == "supplied_by" for link in draft["link_types"]) == 1
+    after = pg_client.get(ROOT + f"/sessions/{session['id']}").json()
+    assert after["revision"] == session["revision"] + 1
+    draft = after["draft"]
+    assert (
+        sum(
+            t["id"] == po["target_id"] and t["technical_name"] == "purchase_order"
+            for t in draft["object_types"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            p["owner_type_id"] == po["target_id"] and p["technical_name"] == "order_no"
+            for p in draft["properties"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            item["id"] == prop["target_id"]
+            and item["owner_type_id"] == po["target_id"]
+            and item["technical_name"] == "order_no"
+            for item in draft["properties"]
+        )
+        == 1
+    )
+    assert (
+        sum(
+            item["id"] == link["target_id"]
+            and item["technical_name"] == "supplied_by"
+            and item["source_type_id"] == po["target_id"]
+            and item["target_type_id"] == session["draft"]["object_types"][0]["id"]
+            for item in draft["link_types"]
+        )
+        == 1
+    )

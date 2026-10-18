@@ -279,11 +279,25 @@ def test_history_shows_the_users_words_and_never_a_run_credential(client, monkey
         f"Authorization: Bearer {credential}\n\n[用户消息]\n补充采购员"
     )
     items = [
-        {"message_id": "m1", "topic_id": "topic-1", "sender_type": "user",
-         "type": "text", "content": prompt, "seq_id": 1},
-        {"message_id": "m2", "topic_id": "topic-1", "sender_type": "assistant",
-         "type": "text", "content": "完成", "seq_id": 2,
-         "blocks": [{"type": "tool", "input": {"command": f'TOKEN="{credential}" curl …'}}]},
+        {
+            "message_id": "m1",
+            "topic_id": "topic-1",
+            "sender_type": "user",
+            "type": "text",
+            "content": prompt,
+            "seq_id": 1,
+        },
+        {
+            "message_id": "m2",
+            "topic_id": "topic-1",
+            "sender_type": "assistant",
+            "type": "text",
+            "content": "完成",
+            "seq_id": 2,
+            "blocks": [
+                {"type": "tool", "input": {"command": f'TOKEN="{credential}" curl …'}}
+            ],
+        },
     ]
     _install_transport(monkeypatch, lambda _r: _messages_response(items, page=1, total=2))
 
@@ -302,8 +316,8 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
     material_id = str(uuid4())
     material_content = b"material"
     material_sha = "a" * 64
-    material_path = client.app.state.settings.data_dir / str(DEMO_WORKSPACE_ID) / (
-        material_sha + ".md"
+    material_path = (
+        client.app.state.settings.data_dir / str(DEMO_WORKSPACE_ID) / (material_sha + ".md")
     )
     material_path.parent.mkdir(parents=True, exist_ok=True)
     material_path.write_bytes(material_content)
@@ -354,9 +368,15 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
 
     _install_transport(monkeypatch, handler)
     base = _endpoint(session["id"])
-    assert client.post(base + "/messages", json={"content": "one", "metadata": {}}).status_code == 202
+    assert (
+        client.post(base + "/messages", json={"content": "one", "metadata": {}}).status_code
+        == 202
+    )
     assert client.get(base).status_code == 200
-    assert client.post(base + "/messages", json={"content": "two", "metadata": {}}).status_code == 202
+    assert (
+        client.post(base + "/messages", json={"content": "two", "metadata": {}}).status_code
+        == 202
+    )
 
     material_uploads = [body for body in uploaded_names if "source.md" in body]
     context_uploads = [body for body in uploaded_names if "ontofoundry-context" in body]
@@ -657,9 +677,7 @@ def test_events_transform_frames_ping_resubscribe_and_done_after_reconcile(
         return None
 
     _install_transport(monkeypatch, handler)
-    monkeypatch.setattr(
-        "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
-    )
+    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
     monkeypatch.setattr("ontofoundry_api.api.agent_conversation.asyncio.sleep", no_sleep)
     response = client.get(_endpoint(session["id"]) + "/events")
     assert response.status_code == 200, response.text
@@ -694,9 +712,7 @@ def test_events_back_off_when_active_stream_repeatedly_ends_empty(client, monkey
         if request.url.path.endswith("/tasks/task-1"):
             task_count += 1
             status = "running" if task_count <= 3 else "finished"
-            return httpx.Response(
-                200, json={"task_id": "task-1", "task_status": status}
-            )
+            return httpx.Response(200, json={"task_id": "task-1", "task_status": status})
         raise AssertionError(request.url.path)
 
     async def record_sleep(delay):
@@ -827,9 +843,7 @@ def test_snapshot_result_reconcile_returns_the_new_task_owner(client, monkeypatc
         return ""
 
     _install_transport(monkeypatch, handler)
-    monkeypatch.setattr(
-        "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
-    )
+    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
     response = client.get(_endpoint(session["id"]))
     assert response.status_code == 200, response.text
     assert response.json()["run"] == {
@@ -1011,9 +1025,7 @@ def test_stale_reconciler_cannot_fail_a_newer_run(client, monkeypatch):
     assert row.task_status == "running"
 
 
-def test_stale_first_submit_without_topic_is_released_and_can_retry(
-    client, monkeypatch
-):
+def test_stale_first_submit_without_topic_is_released_and_can_retry(client, monkeypatch):
     _configure(client)
     session = _create_session(client)
     _set_session(
@@ -1089,9 +1101,7 @@ def test_old_event_stream_closes_without_completing_a_new_task(client, monkeypat
     assert row.task_status == "running"
 
 
-def test_events_waits_when_exhaustion_loses_to_a_new_result_lease(
-    client, monkeypatch
-):
+def test_events_waits_when_exhaustion_loses_to_a_new_result_lease(client, monkeypatch):
     _configure(client)
     session = _create_session(client)
     _set_session(
@@ -1125,9 +1135,7 @@ def test_events_waits_when_exhaustion_loses_to_a_new_result_lease(
         return None
 
     _install_transport(monkeypatch, handler)
-    monkeypatch.setattr(
-        "ontofoundry_api.api.agent_conversation.reconcile_run", reconcile
-    )
+    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
     monkeypatch.setattr(
         "ontofoundry_api.api.agent_conversation.exhaust_retriable_result",
         lambda *args: "processing",
@@ -1160,9 +1168,7 @@ def test_cancel_and_interactions_dispatch_by_kind(client, monkeypatch):
             return httpx.Response(200, json={"ok": True})
         if request.url.path.endswith("/question-answer"):
             return httpx.Response(200, json={"ok": True})
-        return httpx.Response(
-            200, json={"task_id": "task-1", "task_status": "suspended"}
-        )
+        return httpx.Response(200, json={"task_id": "task-1", "task_status": "suspended"})
 
     _install_transport(monkeypatch, handler)
     base = _endpoint(session["id"])

@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, publishApi } from "../../api/client";
 import type { MergeConflict, ModelingSession, PublishPreview } from "../../api/types";
-import { emptyDraft } from "../../lib/draftView";
+import { emptyDraft } from "../../lib/coreModel";
+import { UiProvider } from "../../theme/UiProvider";
 import { lineDiff } from "../../lib/lineDiff";
 import { PublishPanel } from "./PublishPanel";
 import { MemoryRouter } from "react-router-dom";
@@ -30,8 +31,9 @@ function preview(extra: Partial<PublishPreview> = {}): PublishPreview {
     next_version_number: 3,
     current_version_sha256: "c".repeat(64),
     merged_snapshot_sha256: "m".repeat(64),
+    merged_model: emptyDraft("w"),
     validation: {
-      standard: "",
+      standard: "core-1",
       schema_status: "passed",
       semantic_status: "passed",
       errors: [],
@@ -45,20 +47,19 @@ function preview(extra: Partial<PublishPreview> = {}): PublishPreview {
         label: "供应商",
         change: "updated",
         field_changes: [{ path: "description", before: "旧定义", after: "新定义" }],
-        before: {},
-        after: {},
+        before: {} as never,
+        after: {} as never,
       },
       {
-        element_kind: "action",
+        element_kind: "metric",
         element_id: "a",
-        label: "审批供应商",
+        label: "订单数",
         change: "created",
         field_changes: [],
         before: null,
-        after: {},
+        after: { name: "订单数", technical_name: "order_count" } as never,
       },
     ],
-    requires_change: null,
     labels: {},
     impacts: [],
     auto_merged: [
@@ -68,12 +69,11 @@ function preview(extra: Partial<PublishPreview> = {}): PublishPreview {
         label: "物料",
         change: "updated",
         field_changes: [],
-        before: {},
-        after: {},
+        before: {} as never,
+        after: {} as never,
         side: "latest",
       },
     ],
-    ossie: { version: "0.2.0.dev0" },
     ...extra,
   };
 }
@@ -100,13 +100,19 @@ const renderPanel = (props: Partial<Parameters<typeof PublishPanel>[0]> = {}) =>
       onStale={vi.fn()}
       {...props}
     />,
-    { wrapper: MemoryRouter },
+    {
+      wrapper: ({ children }) => (
+        <UiProvider>
+          <MemoryRouter>{children}</MemoryRouter>
+        </UiProvider>
+      ),
+    },
   );
 
 /** Open the confirm dialog from the top-right button and confirm. */
 async function publishFromHeader(version: number, note = "") {
   fireEvent.click(await screen.findByRole("button", { name: `发布 v${version}` }));
-  const dialog = await screen.findByRole("dialog", { name: `发布 v${version}` });
+  const dialog = await screen.findByRole("dialog");
   if (note) fireEvent.change(within(dialog).getByPlaceholderText("说明本次模型变化"), { target: { value: note } });
   fireEvent.click(within(dialog).getByRole("button", { name: "确认发布" }));
   return dialog;
@@ -127,12 +133,12 @@ describe("publish panel", () => {
     expect(screen.getByLabelText("变更计数")).toHaveTextContent("+1~1−0");
     expect(screen.getByText("会话开始于 v1，之后发布的 v2 已纳入合并")).toBeInTheDocument();
     expect(screen.getByText("本次发布将改变的内容")).toBeInTheDocument();
-    expect(screen.getByText("仅定义")).toBeInTheDocument();
+    expect(screen.getByLabelText("指标 订单数")).toBeInTheDocument();
     expect(screen.getByText(/会话开始后已发布的变化 1/)).toBeInTheDocument();
     expect(screen.queryByText(/草稿/)).not.toBeInTheDocument();
-    const card = screen.getByRole("article", { name: "实体 供应商" });
+    const card = screen.getByLabelText("对象 供应商").closest(".ant-collapse-item") as HTMLElement;
     expect(within(card).getByText("新定义")).toBeInTheDocument();
-    fireEvent.click(within(card).getByRole("button", { name: "JSON" }));
+    fireEvent.click(within(card).getByText("JSON"));
     expect(within(card).getByText("发布后")).toBeInTheDocument();
 
     const dialog = await publishFromHeader(3, "上线");
@@ -188,19 +194,7 @@ describe("publish panel", () => {
     vi.spyOn(publishApi, "preview").mockResolvedValue(preview({ changes: [], auto_merged: [] }));
     renderPanel();
     expect(await screen.findByRole("button", { name: "发布 v3" })).toBeDisabled();
-    expect(screen.getByText("本会话不会改变当前发布版本。")).toBeInTheDocument();
-  });
-
-  it("publishes a change to workspace constraints alone", async () => {
-    vi.spyOn(publishApi, "preview").mockResolvedValue(
-      preview({ changes: [], auto_merged: [], requires_change: { before: ["旧约束"], after: ["新约束"] } }),
-    );
-    renderPanel();
-    expect(await screen.findByRole("button", { name: "发布 v3" })).toBeEnabled();
-    const card = screen.getByRole("article", { name: "空间 工作空间约束" });
-    expect(within(card).getByText("新约束")).toBeInTheDocument();
-    expect(within(card).getByText("旧约束")).toBeInTheDocument();
-    expect(screen.getByLabelText("变更计数")).toHaveTextContent("+0~1−0");
+    expect(screen.getAllByText("本会话不会改变当前发布版本").length).toBeGreaterThan(0);
   });
 
   it("does not show checks as passed when the preview failed", async () => {
@@ -208,9 +202,9 @@ describe("publish panel", () => {
     renderPanel();
     await screen.findByText(/网络错误/);
     fireEvent.click(screen.getByRole("tab", { name: /检查/ }));
-    const checks = screen.getByRole("tabpanel", { name: /检查/ });
+    const checks = screen.getByText("合并冲突").closest("ul")!;
     expect(within(checks).getAllByText("等待预览").length).toBe(2);
-    expect(checks.querySelector(".check-pass")).toBeNull();
+    expect(within(checks).queryByText("无冲突")).toBeNull();
   });
 
   it("starts a long list collapsed", async () => {
@@ -221,24 +215,29 @@ describe("publish panel", () => {
     }));
     vi.spyOn(publishApi, "preview").mockResolvedValue(preview({ changes: many }));
     renderPanel();
-    expect(await screen.findByRole("button", { name: "展开 实体0" })).toHaveAttribute("aria-expanded", "false");
+    const header = (await screen.findByLabelText("对象 实体0")).closest("[aria-expanded]")!;
+    expect(header).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(screen.getByRole("button", { name: "全部展开" }));
-    expect(screen.getByRole("button", { name: "收起 实体0" })).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(header).toHaveAttribute("aria-expanded", "true"));
   });
 
-  it("switches tabs with the arrow keys", async () => {
-    vi.spyOn(publishApi, "preview").mockResolvedValue(preview());
-    renderPanel();
-    await screen.findByRole("button", { name: "发布 v3" });
-    fireEvent.keyDown(screen.getByRole("tab", { name: /变更/ }), { key: "ArrowRight" });
-    expect(screen.getByRole("tab", { name: /检查/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: /检查/ })).toHaveFocus();
-  });
-
-  it("resolves conflicts one at a time and saves them together", async () => {
+  it("resolves conflicts one at a time, initializing null string custom text to empty string and non-string to JSON", async () => {
+    const nullStringConflict: MergeConflict = {
+      ...conflict,
+      draft: null,
+    };
+    const nullNonStringConflict: MergeConflict = {
+      ...conflict,
+      key: "/object_types/t/tags",
+      path: "tags",
+      base: ["a"],
+      latest: ["b"],
+      draft: null,
+      allowed: ["latest", "draft", "custom", "both"],
+    };
     vi.spyOn(publishApi, "preview").mockRejectedValue(
       new ApiError("冲突", 409, "MERGE_CONFLICTS", undefined, {
-        conflicts: [conflict, { ...conflict, key: "/object_types/t/tags", path: "tags", allowed: ["latest", "draft", "custom", "both"] }],
+        conflicts: [nullStringConflict, nullNonStringConflict],
         current_version_id: "v2",
       }),
     );
@@ -249,8 +248,11 @@ describe("publish panel", () => {
     const save = screen.getByRole("button", { name: "应用到会话并重新预览" });
     expect(save).toBeDisabled();
     fireEvent.click(screen.getByRole("radio", { name: /自定义/ }));
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "合并后" } });
+    expect(screen.getByRole("textbox", { name: "合并后的内容" })).toHaveValue("");
+    fireEvent.change(screen.getByRole("textbox", { name: "合并后的内容" }), { target: { value: "合并后" } });
     fireEvent.click(screen.getByRole("button", { name: "下一个" }));
+    fireEvent.click(screen.getByRole("radio", { name: /自定义/ }));
+    expect(screen.getByRole("textbox", { name: "合并后的内容" })).toHaveValue("null");
     fireEvent.click(screen.getByRole("radio", { name: /都保留/ }));
     expect(screen.getByText("已解决 2 / 2")).toBeInTheDocument();
     fireEvent.click(save);
@@ -259,6 +261,65 @@ describe("publish panel", () => {
       "/object_types/t/description": { choice: "custom", value: "合并后" },
       "/object_types/t/tags": { choice: "both" },
     });
+  });
+
+  it("shows document fact display names for material_link source_id and target_id in publish preview", async () => {
+    const draftWithFacts = {
+      ...emptyDraft("w"),
+      object_types: [
+        {
+          id: "ot-c",
+          name: "客户",
+          technical_name: "customer",
+          description: "",
+          extends: null,
+          derived_by: [],
+          title_property_id: "p-name",
+          synonyms: [],
+          tags: [],
+          evidence: [],
+        },
+      ],
+      properties: [
+        {
+          id: "p-name",
+          owner_type_id: "ot-c",
+          name: "名称",
+          technical_name: "name",
+          description: "",
+          value_kind: "string" as const,
+          identifier: true,
+          unique: true,
+          required: true,
+          synonyms: [],
+          evidence: [],
+        },
+      ],
+      material_objects: [
+        { id: "mo-1", type_id: "ot-c", values: { name: "星海公司" }, evidence: [] },
+        { id: "mo-2", type_id: "ot-c", values: { name: "远航集团" }, evidence: [] },
+      ],
+    };
+    vi.spyOn(publishApi, "preview").mockResolvedValue(
+      preview({
+        merged_model: draftWithFacts,
+        changes: [
+          {
+            element_kind: "material_link",
+            element_id: "ml-1",
+            label: "合作关系",
+            change: "created",
+            field_changes: [],
+            before: null,
+            after: { id: "ml-1", type_id: "lt-1", source_id: "mo-1", target_id: "mo-2" } as never,
+          },
+        ],
+      }),
+    );
+    renderPanel({ session: { ...session, draft: draftWithFacts } });
+    await screen.findByRole("button", { name: "发布 v3" });
+    expect(screen.getByText("星海公司")).toBeInTheDocument();
+    expect(screen.getByText("远航集团")).toBeInTheDocument();
   });
 
   it("re-merges when the version moved while resolving", async () => {

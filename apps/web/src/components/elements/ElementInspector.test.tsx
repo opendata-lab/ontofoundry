@@ -1,807 +1,496 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  api,
-  ApiError,
-  modelingApi,
-  publishApi,
-  workspaceRequest,
-} from "../../api/client";
-import type {
-  Draft,
-  LegacyDraft,
-  ModelingSession,
-  MappingNode,
-  NativeDraft,
-  Workspace,
-} from "../../api/types";
-import { emptyDraft } from "../../lib/draftView";
-import { nativeMappingFixture } from "../../lib/objectMapping.fixture";
+import { api, ApiError, modelingApi } from "../../api/client";
+import type { Draft, ElementSaveResult, Workspace } from "../../api/types";
 import { WorkspaceContextProvider } from "../../hooks/useWorkspaceContext";
+import { example } from "../../test/drafts";
+import { renderWithProviders } from "../../test/renderWithProviders";
 import { ElementInspector } from "./ElementInspector";
 
 vi.mock("../../api/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../api/client")>();
   return {
     ...original,
-    api: { ...original.api, workspace: vi.fn() },
+    api: { ...original.api, workspace: vi.fn(), presentation: vi.fn() },
     modelingApi: {
       ...original.modelingApi,
       snapshot: vi.fn(),
       get: vi.fn(),
+      previewElementSave: vi.fn(),
       saveElement: vi.fn(),
-      connections: vi.fn(),
-      tables: vi.fn(),
     },
-    publishApi: { ...original.publishApi, preview: vi.fn() },
-    workspaceRequest: vi.fn(),
+    catalogApi: { ...original.catalogApi, mappingPreview: vi.fn() },
+    metricsApi: { preview: vi.fn() },
   };
 });
-const workspace = {
-  id: "w",
-  name: "测试空间",
-  role: "admin",
-  version_id: "v1",
-  current_version: 1,
-} as Workspace;
+
+const workspace = { id: "w", name: "测试空间", role: "admin", version_id: "v1", current_version: 1 } as Workspace;
 const refresh = vi.fn();
-function legacy(): LegacyDraft {
-  return {
-    ...emptyDraft("w"),
-    object_types: [
-      {
-        id: "supplier",
-        name: "供应商",
-        technical_name: "supplier",
-        description: "供应商说明 别名：供方",
-        tags: [],
-        extends: [],
-        evidence: [],
-      },
-      {
-        id: "product",
-        name: "产品",
-        technical_name: "product",
-        description: "",
-        tags: [],
-        extends: [],
-        evidence: [],
-      },
-    ],
-    properties: [
-      {
-        id: "code",
-        owner_type_id: "supplier",
-        name: "编码",
-        technical_name: "code",
-        description: "",
-        value_kind: "string",
-        identifier: true,
-        required: true,
-        evidence: [],
-        verbalizes: [],
-      },
-      {
-        id: "name",
-        owner_type_id: "supplier",
-        name: "名称",
-        technical_name: "name",
-        description: "",
-        value_kind: "string",
-        identifier: false,
-        required: false,
-        evidence: [],
-        verbalizes: [],
-      },
-    ],
-    mappings: [
-      {
-        id: "mapping",
-        type_id: "supplier",
-        connection_alias: "warehouse",
-        table_name: "dim_supplier",
-        schema_name: "public",
-        key_column: "supplier_code",
-        fields: { code: "supplier_code" },
-      },
-    ],
-  };
-}
-function show(
-  draft: Draft = legacy(),
-  tab = "properties",
-  role: Workspace["role"] = "admin",
-  session = false,
-  initialHref?: string,
-) {
-  vi.mocked(workspaceRequest).mockResolvedValue({ model: draft });
+
+function show(draft: Draft, query: string, role: Workspace["role"] = "admin") {
   vi.mocked(modelingApi.snapshot).mockResolvedValue(draft);
-  vi.mocked(modelingApi.get).mockResolvedValue({
-    id: "s",
-    revision: 7,
-    draft,
-    workspace_id: "w",
-  } as ModelingSession);
-  const href = `/workspaces/w/objects?inspect=object_type:${draft.object_types[0].id}&inspectTab=${tab}${session ? "&session=s" : ""}`;
+  vi.mocked(api.presentation).mockResolvedValue({ model: draft, version: {} as never });
   const router = createMemoryRouter(
     [
       {
         path: "/workspaces/:workspaceId/*",
         element: (
-          <WorkspaceContextProvider.Provider
-            value={{
-              workspace: { ...workspace, role },
-              refresh,
-              user: { id: "u" } as never,
-            }}
-          >
+          <WorkspaceContextProvider.Provider value={{ workspace: { ...workspace, role }, refresh, user: { id: "u" } as never }}>
             <ElementInspector />
           </WorkspaceContextProvider.Provider>
         ),
       },
     ],
-    { initialEntries: [initialHref ?? href] },
+    { initialEntries: [`/workspaces/w/objects?${query}`] },
   );
-  render(<RouterProvider router={router} />);
+  renderWithProviders(<RouterProvider router={router} />);
   return router;
 }
-const dialog = () => screen.findByRole("dialog", { name: "供应商" });
+
+const saved = (draft: Draft): ElementSaveResult => ({
+  version: { version_id: "v2" } as never,
+  draft,
+  session: null,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.workspace).mockResolvedValue(workspace);
-  vi.mocked(modelingApi.connections).mockResolvedValue({ items: [] });
-  vi.mocked(modelingApi.tables).mockResolvedValue({ items: [] });
+  vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+    current_version_id: "v1",
+    session_revision: null,
+    affected_items: [],
+  });
 });
 afterEach(cleanup);
 
-describe("approved object popup", () => {
-  it("shows exact populated tabs and counts, hides empty tabs, and supports keyboard switching", async () => {
-    show();
-    const element = await dialog();
-    expect(
-      within(element)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
-    ).toEqual(["概览", "属性与映射2", "实例"]);
-    expect(element.querySelector("header")).toHaveTextContent(
-      "部分映射 · public.dim_supplier",
-    );
-    expect(
-      within(element).queryByRole("button", { name: "高级" }),
-    ).not.toBeInTheDocument();
-    fireEvent.keyDown(
-      within(element).getByRole("tab", { name: "属性与映射 2" }),
-      { key: "Home" },
-    );
+describe("object popup", () => {
+  it("shows the populated tabs, mapping status and column bindings", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties`);
+    const dialog = await screen.findByRole("dialog");
     await waitFor(() =>
-      expect(within(element).getByRole("tab", { name: "概览" })).toHaveFocus(),
+      expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "属性与映射4", "关系1", "实例"]),
     );
+    expect(within(dialog).getByText("已映射")).toBeInTheDocument();
+    expect(within(dialog).getByText("main.customer_id")).toBeInTheDocument();
+    expect(within(dialog).getByText(/^customers/)).toBeInTheDocument();
   });
-  it("hides a zero-property tab and includes inherited relations and rules exactly once", async () => {
-    const draft = legacy();
-    draft.properties = [];
-    draft.object_types[0].extends = ["product", "product"];
-    draft.link_types = [
-      {
-        id: "parent-link",
-        name: "依赖",
-        technical_name: "depends_on",
-        description: "",
-        tags: [],
-        evidence: [],
-        source_type_id: "product",
-        target_type_id: "product",
-        multiplicity: "many_to_many",
-        verbalizes: [],
-      },
-    ];
-    draft.rules = [
-      {
-        id: "parent-rule",
-        owner_kind: "object_type",
-        owner_id: "product",
-        name: "product·constraint1",
-        technical_name: "generated",
-        expression: "EXISTS(code)",
-        description: "父类约束",
-        rule_kind: "constraint",
-        verbalizes: [],
-        evidence: [],
-      },
-    ];
-    show(draft, "relations");
-    const element = await dialog();
-    expect(
-      within(element)
-        .getAllByRole("tab")
-        .map((t) => t.textContent),
-    ).toEqual(["概览", "关系1", "规则1", "实例"]);
-    expect(within(element).getByText("继承")).toBeInTheDocument();
-    fireEvent.click(within(element).getByRole("row", { name: "查看依赖" }));
-    const relation = await screen.findByRole("dialog", { name: "依赖" });
-    expect(
-      within(relation).queryByRole("button", { name: "保存" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(within(relation).getByRole("button", { name: "编辑" }));
-    expect(
-      within(relation).getByRole("button", { name: "保存" }),
-    ).toBeDisabled();
-    expect(
-      within(relation).getByRole("button", { name: "编辑父对象" }),
-    ).toBeInTheDocument();
-    fireEvent.click(
-      within(relation).getByRole("button", { name: "编辑父对象" }),
-    );
-    const parent = await screen.findByRole("dialog", { name: "产品" });
-    expect(within(parent).getByRole("tab", { name: "关系 1" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-  });
-  it("shows synonyms and context inline and puts only evidence behind the basic-info icon", async () => {
-    const draft = legacy();
-    draft.object_types[0].concept_context = {
-      synonyms: ["供货主体"],
-      instructions: "与供货组织一致",
-    };
-    draft.object_types[0].evidence = [
-      {
-        kind: "manual",
-        id: "e1",
-        note: "访谈记录",
-        created_by: "u",
-        created_at: "2026-10-01",
-      },
-    ];
-    show(draft, "basic");
-    const element = await dialog();
-    expect(within(element).getByText("供方、供货主体")).toBeInTheDocument();
-    expect(within(element).getByText("与供货组织一致")).toBeInTheDocument();
-    fireEvent.click(within(element).getByRole("button", { name: "来源证据" }));
-    const evidence = await screen.findByRole("dialog", { name: "来源证据" });
-    expect(within(evidence).getByText("访谈记录")).toBeInTheDocument();
-    expect(
-      within(evidence).queryByText("供方、供货主体"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(evidence).queryByText("与供货组织一致"),
-    ).not.toBeInTheDocument();
-  });
-  it("omits empty metadata and the evidence icon when there is no evidence", async () => {
-    const draft = legacy();
-    draft.object_types[0].description = "";
-    show(draft, "basic");
-    const element = await dialog();
-    for (const label of ["同义词", "上下文说明", "描述", "继承自"])
-      expect(within(element).queryByText(label)).not.toBeInTheDocument();
-    expect(
-      within(element).queryByRole("button", { name: "来源证据" }),
-    ).not.toBeInTheDocument();
-  });
-  it("shows all source fields one per line, with short names and full hover names", async () => {
-    const native = nativeMappingFixture();
-    native.mapping_nodes.push(
-      {
-        id: "other-code-link",
-        parent_id: "properties",
-        kind: "link",
-        slot: "children",
-        relationship: "code",
-        concept_mapping_id: "cm-s",
-      },
-      {
-        id: "other-code-value",
-        parent_id: "other-code-link",
-        kind: "object",
-        slot: "object_mapping",
-        expression: "events.owner",
-        concept_mapping_id: "cm-s",
-      },
-    );
-    show(native);
-    const element = await dialog();
-    expect(
-      within(element)
-        .getAllByRole("columnheader")
-        .map((h) => h.textContent),
-    ).toEqual(["属性", "类型", "来源字段"]);
-    const row = within(element).getByText("编码").closest("tr")!;
-    expect(row.querySelectorAll(".om-entry")).toHaveLength(2);
-    expect(
-      within(row).getByTitle("public.dim_supplier.supplier_code"),
-    ).toHaveTextContent("dim_supplier.supplier_code");
-    expect(
-      within(row).getByTitle("public.fact_calls.supplier_code"),
-    ).toHaveTextContent("fact_calls.supplier_code");
-    expect(
-      within(element).getByRole("textbox", { name: "搜索属性" }),
-    ).toBeInTheDocument();
-    fireEvent.change(
-      within(element).getByRole("combobox", { name: "来源表" }),
-      { target: { value: "unbound" } },
-    );
-    expect(within(element).queryByText("编码")).not.toBeInTheDocument();
-    expect(within(element).getByText("名称")).toBeInTheDocument();
-  });
-  it("shows the derived tag and full wrapped expression inline without a content icon", async () => {
-    const native = nativeMappingFixture();
-    const expression = "CASE WHEN LOWER(name) = 'core' THEN 'Y' ELSE 'N' END";
-    native.dataset_fields.push({
-      id: "derived",
-      dataset_id: "s",
-      name: "normalized",
-      expression: { dialects: [{ dialect: "ANSI_SQL", expression }] },
+
+  it("edits the object and saves only its aggregate against the current version", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=basic`);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(await within(dialog).findByRole("button", { name: "编辑" }));
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "名称" }), { target: { value: "重要客户" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(payload).toMatchObject({
+      target_kind: "object_type",
+      target_id: customer.id,
+      expected_current_version_id: "v1",
+      session_id: null,
+      expected_session_revision: null,
     });
-    (native.mapping_nodes as MappingNode[]).find(
-      (n) => n.id === "code-value",
-    )!.expression = "suppliers.normalized";
-    show(native);
-    const element = await dialog();
-    const row = within(element).getByText("编码").closest("tr")!;
-    expect(within(row).getByText("派生")).toBeInTheDocument();
-    expect(within(row).getByText(`code = ${expression}`)).toHaveClass(
-      "om-binding-expression",
-    );
-    expect(within(row).queryByRole("button")).not.toBeInTheDocument();
+    expect(payload.draft.object_types.find((o) => o.id === customer.id)?.name).toBe("重要客户");
+    expect(await screen.findByRole("status")).toHaveTextContent("已保存");
+    expect(refresh).toHaveBeenCalled();
   });
-  it("shows a parent's declared property type with an inheritance tag", async () => {
-    const draft = legacy();
-    draft.object_types[0].extends = ["product"];
-    draft.properties.push({
-      ...draft.properties[1],
-      id: "parent-count",
-      owner_type_id: "product",
-      name: "数量",
-      technical_name: "quantity",
-      value_kind: "integer",
-    });
-    show(draft);
-    const element = await dialog();
-    const row = within(element).getByText("数量").closest("tr")!;
-    expect(within(row).getByText("整数")).toBeInTheDocument();
-    expect(within(row).getByText("继承")).toBeInTheDocument();
+
+  it("keeps edits and explains a version conflict", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types[0];
+    vi.mocked(modelingApi.saveElement).mockRejectedValue(new ApiError("当前版本已变化", 409, "VERSION_CHANGED"));
+    show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "改名" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("改名");
+  });
+
+  it("edits a child's member conditions on the direct parent's properties", async () => {
+    const draft = example("06-inheritance");
+    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText("哪些当事人属于VIP当事人")).toBeInTheDocument();
+    expect(within(dialog).getByRole("textbox", { name: "条件 1 的值" })).toHaveValue("VIP");
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "条件 1 的值" }), { target: { value: "SVIP" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(payload.draft.object_types.find((o) => o.id === vip.id)?.derived_by).toEqual([
+      { kind: "simple", conditions: [{ path: { links: [], property_id: expect.any(String) }, operator: "eq", values: ["SVIP"] }] },
+    ]);
+  });
+
+  it("lets visitors read the published presentation without editing", async () => {
+    const draft = example("01-basic-sales");
+    show(draft, `inspect=object_type:${draft.object_types[0].id}`, null);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "属性与映射4", "关系1"]));
+    expect(api.presentation).toHaveBeenCalledWith("w", "v1");
+    expect(within(dialog).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
+  });
+
+  it("shows virtual parent alert instead of main table picker when editing a virtual parent object", async () => {
+    const draft = example("06-inheritance");
+    const asset = draft.object_types.find((o) => o.technical_name === "asset")!;
+    show(draft, `inspect=object_type:${asset.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
     expect(
-      within(element).getByRole("tab", { name: "属性与映射 3" }),
+      await within(dialog).findByText("子对象已各自绑定数据集，本对象作为虚拟父对象不绑定主表"),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByRole("combobox", { name: "主表数据集" })).not.toBeInTheDocument();
+  });
+
+  it("clears derived_by and removes orphaned shared_parent mapping when parent object changes", async () => {
+    const draft = example("06-inheritance");
+    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    expect(draft.mappings.find((m) => m.type_id === vip.id)?.binding_mode).toBe("shared_parent");
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByText("哪些当事人属于VIP当事人");
+    const parentField = within(dialog).getByRole("combobox", { name: "父对象" }).closest(".ant-select")!;
+    fireEvent.mouseDown(parentField.querySelector(".ant-select-clear")!);
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const updatedVip = payload.draft.object_types.find((o) => o.id === vip.id)!;
+    expect(updatedVip.extends).toBeNull();
+    expect(updatedVip.derived_by).toEqual([]);
+    expect(payload.draft.mappings.find((m) => m.type_id === vip.id)).toBeUndefined();
+  });
+});
+
+describe("relation, metric and dataset popups", () => {
+  it("shows a relation's ends and its own data binding tab, and alerts when an endpoint is a virtual parent", async () => {
+    const draft = example("06-inheritance");
+    const link = draft.link_types.find((l) => l.technical_name === "responsible_party")!;
+    show(draft, `inspect=link_type:${link.id}&inspectTab=mapping`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "数据绑定", "实例"]));
+    expect(
+      within(dialog).getByText("端点包含虚拟父对象：这条关系的数据绑定在各具体子对象的「关系」页分别配置，关系本身可不绑定。"),
     ).toBeInTheDocument();
   });
-  it("renders all neighbours radially, groups parallel relations, and opens objects from the graph", async () => {
-    const native = nativeMappingFixture();
-    native.mapping_nodes.push(
-      {
-        id: "overview-secondary-link",
-        parent_id: "properties",
-        kind: "link",
-        slot: "children",
-        relationship: "name",
-        concept_mapping_id: "cm-s",
-      },
-      {
-        id: "overview-secondary-value",
-        parent_id: "overview-secondary-link",
-        kind: "object",
-        slot: "object_mapping",
-        expression: "events.name",
-        concept_mapping_id: "cm-s",
-      },
-    );
-    show(native, "basic");
-    const element = await dialog();
-    expect(within(element).getByText("附表")).toBeInTheDocument();
-    const graph = within(element).getByLabelText("供应商的关系图");
-    expect(graph.querySelectorAll(".om-graph-connection")).toHaveLength(1);
-    expect(graph.querySelector(".om-edge-count")).toHaveTextContent("2");
-    expect(graph.querySelector(".om-edge")).toHaveAttribute("marker-end");
-    expect(graph.querySelector("title")).toHaveTextContent("供应产品");
-    fireEvent.click(
-      within(element).getByRole("button", { name: "全部关系 ↗" }),
-    );
-    expect(
-      within(element).getByRole("tab", { name: "关系 2" }),
-    ).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(within(element).getByRole("tab", { name: "概览" }));
-    fireEvent.click(within(element).getByRole("button", { name: "打开产品" }));
-    expect(
-      await screen.findByRole("dialog", { name: "产品" }),
-    ).toBeInTheDocument();
-  });
-  it("saves native fields through semantic_changes and preserves sibling mappings", async () => {
-    const native = nativeMappingFixture();
-    show(native);
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("button", { name: "编辑" }));
-    expect(
-      within(element)
-        .getAllByRole("columnheader")
-        .map((h) => h.textContent),
-    ).toEqual(["属性", "来源字段 ▾", "类型 ▾", "删除"]);
-    fireEvent.change(
-      within(element).getByRole("combobox", { name: "编码 字段" }),
-      { target: { value: "s|name" } },
-    );
-    vi.mocked(modelingApi.saveElement).mockResolvedValue({
-      draft: native,
-      version: { version_id: "v2" } as never,
-      session: null,
+
+  it("creates a metric from the form, supports equal bounds in between filter, and shows expression result type wording", async () => {
+    const draft = example("01-basic-sales");
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, "inspect=metric:new&inspectMode=edit");
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: "指标名称" }), { target: { value: "客户数" } });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "指标技术名" }), { target: { value: "customer_count" } });
+
+    fireEvent.click(within(dialog).getByText("表达式"));
+    expect(await within(dialog).findByText("可选；未指定时留空待补全")).toBeInTheDocument();
+    expect(within(dialog).getByText("未指定")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByText("聚合"));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /添加条件/ }));
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "条件 1 的列" }));
+    fireEvent.click((await screen.findAllByText(/region/))[0]);
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "条件 1 的运算" }));
+    fireEvent.click(await screen.findByText("介于"));
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "条件 1 的值起" }), { target: { value: "100" } });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "条件 1 的值止" }), { target: { value: "100" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
+    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(payload.target_kind).toBe("metric");
+    const metric = payload.draft.metrics.find((m) => m.id === payload.target_id)!;
+    expect(metric).toMatchObject({
+      kind: "simple",
+      name: "客户数",
+      technical_name: "customer_count",
+      aggregation: "count",
+      measure: null,
+      filters: [{ operator: "between", values: ["100", "100"] }],
     });
-    fireEvent.click(within(element).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledOnce());
-    const payload = vi.mocked(modelingApi.saveElement).mock.calls[0][1];
-    expect((payload.draft as NativeDraft)._legacy_form).toBeUndefined();
-    expect(
-      payload.semantic_changes![0].nodes!.find((n) => n.id === "code-value")
-        ?.expression,
-    ).toBe("suppliers.name");
-    expect(
-      payload.semantic_changes![0].nodes!.find((n) => n.id === "simple-value")
-        ?.expression,
-    ).toBe("events.ref");
+    expect(metric).not.toHaveProperty("value_kind");
   });
-  it("keeps conflicts editable and includes session revision in the existing save contract", async () => {
-    show(legacy(), "basic", "admin", true);
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("button", { name: "编辑" }));
-    fireEvent.change(within(element).getByLabelText("名称"), {
-      target: { value: "修改名称" },
-    });
-    vi.mocked(modelingApi.saveElement).mockRejectedValue(
-      new ApiError("内容已变化", 409, "VERSION_CHANGED"),
-    );
-    fireEvent.click(within(element).getByRole("button", { name: "保存" }));
-    expect(await within(element).findByRole("alert")).toHaveTextContent(
-      "你的修改仍保留",
-    );
-    expect(vi.mocked(modelingApi.saveElement).mock.calls[0][1]).toMatchObject({
-      session_id: "s",
-      expected_session_revision: 7,
-    });
-    expect(within(element).getByLabelText("名称")).toHaveValue("修改名称");
-  });
-  it("retains native field edits across tabs and discards them on cancel", async () => {
-    show(nativeMappingFixture());
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("button", { name: "编辑" }));
-    fireEvent.change(
-      within(element).getByRole("combobox", { name: "名称 字段" }),
-      { target: { value: "s|name" } },
-    );
-    fireEvent.click(within(element).getByRole("tab", { name: "概览" }));
-    fireEvent.click(within(element).getByRole("tab", { name: "属性与映射 2" }));
-    expect(
-      within(element).getByRole("combobox", { name: "名称 字段" }),
-    ).toHaveValue("s|name");
-    fireEvent.click(within(element).getByRole("button", { name: "取消" }));
-    await waitFor(() =>
-      expect(
-        within(element).getByRole("button", { name: "编辑" }),
-      ).toBeEnabled(),
-    );
-    expect(
-      within(within(element).getByRole("table")).getByText("未绑定"),
-    ).toBeInTheDocument();
+
+  it("blocks saving an incomplete metric and points at the field", async () => {
+    show(example("01-basic-sales"), "inspect=metric:new&inspectMode=edit");
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("textbox", { name: "指标名称" });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    expect(await within(dialog).findAllByText("请填写名称")).not.toHaveLength(0);
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
   });
-  it("keeps visitors and publish previews read-only, including nested relationship dialogs", async () => {
-    const native = nativeMappingFixture();
-    show(native, "relations", null);
-    const element = await dialog();
-    expect(
-      within(element).queryByRole("button", { name: "编辑" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(element).queryByRole("tab", { name: "实例" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(within(element).getByRole("row", { name: "查看供应产品" }));
-    expect(
-      within(
-        await screen.findByRole("dialog", { name: "供应产品" }),
-      ).queryByRole("button", { name: "编辑" }),
-    ).not.toBeInTheDocument();
+
+  it("shows a dataset's location, snapshot column and registered columns", async () => {
+    const draft = example("12-snapshot-and-trends");
+    const dataset = draft.datasets.find((d) => d.snapshot_date_column)!;
+    show(draft, `inspect=dataset:${dataset.id}`);
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(`每日快照（${dataset.snapshot_date_column}）`)).toBeInTheDocument();
+    const columns = within(dialog).getByRole("columnheader", { name: "物理类型" }).closest("table")!;
+    expect(within(columns).getAllByRole("row")).toHaveLength((dataset.columns?.length ?? 0) + 1);
   });
-  it("reads merged preview content without offering editing", async () => {
-    const merged = legacy();
-    merged.object_types[0].description = "合并后的描述";
-    vi.mocked(publishApi.preview).mockResolvedValue({
-      merged_model: merged,
-      merged_snapshot_sha256: "hash",
+
+  it("opens a property's owner object on the properties tab", async () => {
+    const draft = example("01-basic-sales");
+    const property = draft.properties.find((p) => p.technical_name === "region")!;
+    show(draft, `inspect=property:${property.id}`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("属性与映射"));
+  });
+});
+
+describe("element save impact preview", () => {
+  it.each([false, true])("preserves the shared ancestor source when editing VIP note (column edit: %s)", async (editColumn) => {
+    const draft = example("06-inheritance");
+    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    const note = draft.properties.find((p) => p.owner_type_id === vip.id)!;
+    const mapping = draft.mappings.find((m) => m.type_id === vip.id)!;
+    expect(mapping.sources).toEqual([]);
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${vip.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${note.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "note2" } });
+    expect(within(dialog).getByRole("combobox", { name: "VIP说明列" })).toHaveValue("vip_note");
+    if (editColumn)
+      fireEvent.change(within(dialog).getByRole("combobox", { name: "VIP说明列" }), { target: { value: "party_name" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+      expect(payload.draft.mappings.find((m) => m.id === mapping.id)!.fields).toEqual({
+        note2: { kind: "column", source_id: "main", column: editColumn ? "party_name" : "vip_note" },
+      });
+    }
+  });
+
+  it("keeps both UUID bindings when a typed rename passes through another property's name", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.owner_type_id === customer.id && p.technical_name === "customer_no")!;
+    const mapping = draft.mappings.find((m) => m.type_id === customer.id)!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    for (const value of ["n", "na", "nam", "name", "name2"])
+      fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+      const fields = payload.draft.mappings.find((m) => m.id === mapping.id)!.fields;
+      expect(fields.name2).toEqual(mapping.fields.customer_no);
+      expect(fields.name).toEqual(mapping.fields.name);
+      expect(fields).not.toHaveProperty("customer_no");
+    }
+  });
+
+  it("previews once and saves directly without a confirmation modal when affected_items is empty", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
       current_version_id: "v1",
-    } as never);
-    show(
-      legacy(),
-      "basic",
-      "admin",
-      true,
-      "/workspaces/w/objects?session=s&inspect=object_type:supplier&inspectSource=preview&inspectSession=s&inspectPreviewHash=hash",
-    );
-    const element = await dialog();
-    expect(within(element).getByText("合并后的描述")).toBeInTheDocument();
-    expect(
-      within(element).queryByRole("button", { name: "编辑" }),
-    ).not.toBeInTheDocument();
-  });
-  it("saves existing inline synonyms/context to the native context extension", async () => {
-    const native = nativeMappingFixture();
-    native.extension_v4.concept_context = {
-      ...native.extension_v4.concept_context,
-      [native.object_types[0].id]: {
-        synonyms: ["供方"],
-        instructions: "原说明",
-      },
-    };
-    show(native, "basic");
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("button", { name: "编辑" }));
-    fireEvent.change(within(element).getByRole("textbox", { name: "同义词" }), {
-      target: { value: "供方\n供货方" },
+      session_revision: null,
+      affected_items: [],
     });
-    fireEvent.change(
-      within(element).getByRole("textbox", { name: "上下文说明" }),
-      { target: { value: "供货主体" } },
-    );
-    vi.mocked(modelingApi.saveElement).mockResolvedValue({
-      draft: native,
-      version: { version_id: "v2" } as never,
-      session: null,
-    });
-    fireEvent.click(within(element).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledOnce());
-    const saved = vi.mocked(modelingApi.saveElement).mock.calls[0][1]
-      .draft as NativeDraft;
-    expect(
-      saved.extension_v4.concept_context?.[native.object_types[0].id],
-    ).toMatchObject({ synonyms: ["供方", "供货方"], instructions: "供货主体" });
-    expect(saved.mapping_nodes).toEqual(native.mapping_nodes);
-  });
-});
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
 
-describe("compact actions", () => {
-  it("counts actions and renders the approved name/parameters/impact columns", async () => {
-    const draft = legacy();
-    draft.actions = [
-      {
-        id: "disable",
-        input_type_id: "supplier",
-        name: "停用供应商",
-        technical_name: "disable_supplier",
-        description: "",
-        parameters: [],
-        precondition_rule_ids: [],
-        effects: [],
-        evidence: [],
-      },
-    ];
-    show(draft, "actions");
-    const element = await dialog();
-    expect(
-      within(element).getByRole("tab", { name: "动作 1" }),
-    ).toHaveAttribute("aria-selected", "true");
-    expect(
-      within(element)
-        .getAllByRole("columnheader")
-        .map((h) => h.textContent),
-    ).toEqual(["名称", "参数", "影响"]);
-    expect(within(element).getByText("停用供应商")).toBeInTheDocument();
-  });
-});
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-describe("relationship and rules prototypes", () => {
-  it("renders the four relation columns with directions and record roles, without a status column", async () => {
-    show(nativeMappingFixture(), "relations");
-    const element = await dialog();
-    expect(
-      within(element)
-        .getAllByRole("columnheader")
-        .map((h) => h.textContent),
-    ).toEqual(["关系", "方向", "关联对象", "关联方式"]);
-    expect(within(element).getAllByText("→ 出")).toHaveLength(2);
-    expect(within(element).getByText("记录型")).toBeInTheDocument();
-    expect(within(element).queryByText("状态")).not.toBeInTheDocument();
-    expect(
-      within(element).getByRole("button", { name: "＋ 添加关系" }),
-    ).toBeDisabled();
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
+    const [, previewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(previewPayload).toEqual(savePayload);
+    expect(savePayload).not.toHaveProperty("affected_items");
+    expect(savePayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe("customer_code");
   });
-  it("opens read-only, switches to editable, and saves an existing native record branch", async () => {
-    const native = nativeMappingFixture();
-    show(native, "relations");
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("row", { name: "查看调用记录" }));
-    const detail = await screen.findByRole("dialog", { name: "调用记录" });
-    expect(within(detail).getByText("供应商 → 产品")).toBeInTheDocument();
-    expect(
-      within(detail)
-        .getAllByRole("heading")
-        .map((h) => h.textContent),
-    ).toEqual(["调用记录", "来源对象", "关系", "附加属性", "目标对象"]);
-    expect(within(detail).getByText("常量")).toBeInTheDocument();
-    expect(
-      within(detail).queryByRole("button", { name: "保存" }),
-    ).not.toBeInTheDocument();
-    expect(within(detail).queryByRole("textbox")).not.toBeInTheDocument();
-    fireEvent.click(within(detail).getByRole("button", { name: "编辑" }));
-    expect(
-      within(detail).getByRole("switch", { name: "使用映射表" }),
-    ).toBeDisabled();
-    expect(within(detail).getByRole("button", { name: "删除" })).toBeDisabled();
-    fireEvent.change(
-      within(detail).getByRole("textbox", { name: "次数来源字段 常量" }),
-      { target: { value: "20" } },
-    );
-    vi.mocked(modelingApi.saveElement).mockResolvedValue({
-      draft: native,
-      version: { version_id: "v2" } as never,
-      session: null,
-    });
-    fireEvent.click(within(detail).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledOnce());
-    const nodes = vi.mocked(modelingApi.saveElement).mock.calls[0][1]
-      .semantic_changes![0].nodes!;
-    expect(nodes.find((n) => n.id === "record-count-value-0")?.expression).toBe(
-      "20",
-    );
-    expect(nodes.find((n) => n.id === "record-count-value-1")?.expression).toBe(
-      "10",
-    );
-  });
-  it("labels the two sides explicitly for a self relationship", async () => {
-    const draft = legacy();
-    draft.link_types = [
-      {
-        id: "self",
-        name: "依赖",
-        technical_name: "depends",
-        description: "",
-        tags: [],
-        evidence: [],
-        source_type_id: "supplier",
-        target_type_id: "supplier",
-        multiplicity: "many_to_many",
-        verbalizes: [],
-        data_join: {
-          source_column: "parent_code",
-          target_column: "supplier_code",
+
+  it("shows affected items and reason in a confirmation modal, cancels without saving, and strips reason when confirmed", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customerFact = draft.material_objects.find((f) => f.type_id === customer.id)!;
+    const h = "1".repeat(64);
+    vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [
+        {
+          target_kind: "material_object",
+          target_id: customerFact.id,
+          expected_target_hash: h,
+          reason: "当前元素修改需要同步此依赖的定义或引用",
         },
+      ],
+    });
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    const noticeText = await screen.findByText("确认后这些元素会随本次保存一并改写");
+    const confirmDialog = noticeText.closest<HTMLElement>('[role="dialog"]')!;
+    expect(within(confirmDialog).getByText("确认保存影响")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("文档事实")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("C001")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("当前元素修改需要同步此依赖的定义或引用")).toBeInTheDocument();
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+
+    fireEvent.click(within(confirmDialog).getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument());
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
+
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    const confirmAgain = (await screen.findByText("确认后这些元素会随本次保存一并改写")).closest<HTMLElement>('[role="dialog"]')!;
+    fireEvent.click(within(confirmAgain).getByRole("button", { name: "确认保存" }));
+
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(savePayload.affected_items).toEqual([
+      {
+        target_kind: "material_object",
+        target_id: customerFact.id,
+        expected_target_hash: h,
       },
-    ];
-    show(draft, "relations");
-    const element = await dialog();
-    fireEvent.click(within(element).getByRole("row", { name: "查看依赖" }));
-    const detail = await screen.findByRole("dialog", { name: "依赖" });
-    expect(within(detail).getByText("来源 · 供应商.code")).toBeInTheDocument();
-    expect(within(detail).getByText("目标 · 供应商.code")).toBeInTheDocument();
-    expect(within(detail).getByText("供应商 → 供应商")).toBeInTheDocument();
+    ]);
+    expect(savePayload.affected_items?.[0]).not.toHaveProperty("reason");
   });
-  it("saves standalone join columns through the existing relation form", async () => {
-    const draft = legacy();
-    draft.mappings.push({
-      ...draft.mappings[0],
-      id: "mp",
-      type_id: "product",
-      table_name: "dim_product",
-      key_column: "product_id",
-      fields: {},
-    });
-    draft.link_types = [
-      {
-        id: "join",
-        name: "供应产品",
-        technical_name: "supplies",
-        description: "",
-        tags: [],
-        evidence: [],
-        source_type_id: "supplier",
-        target_type_id: "product",
-        multiplicity: "many_to_one",
-        verbalizes: [],
-        data_join: {
-          source_column: "supplier_code",
-          target_column: "product_id",
-        },
-      },
-    ];
-    show(
-      draft,
-      "basic",
-      "admin",
-      false,
-      "/workspaces/w/relations?inspect=link_type:join&inspectMode=edit",
+
+  it("displays a 409 error from preview without opening the confirmation modal or saving", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    vi.mocked(modelingApi.previewElementSave).mockRejectedValue(
+      new ApiError("当前版本已变化", 409, "VERSION_CHANGED"),
     );
-    const element = await screen.findByRole("dialog", { name: "供应产品" });
-    fireEvent.change(
-      within(element).getByRole("combobox", { name: "来源 · 供应商.code" }),
-      { target: { value: "supplier_code" } },
-    );
-    fireEvent.change(
-      within(element).getByRole("textbox", { name: "关系名称" }),
-      { target: { value: "供货产品" } },
-    );
-    vi.mocked(modelingApi.saveElement).mockResolvedValue({
-      draft,
-      version: { version_id: "v2" } as never,
-      session: null,
-    });
-    fireEvent.click(within(element).getByRole("button", { name: "保存" }));
-    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledOnce());
-    expect(vi.mocked(modelingApi.saveElement).mock.calls[0][1]).toMatchObject({
-      target_kind: "link_type",
-      target_id: "join",
-      semantic_changes: [],
-    });
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
+    expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
   });
-  it("orders object, property, relation rules and shows content/description/inheritance instead of auto names", async () => {
-    const draft = legacy();
-    draft.object_types[0].extends = ["product"];
-    draft.link_types = [
-      {
-        id: "parent-link",
-        name: "依赖",
-        technical_name: "depends_on",
-        description: "",
-        tags: [],
-        evidence: [],
-        source_type_id: "product",
-        target_type_id: "product",
-        multiplicity: "many_to_many",
-        verbalizes: [],
-      },
-    ];
-    const rule = {
-      name: "host_type·constraint1",
-      technical_name: "generated",
-      description: "",
-      rule_kind: "constraint" as const,
-      verbalizes: [],
-      evidence: [],
-    };
-    draft.rules = [
-      {
-        ...rule,
-        id: "link-rule",
-        owner_kind: "link_type",
-        owner_id: "parent-link",
-        expression: "count > 0",
-      },
-      {
-        ...rule,
-        id: "prop-rule",
-        owner_kind: "property",
-        owner_id: "code",
-        expression: "code IS NOT NULL",
-        description: "编码不能为空",
-      },
-      {
-        ...rule,
-        id: "object-rule",
-        owner_kind: "object_type",
-        owner_id: "product",
-        expression: "EXISTS(code)",
-      },
-    ];
-    show(draft, "rules");
-    const element = await dialog();
-    expect(
-      within(element).getByRole("tab", { name: "规则 3" }),
-    ).toBeInTheDocument();
-    expect(
-      within(element)
-        .getAllByRole("columnheader")
-        .map((h) => h.textContent),
-    ).toEqual(["作用于", "类型", "规则"]);
-    const rows = within(element).getAllByRole("row").slice(1);
-    expect(rows[0]).toHaveTextContent("对象继承");
-    expect(rows[1]).toHaveTextContent("编码不能为空");
-    expect(rows[2]).toHaveTextContent("依赖继承");
-    expect(
-      within(element).queryByText("host_type·constraint1"),
-    ).not.toBeInTheDocument();
-    expect(
-      within(element).queryByRole("button", { name: "规则来源" }),
-    ).not.toBeInTheDocument();
+
+  it("disables Ant Design controls while busy and re-runs preview instead of saving stale candidate when Select changes during delayed preview", async () => {
+    const draft = example("07-instances-and-evidence");
+    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    let resolveFirstPreview!: (value: {
+      current_version_id: string | null;
+      session_revision: number | null;
+      affected_items: [];
+    }) => void;
+    let resolveSecondPreview!: (value: {
+      current_version_id: string | null;
+      session_revision: number | null;
+      affected_items: [];
+    }) => void;
+    vi.mocked(modelingApi.previewElementSave)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstPreview = resolve;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSecondPreview = resolve;
+          }),
+      );
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    const cell = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    const row = cell.closest("tr")!;
+
+    const techInput = within(row).getByRole("textbox", { name: "属性技术名" });
+    const valueKindSelect = within(row).getByRole("combobox", { name: `${customerNo.name}类型` });
+    const requiredCheckbox = within(row).getByRole("checkbox", { name: `${customerNo.name}必填` });
+    const otherSelect = within(dialog).getByRole("combobox", { name: "名称类型" });
+
+    // Open the Select dropdown before clicking Save so its portal option is mounted, then click Save
+    fireEvent.mouseDown(valueKindSelect);
+    const integerOption = await screen.findByTitle("整数");
+    fireEvent.change(techInput, { target: { value: "customer_code" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1));
+
+    // While preview is in flight (busy), Ant Design Select, Checkbox, and Input controls must be disabled
+    expect(techInput).toBeDisabled();
+    expect(valueKindSelect).toBeDisabled();
+    expect(valueKindSelect.closest(".ant-select")).toHaveClass("ant-select-disabled");
+    expect(requiredCheckbox).toBeDisabled();
+    expect(otherSelect).toBeDisabled();
+    fireEvent.mouseDown(otherSelect);
+    expect(otherSelect.closest(".ant-select")).not.toHaveClass("ant-select-open");
+
+    // Simulate a late Select change arriving from the pre-opened portal while the first preview is still pending
+    fireEvent.click(integerOption);
+
+    // Resolve the first preview with no affected items (the direct-save branch)
+    resolveFirstPreview({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [],
+    });
+
+    // Must NOT save the old candidate; instead must re-run preview with the updated Select value
+    await waitFor(() => expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2));
+    expect(modelingApi.saveElement).not.toHaveBeenCalled();
+
+    const [, firstPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, secondPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
+    expect(firstPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("string");
+    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("integer");
+    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe(
+      "customer_code",
+    );
+
+    resolveSecondPreview({
+      current_version_id: "v1",
+      session_revision: null,
+      affected_items: [],
+    });
+
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const savedProp = savePayload.draft.properties.find((p) => p.id === customerNo.id);
+    expect(savedProp?.technical_name).toBe("customer_code");
+    expect(savedProp?.value_kind).toBe("integer");
   });
 });

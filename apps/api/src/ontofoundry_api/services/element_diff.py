@@ -9,44 +9,32 @@ from __future__ import annotations
 
 from typing import Any
 
-from ontofoundry_api.domain.canonical import V3_HASH_ALGORITHM, canonical
+from ontofoundry_api.domain.canonical import canonical
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 
 
-def _index(snapshot: dict[str, Any]) -> dict[str, tuple[str, dict]]:
-    contexts = snapshot.get('extension_v4', {}).get('concept_context', {})
-    result = {}
-    for kind, collection in COLLECTIONS.items():
-        for element in snapshot.get(collection) or []:
-            view = element
-            if kind in (ElementKind.OBJECT_TYPE, ElementKind.VALUE_TYPE):
-                view = {**element, 'concept_context': contexts.get(str(element['id']))}
-            result[str(element['id'])] = (kind.value, view)
-    return result
+def _index(snapshot):
+    return {
+        str(e["id"]): (kind.value, e)
+        for kind, collection in COLLECTIONS.items()
+        for e in snapshot.get(collection, [])
+    }
 
 
-
-def element_label(kind: str, element: dict, snapshot_elements: dict[str, tuple[str, dict]]) -> str:
-    if kind == ElementKind.MAPPING.value:
-        return f"{element.get('connection_alias', '')} · {element.get('table_name', '')}"
-    if kind == ElementKind.MATERIAL_LINK.value:
-        from ontofoundry_api.domain.fact_views import binary_fact_view
-
-        definition = snapshot_elements.get(str(element.get("type_id")), ("", {}))[1]
-        try:
-            view = binary_fact_view(definition, element)
-        except ValueError:
-            view = element
-        if view.get("source_id") is not None and view.get("target_id") is not None:
-            ids = [view["source_id"], view["target_id"]]
-        else:
-            ids = [value["object_id"] for value in view.get("role_values", []) if value.get("object_id")]
-        names = [snapshot_elements.get(str(oid), ("", {}))[1].get("name", str(oid)) for oid in ids]
-        return " → ".join(names) if len(names) == 2 else " · ".join(names) or str(element.get("id", "实例关系"))
+def element_label(kind, element, snapshot_elements):
+    if kind == "material_object":
+        return str(element.get("id", ""))
+    if kind == "material_link":
+        return f"{element.get('source_id', '')} → {element.get('target_id', '')}"
+    if kind == "mapping":
+        owner = snapshot_elements.get(str(element.get("type_id")), ("", {}))[1]
+        return str(owner.get("name") or element.get("id"))
     return str(element.get("name") or element.get("technical_name") or element.get("id"))
 
 
-def owner_label(kind: str, element: dict, elements: dict[str, tuple[str, dict]]) -> str | None:
+def owner_label(
+    kind: str, element: dict, elements: dict[str, tuple[str, dict]]
+) -> str | None:
     owner = None
     if kind == ElementKind.PROPERTY.value:
         owner = element.get("owner_type_id", element.get("owner_ref", {}).get("ref"))
@@ -66,7 +54,7 @@ def field_changes(before: dict, after: dict) -> list[dict[str, Any]]:
         if key == "id":
             continue
         old, new = before.get(key), after.get(key)
-        if canonical(old, key, hash_algorithm=V3_HASH_ALGORITHM) != canonical(new, key, hash_algorithm=V3_HASH_ALGORITHM):
+        if canonical(old, key) != canonical(new, key):
             changes.append({"path": key, "before": old, "after": new})
     return changes
 
@@ -79,7 +67,7 @@ def element_changes(left: dict[str, Any], right: dict[str, Any]) -> list[dict[st
     for element_id in sorted(old.keys() | new.keys()):
         before = old.get(element_id)
         after = new.get(element_id)
-        if before and after and canonical(before[1], hash_algorithm=V3_HASH_ALGORITHM) == canonical(after[1], hash_algorithm=V3_HASH_ALGORITHM):
+        if before and after and canonical(before[1]) == canonical(after[1]):
             continue
         kind = (after or before)[0]
         element = (after or before)[1]
@@ -91,7 +79,9 @@ def element_changes(left: dict[str, Any], right: dict[str, Any]) -> list[dict[st
                 "label": element_label(kind, element, both),
                 "owner_label": owner_label(kind, element, both),
                 "change": change,
-                "field_changes": field_changes(before[1], after[1]) if change == "updated" else [],
+                "field_changes": field_changes(before[1], after[1])
+                if change == "updated"
+                else [],
                 "before": before[1] if before else None,
                 "after": after[1] if after else None,
             }

@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
+import pytest
+from pr23_fixtures import example_session
 from test_modeling import ONTOLOGY, ROOT, create_session, save
 
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.domain.canonical import snapshot_sha256
+from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.dependencies import strict_equal
+from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
+from ontofoundry_api.services.publish_preview import three_way
 
 
 def preview(client, session):
@@ -44,9 +52,10 @@ def test_preview_is_what_gets_published(client):
     session = edited(client, "预览即发布")
     body = preview(client, session).json()
     assert body["current_version_number"] == 1 and body["next_version_number"] == 2
-    assert body["current_version_sha256"] == client.get(ONTOLOGY + "/version").json()[
-        "normalized_snapshot_sha256"
-    ]
+    assert (
+        body["current_version_sha256"]
+        == client.get(ONTOLOGY + "/version").json()["normalized_snapshot_sha256"]
+    )
     assert [c["change"] for c in body["changes"]] == ["updated"]
 
     response = publish(client, session, body)
@@ -68,7 +77,9 @@ def test_a_new_version_after_preview_forces_a_new_preview_even_if_it_merges(clie
     assert refused.json()["error"]["code"] == "PREVIEW_OUTDATED"
     assert client.get(ONTOLOGY + "/version").json()["version"] == 2
     again = preview(client, mine).json()
-    assert [c["element_id"] for c in again["auto_merged"]] == [other["draft"]["object_types"][1]["id"]]
+    assert [c["element_id"] for c in again["auto_merged"]] == [
+        other["draft"]["object_types"][1]["id"]
+    ]
     assert publish(client, mine, again).status_code == 200
 
 
@@ -76,16 +87,21 @@ def test_revision_or_merged_hash_drift_is_refused(client):
     session = edited(client, "一")
     body = preview(client, session).json()
     wrong_hash = {**body, "merged_snapshot_sha256": "0" * 64}
-    assert publish(client, session, wrong_hash).json()["error"]["code"] == "PREVIEW_OUTDATED"
+    assert (
+        publish(client, session, wrong_hash).json()["error"]["code"] == "PREVIEW_OUTDATED"
+    )
 
     session["draft"]["object_types"][0]["description"] = "二"
     newer = save(client, session, session["draft"]).json()
     stale = publish(client, {**newer, "revision": newer["revision"] - 1}, body)
     assert stale.status_code == 409
     assert stale.json()["error"]["code"] == "PREVIEW_OUTDATED"
-    assert preview(client, {**newer, "revision": newer["revision"] - 1}).json()["error"][
-        "code"
-    ] == "SESSION_REVISION_CHANGED"
+    assert (
+        preview(client, {**newer, "revision": newer["revision"] - 1}).json()["error"][
+            "code"
+        ]
+        == "SESSION_REVISION_CHANGED"
+    )
 
 
 def test_field_conflicts_are_structured_and_resolved_with_a_custom_value(client):
@@ -144,7 +160,9 @@ def test_deleting_what_another_session_changed_is_a_whole_element_conflict(clien
     a, b = create_session(client), create_session(client)
     link = a["draft"]["link_types"][0]
     a["draft"]["link_types"][0]["description"] = "改了关系"
-    b["draft"]["link_types"] = [x for x in b["draft"]["link_types"] if x["id"] != link["id"]]
+    b["draft"]["link_types"] = [
+        x for x in b["draft"]["link_types"] if x["id"] != link["id"]
+    ]
     a, b = save(client, a, a["draft"]).json(), save(client, b, b["draft"]).json()
     assert publish(client, a, preview(client, a).json()).status_code == 200
     (conflict,) = preview(client, b).json()["error"]["conflicts"]
@@ -196,23 +214,90 @@ def test_invalid_resolutions_are_refused_before_anything_is_saved(client):
         assert response.status_code == 422, bad
         assert response.json()["error"]["code"] == "RESOLUTION_INVALID"
     after = client.get(ROOT + f"/sessions/{b['id']}").json()
-    assert after["revision"] == b["revision"] and after["base_version_id"] == b["base_version_id"]
+    assert (
+        after["revision"] == b["revision"]
+        and after["base_version_id"] == b["base_version_id"]
+    )
     assert resolve({key: {"choice": "custom", "value": "合并"}}).status_code == 200
 
 
-def test_a_constraints_only_change_is_a_change_and_the_preview_names_its_base(client):
+def test_preview_has_only_core_contract(client):
     session = create_session(client)
-    session["draft"]["ontology_requires"] = ["供应商必须有统一社会信用代码"]
+    session["draft"]["object_types"][0]["synonyms"] = ["顾客"]
     session = save(client, session, session["draft"]).json()
-
     body = preview(client, session).json()
-
-    assert body["changes"] == []
-    assert body["requires_change"] == {"before": [], "after": ["供应商必须有统一社会信用代码"]}
-    assert body["base_version_number"] == body["current_version_number"] == 1
-    first = session["draft"]["object_types"][0]
-    assert body["labels"][first["id"]] == first["name"]
+    assert (
+        "ossie" not in body
+        and "requires_change" not in body
+        and "legacy_mapping_form" not in body
+    )
+    assert body["changes"]
     assert publish(client, session, body).status_code == 200
-    assert preview(client, client.get(ROOT + f"/sessions/{session['id']}").json()).json()[
-        "requires_change"
-    ] is None
+
+
+@pytest.mark.parametrize(
+    "old_kind,old,new_kind,new",
+    [
+        ("boolean", True, "integer", 1),
+        ("boolean", False, "integer", 0),
+        ("integer", 1, "float", 1.0),
+        ("integer", 0, "decimal", 0.0),
+    ],
+)
+def test_type_and_fact_change_survives_another_sessions_publication(
+    client, old_kind, old, new_kind, new
+):
+    initial = example_session(client, "07-instances-and-evidence")
+
+    def set_kind_and_values(raw, kind, value):
+        prop = next(p for p in raw["properties"] if p["technical_name"] == "is_vip")
+        prop["value_kind"] = kind
+        for fact in raw["material_objects"]:
+            if fact["type_id"] == prop["owner_type_id"]:
+                fact["values"]["is_vip"] = value
+        return prop["owner_type_id"]
+
+    target_id = set_kind_and_values(initial["draft"], old_kind, old)
+    response = save(client, initial, initial["draft"])
+    assert response.status_code == 200, response.text
+    initial = response.json()
+    response = publish(client, initial, preview(client, initial).json())
+    assert response.status_code == 200, response.text
+    base = published_snapshot(client)
+    mine, other = create_session(client), create_session(client)
+    set_kind_and_values(mine["draft"], new_kind, new)
+    obj = next(o for o in other["draft"]["object_types"] if o["id"] == target_id)
+    obj["description"] = "另一会话发布的虚构客户说明"
+    for session in (mine, other):
+        response = save(client, session, session["draft"])
+        assert response.status_code == 200, response.text
+        session.update(response.json())
+    response = publish(client, other, preview(client, other).json())
+    assert response.status_code == 200, response.text
+    latest = published_snapshot(client)
+    inputs = deepcopy([base, latest, mine["draft"]])
+    for raw in inputs:
+        validate_core_graph(CoreDraft.model_validate(raw))
+    merge = three_way(base, latest, mine["draft"], mine["workspace_id"])
+    assert merge.conflicts == []
+    assert strict_equal([base, latest, mine["draft"]], inputs)
+    response = preview(client, mine)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["validation"]["errors"] == []
+    assert body["merged_snapshot_sha256"] == merge.merged_sha256
+    response = publish(client, mine, body)
+    assert response.status_code == 200, response.text
+    persisted = published_snapshot(client)
+    assert snapshot_sha256(persisted) == body["merged_snapshot_sha256"]
+    for raw in (merge.merged, body["merged_model"], persisted):
+        graph = validate_core_graph(CoreDraft.model_validate(raw))
+        target = next(o for o in graph.object_types if str(o.id) == target_id)
+        assert target.description == obj["description"]
+        prop = next(p for p in graph.properties if p.technical_name == "is_vip")
+        assert prop.value_kind == new_kind
+        facts = [f for f in graph.material_objects if str(f.type_id) == target_id]
+        assert facts
+        for fact in facts:
+            assert type(fact.values["is_vip"]) is type(new)
+            assert fact.values["is_vip"] == new

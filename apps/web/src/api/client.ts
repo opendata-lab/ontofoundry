@@ -1,25 +1,46 @@
 import type {
-  OntologyType,
-  TypeGraph,
-  WorkspaceOverview,
-  User,
-  VersionSummary,
-  Workspace,
-  Draft,
-  LegacyMappingForm,
+  Assets,
+  Capabilities,
+  Comparison,
+  DataConnection,
+  DataTable,
+  Decision,
   DecisionResult,
+  Draft,
+  ElementSave,
+  ElementSaveImpact,
+  ElementSaveResult,
+  FactProposalRevision,
+  ISODate,
+  InstanceDetail,
+  InstanceEnvelope,
+  InstanceList,
+  InstanceNeighborhood,
+  Items,
+  MappingPreview,
+  MappingPreviewRequest,
+  Material,
+  MergeConflict,
+  MetricPreview,
+  MetricPreviewRequest,
   ModelingSession,
+  ModelingSessionSummary,
+  NeighborhoodRequest,
   ProposalBatch,
   ProposalBatchDetail,
   PublishPreview,
+  PublishResult,
   Resolution,
-  ModelingSessionSummary,
-  Material,
-  OssieImportResult,
-  Capabilities,
-  DataConnection,
-  DataTable,
-  TargetKind,
+  ResourceKind,
+  TypeDetail,
+  TypeGraph,
+  TypeList,
+  User,
+  ValidationIssue,
+  ValidationReport,
+  VersionSummary,
+  Workspace,
+  WorkspaceOverview,
 } from "./types";
 
 type ErrorBody = {
@@ -29,9 +50,10 @@ type ErrorBody = {
     code?: string;
     message?: string;
     items?: { proposal_id: string; reason: string }[];
-    conflicts?: unknown[];
-    references?: { name: string; field: string }[];
+    conflicts?: MergeConflict[];
+    references?: { name: string; field: string }[] | string[];
     current_version_id?: string | null;
+    errors?: ValidationIssue[];
   };
   detail?: unknown;
 };
@@ -42,9 +64,11 @@ export class ApiError extends Error {
   detail: unknown;
   /** Per-item reasons, e.g. which proposals were stale (body.error.items). */
   items: { proposal_id: string; reason: string }[];
-  conflicts: unknown[];
+  conflicts: MergeConflict[];
   currentVersionId: string | null;
-  references: { name: string; field: string }[];
+  references: { name: string; field: string }[] | string[];
+  /** Core validation errors with element locations (body.error.errors). */
+  errors: ValidationIssue[];
 
   constructor(
     message: string,
@@ -62,6 +86,7 @@ export class ApiError extends Error {
     this.conflicts = error?.conflicts ?? [];
     this.references = error?.references ?? [];
     this.currentVersionId = error?.current_version_id ?? null;
+    this.errors = error?.errors ?? [];
   }
 }
 
@@ -89,23 +114,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body.error,
     );
   }
-  const body: unknown = await response.json();
-  hydrateNativeResponse(body);
-  return body as T;
-}
-
-function hydrateNativeResponse(body: unknown) {
-  if (!body || typeof body !== "object") return;
-  const result = body as { draft?: Draft; model?: Draft; merged_model?: Draft; legacy_mapping_form?: LegacyMappingForm | null; session?: unknown };
-  const draft = result.draft ?? result.model ?? result.merged_model;
-  if (draft?.schema_version === "3" && result.legacy_mapping_form) draft._legacy_form = result.legacy_mapping_form;
-  if (result.session) hydrateNativeResponse(result.session);
-}
-
-function draftRequest(draft: Draft) {
-  if (draft.schema_version === "2") return { draft };
-  const { _legacy_form, ...native } = draft;
-  return { draft: native, ...(_legacy_form ? { legacy_mappings: _legacy_form.mappings, legacy_joins: _legacy_form.joins } : {}) };
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
 }
 
 // FastAPI answers with a string, a structured {code, message} object, or a
@@ -129,234 +139,190 @@ function detailMessage(detail: unknown): string | null {
   return null;
 }
 
+function json(method: string, body: unknown): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+/** Query string from defined values only; "" for none. */
+function query(params: Record<string, string | number | boolean | undefined | null>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
+  }
+  return search.size ? "?" + search.toString() : "";
+}
+
+const ontologyPath = (workspaceId: string) => "/api/v1/ontology/workspaces/" + workspaceId;
+const sessionPath = (s: Pick<ModelingSession, "id" | "workspace_id">) =>
+  `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}`;
+
 export const api = {
   me: () => request<User>("/api/v1/auth/me"),
-  workspaces: () => request<{ items: Workspace[] }>("/api/v1/workspaces"),
-  createWorkspace: (payload: {
-    name: string;
-    slug: string;
-    description: string;
-  }) =>
-    request<Workspace>("/api/v1/workspaces", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }),
-  workspace: (workspaceId: string) =>
-    request<Workspace>("/api/v1/workspaces/" + workspaceId),
+  workspaces: () => request<Items<Workspace>>("/api/v1/workspaces"),
+  createWorkspace: (payload: { name: string; slug: string; description: string }) =>
+    request<Workspace>("/api/v1/workspaces", json("POST", payload)),
+  workspace: (workspaceId: string) => request<Workspace>("/api/v1/workspaces/" + workspaceId),
   overview: (workspaceId: string) =>
-    request<WorkspaceOverview>(
-      "/api/v1/workspaces/" + workspaceId + "/overview",
+    request<WorkspaceOverview>("/api/v1/workspaces/" + workspaceId + "/overview"),
+  version: (workspaceId: string, versionId?: string) =>
+    request<VersionSummary>(ontologyPath(workspaceId) + "/version" + query({ version_id: versionId })),
+  types: (
+    workspaceId: string,
+    params?: { kind?: ResourceKind; q?: string; version_id?: string },
+  ) => request<TypeList>(ontologyPath(workspaceId) + "/types" + query({ ...params })),
+  type: (workspaceId: string, typeId: string, versionId?: string) =>
+    request<TypeDetail>(
+      ontologyPath(workspaceId) + "/types/" + encodeURIComponent(typeId) + query({ version_id: versionId }),
     ),
-  version: (workspaceId: string) =>
-    request<VersionSummary>(
-      "/api/v1/ontology/workspaces/" + workspaceId + "/version",
+  graph: (workspaceId: string, focusId?: string, depth?: number) =>
+    request<TypeGraph>(
+      ontologyPath(workspaceId) + "/type-graph/neighborhood" + query({ focus_id: focusId, depth }),
     ),
-  types: (workspaceId: string, params?: { kind?: string; q?: string }) => {
-    const query = new URLSearchParams();
-    if (params?.kind) query.set("kind", params.kind);
-    if (params?.q) query.set("q", params.q);
-    const suffix = query.size ? "?" + query.toString() : "";
-    return request<{ items: OntologyType[] }>(
-      "/api/v1/ontology/workspaces/" + workspaceId + "/types" + suffix,
-    );
-  },
-  graph: (workspaceId: string, focusId?: string) => {
-    const suffix = focusId
-      ? "?" + new URLSearchParams({ focus_id: focusId }).toString()
-      : "";
-    return request<TypeGraph>(
-      "/api/v1/ontology/workspaces/" +
-        workspaceId +
-        "/type-graph/neighborhood" +
-        suffix,
-    );
-  },
-  definition: (workspaceId: string, versionId: string) => request<unknown>("/api/v1/ontology/workspaces/" + workspaceId + "/versions/" + versionId + "/export"),
-  exportUrl: (workspaceId: string, versionId: string) =>
-    "/api/v1/ontology/workspaces/" +
-    workspaceId +
-    "/versions/" +
-    versionId +
-    "/export",
+  versions: (workspaceId: string) =>
+    request<Items<VersionSummary>>("/api/v1/workspaces/" + workspaceId + "/versions"),
+  presentation: (workspaceId: string, versionId: string) =>
+    request<{ version: VersionSummary; model: Draft }>(
+      `/api/v1/workspaces/${workspaceId}/versions/${versionId}/presentation`,
+    ),
+  comparison: (workspaceId: string, rightId: string, leftId?: string) =>
+    request<Comparison>(
+      `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),
+    ),
 };
 
-export function workspaceRequest<T>(
-  id: string,
-  suffix: string,
-  body?: unknown,
-  method?: string,
-) {
+export function workspaceRequest<T>(id: string, suffix: string, body?: unknown, method?: string) {
   return request<T>(
     "/api/v1/workspaces/" + id + suffix,
-    body === undefined
-      ? { method: method ?? "GET" }
-      : {
-          method: method ?? "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
+    body === undefined ? { method: method ?? "GET" } : json(method ?? "POST", body),
   );
 }
 
 export const modelingApi = {
-  sessions: (id: string) =>
-    workspaceRequest<{
-      items: ModelingSessionSummary[];
-    }>(id, "/sessions"),
+  sessions: (id: string) => workspaceRequest<Items<ModelingSessionSummary>>(id, "/sessions"),
   create: (id: string, title = "新的建模会话") =>
     workspaceRequest<ModelingSession>(id, "/sessions", { title }),
-  get: (id: string, sid: string) =>
-    workspaceRequest<ModelingSession>(id, "/sessions/" + sid),
-  save: async (session: ModelingSession, draft: Draft, extra = {}) => {
-    const s = session;
-    return workspaceRequest<ModelingSession>(
-      s.workspace_id,
-      "/sessions/" + s.id,
-      { revision: s.revision, ...draftRequest(draft), ...extra },
-      "PUT",
-    );
-  },
-  candidates: (s: ModelingSession, ids: string[], action: string) =>
-    workspaceRequest<ModelingSession>(
-      s.workspace_id,
-      "/sessions/" + s.id + "/candidates",
-      { revision: s.revision, ids, action },
-    ),
-  validate: (s: ModelingSession) =>
-    workspaceRequest<VersionSummary["validation"]>(
-      s.workspace_id,
-      "/sessions/" + s.id + "/validate",
-      {},
-    ),
-  publish: (s: ModelingSession, message: string) =>
-    workspaceRequest<{ version: VersionSummary; session: ModelingSession }>(
-      s.workspace_id,
-      "/sessions/" + s.id + "/publish",
-      { revision: s.revision, message },
-    ),
-  snapshot: async (id: string) => {
-    const draft = await workspaceRequest<Draft>(id, "/published-snapshot");
-    if (draft.schema_version === "3") draft._legacy_form = await workspaceRequest<LegacyMappingForm>(id, "/published-legacy-form");
-    return draft;
-  },
-  saveElement: (id: string, payload: {
-    target_kind: Extract<TargetKind, "object_type" | "value_type" | "link_type">;
-    target_id: string;
-    expected_current_version_id: string | null;
-    session_id: string | null;
-    expected_session_revision: number | null;
-    draft: Draft;
-    semantic_changes?: import("./types").SemanticChange[];
-  }) => workspaceRequest<{ version: VersionSummary; draft: Draft; session: ModelingSession | null }>(
-    id, "/element-saves", { ...payload, ...draftRequest(payload.draft) },
-  ),
-  importOssie: (
-    id: string,
-    document: unknown,
-    mode: "merge" | "replace",
-    title?: string,
-  ) =>
-    workspaceRequest<OssieImportResult>(id, "/imports/ossie", {
-      document,
-      mode,
-      ...(title ? { title } : {}),
-    }),
-  materials: (id: string) =>
-    workspaceRequest<{ items: Material[] }>(id, "/materials"),
+  get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid),
+  /** Saves the whole session draft; it does not publish. */
+  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[] } = {}) =>
+    request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft, ...extra })),
+  validate: (s: ModelingSession) => request<ValidationReport>(sessionPath(s) + "/validate", json("POST", {})),
+  snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  /** Previews cross-aggregate impact read-only before saving an element. */
+  previewElementSave: (id: string, payload: ElementSave) =>
+    workspaceRequest<ElementSaveImpact>(id, "/element-saves/preview", payload),
+  /** Saves one aggregate and publishes it right away (current-version CAS). */
+  saveElement: (id: string, payload: ElementSave) =>
+    workspaceRequest<ElementSaveResult>(id, "/element-saves", payload),
+  materials: (id: string) => workspaceRequest<Items<Material>>(id, "/materials"),
   upload: (id: string, file: File) =>
     request<Material>(
-      "/api/v1/workspaces/" +
-        id +
-        "/materials?name=" +
-        encodeURIComponent(file.name),
+      "/api/v1/workspaces/" + id + "/materials?name=" + encodeURIComponent(file.name),
       { method: "POST", body: file },
     ),
-  capabilities: (id: string) =>
-    workspaceRequest<Capabilities>(id, "/capabilities"),
-  connections: (id: string) =>
-    workspaceRequest<{ items: DataConnection[] }>(id, "/connections"),
-  tableMaterial: (id: string, connectionId: string, tables: string[]) =>
-    workspaceRequest<Material>(
-      id,
-      "/connections/" + connectionId + "/table-material",
-      { tables },
-    ),
-  tables: (id: string, connectionId: string) =>
-    workspaceRequest<{ items: DataTable[] }>(
-      id,
-      "/connections/" + connectionId + "/tables",
-    ),
+  capabilities: (id: string) => workspaceRequest<Capabilities>(id, "/capabilities"),
 };
 
+export const catalogApi = {
+  connections: (id: string) => workspaceRequest<Items<DataConnection>>(id, "/connections"),
+  tables: (id: string, connectionId: string, params?: { table?: string; schema_name?: string }) =>
+    workspaceRequest<Items<DataTable>>(id, `/connections/${connectionId}/tables` + query({ ...params })),
+  tableMaterial: (id: string, connectionId: string, tables: string[], schemaName?: string) =>
+    workspaceRequest<Material>(id, `/connections/${connectionId}/table-material`, {
+      tables,
+      ...(schemaName ? { schema_name: schemaName } : {}),
+    }),
+  schemas: (id: string, connectionId: string) =>
+    workspaceRequest<Items<string>>(id, `/connections/${connectionId}/schemas`),
+  assets: (id: string, connectionId: string, params?: { schema_name?: string; version_id?: string }) =>
+    workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
+  refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }) =>
+    workspaceRequest<Assets>(id, `/connections/${connectionId}/assets/refresh` + query({ ...params }), undefined, "POST"),
+  mappingPreview: (id: string, payload: MappingPreviewRequest) =>
+    workspaceRequest<MappingPreview>(id, "/mapping-preview", payload),
+};
+
+export const instancesApi = {
+  list: (
+    workspaceId: string,
+    params: {
+      type_id?: string;
+      source?: "document" | "database";
+      q?: string;
+      cursor?: string;
+      limit?: number;
+      snapshot_date?: ISODate;
+      version_id?: string;
+    },
+  ) => request<InstanceList>(ontologyPath(workspaceId) + "/objects" + query({ ...params })),
+  get: (workspaceId: string, ref: string, params?: { snapshot_date?: ISODate; version_id?: string }) =>
+    request<InstanceDetail>(ontologyPath(workspaceId) + "/objects/" + encodeURIComponent(ref) + query({ ...params })),
+  neighborhood: (
+    workspaceId: string,
+    ref: string,
+    params?: { depth?: number; snapshot_date?: ISODate; version_id?: string },
+  ) =>
+    request<InstanceEnvelope & InstanceNeighborhood>(
+      ontologyPath(workspaceId) + "/objects/" + encodeURIComponent(ref) + "/neighborhood" + query({ ...params }),
+    ),
+  /** Neighborhood of a database row against the session or published model. */
+  draftNeighborhood: (workspaceId: string, payload: NeighborhoodRequest) =>
+    workspaceRequest<InstanceNeighborhood>(workspaceId, "/instance-neighborhood", payload),
+};
 
 export const proposalsApi = {
-  batches: (s: Pick<ModelingSession, "id" | "workspace_id">) =>
-    request<{ items: ProposalBatch[]; next_cursor: string | null }>(
-      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-batches`,
+  batches: (s: Pick<ModelingSession, "id" | "workspace_id">, params?: { limit?: number; cursor?: string }) =>
+    request<Items<ProposalBatch> & { next_cursor: string | null }>(
+      sessionPath(s) + "/proposal-batches" + query({ ...params }),
     ),
   batch: (s: Pick<ModelingSession, "id" | "workspace_id">, batchId: string) =>
-    request<ProposalBatchDetail>(
-      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-batches/${batchId}`,
-    ),
-  decide: (
-    s: ModelingSession,
-    decisions: { proposal_id: string; decision: "accept" | "reject" | "restore" }[],
-    idempotencyKey: string,
-  ) =>
+    request<ProposalBatchDetail>(sessionPath(s) + "/proposal-batches/" + batchId),
+  decide: (s: ModelingSession, decisions: Decision[], idempotencyKey: string) =>
     request<DecisionResult>(
-      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/proposal-decisions`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          idempotency_key: idempotencyKey,
-          expected_session_revision: s.revision,
-          decisions,
-        }),
-      },
+      sessionPath(s) + "/proposal-decisions",
+      json("POST", {
+        idempotency_key: idempotencyKey,
+        expected_session_revision: s.revision,
+        decisions,
+      }),
+    ),
+  /** Turns a pending duplicate-fact create into an update of an existing fact. */
+  reviseFact: (s: ModelingSession, proposalId: string, payload: FactProposalRevision) =>
+    request<ProposalBatchDetail>(
+      sessionPath(s) + "/proposal-items/" + proposalId + "/revision",
+      json("POST", payload),
     ),
 };
-
 
 export const publishApi = {
   preview: (s: ModelingSession) =>
-    request<PublishPreview>(`/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/preview`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ expected_session_revision: s.revision }),
-    }),
-  publish: async (session: ModelingSession, preview: PublishPreview, message: string) => {
-    const s = session;
-    return request<{ version: VersionSummary; session: ModelingSession }>(
-      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/publish`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expected_session_revision: preview.session_revision,
-          expected_current_version_id: preview.current_version_id,
-          expected_merged_snapshot_sha256: preview.merged_snapshot_sha256,
-          message,
-        }),
-      },
-    );
-  },
-  resolve: (
-    s: ModelingSession,
-    currentVersionId: string | null,
-    resolutions: Record<string, Resolution>,
-  ) =>
-    request<ModelingSession>(
-      `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}/resolve-merge`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expected_session_revision: s.revision,
-          expected_current_version_id: currentVersionId,
-          resolutions,
-        }),
-      },
+    request<PublishPreview>(sessionPath(s) + "/preview", json("POST", { expected_session_revision: s.revision })),
+  publish: (session: ModelingSession, preview: PublishPreview, message: string) =>
+    request<PublishResult>(
+      sessionPath(session) + "/publish",
+      json("POST", {
+        expected_session_revision: preview.session_revision,
+        expected_current_version_id: preview.current_version_id,
+        expected_merged_snapshot_sha256: preview.merged_snapshot_sha256,
+        message,
+      }),
     ),
+  resolve: (s: ModelingSession, currentVersionId: string | null, resolutions: Record<string, Resolution>) =>
+    request<ModelingSession>(
+      sessionPath(s) + "/resolve-merge",
+      json("POST", {
+        expected_session_revision: s.revision,
+        expected_current_version_id: currentVersionId,
+        resolutions,
+      }),
+    ),
+};
+
+export const metricsApi = {
+  /** Runs the unsaved form definition read-only; nothing is stored. */
+  preview: (workspaceId: string, payload: MetricPreviewRequest) =>
+    request<MetricPreview>(`/api/v1/modeling/workspaces/${workspaceId}/metrics/preview`, json("POST", payload)),
 };

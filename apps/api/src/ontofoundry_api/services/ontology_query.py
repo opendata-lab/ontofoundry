@@ -1,28 +1,26 @@
-from __future__ import annotations
+"""Core-1 resource projections shared by REST and MCP."""
 
-from collections import deque
+from copy import deepcopy
 from datetime import UTC
-from typing import Any
-
-from sqlalchemy.orm import Session
 
 from ontofoundry_api.db_models import OntologyVersionRecord
+from ontofoundry_api.domain.bindings import binding_readiness, resolve_binding
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.snapshot import as_v3_dict
+from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.instance_display import document_display_text
+from ontofoundry_api.domain.snapshot import read_snapshot_json
+from ontofoundry_api.services.errors import NotFoundError
+from ontofoundry_api.services.workspaces import get_workspace
 
-from .errors import NotFoundError
-from .ontology_context import concept_context, context_elements, document_context, matches
-from .public_projection import public_projection
-from .workspaces import get_workspace
 
-
-def current_version(
-    session: Session, workspace_id: str, version_id: str | None = None
-) -> OntologyVersionRecord:
+def current_version(session, workspace_id, version_id=None):
     workspace = get_workspace(session, workspace_id)
-    if not version_id and not workspace.current_version_id:
-        raise NotFoundError("该工作空间还没有已发布版本")
-    version = session.get(OntologyVersionRecord, version_id or workspace.current_version_id)
+    version = (
+        session.get(OntologyVersionRecord, version_id or workspace.current_version_id)
+        if version_id or workspace.current_version_id
+        else None
+    )
     if (
         version is None
         or version.workspace_id != workspace_id
@@ -32,21 +30,11 @@ def current_version(
     return version
 
 
-def snapshot_of(version: OntologyVersionRecord) -> dict[str, Any]:
-    """The version's snapshot as v3 JSON, normalized once per loaded record.
-
-    Published snapshots were validated when they were published, so reads only
-    normalize the shape; they do not re-run domain validation.
-    """
-    cached = getattr(version, "_v3_snapshot", None)
-    if cached is None:
-        cached = as_v3_dict(version.snapshot_json, version.workspace_id)
-        version._v3_snapshot = cached
-    return cached
+def snapshot_of(version):
+    return read_snapshot_json(version.snapshot_json, version.workspace_id)
 
 
-def version_hashes(version: OntologyVersionRecord) -> dict[str, str]:
-    """Both version hashes; `version_sha256` stays as the content hash alias."""
+def version_hashes(version):
     return {
         "version_sha256": version.sha256,
         "version_content_sha256": version.sha256,
@@ -54,384 +42,374 @@ def version_hashes(version: OntologyVersionRecord) -> dict[str, str]:
     }
 
 
-def _query_view(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Project a native snapshot onto the shape this query layer has always served.
-
-    Object types carry their own properties as `attributes`, and rules appear as
-    `requires`/`derived_by` on their owners. This is the published read contract
-    for REST and MCP type queries, not a storage format.
-    """
-
-    from ontofoundry_api.domain.runtime_views import query_compat
-    snapshot = query_compat(snapshot)
-
-    def rules(owner_id: str) -> dict[str, list[str]]:
-        owned = [r for r in snapshot["rules"] if r["owner_id"] == owner_id]
-        return {
-            "requires": [r["expression"] for r in owned if r["rule_kind"] == "constraint"],
-            "derived_by": [r["expression"] for r in owned if r["rule_kind"] == "derivation"],
-        }
-
-    properties: dict[str, list[dict[str, Any]]] = {}
-    for prop in snapshot["properties"]:
-        view = {k: v for k, v in prop.items() if k not in ("owner_type_id", "evidence")}
-        properties.setdefault(prop["owner_type_id"], []).append({**view, **rules(prop["id"])})
-    return {
-        **snapshot,
-        "object_types": [
-            {
-                **{k: v for k, v in item.items() if k != "evidence"},
-                **rules(item["id"]),
-                "attributes": properties.get(item["id"], []),
-            }
-            for item in snapshot["object_types"]
-        ],
-        "link_types": [
-            {**{k: v for k, v in item.items() if k != "evidence"}, **rules(item["id"])}
-            for item in snapshot["link_types"]
-        ],
-        "objects": snapshot["material_objects"],
-        "links": snapshot["material_links"],
-    }
-
-
-def query_view(version: OntologyVersionRecord) -> dict[str, Any]:
-    return _query_view(snapshot_of(version))
-
-
-def version_summary(version: OntologyVersionRecord) -> dict[str, Any]:
-    snapshot = snapshot_of(version)
+def envelope(version):
     return {
         "workspace_id": version.workspace_id,
         "version_id": version.id,
-        "version": version.version_number,
         **version_hashes(version),
+    }
+
+
+def version_summary(version, *, include_mappings=True, include_instances=True):
+    snapshot = snapshot_of(version)
+    counts = {
+        "object_types": len(snapshot["object_types"]),
+        "link_types": len(snapshot["link_types"]),
+        "attributes": len(snapshot["properties"]),
+        "rules": len(snapshot["rules"]),
+        "metrics": len(snapshot["metrics"]),
+    }
+    if include_mappings:
+        counts.update(
+            datasets=len(snapshot["datasets"]), mappings=len(snapshot["mappings"])
+        )
+    if include_instances:
+        counts.update(
+            material_objects=len(snapshot["material_objects"]),
+            material_links=len(snapshot["material_links"]),
+        )
+    return {
+        **envelope(version),
+        "version": version.version_number,
         "status": version.status,
         "message": version.message,
         "published_at": version.created_at
         if version.created_at.tzinfo
         else version.created_at.replace(tzinfo=UTC),
         "validation": version.validation_json,
-        "counts": {
-            "object_types": len(snapshot.get("object_types", [])),
-            "link_types": len(snapshot.get("link_types", [])),
-            "attributes": len(snapshot["properties"]),
-            "rules": len(snapshot["rules"]),
-            "actions": len(snapshot["actions"]),
-            "mappings": len(query_view(version).get("mappings", [])),
-        },
+        "counts": counts,
     }
 
 
-def workspace_overview(version: OntologyVersionRecord, *, include_private: bool) -> dict:
-    """A bounded projection of one published snapshot; never query source databases."""
-    result = {
-        "version": version_summary(version),
-        "graph": type_graph(version),
-        "details": None,
-    }
-    if not include_private:
-        return result
-    snapshot = snapshot_of(version)
-    objects = snapshot["material_objects"]
-    links = snapshot["material_links"]
-    from ontofoundry_api.domain.models import OntologyDraft
-    from ontofoundry_api.domain.semantic_views import SemanticViews
-    model = OntologyDraft.model_validate(snapshot)
-    views = SemanticViews(model)
-    # A read-only native mapping still belongs in the member's overview. Counts
-    # describe native mappings; queryability comes from the same instance view.
-    mappings = []
-    for cm in model.concept_mappings:
-        analysis = views.analyze(cm.concept_id.ref)
-        mappings.append({"id": str(cm.id), "type_id": str(cm.concept_id.ref),
-                         "table_name": analysis.mapping.table_name if analysis.mapping else "复杂映射",
-                         "state": analysis.public(cm.concept_id.ref)["state"], "reason": analysis.reason})
-    sample_objects = [
-        {key: item[key] for key in ("id", "name", "type_id")} for item in objects[:24]
-    ]
-    sample_ids = {item["id"] for item in sample_objects}
-    material_ids = {
-        evidence["material_id"]
-        for item in [*objects, *links]
-        for evidence in item.get("evidence", [])
-        if evidence.get("kind") == "material"
-    }
-    result["details"] = {
-        "object_count": len(objects),
-        "link_count": len(links),
-        "evidence_material_count": len(material_ids),
-        "mapping_count": len(mappings),
-        "objects": sample_objects,
-        "links": [
-            {key: item[key] for key in ("id", "type_id", "source_id", "target_id")}
-            for item in links
-            if item["source_id"] in sample_ids and item["target_id"] in sample_ids
-        ][:48],
-        "mappings": [
-            {key: item[key] for key in ("id", "type_id", "table_name", "state", "reason")}
-            for item in mappings[:24]
-        ],
-    }
-    return result
+def binding_status(draft, type_id, db=None, workspace_id=None):
+    status = binding_readiness(draft, type_id).status
+    if db is not None:
+        from ontofoundry_api.services.dataset_sources import resolve_dataset
+        from ontofoundry_api.services.errors import ServiceError
+
+        binding = resolve_binding(draft, type_id)
+        sources = []
+        for source in binding.sources.values():
+            try:
+                sources.append(
+                    resolve_dataset(
+                        db, workspace_id, DraftIndex(draft).datasets[source.dataset_id]
+                    )
+                )
+            except ServiceError:
+                return "unbound"
+        if len({s.connection.id for s in sources}) > 1:
+            return "cross_connection"
+    return status
 
 
-def _supertypes(type_id: str, by_id: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """Ancestors closest first; consumers should not have to walk `extends`."""
-    ordered: list[dict[str, Any]] = []
-    seen: set[str] = {type_id}
-    frontier = list(by_id.get(type_id, {}).get("extends", []))
-    while frontier:
-        parent_id = str(frontier.pop(0))
-        if parent_id in seen or parent_id not in by_id:
-            continue
-        seen.add(parent_id)
-        ordered.append(by_id[parent_id])
-        frontier.extend(by_id[parent_id].get("extends", []))
-    return ordered
+def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspace_id=None):
+    draft = CoreDraft.model_validate(snapshot)
+    index = DraftIndex(draft)
 
-
-def _type_items(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    by_id = {str(item["id"]): item for item in snapshot.get("object_types", [])}
-    objects = []
-    for item in snapshot.get("object_types", []):
-        supertypes = _supertypes(str(item["id"]), by_id)
-        inherited = [
-            {**attribute, "declared_by": parent["id"]}
-            for parent in supertypes
-            for attribute in parent.get("attributes", [])
-        ]
-        objects.append(
-            {
-                **item,
-                "kind": "object_type",
-                "supertypes": [
-                    {key: parent[key] for key in ("id", "name", "technical_name")}
-                    for parent in supertypes
-                ],
-                "inherited_attributes": inherited,
-                "attribute_count": len(item.get("attributes", [])) + len(inherited),
+    def project(value):
+        if isinstance(value, dict):
+            return {
+                key: project(entry)
+                for key, entry in value.items()
+                if instances or key != "evidence"
             }
+        if isinstance(value, list):
+            return [project(entry) for entry in value]
+        return value
+
+    def dump(item):
+        return project(item.model_dump(mode="json"))
+
+    items = []
+    for obj in draft.object_types:
+        status = (
+            binding_status(draft, obj.id, db, workspace_id) if mappings else "forbidden"
         )
-    links = []
-    for item in snapshot.get("link_types", []):
-        source = by_id.get(str(item["source_type_id"]))
-        target = by_id.get(str(item["target_type_id"]))
-        links.append(
-            {
-                **{key: value for key, value in item.items() if key != "data_join"},
-                "kind": "link_type",
-                "source_type": _type_summary(source),
-                "target_type": _type_summary(target),
-                "attribute_count": 0,
+        binding = resolve_binding(draft, obj.id)
+        properties = []
+        for prop in index.effective_properties(obj.id):
+            p = {
+                **dump(prop),
+                "inherited_from": str(prop.owner_type_id)
+                if prop.owner_type_id != obj.id
+                else None,
+                "binding_status": status,
             }
-        )
-    values = [{**concept_context({k: v for k, v in item.items() if k != "evidence"}, snapshot), "kind": "value_type", "attribute_count": 0}
-              for item in snapshot.get("value_types", [])]
-    return [concept_context(item, snapshot) for item in objects] + links + values
+            if mappings and prop.technical_name in binding.fields:
+                b = binding.fields[prop.technical_name]
+                p["binding"] = b.model_dump(mode="json")
+                if b.kind == "column":
+                    ds = index.datasets[binding.sources[b.source_id].dataset_id]
+                    p["physical_type"] = next(
+                        (c.physical_type for c in ds.columns or [] if c.name == b.column),
+                        None,
+                    )
+            properties.append(p)
+        links = []
+        for link in index.effective_links(obj.id):
+            forward = index.is_a(obj.id, link.source_type_id)
+            owner = link.source_type_id if forward else link.target_type_id
+            link_view = {
+                **dump(link),
+                "direction": "forward" if forward else "reverse",
+                "inherited_from": str(owner) if owner != obj.id else None,
+                "binding_status": status,
+            }
+            if mappings:
+                effective_join = binding.link_bindings.get(link.id, link.data_join)
+                link_view["data_join"] = (
+                    effective_join.model_dump(mode="json") if effective_join else None
+                )
+            else:
+                link_view.pop("data_join", None)
+            links.append(link_view)
+        definition = {
+            **dump(obj),
+            "properties": properties,
+            "links": links,
+            "rules": [
+                {
+                    **dump(r),
+                    "inherited_from": str(r.owner_id) if r.owner_id != obj.id else None,
+                    "binding_status": status,
+                }
+                for r in index.effective_rules(obj.id)
+            ],
+            "child_types": [
+                {"id": str(o.id), "name": o.name, "technical_name": o.technical_name}
+                for o in index.children(obj.id)
+            ],
+            "binding_status": status,
+        }
+        if mappings:
+            local = next((m for m in draft.mappings if m.type_id == obj.id), None)
+            definition["mapping"] = (
+                {**dump(local), "binding_status": status} if local else None
+            )
+            definition["instance_source_type_ids"] = [str(i) for i in binding.virtual_types]
+        items.append({"kind": "object_type", "definition": definition})
+    for link in draft.link_types:
+        definition = {
+            **dump(link),
+            "direction": "forward",
+            "inherited_from": None,
+            "binding_status": "bound" if link.data_join else "unbound",
+        }
+        if not mappings:
+            definition.pop("data_join", None)
+            definition["binding_status"] = "forbidden"
+        items.append({"kind": "link_type", "definition": definition})
+    from ontofoundry_api.services.metric_query import metric_projection
 
+    for metric in draft.metrics:
+        if mappings:
+            definition = metric_projection(draft, metric, db=db, workspace_id=workspace_id)
+            definition = project(definition)
+        else:
+            definition = {
+                k: v
+                for k, v in dump(metric).items()
+                if k in {"id", "name", "technical_name", "description", "synonyms"}
+            }
+            definition["binding_status"] = "forbidden"
+        items.append({"kind": "metric", "definition": definition})
+    if mappings:
+        for dataset in draft.datasets:
+            if db is not None:
+                from ontofoundry_api.services.dataset_sources import (
+                    authorized_dataset_projection,
+                )
 
-def _type_summary(item: dict[str, Any] | None) -> dict[str, Any] | None:
-    if item is None:
-        return None
-    return {key: item[key] for key in ("id", "name", "technical_name")}
-
-
-# Among equally relevant hits, business concepts come before the semantic-layer
-# nodes that implement them (a dataset may share its concept's name).
-_KIND_PRIORITY = {'object_type': 0, 'value_type': 1, 'link_type': 2, 'document': 9}
-
-
-def _relevance(item: dict, query: str) -> int:
-    """Rank a hit so the element a caller named comes first: exact name, then
-    exact alias, then a name or alias containing the query, then any other
-    field. Without this, hits sorted by kind put every relation whose
-    description mentions "组件" ahead of the object named 组件."""
-    names = [(item.get(field) or '').casefold() for field in ('name', 'technical_name')]
-    aliases = [m['value'].casefold() for m in item['matches'] if not m['source'].startswith('element.')]
-    if query in names:
-        return 0
-    if query in aliases:
-        return 1
-    if any(query in name for name in names):
-        return 2
-    if aliases:
-        return 3
-    return 4
+                definition = authorized_dataset_projection(db, workspace_id, dataset)
+            else:
+                definition = {**dump(dataset), "binding_status": "unbound"}
+            items.append({"kind": "dataset", "definition": definition})
+    return items
 
 
 def search_types(
-    version: OntologyVersionRecord,
-    *, query: str = '', kind: str | None = None, include_context_elements: bool = False, include_document_context: bool = False,
-) -> dict[str, Any]:
-    normalized_query = query.strip().casefold()
-    snapshot = snapshot_of(version)
-    items = _type_items(query_view(version))
-    if include_context_elements:
-        items += [item for group in context_elements(snapshot).values() for item in group]
-    if include_document_context and (normalized_query or kind == 'document'):
-        items.append(document_context(snapshot))
-    if kind:
-        items = [item for item in items if item['kind'] == kind]
-    if normalized_query:
-        items = [{**item, 'matches': matches(item, normalized_query)} for item in items]
-        items = [item for item in items if item['matches']]
-    items.sort(key=lambda item: (
-        _relevance(item, normalized_query) if normalized_query else 0,
-        _KIND_PRIORITY.get(item['kind'], 5) if normalized_query else 0,
-        item['kind'], item['technical_name'].casefold(), item['id'],
-    ))
+    version,
+    *,
+    query="",
+    kind=None,
+    include_context_elements=True,
+    include_document_context=False,
+    include_instances=True,
+    db=None,
+):
+    items = resource_items(
+        snapshot_of(version),
+        mappings=include_context_elements,
+        instances=include_instances,
+        db=db,
+        workspace_id=version.workspace_id,
+    )
+    query = query.casefold()
+    items = [
+        item
+        for item in items
+        if (kind is None or item["kind"] == kind)
+        and (
+            not query
+            or any(
+                query in str(item["definition"].get(k, "")).casefold()
+                for k in ("name", "technical_name", "description", "synonyms")
+            )
+        )
+    ]
+    return {**envelope(version), "items": items, "next_cursor": None, "ambiguous": False}
+
+
+def get_type(
+    version,
+    type_id,
+    *,
+    include_context_elements=True,
+    include_document_context=False,
+    include_instances=True,
+    db=None,
+):
+    items = search_types(
+        version,
+        include_context_elements=include_context_elements,
+        include_instances=include_instances,
+        db=db,
+    )["items"]
+    found = [i for i in items if i["definition"]["id"] == type_id]
+    if not found:
+        found = [
+            i
+            for i in items
+            if i["definition"].get("technical_name", "").casefold() == type_id.casefold()
+        ]
+    if not found:
+        raise NotFoundError("没有找到该资源")
     return {
-        'workspace_id': version.workspace_id, 'version_id': version.id, **version_hashes(version),
-        'items': public_projection(items), 'next_cursor': None, 'ambiguous': bool(normalized_query) and len(items) > 1,
-        'document_context': public_projection(document_context(snapshot)),
+        **envelope(version),
+        "ambiguous": len(found) > 1,
+        "item": found[0] if len(found) == 1 else None,
+        **({"candidates": found} if len(found) > 1 else {}),
     }
 
 
-def get_type(version: OntologyVersionRecord, type_id: str, *, include_context_elements: bool = False, include_document_context: bool = False) -> dict[str, Any]:
-    snapshot = snapshot_of(version)
-    items = _type_items(query_view(version))
-    if include_context_elements:
-        items += [item for group in context_elements(snapshot).values() for item in group]
-    if include_document_context:
-        items.append(document_context(snapshot))
-    found = [item for item in items if item['id'] == type_id]
-    if not found:
-        found = [item for item in items if item['technical_name'] == type_id]
-    if not found:
-        raise NotFoundError('没有找到该本体类型')
-    envelope = dict(workspace_id=version.workspace_id, version_id=version.id, **version_hashes(version))
-    if len(found) > 1:
-        return {**envelope, 'item': None, 'candidates': public_projection(found), 'ambiguous': True}
-    return {**envelope, 'item': public_projection(found[0]), 'ambiguous': False}
+def _all_graph(snapshot):
+    nodes = [
+        {
+            "id": o["id"],
+            "kind": "object_type",
+            "label": o["name"],
+            "technical_name": o["technical_name"],
+            "description": o["description"],
+            "tags": o["tags"],
+        }
+        for o in snapshot["object_types"]
+    ]
+    edges = [
+        {
+            "id": link_view["id"],
+            "kind": "link_type",
+            "link_type_id": link_view["id"],
+            "label": link_view["name"],
+            "technical_name": link_view["technical_name"],
+            "source": link_view["source_type_id"],
+            "target": link_view["target_type_id"],
+            "multiplicity": link_view["multiplicity"],
+            "description": link_view["description"],
+            "tags": link_view["tags"],
+        }
+        for link_view in snapshot["link_types"]
+    ]
+    edges.extend(
+        {
+            "id": "extends:" + o["id"],
+            "kind": "extends",
+            "label": "继承",
+            "technical_name": "extends",
+            "source": o["id"],
+            "target": o["extends"],
+        }
+        for o in snapshot["object_types"]
+        if o["extends"]
+    )
+    return nodes, edges
 
 
-def _all_graph(snapshot: dict[str, Any]) -> tuple[list[dict], list[dict]]:
-    nodes: list[dict[str, Any]] = []
-    edges: list[dict[str, Any]] = []
-    for object_type in snapshot.get("object_types", []):
-        nodes.append(
-            {
-                "id": object_type["id"],
-                "kind": "object_type",
-                "label": object_type["name"],
-                "technical_name": object_type["technical_name"],
-                "description": object_type.get("description", ""),
-                "tags": object_type.get("tags", []),
-                "attribute_count": len(object_type.get("attributes", [])),
-            }
-        )
-        for attribute in object_type.get("attributes", []):
-            value_id = f"value:{attribute['id']}"
-            nodes.append(
-                {
-                    "id": value_id,
-                    "kind": "value_type",
-                    "label": attribute["name"],
-                    "technical_name": (
-                        f"{object_type['technical_name']}_{attribute['technical_name']}_value"
-                    ),
-                    "description": attribute.get("description", ""),
-                    "tags": [],
-                    "value_kind": attribute["value_kind"],
-                    "identifier": attribute["identifier"],
-                }
-            )
-            edges.append(
-                {
-                    "id": f"attribute:{attribute['id']}",
-                    "kind": "attribute",
-                    "label": attribute["name"],
-                    "technical_name": attribute["technical_name"],
-                    "source": object_type["id"],
-                    "target": value_id,
-                }
-            )
-        # Inheritance is part of the picture: a subtype points at its supertypes.
-        for parent in object_type.get("extends", []):
-            edges.append(
-                {
-                    "id": f"extends:{object_type['id']}:{parent}",
-                    "kind": "extends",
-                    "label": "继承",
-                    "technical_name": "extends",
-                    "source": object_type["id"],
-                    "target": parent,
-                    "description": f"{object_type['name']} 继承自上级业务对象",
-                }
-            )
-    known = {n["id"] for n in nodes}
-    concepts = {i["id"]: i for i in [*snapshot.get("object_types", []), *snapshot.get("value_types", [])]}
-    for link in snapshot.get("link_types", []):
-        if link.get("owner_ref") and not link.get("source_type_id"):
-            nodes.append({"id": link["id"], "kind": "link_type", "label": link["name"],
-                          "technical_name": link["technical_name"], "description": link.get("description") or "",
-                          "tags": link.get("tags", []), "roles": link["roles"], "owner_ref": link["owner_ref"],
-                          "all_roles": link["all_roles"], "verbalizes": link.get("verbalizes", [])})
-            for role in link["all_roles"]:
-                ref = role["concept"]
-                target = ref["ref"] if ref["kind"] in ("object_type", "value_type") else ref["kind"] + ":" + ref["ref"]
-                if target not in known:
-                    concept = concepts.get(target, {})
-                    nodes.append({"id": target, "kind": "value_type", "label": concept.get("name") or ref["ref"],
-                                  "technical_name": concept.get("concept") or ref["ref"], "description": concept.get("description") or "", "tags": []})
-                    known.add(target)
-                edges.append({"id": link["id"] + ":role:" + role["id"], "kind": "role", "link_type_id": link["id"],
-                              "role_id": role["id"], "label": role.get("name") or concepts.get(target, {}).get("name") or ref["ref"],
-                              "technical_name": link["technical_name"], "source": link["id"], "target": target})
-            continue
-        edges.append(
-            {
-                "id": link["id"],
-                "kind": "link_type",
-                "label": link["name"],
-                "technical_name": link["technical_name"],
-                "source": link["source_type_id"],
-                "target": link["target_type_id"],
-                "multiplicity": link["multiplicity"],
-                "description": link.get("description", ""),
-                "tags": link.get("tags", []),
-                "identifier": link.get("identifier", False),
-            }
-        )
-    return public_projection(nodes), public_projection(edges)
+def _query_view(snapshot):
+    return deepcopy(snapshot)
 
 
-def type_graph(
-    version: OntologyVersionRecord,
-    *,
-    focus_id: str | None = None,
-    depth: int = 1,
-) -> dict[str, Any]:
-    nodes, edges = _all_graph(query_view(version))
+def query_view(version):
+    return snapshot_of(version)
+
+
+def type_graph(version, *, focus_id=None, depth=1):
+    nodes, edges = _all_graph(snapshot_of(version))
     if focus_id:
-        neighbors: dict[str, set[str]] = {}
-        for edge in edges:
-            neighbors.setdefault(edge["source"], set()).add(edge["target"])
-            neighbors.setdefault(edge["target"], set()).add(edge["source"])
-        visible = {focus_id}
-        queue = deque([(focus_id, 0)])
-        while queue:
-            node_id, current_depth = queue.popleft()
-            if current_depth >= depth:
-                continue
-            for neighbor in neighbors.get(node_id, set()):
-                if neighbor not in visible:
-                    visible.add(neighbor)
-                    queue.append((neighbor, current_depth + 1))
-        # A reached hyperedge always exposes its complete role incidence.
-        hyperedges = {n["id"] for n in nodes if n["kind"] == "link_type" and n["id"] in visible}
-        visible.update(e["target"] for e in edges if e["kind"] == "role" and e["source"] in hyperedges)
-        nodes = [node for node in nodes if node["id"] in visible]
-        edges = [
-            edge
-            for edge in edges
-            if edge["source"] in visible and edge["target"] in visible
-        ]
+        selected = {focus_id}
+        for _ in range(depth):
+            selected |= {
+                e[k]
+                for e in edges
+                if e["source"] in selected or e["target"] in selected
+                for k in ("source", "target")
+            }
+        nodes = [n for n in nodes if n["id"] in selected]
+        edges = [e for e in edges if e["source"] in selected and e["target"] in selected]
+    return {**envelope(version), "nodes": nodes, "edges": edges}
+
+
+def workspace_overview(
+    version, *, include_private=False, include_mappings=None, include_instances=None
+):
+    if version is None:
+        return {"version": None, "graph": None, "details": None}
+    mappings = include_private if include_mappings is None else include_mappings
+    instances = include_private if include_instances is None else include_instances
+    snapshot = snapshot_of(version)
+    details = {}
+    if mappings:
+        details.update(
+            mapping_count=len(snapshot["mappings"]),
+            mappings=[
+                {"id": m["id"], "type_id": m["type_id"], "binding_status": "unbound"}
+                for m in snapshot["mappings"][:24]
+            ],
+        )
+    if instances:
+        draft = CoreDraft.model_validate(snapshot)
+        details.update(
+            object_count=len(draft.material_objects),
+            link_count=len(draft.material_links),
+            evidence_material_count=len(
+                {
+                    e.material_id
+                    for f in [*draft.material_objects, *draft.material_links]
+                    for e in f.evidence
+                    if e.kind == "material"
+                }
+            ),
+            objects=[
+                {
+                    "id": str(f.id),
+                    "type_id": str(f.type_id),
+                    "display_text": document_display_text(draft, f),
+                }
+                for f in draft.material_objects[:24]
+            ],
+            links=[
+                {
+                    k: v
+                    for k, v in f.model_dump(mode="json").items()
+                    if k in {"id", "type_id", "source_id", "target_id"}
+                }
+                for f in draft.material_links[:48]
+            ],
+        )
     return {
-        "workspace_id": version.workspace_id,
-        "version_id": version.id,
-        **version_hashes(version),
-        "nodes": nodes,
-        "edges": edges,
+        "version": version_summary(
+            version, include_mappings=mappings, include_instances=instances
+        ),
+        "graph": type_graph(version),
+        "details": details or None,
     }

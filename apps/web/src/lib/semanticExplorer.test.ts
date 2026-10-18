@@ -1,87 +1,27 @@
 import { describe, expect, it } from "vitest";
-import type { GraphNode, TypeGraph } from "../api/types";
-import { semanticCanvas, semanticResources } from "./semanticExplorer";
-const object = (id: string): GraphNode => ({
-  id,
-  kind: "object_type",
-  label: id,
-  technical_name: id,
-  description: "",
-  tags: [],
-});
-describe("semantic canvas projection", () => {
-  it("preserves record self-relations and all extra roles while keeping one main relation edge", () => {
-    const relation: GraphNode = {
-      id: "calls",
-      kind: "link_type",
-      label: "调用观测",
-      technical_name: "calls",
-      description: "",
-      tags: [],
-      owner_ref: { kind: "object_type", ref: "component" },
-      roles: [
-        {
-          id: "called",
-          name: "called",
-          concept: { kind: "object_type", ref: "component" },
-        },
-        {
-          id: "env",
-          name: "environment",
-          concept: { kind: "object_type", ref: "environment" },
-        },
-        {
-          id: "count",
-          name: "count",
-          concept: { kind: "builtin", ref: "Integer" },
-        },
-      ],
-    };
-    const graph: TypeGraph = {
-      workspace_id: "w",
-      version_id: "v",
-      version_sha256: "h",
-      nodes: [
-        object("component"),
-        object("environment"),
-        relation,
-        {
-          id: "builtin:Integer",
-          kind: "value_type",
-          label: "Integer",
-          technical_name: "Integer",
-          description: "",
-          tags: [],
-        },
-      ],
-      edges: [
-        { role_id: "owner", target: "component" },
-        { role_id: "called", target: "component" },
-        { role_id: "env", target: "environment" },
-        { role_id: "count", target: "builtin:Integer" },
-      ].map((role) => ({
-        ...role,
-        id: `role:${role.role_id}`,
-        source: "calls",
-        kind: "role",
-        link_type_id: "calls",
-        label: role.role_id,
-        technical_name: "calls",
-      })),
-    };
-    const resources = semanticResources(graph);
+import { example } from "../test/drafts";
+import { draftGraph, semanticCanvas, semanticResources } from "./semanticExplorer";
+
+describe("semantic resources", () => {
+  it("lists objects, relations, metrics and datasets; only objects and links are drawn", () => {
+    const draft = example("01-basic-sales");
+    const graph = draftGraph(draft);
+    const resources = semanticResources(graph, draft);
+    const count = (kind: string) => resources.filter((r) => r.kind === kind).length;
+    expect([count("object"), count("relation"), count("metric"), count("dataset")]).toEqual([2, 1, 10, 2]);
+    const metric = resources.find((r) => r.technical === "order_amount")!;
+    expect(metric.subtitle).toBe("orders · 求和");
+    expect(metric.selection).toBeNull();
+    expect(metric.detail).toMatchObject({ kind: "metric", id: metric.id });
+    expect(resources.find((r) => r.kind === "dataset" && r.name === "orders")?.detail.kind).toBe("dataset");
     const canvas = semanticCanvas(graph, resources);
-    expect(resources.filter((r) => r.kind === "relation")).toHaveLength(1);
-    expect(resources.find((r) => r.id === "builtin:Integer")?.name).toBe(
-      "整数",
-    );
-    expect(canvas.nodes.some((n) => n.kind === "link_type")).toBe(false);
-    expect(canvas.edges.find((e) => e.id === "calls")).toMatchObject({
-      source: "component",
-      target: "component",
-    });
-    expect(
-      canvas.edges.filter((e) => e.kind === "role").map((e) => e.target),
-    ).toEqual(["environment", "builtin:Integer"]);
+    expect(canvas.nodes).toHaveLength(2);
+    expect(canvas.edges.every((e) => e.kind === "link_type" || e.kind === "extends")).toBe(true);
+  });
+  it("draws inheritance as extends edges from the child", () => {
+    const draft = example("06-inheritance");
+    const graph = draftGraph(draft);
+    const person = draft.object_types.find((o) => o.technical_name === "person")!;
+    expect(graph.edges.find((e) => e.kind === "extends" && e.source === person.id)?.target).toBe(person.extends);
   });
 });

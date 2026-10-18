@@ -1,5 +1,7 @@
 # Ossie v3 覆盖矩阵（P0 合同冻结）
 
+> **已被 core-1 主设计取代。** 本文记录 2026-10-08 方案及当时的进展，保留作历史参考；现行模型与实施以 [core-1 主设计](2026-10-14-core-model-and-format-adapters.md) 为准。
+
 日期：2026-10-08。规范与范围以已评审方案第 1、3、5 节为准。
 
 由 `python3 scripts/ossie_coverage_matrix.py` 从仓库固定 schema 与显式指定的样例生成；`--check` 校验字段集合、计数与文档一致。

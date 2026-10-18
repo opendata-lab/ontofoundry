@@ -626,6 +626,16 @@
             "name": "device_id",
             "physical_type": "varchar",
             "comment": "示例登记列"
+          },
+          {
+            "name": "device_name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "responsible_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
           }
         ]
       },
@@ -640,6 +650,16 @@
         "columns": [
           {
             "name": "vehicle_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "vehicle_name",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "responsible_id",
             "physical_type": "varchar",
             "comment": "示例登记列"
           }

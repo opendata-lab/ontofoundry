@@ -1,5 +1,7 @@
 # P3 语义模型与映射树实施进度
 
+> **已被 core-1 主设计取代。** 本文记录 2026-10-08 方案及当时的进展，保留作历史参考；现行模型与实施以 [core-1 主设计](../design/2026-10-14-core-model-and-format-adapters.md) 为准。
+
 基线：2026-10-09，P2 提交 `3a2ceef`。仅本 worktree 修改，禁止提交/启动服务/访问演示目录。保留已有问数提示词工作区改动。
 
 核对：P1/P2 已原生承载 semantic_models/datasets/dataset_fields/dataset_relationships/metrics/concept_mappings/mapping_nodes，slot、出现状态、数组顺序、扩展与稳定 ID 已具备，A/B 严格往返 0 差异。缺口是读路径仍借助旧编译/解析器，写表单按连接整组重建、复合连接不可查询，以及缺少语义层只读浏览。

@@ -1,12 +1,14 @@
+import { Tag } from "antd";
+
 // Renders nothing without tags: an empty tag row is noise, not information.
 export function TagList({ tags }: { tags: readonly string[] }) {
   if (!tags.length) return null;
   return (
-    <span className="tag-list">
+    <span className="inline-flex flex-wrap gap-1">
       {tags.map((tag, index) => (
-        <span className="tag tag--label" key={`${tag}:${index}`}>
+        <Tag key={`${tag}:${index}`} className="!m-0">
           {tag}
-        </span>
+        </Tag>
       ))}
     </span>
   );

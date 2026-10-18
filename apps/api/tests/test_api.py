@@ -1,101 +1,44 @@
-from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
+"""Core REST read resources and retired endpoint boundaries."""
+
+from test_modeling import ONTOLOGY, ROOT
 
 
 def test_health_and_current_user(client):
     assert client.get("/healthz").json()["status"] == "ok"
-    response = client.get("/api/v1/auth/me")
-    assert response.status_code == 200
-    assert response.json()["display_name"] == "admin"
+    assert client.get("/api/v1/auth/me").json()["display_name"] == "admin"
 
 
-def test_workspace_directory_exposes_published_summary(client):
-    response = client.get("/api/v1/workspaces")
-
-    assert response.status_code == 200
-    workspace = response.json()["items"][0]
-    assert workspace["id"] == str(DEMO_WORKSPACE_ID)
-    assert workspace["role"] == "admin"
-    assert workspace["current_version"] == 1
-    assert workspace["object_type_count"] == 5
-    assert workspace["link_type_count"] == 4
-
-
-def test_published_ontology_query_and_export_share_version(client):
-    workspace_id = str(DEMO_WORKSPACE_ID)
-    version = client.get(f"/api/v1/ontology/workspaces/{workspace_id}/version").json()
-    objects = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/types",
-        params={"kind": "object_type"},
-    ).json()
-    graph = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/type-graph/neighborhood"
-    ).json()
-    export = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/versions/"
-        f"{version['version_id']}/export"
+def test_resources_and_graph_share_version(client):
+    version = client.get(ONTOLOGY + "/version").json()
+    resources = client.get(ONTOLOGY + "/types").json()
+    graph = client.get(ONTOLOGY + "/type-graph/neighborhood").json()
+    assert (
+        version["version_sha256"] == resources["version_sha256"] == graph["version_sha256"]
     )
-
-    assert version["validation"]["publishable"] is True
-    assert version["version_sha256"] == objects["version_sha256"]
-    assert version["version_sha256"] == graph["version_sha256"]
-    assert len(objects["items"]) == 5
-    assert any(item["technical_name"] == "material" for item in objects["items"])
-    assert {node["kind"] for node in graph["nodes"]} == {
+    assert {r["kind"] for r in resources["items"]} == {
         "object_type",
-        "value_type",
-    }
-    assert {edge["kind"] for edge in graph["edges"]} == {
-        "attribute",
         "link_type",
+        "metric",
+        "dataset",
     }
-    assert export.status_code == 200
-    assert export.json()["version"] == "0.2.0.dev0"
-    assert "mappings" in version["counts"]
-
-
-def test_relation_type_includes_endpoint_name_summaries(client):
-    workspace_id = str(DEMO_WORKSPACE_ID)
-    relation = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/types",
-        params={"kind": "link_type"},
-    ).json()["items"][0]
-    detail = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/types/{relation['id']}"
-    ).json()["item"]
-
-    for endpoint in ("source_type", "target_type"):
-        assert set(detail[endpoint]) == {"id", "name", "technical_name"}
-        assert detail[endpoint]["name"]
-
-
-def test_type_neighborhood_limits_result(client):
-    workspace_id = str(DEMO_WORKSPACE_ID)
-    objects = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/types",
-        params={"kind": "object_type", "q": "物料"},
-    ).json()["items"]
-    material_id = objects[0]["id"]
-
-    response = client.get(
-        f"/api/v1/ontology/workspaces/{workspace_id}/type-graph/neighborhood",
-        params={"focus_id": material_id, "depth": 1},
+    assert {n["kind"] for n in graph["nodes"]} == {"object_type"}
+    assert {e["kind"] for e in graph["edges"]} == {"link_type"}
+    resource = resources["items"][0]
+    assert (
+        client.get(ONTOLOGY + "/types/" + resource["definition"]["id"]).json()["item"]
+        == resource
     )
+    assert (
+        client.get(ONTOLOGY + f"/versions/{version['version_id']}/export").status_code
+        == 404
+    )
+    assert client.post(ROOT + "/publish", json={}).status_code == 404
+    assert client.get(ROOT + "/semantic-models").status_code == 404
+    assert client.post(ROOT + "/imports/ossie", json={}).status_code == 404
 
-    assert response.status_code == 200
-    result = response.json()
-    assert material_id in {node["id"] for node in result["nodes"]}
-    assert len(result["nodes"]) < 16
 
-
-def test_workspace_names_are_unique_case_insensitively(client):
+def test_workspace_names_unique(client):
     response = client.post(
-        "/api/v1/workspaces",
-        json={
-            "name": "制造供应链",
-            "slug": "another-space",
-            "description": "",
-        },
+        "/api/v1/workspaces", json={"name": "星港销售", "slug": "another-space"}
     )
-
     assert response.status_code == 409
-    assert response.json()["error"]["code"] == "CONFLICT"

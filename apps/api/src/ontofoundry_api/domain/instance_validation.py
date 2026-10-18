@@ -65,7 +65,9 @@ def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list
             value is None or (isinstance(value, str) and not value.strip())
         ):
             code, severity, message = (
-                "INSTANCE_REQUIRED", "warning", f"{attribute.name} 待补全：原文未提供"
+                "INSTANCE_REQUIRED",
+                "warning",
+                f"{attribute.name} 待补全：原文未提供",
             )
         elif value is not None and not valid_value(attribute.value_kind, value):
             code, severity, message = (
@@ -104,7 +106,9 @@ def completeness_warnings(draft: OntologyDraft) -> list[dict]:
     """A document often names a concept without saying what it records. That
     is a valid model, but it should be finished from a table or by hand."""
     # A parent that others extend is a category; it needs no fields of its own.
-    parents = {str(parent) for item in draft.object_types for parent in draft.parent_ids(item)}
+    parents = {
+        str(parent) for item in draft.object_types for parent in draft.parent_ids(item)
+    }
     return [
         {
             "severity": "warning",

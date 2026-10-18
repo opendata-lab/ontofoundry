@@ -1,0 +1,49 @@
+/* The only stylesheet entry. Cascade order, lowest first:
+   theme      Tailwind theme variables
+   base       Tailwind preflight, design tokens, document defaults
+   antd       Ant Design (StyleProvider layer in theme/UiProvider.tsx)
+   components third-party component styles (React Flow)
+   utilities  Tailwind utilities
+   Pages are laid out with Tailwind utilities and Ant Design components;
+   there are no page stylesheets. */
+@layer theme, base, antd, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "./tokens.css" layer(base);
+@import "@xyflow/react/dist/style.css" layer(components);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink-2);
+    font-family: var(--font-body);
+    font-size: var(--text-sm);
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
+  }
+
+  code,
+  kbd {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}

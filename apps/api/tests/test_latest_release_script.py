@@ -1,4 +1,5 @@
 """Rolling release uploads are verified before the latest pointer can move."""
+
 import json
 import os
 import subprocess
@@ -17,7 +18,9 @@ def run_release(tmp_path, *, existing=False, upload_fail=False, sha=SHA, package
         archive.write_bytes(b"offline-package-test-content")
     calls = tmp_path / "calls.jsonl"
     gh = tmp_path / "gh"
-    gh.write_text(f"#!{sys.executable}\n" + '''
+    gh.write_text(
+        f"#!{sys.executable}\n"
+        + """
 import hashlib, json, os, pathlib, sys
 args = sys.argv[1:]
 with open(os.environ['CALLS'], 'a') as log:
@@ -32,15 +35,26 @@ if args[:2] in (['release', 'upload'], ['release', 'create']):
     assert digest == hashlib.sha256(archive.read_bytes()).hexdigest()
     if os.environ['UPLOAD_FAIL'] == '1':
         sys.exit(1)
-''')
+"""
+    )
     gh.chmod(0o755)
-    env = {**os.environ, "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
-           "GITHUB_REPOSITORY": "example/ontofoundry", "GITHUB_SHA": sha,
-           "CALLS": str(calls), "EXISTING": str(int(existing)),
-           "UPLOAD_FAIL": str(int(upload_fail))}
-    result = subprocess.run(["bash", str(SCRIPT), str(archive)], env=env,
-                            capture_output=True, text=True)
-    recorded = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+    env = {
+        **os.environ,
+        "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+        "GITHUB_REPOSITORY": "example/ontofoundry",
+        "GITHUB_SHA": sha,
+        "CALLS": str(calls),
+        "EXISTING": str(int(existing)),
+        "UPLOAD_FAIL": str(int(upload_fail)),
+    }
+    result = subprocess.run(
+        ["bash", str(SCRIPT), str(archive)], env=env, capture_output=True, text=True
+    )
+    recorded = (
+        [json.loads(line) for line in calls.read_text().splitlines()]
+        if calls.exists()
+        else []
+    )
     return result, recorded
 
 
@@ -51,7 +65,11 @@ def test_latest_release_uploads_valid_checksum_and_only_updates_latest(tmp_path,
     assert not any("delete" in call for call in calls)
     if existing:
         assert [call[:2] for call in calls] == [
-            ["release", "view"], ["release", "upload"], ["api", "--method"], ["release", "edit"]]
+            ["release", "view"],
+            ["release", "upload"],
+            ["api", "--method"],
+            ["release", "edit"],
+        ]
         assert "repos/example/ontofoundry/git/refs/tags/latest" in calls[2]
         assert "sha=" + SHA in calls[2]
     else:

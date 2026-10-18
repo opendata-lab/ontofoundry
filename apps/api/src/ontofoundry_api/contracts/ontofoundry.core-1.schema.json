@@ -1,0 +1,1826 @@
+{
+  "$defs": {
+    "Aggregation": {
+      "enum": [
+        "sum",
+        "avg",
+        "median",
+        "min",
+        "max",
+        "count",
+        "count_distinct"
+      ],
+      "title": "Aggregation",
+      "type": "string"
+    },
+    "BindingMode": {
+      "enum": [
+        "independent",
+        "shared_parent"
+      ],
+      "title": "BindingMode",
+      "type": "string"
+    },
+    "ColumnBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "kind": {
+          "const": "column",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "source_id",
+        "column"
+      ],
+      "title": "ColumnBinding",
+      "type": "object"
+    },
+    "ColumnReference": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "column"
+      ],
+      "title": "ColumnReference",
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/ColumnReference"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "operator"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "DataMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_mode": {
+          "$ref": "#/$defs/BindingMode"
+        },
+        "fields": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "column": "#/$defs/ColumnBinding",
+                "expression": "#/$defs/ExpressionBinding"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ColumnBinding"
+              },
+              {
+                "$ref": "#/$defs/ExpressionBinding"
+              }
+            ]
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "inherited_link_bindings": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "direct": "#/$defs/DirectJoin",
+                "mapping_table": "#/$defs/MappingTableJoin"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DirectJoin"
+              },
+              {
+                "$ref": "#/$defs/MappingTableJoin"
+              }
+            ]
+          },
+          "propertyNames": {
+            "format": "uuid"
+          },
+          "title": "Inherited Link Bindings",
+          "type": "object"
+        },
+        "membership_source_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Membership Source Id"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/MappingSource"
+          },
+          "maxItems": 64,
+          "title": "Sources",
+          "type": "array"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "binding_mode"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "Dataset": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DatasetColumn"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "dialect": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dialect"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "snapshot_date_column": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Date Column"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "table_name"
+      ],
+      "title": "Dataset",
+      "type": "object"
+    },
+    "DatasetColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Comment",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "physical_type": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DatasetColumn",
+      "type": "object"
+    },
+    "DerivedExpression": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "DerivedExpression",
+      "type": "object"
+    },
+    "DerivedSimple": {
+      "additionalProperties": false,
+      "description": "One membership branch: every condition must hold (AND).",
+      "properties": {
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/PathCondition"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        },
+        "kind": {
+          "const": "simple",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "conditions"
+      ],
+      "title": "DerivedSimple",
+      "type": "object"
+    },
+    "DirectJoin": {
+      "additionalProperties": false,
+      "description": "Source properties equal target properties, pair by pair.",
+      "properties": {
+        "kind": {
+          "const": "direct",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Property Ids",
+          "type": "array"
+        },
+        "target_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "source_property_ids",
+        "target_property_ids"
+      ],
+      "title": "DirectJoin",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "ExpressionBinding": {
+      "additionalProperties": false,
+      "description": "A same-row expression over this object's own sources (`source.column`).",
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "ExpressionBinding",
+      "type": "object"
+    },
+    "ExpressionMetric": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "time_field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "value_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValueKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "kind",
+        "dataset_id",
+        "expression"
+      ],
+      "title": "ExpressionMetric",
+      "type": "object"
+    },
+    "LinkStep": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "link_type_id",
+        "direction"
+      ],
+      "title": "LinkStep",
+      "type": "object"
+    },
+    "LinkType": {
+      "additionalProperties": false,
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "direct": "#/$defs/DirectJoin",
+                  "mapping_table": "#/$defs/MappingTableJoin"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/DirectJoin"
+                },
+                {
+                  "$ref": "#/$defs/MappingTableJoin"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Join"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "inverse_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inverse Name"
+        },
+        "multiplicity": {
+          "$ref": "#/$defs/Multiplicity"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "source_type_id": {
+          "format": "uuid",
+          "title": "Source Type Id",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_type_id": {
+          "format": "uuid",
+          "title": "Target Type Id",
+          "type": "string"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "source_type_id",
+        "target_type_id",
+        "multiplicity"
+      ],
+      "title": "LinkType",
+      "type": "object"
+    },
+    "ManualEvidence": {
+      "additionalProperties": false,
+      "description": "A member vouching for a fact. Author and time are written by the server.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "MappingKey": {
+      "additionalProperties": false,
+      "description": "The end object's main source `key_columns`.",
+      "properties": {
+        "kind": {
+          "const": "mapping_key",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "MappingKey",
+      "type": "object"
+    },
+    "MappingSource": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Key Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "dataset_id"
+      ],
+      "title": "MappingSource",
+      "type": "object"
+    },
+    "MappingTableJoin": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "mapping_table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Columns",
+          "type": "array"
+        },
+        "source_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Source Key"
+        },
+        "target_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Columns",
+          "type": "array"
+        },
+        "target_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Target Key"
+        }
+      },
+      "required": [
+        "kind",
+        "dataset_id",
+        "source_columns",
+        "target_columns",
+        "source_key",
+        "target_key"
+      ],
+      "title": "MappingTableJoin",
+      "type": "object"
+    },
+    "MaterialEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "material_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Material Id",
+          "type": "string"
+        },
+        "material_sha256": {
+          "title": "Material Sha256",
+          "type": "string"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "material_id",
+        "material_sha256",
+        "locator"
+      ],
+      "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "MaterialLink": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "format": "uuid",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "source_id",
+        "target_id"
+      ],
+      "title": "MaterialLink",
+      "type": "object"
+    },
+    "MaterialObject": {
+      "additionalProperties": false,
+      "description": "A document fact. Its display text is derived on read, not stored.",
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type_id"
+      ],
+      "title": "MaterialObject",
+      "type": "object"
+    },
+    "Multiplicity": {
+      "description": "No one_to_many: a one-to-many link is built from the many side.",
+      "enum": [
+        "one_to_one",
+        "many_to_one",
+        "many_to_many"
+      ],
+      "title": "Multiplicity",
+      "type": "string"
+    },
+    "ObjectType": {
+      "additionalProperties": false,
+      "properties": {
+        "derived_by": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "expression": "#/$defs/DerivedExpression",
+                "simple": "#/$defs/DerivedSimple"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DerivedSimple"
+              },
+              {
+                "$ref": "#/$defs/DerivedExpression"
+              }
+            ]
+          },
+          "maxItems": 20,
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "extends": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extends"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "title_property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Property Id"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name"
+      ],
+      "title": "ObjectType",
+      "type": "object"
+    },
+    "Operator": {
+      "enum": [
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "in",
+        "not_in",
+        "between",
+        "is_null",
+        "not_null"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "Path": {
+      "additionalProperties": false,
+      "description": "From a context object, through links, to one property. Ontology rules and\nmembership conditions only; metrics never use paths.",
+      "properties": {
+        "links": {
+          "items": {
+            "$ref": "#/$defs/LinkStep"
+          },
+          "maxItems": 8,
+          "title": "Links",
+          "type": "array"
+        },
+        "property_id": {
+          "format": "uuid",
+          "title": "Property Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "property_id"
+      ],
+      "title": "Path",
+      "type": "object"
+    },
+    "PathCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "operator"
+      ],
+      "title": "PathCondition",
+      "type": "object"
+    },
+    "PropertiesKey": {
+      "additionalProperties": false,
+      "description": "A single unique property or the end object's complete identifier.",
+      "properties": {
+        "kind": {
+          "const": "properties",
+          "title": "Kind",
+          "type": "string"
+        },
+        "property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "property_ids"
+      ],
+      "title": "PropertiesKey",
+      "type": "object"
+    },
+    "Property": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_type_id": {
+          "format": "uuid",
+          "title": "Owner Type Id",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "unique": {
+          "default": false,
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind"
+        }
+      },
+      "required": [
+        "id",
+        "owner_type_id",
+        "name",
+        "technical_name",
+        "value_kind"
+      ],
+      "title": "Property",
+      "type": "object"
+    },
+    "RatioMetric": {
+      "additionalProperties": false,
+      "description": "dataset_id, time_field and value_kind come from the two components.",
+      "properties": {
+        "denominator_id": {
+          "format": "uuid",
+          "title": "Denominator Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "ratio",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "numerator_id": {
+          "format": "uuid",
+          "title": "Numerator Id",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "kind",
+        "numerator_id",
+        "denominator_id"
+      ],
+      "title": "RatioMetric",
+      "type": "object"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "format": "uuid",
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/RuleOwnerKind"
+        },
+        "rule_kind": {
+          "$ref": "#/$defs/RuleKind"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "RuleKind": {
+      "enum": [
+        "constraint",
+        "derivation"
+      ],
+      "title": "RuleKind",
+      "type": "string"
+    },
+    "RuleOwnerKind": {
+      "enum": [
+        "object_type",
+        "property",
+        "link_type"
+      ],
+      "title": "RuleOwnerKind",
+      "type": "string"
+    },
+    "SimpleMetric": {
+      "additionalProperties": false,
+      "description": "value_kind is derived on read and not accepted as input.",
+      "properties": {
+        "aggregation": {
+          "$ref": "#/$defs/Aggregation"
+        },
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "filters": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "maxItems": 50,
+          "title": "Filters",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "simple",
+          "title": "Kind",
+          "type": "string"
+        },
+        "measure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "technical_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Technical Name",
+          "type": "string"
+        },
+        "time_field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "technical_name",
+        "kind",
+        "dataset_id",
+        "aggregation"
+      ],
+      "title": "SimpleMetric",
+      "type": "object"
+    },
+    "ValueKind": {
+      "description": "Ossie's seven built-in value types; core-1 adds no others.",
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "datasets": {
+      "items": {
+        "$ref": "#/$defs/Dataset"
+      },
+      "title": "Datasets",
+      "type": "array"
+    },
+    "link_types": {
+      "items": {
+        "$ref": "#/$defs/LinkType"
+      },
+      "title": "Link Types",
+      "type": "array"
+    },
+    "mappings": {
+      "items": {
+        "$ref": "#/$defs/DataMapping"
+      },
+      "title": "Mappings",
+      "type": "array"
+    },
+    "material_links": {
+      "items": {
+        "$ref": "#/$defs/MaterialLink"
+      },
+      "title": "Material Links",
+      "type": "array"
+    },
+    "material_objects": {
+      "items": {
+        "$ref": "#/$defs/MaterialObject"
+      },
+      "title": "Material Objects",
+      "type": "array"
+    },
+    "metrics": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "expression": "#/$defs/ExpressionMetric",
+            "ratio": "#/$defs/RatioMetric",
+            "simple": "#/$defs/SimpleMetric"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/SimpleMetric"
+          },
+          {
+            "$ref": "#/$defs/RatioMetric"
+          },
+          {
+            "$ref": "#/$defs/ExpressionMetric"
+          }
+        ]
+      },
+      "title": "Metrics",
+      "type": "array"
+    },
+    "object_types": {
+      "items": {
+        "$ref": "#/$defs/ObjectType"
+      },
+      "title": "Object Types",
+      "type": "array"
+    },
+    "properties": {
+      "items": {
+        "$ref": "#/$defs/Property"
+      },
+      "title": "Properties",
+      "type": "array"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/Rule"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "core-1",
+      "default": "core-1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "workspace_id": {
+      "format": "uuid",
+      "title": "Workspace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "workspace_id"
+  ],
+  "title": "CoreDraft",
+  "type": "object"
+}

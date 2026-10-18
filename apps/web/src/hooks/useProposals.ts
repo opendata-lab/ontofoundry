@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, proposalsApi } from "../api/client";
 import type {
+  FactProposalRevision,
   ModelingSession,
   ProposalBatch,
   ProposalBatchDetail,
@@ -137,6 +138,37 @@ export function useProposals(
     }
   };
 
+  /**
+   * Turns a pending duplicate-fact create into an update of an existing fact.
+   * The server builds a new pending item; the session and batch are reread.
+   */
+  const revise = async (itemId: string, payload: Omit<FactProposalRevision, "expected_session_revision">) => {
+    const current = sessionRef.current;
+    if (!current) return false;
+    setBusy(true);
+    setError("");
+    setItemErrors({});
+    try {
+      await proposalsApi.reviseFact(current, itemId, {
+        ...payload,
+        expected_session_revision: current.revision,
+      });
+      onStale();
+      reload();
+      return true;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "修订失败";
+      setItemErrors({ [itemId]: message });
+      if (e instanceof ApiError && (e.status === 409 || e.status === 422)) {
+        onStale();
+        reload();
+      }
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return {
     batches,
     selected,
@@ -147,6 +179,7 @@ export function useProposals(
     busy,
     reload,
     decide,
+    revise,
   };
 }
 

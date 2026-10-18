@@ -9,20 +9,21 @@ pending again by itself.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, ParsedBatch
 from ontofoundry_api.db_models import (
+    ModelingSessionRecord,
     ProposalBatchRecord,
     ProposalItemDependencyRecord,
     ProposalItemRecord,
     utc_now,
 )
 from ontofoundry_api.domain.canonical import (
-    LEGACY_HASH_ALGORITHM,
     element_sha256,
 )
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
@@ -73,13 +74,27 @@ def store_batch(
     db.flush()
     targets = [item.target_id for item in parsed.items]
     if targets:
+        older_groups = set(
+            db.scalars(
+                select(ProposalItemRecord.atomic_group_id).where(
+                    ProposalItemRecord.workspace_id == workspace_id,
+                    ProposalItemRecord.session_id == session_id,
+                    ProposalItemRecord.status == "pending",
+                    ProposalItemRecord.target_id.in_(targets),
+                    ProposalItemRecord.atomic_group_id.is_not(None),
+                )
+            )
+        )
         db.execute(
             update(ProposalItemRecord)
             .where(
                 ProposalItemRecord.workspace_id == workspace_id,
                 ProposalItemRecord.session_id == session_id,
                 ProposalItemRecord.status == "pending",
-                ProposalItemRecord.target_id.in_(targets),
+                or_(
+                    ProposalItemRecord.target_id.in_(targets),
+                    ProposalItemRecord.atomic_group_id.in_(older_groups),
+                ),
             )
             .values(status="superseded")
         )
@@ -93,6 +108,7 @@ def store_batch(
                 ordinal=item.ordinal,
                 client_ref=item.client_ref,
                 fingerprint=item.fingerprint,
+                atomic_group_id=item.atomic_group_id,
                 operation=item.operation,
                 target_kind=item.target_kind,
                 target_id=item.target_id,
@@ -187,14 +203,15 @@ def proposal_header(manifest: dict[str, Any]) -> dict[str, Any]:
 def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
     """What the agent reads: the pinned draft and the hash of every element,
     which update and delete proposals must quote as expected_target_hash."""
-    from ontofoundry_api.domain.runtime_views import proposal_snapshot
-    elements = proposal_snapshot(draft)
+    elements = draft
     return {
-        "legacy_mapping_form": elements.get("mappings", []),
-        "run": {key: manifest[key] for key in ("run_token", "base_version_id", "source_session_revision")},
+        "run": {
+            key: manifest[key]
+            for key in ("run_token", "base_version_id", "source_session_revision")
+        },
         "draft": draft,
         "element_hashes": {
-            str(element["id"]): element_sha256(element, hash_algorithm=draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM, collection=collection)
+            str(element["id"]): element_sha256(element, collection=collection)
             for collection in COLLECTIONS.values()
             for element in elements.get(collection) or []
         },
@@ -218,8 +235,7 @@ def effective_statuses(
     draft: dict[str, Any],
 ) -> dict[str, tuple[str, str]]:
     """item id -> (effective status, reason). Pure; see module docstring."""
-    from ontofoundry_api.domain.runtime_views import proposal_snapshot
-    elements = _elements(proposal_snapshot(draft))
+    elements = _elements(draft)
     by_id = {item.id: item for item in items}
     result: dict[str, tuple[str, str]] = {}
 
@@ -233,12 +249,11 @@ def effective_statuses(
             return "pending", ""
         if found is None or found[0] != item.target_kind:
             return "conflict", "目标元素已被删除或类型已改变"
-        if element_sha256(found[1], hash_algorithm=draft.get("hash_algorithm") or LEGACY_HASH_ALGORITHM, collection=COLLECTIONS[ElementKind(found[0])]) != item.expected_target_hash:
+        if (
+            element_sha256(found[1], collection=COLLECTIONS[ElementKind(found[0])])
+            != item.expected_target_hash
+        ):
             return "stale", "目标在提案生成后已被修改"
-        if item.before_json and 'concept_context' in item.before_json:
-            current_context = draft.get('extension_v4', {}).get('concept_context', {}).get(item.target_id)
-            if current_context != item.before_json['concept_context']:
-                return 'stale', '概念上下文在提案生成后已被修改'
         return "pending", ""
 
     def resolve(item_id: str, trail: tuple[str, ...] = ()) -> tuple[str, str]:
@@ -256,7 +271,11 @@ def effective_statuses(
                 if dep_status in ("rejected", "superseded"):
                     status, reason = "conflict", f"依赖 {label} 已被拒绝或取代"
                     break
-                if dep_status == "accepted" and dep.target_id not in elements and dep.operation != "delete":
+                if (
+                    dep_status == "accepted"
+                    and dep.target_id not in elements
+                    and dep.operation != "delete"
+                ):
                     status, reason = "conflict", f"依赖 {label} 接受后已被删除"
                     break
                 if dep_status in ("stale", "conflict"):
@@ -288,6 +307,45 @@ def dependency_map(
     result: dict[str, list[str]] = {}
     for row in rows:
         result.setdefault(row.item_id, []).append(row.depends_on_item_id)
+    # Rebuild dependency edges from the current candidate, preserving explicit
+    # edges from the immutable proposal report. Invalid/stale drafts keep those
+    # edges and expose their conflict through effective_statuses.
+    session = db.get(ModelingSessionRecord, session_id)
+    if session is not None:
+        items = batch_items(db, batch_ids, workspace_id, session_id)
+        by_target = {i.target_id: i for i in items}
+        candidate = deepcopy(session.draft_json)
+        for item in items:
+            if item.status in {"pending", "accepted"}:
+                collection = COLLECTIONS[ElementKind(item.target_kind)]
+                candidate[collection] = [
+                    e for e in candidate[collection] if e["id"] != item.target_id
+                ]
+                if item.after_json is not None:
+                    candidate[collection].append(item.after_json)
+        try:
+            from ontofoundry_api.domain.core import CoreDraft
+            from ontofoundry_api.domain.dependencies import reference_index
+
+            references = reference_index(CoreDraft.model_validate(candidate))
+            for owner, refs in references.items():
+                item = by_target.get(str(owner))
+                if item is None:
+                    continue
+                for ref in refs:
+                    parent = by_target.get(str(ref.target_id))
+                    if (
+                        parent
+                        and parent.id != item.id
+                        and (
+                            not item.atomic_group_id
+                            or parent.atomic_group_id != item.atomic_group_id
+                        )
+                    ):
+                        result.setdefault(item.id, []).append(parent.id)
+        except (ValueError, KeyError):
+            pass
+    result = {key: sorted(set(value)) for key, value in result.items()}
     return result
 
 
@@ -314,14 +372,14 @@ def dependent_group(item_id: str, dependencies: dict[str, list[str]]) -> list[st
 
 KIND_LABELS = {
     ElementKind.OBJECT_TYPE.value: "实体",
-    ElementKind.VALUE_TYPE.value: "值概念",
     ElementKind.PROPERTY.value: "属性",
     ElementKind.LINK_TYPE.value: "关系",
     ElementKind.RULE.value: "规则",
-    ElementKind.ACTION.value: "Action",
     ElementKind.MATERIAL_OBJECT.value: "材料实例",
     ElementKind.MATERIAL_LINK.value: "材料关系",
     ElementKind.MAPPING.value: "映射",
+    ElementKind.DATASET.value: "数据集",
+    ElementKind.METRIC.value: "指标",
 }
 
 
@@ -362,7 +420,9 @@ def proposal_state(db: Session, workspace_id: str, session_id: str) -> tuple:
     return tuple(sorted(map(tuple, batches))), tuple(sorted(map(tuple, items)))
 
 
-def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict) -> dict[str, Any]:
+def pending_summary(
+    db: Session, workspace_id: str, session_id: str, draft: dict
+) -> dict[str, Any]:
     """`pending_proposal_count` and `latest_batch_id` for session responses."""
     batches = db.execute(
         select(ProposalBatchRecord.id, ProposalBatchRecord.status)
@@ -374,7 +434,9 @@ def pending_summary(db: Session, workspace_id: str, session_id: str, draft: dict
     ).all()
     ids = [row.id for row in batches]
     items = batch_items(db, ids, workspace_id, session_id)
-    statuses = effective_statuses(items, dependency_map(db, ids, workspace_id, session_id), draft)
+    statuses = effective_statuses(
+        items, dependency_map(db, ids, workspace_id, session_id), draft
+    )
     # The batch to show by default: the newest one that can be acted on.
     available = [row.id for row in batches if row.status == "available"]
     return {

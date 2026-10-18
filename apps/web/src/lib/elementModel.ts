@@ -1,168 +1,113 @@
-import type {
-  LegacyDraft,
-  NativeDraft,
-  LinkTypeElement,
-  ObjectTypeElement,
-  PropertyElement,
-} from "../api/types";
+import type { Draft, LinkType, ObjectType, Property, Rule, UUID } from "../api/types";
+import {
+  effectiveLinks,
+  effectiveProperties,
+  byId,
+  effectiveRules,
+  isA,
+  lineage,
+  rulesOfLink,
+  type EffectiveLink,
+} from "./coreModel";
 import type { ElementRequest } from "./elementInspector";
 
-export type ElementType = ObjectTypeElement | LinkTypeElement;
-export type PanelProps = {
-  draft: LegacyDraft;
-  nativeDraft?: NativeDraft;
-  type: ElementType;
+export { MULTIPLICITY, VALUE_KINDS } from "./coreModel";
+
+/** The two definitions that open in the element inspector with tabs. */
+export type ElementType = ObjectType | LinkType;
+
+/** What every inspector panel receives; `type` is the inspected element. */
+export type PanelProps<T = ElementType> = {
+  draft: Draft;
+  type: T;
   editing: boolean;
-  canEdit?: boolean;
-  saveError?: string;
-  requestEdit?: () => void;
-  saveDraft?: (draft: LegacyDraft) => Promise<boolean>;
-  change: (next: LegacyDraft) => void;
+  canEdit: boolean;
+  sessionId: string | null;
+  change: (next: Draft) => void;
   open: (request: ElementRequest) => void;
 };
-export const VALUE_KINDS: Record<string, string> = {
-  string: "文本",
-  integer: "整数",
-  decimal: "小数",
-  float: "浮点数",
-  boolean: "布尔",
-  date: "日期",
-  datetime: "日期时间",
-};
-export const MULTIPLICITY: Record<string, string> = {
-  many_to_many: "多对多",
-  many_to_one: "多对一",
-  one_to_many: "一对多",
-  one_to_one: "一对一",
-};
-export function isObject(type: ElementType): type is ObjectTypeElement {
-  return "extends" in type;
+
+export function isObject(type: ElementType): type is ObjectType {
+  return "derived_by" in type;
 }
-export function changeType(
-  { draft, type, change }: PanelProps,
-  patch: Partial<ElementType>,
-) {
-  const key = isObject(type)
-    ? type.concept_kind === "value_type"
-      ? "value_types"
-      : "object_types"
-    : "link_types";
-  change({
-    ...draft,
-    [key]: (draft[key] ?? []).map((item) =>
-      item.id === type.id ? { ...item, ...patch } : item,
-    ),
-  });
-}
-export function inheritedProperties(
-  draft: LegacyDraft,
-  type: ObjectTypeElement,
-) {
-  const seenTypes = new Set([type.id]);
-  const seenProps = new Set(
-    draft.properties
-      .filter((p) => p.owner_type_id === type.id)
-      .map((p) => p.technical_name),
-  );
-  const queue = [...type.extends];
-  const rows: { property: PropertyElement; owner: ObjectTypeElement }[] = [];
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (seenTypes.has(id)) continue;
-    seenTypes.add(id);
-    const owner = draft.object_types.find((t) => t.id === id);
-    if (!owner) continue;
-    for (const property of draft.properties.filter(
-      (p) => p.owner_type_id === id,
-    )) {
-      if (seenProps.has(property.technical_name)) continue;
-      seenProps.add(property.technical_name);
-      rows.push({ property, owner });
-    }
-    queue.push(...owner.extends);
+
+/** Replaces the inspected object or link with a patched copy. */
+export function changeType<T extends ElementType>({ draft, type, change }: PanelProps<T>, patch: Partial<T>) {
+  if (isObject(type)) {
+    change({
+      ...draft,
+      object_types: draft.object_types.map((item) =>
+        item.id === type.id ? ({ ...item, ...patch } as ObjectType) : item,
+      ),
+    });
+  } else {
+    change({
+      ...draft,
+      link_types: draft.link_types.map((item) =>
+        item.id === type.id ? ({ ...item, ...patch } as LinkType) : item,
+      ),
+    });
   }
-  return rows;
 }
-/** Breadth-first lineage, stable and cycle-safe for multiple inheritance. */
-export function objectLineage(draft: LegacyDraft, type: ObjectTypeElement) {
-  const ids = new Set<string>();
-  const queue = [type.id];
-  while (queue.length) {
-    const id = queue.shift()!;
-    if (ids.has(id)) continue;
-    ids.add(id);
-    queue.push(...(draft.object_types.find((o) => o.id === id)?.extends ?? []));
-  }
-  return ids;
+
+/** Inherited (not local) properties with the ancestor that defines them. */
+export function inheritedProperties(draft: Draft, type: ObjectType) {
+  return effectiveProperties(draft, type.id)
+    .filter((p) => p.inheritedFrom)
+    .map((p) => ({
+      property: p.definition,
+      owner: draft.object_types.find((o) => o.id === p.inheritedFrom)!,
+    }))
+    .filter((row) => row.owner);
 }
-export const relationSource = (relation: LinkTypeElement) =>
-  relation.source_type_id || relation.owner_ref?.ref || "";
-export const relationTarget = (relation: LinkTypeElement) =>
-  relation.target_type_id ||
-  relation.roles?.find((r) => r.concept.kind === "object_type")?.concept.ref ||
-  "";
-export function relationObjects(relation: LinkTypeElement) {
-  return [
-    ...new Set(
-      [
-        relation.owner_ref?.ref ?? relation.source_type_id,
-        ...(relation.roles
-          ? relation.roles
-              .filter((r) => r.concept.kind === "object_type")
-              .map((r) => r.concept.ref)
-          : [relation.target_type_id]),
-      ].filter(Boolean),
-    ),
-  ];
+
+export function ownProperties(draft: Draft, type: ObjectType): Property[] {
+  return draft.properties.filter((p) => p.owner_type_id === type.id);
 }
-export function relationsFor(draft: LegacyDraft, type: ObjectTypeElement) {
-  const lineage = objectLineage(draft, type);
-  return draft.link_types.flatMap((definition) => {
-    const ends = relationObjects(definition);
-    const direct = ends.includes(type.id);
-    const inheritedFrom = direct
-      ? undefined
-      : [...lineage].slice(1).find((id) => ends.includes(id));
-    if (!direct && !inheritedFrom) return [];
-    return [
-      {
-        definition,
-        inherited: !!inheritedFrom,
-        inheritedFrom,
-        incoming: relationSource(definition) !== (inheritedFrom ?? type.id),
-      },
-    ];
-  });
+
+export function objectLineage(draft: Draft, type: ObjectType): Set<UUID> {
+  return new Set(lineage(draft, type.id));
 }
-export function rulesFor(draft: LegacyDraft, type: ElementType) {
-  const lineage = isObject(type)
-    ? objectLineage(draft, type)
-    : new Set([type.id]);
-  const properties = draft.properties.filter((p) =>
-    lineage.has(p.owner_type_id),
-  );
-  const links = isObject(type)
-    ? relationsFor(draft, type)
-    : [{ definition: type, inherited: false }];
-  const actions = draft.actions.filter((a) => a.input_type_id === type.id);
-  const rank = (kind: string) =>
-    kind === "object_type" || kind === "value_type"
-      ? 0
-      : kind === "property"
-        ? 1
-        : kind === "link_type"
-          ? 2
-          : 3;
-  return draft.rules
-    .filter(
-      (r) =>
-        ((r.owner_kind === "object_type" || r.owner_kind === "value_type") &&
-          lineage.has(r.owner_id)) ||
-        (r.owner_kind === "property" &&
-          properties.some((p) => p.id === r.owner_id)) ||
-        (r.owner_kind === "link_type" &&
-          links.some((l) => l.definition.id === r.owner_id)) ||
-        (r.owner_kind === "action" && actions.some((a) => a.id === r.owner_id)),
-    )
-    .sort((a, b) => rank(a.owner_kind) - rank(b.owner_kind));
+
+export type RelationRow = {
+  definition: LinkType;
+  inherited: boolean;
+  inheritedFrom: UUID | undefined;
+  /** The inspected object is the link's target. */
+  incoming: boolean;
+};
+
+export function relationsFor(draft: Draft, type: ObjectType): RelationRow[] {
+  return effectiveLinks(draft, type.id).map((link: EffectiveLink) => ({
+    definition: link.definition,
+    inherited: link.inheritedFrom !== null,
+    inheritedFrom: link.inheritedFrom ?? undefined,
+    incoming: link.direction === "reverse",
+  }));
+}
+
+const RULE_RANK: Record<Rule["owner_kind"], number> = { object_type: 0, property: 1, link_type: 2 };
+
+export function rulesFor(draft: Draft, type: ElementType): Rule[] {
+  const rules = isObject(type)
+    ? effectiveRules(draft, type.id).map((r) => r.definition)
+    : rulesOfLink(draft, type.id);
+  return [...rules].sort((a, b) => RULE_RANK[a.owner_kind] - RULE_RANK[b.owner_kind]);
+}
+
+type TreeNode = { value: string; title: string; children: TreeNode[]; disabled?: boolean };
+
+
+/** Objects as an inheritance tree; `exclude` and its descendants cannot be picked. */
+export function objectTree(draft: Draft, exclude?: UUID): TreeNode[] {
+  const build = (parent: string | null): TreeNode[] =>
+    draft.object_types
+      .filter((o) => (o.extends ?? null) === parent || (parent === null && o.extends && !byId(draft.object_types, o.extends)))
+      .map((o) => ({
+        value: o.id,
+        title: o.name || o.technical_name || "未命名对象",
+        disabled: !!exclude && isA(draft, o.id, exclude),
+        children: build(o.id),
+      }));
+  return build(null);
 }

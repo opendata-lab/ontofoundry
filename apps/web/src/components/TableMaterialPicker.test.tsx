@@ -1,25 +1,44 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, expect, it, vi } from "vitest";
-import { modelingApi } from "../api/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { catalogApi } from "../api/client";
+import type { DataConnection, DataTable, Material } from "../api/types";
+import { example } from "../test/drafts";
+import { renderWithProviders } from "../test/renderWithProviders";
 import { TableMaterialPicker } from "./TableMaterialPicker";
 
 vi.mock("../api/client", () => ({
-  modelingApi: {
+  catalogApi: {
     connections: vi.fn(),
     tables: vi.fn(),
     tableMaterial: vi.fn(),
   },
 }));
 
+beforeEach(() => vi.resetAllMocks());
 afterEach(cleanup);
 
-// jsdom has no modal dialog support; the picker only needs open/close.
-HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
-HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+const connection = (id: string, name: string): DataConnection => ({
+  id,
+  name,
+  kind: "mysql",
+  host: "db.example.test",
+  port: 3306,
+  database: "dw",
+  username: "reader",
+});
+
+// The catalog tables behind the fictional order example's datasets; the first
+// column stands in as the primary key.
+const catalogTables = (name: string): DataTable[] =>
+  example(name).datasets.map((d) => ({
+    name: d.table_name,
+    schema: d.schema_name,
+    columns: (d.columns ?? []).map((c, i) => ({ name: c.name, type: c.physical_type ?? "varchar", primary_key: i === 0 })),
+  }));
 
 function renderPicker(onMaterial = vi.fn().mockResolvedValue(undefined)) {
-  render(
+  renderWithProviders(
     <MemoryRouter>
       <TableMaterialPicker workspaceId="w1" disabled={false} onMaterial={onMaterial} />
     </MemoryRouter>,
@@ -27,52 +46,89 @@ function renderPicker(onMaterial = vi.fn().mockResolvedValue(undefined)) {
   return onMaterial;
 }
 
+const openPicker = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "选择数据表…" }));
+  return screen.findByRole("group", { name: "选择数据表" });
+};
+
 it("turns the chosen tables into one material for the session", async () => {
-  vi.mocked(modelingApi.connections).mockResolvedValue({
-    items: [{ id: "c1", name: "销售业务库", kind: "mysql", host: "h", port: 3306,
-      database: "d", username: "u" }],
-  });
-  vi.mocked(modelingApi.tables).mockResolvedValue({
-    items: [{ name: "customers", schema: null, columns: [] },
-      { name: "orders", schema: null, columns: [] }],
-  });
-  const material = { id: "m1", name: "数据表结构-销售业务库-orders-customers.md" };
-  vi.mocked(modelingApi.tableMaterial).mockResolvedValue(material as never);
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection("c1", "销售业务库")] });
+  vi.mocked(catalogApi.tables).mockResolvedValue({ items: catalogTables("01-basic-sales") });
+  const material: Material = {
+    id: "m1",
+    name: "数据表结构-销售业务库-orders-customers.md",
+    byte_size: 2048,
+    chunk_count: 1,
+    sha256: "e".repeat(64),
+  };
+  vi.mocked(catalogApi.tableMaterial).mockResolvedValue(material);
   const onMaterial = renderPicker();
 
-  fireEvent.click(await screen.findByRole("button", { name: "选择数据表…" }));
-  fireEvent.click(await screen.findByRole("checkbox", { name: "orders" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "customers" }));
+  const list = await openPicker();
+  // A single connection is chosen for the user.
+  await waitFor(() => expect(catalogApi.tables).toHaveBeenCalledWith("w1", "c1"));
+  fireEvent.click(await within(list).findByRole("checkbox", { name: "orders" }));
+  fireEvent.click(within(list).getByRole("checkbox", { name: "customers" }));
   fireEvent.click(screen.getByRole("button", { name: "加入建模材料（2 张表）" }));
 
   await waitFor(() => expect(onMaterial).toHaveBeenCalledWith(material));
-  expect(modelingApi.tableMaterial).toHaveBeenCalledWith("w1", "c1", ["orders", "customers"]);
-  await waitFor(() => expect(screen.getByRole("dialog", { hidden: true })).not.toHaveAttribute("open"));
+  expect(catalogApi.tableMaterial).toHaveBeenCalledWith("w1", "c1", ["orders", "customers"]);
+  await waitFor(() => expect(screen.queryByRole("group", { name: "选择数据表" })).toBeNull());
+});
+
+it("keeps the choice and shows why reading the tables failed", async () => {
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection("c1", "销售业务库")] });
+  vi.mocked(catalogApi.tables).mockResolvedValue({ items: catalogTables("01-basic-sales") });
+  vi.mocked(catalogApi.tableMaterial).mockRejectedValue(new Error("连接超时"));
+  const onMaterial = renderPicker();
+
+  const list = await openPicker();
+  fireEvent.click(await within(list).findByRole("checkbox", { name: "orders" }));
+  fireEvent.click(screen.getByRole("button", { name: "加入建模材料（1 张表）" }));
+
+  expect(await screen.findByText("连接超时")).toBeInTheDocument();
+  expect(onMaterial).not.toHaveBeenCalled();
+  expect(within(list).getByRole("checkbox", { name: "orders" })).toBeChecked();
 });
 
 it("filters by name and selects only the visible tables", async () => {
-  vi.mocked(modelingApi.connections).mockResolvedValue({
-    items: [{ id: "c1", name: "销售业务库", kind: "mysql", host: "h", port: 3306,
-      database: "d", username: "u" }],
-  });
-  vi.mocked(modelingApi.tables).mockResolvedValue({
-    items: [{ name: "customers", schema: null, columns: [{ name: "id", type: "int", primary_key: true }] },
-      { name: "orders", schema: null, columns: [] },
-      { name: "order_items", schema: null, columns: [] }],
-  });
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection("c1", "销售业务库")] });
+  vi.mocked(catalogApi.tables).mockResolvedValue({ items: catalogTables("04-composite-key") });
   renderPicker();
-  fireEvent.click(await screen.findByRole("button", { name: "选择数据表…" }));
-  await screen.findByRole("checkbox", { name: "customers" });
-  expect(screen.getByText("1 列 · 主键 id")).toBeInTheDocument();
+
+  const list = await openPicker();
+  await within(list).findByRole("checkbox", { name: "orders" });
+  expect(within(list).getByText("dw · 2 列 · 主键 order_id")).toBeInTheDocument();
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据表" }), { target: { value: "order" } });
-  expect(screen.queryByRole("checkbox", { name: "customers" })).not.toBeInTheDocument();
+  expect(within(list).queryByRole("checkbox", { name: "products" })).not.toBeInTheDocument();
+  expect(within(list).getAllByRole("checkbox")).toHaveLength(2);
   fireEvent.click(screen.getByRole("button", { name: "全选筛选结果" }));
   expect(screen.getByRole("button", { name: "加入建模材料（2 张表）" })).toBeEnabled();
-  expect(screen.getByText("已选 2 / 共 3 张表")).toBeInTheDocument();
+  expect(screen.getByText("已选 2 / 共 4 张表")).toBeInTheDocument();
+
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据表" }), { target: { value: "missing" } });
+  expect(within(list).getByText("没有匹配的数据表")).toBeInTheDocument();
+});
+
+it("asks for a connection first when the workspace has several", async () => {
+  vi.mocked(catalogApi.connections).mockResolvedValue({
+    items: [connection("c1", "销售业务库"), connection("c2", "仓储业务库")],
+  });
+  vi.mocked(catalogApi.tables).mockResolvedValue({ items: catalogTables("04-composite-key") });
+  renderPicker();
+
+  const list = await openPicker();
+  expect(within(list).getByText("先选择数据连接")).toBeInTheDocument();
+  expect(catalogApi.tables).not.toHaveBeenCalled();
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "数据连接" }));
+  fireEvent.click(await screen.findByTitle("仓储业务库"));
+  await waitFor(() => expect(catalogApi.tables).toHaveBeenCalledWith("w1", "c2"));
+  expect(await within(list).findByRole("checkbox", { name: "shipments" })).toBeInTheDocument();
 });
 
 it("points to connections when the workspace has none", async () => {
-  vi.mocked(modelingApi.connections).mockResolvedValue({ items: [] });
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [] });
   renderPicker();
   expect(await screen.findByRole("link", { name: "新增数据连接" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "选择数据表…" })).toBeNull();
 });

@@ -1,5 +1,7 @@
 # P2 上下文与扩展实施进度
 
+> **已被 core-1 主设计取代。** 本文记录 2026-10-08 方案及当时的进展，保留作历史参考；现行模型与实施以 [core-1 主设计](../design/2026-10-14-core-model-and-format-adapters.md) 为准。
+
 基线：2026-10-09，P1 评审提交 `6174500`，worktree `ontograph-ossie-native`，分支 `feat/ossie-native`。
 
 范围：方案 P2、3.1/3.4 与覆盖矩阵；只修改本 worktree，不提交、不启动服务、不 make build、不访问演示目录。保留原生构造、旧版本读取和现有 DataMapping/data_join 路径。

@@ -1,25 +1,19 @@
-"""Published instance reads. REST and MCP share the same version and query limits."""
+"""Published core instance reads. MCP uses only the document path."""
 
 import base64
 import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import HTTPException
-from itsdangerous import BadSignature, URLSafeSerializer
 from pydantic import BaseModel, Field
 
-from ontofoundry_api.api.connections import PreviewRequest, query_mapping
-from ontofoundry_api.api.instances import (
-    NeighborhoodRequest,
-    database_neighborhood,
-    database_object,
-)
+from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.instance_display import document_display_text
 from ontofoundry_api.domain.instance_validation import value_issues
-from ontofoundry_api.domain.semantic_views import SemanticViews
 from ontofoundry_api.domain.snapshot import read_snapshot
+from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
+from ontofoundry_api.services.errors import NotFoundError, ServiceError
 from ontofoundry_api.services.ontology_query import version_hashes
-from ontofoundry_api.services.public_projection import public_projection
 
 
 class ObjectSearch(BaseModel):
@@ -28,6 +22,7 @@ class ObjectSearch(BaseModel):
     q: str = Field(default="", max_length=240)
     cursor: str | None = Field(default=None, max_length=4000)
     limit: int = Field(default=20, ge=1, le=100)
+    snapshot_date: str | None = None
 
 
 def envelope(version):
@@ -40,8 +35,12 @@ def envelope(version):
 
 
 def db_ref(type_id, key):
-    payload = json.dumps([str(type_id), str(key)], ensure_ascii=False).encode()
-    return "db." + base64.urlsafe_b64encode(payload).decode().rstrip("=")
+    from ontofoundry_api.services.instance_plan import key_values
+
+    key_values(key)
+    return "db." + base64.urlsafe_b64encode(
+        json.dumps([str(type_id), key], ensure_ascii=False, separators=(",", ":")).encode()
+    ).decode().rstrip("=")
 
 
 def parse_ref(ref):
@@ -55,105 +54,116 @@ def parse_ref(ref):
                 )
             )
             if (
-                isinstance(values, list)
-                and len(values) == 2
-                and isinstance(values[1], str)
-                and len(values[1]) <= 2000
+                not isinstance(values, list)
+                or len(values) != 2
+                or not isinstance(values[0], str)
+                or not isinstance(values[1], list)
+                or not 1 <= len(values[1]) <= 16
             ):
-                return "database", str(UUID(values[0])), values[1]
+                raise ValueError()
+            from ontofoundry_api.services.instance_plan import key_values
+
+            key_values(values[1])
+            return "database", str(UUID(values[0])), values[1]
     except (ValueError, TypeError, UnicodeError):
         pass
-    raise HTTPException(422, {"code": "INVALID_OBJECT_REF", "message": "实例引用无效"})
+    raise ServiceError("实例引用无效", code="INVALID_OBJECT_REF", status_code=422)
 
 
-def document_object(obj):
+def document_object(obj, draft):
     return {
         **obj.model_dump(mode="json"),
         "ref": "doc." + str(obj.id),
         "source": "document",
+        "display_text": document_display_text(draft, obj),
+    }
+
+
+def database_object(type_id, row):
+    ref = db_ref(row.get("__type_id", type_id), row["__key"])
+    return {
+        "id": ref,
+        "ref": ref,
+        "type_id": row.get("__type_id", str(type_id)),
+        "key": row["__key"],
+        "source": "database",
+        "display_text": row["display_text"],
+        "values": row["values"],
+        "evidence": [],
     }
 
 
 def mapping_for(draft, type_id):
-    analysis = SemanticViews(draft).analyze(type_id)
-    if analysis.reason:
-        raise HTTPException(422, {"code": "COMPLEX_MAPPING_READ_ONLY", "message": "复杂映射暂不支持实例查询", "reason": analysis.reason})
-    if not analysis.mapping:
-        raise HTTPException(422, {"code": "MAPPING_REQUIRED", "message": "该类型没有数据映射"})
-    return analysis.mapping
+    mapping = next((m for m in draft.mappings if m.type_id == UUID(str(type_id))), None)
+    if mapping is None:
+        raise ServiceError("对象没有本地绑定", code="MAPPING_REQUIRED", status_code=422)
+    return mapping
 
 
-def search_objects(db, version, options: ObjectSearch, settings):
-    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
-    if options.type_id and options.type_id not in {t.id for t in draft.object_types}:
-        raise HTTPException(404, "业务对象类型不存在")
+def search_objects(db, version, options, settings, *, permission_fingerprint=""):
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    index = DraftIndex(draft)
+    if options.type_id and options.type_id not in index.objects:
+        raise NotFoundError("对象类型不存在")
+    if options.source == "document" and options.snapshot_date:
+        raise ServiceError(
+            "文档事实不接受快照日期", code="VALIDATION_FAILED", status_code=422
+        )
     context = [
         version.workspace_id,
         version.id,
+        "rest_objects",
         str(options.type_id or ""),
         options.source,
         options.q,
+        options.snapshot_date,
+        permission_fingerprint,
     ]
-    signer = URLSafeSerializer(settings.session_secret, salt="instance-cursor-v1")
-    offset = 0
-    if options.cursor:
-        try:
-            cursor = signer.loads(options.cursor)
-            if (
-                cursor["context"] != context
-                or type(cursor["offset"]) is not int
-                or not 0 <= cursor["offset"] <= 10000
-            ):
-                raise ValueError()
-            offset = cursor["offset"]
-        except (BadSignature, ValueError, KeyError, TypeError) as exc:
-            raise HTTPException(
-                422, {"code": "INVALID_CURSOR", "message": "游标无效或与版本、筛选不一致"}
-            ) from exc
+    offset, _ = decode_cursor(settings, options.cursor, context)
     if options.source == "database":
         if not options.type_id:
-            raise HTTPException(422, "数据库实例搜索需要指定业务对象类型")
-        mapping = mapping_for(draft, options.type_id)
-        data = query_mapping(
+            raise ServiceError(
+                "数据库浏览必须指定对象类型", code="VALIDATION_FAILED", status_code=422
+            )
+        from ontofoundry_api.services.instance_plan import query_instances
+
+        data = query_instances(
             db,
             version.workspace_id,
-            PreviewRequest(
-                mapping=mapping, q=options.q, offset=offset, limit=options.limit
-            ),
+            draft,
+            options.type_id,
             settings,
+            q=options.q,
+            offset=offset,
+            limit=options.limit,
+            snapshot_date=options.snapshot_date,
         )
-        items = [
-            {
-                **database_object(options.type_id, row),
-                "ref": db_ref(options.type_id, row["__key"]),
-            }
-            for row in data["items"]
-        ]
-        has_more = data["has_more"]
+        items = [database_object(options.type_id, r) for r in data["items"]]
+        more, dates = data["has_more"], data["snapshot_dates"]
     else:
-        rows = sorted(
-            (
-                obj
-                for obj in draft.material_objects
-                if (
-                    not options.type_id or obj.type_id in draft.descendants(options.type_id)
-                )
-                and options.q.casefold()
-                in (obj.name + " " + " ".join(map(str, obj.values.values()))).casefold()
-            ),
-            key=lambda obj: str(obj.id),
-        )
-        items = [document_object(obj) for obj in rows[offset : offset + options.limit]]
-        has_more = offset + options.limit < len(rows)
-    next_offset = offset + options.limit
-    truncated = has_more and next_offset > 10000
+        rows = [
+            o
+            for o in draft.material_objects
+            if (not options.type_id or index.is_a(o.type_id, options.type_id))
+            and options.q.casefold()
+            in (
+                document_display_text(draft, o)
+                + " "
+                + " ".join(map(str, o.values.values()))
+            ).casefold()
+        ]
+        rows.sort(key=lambda o: o.id.bytes)
+        items = [document_object(o, draft) for o in rows[offset : offset + options.limit]]
+        more, dates = len(rows) > offset + options.limit, []
+    truncated = more and offset + options.limit > 10000
     return {
         **envelope(version),
         "items": items,
         "source": options.source,
         "data_mode": "live" if options.source == "database" else "snapshot",
-        "next_cursor": signer.dumps({"context": context, "offset": next_offset})
-        if has_more and not truncated
+        "snapshot_dates": dates,
+        "next_cursor": encode_cursor(settings, context, offset + options.limit)
+        if more and not truncated
         else None,
         "truncated": truncated,
         "quality_issues": [
@@ -166,56 +176,68 @@ def search_objects(db, version, options: ObjectSearch, settings):
     }
 
 
-def get_object(db, version, ref, settings):
+def get_object(db, version, ref, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    dates = []
     if source == "document":
-        obj = next((obj for obj in draft.material_objects if str(obj.id) == identity), None)
-        if not obj:
-            raise HTTPException(404, "该版本中没有此文档实例")
-        item = document_object(obj)
+        if snapshot_date:
+            raise ServiceError(
+                "文档事实不接受快照日期", code="VALIDATION_FAILED", status_code=422
+            )
+        fact = next((o for o in draft.material_objects if str(o.id) == identity), None)
+        if fact is None:
+            raise NotFoundError("该版本中没有此文档事实")
+        item = document_object(fact, draft)
     else:
-        mapping = mapping_for(draft, identity)
-        rows = query_mapping(
+        from ontofoundry_api.services.instance_plan import query_instances
+
+        data = query_instances(
             db,
             version.workspace_id,
-            PreviewRequest(mapping=mapping, key=key, limit=2),
+            draft,
+            identity,
             settings,
-        )["items"]
-        if not rows:
-            raise HTTPException(404, "实例不存在或源数据已删除")
-        if len(rows) != 1 or rows[0]["__key"] is None:
-            raise HTTPException(422, "实例标识不唯一或为空")
-        item = {**database_object(identity, rows[0]), "ref": ref}
+            key=key,
+            limit=2,
+            snapshot_date=snapshot_date,
+        )
+        if not data["items"]:
+            raise NotFoundError("该实例不存在或源数据已删除")
+        item, dates = database_object(identity, data["items"][0]), data["snapshot_dates"]
     return {
         **envelope(version),
         "item": item,
+        "snapshot_dates": dates,
         "data_mode": "live" if source == "database" else "snapshot",
         "quality_issues": value_issues(draft, UUID(item["type_id"]), item["values"], ref),
     }
 
 
-def object_neighborhood(db, version, ref, depth, settings):
+def object_neighborhood(db, version, ref, depth, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id, target_version="3")
+    draft = read_snapshot(version.snapshot_json, version.workspace_id)
     if source == "database":
+        from types import SimpleNamespace
+
+        from ontofoundry_api.services.instance_neighborhood import database_neighborhood
+
         result = database_neighborhood(
             db,
             version.workspace_id,
             draft,
-            NeighborhoodRequest(type_id=identity, key=key, depth=depth),
+            SimpleNamespace(
+                type_id=identity, key=key, depth=depth, snapshot_date=snapshot_date
+            ),
             settings,
         )
-        for obj in result["objects"]:
-            obj["ref"] = db_ref(obj["type_id"], obj["key"])
     else:
-        center = get_object(db, version, ref, settings)["item"]
-        by_id = {str(obj.id): obj for obj in draft.material_objects}
+        center = get_object(db, version, ref, settings, snapshot_date)["item"]
         visible, frontier, edges, truncated = {identity}, {identity}, {}, False
         for _ in range(depth):
             following = set()
             for link in draft.material_links:
-                ends = {str(v.object_id) for v in link.role_values if v.object_id is not None}
+                ends = {str(link.source_id), str(link.target_id)}
                 if not frontier.intersection(ends):
                     continue
                 if len(visible | ends) > 100 or (
@@ -227,43 +249,23 @@ def object_neighborhood(db, version, ref, depth, settings):
                 visible.update(ends)
                 edges[str(link.id)] = link.model_dump(mode="json")
             frontier = following
-            if not frontier or truncated:
-                break
         result = {
             "center_id": center["id"],
-            "objects": [document_object(by_id[oid]) for oid in sorted(visible)],
+            "objects": [
+                document_object(o, draft)
+                for o in draft.material_objects
+                if str(o.id) in visible
+            ],
             "links": list(edges.values()),
+            "source": "document",
+            "depth": depth,
             "warnings": [],
             "truncated": truncated,
-            "source": source,
-            "depth": depth,
+            "snapshot_dates": [],
         }
-    from ontofoundry_api.domain.runtime_views import all_roles_of
-    definitions = {str(link.id): link for link in draft.link_types}
-    names = {obj["id"]: obj["name"] for obj in result["objects"]}
-    for fact in result["links"]:
-        link = definitions.get(str(fact["type_id"]))
-        if link is None:
-            continue
-        definition = link.model_dump(mode="json")
-        fact.update(owner_ref=definition["owner_ref"], roles=definition["roles"],
-                    owner_role_id=str(link.owner_role_id), all_roles=all_roles_of(definition))
-        if source == "database":
-            owner, extra = (fact["source_id"], fact["target_id"]) if link.endpoint_direction == "forward" else (fact["target_id"], fact["source_id"])
-            fact["role_values"] = [{"role_id": str(link.owner_role_id), "object_id": owner},
-                                   {"role_id": str(link.roles[0].id), "object_id": extra}]
-        if fact.get("source_id") is not None:
-            fact["source_name"] = names.get(fact["source_id"], fact["source_id"])
-            fact["target_name"] = names.get(fact["target_id"], fact["target_id"])
-    return public_projection({
+    return {
         **envelope(version),
         **result,
         "data_mode": "live" if source == "database" else "snapshot",
-        "quality_issues": [
-            issue
-            for item in result["objects"]
-            for issue in value_issues(
-                draft, UUID(item["type_id"]), item["values"], item["ref"]
-            )
-        ],
-    })
+        "quality_issues": [],
+    }

@@ -46,9 +46,9 @@ def pg_client(tmp_path) -> Iterator[TestClient]:
         conn.execute(sa.text(f'CREATE DATABASE "{name}"'))
     settings = Settings(
         environment="test",
-        database_url=make_url(ADMIN_URL).set(database=name).render_as_string(
-            hide_password=False
-        ),
+        database_url=make_url(ADMIN_URL)
+        .set(database=name)
+        .render_as_string(hide_password=False),
         data_dir=tmp_path / "files",
         auto_create_schema=True,
         seed_demo=True,
@@ -64,5 +64,3 @@ def pg_client(tmp_path) -> Iterator[TestClient]:
         with admin.connect() as conn:
             conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         admin.dispose()
-
-

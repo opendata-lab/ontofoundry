@@ -1,71 +1,85 @@
-import {
-  Box,
-  Braces,
-  Database,
-  FileText,
-  GitBranch,
-  ListChecks,
-  ShieldCheck,
-  Zap,
-} from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import type {
-  DraftView,
-  ElementChange,
-  ModelingSession,
-  TargetKind,
-  TypeGraph,
-} from "../api/types";
+import { Alert, Badge, Button, Empty, Input, Segmented, Table, Tabs, Tag, Typography } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import type { Draft, ElementChange, ModelingSession, TargetKind, TypeGraph } from "../api/types";
+import { useElementInspector } from "../hooks/useElementInspector";
 import type { ProposalsState } from "../hooks/useProposals";
-import { toView } from "../lib/draftView";
-import { EmptyModel } from "./EmptyModel";
-import { WorkspaceConstraints } from "./ReleaseReview";
+import { VALUE_KINDS, byId } from "../lib/coreModel";
+import { documentDisplayText } from "../lib/instanceDisplay";
+import { METRIC_KINDS } from "../lib/metricEditing";
+import { BINDING_MODES } from "../lib/objectMapping";
+import { draftGraph } from "../lib/semanticExplorer";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
-import { useElementInspector } from "../hooks/useElementInspector";
 
-function draftGraph(draft: DraftView): TypeGraph {
-  return {
-    workspace_id: draft.workspace_id,
-    version_id: "draft",
-    version_sha256: "",
-    nodes: draft.object_types.map((t) => ({
-      id: t.id,
-      kind: "object_type",
-      label: t.name,
-      technical_name: t.technical_name,
-      description: t.description,
-      tags: t.tags,
-      attribute_count: t.attributes.length,
-    })),
-    edges: draft.link_types.map((r) => ({
-      id: r.id,
-      kind: "link_type",
-      label: r.name,
-      technical_name: r.technical_name,
-      source: r.source_type_id,
-      target: r.target_type_id,
-      description: r.description,
-      multiplicity: r.multiplicity,
-    })),
-  };
+const { Text } = Typography;
+
+
+type Row = { id: string; kind: TargetKind; name: string; technical: string; description: string; deleted?: boolean };
+
+const CHANGE: Record<ElementChange["change"], { text: string; color: string }> = {
+  created: { text: "新增", color: "success" },
+  updated: { text: "已修改", color: "processing" },
+  deleted: { text: "待删除", color: "error" },
+};
+
+const CATEGORIES: { key: TargetKind; text: string }[] = [
+  { key: "object_type", text: "对象" },
+  { key: "link_type", text: "关系" },
+  { key: "property", text: "属性" },
+  { key: "rule", text: "规则" },
+  { key: "metric", text: "指标" },
+  { key: "dataset", text: "数据集" },
+  { key: "mapping", text: "映射" },
+  { key: "material_object", text: "文档事实" },
+  { key: "material_link", text: "文档关系" },
+];
+
+function rowsOf(draft: Draft, kind: TargetKind): Row[] {
+  const row = (id: string, name: string, technical: string, description: string): Row => ({ id, kind, name, technical, description });
+  switch (kind) {
+    case "object_type":
+      return draft.object_types.map((o) => row(o.id, o.name, o.technical_name, o.description));
+    case "link_type":
+      return draft.link_types.map((l) =>
+        row(l.id, l.name, l.technical_name, `${byId(draft.object_types, l.source_type_id)?.name ?? "?"} → ${byId(draft.object_types, l.target_type_id)?.name ?? "?"}`),
+      );
+    case "property":
+      return draft.properties.map((p) =>
+        row(p.id, p.name, p.technical_name, `${byId(draft.object_types, p.owner_type_id)?.name ?? "?"} · ${VALUE_KINDS[p.value_kind]}`),
+      );
+    case "rule":
+      return draft.rules.map((r) => row(r.id, r.name, r.technical_name, r.expression));
+    case "metric":
+      return draft.metrics.map((m) => row(m.id, m.name, m.technical_name, `${METRIC_KINDS[m.kind]}${m.description ? " · " + m.description : ""}`));
+    case "dataset":
+      return draft.datasets.map((d) => row(d.id, d.name, [d.schema_name, d.table_name].filter(Boolean).join("."), d.description));
+    case "mapping":
+      return draft.mappings.map((m) =>
+        row(
+          m.id,
+          byId(draft.object_types, m.type_id)?.name ?? "?",
+          BINDING_MODES[m.binding_mode] ?? m.binding_mode,
+          m.sources.map((s) => byId(draft.datasets, s.dataset_id)?.name ?? "?").join("、"),
+        ),
+      );
+    case "material_object":
+      return draft.material_objects.map((o) => row(o.id, documentDisplayText(draft, o), "", byId(draft.object_types, o.type_id)?.name ?? ""));
+    case "material_link":
+      return draft.material_links.map((l) => {
+        const source = byId(draft.material_objects, l.source_id);
+        const target = byId(draft.material_objects, l.target_id);
+        return row(
+          l.id,
+          `${source ? documentDisplayText(draft, source) : "?"} → ${target ? documentDisplayText(draft, target) : "?"}`,
+          "",
+          byId(draft.link_types, l.type_id)?.name ?? "",
+        );
+      });
+    default:
+      return [];
+  }
 }
-
-type Row = {
-  id: string;
-  name: string;
-  technical_name: string;
-  description: string;
-  attributes?: DraftView["object_types"][number]["attributes"];
-  deleted?: boolean;
-};
-
-const CHANGE_LABEL: Record<ElementChange["change"], string> = {
-  created: "新增",
-  updated: "已修改",
-  deleted: "待删除",
-};
 
 type Panel = "proposals" | "draft" | "graph";
 
@@ -74,26 +88,17 @@ export function ModelResults({
   proposals,
   running = false,
   onRemodel = () => undefined,
-  onSession,
-  onConstraintsDirty,
-  onConstraintsBusy,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
   running?: boolean;
   onRemodel?: (text: string) => void;
-  /** Saves edits made here (workspace constraints) back into the page's session. */
-  onSession?: (value: ModelingSession) => void;
-  onConstraintsDirty?: (dirty: boolean) => void;
-  onConstraintsBusy?: (busy: boolean) => void;
 }) {
   const [params, setParams] = useSearchParams();
   const inspector = useElementInspector();
   const pending = session?.pending_proposal_count ?? 0;
   const requested = params.get("panel") as Panel | null;
-  const [tab, setTabState] = useState<Panel>(
-    requested ?? (proposals && pending > 0 ? "proposals" : "draft"),
-  );
+  const [tab, setTabState] = useState<Panel>(requested ?? (proposals && pending > 0 ? "proposals" : "draft"));
   const [fresh, setFresh] = useState(0);
   const lastRevision = useRef(session?.revision);
   const setTab = (next: Panel) => {
@@ -119,226 +124,166 @@ export function ModelResults({
   useEffect(() => {
     const previous = lastRevision.current;
     lastRevision.current = session?.revision;
-    if (previous !== undefined && session && session.revision > previous && tab === "proposals")
-      setFresh((n) => n + 1);
+    if (previous !== undefined && session && session.revision > previous && tab === "proposals") setFresh((n) => n + 1);
   }, [session, tab]);
-
-  const [kind, setKind] = useState("object_type");
+  const [kind, setKind] = useState<TargetKind>("object_type");
   const [query, setQuery] = useState("");
-  const model = session ? toView(session.draft) : null;
-  const diff = new Map((session?.base_diff ?? []).map((c) => [c.element_id, c]));
-  const deleted = (session?.base_diff ?? []).filter((c) => c.change === "deleted");
-  const deletedRows = (target: string): Row[] =>
-    deleted
-      .filter((c) => c.element_kind === target)
+  const draft = session?.draft ?? null;
+  const diff = useMemo(() => new Map((session?.base_diff ?? []).map((c) => [c.element_id, c])), [session?.base_diff]);
+  const rows = useMemo(() => {
+    if (!draft) return [];
+    const deleted: Row[] = (session?.base_diff ?? [])
+      .filter((c) => c.change === "deleted" && c.element_kind === kind)
       .map((c) => ({
         id: c.element_id,
+        kind,
         name: c.label,
-        technical_name: String(c.before?.technical_name ?? ""),
-        description: String(c.before?.description ?? ""),
+        technical: String((c.before as { technical_name?: string } | null)?.technical_name ?? ""),
+        description: "",
         deleted: true,
       }));
-  const rules = session?.draft.rules ?? [];
-  const actions = session?.draft.actions ?? [];
-  const rows: Row[] =
-    kind === "object_type"
-      ? [...(model?.object_types ?? []), ...deletedRows("object_type")]
-      : kind === "link_type"
-        ? [...(model?.link_types ?? []), ...deletedRows("link_type")]
-        : kind === "mapping"
-          ? (model?.mappings ?? []).map((m) => ({
-              ...m,
-              name: `${m.connection_alias} · ${m.schema_name ? m.schema_name + "." : ""}${m.table_name}`,
-              description: `主键 ${m.key_column}`,
-              technical_name: m.table_name,
-            }))
-          : kind === "rule"
-            ? [
-                ...rules.map((r) => ({
-                  id: r.id,
-                  name: r.name,
-                  technical_name: r.technical_name,
-                  description: r.expression,
-                })),
-                ...deletedRows("rule"),
-              ]
-            : kind === "action"
-              ? [
-                  ...actions.map((a) => ({
-                    id: a.id,
-                    name: a.name,
-                    technical_name: a.technical_name,
-                    description: a.description || "仅定义 · 不可执行",
-                  })),
-                  ...deletedRows("action"),
-                ]
-              : kind === "instance"
-                ? (model?.objects ?? []).map((o) => ({
-                    id: o.id,
-                    name: o.name,
-                    technical_name: "",
-                    description:
-                      model?.object_types.find((t) => t.id === o.type_id)?.name ?? "",
-                  }))
-                : (model?.object_types.flatMap((t) =>
-                    t.attributes.map((a) => ({
-                      ...a,
-                      description: t.name + " · " + a.value_kind,
-                    })),
-                  ) ?? []);
-  const categories = [
-    { key: "object_type", text: "实体", icon: Box, count: model?.object_types.length ?? 0, cls: "object" },
-    { key: "link_type", text: "关系", icon: GitBranch, count: model?.link_types.length ?? 0, cls: "relation" },
-    { key: "attribute", text: "属性", icon: Braces, count: model?.object_types.reduce((n, t) => n + t.attributes.length, 0) ?? 0, cls: "attribute" },
-    { key: "rule", text: "规则", icon: ShieldCheck, count: rules.length, cls: "rule" },
-    { key: "action", text: "Action", icon: Zap, count: actions.length, cls: "action" },
-    { key: "instance", text: "材料实例", icon: FileText, count: model?.objects.length ?? 0, cls: "instance" },
-    { key: "mapping", text: "映射", icon: Database, count: model?.mappings.length ?? 0, cls: "mapping" },
-    {
-      key: "constraint",
-      text: "空间约束",
-      icon: ListChecks,
-      count: session?.draft.ontology_requires?.length ?? 0,
-      cls: "rule",
-    },
-  ];
+    return [...rowsOf(draft, kind), ...deleted];
+  }, [draft, kind, session?.base_diff]);
+  const normalized = query.trim().toLowerCase();
+  const visible = rows.filter((r) => !normalized || [r.name, r.technical, r.description].join(" ").toLowerCase().includes(normalized));
+  const count = (k: TargetKind) => (draft ? rowsOf(draft, k).length : 0);
   const warnings = session?.result_warnings ?? [];
-  const visibleRows = rows.filter((r) =>
-    (r.name + r.technical_name + r.description)
-      .toLowerCase()
-      .includes(query.toLowerCase()),
-  );
-
+  const graph = draft ? (session?.graph?.nodes.length ? (session.graph as TypeGraph) : draftGraph(draft)) : null;
   return (
-    <aside className="ref-results">
-      {warnings.length > 0 && (
-        <div className="result-warnings" role="status">
-          {warnings.map((text) => (
-            <p key={text}>{text}</p>
-          ))}
-        </div>
-      )}
-      <div className="ref-tabs" role="tablist" aria-label="构建结果">
-        {proposals && (
-          <button role="tab" aria-selected={tab === "proposals"} onClick={() => setTab("proposals")}>
-            提案 {pending > 0 && <span className="tab-badge">{pending}</span>}
-          </button>
-        )}
-        <button role="tab" aria-selected={tab === "draft"} onClick={() => setTab("draft")}>
-          本体草稿 {fresh > 0 && <span className="tab-badge tab-badge--fresh">+{fresh}</span>}
-        </button>
-        <button role="tab" aria-selected={tab === "graph"} onClick={() => setTab("graph")}>
-          语义图谱
-        </button>
-      </div>
-      {tab === "proposals" && proposals ? (
-        <ProposalPanel session={session} proposals={proposals} running={running} onRemodel={onRemodel} />
-      ) : tab === "draft" ? (
-        <>
-          <div className="category-grid">
-            {categories.map((c) => (
-              <button
-                key={c.key}
-                className={"category category--" + c.cls}
-                aria-pressed={kind === c.key}
-                onClick={() => setKind(c.key)}
-              >
-                <c.icon size={15} />
-                <span>{c.text}</span>
-                <b>{c.count}</b>
-              </button>
-            ))}
-          </div>
-          {kind === "constraint" ? (
-            session && onSession ? (
-              <WorkspaceConstraints
-                key={session.id}
-                session={session}
-                onSaved={onSession}
-                disabled={running}
-                onDirtyChange={onConstraintsDirty}
-                onBusyChange={onConstraintsBusy}
-              />
-            ) : (
-              <EmptyModel text="暂无构建结果" />
-            )
-          ) : (
-          <>
-          <label className="ref-search results-search">
-            <input
-              aria-label="搜索模型"
-              placeholder="搜索名称、API 标识、描述等"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-          <div className="result-list">
-            {visibleRows.map((r) => {
-              const change = r.deleted ? "deleted" : diff.get(r.id)?.change;
-              return (
-                <details className={"result-row" + (r.deleted ? " result-row--deleted" : "")} key={r.id}>
-                  <summary>
-                    <span className="result-row-title">
-                      <strong>{r.name}</strong>
-                      <small>{r.technical_name}</small>
-                      <p>{r.description || "尚未填写定义"}</p>
-                    </span>
-                    {change && <span className={`tag tag--change-${change}`}>{CHANGE_LABEL[change]}</span>}
-                    {r.attributes && <span className="result-count">{r.attributes.length} 属性</span>}
-                  </summary>
-                  <div className="result-expanded">
-                    {r.attributes && (
-                      <table>
-                        <tbody>
-                          {r.attributes.map((a) => (
-                            <tr key={a.id}>
-                              <td>
-                                <Braces size={12} />
-                                {a.name}
-                              </td>
-                              <td>{a.technical_name}</td>
-                              <td>{a.value_kind}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                    {session && !r.deleted && (
-                      <Link className="button button--text" to={inspector.href({ kind: (kind === "attribute" ? "property" : kind === "instance" ? "material_object" : kind) as TargetKind, id: r.id, sessionId: session.id })}>
-                        查看元素
-                      </Link>
-                    )}
-                  </div>
-                </details>
-              );
-            })}
-            {!visibleRows.length && (
-              <EmptyModel text={query ? "没有匹配的模型" : model ? "暂无此类模型" : "暂无构建结果"} />
-            )}
-          </div>
-          </>
-          )}
-          {session && (
-            <footer className="result-footnote">
-              本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
-            </footer>
-          )}
-        </>
-      ) : (
-        <div className="result-graph">
-          {model?.object_types.length ? (
-            <OntologyGraph graph={session?.graph ?? draftGraph(model)} query="" onSelect={(selected) => {
-              if (selected && session) {
-                if (selected.category === "node" && selected.item.kind === "value_type") return;
-                const object = selected.category === "node" && selected.item.kind === "object_type";
-                inspector.open({ kind: object ? "object_type" : "link_type", id: selected.category === "edge" ? selected.item.link_type_id ?? selected.item.id : selected.item.id, sessionId: session.id, tab: object ? "properties" : "endpoints" });
-              }
-            }} />
-          ) : (
-            <EmptyModel />
-          )}
-        </div>
-      )}
+    <aside className="flex min-h-0 flex-col gap-2 overflow-hidden">
+      {warnings.map((text) => (
+        <Alert key={text} type="warning" showIcon message={text} />
+      ))}
+      <Tabs
+        size="small"
+        activeKey={tab}
+        onChange={(key) => setTab(key as Panel)}
+        className="min-h-0 flex-1 [&_.ant-tabs-content]:h-full [&_.ant-tabs-tabpane]:h-full"
+        items={[
+          ...(proposals
+            ? [
+                {
+                  key: "proposals",
+                  label: (
+                    <Badge count={pending} size="small" offset={[8, -2]}>
+                      提案
+                    </Badge>
+                  ),
+                  children: <ProposalPanel session={session} proposals={proposals} running={running} onRemodel={onRemodel} />,
+                },
+              ]
+            : []),
+          {
+            key: "draft",
+            label: (
+              <Badge count={fresh ? `+${fresh}` : 0} size="small" color="green" offset={[10, -2]}>
+                本体草稿
+              </Badge>
+            ),
+            children: (
+              <div className="flex h-full min-h-0 flex-col gap-2">
+                <Segmented
+                  size="small"
+                  className="self-start"
+                  value={kind}
+                  onChange={(value) => setKind(value as TargetKind)}
+                  options={CATEGORIES.map((c) => ({ value: c.key, label: `${c.text} ${count(c.key)}` }))}
+                />
+                <Input.Search
+                  allowClear
+                  size="small"
+                  aria-label="搜索模型"
+                  placeholder="搜索名称、技术名、描述"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <div className="min-h-0 flex-1 overflow-auto">
+                  <Table
+                    size="small"
+                    rowKey="id"
+                    pagination={visible.length > 50 ? { pageSize: 50, size: "small" } : false}
+                    dataSource={visible}
+                    locale={{ emptyText: <Empty description={query ? "没有匹配的模型" : draft ? "暂无此类模型" : "暂无构建结果"} /> }}
+                    columns={[
+                      {
+                        title: "名称",
+                        key: "name",
+                        render: (_, r) => (
+                          <div className={`flex flex-col ${r.deleted ? "line-through opacity-60" : ""}`}>
+                            {session && !r.deleted ? (
+                              <Button
+                                type="link"
+                                size="small"
+                                className="!h-auto self-start !p-0"
+                                onClick={() => inspector.open({ kind: r.kind, id: r.id, sessionId: session.id })}
+                              >
+                                {r.name || "未命名"}
+                              </Button>
+                            ) : (
+                              <span>{r.name}</span>
+                            )}
+                            {r.technical && <code className="text-xs text-muted">{r.technical}</code>}
+                          </div>
+                        ),
+                      },
+                      {
+                        title: "说明",
+                        key: "description",
+                        render: (_, r) => (
+                          <Text type="secondary" className="text-xs">
+                            {r.description || "—"}
+                          </Text>
+                        ),
+                      },
+                      {
+                        title: "",
+                        key: "change",
+                        width: 72,
+                        render: (_, r) => {
+                          const change = r.deleted ? "deleted" : diff.get(r.id)?.change;
+                          return change ? (
+                            <Tag color={CHANGE[change].color} className="!m-0">
+                              {CHANGE[change].text}
+                            </Tag>
+                          ) : null;
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+                {session && (
+                  <Text type="secondary" className="text-xs">
+                    本会话的修改 · 基于{session.base_version_id ? "已发布版本" : "空白模型"} · 发布前在发布页预览合并结果
+                  </Text>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "graph",
+            label: "语义图谱",
+            children: (
+              <div className="relative h-full min-h-[420px] overflow-hidden rounded-md border border-rule">
+                {graph?.nodes.length ? (
+                  <OntologyGraph
+                    graph={graph}
+                    query=""
+                    onSelect={(selected) => {
+                      if (!selected || !session) return;
+                      if (selected.category === "node")
+                        inspector.open({ kind: "object_type", id: selected.item.id, sessionId: session.id, tab: "properties" });
+                      else if (selected.item.kind === "link_type")
+                        inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: session.id });
+                    }}
+                  />
+                ) : (
+                  <Empty className="mt-16" description="暂无构建结果" />
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
     </aside>
   );
 }

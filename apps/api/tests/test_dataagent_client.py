@@ -11,7 +11,9 @@ from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 def _client(monkeypatch, handler, *, access_key: str = "secret") -> DataAgentClient:
     transport = httpx.MockTransport(handler)
     real_async_client = httpx.AsyncClient
-    monkeypatch.setattr(httpx, "AsyncClient", partial(real_async_client, transport=transport))
+    monkeypatch.setattr(
+        httpx, "AsyncClient", partial(real_async_client, transport=transport)
+    )
     return DataAgentClient(
         "https://dataagent.example/",
         prefix="/custom/runtime/",

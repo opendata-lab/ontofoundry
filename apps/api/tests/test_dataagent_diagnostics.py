@@ -66,7 +66,7 @@ def _dataagent_client(
             502,
             "DataAgent 上找不到该 Agent",
             (
-                "创建 agent_id=agent-missing、安装 md2ossie Skill，"
+                "创建 agent_id=agent-missing、安装 ontofoundry-modeling Skill，"
                 "并确认其可见性允许 Widget 访问"
             ),
         ),
@@ -160,9 +160,7 @@ def test_health_checks_agent_profile_public_route_and_reports_all_checks(
         "Agent 存在性",
     ]
     assert all(check["ok"] for check in response.json()["checks"])
-    assert requested_paths == [
-        f"/api/v1/dataagent/agents/{settings.dataagent_agent_id}"
-    ]
+    assert requested_paths == [f"/api/v1/dataagent/agents/{settings.dataagent_agent_id}"]
 
 
 def test_health_reports_missing_agent_without_using_topic_filter(client, monkeypatch):
@@ -192,7 +190,7 @@ def test_health_reports_missing_agent_without_using_topic_filter(client, monkeyp
         "ok": False,
         "message": "DataAgent 上找不到该 Agent",
         "hint": (
-            "创建 agent_id=missing-agent、安装 md2ossie Skill，"
+            "创建 agent_id=missing-agent、安装 ontofoundry-modeling Skill，"
             "并确认其可见性允许 Widget 访问"
         ),
     }

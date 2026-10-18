@@ -1,43 +1,80 @@
-import { X } from "lucide-react";
+import { Card, Collapse, Descriptions, Typography } from "antd";
+import { FileText, UserCheck } from "lucide-react";
 import type { EvidenceView } from "../../api/types";
-import { ReviewPopover } from "./ReviewOverlays";
-import { ReviewIcon } from "./ReviewIcon";
 
+const { Text } = Typography;
+
+const lines = (start: number, end: number) => (start === end ? `第 ${start} 行` : `第 ${start}–${end} 行`);
+
+/** Material quotes and manual confirmations behind a proposal. */
 export function ReviewEvidence({ evidence }: { evidence: EvidenceView[] }) {
-  if (!evidence.length) return <span className="muted">未附证据</span>;
-  return <>{evidence.map((entry) => entry.kind === "manual" ? (
-    <article className="evidence-item" key={entry.id}>
-      <header><ReviewIcon name="evidence" /><strong>人工确认</strong><span>· {entry.created_by}</span></header>
-      <blockquote>{entry.note || "未提供说明"}</blockquote>
-    </article>
-  ) : (
-    <article className="evidence-item" key={entry.id}>
-      <header><ReviewIcon name="evidence" /><strong>{entry.material_name || "材料"}</strong>
-        <span>· {entry.locator?.line_start != null ? `第 ${entry.locator.line_start}${entry.locator.line_end && entry.locator.line_end !== entry.locator.line_start ? `–${entry.locator.line_end}` : ""} 行` : "未提供行号"}</span>
-        {entry.material_archived && <span>（已归档）</span>}
-      </header>
-      <blockquote>{entry.quote || "未提供引用原文"}</blockquote>
-      <details className="provenance"><summary>来源标识</summary><dl>
-        <dt>材料 ID</dt><dd>{entry.material_id || "未提供"}</dd>
-        <dt>内容校验</dt><dd>{entry.material_sha256 || "未提供"}</dd>
-        <dt>证据 ID</dt><dd>{entry.id || "未提供"}</dd>
-      </dl></details>
-    </article>
-  ))}</>;
-}
-
-export function EvidencePopover({ evidence, anchor, onClose }: {
-  evidence: EvidenceView[];
-  anchor: HTMLElement;
-  onClose: () => void;
-}) {
-  return <ReviewPopover className="evidence-popover" anchor={anchor} label="材料证据" onClose={onClose}>
-    <header className="popover-header"><h3>材料证据</h3>
-      <button type="button" className="icon-btn" data-initial-focus aria-label="关闭证据" onClick={() => {
-        onClose(); anchor.focus({ preventScroll: true });
-      }}><X /></button>
-    </header>
-    <ReviewEvidence evidence={evidence} />
-    <p className="popover-footer">来源和引用原文 · Esc 关闭</p>
-  </ReviewPopover>;
+  if (!evidence.length) return <Text type="secondary">未附证据</Text>;
+  return (
+    <div className="flex flex-col gap-2">
+      {evidence.map((entry) =>
+        "material_id" in entry ? (
+          <Card key={entry.id} size="small" className="bg-surface-soft">
+            <div className="flex flex-col gap-1">
+              <span className="inline-flex items-center gap-1 text-sm">
+                <FileText size={14} />
+                <strong>{entry.material_name || "材料"}</strong>
+                <Text type="secondary">
+                  · {lines(entry.locator.line_start, entry.locator.line_end)}
+                  {entry.locator.heading ? ` · ${entry.locator.heading}` : ""}
+                  {entry.material_archived ? "（已归档）" : ""}
+                </Text>
+              </span>
+              <blockquote className="m-0 border-l-2 border-rule-strong pl-3 text-sm whitespace-pre-wrap">
+                {entry.quote || "未提供引用原文"}
+              </blockquote>
+              <Collapse
+                ghost
+                size="small"
+                items={[
+                  {
+                    key: "ids",
+                    label: <Text type="secondary" className="text-xs">来源标识</Text>,
+                    children: (
+                      <Descriptions
+                        size="small"
+                        column={1}
+                        items={[
+                          {
+                            key: "material_id",
+                            label: "材料 ID",
+                            children: <span className="break-all text-xs">{entry.material_id}</span>,
+                          },
+                          {
+                            key: "material_sha256",
+                            label: "内容校验",
+                            children: <span className="break-all text-xs">{entry.material_sha256}</span>,
+                          },
+                          {
+                            key: "id",
+                            label: "证据 ID",
+                            children: <span className="break-all text-xs">{entry.id}</span>,
+                          },
+                        ]}
+                      />
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          </Card>
+        ) : (
+          <Card key={entry.id} size="small" className="bg-surface-soft">
+            <div className="flex flex-col gap-1">
+              <span className="inline-flex items-center gap-1 text-sm">
+                <UserCheck size={14} />
+                <strong>人工确认</strong>
+                <Text type="secondary">· {entry.created_by}</Text>
+              </span>
+              <span className="text-sm">{entry.note || "未提供说明"}</span>
+            </div>
+          </Card>
+        ),
+      )}
+    </div>
+  );
 }

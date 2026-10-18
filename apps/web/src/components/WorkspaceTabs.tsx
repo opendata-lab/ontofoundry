@@ -1,3 +1,4 @@
+import { Alert, Button, Modal, Tabs } from "antd";
 import {
   memo,
   Suspense,
@@ -39,11 +40,12 @@ import {
 import { preloadWorkspacePages } from "../lib/workspacePages";
 import { LoadingSurface } from "./AsyncState";
 import { WorkspaceRoutes } from "./WorkspaceRoutes";
-import "../styles/page-tabs.css";
 
 // Each panel reads its own location, fixed to the tab's href. The router's
 // context changes on every navigation; without this every open page, hidden
-// or not, re-rendered on each menu switch.
+// or not, re-rendered on each menu switch. Ant Design renders the surrounding
+// tabpanel (id, role, aria-labelledby), mounting it on first activation and
+// keeping it mounted while hidden.
 const TabPanel = memo(function TabPanel({
   tab,
   active,
@@ -89,14 +91,7 @@ const TabPanel = memo(function TabPanel({
     [tab.href, tab.id],
   );
   return (
-    <section
-      className="route-panel"
-      id={`panel-${tab.id}`}
-      role="tabpanel"
-      aria-labelledby={`tab-${tab.id}`}
-      hidden={!active}
-      inert={!active}
-    >
+    <div className="h-full min-w-0 overflow-auto" inert={!active}>
       <LocationContext.Provider value={location}>
         <PageTabContext.Provider value={context}>
           <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
@@ -104,9 +99,14 @@ const TabPanel = memo(function TabPanel({
           </Suspense>
         </PageTabContext.Provider>
       </LocationContext.Provider>
-    </section>
+    </div>
   );
 });
+
+const TAB_BAR =
+  "flex-none [&_.ant-tabs-nav]:!mb-0 [&_.ant-tabs-nav]:bg-[#f3f5f7] [&_.ant-tabs-nav]:px-2.5 [&_.ant-tabs-nav]:pt-1 [&_.ant-tabs-tab]:!h-[30px] [&_.ant-tabs-tab]:!px-2.5 [&_.ant-tabs-tab]:!py-0 [&_.ant-tabs-tab]:!text-xs [&_.ant-tabs-tab-remove]:!ml-1 [&_.ant-tabs-tab-remove]:!p-0";
+const TAB_PANES =
+  "h-full [&>.ant-tabs-content-holder]:min-h-0 [&>.ant-tabs-content-holder>.ant-tabs-content]:h-full [&>.ant-tabs-content-holder>.ant-tabs-content>.ant-tabs-tabpane]:h-full";
 
 export function WorkspaceTabs({
   workspaceId,
@@ -154,9 +154,9 @@ export function WorkspaceTabs({
   });
   useEffect(() => preloadWorkspacePages(), []);
   const strip = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
   const [closing, setClosing] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
-  const dialog = useRef<HTMLDialogElement>(null);
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
   const inspectionKey = (address: string) => {
@@ -179,10 +179,6 @@ export function WorkspaceTabs({
   const blocked = blocker.state === "blocked";
   const blockingBusy = blocked && busy && !closing;
   useEffect(() => {
-    if (closing || blocked) dialog.current?.showModal();
-    else dialog.current?.close();
-  }, [closing, blocked]);
-  useEffect(() => {
     try {
       sessionStorage.setItem(
         storageKey,
@@ -204,10 +200,13 @@ export function WorkspaceTabs({
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, busy]);
   useLayoutEffect(() => {
-    strip.current
+    const nav = bar.current;
+    // rc-tabs offers no prop for naming its tablist; the node itself is stable.
+    nav?.querySelector('[role="tablist"]')?.setAttribute("aria-label", "已打开的页面");
+    nav
       ?.querySelector('[aria-selected="true"]')
       ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-  }, [state.active]);
+  }, [state.tabs, state.active]);
   const update = useCallback((id: string, meta: PageTabMeta) => {
     setState((current) => {
       const tab = current.tabs.find((t) => t.id === id);
@@ -239,7 +238,7 @@ export function WorkspaceTabs({
       });
     setClosing(null);
     strip.current
-      ?.querySelector<HTMLButtonElement>(`#tab-${next.active}`)
+      ?.querySelector<HTMLElement>(`#workspace-tab-${next.active}`)
       ?.focus();
   };
   const requestClose = (tab: PageTab) => {
@@ -256,121 +255,116 @@ export function WorkspaceTabs({
   };
   const target = state.tabs.find((t) => t.id === closing);
   return (
-    <>
-      <div
-        className="route-tabs"
-        ref={strip}
-        role="tablist"
-        aria-label="已打开的页面"
-        onKeyDown={(e) => {
-          if (
-            !(e.target instanceof HTMLElement) ||
-            e.target.getAttribute("role") !== "tab"
-          )
-            return;
-          const targetId = e.target.id;
-          const index = state.tabs.findIndex((t) => `tab-${t.id}` === targetId);
-          const nextIndex =
-            e.key === "ArrowRight"
-              ? (index + 1) % state.tabs.length
-              : e.key === "ArrowLeft"
-                ? (index - 1 + state.tabs.length) % state.tabs.length
-                : e.key === "Home"
-                  ? 0
-                  : e.key === "End"
-                    ? state.tabs.length - 1
-                    : -1;
-          if (nextIndex >= 0) {
-            e.preventDefault();
-            const tab = state.tabs[nextIndex];
-            void navigate(tab.href);
-            strip.current
-              ?.querySelector<HTMLButtonElement>(`#tab-${tab.id}`)
-              ?.focus();
-          } else if (e.key === "Delete") {
-            e.preventDefault();
-            requestClose(state.tabs[index]);
-          }
-        }}
-      >
-        {state.tabs.map((tab) => {
-          const area = new URL(tab.href, "http://local").pathname.split("/")[3];
-          const Icon =
-            {
-              view: Network,
-              relations: GitBranch,
-              builder: Sparkles,
-              mappings: Database,
-              delivery: Rocket,
-              settings: Settings,
-            }[area] ?? Box;
-          return (
-            <div
-              key={tab.id}
-              className={
-                "route-tab" + (state.active === tab.id ? " is-active" : "")
-              }
-            >
-              <button
-                id={`tab-${tab.id}`}
-                role="tab"
-                aria-controls={`panel-${tab.id}`}
-                aria-selected={state.active === tab.id}
-                tabIndex={state.active === tab.id ? 0 : -1}
-                title={tab.title + (tab.dirty ? " · 未保存" : "")}
-                onClick={() => void navigate(tab.href)}
-              >
-                <Icon size={14} />
-                <span>{tab.title}</span>
-                {tab.dirty && <i className="tab-dirty" aria-label="未保存" />}
-              </button>
-              <button
-                className="tab-close"
-                aria-label={`关闭 ${tab.title}`}
-                title="关闭页面"
-                onClick={() => requestClose(tab)}
-              >
-                <X size={12} />
-              </button>
+    <div className="flex h-full flex-col">
+      <div ref={strip} className="min-h-0 min-w-0 flex-1">
+        <Tabs
+          id="workspace"
+          type="editable-card"
+          size="small"
+          hideAdd
+          activeKey={state.active}
+          tabBarGutter={3}
+          tabBarStyle={{ margin: 0 }}
+          // Child combinators only: pages rendered inside the panes have Tabs too.
+          className={TAB_PANES}
+          renderTabBar={(props, DefaultTabBar) => (
+            // The bar holds only the strip and its notice, so these descendant
+            // selectors cannot reach a page's own Tabs.
+            <div ref={bar} className={TAB_BAR}>
+              <DefaultTabBar {...props} />
+              {notice && (
+                <Alert
+                  banner
+                  type="warning"
+                  role="status"
+                  message={notice}
+                  closable={{ closeIcon: true, "aria-label": "关闭提示" }}
+                  onClose={() => setNotice("")}
+                />
+              )}
             </div>
-          );
-        })}
+          )}
+          onChange={(key) => {
+            const tab = state.tabs.find((t) => t.id === key);
+            if (tab) void navigate(tab.href);
+          }}
+          onEdit={(targetKey, action) => {
+            if (action === "remove" && typeof targetKey === "string") {
+              const tab = state.tabs.find((t) => t.id === targetKey);
+              if (tab) requestClose(tab);
+            }
+          }}
+          items={state.tabs.map((tab) => {
+            const area = new URL(tab.href, "http://local").pathname.split("/")[3];
+            const Icon =
+              {
+                view: Network,
+                relations: GitBranch,
+                builder: Sparkles,
+                mappings: Database,
+                delivery: Rocket,
+                settings: Settings,
+              }[area] ?? Box;
+            return {
+              key: tab.id,
+              children: tab.visited ? (
+                <TabPanel tab={tab} active={state.active === tab.id} update={update} />
+              ) : null,
+              label: (
+                <span
+                  title={tab.title + (tab.dirty ? " · 未保存" : "")}
+                  className="inline-flex min-w-0 items-center gap-[7px] text-xs whitespace-nowrap"
+                >
+                  <Icon size={14} className="flex-none" />
+                  <span className="max-w-[180px] truncate">{tab.title}</span>
+                  {tab.dirty && (
+                    <i
+                      className="size-[5px] flex-none rounded-full bg-[#d58b20]"
+                      aria-label="未保存"
+                    />
+                  )}
+                </span>
+              ),
+              closeIcon: (
+                <span
+                  role="button"
+                  aria-label={`关闭 ${tab.title}`}
+                  title="关闭页面"
+                  className="inline-flex size-4 items-center justify-center rounded-[3px]"
+                >
+                  <X size={12} />
+                </span>
+              ),
+            };
+          })}
+        />
       </div>
-      {notice && (
-        <div className="tab-notice" role="status">
-          {notice}
-          <button onClick={() => setNotice("")} aria-label="关闭提示">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      <div className="route-panels">
-        {state.tabs
-          .filter((t) => t.visited)
-          .map((tab) => (
-            <TabPanel
-              key={tab.id}
-              tab={tab}
-              active={state.active === tab.id}
-              update={update}
-            />
-          ))}
-      </div>
-      <dialog
-        ref={dialog}
-        className="ref-dialog tab-confirm"
-        aria-labelledby="tab-confirm-title"
-        onCancel={(e) => {
-          e.preventDefault();
-          cancel();
-        }}
+      <Modal
+        open={!!closing || blocked}
+        width={420}
+        title={blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
+        onCancel={cancel}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button autoFocus onClick={cancel}>
+              返回页面
+            </Button>
+            {!blockingBusy && (
+              <Button
+                type="primary"
+                danger
+                onClick={() => {
+                  if (closing) remove(closing);
+                  else if (blocker.state === "blocked") blocker.proceed();
+                }}
+              >
+                放弃并{closing ? "关闭" : "离开"}
+              </Button>
+            )}
+          </div>
+        }
       >
-        <header>
-          <h2 id="tab-confirm-title">
-            {blockingBusy ? "操作正在进行" : "有尚未保存的内容"}
-          </h2>
-        </header>
-        <p>
+        <p className="text-[13px] leading-[1.7]">
           {blockingBusy
             ? "请等待当前操作完成后再离开空间。"
             : target
@@ -379,27 +373,7 @@ export function WorkspaceTabs({
                 ? "离开当前内容将丢失尚未保存的修改，是否继续？"
                 : "离开空间将丢失所有页签中尚未保存的内容，是否继续？"}
         </p>
-        <footer className="row-actions">
-          <button
-            className="button button--secondary"
-            autoFocus
-            onClick={cancel}
-          >
-            返回页面
-          </button>
-          {!blockingBusy && (
-            <button
-              className="button button--primary"
-              onClick={() => {
-                if (closing) remove(closing);
-                else if (blocker.state === "blocked") blocker.proceed();
-              }}
-            >
-              放弃并{closing ? "关闭" : "离开"}
-            </button>
-          )}
-        </footer>
-      </dialog>
-    </>
+      </Modal>
+    </div>
   );
 }

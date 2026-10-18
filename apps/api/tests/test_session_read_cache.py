@@ -80,7 +80,10 @@ def test_a_decision_without_a_draft_change_recomputes_the_summary(client, monkey
     with client.app.state.session_factory() as db:
         db.execute(
             update(ProposalItemRecord)
-            .where(ProposalItemRecord.session_id == session["id"], ProposalItemRecord.ordinal == 0)
+            .where(
+                ProposalItemRecord.session_id == session["id"],
+                ProposalItemRecord.ordinal == 0,
+            )
             .values(status="rejected")
         )
         db.commit()
@@ -95,6 +98,7 @@ def test_read_cache_evicts_least_recently_used():
         def compute():
             computed.append(key)
             return key.upper()
+
         return compute
 
     assert cache.get("a", value("a")) == "A"

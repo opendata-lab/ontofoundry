@@ -1,9 +1,7 @@
-import json
-from copy import deepcopy
-from uuid import uuid4
+"""Core session persistence, revision guards and three-way publication."""
 
-from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.db_models import ModelingSessionRecord
+from copy import deepcopy
+
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
@@ -11,393 +9,146 @@ ONTOLOGY = f"/api/v1/ontology/workspaces/{DEMO_WORKSPACE_ID}"
 
 
 def create_session(client):
-    response = client.post(ROOT + "/sessions", json={"title": "集成测试草稿"})
+    response = client.post(ROOT + "/sessions", json={"title": "虚构销售建模"})
     assert response.status_code == 201, response.text
     return response.json()
 
 
 def save(client, session, draft):
     return client.put(
-        ROOT + "/sessions/" + session["id"],
+        ROOT + f"/sessions/{session['id']}",
         json={"revision": session["revision"], "draft": draft},
     )
 
 
-def publish(client, session):
+def preview(client, session):
     return client.post(
-        ROOT + "/sessions/" + session["id"] + "/publish",
-        json={"revision": session["revision"], "message": "测试发布"},
+        ROOT + f"/sessions/{session['id']}/preview",
+        json={"expected_session_revision": session["revision"]},
     )
 
 
-def test_saved_draft_survives_reload_and_does_not_mutate_published(client):
-    s = create_session(client)
-    s["draft"]["object_types"][0]["description"] = "只修改草稿"
-    response = save(client, s, s["draft"])
-    assert response.status_code == 200, response.text
-    assert (
-        client.get(ROOT + "/sessions/" + s["id"]).json()["draft"]["object_types"][0][
-            "description"
-        ]
-        == "只修改草稿"
-    )
-    assert (
-        client.get(ROOT + "/published-snapshot").json()["object_types"][0]["description"]
-        != "只修改草稿"
-    )
-    assert save(client, s, s["draft"]).status_code == 409
-
-
-def test_two_sessions_merge_independent_fields_and_publish_atomically(client):
-    a, b = create_session(client), create_session(client)
-    a["draft"]["object_types"][0]["description"] = "新的供应商定义"
-    b["draft"]["object_types"][1]["description"] = "新的物料定义"
-    a = save(client, a, a["draft"]).json()
-    b = save(client, b, b["draft"]).json()
-    assert publish(client, a).status_code == 200
-    response = publish(client, b)
-    assert response.status_code == 200, response.text
-    snapshot = client.get(ROOT + "/published-snapshot").json()
-    descriptions = {t["description"] for t in snapshot["object_types"]}
-    assert {"新的供应商定义", "新的物料定义"} <= descriptions
-    assert response.json()["version"]["version"] == 3
-    assert (
-        client.get(ONTOLOGY + "/version").json()["version_sha256"]
-        == response.json()["version"]["version_sha256"]
-    )
-
-
-def test_same_field_conflict_can_be_resolved_without_overwriting_other_changes(client):
-    a, b = create_session(client), create_session(client)
-    a["draft"]["object_types"][0]["description"] = "A 修改"
-    b["draft"]["object_types"][0]["description"] = "B 修改"
-    a = save(client, a, a["draft"]).json()
-    b = save(client, b, b["draft"]).json()
-    assert publish(client, a).status_code == 200
-    response = publish(client, b)
-    assert response.status_code == 409
-    detail = response.json()["detail"]
-    assert client.get(ONTOLOGY + "/version").json()["version"] == 2
-    resolution = client.post(
-        ROOT + "/sessions/" + b["id"] + "/resolve-merge",
+def publish(client, session):
+    response = preview(client, session)
+    if response.status_code != 200:
+        return response
+    body = response.json()
+    return client.post(
+        ROOT + f"/sessions/{session['id']}/publish",
         json={
-            "revision": b["revision"],
-            "current_version_id": detail["current_version_id"],
-            "resolutions": {c["path"]: "draft" for c in detail["conflicts"]},
+            "expected_session_revision": session["revision"],
+            "expected_current_version_id": body["current_version_id"],
+            "expected_merged_snapshot_sha256": body["merged_snapshot_sha256"],
         },
     )
-    assert resolution.status_code == 200, resolution.text
-    assert publish(client, resolution.json()).status_code == 200
-
-
-def test_invalid_names_save_as_draft_but_cannot_publish(client):
-    s = create_session(client)
-    s["draft"]["object_types"][1]["name"] = s["draft"]["object_types"][0]["name"]
-    result = save(client, s, s["draft"])
-    assert result.status_code == 200
-    assert not result.json()["validation"]["publishable"]
-    assert publish(client, result.json()).status_code == 422
-    assert client.get(ONTOLOGY + "/version").json()["version"] == 1
-
-
-def test_markdown_upload_dedup_download_and_encoding(client):
-    content = "# 供应链\n供应商向客户提供物料。".encode()
-    first = client.post(ROOT + "/materials?name=business.md", content=content)
-    second = client.post(ROOT + "/materials?name=renamed.md", content=content)
-    assert first.status_code == 201, first.text
-    assert first.json()["id"] == second.json()["id"]
-    assert first.json()["chunk_count"] == 1
-    assert client.get(ROOT + "/materials/" + first.json()["id"]).content == content
-    assert client.post(ROOT + "/materials?name=x.pdf", content=b"pdf").status_code == 422
-    assert client.post(ROOT + "/materials?name=x.md", content=b"\xff").status_code == 422
-
-
-def test_text_materials_other_than_markdown_upload_with_their_type(client):
-    content = json.dumps({"object_types": [{"id": "component", "name_zh": "组件"}]}, ensure_ascii=False, indent=2).encode()
-    uploaded = client.post(ROOT + "/materials?name=ontology.json", content=content)
-    assert uploaded.status_code == 201, uploaded.text
-    assert uploaded.json()["name"] == "ontology.json"
-    downloaded = client.get(ROOT + "/materials/" + uploaded.json()["id"])
-    assert downloaded.content == content
-    assert downloaded.headers["content-type"].startswith("application/json")
-    for name in ("notes.txt", "terms.yaml", "terms.yml", "rows.csv"):
-        response = client.post(ROOT + f"/materials?name={name}", content=f"{name}\n".encode())
-        assert response.status_code == 201, (name, response.text)
-    assert client.post(ROOT + "/materials?name=x.docx", content=b"doc").status_code == 422
-
-
-def test_non_member_cannot_read_materials_drafts_connections_or_instances(client):
-    s = create_session(client)
-    client.app.dependency_overrides[current_principal] = lambda: Principal(
-        "not-a-member", "test:visitor", "visitor", None
-    )
-    for path in (
-        "/materials",
-        "/sessions",
-        "/sessions/" + s["id"],
-        "/connections",
-        "/published-snapshot",
-    ):
-        assert client.get(ROOT + path).status_code == 403
-    client.app.dependency_overrides.clear()
-
-
-def test_service_token_is_workspace_scoped_revocable_and_read_only(client):
-    token = client.post(ROOT + "/service-tokens", json={"name": "测试调用方"}).json()
-    assert token["scopes"] == ["instances:read", "mappings:read", "ontology:read"]
-    headers = {"Authorization": "Bearer " + token["token"]}
-    assert client.get(ONTOLOGY + "/types", headers=headers).status_code == 200
-    assert client.post(ROOT + "/sessions", json={}, headers=headers).status_code == 401
-    assert (
-        client.get("/api/v1/ontology/workspaces/other/types", headers=headers).status_code
-        == 401
-    )
-    assert "token" not in client.get(ROOT + "/service-tokens").text.replace(
-        "service-tokens", ""
-    )
-    assert client.get(ROOT + "/service-tokens").json()["items"][0]["scopes"] == [
-        "ontology:read",
-        "instances:read",
-        "mappings:read",
-    ]
-    client.delete(ROOT + "/service-tokens/" + token["id"])
-    assert client.get(ONTOLOGY + "/types", headers=headers).status_code == 401
-
-
-def test_ontology_workspace_directory_is_filtered_for_service_tokens(client):
-    other = client.post(
-        "/api/v1/workspaces",
-        json={"name": "第二空间", "slug": "second-space", "description": ""},
-    ).json()
-    user_items = client.get("/api/v1/ontology/workspaces").json()["items"]
-    assert {item["id"] for item in user_items} == {
-        str(DEMO_WORKSPACE_ID),
-        other["id"],
-    }
-    assert all(item["mcp_endpoint"].endswith("/mcp") for item in user_items)
-
-    token = client.post(
-        ROOT + "/service-tokens",
-        json={"name": "目录调用方", "scopes": ["ontology:read"]},
-    ).json()
-    token_items = client.get(
-        "/api/v1/ontology/workspaces",
-        headers={"Authorization": "Bearer " + token["token"]},
-    ).json()["items"]
-    assert [item["id"] for item in token_items] == [str(DEMO_WORKSPACE_ID)]
 
 
 def mcp_request(client, method, params=None, headers=None):
-    values = params or {}
-    values = {
-        **values,
-        "_meta": {
-            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-            "io.modelcontextprotocol/clientCapabilities": {},
-        },
-    }
-    actual_headers = {
-        "MCP-Protocol-Version": "2026-07-28",
-        "Mcp-Method": method,
-        "Accept": "application/json, text/event-stream",
-    }
-    if "name" in values:
-        actual_headers["Mcp-Name"] = values["name"]
     return client.post(
         ONTOLOGY + "/mcp",
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": values},
-        headers={**actual_headers, **(headers or {})},
-    )
-
-
-def test_mcp_discover_list_call_and_notification(client):
-    discover = mcp_request(client, "server/discover")
-    assert discover.json()["result"]["supportedVersions"] == ["2026-07-28"]
-    assert discover.json()["result"]["resultType"] == "complete"
-    tools = mcp_request(client, "tools/list").json()["result"]["tools"]
-    assert len(tools) == 13
-    assert {"list_metrics", "query_metric"} <= {tool["name"] for tool in tools}
-    result = mcp_request(client, "tools/call", {"name": "get_ontology_version"}).json()
-    assert result["result"]["isError"] is False
-    assert result["result"]["structuredContent"] == json.loads(
-        result["result"]["content"][0]["text"]
-    )
-    assert (
-        client.post(
-            ONTOLOGY + "/mcp", json={"jsonrpc": "2.0", "method": "notifications/example"}
-        ).status_code
-        == 202
-    )
-    assert (
-        mcp_request(
-            client, "ping", headers={"Origin": "https://untrusted.example"}
-        ).status_code
-        == 403
-    )
-    assert client.get(ONTOLOGY + "/mcp").status_code == 405
-
-
-def test_mcp_rejects_mismatched_headers_and_invalid_arguments(client):
-    response = mcp_request(
-        client, "tools/call", {"name": "get_ontology_type"}, {"Mcp-Name": "wrong"}
-    )
-    assert response.status_code == 400 and response.json()["error"]["code"] == -32020
-    response = mcp_request(client, "tools/call", {"name": "get_ontology_type"})
-    assert response.json()["error"]["code"] == -32602
-    assert (
-        mcp_request(
-            client,
-            "tools/call",
-            {"name": "get_ontology_graph", "arguments": {"depth": 100}},
-        ).status_code
-        == 400
-    )
-    assert mcp_request(client, "unknown").status_code == 404
-
-
-def test_mcp_legacy_initialize_negotiates_without_weakening_modern_requests(client):
-    initialized = client.post(
-        ONTOLOGY + "/mcp",
-        json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-06-18",
-                "capabilities": {},
-                "clientInfo": {"name": "legacy-test", "version": "1.0"},
-            },
-        },
-        headers={"Accept": "application/json, text/event-stream"},
-    )
-    assert initialized.status_code == 200
-    assert initialized.json()["result"]["protocolVersion"] == "2025-06-18"
-    assert initialized.json()["result"]["capabilities"] == {
-        "tools": {"listChanged": False}
-    }
-
-    legacy_tools = client.post(
-        ONTOLOGY + "/mcp",
-        json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}},
         headers={
-            "MCP-Protocol-Version": "2025-06-18",
             "Accept": "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2025-11-25",
+            **(headers or {}),
         },
     )
-    assert legacy_tools.status_code == 200
-    assert len(legacy_tools.json()["result"]["tools"]) == 13
-    assert {"list_metrics", "query_metric"} <= {
-        tool["name"] for tool in legacy_tools.json()["result"]["tools"]
-    }
-    assert "resultType" not in legacy_tools.json()["result"]
-
-    modern_without_modern_headers = client.post(
-        ONTOLOGY + "/mcp",
-        json={"jsonrpc": "2.0", "id": 3, "method": "tools/list", "params": {}},
-        headers={"Accept": "application/json, text/event-stream"},
-    )
-    assert modern_without_modern_headers.json()["error"]["code"] == -32020
 
 
-def test_mcp_legacy_initialize_counteroffers_latest_handshake_version(client):
-    response = client.post(
-        ONTOLOGY + "/mcp",
+def test_saved_draft_and_cas(client):
+    session = create_session(client)
+    draft = deepcopy(session["draft"])
+    draft["object_types"][0]["description"] = "会话内修改"
+    response = save(client, session, draft)
+    assert response.status_code == 200, response.text
+    assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == draft
+    assert client.get(ROOT + "/published-snapshot").json() != draft
+    assert save(client, session, draft).status_code == 409
+
+
+def test_two_sessions_merge_and_conflict(client):
+    a, b = create_session(client), create_session(client)
+    a["draft"]["object_types"][0]["description"] = "甲"
+    b["draft"]["object_types"][1]["description"] = "乙"
+    a, b = save(client, a, a["draft"]).json(), save(client, b, b["draft"]).json()
+    assert publish(client, a).status_code == 200
+    assert publish(client, b).status_code == 200
+    a, b = create_session(client), create_session(client)
+    a["draft"]["object_types"][0]["description"] = "并发甲"
+    b["draft"]["object_types"][0]["description"] = "并发乙"
+    a, b = save(client, a, a["draft"]).json(), save(client, b, b["draft"]).json()
+    assert publish(client, a).status_code == 200
+    conflict = preview(client, b)
+    assert conflict.status_code == 409
+    error = conflict.json()["error"]
+    resolved = client.post(
+        ROOT + f"/sessions/{b['id']}/resolve-merge",
         json={
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "old-client", "version": "1.0"},
-            },
+            "expected_session_revision": b["revision"],
+            "expected_current_version_id": error["current_version_id"],
+            "resolutions": {c["key"]: {"choice": "draft"} for c in error["conflicts"]},
         },
-        headers={"Accept": "application/json, text/event-stream"},
     )
-    assert response.json()["result"]["protocolVersion"] == "2025-11-25"
+    assert resolved.status_code == 200, resolved.text
+    assert publish(client, resolved.json()).status_code == 200
 
 
-def test_mcp_invalid_ids_do_not_emit_a_null_response_id(client):
-    for rid in [None, True, {}, []]:
-        response = client.post(
-            ONTOLOGY + "/mcp",
-            json={"jsonrpc": "2.0", "id": rid, "method": "ping"},
-        )
-        assert response.status_code == 400
-        assert response.json()["error"]["code"] == -32600
-        assert "id" not in response.json()
+def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
+    from pr23_fixtures import example_session
+    from test_t4_proposal_decisions import decide, seed_batch, update
 
-
-def test_mcp_version_negotiation_and_required_metadata(client):
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "ping",
-        "params": {
-            "_meta": {
-                "io.modelcontextprotocol/protocolVersion": "1900-01-01",
-                "io.modelcontextprotocol/clientCapabilities": {},
-            }
-        },
-    }
-    response = client.post(
-        ONTOLOGY + "/mcp",
-        json=payload,
-        headers={"MCP-Protocol-Version": "1900-01-01", "Mcp-Method": "ping"},
+    session = example_session(client, "01-basic-sales", published=True)
+    metric = session["draft"]["metrics"][0]
+    batch = seed_batch(
+        client, session, [update("metric", metric, description="待接受的口径说明")]
     )
-    assert response.status_code == 400
-    assert response.json()["error"]["code"] == -32022
-    assert response.json()["error"]["data"]["supported"] == ["2026-07-28"]
-    payload["params"]["_meta"] = {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}
-    response = client.post(
-        ONTOLOGY + "/mcp",
-        json=payload,
-        headers={"MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "ping"},
+    incomplete = deepcopy(session["draft"])
+    incomplete["object_types"][1]["technical_name"] = incomplete["object_types"][0][
+        "technical_name"
+    ]
+    response = save(client, session, incomplete)
+    assert response.status_code == 200, response.text
+    stashed = response.json()
+    assert stashed["revision"] == session["revision"] + 1
+    assert not stashed["validation"]["publishable"]
+    assert any("技术名重复" in e["message"] for e in stashed["validation"]["errors"])
+    assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == incomplete
+    refused = decide(client, stashed, [(batch["items"][0]["id"], "accept")])
+    assert (
+        refused.status_code == 422
+        and refused.json()["error"]["code"] == "VALIDATION_FAILED"
     )
-    assert response.json()["error"]["code"] == -32602
-
-
-def test_candidate_cannot_overwrite_later_manual_edit(client):
-    s = create_session(client)
-    before = deepcopy(s["draft"]["object_types"][0])
-    candidate = {**before, "description": "Agent 的建议"}
-    cid = str(uuid4())
-    with client.app.state.session_factory() as db:
-        item = db.get(ModelingSessionRecord, s["id"])
-        item.candidates_json = [
-            {
-                "id": cid,
-                "kind": "object_type",
-                "value": candidate,
-                "before": before,
-                "status": "pending",
-            }
-        ]
-        db.commit()
-    s["draft"]["object_types"][0]["description"] = "人工修改"
-    saved = save(client, s, s["draft"]).json()
-    result = client.post(
-        ROOT + "/sessions/" + s["id"] + "/candidates",
-        json={"revision": saved["revision"], "ids": [cid], "action": "accept"},
+    version = client.get(ONTOLOGY + "/version").json()["version_id"]
+    invalid_preview = preview(client, stashed)
+    assert invalid_preview.status_code == 200, invalid_preview.text
+    assert not invalid_preview.json()["validation"]["publishable"]
+    refused = publish(client, stashed)
+    assert (
+        refused.status_code == 422
+        and refused.json()["error"]["code"] == "VALIDATION_FAILED"
     )
-    assert result.status_code == 200
-    assert result.json()["draft"]["object_types"][0]["description"] == "人工修改"
-    assert result.json()["candidates"][0]["conflict"]
+    assert client.get(ONTOLOGY + "/version").json()["version_id"] == version
+    fixed = save(client, stashed, session["draft"])
+    assert fixed.status_code == 200 and fixed.json()["validation"]["publishable"]
+    assert publish(client, fixed.json()).status_code == 200
 
 
-def test_session_list_says_which_sessions_have_unpublished_changes(client):
-    def listed(session_id):
-        items = client.get(ROOT + "/sessions").json()["items"]
-        return next(item for item in items if item["id"] == session_id)
+def test_stash_checks_known_source_columns_with_specific_error(client):
+    from pr23_fixtures import example_session
 
-    s = create_session(client)
-    assert listed(s["id"])["has_unpublished_changes"] is False
-    assert listed(s["id"])["base_version_id"] == s["base_version_id"]
-
-    s["draft"]["object_types"][0]["description"] = "未发布的修改"
-    s = save(client, s, s["draft"]).json()
-    assert listed(s["id"])["has_unpublished_changes"] is True
-
-    published = publish(client, s).json()["session"]
-    assert listed(s["id"])["has_unpublished_changes"] is False
-    assert listed(s["id"])["base_version_id"] == published["base_version_id"]
+    session = example_session(client, "01-basic-sales")
+    invalid = deepcopy(session["draft"])
+    invalid["mappings"][0]["sources"][0]["key_columns"] = ["missing_customer_key"]
+    response = save(client, session, invalid)
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "JOIN_COLUMN_NOT_FOUND"
+    assert (
+        client.get(ROOT + f"/sessions/{session['id']}").json()["revision"]
+        == session["revision"]
+    )
+    # A dangling semantic reference is reportable, not a structural/source error.
+    invalid = deepcopy(session["draft"])
+    invalid["link_types"][0]["target_type_id"] = "00000000-0000-4000-8000-000000099999"
+    response = save(client, session, invalid)
+    assert response.status_code == 200, response.text
+    assert not response.json()["validation"]["publishable"]

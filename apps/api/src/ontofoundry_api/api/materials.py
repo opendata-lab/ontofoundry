@@ -51,25 +51,33 @@ def material_references(db: Session, workspace_id: str, material_id: str) -> lis
         (
             "提案",
             db.scalars(
-                select(ProposalItemRecord).where(ProposalItemRecord.workspace_id == workspace_id)
+                select(ProposalItemRecord).where(
+                    ProposalItemRecord.workspace_id == workspace_id
+                )
             ),
         ),
         (
             "运行清单",
             db.scalars(
-                select(ProposalBatchRecord).where(ProposalBatchRecord.workspace_id == workspace_id)
+                select(ProposalBatchRecord).where(
+                    ProposalBatchRecord.workspace_id == workspace_id
+                )
             ),
         ),
         (
             "会话草稿",
             db.scalars(
-                select(ModelingSessionRecord).where(ModelingSessionRecord.workspace_id == workspace_id)
+                select(ModelingSessionRecord).where(
+                    ModelingSessionRecord.workspace_id == workspace_id
+                )
             ),
         ),
         (
             "已发布版本",
             db.scalars(
-                select(OntologyVersionRecord).where(OntologyVersionRecord.workspace_id == workspace_id)
+                select(OntologyVersionRecord).where(
+                    OntologyVersionRecord.workspace_id == workspace_id
+                )
             ),
         ),
     ):
@@ -109,17 +117,27 @@ def store_text_material(db: Session, settings, workspace_id: str, name: str, tex
     if existing:
         return existing
     item = MaterialRecord(
-        id=str(uuid4()), workspace_id=workspace_id, name=Path(name).name,
-        sha256=sha, byte_size=len(data),
+        id=str(uuid4()),
+        workspace_id=workspace_id,
+        name=Path(name).name,
+        sha256=sha,
+        byte_size=len(data),
     )
     db.add(item)
     db.flush()
     count, line = 0, 1
     for start in range(0, len(text), 12000):
-        chunk = text[start:start + 12000]
+        chunk = text[start : start + 12000]
         end = line + chunk.count("\n")
-        db.add(MaterialChunkRecord(material_id=item.id, ordinal=count,
-                                   line_start=line, line_end=end, text=chunk))
+        db.add(
+            MaterialChunkRecord(
+                material_id=item.id,
+                ordinal=count,
+                line_start=line,
+                line_end=end,
+                text=chunk,
+            )
+        )
         count, line = count + 1, end
     item.chunk_count = count
     destination = settings.data_dir.resolve() / workspace_id / (sha + ".md")
@@ -144,7 +162,8 @@ def list_materials(
         query = query.where(MaterialRecord.archived_at.is_(None))
     return {
         "items": [
-            describe(m) for m in db.scalars(query.order_by(MaterialRecord.created_at.desc())).all()
+            describe(m)
+            for m in db.scalars(query.order_by(MaterialRecord.created_at.desc())).all()
         ]
     }
 
@@ -159,9 +178,7 @@ async def upload(
 ):
     require_member(db, workspace_id, user.id)
     if not is_material_name(name):
-        raise HTTPException(
-            422, "仅支持 UTF-8 文本材料：Markdown、TXT、JSON、YAML、CSV"
-        )
+        raise HTTPException(422, "仅支持 UTF-8 文本材料：Markdown、TXT、JSON、YAML、CSV")
     root = request.app.state.settings.data_dir.resolve()
     root.mkdir(parents=True, exist_ok=True)
     digest, size = hashlib.sha256(), 0
@@ -298,7 +315,11 @@ def delete_material(
             details={"references": references},
         )
     sha = item.sha256
-    db.execute(sql_delete(MaterialChunkRecord).where(MaterialChunkRecord.material_id == material_id))
+    db.execute(
+        sql_delete(MaterialChunkRecord).where(
+            MaterialChunkRecord.material_id == material_id
+        )
+    )
     db.delete(item)
     db.commit()
     still_used = db.scalar(
@@ -307,4 +328,6 @@ def delete_material(
         )
     )
     if still_used is None:
-        (request.app.state.settings.data_dir / workspace_id / (sha + ".md")).unlink(missing_ok=True)
+        (request.app.state.settings.data_dir / workspace_id / (sha + ".md")).unlink(
+            missing_ok=True
+        )

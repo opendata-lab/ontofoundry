@@ -1,369 +1,149 @@
+// Pure edits of an object's DataMapping. Each returns a new draft; nothing is
+// saved here. Saving goes through the mapping element save or the session.
 import type {
-  LegacyDraft,
-  MappingNode,
-  PropertyElement,
-  SemanticConceptMapping,
-  SemanticDataset,
+  DataJoin,
+  DataMapping,
+  Draft,
+  FieldBinding,
+  MappingSource,
+  Property,
+  UUID,
 } from "../api/types";
-import type { PanelProps } from "./elementModel";
-import { inheritedProperties, isObject } from "./elementModel";
-import { cleanNodes } from "./semanticEditing";
+import { identifier, lineage, mappingFor, upsert } from "./coreModel";
 import { newId } from "./id";
-import {
-  mappingModels,
-  nativeEntryValue,
-  objectMapping,
-  readonlyReason,
-  type MappingEntry,
-} from "./objectMapping";
 
-export function stageMapping(
-  draft: LegacyDraft,
-  cm: SemanticConceptMapping,
-  nodes: MappingNode[],
-  parentId?: string,
-): LegacyDraft {
-  const previous = draft._semantic_changes?.find((c) => c.id === cm.id);
+export const MAIN_SOURCE = "main";
+
+/** The object's own mapping, created (independent or shared) when missing. */
+export function ensureMapping(draft: Draft, typeId: UUID): DataMapping {
+  const existing = mappingFor(draft, typeId);
+  if (existing) return existing;
+  const sharesParent = lineage(draft, typeId)
+    .slice(1)
+    .some((id) => mappingFor(draft, id));
+  return {
+    id: newId(),
+    type_id: typeId,
+    binding_mode: sharesParent ? "shared_parent" : "independent",
+    sources: [],
+    fields: {},
+    membership_source_id: null,
+    inherited_link_bindings: {},
+  };
+}
+
+function save(draft: Draft, mapping: DataMapping): Draft {
+  return upsert(draft, "mappings", mapping);
+}
+
+/** Uses a dataset as the main source of an independent mapping. */
+export function setMainDataset(draft: Draft, typeId: UUID, datasetId: UUID, keyColumns: string[] = []): Draft {
+  const mapping = ensureMapping(draft, typeId);
+  const main: MappingSource = { id: MAIN_SOURCE, dataset_id: datasetId, key_columns: keyColumns };
+  const others = mapping.sources.filter((s) => s.id !== MAIN_SOURCE);
+  return save(draft, { ...mapping, binding_mode: "independent", sources: [main, ...others] });
+}
+
+/** Adds a side table (or a shared-parent extension) with a fresh local id. */
+export function addSource(draft: Draft, typeId: UUID, datasetId: UUID, keyColumns: string[] = []): { draft: Draft; sourceId: string } {
+  const mapping = ensureMapping(draft, typeId);
+  const taken = new Set(mapping.sources.map((s) => s.id));
+  let n = 1;
+  while (taken.has(`side${n}`)) n++;
+  const sourceId = `side${n}`;
+  return {
+    draft: save(draft, { ...mapping, sources: [...mapping.sources, { id: sourceId, dataset_id: datasetId, key_columns: keyColumns }] }),
+    sourceId,
+  };
+}
+
+/** Removes a source and every field binding that reads it. */
+export function removeSource(draft: Draft, typeId: UUID, sourceId: string): Draft {
+  const mapping = mappingFor(draft, typeId);
+  if (!mapping) return draft;
+  const fields = Object.fromEntries(
+    Object.entries(mapping.fields).filter(([, binding]) => binding.kind !== "column" || binding.source_id !== sourceId),
+  );
+  return save(draft, {
+    ...mapping,
+    sources: mapping.sources.filter((s) => s.id !== sourceId),
+    fields,
+    membership_source_id: mapping.membership_source_id === sourceId ? null : mapping.membership_source_id,
+  });
+}
+
+export function setKeyColumns(draft: Draft, typeId: UUID, sourceId: string, keyColumns: string[]): Draft {
+  const mapping = ensureMapping(draft, typeId);
+  return save(draft, {
+    ...mapping,
+    sources: mapping.sources.map((s) => (s.id === sourceId ? { ...s, key_columns: keyColumns } : s)),
+  });
+}
+
+/** Binds (or with null unbinds) one property by technical name. */
+export function setFieldBinding(draft: Draft, typeId: UUID, property: Property, binding: FieldBinding | null): Draft {
+  const mapping = ensureMapping(draft, typeId);
+  const fields = { ...mapping.fields };
+  if (binding) fields[property.technical_name] = binding;
+  else delete fields[property.technical_name];
+  return save(draft, { ...mapping, fields });
+}
+
+/** A shared-parent child's extension table limits its members. */
+export function setMembershipSource(draft: Draft, typeId: UUID, sourceId: string | null): Draft {
+  const mapping = ensureMapping(draft, typeId);
+  return save(draft, { ...mapping, binding_mode: "shared_parent", membership_source_id: sourceId });
+}
+
+/** Local binding of a link inherited from a virtual parent. */
+export function setInheritedLinkBinding(draft: Draft, typeId: UUID, linkId: UUID, join: DataJoin | null): Draft {
+  const mapping = ensureMapping(draft, typeId);
+  const bindings = { ...mapping.inherited_link_bindings };
+  if (join) bindings[linkId] = join;
+  else delete bindings[linkId];
+  return save(draft, { ...mapping, inherited_link_bindings: bindings });
+}
+
+/** Sets a link's own data binding. */
+export function setLinkJoin(draft: Draft, linkId: UUID, join: DataJoin | null): Draft {
   return {
     ...draft,
-    _semantic_changes: [
-      ...(draft._semantic_changes ?? []).filter((c) => c.id !== cm.id),
-      {
-        kind: "concept_mapping",
-        operation: previous?.operation ?? "update",
-        id: cm.id,
-        parent_id: previous?.parent_id ?? parentId,
-        values: { concept_id: cm.concept_id, ...previous?.values },
-        nodes: cleanNodes(nodes),
-      },
-    ],
+    link_types: draft.link_types.map((l) => (l.id === linkId ? { ...l, data_join: join } : l)),
   };
-}
-export function propertyEntryChange(
-  props: PanelProps,
-  property: PropertyElement,
-  index: number,
-  entry: MappingEntry,
-) {
-  if (!isObject(props.type)) return;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  let cm = record.mappings[0];
-  if (!props.nativeDraft) return;
-  let base = props.draft;
-  if (!cm) {
-    const model = record.models.find((m) =>
-      m.datasets.some((d) => d.id === entry.dataset?.id),
-    );
-    if (!model) return;
-    cm = {
-      id: newId(),
-      concept_id: { kind: "object_type", ref: props.type.id },
-      nodes: [],
-    };
-    base = {
-      ...base,
-      _semantic_changes: [
-        ...(base._semantic_changes ?? []),
-        {
-          kind: "concept_mapping",
-          operation: "create",
-          id: cm.id,
-          parent_id: model.id,
-          values: { concept_id: cm.concept_id },
-          nodes: [],
-        },
-      ],
-    };
-  }
-  let nodes = cm.nodes.map((n) => ({ ...n }));
-  const value = nativeEntryValue(entry);
-  const node = entry.nodeId
-    ? nodes.find((n) => n.id === entry.nodeId)
-    : undefined;
-  const entryId = node?.id ?? newId();
-  if (node) node.expression = value;
-  else {
-    let host = nodes.find(
-      (n) => n.slot === "link_mappings" && !n.parent_id && !n.relationship,
-    );
-    if (!host) {
-      host = {
-        id: newId(),
-        parent_id: null,
-        kind: "link",
-        slot: "link_mappings",
-      };
-      nodes.push(host, {
-        id: newId(),
-        parent_id: host.id,
-        kind: "object",
-        slot: "object_mapping",
-        expression: record.keys[0]?.value ?? "",
-      });
-    }
-    const link: MappingNode = {
-      id: newId(),
-      parent_id: host.id,
-      kind: "link",
-      slot: "children",
-      relationship: property.technical_name,
-    };
-    nodes.push(link, {
-      id: entryId,
-      parent_id: link.id,
-      kind: "object",
-      slot: "object_mapping",
-      concept: property.roles?.[0]?.concept ?? {
-        kind: "builtin",
-        ref: "String",
-      },
-      expression: value,
-    });
-    // A suggested identifier is not an actual property node until bound here.
-    void index;
-  }
-  if (
-    property.identifier &&
-    value &&
-    record.keys.length <= 1 &&
-    (index === 0 || !record.keys.length)
-  ) {
-    const oldKey = record.keys[0]?.value;
-    nodes = nodes.map((n) =>
-      n.slot === "object_mappings" ||
-      (n.kind === "object" &&
-        !n.concept &&
-        (!n.expression || n.expression === oldKey))
-        ? { ...n, expression: value }
-        : n,
-    );
-    if (!nodes.some((n) => n.slot === "object_mappings"))
-      nodes.unshift({
-        id: newId(),
-        parent_id: null,
-        kind: "object",
-        slot: "object_mappings",
-        expression: value,
-      });
-  }
-  props.change({
-    ...stageMapping(base, cm, nodes),
-    _mapping_modes: { ...base._mapping_modes, [entryId]: entry.mode },
-  });
-}
-export function selectMappingDataset(props: PanelProps, dataset: SemanticDataset) {
-  if (!isObject(props.type)) return;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  let next = record.mappings.length ? props.draft : {
-    ...props.draft,
-    mappings: props.draft.mappings.filter((m) => m.type_id !== props.type.id),
-  };
-  for (const row of record.properties) {
-    if (propertyReadonly(props, row.property)) continue;
-    row.entries.forEach((entry, index) => {
-      if (entry.mode === "constant" ||
-          (entry.dataset && entry.dataset.id !== record.mainDataset?.id)) return;
-      propertyEntryChange({
-        ...props, draft: next, change: (value) => { next = value; },
-      }, row.property, index, { ...entry, dataset, expression: "", pending: false });
-    });
-  }
-  props.change({
-    ...next,
-    _mapping_tables: { ...next._mapping_tables, [props.type.id]: dataset.id },
-  });
 }
 
-export function tableReplacementReason(props: PanelProps): string | null {
-  if (props.draft.mapping_status?.[props.type.id]?.state === "readonly")
-    return `${readonlyReason(props.draft, props.type.id) ?? "当前映射不能通过单表表单替换"}；请在「数据映射 › 语义模型」中配置新的数据集。`;
-  if (!isObject(props.type)) return null;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  return props.draft._semantic_changes?.some((change) =>
-    record.mappings.some((cm) => cm.id === change.id),
-  ) ? "原生节点编辑已加入草稿；请先保存后替换来源表。" : null;
-}
-export function chooseIdentifier(props: PanelProps, property: PropertyElement) {
-  if (!isObject(props.type)) return;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  const entry = record.properties
-    .find((p) => p.property.id === property.id)
-    ?.entries.find((e) => e.expression && !e.pending);
-  let draft: LegacyDraft = {
-    ...props.draft,
-    properties: props.draft.properties.map((p) =>
-      p.owner_type_id === props.type.id
-        ? { ...p, identifier: p.id === property.id }
-        : p,
-    ),
-  };
-  if (record.mappings.length === 1 && !record.usesLegacyForm && entry) {
-    const cm = record.mappings[0],
-      oldKey = record.keys[0]?.value;
-    const value = nativeEntryValue(entry);
-    const nodes = cm.nodes.map((n) =>
-      n.slot === "object_mappings" ||
-      (n.kind === "object" && !n.concept && (!n.expression || n.expression === oldKey))
-        ? { ...n, expression: value }
-        : n,
-    );
-    if (!nodes.some((n) => n.slot === "object_mappings"))
-      nodes.unshift({
-        id: newId(),
-        parent_id: null,
-        kind: "object",
-        slot: "object_mappings",
-        expression: value,
-      });
-    draft = stageMapping(draft, cm, nodes);
-  } else {
-    draft = {
-      ...draft,
-      mappings: draft.mappings.map((m) =>
-        m.type_id === props.type.id && entry
-          ? { ...m, key_column: entry.expression }
-          : m,
-      ),
-    };
-  }
-  props.change(draft);
-}
-export function relationEntryChange(
-  props: PanelProps,
-  entry: MappingEntry,
-  next: MappingEntry,
-): LegacyDraft {
-  const cm = mappingModels(props.draft, props.nativeDraft)
-    .flatMap((m) => m.concept_mappings ?? [])
-    .find((cm) => cm.id === entry.mappingId);
-  if (!cm || !entry.nodeId) return props.draft;
-  const staged = stageMapping(
-    props.draft,
-    cm,
-    cm.nodes.map((n) =>
-      n.id === entry.nodeId ? { ...n, expression: nativeEntryValue(next) } : n,
-    ),
-  );
+/**
+ * Makes one property the whole identifier of its object. A single-property
+ * identifier must be unique; a composite one need not be.
+ */
+export function chooseIdentifier(draft: Draft, typeId: UUID, propertyId: UUID): Draft {
   return {
-    ...staged,
-    _mapping_modes: { ...staged._mapping_modes, [entry.nodeId]: next.mode },
+    ...draft,
+    properties: draft.properties.map((p) => {
+      if (p.owner_type_id !== typeId) return p;
+      if (p.id === propertyId) return { ...p, identifier: true, unique: true };
+      return p.identifier ? { ...p, identifier: false } : p;
+    }),
   };
 }
-export function propertyReadonly(
-  props: PanelProps,
-  property: PropertyElement,
-): string | null {
-  if (!isObject(props.type)) return null;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  if ((property.roles?.length ?? 1) > 1)
-    return "属性包含多个角色；单行字段编辑不能保留完整角色结构，请在「数据映射 › 语义模型 › 概念映射」中编辑映射树。";
-  const expressionReason = record.properties.find((row) => row.property.id === property.id)
-    ?.entries.find((entry) => entry.readonlyReason)?.readonlyReason;
-  if (expressionReason) return expressionReason;
-  if (record.mappings.length > 1)
-    return `${readonlyReason(props.draft, props.type.id) ?? "同一概念有多个映射"}；不能确定属性所属的映射，请在「数据映射 › 语义模型 › 概念映射」中选择映射树。`;
-  const cm = record.mappings[0];
-  const links =
-    cm?.nodes.filter(
-      (n) => n.kind === "link" && n.relationship === property.technical_name,
-    ) ?? [];
-  if (
-    links.some(
-      (link) =>
-        !cm!.nodes.some(
-          (n) =>
-            n.parent_id === link.id &&
-            n.slot === "object_mapping" &&
-            n.expression != null &&
-            !cm!.nodes.some(
-              (child) =>
-                child.parent_id === n.id && child.slot === "referent_mappings",
-            ),
-        ),
-    )
-  ) {
-    return `${readonlyReason(props.draft, props.type.id) ?? "属性映射含嵌套结构或 referent 引用"}；请在「数据映射 › 语义模型 › 概念映射」中编辑完整映射树。`;
-  }
-  return null;
-}
-export function mappingSaveError(props: PanelProps): string | null {
-  if (!isObject(props.type)) return null;
-  const record = objectMapping(props.draft, props.type, props.nativeDraft);
-  const mapping = props.draft.mappings.find((m) => m.type_id === props.type.id);
-  for (const cm of record.mappings) {
-    for (const node of cm.nodes) {
-      if (props.draft._mapping_modes?.[node.id] === "constant" &&
-          node.expression && !/^(?:'(?:[^']|'')*'|[+-]?\d+(?:\.\d+)?|true|false|null)$/i.test(node.expression.trim()))
-        return "常量格式无效：字符串须使用单引号。";
-    }
-  }
-  if (mapping && !mapping.key_column) return "请在已映射的属性行标记实例标识。";
-  const changed = new Set(
-    (props.draft._semantic_changes ?? [])
-      .filter((c) => c.kind === "concept_mapping")
-      .map((c) => c.id),
-  );
-  if (
-    record.keys.length <= 1 &&
-    record.properties.some(
-      (row) =>
-        row.property.identifier &&
-        !row.entries.some((e) => e.expression && !e.pending),
-    ) &&
-    changed.size
-  )
-    return "请为实例标识属性选择字段。";
-  if (changed.size && !record.keys.some((e) => e.expression))
-    return "请在已映射的属性行标记实例标识。";
-  for (const row of record.properties) {
-    for (const e of row.entries) {
-      if (
-        e.mode === "constant" &&
-        e.expression &&
-        !/^(?:'(?:[^']|'')*'|[+-]?\d+(?:\.\d+)?|true|false|null)$/i.test(
-          e.expression,
-        )
-      )
-        return `${row.property.name}：常量格式无效。`;
-    }
-  }
-  return null;
+
+/** Why the object may not change its identifier here, or null. */
+export function identifierLockedReason(draft: Draft, typeId: UUID): string | null {
+  const inherited = identifier(draft, typeId).some((p) => p.owner_type_id !== typeId);
+  return inherited ? "子对象沿用父对象的标识，不能在这里修改" : null;
 }
 
-/** Clearing an optional field removes its simple binding, preserving other native nodes. */
-export function mappingChangesForSave(draft: LegacyDraft) {
-  return (draft._semantic_changes ?? []).map((change) => {
-    if (change.kind !== "concept_mapping" || !change.nodes) return change;
-    const concept = change.values.concept_id as { ref?: string } | undefined;
-    const owner = draft.object_types.find(
-      (object) => object.id === concept?.ref,
-    );
-    if (!owner) return change;
-    const properties = new Set(
-      [
-        ...draft.properties.filter((p) => p.owner_type_id === owner.id),
-        ...inheritedProperties(draft, owner).map((p) => p.property),
-      ].map((p) => p.technical_name),
-    );
-    const removed = new Set<string>();
-    for (const link of change.nodes) {
-      if (
-        link.kind !== "link" ||
-        !link.relationship ||
-        !properties.has(link.relationship)
-      )
-        continue;
-      const children = change.nodes.filter((n) => n.parent_id === link.id);
-      if (
-        children.length !== 1 ||
-        children[0].slot !== "object_mapping" ||
-        children[0].expression !== "" ||
-        change.nodes.some((n) => n.parent_id === children[0].id)
-      )
-        continue;
-      removed.add(link.id);
-      removed.add(children[0].id);
-    }
-    return { ...change, nodes: change.nodes.filter((n) => !removed.has(n.id)) };
-  });
+/** First reason a join cannot be saved, or null. */
+export function joinProblem(join: DataJoin | null): string | null {
+  if (!join) return null;
+  if (join.kind === "direct") {
+    const pairs = join.source_property_ids.map((s, i) => [s, join.target_property_ids[i]]);
+    return pairs.length && pairs.every(([s, t]) => s && t) ? null : "关系绑定的属性对应未填完整";
+  }
+  if (!join.dataset_id) return "请选择映射表";
+  if (!join.source_columns.length || !join.target_columns.length) return "请选择映射表两端的列";
+  for (const key of [join.source_key, join.target_key]) {
+    if (key.kind === "properties" && !key.property_ids.length) return "请选择映射表对应的属性";
+  }
+  return null;
 }

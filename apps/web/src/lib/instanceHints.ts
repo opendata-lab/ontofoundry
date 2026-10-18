@@ -48,7 +48,7 @@ function describe(value: unknown): string {
   return typeof value;
 }
 
-const kindName = (kind: string) => VALUE_KINDS[kind] ?? kind;
+const kindName = (kind: string) => (VALUE_KINDS as Record<string, string>)[kind] ?? kind;
 
 /** Preview rows come back keyed by property technical name; only mapped
  * properties (those in `fields`) have values to compare. */
