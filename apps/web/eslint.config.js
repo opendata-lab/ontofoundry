@@ -131,7 +131,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Migrated U0–U3 files enforce all visual consistency rules as errors.
+  // Migrated U0–U4 files enforce all visual consistency rules as errors.
   {
     files: [
       "src/pages/MappingsPage.tsx",
@@ -156,6 +156,18 @@ export default tseslint.config(
       "src/components/proposals/EvidencePopover.tsx",
       "src/components/ModelResults.tsx",
       "src/components/DatasetPicker.tsx",
+      "src/components/elements/ElementInspector.tsx",
+      "src/components/elements/ElementPanels.tsx",
+      "src/components/elements/PropertyMappingTable.tsx",
+      "src/components/elements/RelationMappingTable.tsx",
+      "src/components/elements/LinkMappingPanel.tsx",
+      "src/components/elements/ObjectTablePicker.tsx",
+      "src/components/elements/DatasetPanel.tsx",
+      "src/components/elements/MetricPanel.tsx",
+      "src/components/elements/MetricForm.tsx",
+      "src/components/elements/MetricPreview.tsx",
+      "src/components/elements/DerivedConditionEditor.tsx",
+      "src/components/elements/ElementInstances.tsx",
       "src/components/elements/MappingWidgets.tsx",
       "src/components/PageHeader.tsx",
       "src/components/layout/**/*.tsx",

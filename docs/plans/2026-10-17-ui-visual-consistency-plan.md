@@ -73,6 +73,14 @@
 
 `ElementInspector` 及 `ElementPanels`、`PropertyMappingTable`、`RelationMappingTable`、`LinkMappingPanel`、`ObjectTablePicker`、`DatasetPanel`、`MetricPanel`、`MetricForm`、`MetricPreview`、`DerivedConditionEditor`、`ElementInstances`。需要先在设计第 4 节补充详情弹窗的键值区和小节布局。
 
+### U4 完成记录（2026-10-18）
+
+- 改造本节列出的十二个元素组件；`MappingWidgets` 已在 U0 使用 `StatusMark`，本轮继续复用。设计第 4 节先补充详情弹窗头部、页签、键值区、小节、表格内编辑行及底部操作栏模式。弹窗作为白色容器，页签使用 `PanelToolbar`，键值区改为无边框 Descriptions，小节使用 `SectionTitle` 配合分割线，移除规则、实例详情和指标预览的嵌套 Card。状态统一使用 `StatusMark`，类型标签保持中性；宽度、正文高度及表单宽度复用既有 tokens 和间距档位，不修改范围外的主题或布局组件。
+- 十二个组件移除 Tailwind 任意值、强制覆盖、内联样式及彩色状态 Tag，全部加入 lint error 清单。保留保存与取消、预检确认、ConfigProvider 忙碌禁用、草稿变化重新预检、属性与关系绑定、派生成员条件、实例筛选详情及指标预览。新增一项功能测试，覆盖影响确认出现后收到迟到的草稿变更，会关闭旧确认并在下次保存时重新预检。
+- `elements.spec.ts` 新增 **11 个视觉用例、11 个截图断言**：对象概览、属性与映射查看、属性与映射编辑、关系概览、关系绑定编辑、指标表单、指标预览、数据集、派生条件编辑、实例页签及展开详情、保存影响确认。复用 `fixtures.ts` 的虚构空间和接口拦截，补充固定指标预览、快照列及保存影响数据。接口只匹配以 `/api/` 开头的路径，页签计数使用 `[role=tab][aria-selected]`。
+- 全部代码编辑完成后，使用 Node 22.19.0 统一运行指定检查：`vitest --run` 37 个文件、166 项通过；`tsc -b`（含视觉用例）、`lint`、`check:core-types`、`build` 及 `git diff --check` 通过。当前 **0 error、62 warn，分布在范围外的 9 个文件**；比 U3 减少 63 warn。仍有既有日期控件空值提示与构建大体积 chunk 提示。实例详情测试改为通过可访问名称定位，避免依赖已移除的 Card 样式类。
+- 按设计第 3 节静态核对容器层级、对齐线、字号档位、状态显示及表格密度。按本轮环境要求未启动服务、未连接数据库、未访问局域网、未启动 Chromium、未运行 `test:visual` / `test:visual:update`、未生成截图。**截图基准更新、1440×900 截图对比及浏览器视觉验收待协调者在沙箱外运行。** 未 commit 或 push。
+
 ## U5 本体构建与画布类页面
 
 `BuilderPage`、`BuilderConversationEmpty`、`SessionPicker`、`TableMaterialPicker`、`OntologyViewPage`、`OntologyOverview`、`OntologyGraph`、`ObjectRelationGraph`、`SemanticView`、`InstancesPage`、`Markdown`。画布部分按设计第 7 节例外处理。

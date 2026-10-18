@@ -1,5 +1,5 @@
 import { Alert, Button, ConfigProvider, Input, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
-import { Box, Check, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
+import { Box, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -34,6 +34,7 @@ import { documentDisplayText } from "../../lib/instanceDisplay";
 import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
 import { objectMapping, shortObjectName } from "../../lib/objectMapping";
 import { newDataset } from "../../lib/datasetEditing";
+import { PanelToolbar, StatusMark } from "../layout";
 import { KIND } from "../proposals/elementMeta";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
@@ -670,14 +671,14 @@ function Inspector({
       onCancel={close}
       maskClosable={!busy && !dirty && !impactPreview}
       keyboard={!busy && !impactPreview}
-      width={expanded ? "96vw" : 1180}
+      width={expanded ? "100%" : "var(--app-min-width)"}
       centered
       destroyOnHidden={false}
       closable={{ "aria-label": `关闭${NOUN[kind]}弹窗`, disabled: busy }}
-      styles={{ body: { minHeight: 360, maxHeight: expanded ? "82vh" : "70vh", overflowY: "auto" } }}
+      classNames={{ body: "overflow-hidden" }}
       footer={
         editing ? (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 border-t border-rule pt-3">
             <Button disabled={busy} onClick={cancel}>
               取消
             </Button>
@@ -689,8 +690,8 @@ function Inspector({
       }
       title={
         <div className="flex items-start gap-3 pr-8">
-          <span className="mt-0.5 text-accent">
-            <Icon size={28} strokeWidth={1.8} />
+          <span className="mt-1 text-accent">
+            <Icon className="size-icon" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
             <span className="flex flex-wrap items-baseline gap-2" aria-label={element?.name || title}>
@@ -711,10 +712,7 @@ function Inspector({
           </div>
           <div className="flex items-center gap-1">
             {notice && (
-              <Text type="success" className="inline-flex items-center gap-1 text-xs font-normal" role="status">
-                <Check size={14} />
-                {notice}
-              </Text>
+              <StatusMark state="mapped" label={notice} className="font-normal" role="status" />
             )}
             {!editing && member && !previewHash && element && (
               <Button size="small" onClick={beginEdit} disabled={!loaded || busy}>
@@ -740,52 +738,55 @@ function Inspector({
         </div>
       }
     >
-      <div ref={body} aria-busy={busy} className="flex flex-col gap-3">
+      <div ref={body} aria-busy={busy} className="flex flex-col">
         {tabs.length > 0 && (
-          <Tabs
-            size="small"
-            className="sticky top-0 z-10 !mb-0 bg-surface"
-            activeKey={selectedTab}
-            onChange={(key) => !busy && selectTab(key as ElementTab)}
-            items={tabs.map((tab) => ({
-              key: tab.key,
-              disabled: busy,
-              label: (
-                <span>
-                  {tab.label}
-                  {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
-                </span>
-              ),
-            }))}
-          />
+          <PanelToolbar>
+            <Tabs
+              size="small"
+              activeKey={selectedTab}
+              onChange={(key) => !busy && selectTab(key as ElementTab)}
+              items={tabs.map((tab) => ({
+                key: tab.key,
+                disabled: busy,
+                label: (
+                  <span>
+                    {tab.label}
+                    {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
+                  </span>
+                ),
+              }))}
+            />
+          </PanelToolbar>
         )}
-        {error && (
-          <Alert
-            type="error"
-            showIcon
-            message={error}
-            action={
-              !draft ? (
-                <Button size="small" onClick={() => setAttempt((n) => n + 1)}>
-                  重新读取
-                </Button>
-              ) : undefined
-            }
-          />
-        )}
-        {!loaded && !error && (
-          <div className="flex justify-center py-12" role="status" aria-label="正在读取">
-            <Spin />
-          </div>
-        )}
-        {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
-        {content && (
-          <ConfigProvider componentDisabled={busy}>
-            <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
-              {content}
-            </fieldset>
-          </ConfigProvider>
-        )}
+        <div className={`flex min-h-review-code flex-col gap-3 overflow-y-auto p-4 ${expanded ? "max-h-180" : "max-h-review-detail"}`}>
+          {error && (
+            <Alert
+              type="error"
+              showIcon
+              message={error}
+              action={
+                !draft ? (
+                  <Button size="small" onClick={() => setAttempt((n) => n + 1)}>
+                    重新读取
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+          {!loaded && !error && (
+            <div className="flex justify-center py-12" role="status" aria-label="正在读取">
+              <Spin />
+            </div>
+          )}
+          {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
+          {content && (
+            <ConfigProvider componentDisabled={busy}>
+              <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+                {content}
+              </fieldset>
+            </ConfigProvider>
+          )}
+        </div>
       </div>
       {impactPreview && draft && (
         <Modal
@@ -803,19 +804,20 @@ function Inspector({
             <Text type="secondary">确认后这些元素会随本次保存一并改写</Text>
             <List
               size="small"
-              bordered
               dataSource={impactPreview.items}
               renderItem={(item) => (
-                <List.Item key={`${item.target_kind}:${item.target_id}`} className="!flex-col !items-start gap-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <Tag color={KIND[item.target_kind].color} className="!m-0">
-                      {KIND[item.target_kind].label}
-                    </Tag>
-                    <strong>{affectedElementName(draft, loaded?.draft ?? draft, item)}</strong>
-                  </span>
-                  <Text type="secondary" className="text-xs">
-                    {item.reason}
-                  </Text>
+                <List.Item key={`${item.target_kind}:${item.target_id}`}>
+                  <div className="flex flex-col gap-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <Tag className="m-0">
+                        {KIND[item.target_kind].label}
+                      </Tag>
+                      <strong>{affectedElementName(draft, loaded?.draft ?? draft, item)}</strong>
+                    </span>
+                    <Text type="secondary" className="text-xs">
+                      {item.reason}
+                    </Text>
+                  </div>
                 </List.Item>
               )}
             />

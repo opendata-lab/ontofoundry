@@ -91,7 +91,7 @@ export function LinkJoinEditor({
   };
   const problem = joinProblem(value);
   return (
-    <Form layout="vertical" component="div" className="flex max-w-[860px] flex-col">
+    <Form layout="vertical" component="div" className="flex max-w-settings flex-col">
       <Form.Item label="绑定方式">
         <Segmented
           value={mode}
@@ -107,8 +107,9 @@ export function LinkJoinEditor({
         <Form.Item label={`${source?.name ?? "来源"} 的属性 = ${target?.name ?? "目标"} 的属性`}>
           <div className="flex flex-col gap-2">
             {value.source_property_ids.map((sourceId, i) => (
-              <div key={i} className="grid grid-cols-[1fr_auto_1fr_32px] items-center gap-2">
+              <div key={i} className="flex items-center gap-2">
                 <Select
+                  className="min-w-0 flex-1"
                   aria-label={`第 ${i + 1} 组来源属性`}
                   showSearch
                   optionFilterProp="label"
@@ -122,6 +123,7 @@ export function LinkJoinEditor({
                 />
                 <Text type="secondary">=</Text>
                 <Select
+                  className="min-w-0 flex-1"
                   aria-label={`第 ${i + 1} 组目标属性`}
                   showSearch
                   optionFilterProp="label"
@@ -253,11 +255,10 @@ export function LinkMappingPanel(props: PanelProps<LinkType>) {
   ) : null;
   if (!editing)
     return (
-      <div className="flex max-w-[860px] flex-col gap-3">
+      <div className="flex max-w-settings flex-col gap-3">
         {virtualAlert}
         <Descriptions
           size="small"
-          bordered
           column={1}
           items={[
             { key: "join", label: "数据绑定", children: joinSummary(draft, type.data_join) },
@@ -272,7 +273,7 @@ export function LinkMappingPanel(props: PanelProps<LinkType>) {
       </div>
     );
   return (
-    <div className="flex max-w-[860px] flex-col gap-3">
+    <div className="flex max-w-settings flex-col gap-3">
       {virtualAlert}
       <LinkJoinEditor
         draft={draft}

@@ -487,3 +487,60 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
     },
   );
 }
+
+export const ELEMENT_DRAFT = structuredClone(FIXTURE_DRAFT);
+export const ELEMENTS = {
+  object: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "person")!,
+  derived: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "vip_party")!,
+  relation: ELEMENT_DRAFT.link_types.find((item) => item.technical_name === "signer")!,
+  metric: ELEMENT_DRAFT.metrics.find((item) => item.technical_name === "vip_party_count")!,
+  dataset: ELEMENT_DRAFT.datasets.find((item) => item.name === "contracts")!,
+};
+ELEMENTS.dataset.columns!.push({ name: "stat_date", physical_type: "date", comment: "每日快照日期" });
+
+/** Inspector requests reuse the common workspace fixture and never reach a backend. */
+export async function mockElementsApi(page: Page, options: { impact?: boolean } = {}) {
+  await mockMappingsApi(page);
+  const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
+  const preview: import("../../src/api/types").MetricPreview = {
+    definition_hash: "f".repeat(64),
+    context_version: FIXTURE_WORKSPACE.version_id,
+    session_revision: null,
+    status: "ok",
+    value: 1280,
+    value_kind: "integer",
+    snapshot_dates: [],
+    warnings: [],
+    total_query: {
+      sql: "SELECT COUNT(*) FROM inheritance_demo.parties WHERE level = :level",
+      params: { level: "VIP" },
+      dialect: "mysql",
+      database: "inheritance_demo",
+    },
+  };
+  await page.route(
+    (url) => url.pathname.startsWith("/api/"),
+    async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === `${base}/published-snapshot`) {
+        await route.fulfill({ json: ELEMENT_DRAFT });
+      } else if (pathname === `/api/v1/modeling/workspaces/${WORKSPACE_ID}/metrics/preview`) {
+        await route.fulfill({ json: preview });
+      } else if (pathname === `${base}/element-saves/preview`) {
+        const impact: import("../../src/api/types").ElementSaveImpact = {
+          current_version_id: FIXTURE_WORKSPACE.version_id,
+          session_revision: null,
+          affected_items: options.impact ? [{
+            target_kind: "material_object",
+            target_id: ELEMENT_DRAFT.material_objects.find((item) => item.type_id === ELEMENTS.object.id)!.id,
+            expected_target_hash: "1".repeat(64),
+            reason: "当前元素修改需要同步此依赖的定义或引用",
+          }] : [],
+        };
+        await route.fulfill({ json: impact });
+      } else {
+        await route.fallback();
+      }
+    },
+  );
+}

@@ -1,4 +1,5 @@
 import { Button, Empty, Table, Tag, Typography } from "antd";
+import { PanelToolbar, SectionTitle } from "../layout";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import type { DataJoin, ObjectType } from "../../api/types";
@@ -31,7 +32,7 @@ export function RelationsPanel(props: PanelProps<ObjectType>) {
   };
   return (
     <div className="flex flex-col gap-3">
-      {!editing && canEdit && (
+      <PanelToolbar className="px-0" extra={!editing && canEdit ? (
         <Button
           icon={<Plus size={15} />}
           className="self-start"
@@ -39,7 +40,9 @@ export function RelationsPanel(props: PanelProps<ObjectType>) {
         >
           新建关系
         </Button>
-      )}
+      ) : undefined}>
+        <SectionTitle title="关系" />
+      </PanelToolbar>
       {relations.length ? (
         <Table
           size="small"
@@ -97,7 +100,7 @@ export function RelationsPanel(props: PanelProps<ObjectType>) {
                 return (
                   <span className="flex flex-wrap items-center gap-2">
                     {joinSummary(draft, r.join)}
-                    {r.local && <Tag className="!m-0">本对象绑定</Tag>}
+                    {r.local && <Tag className="m-0">本对象绑定</Tag>}
                     {editing && !editable && <ReadonlyIcon reason={reason ?? "先为本对象独立绑定数据集"} />}
                     {editable && (
                       <Button size="small" onClick={() => setBinding({ relation: r, join: r.local ? r.join : null })}>

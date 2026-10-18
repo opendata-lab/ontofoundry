@@ -1,4 +1,5 @@
 import { AutoComplete, Button, Checkbox, Input, Segmented, Select, Table, Tag, Tooltip, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import { Plus, Trash2, X } from "lucide-react";
 import type { Draft, FieldBinding, ObjectType, Property, ValueKind } from "../../api/types";
 import { VALUE_KINDS, byId, type ResolvedSource } from "../../lib/coreModel";
@@ -31,7 +32,7 @@ function BindingEditor({
   const sourceId = value?.kind === "column" ? value.source_id : (sources[0]?.id ?? MAIN_SOURCE);
   const source = sources.find((s) => s.id === sourceId);
   return (
-    <div className="flex min-w-[300px] items-center gap-1">
+    <div className="flex min-w-72 items-center gap-1">
       <Segmented
         size="small"
         value={kind}
@@ -50,7 +51,7 @@ function BindingEditor({
             <Select
               size="small"
               aria-label={`${label}来源表`}
-              className="w-[96px]"
+              className="w-24"
               value={sourceId}
               options={sources.map((s) => ({ value: s.id, label: sourceLabel(s, membership, shared) }))}
               onChange={(id: string) => onChange({ kind: "column", source_id: id, column: "" })}
@@ -59,7 +60,7 @@ function BindingEditor({
           <AutoComplete
             size="small"
             aria-label={`${label}列`}
-            className="min-w-[140px] flex-1"
+            className="min-w-36 flex-1"
             placeholder="选择或输入列名"
             value={value?.kind === "column" ? value.column : ""}
             options={sourceColumns(source?.dataset).map((c) => ({ value: c }))}
@@ -164,17 +165,11 @@ export function PropertiesPanel(props: PanelProps<ObjectType>) {
   return (
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-2">
-        <Text strong>数据来源</Text>
+        <SectionTitle title="数据来源" />
         <MappingSources draft={draft} type={type} editing={editing} change={change} />
       </section>
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center gap-3">
-          <Text strong>属性</Text>
-          <Text type="secondary" className="text-xs">
-            {identifierCount > 1 ? "多个属性组成复合标识" : "标识用于定位唯一实例"}
-            {lockedIdentifier ? `；${lockedIdentifier}` : ""}
-          </Text>
-        </div>
+      <section className="flex flex-col gap-3 border-t border-rule pt-4">
+        <SectionTitle title="属性" note={`${identifierCount > 1 ? "多个属性组成复合标识" : "标识用于定位唯一实例"}${lockedIdentifier ? `；${lockedIdentifier}` : ""}`} />
         <Table
           size="small"
           rowKey={(row) => row.property.id}
@@ -258,7 +253,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType>) {
                 return (
                   <span className="flex items-center gap-2">
                     {row.binding ? <code className="text-xs">{bindingText(row.binding)}</code> : <Text type="secondary">未绑定</Text>}
-                    {row.binding?.kind === "expression" && <Tag className="!m-0">计算</Tag>}
+                    {row.binding?.kind === "expression" && <Tag className="m-0">计算</Tag>}
                     {row.boundBy && row.boundBy !== type.id && (
                       <Text type="secondary" className="text-xs">
                         来自{byId(draft.object_types, row.boundBy)?.name}

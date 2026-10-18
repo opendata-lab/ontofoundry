@@ -55,7 +55,7 @@ describe("instances tab", () => {
     const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
     renderWithProviders(<ElementInstances {...props} draft={draft} type={customer} />);
     fireEvent.click(screen.getByRole("button", { name: "C001" }));
-    const detail = screen.getByText("关联实例").closest<HTMLElement>(".ant-card")!;
+    const detail = screen.getByRole("region", { name: "C001的实例详情" });
     expect(within(detail).getByText("是")).toBeInTheDocument();
     expect(within(detail).getByText(/RT-0103/)).toBeInTheDocument();
   });

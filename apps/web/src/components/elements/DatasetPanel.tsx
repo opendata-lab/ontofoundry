@@ -1,4 +1,5 @@
 import { Alert, Descriptions, Form, Input, Select, Table, Tag, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import type { Dataset, Draft } from "../../api/types";
 import { DATE_KINDS, physicalValueKind, upsert } from "../../lib/coreModel";
 import { DIALECTS } from "../../lib/datasetEditing";
@@ -26,7 +27,7 @@ function ColumnsTable({ dataset }: { dataset: Dataset }) {
           render: (_, c) => (
             <span className="inline-flex items-center gap-2">
               <code>{c.name}</code>
-              {c.name === dataset.snapshot_date_column && <Tag className="!m-0">快照日期</Tag>}
+              {c.name === dataset.snapshot_date_column && <Tag className="m-0">快照日期</Tag>}
             </span>
           ),
         },
@@ -62,7 +63,7 @@ export function DatasetPanel({
   });
   if (editing)
     return (
-      <div className="flex max-w-[880px] flex-col gap-4">
+      <div className="flex max-w-settings flex-col gap-4">
         <Form layout="vertical" component="div" requiredMark>
           <div className="grid grid-cols-2 gap-x-4">
             <Form.Item label="名称" required>
@@ -130,19 +131,21 @@ export function DatasetPanel({
             )}
           </Form.Item>
         </Form>
-        <ColumnsTable dataset={dataset} />
+        <section className="flex flex-col gap-3 border-t border-rule pt-4">
+          <SectionTitle title="列清单" />
+          <ColumnsTable dataset={dataset} />
+        </section>
       </div>
     );
   return (
-    <div className="flex max-w-[880px] flex-col gap-4">
+    <div className="flex max-w-settings flex-col gap-4">
       {dataset.description ? (
-        <Paragraph className="!m-0 whitespace-pre-wrap">{dataset.description}</Paragraph>
+        <Paragraph className="m-0 whitespace-pre-wrap">{dataset.description}</Paragraph>
       ) : (
         <Text type="secondary">暂无描述</Text>
       )}
       <Descriptions
         size="small"
-        bordered
         column={2}
         items={[
           { key: "location", label: "物理位置", children: <code>{location(dataset)}</code> },
@@ -173,7 +176,10 @@ export function DatasetPanel({
           },
         ]}
       />
-      <ColumnsTable dataset={dataset} />
+      <section className="flex flex-col gap-3 border-t border-rule pt-4">
+        <SectionTitle title="列清单" />
+        <ColumnsTable dataset={dataset} />
+      </section>
     </div>
   );
 }
