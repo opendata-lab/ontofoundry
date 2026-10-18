@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from ontofoundry_api.domain.dependencies import strict_equal
+
 MISSING = object()
 
 
@@ -11,9 +13,9 @@ def merge_snapshots(
     conflicts = []
 
     def merge(b, c, d, path):
-        if c == d or b == d:
+        if strict_equal(c, d) or strict_equal(b, d):
             return deepcopy(c) if c is not MISSING else MISSING
-        if b == c:
+        if strict_equal(b, c):
             return deepcopy(d) if d is not MISSING else MISSING
         if all(isinstance(v, dict) for v in (b, c, d)):
             result = {}
@@ -44,7 +46,9 @@ def merge_snapshots(
         if choice == "custom":
             return deepcopy(side.get("value"))
         if choice == "both" and isinstance(c, list) and isinstance(d, list):
-            return deepcopy(c) + [deepcopy(x) for x in d if x not in c]
+            return deepcopy(c) + [
+                deepcopy(x) for x in d if not any(strict_equal(x, y) for y in c)
+            ]
         conflicts.append(
             {
                 "path": path,

@@ -185,6 +185,7 @@ def test_typed_fact_swap_batch_must_include_rewritten_facts_at_ingestion(
     from ontofoundry_api.domain.core import CoreDraft
     from ontofoundry_api.domain.dependencies import rewrite_references
     from ontofoundry_api.domain.validation import validate_core_graph
+    from ontofoundry_api.services.publish_preview import three_way
 
     before, candidate, target_id = typed_fact_swap(left_kind, left, right_kind, right)
     ctx = context(before)
@@ -225,9 +226,22 @@ def test_typed_fact_swap_batch_must_include_rewritten_facts_at_ingestion(
     accepted = validate_core_graph(
         CoreDraft.model_validate(apply_items(before, parsed.items))
     )
-    for fact in accepted.material_objects:
-        if str(fact.type_id) == target_id:
-            assert type(fact.values["is_vip"]) is type(left)
-            assert type(fact.values["name"]) is type(right)
-            assert fact.values["is_vip"] == left
-            assert fact.values["name"] == right
+    latest = deepcopy(before)
+    obj = next(o for o in latest["object_types"] if o["id"] == target_id)
+    obj["description"] = "另一会话发布的虚构客户说明"
+    merged = three_way(
+        before, latest, accepted.model_dump(mode="json"), before["workspace_id"]
+    )
+    assert merged.conflicts == []
+    published = validate_core_graph(CoreDraft.model_validate(merged.merged))
+    assert (
+        next(o for o in published.object_types if str(o.id) == target_id).description
+        == (obj["description"])
+    )
+    for graph in (accepted, published):
+        for fact in graph.material_objects:
+            if str(fact.type_id) == target_id:
+                assert type(fact.values["is_vip"]) is type(left)
+                assert type(fact.values["name"]) is type(right)
+                assert fact.values["is_vip"] == left
+                assert fact.values["name"] == right

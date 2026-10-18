@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
+import pytest
+from pr23_fixtures import example_session
 from test_modeling import ONTOLOGY, ROOT, create_session, save
 
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.domain.canonical import snapshot_sha256
+from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.dependencies import strict_equal
+from ontofoundry_api.domain.validation import validate_core_graph
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
+from ontofoundry_api.services.publish_preview import three_way
 
 
 def preview(client, session):
@@ -225,3 +233,71 @@ def test_preview_has_only_core_contract(client):
     )
     assert body["changes"]
     assert publish(client, session, body).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "old_kind,old,new_kind,new",
+    [
+        ("boolean", True, "integer", 1),
+        ("boolean", False, "integer", 0),
+        ("integer", 1, "float", 1.0),
+        ("integer", 0, "decimal", 0.0),
+    ],
+)
+def test_type_and_fact_change_survives_another_sessions_publication(
+    client, old_kind, old, new_kind, new
+):
+    initial = example_session(client, "07-instances-and-evidence")
+
+    def set_kind_and_values(raw, kind, value):
+        prop = next(p for p in raw["properties"] if p["technical_name"] == "is_vip")
+        prop["value_kind"] = kind
+        for fact in raw["material_objects"]:
+            if fact["type_id"] == prop["owner_type_id"]:
+                fact["values"]["is_vip"] = value
+        return prop["owner_type_id"]
+
+    target_id = set_kind_and_values(initial["draft"], old_kind, old)
+    response = save(client, initial, initial["draft"])
+    assert response.status_code == 200, response.text
+    initial = response.json()
+    response = publish(client, initial, preview(client, initial).json())
+    assert response.status_code == 200, response.text
+    base = published_snapshot(client)
+    mine, other = create_session(client), create_session(client)
+    set_kind_and_values(mine["draft"], new_kind, new)
+    obj = next(o for o in other["draft"]["object_types"] if o["id"] == target_id)
+    obj["description"] = "另一会话发布的虚构客户说明"
+    for session in (mine, other):
+        response = save(client, session, session["draft"])
+        assert response.status_code == 200, response.text
+        session.update(response.json())
+    response = publish(client, other, preview(client, other).json())
+    assert response.status_code == 200, response.text
+    latest = published_snapshot(client)
+    inputs = deepcopy([base, latest, mine["draft"]])
+    for raw in inputs:
+        validate_core_graph(CoreDraft.model_validate(raw))
+    merge = three_way(base, latest, mine["draft"], mine["workspace_id"])
+    assert merge.conflicts == []
+    assert strict_equal([base, latest, mine["draft"]], inputs)
+    response = preview(client, mine)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["validation"]["errors"] == []
+    assert body["merged_snapshot_sha256"] == merge.merged_sha256
+    response = publish(client, mine, body)
+    assert response.status_code == 200, response.text
+    persisted = published_snapshot(client)
+    assert snapshot_sha256(persisted) == body["merged_snapshot_sha256"]
+    for raw in (merge.merged, body["merged_model"], persisted):
+        graph = validate_core_graph(CoreDraft.model_validate(raw))
+        target = next(o for o in graph.object_types if str(o.id) == target_id)
+        assert target.description == obj["description"]
+        prop = next(p for p in graph.properties if p.technical_name == "is_vip")
+        assert prop.value_kind == new_kind
+        facts = [f for f in graph.material_objects if str(f.type_id) == target_id]
+        assert facts
+        for fact in facts:
+            assert type(fact.values["is_vip"]) is type(new)
+            assert fact.values["is_vip"] == new

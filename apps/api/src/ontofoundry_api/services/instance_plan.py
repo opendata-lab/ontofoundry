@@ -36,7 +36,7 @@ from ontofoundry_api.domain.expressions import (
 from ontofoundry_api.domain.graph import DraftIndex
 from ontofoundry_api.domain.instance_display import database_display_text
 from ontofoundry_api.services.dataset_sources import resolve_dataset
-from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.errors import NotFoundError, ServiceError
 from ontofoundry_api.services.readonly import connect_readonly
 
 
@@ -494,7 +494,12 @@ def query_instances(
     limit=20,
     snapshot_date=None,
 ):
-    type_id = UUID(str(type_id))
+    try:
+        type_id = UUID(str(type_id))
+    except ValueError:
+        fail("对象类型引用无效", "INVALID_OBJECT_REF")
+    if type_id not in DraftIndex(draft).objects:
+        raise NotFoundError("对象类型不存在")
     binding = resolve_binding(draft, type_id)
     if binding.main is None:
         if not binding.virtual_types:

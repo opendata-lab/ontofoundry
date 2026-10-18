@@ -56,6 +56,7 @@ def parse_ref(ref):
             if (
                 not isinstance(values, list)
                 or len(values) != 2
+                or not isinstance(values[0], str)
                 or not isinstance(values[1], list)
                 or not 1 <= len(values[1]) <= 16
             ):
