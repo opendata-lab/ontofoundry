@@ -249,6 +249,31 @@ describe("relation, metric and dataset popups", () => {
 });
 
 describe("element save impact preview", () => {
+  it.each([false, true])("preserves the shared ancestor source when editing VIP note (column edit: %s)", async (editColumn) => {
+    const draft = example("06-inheritance");
+    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    const note = draft.properties.find((p) => p.owner_type_id === vip.id)!;
+    const mapping = draft.mappings.find((m) => m.type_id === vip.id)!;
+    expect(mapping.sources).toEqual([]);
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${vip.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await within(dialog).findByRole("textbox", { name: "属性技术名" });
+    const row = dialog.querySelector<HTMLElement>(`[data-element-id="${note.id}"]`)!;
+    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "note2" } });
+    expect(within(dialog).getByRole("combobox", { name: "VIP说明列" })).toHaveValue("vip_note");
+    if (editColumn)
+      fireEvent.change(within(dialog).getByRole("combobox", { name: "VIP说明列" }), { target: { value: "party_name" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+      expect(payload.draft.mappings.find((m) => m.id === mapping.id)!.fields).toEqual({
+        note2: { kind: "column", source_id: "main", column: editColumn ? "party_name" : "vip_note" },
+      });
+    }
+  });
+
   it("keeps both UUID bindings when a typed rename passes through another property's name", async () => {
     const draft = example("01-basic-sales");
     const customer = draft.object_types.find((o) => o.technical_name === "customer")!;

@@ -1,5 +1,5 @@
 import type { Draft, FieldBinding } from "../api/types";
-import { effectiveProperties } from "./coreModel";
+import { effectiveProperties, effectiveSources } from "./coreModel";
 
 /** Session-local bindings survive temporary duplicate names without entering the model. */
 export type PropertyBindingEdits = Map<string, Map<string, FieldBinding>>;
@@ -32,7 +32,7 @@ export function preservePropertyBindings(before: Draft, next: Draft, edits: Prop
       for (const p of properties) {
         const binding = bindings.get(p.id);
         if (!binding || properties.filter((other) => other.technical_name === p.technical_name).length !== 1) continue;
-        if (binding.kind === "column" && !mapping.sources.some((source) => source.id === binding.source_id)) {
+        if (binding.kind === "column" && !effectiveSources(next, mapping.type_id).some((source) => source.id === binding.source_id)) {
           bindings.delete(p.id);
           continue;
         }
