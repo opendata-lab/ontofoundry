@@ -235,3 +235,23 @@
 | 仓库根 `git diff --check` | 退出码 0 |
 
 相较前轮增加 9 项回归。旧 region 文本列测试原先期望数字，已修正为原文字符串；最终全量通过。测试仍有既有 Ant Design Spin 提示，构建仍提示大包体积，不影响通过。按本任务限制不启动服务，不做局域网浏览器访问，不 commit/push。
+
+## PR #23 第五轮评审修正
+
+- N1：属性绑定重建按编辑后图的 `effectiveSources()` 判断来源，保留共享父绑定中的祖先来源；真正失效来源仍移除。补例 06 工具函数回归及真实 ElementInspector 回调回归，核对改名后的预检和保存载荷，覆盖 `note → note2` 以及继续修改列绑定。
+- A2：删除 `ConditionValueInput.tsx` 多余末尾空行，使用仓库 diff 检查验证。
+
+全部编辑完成后统一执行指定 Vitest、TypeScript、lint、生成类型检查、构建及仓库 diff 检查，结果见本节后续记录。遵守本次禁止启动应用服务、禁止访问局域网的限制，界面行为由组件回调回归验证，未运行浏览器或局域网验收。不 commit/push；保留已有未跟踪 node_modules。
+
+验证在 `apps/web` 执行，先 `. ~/.nvm/nvm.sh && nvm use 22.19.0`：
+
+| 命令 | 结果 |
+|---|---|
+| `npx vitest --run` | 35 个文件、166 passed、0 failed、0 errors、0 skipped；19.55 秒 |
+| `npx tsc -b` | 退出码 0 |
+| `npm run lint` | 退出码 0 |
+| `npm run check:core-types` | 退出码 0，类型与 Schema 一致 |
+| `npm run build` | 退出码 0；仅有大于 500 kB 的构建分包提示 |
+| `git diff --check`、`git diff --check origin/main` | 退出码 0，当前工作树相对主分支也无末尾空行问题 |
+
+本轮增加 4 项回归，未放宽既有断言。最终只补验证记录，未改实现。

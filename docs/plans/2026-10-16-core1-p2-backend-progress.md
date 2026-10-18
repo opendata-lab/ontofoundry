@@ -339,3 +339,35 @@ env -u ONTOFOUNDRY_TEST_POSTGRES_URL -u ONTOFOUNDRY_TEST_MYSQL_CONFIG \
 | 仓库根 `git diff --check` | 退出码 0 |
 
 相较前轮增加 11 项回归。首轮新增例 06 断言误将集合内容按列表顺序比较，已改为按 UUID 比较完整定义，最终全量通过；仅余既有 Starlette/httpx、anyio 两项依赖弃用提示。数据库先以 SELECT 1 核对，只连接指定 PostgreSQL 55460 与配置文件中的 MySQL 33070，无需环境恢复。不启动应用服务，不 commit/push。
+
+## PR #23 第五轮评审修正
+
+- N1：补例 06 共享父来源的 `note → note2` 保存回归，以及改名后改列绑定的发布图、会话图有效绑定和 bound 状态断言。
+- N2：递归类型严格比较复用于保存范围、会话同步/发布确认集合、提案批次完整性。覆盖 true/1、false/0、1/1.0、0/0.0 的原始/最终候选、已有最终草稿、确认及 hash、空确认拒绝、额外事实类型改动拒绝；提案缺事实在接收阶段拒绝，完整原子组应用后校验通过。
+- N3：闭包遍历遇到对象即补有效映射并递归来源 Dataset。新增简单派生/表达式 × 单跳/多跳 × 已有/缺失映射回归，核对预检保存一致、补入清单/hash、错误请求原子性、既有对象/映射/Dataset 草稿保留；使用虚构 SQLite 数据实际执行两侧派生查询，确认都返回 P1。
+
+全部编辑完成后统一执行指定检查，结果见本节后续记录。只连接指定一次性 PostgreSQL 55460 和 MySQL 配置的 33070 端口；不启动应用服务，不 commit/push。
+
+最终验证在 `apps/api` 执行，环境和命令如下（数据库先以 SELECT 1 验证连通）：
+
+```sh
+export PYTHONPATH="$PWD/src"
+export ONTOFOUNDRY_TEST_POSTGRES_URL='postgresql+psycopg://of:of@127.0.0.1:55460/of_test'
+export ONTOFOUNDRY_TEST_MYSQL_CONFIG="$PWD/../../../accept/mysql-p2.json"
+../../../backend/apps/api/.venv/bin/python -m ontofoundry_api.contracts.export_schema --check
+../../../backend/apps/api/.venv/bin/ruff check src tests
+../../../backend/apps/api/.venv/bin/ruff format --check src tests
+../../../backend/apps/api/.venv/bin/python -m pytest -q -rs
+../../../backend/apps/api/.venv/bin/python -m pytest -q ../../integrations/dataagent/skills/ontofoundry-modeling/tests
+```
+
+| 检查 | 最终结果 |
+|---|---|
+| Schema `--check` | 退出码 0 |
+| `ruff check src tests` | 退出码 0 |
+| `ruff format --check src tests` | 退出码 0，144 个文件已格式化 |
+| `pytest -q -rs` | **563 passed、0 failed、0 errors、0 skipped**；97.17 秒 |
+| 建模技能测试 | 3 passed、0 failed、0 errors、0 skipped |
+| 根目录 `git diff --check`、`git diff --check origin/main` | 退出码 0 |
+
+相较前轮增加 23 项回归，既有断言未放宽。首轮全量为 555 passed、8 failed：新增导航测试误把继承入边端点当作无关对象；按现有双向关系继承语义改为精确核对完整对象集合后，最终全量通过，两侧实际查询仍严格断言只返回 P1。仅有既有 Starlette/httpx、anyio 两项弃用提示，无需恢复环境。最终测试后仅补文档结果并检查 diff，没有改实现。
