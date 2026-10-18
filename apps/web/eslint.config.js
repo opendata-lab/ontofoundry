@@ -94,7 +94,7 @@ export default tseslint.config(
     ignores: ["src/**/*.test.tsx"],
     rules: {
       "no-restricted-syntax": [
-        "warn",
+        "error",
         ...nativeControlSelectors,
         ...visualConsistencySelectors,
       ],
