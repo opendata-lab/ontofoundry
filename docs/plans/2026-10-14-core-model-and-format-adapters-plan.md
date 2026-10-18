@@ -309,7 +309,7 @@ P1 前端不迁移页面控件或删除页面 CSS；共用 P0 Provider 的 13 �
 
 控件替换：`InspectorDialog` / `ElementInspector` 的原生 dialog 改 antd `Modal`/`Drawer`（按详情与编辑交互选用，不叠套原生 dialog）；`ElementPanels`、`IdentifierBar`、`RelationCards` 的输入/复选/描述/页签改 `Form`、`Input`/`Input.TextArea`、`Checkbox`、`Tabs`；`MappingWidgets` / `ObjectTablePicker` / 各映射表的原生 select 改有 `showSearch` 的 `Select`（按 label 搜索并保留 UUID/列值），层级定义选择用 `TreeSelect`；手写映射/规则/实例 table 改 `Table`，状态用 `Tag`/`Alert`。迁移 `element-inspector.css`、`object-mapping.css` 对应规则为 Tailwind；关系图专用规则和其他消费者仍保留，无引用后才删整文件。
 
-**P2-18 新做派生编辑器。** 新增 `components/elements/DerivedConditionEditor.tsx` 和 `lib/derivedEditing.ts`；按 P0 原型处理分支、路径、值类型、方向、EXISTS、表达式切换。上下文只选直接父的有效定义，不选物理列。错误定位具体分支/条件，保存走正常 element save 和最终图校验。直接使用 `Form.List` 表达 OR 分支/AND 条件，`Segmented` 切 simple/expression，`TreeSelect` 选择有方向的本体路径，`Select` 搜索运算符/定义，按类型用 `Input`/`InputNumber`/`DatePicker`/`Switch`，表达式用 `Input.TextArea`，错误用 Form 校验/`Alert`。替代 `ElementPanels` 内相应手写输入与 `ExpressionsEditor` 涉及的编辑控件；不改变本体条件与指标过滤的语义边界。布局直接用 Tailwind，不新增 derived 页面 CSS；清除原 element-inspector/object-mapping 中派生编辑规则，完整文件按 §9.2.1 判定。
+**P2-18 新做派生编辑器。** **2026-10-18 优先级更新：用户确认结构化 OR 多分支和多跳路径编辑属于后续便利性优化，不阻塞 P3～P5；当前复杂成员条件继续使用表达式编辑。** 新增 `components/elements/DerivedConditionEditor.tsx` 和 `lib/derivedEditing.ts`；按 P0 原型处理分支、路径、值类型、方向、EXISTS、表达式切换。上下文只选直接父的有效定义，不选物理列。错误定位具体分支/条件，保存走正常 element save 和最终图校验。直接使用 `Form.List` 表达 OR 分支/AND 条件，`Segmented` 切 simple/expression，`TreeSelect` 选择有方向的本体路径，`Select` 搜索运算符/定义，按类型用 `Input`/`InputNumber`/`DatePicker`/`Switch`，表达式用 `Input.TextArea`，错误用 Form 校验/`Alert`。替代 `ElementPanels` 内相应手写输入与 `ExpressionsEditor` 涉及的编辑控件；不改变本体条件与指标过滤的语义边界。布局直接用 Tailwind，不新增 derived 页面 CSS；清除原 element-inspector/object-mapping 中派生编辑规则，完整文件按 §9.2.1 判定。
 
 **P2-19 新做指标/数据集弹窗与预览。** 新增 `components/elements/MetricPanel.tsx`、`MetricForm.tsx`、`MetricPreview.tsx`、`DatasetPanel.tsx`、`lib/metricEditing.ts`。MetricForm 覆盖 simple/ratio/expression、全部条件运算符、列/日期列筛选、类型推导；ratio 不提交三项派生字段。预览点击时发送完整表单与分量，不要求先保存。definition_hash/请求序号匹配才显示返回；表单改变或取消请求时旧结果失效，展示“需重新预览”，不让慢响应覆盖新口径。SQL 与总值/趋势结果一同显示；失败给原因。Dataset 表单可无列清单保存，但不能手工伪造元数据采集记录。直接用 `Modal`/`Drawer`、`Form`/`Form.List`、`Segmented`、可搜索 `Select`、`Input`/`InputNumber`、`DatePicker.RangePicker`、`Button`；预览值/状态/查询用 `Statistic`、`Spin`、`Alert`、`Tabs`、`Table` 与保留格式的 SQL 文本。此处 DatePicker 仅填写需要的条件值和预览范围，不新增采集时间字段。Dataset 列清单用 Table；替代旧 `SemanticModels` 中指标输入、原生表格和 `semantic.css` 的编辑样式，不复用旧语义树 UI。表单/预览测试覆盖搜索、校验、过期响应和提交定义；布局直接 Tailwind，无新 metric/dataset CSS。
 
@@ -356,6 +356,8 @@ make -C integrations/dataagent zip
 
 ## 6. P3：机械导入适配器
 
+2026-10-18：P3 已在 `codex/core1-remaining` 工作树实施，验证完成并进入 PR/CI 交付流程；范围、验证和外部环境跳过项见 `2026-10-18-core1-p3-import-adapters-progress.md`。导入 API/界面已在 P4 接通，导出与定向往返已在 P5 接通。
+
 本阶段完成纯翻译，不创建或合并草稿，不发布。纯输入错误与局部不支持不同：局部错误只暂停本条及无法独立成立的依赖；文件无法解析/版本不支持阻止整份，报告仍可显示。
 
 ### 任务
@@ -391,6 +393,8 @@ make -C integrations/dataagent zip
 P3 只改适配器，不新增页面/原生控件/CSS，不重复跑前端；若契约变化牵动前端，则补 P2 的 check:core-types、vitest、tsc、lint、build 与相关浏览器验收。vendor schema 校验从测试调用固定版本 validator，不下载新 upstream，也不根据上游变化修改已定范围。
 
 ## 7. P4：导入报告、匹配、提案与弹窗
+
+2026-10-18：P4 已在 `codex/core1-remaining` 实施，验证完成并进入 PR/CI 交付流程；验证、迁移与局域网验收见 `2026-10-18-core1-p4-import-workflow-progress.md`。导入只生成待审提案，开发/生产迁移和 DataAgent 部署仍单独执行。
 
 ### 任务
 
@@ -440,6 +444,8 @@ npm run check:core-types --workspace apps/web
 同批包含新 Alembic 的 PostgreSQL 升级测试（需预配 disposable URL）；没有环境就记录未覆盖，不能只用 create_all 证明导入表迁移。集中手工走三个文件：A/B 之一、07 缺证据材料、13 无对象指标；确认直接发布入口消失；复用 P0 dev/preview 命令在局域网 HTTP 验 Upload/报告 Modal 与嵌套选择器，检查主题/层叠、焦点、文件重置和包体积变化。
 
 ## 8. P5：导出、官方校验与往返
+
+2026-10-18：P5 已在 `codex/core1-remaining` 工作树实施，验证完成并进入 PR/CI 交付流程。范围与验收见 `2026-10-18-core1-p5-export-workflow-progress.md`；开发/生产数据库切换和 DataAgent 部署仍是单独事项。
 
 ### 任务
 
@@ -662,18 +668,18 @@ P2 导入/导出暂下线由能力接口和 UI 控制；旧路径返回明确不
 - [ ] P2：antd portal/异步/可访问性与业务提交断言通过；快照已审阅；xyflow 弹层/焦点/裁剪、局域网 HTTP、包体积回归有记录。
 - [ ] P2：建模技能与问数提示词、结果收集器、部署技能 ZIP 配置同步完成。
 - [ ] P2：阶段全部编辑后统一 pytest/vitest/tsc/eslint/ruff/build/schema 检查；外部 skip 如实记录。
-- [ ] P3：两导入器仅翻译独立合法核心子图，RT 与原文/真实定位完整，A/B 支持子集验收完成。
-- [ ] P3：值约束/多元完整键/RT-68/COUNT 分类/RT-69 负例通过，统一测试已记录；未动前端则标不适用，若动契约补前端整组检查。
-- [ ] P4：preview/confirm 同 hash、基线过期/幂等、材料 SHA/格式化行号、历史报告保存完成。
-- [ ] P4：UUID 两轮匹配、映射一对一、所有引用重写、名字交换和依赖闭包完成，永不生成 delete。
-- [ ] P4：确认只建 pending 提案，空空间也进入会话审阅；人工待补全和实时解阻断完成。
-- [ ] P4：新导入 Modal/Drawer/Upload/Form 与 Table 报告直接用 antd + Tailwind，无替换/直接发布/新页面 CSS；专属旧导入样式已删。
-- [ ] P4：13 原生示例与 A/B 导入验收；含选择文件不自动提交/防重/重置的 UI 回归和阶段统一检查完成，局域网上传/弹层/包体积已记录。
-- [ ] P5：原生单文件/Ossie exporter、逐项报告、每 Dataset/Metric 一一输出与官方校验完成。
-- [ ] P5：01–08/10–12 合法导出；09/13 Ossie error 无 artifact；native 不宣称材料无损。
-- [ ] P5：每支持 RT 定向往返、A/B 差异归类、行 COUNT/可空 COUNT/裸 COUNT 来源/ratio 无分量回读完成。
-- [ ] P5：ExportDialog 与复用报告直接 antd + Tailwind；旧版本选择/下载控件及对应 CSS 按任务替换，无新页面 CSS。
-- [ ] P5：下载同产物 hash、权限、版本选择；含 ExportDialog 的全阶段统一回归与局域网 HTTP 下载/报告/包体积/最终 CSS 台账已记录。
+- [x] P3：两导入器仅翻译独立合法核心子图，RT 与原文/真实定位完整，A/B 支持子集验收完成。
+- [x] P3：值约束/多元完整键/RT-68/COUNT 分类/RT-69 负例通过，统一测试已记录；未动前端则标不适用，若动契约补前端整组检查。
+- [x] P4：preview/confirm 同 hash、基线过期/幂等、材料 SHA/格式化行号、历史报告保存完成。
+- [x] P4：UUID 两轮匹配、映射一对一、所有引用重写、名字交换和依赖闭包完成，永不生成 delete。
+- [x] P4：确认只建 pending 提案，空空间也进入会话审阅；人工待补全和实时解阻断完成。
+- [x] P4：新导入 Modal/Drawer/Upload/Form 与 Table 报告直接用 antd + Tailwind，无替换/直接发布/新页面 CSS；专属旧导入样式已删。
+- [x] P4：13 原生示例与 A/B 导入验收；含选择文件不自动提交/防重/重置的 UI 回归和阶段统一检查完成，局域网上传/弹层/包体积已记录。
+- [x] P5：原生单文件/Ossie exporter、逐项报告、每 Dataset/Metric 一一输出与官方校验完成。
+- [x] P5：01–08/10–12 合法导出；09/13 Ossie error 无 artifact；native 不宣称材料无损。
+- [x] P5：每支持 RT 定向往返、A/B 差异归类、行 COUNT/可空 COUNT/裸 COUNT 来源/ratio 无分量回读完成。
+- [x] P5：ExportDialog 与复用报告直接 antd + Tailwind；旧版本选择/下载控件及对应 CSS 按任务替换，无新页面 CSS。
+- [x] P5：下载同产物 hash、权限、版本选择；含 ExportDialog 的全阶段统一回归与局域网 HTTP 下载/报告/包体积/最终 CSS 台账已记录。
 - [ ] 收尾：旧代码/工具/测试逐项清理，10-08 文档标取代；无原型、真实名称、凭据或临时夹具进入提交。
 
 ## 修订记录

@@ -89,7 +89,7 @@ export function SessionPicker({
               },
             })}
             columns={[
-              { title: "标题", key: "title", ellipsis: true, render: (_, item) => <span title={item.title}>{item.title}</span> },
+              { title: "标题", key: "title", ellipsis: true, render: (_, item) => <span title={item.title}>{item.title}{item.import_source && <span className="ml-2 text-xs text-muted">文件导入</span>}</span> },
               {
                 title: "状态",
                 key: "status",

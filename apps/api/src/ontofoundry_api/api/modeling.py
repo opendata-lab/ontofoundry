@@ -248,6 +248,7 @@ def session_response(db, item) -> dict:
     """A session as the API returns it: data plus proposal summary and the
     element-level changes relative to its base version."""
     data = session_data(item)
+    data["import_source"] = import_source(db, item.workspace_id, item.id)
     key = _read_key(item)
 
     def base_diff():
@@ -270,6 +271,17 @@ def session_response(db, item) -> dict:
             (*key, "base_diff", item.base_version_id, item.base_version_sha256), base_diff
         ),
     }
+
+
+def import_source(db, workspace_id, session_id):
+    from ontofoundry_api.db_models import ImportRecord
+
+    record = db.scalar(
+        select(ImportRecord).where(
+            ImportRecord.workspace_id == workspace_id, ImportRecord.session_id == session_id
+        )
+    )
+    return {"adapter": record.adapter, "report_id": record.id} if record else None
 
 
 def _read_key(item) -> tuple | None:
@@ -554,11 +566,23 @@ def sessions(
         .order_by(ModelingSessionRecord.updated_at.desc())
     ).all()
     schedule_run_sync(request, background, rows)
+    from ontofoundry_api.db_models import ImportRecord
+
+    sources = {
+        r.session_id: {"adapter": r.adapter, "report_id": r.id}
+        for r in db.scalars(
+            select(ImportRecord).where(
+                ImportRecord.workspace_id == workspace_id,
+                ImportRecord.session_id.is_not(None),
+            )
+        )
+    }
     return {
         "items": [
             {
                 "id": r.id,
                 "title": r.title,
+                "import_source": sources.get(r.id),
                 "updated_at": r.updated_at,
                 "task_status": r.task_status,
                 "base_version_id": r.base_version_id,

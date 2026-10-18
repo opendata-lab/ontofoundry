@@ -147,7 +147,7 @@ def test_postgres_fresh_and_old_head_upgrade(starting, postgres_cutover_database
     engine, upgrade = postgres_cutover_database
     if starting != "base":
         upgrade(starting)
-    upgrade("head")
+    upgrade("20261016_000001")
     with engine.connect() as c:
         assert (
             c.exec_driver_sql("SELECT version_num FROM alembic_version").scalar()
@@ -328,7 +328,7 @@ def test_postgres_populated_cutover_preserves_platform_rows(postgres_cutover_dat
     ]
     first_result = None
     for _ in range(2):
-        upgrade("head")
+        upgrade("20261016_000001")
         with engine.connect() as conn:
             after = snapshot(conn)
             assert set(after) == set(before)

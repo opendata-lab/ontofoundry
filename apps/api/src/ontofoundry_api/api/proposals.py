@@ -78,6 +78,7 @@ def _batch_summary(batch: ProposalBatchRecord, items, statuses) -> dict[str, Any
         "base_version_id": batch.base_version_id,
         "counts": _counts(items, statuses),
         "error": batch.error_json,
+        "producer": batch.producer_json,
     }
 
 

@@ -1,0 +1,692 @@
+{
+  "$defs": {
+    "Dataset": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DatasetColumn"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "dialect": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dialect"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "snapshot_date_column": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Date Column"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "table_name"
+      ],
+      "title": "Dataset",
+      "type": "object"
+    },
+    "DatasetColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Comment",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "physical_type": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DatasetColumn",
+      "type": "object"
+    },
+    "ImportBlocked": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_id",
+        "reason"
+      ],
+      "title": "ImportBlocked",
+      "type": "object"
+    },
+    "ImportCompletion": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Dataset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "datasets": {
+          "items": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "title": "Datasets",
+          "type": "array"
+        },
+        "issue_id": {
+          "format": "uuid",
+          "title": "Issue Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "count_dataset",
+            "dataset_metadata",
+            "source_definition"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Original"
+        },
+        "source_locator": {
+          "additionalProperties": true,
+          "title": "Source Locator",
+          "type": "object"
+        },
+        "source_path": {
+          "title": "Source Path",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "proposed",
+            "accepted"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issue_id",
+        "message",
+        "original",
+        "source_path",
+        "source_locator",
+        "kind",
+        "datasets",
+        "status"
+      ],
+      "title": "ImportCompletion",
+      "type": "object"
+    },
+    "ImportCompletionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Dataset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dataset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dataset Id"
+        },
+        "definition": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Definition"
+        },
+        "expected_draft_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Expected Draft Sha256",
+          "type": "string"
+        },
+        "expected_session_revision": {
+          "minimum": 0,
+          "title": "Expected Session Revision",
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "maxLength": 64,
+          "minLength": 8,
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "issue_id": {
+          "format": "uuid",
+          "title": "Issue Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "issue_id",
+        "expected_session_revision",
+        "expected_draft_sha256",
+        "idempotency_key"
+      ],
+      "title": "ImportCompletionRequest",
+      "type": "object"
+    },
+    "ImportConfirm": {
+      "additionalProperties": false,
+      "properties": {
+        "content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "expected_current_version_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Expected Current Version Id"
+        },
+        "idempotency_key": {
+          "maxLength": 64,
+          "minLength": 8,
+          "title": "Idempotency Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content_sha256",
+        "expected_current_version_id",
+        "idempotency_key"
+      ],
+      "title": "ImportConfirm",
+      "type": "object"
+    },
+    "ImportConfirmed": {
+      "additionalProperties": false,
+      "properties": {
+        "batch_id": {
+          "format": "uuid",
+          "title": "Batch Id",
+          "type": "string"
+        },
+        "report_id": {
+          "format": "uuid",
+          "title": "Report Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "batch_id",
+        "report_id"
+      ],
+      "title": "ImportConfirmed",
+      "type": "object"
+    },
+    "ImportPreview": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "base_version_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Base Version Id"
+        },
+        "completion": {
+          "items": {
+            "$ref": "#/$defs/ImportCompletion"
+          },
+          "title": "Completion",
+          "type": "array"
+        },
+        "confirmed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImportConfirmed"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "content_sha256": {
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "current_blocked": {
+          "items": {
+            "$ref": "#/$defs/ImportBlocked"
+          },
+          "title": "Current Blocked",
+          "type": "array"
+        },
+        "document_error": {
+          "title": "Document Error",
+          "type": "boolean"
+        },
+        "filename": {
+          "title": "Filename",
+          "type": "string"
+        },
+        "formatted_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Formatted Sha256"
+        },
+        "id_map": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Id Map",
+          "type": "object"
+        },
+        "import_id": {
+          "format": "uuid",
+          "title": "Import Id",
+          "type": "string"
+        },
+        "material_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Material Id"
+        },
+        "proposal_summary": {
+          "$ref": "#/$defs/ImportProposalSummary"
+        },
+        "raw_sha256": {
+          "title": "Raw Sha256",
+          "type": "string"
+        },
+        "report": {
+          "$ref": "#/$defs/TranslationReport"
+        }
+      },
+      "required": [
+        "import_id",
+        "adapter",
+        "filename",
+        "report",
+        "content_sha256",
+        "raw_sha256",
+        "formatted_sha256",
+        "material_id",
+        "base_version_id",
+        "proposal_summary",
+        "id_map",
+        "document_error",
+        "completion"
+      ],
+      "title": "ImportPreview",
+      "type": "object"
+    },
+    "ImportProposalSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "blocked": {
+          "items": {
+            "$ref": "#/$defs/ImportBlocked"
+          },
+          "title": "Blocked",
+          "type": "array"
+        },
+        "create": {
+          "title": "Create",
+          "type": "integer"
+        },
+        "unchanged": {
+          "title": "Unchanged",
+          "type": "integer"
+        },
+        "update": {
+          "title": "Update",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "create",
+        "update",
+        "unchanged",
+        "blocked"
+      ],
+      "title": "ImportProposalSummary",
+      "type": "object"
+    },
+    "TranslationIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "completion_status": {
+          "default": "not_needed",
+          "enum": [
+            "not_needed",
+            "available"
+          ],
+          "title": "Completion Status",
+          "type": "string"
+        },
+        "construct": {
+          "title": "Construct",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "original": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Original"
+        },
+        "outcome": {
+          "enum": [
+            "converted",
+            "dropped",
+            "error"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "rule_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rule Id"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "source_locator": {
+          "additionalProperties": true,
+          "title": "Source Locator",
+          "type": "object"
+        },
+        "source_path": {
+          "title": "Source Path",
+          "type": "string"
+        },
+        "target_element_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Target Element Ids",
+          "type": "array"
+        },
+        "target_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Path"
+        }
+      },
+      "required": [
+        "outcome",
+        "construct",
+        "id",
+        "severity",
+        "source_path",
+        "source_locator",
+        "message"
+      ],
+      "title": "TranslationIssue",
+      "type": "object"
+    },
+    "TranslationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter": {
+          "title": "Adapter",
+          "type": "string"
+        },
+        "content_sha256": {
+          "title": "Content Sha256",
+          "type": "string"
+        },
+        "counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Counts",
+          "type": "object"
+        },
+        "direction": {
+          "enum": [
+            "import",
+            "export"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/TranslationIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "content_sha256",
+        "direction",
+        "adapter",
+        "counts",
+        "issues"
+      ],
+      "title": "TranslationReport",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/ImportPreview"
+    },
+    {
+      "$ref": "#/$defs/ImportConfirm"
+    },
+    {
+      "$ref": "#/$defs/ImportConfirmed"
+    },
+    {
+      "$ref": "#/$defs/ImportCompletionRequest"
+    }
+  ]
+}

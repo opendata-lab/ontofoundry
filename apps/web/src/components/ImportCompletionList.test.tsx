@@ -1,0 +1,40 @@
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
+import { importApi } from "../api/client";
+import { importPreview } from "../test/importRecords";
+import { modelingSession } from "../test/apiRecords";
+import { example } from "../test/drafts";
+import { renderWithProviders } from "../test/renderWithProviders";
+import { ImportCompletionList } from "./ImportCompletionList";
+vi.mock("../api/client", async (load) => ({ ...(await load<typeof import("../api/client")>()), importApi: { complete: vi.fn() } }));
+afterEach(cleanup);
+it("requires a searchable explicit dataset choice and creates a pending revision", async () => {
+  vi.mocked(importApi.complete).mockResolvedValue({ session_id: "fiction-session", batch_id: "fiction-batch", report_id: "fiction-import" });
+  const onChanged = vi.fn();
+  const current = modelingSession({}, example("01-basic-sales"));
+  renderWithProviders(<ImportCompletionList items={importPreview.completion} source={{ adapter: "ossie-0.2", report_id: "fiction-import" }} session={current} onChanged={onChanged} />);
+  fireEvent.click(screen.getByText(importPreview.completion[0].message));
+  expect(screen.getByRole("button", { name: "生成修订提案" })).toBeDisabled();
+  const select = screen.getByRole("combobox", { name: "统计数据集" });
+  fireEvent.mouseDown(select);
+  fireEvent.change(select, { target: { value: "订单" } });
+  fireEvent.click(await screen.findByText("虚构订单数据", { selector: ".ant-select-item-option-content" }));
+  fireEvent.click(screen.getByRole("button", { name: "生成修订提案" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+  expect(importApi.complete).toHaveBeenCalledWith(current.workspace_id, expect.anything(), expect.objectContaining({ dataset_id: "fiction-dataset", expected_session_revision: current.revision, expected_draft_sha256: current.draft_sha256 }));
+});
+
+it("offers dataset metadata fields and preserves a correction for review", async () => {
+  vi.mocked(importApi.complete).mockClear().mockResolvedValue({ session_id: "fiction-session", batch_id: "fiction-metadata", report_id: "fiction-import" });
+  const draft = example("01-basic-sales");
+  const dataset = { ...draft.datasets[0], dialect: null, columns: [{ name: "order_code", physical_type: null, comment: "" }] };
+  const item = { ...importPreview.completion[0], kind: "dataset_metadata" as const, dataset };
+  const onChanged = vi.fn();
+  renderWithProviders(<ImportCompletionList items={[item]} source={{ adapter: "ossie-0.2", report_id: "fiction-import" }} session={modelingSession({}, draft)} onChanged={onChanged} />);
+  fireEvent.click(screen.getByText(item.message));
+  fireEvent.change(screen.getByRole("textbox", { name: "物理类型 1" }), { target: { value: "VARCHAR" } });
+  fireEvent.click(screen.getByRole("button", { name: "生成修订提案" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
+  expect(importApi.complete).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ dataset: expect.objectContaining({ columns: [{ name: "order_code", physical_type: "VARCHAR", comment: "" }] }) }));
+  expect(dataset.columns[0].physical_type).toBeNull();
+});

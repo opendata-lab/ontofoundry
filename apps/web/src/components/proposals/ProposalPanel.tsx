@@ -3,6 +3,7 @@ import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
 import type { ProposalsState } from "../../hooks/useProposals";
+import { ImportReportDialog } from "../ImportReportDialog";
 import { PanelToolbar } from "../layout";
 import { ProposalCard, type CardActions } from "./ProposalCard";
 import { ProposalDetail } from "./ProposalDetail";
@@ -47,6 +48,9 @@ export function ProposalPanel(props: Props) {
 
 function ProposalReview({ session, proposals, running, onRemodel }: Props & { session: ModelingSession }) {
   const { detail } = proposals;
+  const [reportOpen, setReportOpen] = useState(false);
+  const producer = detail?.producer;
+  const importSource = producer?.kind === "import" && producer.adapter && producer.report_id ? { adapter: producer.adapter, report_id: producer.report_id } : session.import_source;
   const items = useMemo(() => detail?.items ?? [], [detail]);
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const kinds = KIND_ORDER.filter((kind) => items.some((item) => item.target_kind === kind));
@@ -150,6 +154,10 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
     });
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="提案审核面板" aria-busy={busy}>
+      {importSource && <>
+        <PanelToolbar><Typography.Text type="secondary">文件导入 · {importSource.adapter}</Typography.Text><Button size="small" onClick={() => setReportOpen(true)}>查看导入报告与补全</Button></PanelToolbar>
+        <ImportReportDialog open={reportOpen} source={importSource} session={session} onClose={() => setReportOpen(false)} onChanged={(result) => { proposals.select(result.batch_id); proposals.reload(); }} />
+      </>}
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
       {drifted && <Alert type="warning" showIcon message="草稿已更新，部分提案需要重新确认" />}
       {detail?.status === "failed" && (

@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type { VersionSummary } from "../api/types";
 import { LoadingSurface } from "../components/AsyncState";
+import { ExportDialog } from "../components/ExportDialog";
 import { HistoryComparison } from "../components/ReleaseReview";
 import { SessionPicker } from "../components/SessionPicker";
 import { PublishPanel } from "../components/publish/PublishPanel";
@@ -56,6 +57,9 @@ export function DeliveryPage() {
       },
       { replace: true },
     );
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportVersionId, setExportVersionId] = useState<string>();
+  const openExport = (versionId?: string) => { setExportVersionId(versionId); setExportOpen(true); };
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [result, setResult] = useState("");
   const { setError } = model;
@@ -102,7 +106,10 @@ export function DeliveryPage() {
       <PageHeader
         title="本体发布"
         note={workspace.current_version && <StatusMark state="mapped" label={`当前 v${workspace.current_version}`} />}
-      />
+      >
+        {workspace.role && <Button disabled={!versions.length} onClick={() => openExport(versions[0]?.version_id)}>导出文件</Button>}
+      </PageHeader>
+      <ExportDialog open={exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={exportVersionId} onClose={() => setExportOpen(false)} />
       <PageBody>
         <Panel>
           <Tabs
@@ -136,7 +143,7 @@ export function DeliveryPage() {
                   <div className="flex flex-col gap-3">
                     {workspace.role && versions.length > 0 && (
                       <div className="px-4 pt-4">
-                        <HistoryComparison workspaceId={workspace.id} versions={versions} />
+                        <HistoryComparison workspaceId={workspace.id} versions={versions} onExport={openExport} />
                       </div>
                     )}
                     <Table
@@ -163,6 +170,7 @@ export function DeliveryPage() {
                           key: "published",
                           render: (_, v) => new Date(v.published_at).toLocaleString("zh-CN", { hour12: false }),
                         },
+                        ...(workspace.role ? [{ title: "操作", key: "export", render: (_: unknown, v: VersionSummary) => <Button size="small" onClick={() => openExport(v.version_id)}>导出此版本</Button> }] : []),
                       ]}
                     />
                   </div>

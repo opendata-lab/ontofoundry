@@ -13,6 +13,8 @@ from ontofoundry_api.api import (
     assets,
     auth,
     connections,
+    exports,
+    imports,
     instances,
     materials,
     mcp,
@@ -154,6 +156,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(proposals.router)
     app.include_router(proposals.metrics_router)
     app.include_router(materials.router)
+    app.include_router(imports.router)
+    app.include_router(exports.router)
     app.include_router(agent_conversation.router)
     app.include_router(connections.router)
     app.include_router(instances.router)

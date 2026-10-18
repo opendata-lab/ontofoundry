@@ -355,6 +355,7 @@ export type ElementChange = {
 };
 
 export type ModelingSession = {
+  import_source?: ImportSource | null;
   id: UUID;
   workspace_id: UUID;
   title: string;
@@ -386,7 +387,7 @@ export type ModelingSession = {
 export type ModelingSessionSummary = Pick<
   ModelingSession,
   "id" | "title" | "task_status" | "updated_at" | "base_version_id"
-> & { has_unpublished_changes: boolean };
+> & { has_unpublished_changes: boolean; import_source?: ImportSource | null };
 
 export type MergeConflict = {
   key: string;
@@ -496,6 +497,7 @@ export type ProposalItem = {
   decided_at: ISOTime | null;
 };
 export type ProposalBatch = {
+  producer?: { kind?: string; adapter?: string; report_id?: UUID; issue_id?: UUID };
   id: UUID;
   status: "validating" | "available" | "failed";
   created_at: ISOTime;
@@ -843,4 +845,77 @@ export type MCPCallResult<T> = {
   content: { type: "text"; text: string }[];
   structuredContent: T;
   isError?: boolean;
+};
+
+export type ImportSource = { adapter: string; report_id: UUID };
+export type TranslationIssue = {
+  id: UUID;
+  outcome: "converted" | "dropped" | "error";
+  construct: string;
+  rule_id: string | null;
+  severity: "info" | "warning" | "error";
+  source_path: string;
+  source_locator: { sha256?: string; formatted_sha256?: string; json_pointer?: string; line_start?: number; line_end?: number; line?: number; column?: number };
+  original: string | null;
+  target_element_ids: UUID[];
+  completion_status: "not_needed" | "available";
+  target_path: string | null;
+  message: string;
+};
+export type TranslationReportData = {
+  id: UUID;
+  content_sha256: SHA256;
+  direction: "import" | "export";
+  adapter: string;
+  counts: Record<string, number>;
+  issues: TranslationIssue[];
+};
+export type ImportCompletion = {
+  issue_id: UUID;
+  message: string;
+  original: string | null;
+  source_path: string;
+  source_locator: TranslationIssue["source_locator"];
+  kind: "count_dataset" | "dataset_metadata" | "source_definition";
+  dataset?: Dataset | null;
+  datasets: { id: UUID; name: string }[];
+  status: "available" | "proposed" | "accepted";
+};
+export type ImportConfirmed = { session_id: UUID; batch_id: UUID; report_id: UUID };
+export type ImportPreview = {
+  import_id: UUID;
+  adapter: string;
+  filename: string;
+  report: TranslationReportData;
+  content_sha256: SHA256;
+  raw_sha256: SHA256;
+  formatted_sha256: SHA256 | null;
+  material_id: UUID | null;
+  base_version_id: UUID | null;
+  proposal_summary: { create: number; update: number; unchanged: number; blocked: { target_id: UUID; reason: string }[] };
+  id_map: Record<UUID, UUID>;
+  current_blocked: { target_id: UUID; reason: string }[];
+  document_error: boolean;
+  completion: ImportCompletion[];
+  confirmed: ImportConfirmed | null;
+};
+export type ImportConfirm = { content_sha256: SHA256; expected_current_version_id: UUID | null; idempotency_key: string };
+export type ImportCompletionRequest = {
+  issue_id: UUID;
+  expected_session_revision: number;
+  expected_draft_sha256: SHA256;
+  idempotency_key: string;
+  dataset_id?: UUID | null;
+  definition?: Record<string, unknown> | null;
+  dataset?: Dataset | null;
+};
+
+export type ExportPreview = {
+  version_id: UUID;
+  adapter: string;
+  report: TranslationReportData;
+  content_sha256: SHA256 | null;
+  filename: string;
+  media_type: string;
+  download_url: string | null;
 };
