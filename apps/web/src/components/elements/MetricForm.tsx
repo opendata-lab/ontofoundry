@@ -358,7 +358,7 @@ export function MetricForm({
                       onChange={(operator: Operator) => set({ ...filter, operator, values: [] })}
                     />
                     <div className="min-w-0 flex-1">
-                    <ConditionValueInput kind={kind} operator={filter.operator} values={filter.values ?? []} label={`条件 ${i + 1} 的值`} onChange={(values) => set({ ...filter, values })} />
+                      <ConditionValueInput kind={kind} operator={filter.operator} values={filter.values ?? []} label={`条件 ${i + 1} 的值`} onChange={(values) => set({ ...filter, values })} />
                     </div>
                     <Button
                       type="text"

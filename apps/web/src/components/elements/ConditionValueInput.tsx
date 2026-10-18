@@ -68,7 +68,7 @@ export function ConditionValueInput({
       return (
         <InputNumber
           aria-label={name}
-          className="!w-full"
+          className="w-full"
           value={typeof value === "number" ? value : null}
           onChange={(v) => set(v ?? null)}
         />
@@ -77,7 +77,7 @@ export function ConditionValueInput({
       return (
         <DatePicker
           aria-label={name}
-          className="!w-full"
+          className="w-full"
           showTime={kind === "datetime"}
           value={typeof value === "string" && value && dayjs(value).isValid() ? dayjs(value) : null}
           onChange={(d) => set(d ? (kind === "date" ? d.format("YYYY-MM-DD") : d.toISOString()) : null)}
@@ -86,10 +86,10 @@ export function ConditionValueInput({
     return <Input aria-label={name} value={value === null ? "" : String(value)} onChange={(e) => set(e.target.value)} />;
   };
   return arity === 2 ? (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
-      {one(0)}
+    <div className="flex items-center gap-1">
+      <div className="min-w-0 flex-1">{one(0)}</div>
       <Text type="secondary">至</Text>
-      {one(1)}
+      <div className="min-w-0 flex-1">{one(1)}</div>
     </div>
   ) : (
     one(0)
