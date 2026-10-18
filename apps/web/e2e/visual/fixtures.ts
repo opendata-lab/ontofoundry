@@ -4,9 +4,16 @@ import type { CoreDraft } from "../../src/api/core.generated";
 import type {
   DataAgentHealth,
   DataConnection,
+  Comparison,
   Draft,
+  EvidenceView,
+  MergeConflict,
   Member,
   Metric,
+  ModelingSession,
+  ProposalBatchDetail,
+  ProposalItem,
+  PublishPreview,
   VersionSummary,
   Workspace,
 } from "../../src/api/types";
@@ -244,6 +251,239 @@ export async function mockMappingsApi(page: Page) {
     async (route) => {
       const { pathname } = new URL(route.request().url());
       await route.fulfill({ json: responses[pathname] ?? { items: [] } });
+    },
+  );
+}
+
+export const REVIEW_SESSION_ID = "session-visual-review";
+
+const SUPPLIER = FIXTURE_DRAFT.object_types.find((item) => item.technical_name === "supplier")!;
+const REVIEW_EVIDENCE: EvidenceView[] = [
+  {
+    kind: "material",
+    id: "evidence-visual-supplier",
+    material_id: "material-visual-guide",
+    material_sha256: "b".repeat(64),
+    material_name: "星河采购业务说明.md",
+    material_archived: false,
+    locator: { line_start: 12, line_end: 14, heading: "供应商范围" },
+    quote: "供应商是向星河零售提供商品或服务的组织，统一登记名称与供应范围。",
+  },
+  {
+    kind: "manual",
+    id: "evidence-visual-confirmation",
+    created_by: "林晓",
+    created_at: "2026-10-17T02:00:00Z",
+    note: "已确认供应商范围包含商品与服务。",
+  },
+];
+
+function reviewItem(overrides: Partial<ProposalItem>): ProposalItem {
+  return {
+    id: "proposal-visual-supplier",
+    batch_id: "batch-visual-review",
+    ordinal: 0,
+    client_ref: null,
+    operation: "update",
+    target_kind: "object_type",
+    target_id: SUPPLIER.id,
+    display_name: "供应商",
+    owner_label: null,
+    before: { ...SUPPLIER, description: "提供商品的组织" },
+    after: { ...SUPPLIER, description: "提供商品或服务的组织" },
+    field_changes: [{ path: "description", before: "提供商品的组织", after: "提供商品或服务的组织" }],
+    evidence: REVIEW_EVIDENCE,
+    reason: "依据采购业务说明，补充供应商的服务范围。",
+    depends_on: [],
+    dependency_group: [],
+    atomic_group_id: null,
+    duplicate_candidates: [],
+    status: "pending",
+    stored_status: "pending",
+    status_reason: "",
+    accepted_revision: null,
+    decided_at: null,
+    ...overrides,
+  };
+}
+
+const REVIEW_BATCH: ProposalBatchDetail = {
+  id: "batch-visual-review",
+  status: "available",
+  created_at: "2026-10-17T02:00:00Z",
+  source_session_revision: 7,
+  base_version_id: "ver-visual-demo-2",
+  counts: { pending: 3, accepted: 1, rejected: 1, stale: 1, conflict: 0, superseded: 0 },
+  error: null,
+  items: [
+    reviewItem({}),
+    reviewItem({
+      id: "proposal-visual-property",
+      ordinal: 1,
+      operation: "create",
+      target_kind: "property",
+      target_id: "property-visual-service-scope",
+      display_name: "供应范围",
+      owner_label: "供应商",
+      before: null,
+      after: {
+        id: "property-visual-service-scope",
+        owner_type_id: SUPPLIER.id,
+        name: "供应范围",
+        technical_name: "service_scope",
+        value_kind: "string",
+        description: "供应商提供的商品或服务范围",
+        identifier: false,
+        unique: false,
+        required: false,
+        synonyms: [],
+        evidence: [],
+      },
+      field_changes: [],
+      depends_on: ["proposal-visual-supplier"],
+      dependency_group: ["proposal-visual-property", "proposal-visual-supplier"],
+    }),
+    reviewItem({ id: "proposal-visual-name", ordinal: 2, display_name: "供应商名称", evidence: [] }),
+    reviewItem({ id: "proposal-visual-accepted", ordinal: 3, status: "accepted", stored_status: "accepted", accepted_revision: 7 }),
+    reviewItem({ id: "proposal-visual-rejected", ordinal: 4, status: "rejected", stored_status: "rejected" }),
+    reviewItem({ id: "proposal-visual-stale", ordinal: 5, status: "stale", status_reason: "目标在提案生成后已被修改" }),
+  ],
+};
+
+const REVIEW_DRAFT = structuredClone(FIXTURE_DRAFT);
+REVIEW_DRAFT.object_types.find((item) => item.id === SUPPLIER.id)!.description = "提供商品或服务的组织";
+
+const REVIEW_SESSION: ModelingSession = {
+  id: REVIEW_SESSION_ID,
+  workspace_id: WORKSPACE_ID,
+  title: "供应商范围修订",
+  base_version_id: "ver-visual-demo-2",
+  revision: 7,
+  draft: REVIEW_DRAFT,
+  draft_sha256: "d".repeat(64),
+  base_version_sha256: "2".repeat(64),
+  pending_proposal_count: 3,
+  latest_batch_id: REVIEW_BATCH.id,
+  base_diff: [{
+    element_kind: "object_type",
+    element_id: SUPPLIER.id,
+    label: "供应商",
+    change: "updated",
+    before: REVIEW_BATCH.items[0].before,
+    after: REVIEW_BATCH.items[0].after,
+    field_changes: REVIEW_BATCH.items[0].field_changes,
+  }],
+  graph: {
+    workspace_id: WORKSPACE_ID,
+    version_id: "",
+    version_sha256: "d".repeat(64),
+    version_content_sha256: "d".repeat(64),
+    normalized_snapshot_sha256: "d".repeat(64),
+    nodes: [],
+    edges: [],
+  },
+  material_ids: ["material-visual-guide"],
+  task_status: "finished",
+  task_detail: "",
+  dataagent_topic_id: null,
+  dataagent_task_id: null,
+  updated_at: "2026-10-17T02:00:00Z",
+};
+
+const REVIEW_PREVIEW: PublishPreview = {
+  session_revision: 7,
+  base_version_id: "ver-visual-demo-2",
+  base_version_number: 2,
+  current_version_id: "ver-visual-demo-3",
+  current_version_number: 3,
+  next_version_number: 4,
+  current_version_sha256: "3".repeat(64),
+  merged_snapshot_sha256: "e".repeat(64),
+  merged_model: REVIEW_DRAFT,
+  validation: {
+    ...FIXTURE_VERSIONS[0].validation,
+    warnings: [{ message: "供应商名称尚未绑定数据来源" }],
+  },
+  changes: REVIEW_SESSION.base_diff,
+  labels: { [SUPPLIER.id]: "供应商" },
+  impacts: [],
+  auto_merged: [],
+};
+
+const REVIEW_CONFLICTS: MergeConflict[] = [
+  {
+    key: `/object_types/${SUPPLIER.id}/description`,
+    element_kind: "object_type",
+    element_id: SUPPLIER.id,
+    element_label: "供应商",
+    path: "description",
+    kind: "field",
+    base: "提供商品的组织",
+    latest: "经资质审核的商品供应组织",
+    draft: "提供商品或服务的组织",
+    allowed: ["latest", "draft", "custom"],
+  },
+  {
+    key: `/object_types/${SUPPLIER.id}/tags`,
+    element_kind: "object_type",
+    element_id: SUPPLIER.id,
+    element_label: "供应商",
+    path: "tags",
+    kind: "field",
+    base: ["采购"],
+    latest: ["采购", "资质管理"],
+    draft: ["采购", "服务"],
+    allowed: ["latest", "draft", "custom", "both"],
+  },
+];
+
+/** Adds review data while keeping the common workspace API interception. */
+export async function mockReviewApi(page: Page, options: { conflicts?: boolean } = {}) {
+  await mockMappingsApi(page);
+  const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
+  const sessionPath = `${base}/sessions/${REVIEW_SESSION_ID}`;
+  const comparison: Comparison = {
+    left: null,
+    right: FIXTURE_VERSIONS[0],
+    changes: [
+      { path: `/object_types/${SUPPLIER.id}/description`, kind: "changed", before: "提供商品的组织", after: "提供商品或服务的组织" },
+      { path: "/properties/service_scope", kind: "added", before: null, after: { name: "供应范围", value_kind: "string" } },
+    ],
+    impacts: [{ kind: "object_type", id: SUPPLIER.id, label: "供应商" }],
+  };
+  const responses: Record<string, unknown> = {
+    [`${base}/sessions`]: { items: [{ ...REVIEW_SESSION, has_unpublished_changes: true }] },
+    [sessionPath]: REVIEW_SESSION,
+    [`${sessionPath}/preview`]: REVIEW_PREVIEW,
+    [`${sessionPath}/proposal-batches`]: { items: [REVIEW_BATCH], next_cursor: null },
+    [`${sessionPath}/proposal-batches/${REVIEW_BATCH.id}`]: REVIEW_BATCH,
+    [`${sessionPath}/agent-conversation`]: { messages: [], run: null },
+    [`${base}/capabilities`]: { agent_configured: true, model: "demo-model", max_file_mb: 256, connections_configured: true, skills: [] },
+    [`${base}/materials`]: { items: [] },
+    [`${base}/version-comparison`]: comparison,
+  };
+  await page.route(
+    (url) => url.pathname.startsWith("/api/"),
+    async (route) => {
+      const { pathname, searchParams } = new URL(route.request().url());
+      if (pathname === `${sessionPath}/preview` && options.conflicts) {
+        await route.fulfill({
+          status: 409,
+          json: { error: { code: "MERGE_CONFLICTS", message: "合并存在冲突", conflicts: REVIEW_CONFLICTS, current_version_id: "ver-visual-demo-3" } },
+        });
+      } else if (pathname === `${base}/version-comparison`) {
+        const left = FIXTURE_VERSIONS.find((version) => version.version_id === searchParams.get("left_id")) ?? null;
+        await route.fulfill({ json: {
+          ...comparison,
+          left,
+          right: FIXTURE_VERSIONS.find((version) => version.version_id === searchParams.get("right_id")) ?? comparison.right,
+          changes: left ? comparison.changes : [{ path: `/object_types/${SUPPLIER.id}`, kind: "added", before: null, after: { name: "供应商" } }],
+        } });
+      } else if (Object.hasOwn(responses, pathname)) {
+        await route.fulfill({ json: responses[pathname] });
+      } else {
+        await route.fallback();
+      }
     },
   );
 }

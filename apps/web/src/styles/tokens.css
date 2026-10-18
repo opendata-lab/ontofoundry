@@ -108,6 +108,15 @@
   /* U2 directory and settings content bounds. */
   --directory-max-width: 1080px;
   --settings-max-width: 880px;
+  /* U3 existing review overlay and preview bounds. */
+  --review-code-height: 360px;
+  --review-detail-height: 64vh;
+  --review-detail-width: 860px;
+  --review-dialog-width: 720px;
+  --review-evidence-width: 420px;
+  --review-conflict-width: 280px;
+  --review-filter-width: 152px;
+  --review-graph-height: 420px;
   --icon-size: 16px;
   --icon-size-sm: 14px;
   --icon-size-xs: 12px;
@@ -118,6 +127,11 @@
    variables directly; the :root values above stay the single source. */
 @theme inline {
   --spacing: var(--space-3xs);
+  --spacing-review-code: var(--review-code-height);
+  --spacing-review-detail: var(--review-detail-height);
+  --spacing-review-evidence: var(--review-evidence-width);
+  --spacing-review-filter: var(--review-filter-width);
+  --spacing-review-graph: var(--review-graph-height);
   --spacing-control-sm: var(--control-height-sm);
   --spacing-control-lg: var(--control-height-lg);
   --spacing-tab-dirty: var(--workspace-tab-dirty-size);
@@ -212,3 +226,15 @@
   background: var(--color-accent);
 }
 .brand-tile-muted { opacity: var(--brand-muted-opacity); }
+
+/* Retained result tabs fill the workbench without reaching nested Tabs. */
+.review-tabs {
+  & > .ant-tabs-content-holder { min-height: 0; flex: 1; }
+  & > .ant-tabs-content-holder > .ant-tabs-content,
+  & > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane { height: 100%; }
+}
+.review-conflicts {
+  display: grid;
+  grid-template-columns: minmax(0, var(--review-conflict-width)) minmax(0, 1fr);
+  gap: var(--space-md);
+}

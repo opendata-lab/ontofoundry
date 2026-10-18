@@ -1,14 +1,15 @@
-import { Alert, Button, Descriptions, Modal, Table, Tag, Typography } from "antd";
+import { Alert, Button, Descriptions, Modal, Table, Typography } from "antd";
 import { useState } from "react";
 import type { DuplicateCandidate, Draft, MaterialObject, ProposalItem } from "../../api/types";
 import { byId, effectiveProperties } from "../../lib/coreModel";
+import { SectionTitle } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
-import { ProposalActions, type CardActions } from "./ProposalCard";
-import { OPERATION, STATUS, STATUS_COLOR } from "./elementMeta";
+import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
+import { OPERATION, STATUS } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
 import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
-const { Text, Title, Paragraph } = Typography;
+const { Text } = Typography;
 
 
 function ReviseDialog({
@@ -39,15 +40,15 @@ function ReviseDialog({
       cancelText="取消"
       okButtonProps={{ disabled: !after, loading: busy }}
       onOk={() => after && onConfirm(after)}
-      width={720}
+      width="var(--review-dialog-width)"
     >
       {!after ? (
         <Alert type="error" showIcon message="当前会话中找不到这个事实，请刷新后重试。" />
       ) : (
         <div className="flex flex-col gap-3">
-          <Paragraph type="secondary" className="!mb-0 text-xs">
+          <p className="m-0 text-xs text-muted">
             提案不再新建事实，而是更新已有事实：保留已有证据，追加本提案的证据；提案中有值的属性覆盖已有值。修订后会生成新的待审提案。
-          </Paragraph>
+          </p>
           <Table
             size="small"
             rowKey="id"
@@ -108,16 +109,14 @@ export function ProposalDetail({
     <Modal
       open
       onCancel={onClose}
-      width={860}
+      width="var(--review-detail-width)"
       title={
         <div className="flex flex-wrap items-center gap-2 pr-8">
           <span>
             {OPERATION[item.operation]}
             {reviewKindName(item.target_kind)} · {item.display_name}
           </span>
-          <Tag color={STATUS_COLOR[item.status]} className="!m-0">
-            {STATUS[item.status]}
-          </Tag>
+          <ProposalStatusMark status={item.status} />
           <code className="text-xs font-normal text-muted">{technical}</code>
         </div>
       }
@@ -134,15 +133,13 @@ export function ProposalDetail({
         </div>
       }
     >
-      <div className="flex max-h-[64vh] flex-col gap-4 overflow-auto">
+      <div className="flex max-h-review-detail flex-col gap-4 overflow-auto">
         {["conflict", "stale"].includes(item.status) && (
           <Alert type="warning" showIcon message={`${STATUS[item.status]}：${item.status_reason || "当前目标已发生变化，请重新评估"}`} />
         )}
         {canRevise && (
-          <section className="flex flex-col gap-2">
-            <Title level={5} className="!m-0">
-              可能重复的已有事实
-            </Title>
+          <section className="flex flex-col gap-2 border-b border-rule pb-4">
+            <SectionTitle title="可能重复的已有事实" />
             <Text type="secondary" className="text-xs">
               确认是同一个实例时，把这条新建提案改为更新已有事实，不会自动合并。
             </Text>
@@ -168,30 +165,22 @@ export function ProposalDetail({
             />
           </section>
         )}
-        <section className="flex flex-col gap-2">
-          <Title level={5} className="!m-0">
-            字段差异 <Text type="secondary" className="text-xs font-normal">{changes.length} 处改动</Text>
-          </Title>
+        <section className="flex flex-col gap-2 border-b border-rule pb-4">
+          <SectionTitle title="字段差异" note={`${changes.length} 处改动`} />
           <FieldDiff changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
         </section>
         {reason && (
-          <section className="flex flex-col gap-1">
-            <Title level={5} className="!m-0">
-              提案理由
-            </Title>
-            <Paragraph className="!mb-0 whitespace-pre-wrap">{reason}</Paragraph>
+          <section className="flex flex-col gap-1 border-b border-rule pb-4">
+            <SectionTitle title="提案理由" />
+            <p className="m-0 whitespace-pre-wrap">{reason}</p>
           </section>
         )}
-        <section className="flex flex-col gap-2">
-          <Title level={5} className="!m-0">
-            材料证据 <Text type="secondary" className="text-xs font-normal">{item.evidence.length} 条引用</Text>
-          </Title>
+        <section className="flex flex-col gap-2 border-b border-rule pb-4">
+          <SectionTitle title="材料证据" note={`${item.evidence.length} 条引用`} />
           <ReviewEvidence evidence={item.evidence} />
         </section>
-        <section className="flex flex-col gap-2">
-          <Title level={5} className="!m-0">
-            依赖关系 {deps.length > 0 && <Text type="secondary" className="text-xs font-normal">{deps.length} 项</Text>}
-          </Title>
+        <section className="flex flex-col gap-2 border-b border-rule pb-4">
+          <SectionTitle title="依赖关系" note={deps.length > 0 ? `${deps.length} 项` : undefined} />
           {deps.length ? (
             <>
               <Descriptions
@@ -204,12 +193,10 @@ export function ProposalDetail({
                     label: dependency ? reviewKindName(dependency.target_kind) : "缺失",
                     children: dependency ? (
                       <span className="flex items-center gap-2">
-                        <Button type="link" size="small" className="!h-auto !p-0" onClick={() => actions.open(dependency)}>
+                        <Button type="link" size="small" className="h-auto p-0" onClick={() => actions.open(dependency)}>
                           {dependency.display_name}
                         </Button>
-                        <Tag color={STATUS_COLOR[dependency.status]} className="!m-0">
-                          {STATUS[dependency.status]}
-                        </Tag>
+                        <ProposalStatusMark status={dependency.status} />
                       </span>
                     ) : (
                       <Text type="danger">依赖提案缺失，暂不可接受</Text>

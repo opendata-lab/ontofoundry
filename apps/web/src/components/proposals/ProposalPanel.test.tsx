@@ -189,6 +189,32 @@ describe("proposal review", () => {
     expect(customer).toBeDefined();
   });
 
+  it("opens evidence without opening the row and keeps source identifiers and manual confirmation available in detail", async () => {
+    const manual = {
+      kind: "manual" as const,
+      id: "manual-confirmation",
+      created_by: "林晓",
+      created_at: "2026-10-17T02:00:00Z",
+      note: "已核对供应商名称",
+    };
+    const supplier = { ...items[2], evidence: [evidence, manual] };
+    panel(state({ detail: batch([supplier]) }));
+    fireEvent.click(within(row("supplier")).getByRole("button", { name: "查看 供应商 的证据（2 条）" }));
+    const popover = (await screen.findByText("制度.md")).closest(".ant-popover") as HTMLElement;
+    expect(within(popover).getByText("供应商名称以材料为准")).toBeInTheDocument();
+    expect(within(popover).getByText("已核对供应商名称")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(within(popover).getByText("来源标识"));
+    expect(await within(popover).findByText("a".repeat(64))).toBeInTheDocument();
+    fireEvent.click(within(row("supplier")).getByRole("button", { name: "查看 供应商 的证据（2 条）" }));
+    fireEvent.keyDown(row("supplier"), { key: "Enter" });
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("旧供应商名称")).toBeInTheDocument();
+    expect(within(dialog).getByText("供应商名称以材料为准")).toBeInTheDocument();
+    expect(within(dialog).getByText("已核对供应商名称")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "接受 供应商" })).toBeEnabled();
+  });
+
   it("turns a duplicate fact create into an update of the chosen existing fact", async () => {
     const draft = example("07-instances-and-evidence");
     const customer = draft.material_objects.find((o) => o.values.customer_no === "C001")!;

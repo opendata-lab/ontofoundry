@@ -60,6 +60,15 @@
 
 `PublishPanel`、`ConflictResolver`、`ReleaseReview`、`ProposalPanel`、`ProposalCard`、`ProposalDetail`、`EvidencePopover`、`ModelResults`。
 
+### U3 完成记录（2026-10-18）
+
+- 改造上述八个组件，沿用 `Panel` / `PanelToolbar` / `SectionTitle` 与 Ant Design 控件。发布上下文、检查结果、历史比较、提案详情与证据按分割线分区，移除嵌套卡片；状态统一使用 `StatusMark`，类型与操作保留中性标签。保留发布预览、校验与冲突阻断、三方对比和自定义合并、版本比较、筛选搜索、批量审核、依赖联动、重复事实修订及证据来源查看的功能和文案含义。
+- 八个组件移除 Tailwind 任意值、强制覆盖、内联样式、颜色字面量及彩色状态 Tag，全部加入 lint error 清单。当前 **0 error、125 warn，分布在 21 个文件**；比 U2 减少 59 warn，剩余项属于后续批次。
+- 设计第 4 节补充发布与提案的分区模式、窄面板工具栏按组换行及构建结果的剩余高度规则。`Panel` 新增显式 `fill` 选项，默认保留目录等页面的内容高度；构建结果页签的高度选择器只作用于直接子级。`StatusMark` 补充修改和待审状态，并透传原生事件及引用，保留 Tooltip 的悬停交互。详情、证据弹层、冲突列与 JSON 预览的尺寸集中到 `tokens.css`。
+- 在 `publish-proposals.spec.ts` 新增 5 个视觉用例、6 个截图断言：发布检查、展开的版本历史比较、冲突处理、提案列表、提案详情与证据弹层（含来源标识和人工确认）。复用 `fixtures.ts` 的接口拦截和虚构工作空间，补齐固定会话、提案批次、证据、合并预览及冲突数据，固定预览时间。接口只拦截以 `/api/` 开头的路径；页签计数使用 `[role=tab][aria-selected]`。新增 1 项功能测试，覆盖证据按钮不会误开详情、来源标识展开及键盘打开详情后保留证据。
+- 全部代码编辑完成后，使用 Node 22.19.0 统一运行指定检查：`vitest --run` 37 个文件、165 项通过；`tsc -b`（含视觉用例）、`lint`、`check:core-types`、`build` 及 `git diff --check` 通过。仍有既有日期控件空值提示与构建大体积 chunk 提示。
+- 按设计第 3 节静态核对容器层级、对齐线、字号档位、状态显示和表格密度。本轮未启动服务、未连接数据库、未访问局域网，未启动 Chromium，未运行 `test:visual` / `test:visual:update`，未生成截图。**截图基准更新、1440×900 截图对比及浏览器视觉验收待协调者在沙箱外运行。** 未 commit 或 push。
+
 ## U4 元素弹窗
 
 `ElementInspector` 及 `ElementPanels`、`PropertyMappingTable`、`RelationMappingTable`、`LinkMappingPanel`、`ObjectTablePicker`、`DatasetPanel`、`MetricPanel`、`MetricForm`、`MetricPreview`、`DerivedConditionEditor`、`ElementInstances`。需要先在设计第 4 节补充详情弹窗的键值区和小节布局。

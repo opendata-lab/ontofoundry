@@ -131,7 +131,7 @@ export default tseslint.config(
       ],
     },
   },
-  // Migrated U0, U1 and U2 files enforce all visual consistency rules as errors.
+  // Migrated U0–U3 files enforce all visual consistency rules as errors.
   {
     files: [
       "src/pages/MappingsPage.tsx",
@@ -147,6 +147,14 @@ export default tseslint.config(
       "src/components/AsyncState.tsx",
       "src/components/TagList.tsx",
 
+      "src/components/publish/PublishPanel.tsx",
+      "src/components/publish/ConflictResolver.tsx",
+      "src/components/ReleaseReview.tsx",
+      "src/components/proposals/ProposalPanel.tsx",
+      "src/components/proposals/ProposalCard.tsx",
+      "src/components/proposals/ProposalDetail.tsx",
+      "src/components/proposals/EvidencePopover.tsx",
+      "src/components/ModelResults.tsx",
       "src/components/DatasetPicker.tsx",
       "src/components/elements/MappingWidgets.tsx",
       "src/components/PageHeader.tsx",

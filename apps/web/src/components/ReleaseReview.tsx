@@ -1,10 +1,11 @@
-import { Alert, Collapse, Select, Spin, Table, Tag, Typography } from "antd";
+import { Alert, Collapse, Select, Spin, Table, Typography } from "antd";
 import { useEffect, useState } from "react";
+import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "./layout";
 import { api } from "../api/client";
 import type { Comparison, Json, VersionSummary } from "../api/types";
 
 const { Text } = Typography;
-const KINDS = { added: { text: "新增", color: "success" }, removed: { text: "删除", color: "error" }, changed: { text: "修改", color: "processing" } };
+const KINDS: Record<Comparison["changes"][number]["kind"], { text: string; state: StatusState }> = { added: { text: "新增", state: "mapped" }, removed: { text: "删除", state: "error" }, changed: { text: "修改", state: "info" } };
 
 const json = (value: Json) =>
   value === null || value === undefined ? (
@@ -32,7 +33,7 @@ function Changes({ value }: { value: Comparison }) {
             title: "变化",
             key: "kind",
             width: 72,
-            render: (_, c) => <Tag color={KINDS[c.kind].color} className="!m-0">{KINDS[c.kind].text}</Tag>,
+            render: (_, c) => <StatusMark state={KINDS[c.kind].state} label={KINDS[c.kind].text} />,
           },
           { title: "修改前", key: "before", render: (_, c) => json(c.before) },
           { title: "修改后", key: "after", render: (_, c) => json(c.after) },
@@ -64,12 +65,12 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
   const options = versions.map((v) => ({ value: v.version_id, label: `v${v.version}` }));
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-3">
+      <PanelToolbar className="px-0">
         <span className="inline-flex items-center gap-2">
           基线
           <Select
             aria-label="比较基线"
-            className="w-[120px]"
+            className="w-30"
             value={left}
             options={[{ value: "", label: "空基线" }, ...options]}
             onChange={setLeft}
@@ -77,9 +78,9 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
         </span>
         <span className="inline-flex items-center gap-2">
           目标
-          <Select aria-label="比较目标" className="w-[120px]" value={right} options={options} onChange={setChosen} />
+          <Select aria-label="比较目标" className="w-30" value={right} options={options} onChange={setChosen} />
         </span>
-      </div>
+      </PanelToolbar>
       {left === right ? (
         <Text type="secondary">请选择不同版本。</Text>
       ) : error ? (
@@ -96,9 +97,10 @@ function ComparisonBody({ workspaceId, versions }: { workspaceId: string; versio
 export function HistoryComparison({ workspaceId, versions }: { workspaceId: string; versions: VersionSummary[] }) {
   return (
     <Collapse
+      ghost
       size="small"
       destroyOnHidden
-      items={[{ key: "compare", label: "比较历史版本", children: <ComparisonBody workspaceId={workspaceId} versions={versions} /> }]}
+      items={[{ key: "compare", label: <SectionTitle title="比较历史版本" />, children: <ComparisonBody workspaceId={workspaceId} versions={versions} /> }]}
     />
   );
 }

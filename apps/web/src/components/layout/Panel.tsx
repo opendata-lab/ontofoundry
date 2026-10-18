@@ -8,15 +8,18 @@ import type { ReactNode } from "react";
 export function Panel({
   children,
   footer,
+  fill = false,
   className = "",
 }: {
   children: ReactNode;
   footer?: ReactNode;
+  /** Workbench panels fill the available height and scroll their own content. */
+  fill?: boolean;
   className?: string;
 }) {
   return (
     <section
-      className={`flex flex-none flex-col overflow-hidden rounded-md border border-rule bg-surface shadow-panel ${className}`.trim()}
+      className={`flex ${fill ? "min-h-0 flex-1" : "flex-none"} flex-col overflow-hidden rounded-md border border-rule bg-surface shadow-panel ${className}`.trim()}
     >
       {children}
       {footer && (

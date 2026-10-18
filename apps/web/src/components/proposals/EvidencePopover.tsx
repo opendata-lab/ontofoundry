@@ -1,5 +1,5 @@
-import { Card, Collapse, Descriptions, Typography } from "antd";
-import { FileText, UserCheck } from "lucide-react";
+import { Collapse, Descriptions, Typography } from "antd";
+import { SectionTitle } from "../layout";
 import type { EvidenceView } from "../../api/types";
 
 const { Text } = Typography;
@@ -13,17 +13,12 @@ export function ReviewEvidence({ evidence }: { evidence: EvidenceView[] }) {
     <div className="flex flex-col gap-2">
       {evidence.map((entry) =>
         "material_id" in entry ? (
-          <Card key={entry.id} size="small" className="bg-surface-soft">
+          <section key={entry.id} className="border-b border-rule-soft py-2">
             <div className="flex flex-col gap-1">
-              <span className="inline-flex items-center gap-1 text-sm">
-                <FileText size={14} />
-                <strong>{entry.material_name || "材料"}</strong>
-                <Text type="secondary">
-                  · {lines(entry.locator.line_start, entry.locator.line_end)}
-                  {entry.locator.heading ? ` · ${entry.locator.heading}` : ""}
-                  {entry.material_archived ? "（已归档）" : ""}
-                </Text>
-              </span>
+              <SectionTitle
+                title={entry.material_name || "材料"}
+                note={`${lines(entry.locator.line_start, entry.locator.line_end)}${entry.locator.heading ? ` · ${entry.locator.heading}` : ""}${entry.material_archived ? "（已归档）" : ""}`}
+              />
               <blockquote className="m-0 border-l-2 border-rule-strong pl-3 text-sm whitespace-pre-wrap">
                 {entry.quote || "未提供引用原文"}
               </blockquote>
@@ -61,18 +56,14 @@ export function ReviewEvidence({ evidence }: { evidence: EvidenceView[] }) {
                 ]}
               />
             </div>
-          </Card>
+          </section>
         ) : (
-          <Card key={entry.id} size="small" className="bg-surface-soft">
+          <section key={entry.id} className="border-b border-rule-soft py-2">
             <div className="flex flex-col gap-1">
-              <span className="inline-flex items-center gap-1 text-sm">
-                <UserCheck size={14} />
-                <strong>人工确认</strong>
-                <Text type="secondary">· {entry.created_by}</Text>
-              </span>
+              <SectionTitle title="人工确认" note={entry.created_by} />
               <span className="text-sm">{entry.note || "未提供说明"}</span>
             </div>
-          </Card>
+          </section>
         ),
       )}
     </div>
