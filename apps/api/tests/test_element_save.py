@@ -1037,3 +1037,150 @@ def test_example06_old_session_imports_effective_inheritance_and_bindings(
             next(o for o in synced.object_types if str(o.id) == parent["id"]).description
             == "保留已有父类型草稿"
         )
+
+
+@pytest.mark.parametrize("column", ["vip_note", "party_name"])
+def test_example06_shared_parent_note_rename_keeps_column_binding(client, column):
+    from pr23_fixtures import example_session
+
+    from ontofoundry_api.domain.bindings import binding_readiness, resolve_binding
+    from ontofoundry_api.domain.core import CoreDraft
+
+    session = example_session(client, "06-inheritance", published=True)
+    candidate = deepcopy(session["draft"])
+    vip = next(o for o in candidate["object_types"] if o["technical_name"] == "vip_party")
+    next(p for p in candidate["properties"] if p["owner_type_id"] == vip["id"])[
+        "technical_name"
+    ] = "note2"
+    mapping = next(m for m in candidate["mappings"] if m["type_id"] == vip["id"])
+    assert mapping["sources"] == []
+    mapping["fields"] = {"note2": {"kind": "column", "source_id": "main", "column": column}}
+    body = save_body(client, session, candidate, target_id=vip["id"])
+    assert preflight_confirmations(client, body) == []
+    response = client.post(ROOT + "/element-saves", json=body)
+    assert response.status_code == 200, response.text
+    for raw in (response.json()["draft"], response.json()["session"]["draft"]):
+        graph = CoreDraft.model_validate(raw)
+        obj = next(o for o in graph.object_types if str(o.id) == vip["id"])
+        binding = resolve_binding(graph, obj.id)
+        assert binding.fields["note2"].model_dump(mode="json") == mapping["fields"]["note2"]
+        assert "note" not in binding.fields
+        assert binding_readiness(graph, obj.id).status == "bound"
+
+
+@pytest.mark.parametrize(
+    ("left_kind", "left", "right_kind", "right"),
+    [
+        ("boolean", True, "integer", 1),
+        ("boolean", False, "integer", 0),
+        ("integer", 1, "float", 1.0),
+        ("integer", 0, "decimal", 0.0),
+    ],
+)
+@pytest.mark.parametrize("already_rewritten", [False, True])
+def test_typed_fact_swap_requires_confirmations_and_preserves_value_types(
+    client, left_kind, left, right_kind, right, already_rewritten
+):
+    from pr23_fixtures import typed_fact_swap
+    from test_modeling import publish
+
+    from ontofoundry_api.domain.canonical import element_sha256
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.dependencies import rewrite_references
+    from ontofoundry_api.services.element_save import calculate_element_save
+
+    initial = create_session(client)
+    before, candidate, target_id = typed_fact_swap(left_kind, left, right_kind, right)
+    before["workspace_id"] = candidate["workspace_id"] = initial["workspace_id"]
+    response = save(client, initial, before)
+    assert response.status_code == 200, response.text
+    assert publish(client, response.json()).status_code == 200
+    session = create_session(client)
+    original = session["draft"]
+    if already_rewritten:
+        candidate = rewrite_references(
+            CoreDraft.model_validate(original), CoreDraft.model_validate(candidate)
+        ).model_dump(mode="json")
+    inputs = deepcopy((original, candidate))
+    calculation = calculate_element_save(
+        original, original, original, candidate, "object_type", target_id
+    )
+    assert (original, candidate) == inputs
+    body = save_body(client, session, candidate, target_id=target_id)
+    confirmations = preflight_confirmations(client, body)
+    facts = [f for f in original["material_objects"] if f["type_id"] == target_id]
+    assert {c["target_id"] for c in confirmations} == {f["id"] for f in facts}
+    assert {c["target_id"] for c in calculation.affected_items} == {f["id"] for f in facts}
+    for fact in facts:
+        assert next(c for c in confirmations if c["target_id"] == fact["id"]) == {
+            "target_kind": "material_object",
+            "target_id": fact["id"],
+            "expected_target_hash": element_sha256(fact, collection="material_objects"),
+        }
+    staged = calculate_element_save(
+        original,
+        original,
+        calculation.session_draft,
+        calculation.session_draft,
+        "object_type",
+        target_id,
+    )
+    assert {c["target_id"] for c in staged.affected_items} == {f["id"] for f in facts}
+    for entry in staged.affected_items:
+        fact = next(
+            f
+            for f in calculation.session_draft["material_objects"]
+            if f["id"] == entry["target_id"]
+        )
+        assert entry["expected_target_hash"] == element_sha256(
+            fact, collection="material_objects"
+        )
+    before_version = client.get(ONTOLOGY + "/version").json()
+    before_session = client.get(ROOT + f"/sessions/{session['id']}").json()
+    for items, status, code in [
+        ([], 422, "ELEMENT_SCOPE_INVALID"),
+        (
+            [{**confirmations[0], "expected_target_hash": "0" * 64}, *confirmations[1:]],
+            409,
+            "VERSION_CHANGED",
+        ),
+    ]:
+        response = client.post(
+            ROOT + "/element-saves", json={**body, "affected_items": items}
+        )
+        assert response.status_code == status, response.text
+        assert response.json()["error"]["code"] == code
+        assert client.get(ONTOLOGY + "/version").json() == before_version
+        assert client.get(ROOT + f"/sessions/{session['id']}").json() == before_session
+    response = client.post(
+        ROOT + "/element-saves", json={**body, "affected_items": confirmations}
+    )
+    assert response.status_code == 200, response.text
+    for raw in (
+        calculation.merged,
+        calculation.session_draft,
+        response.json()["draft"],
+        response.json()["session"]["draft"],
+    ):
+        for fact in raw["material_objects"]:
+            if fact["type_id"] == target_id:
+                assert type(fact["values"]["is_vip"]) is type(left)
+                assert type(fact["values"]["name"]) is type(right)
+                assert fact["values"]["is_vip"] == left
+                assert fact["values"]["name"] == right
+
+
+def test_type_only_out_of_scope_fact_edit_is_rejected():
+    from pr23_fixtures import typed_fact_swap
+
+    from ontofoundry_api.services.element_save import calculate_element_save
+    from ontofoundry_api.services.errors import ServiceError
+
+    before, _, target_id = typed_fact_swap("boolean", True, "integer", 1)
+    candidate = deepcopy(before)
+    candidate["object_types"][0]["description"] = "仅修改说明"
+    fact = next(f for f in candidate["material_objects"] if f["type_id"] == target_id)
+    fact["values"]["name"] = 1
+    with pytest.raises(ServiceError) as error:
+        calculate_element_save(before, before, before, candidate, "object_type", target_id)
+    assert error.value.code == "ELEMENT_SCOPE_INVALID"

@@ -162,3 +162,72 @@ def test_material_quote_checked_and_manual_cannot_be_authored():
     evidence["quote"] = "不存在"
     with pytest.raises(ProposalContractError):
         parse(result(ctx, [item]), ctx, lambda _: ("a" * 64, ["客户订单"]))
+
+
+@pytest.mark.parametrize(
+    ("left_kind", "left", "right_kind", "right"),
+    [
+        ("boolean", True, "integer", 1),
+        ("boolean", False, "integer", 0),
+        ("integer", 1, "float", 1.0),
+        ("integer", 0, "decimal", 0.0),
+    ],
+)
+def test_typed_fact_swap_batch_must_include_rewritten_facts_at_ingestion(
+    left_kind, left, right_kind, right
+):
+    from copy import deepcopy
+
+    from pr23_fixtures import typed_fact_swap
+
+    from ontofoundry_api.contracts.proposals import apply_items
+    from ontofoundry_api.domain.canonical import element_sha256
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.dependencies import rewrite_references
+    from ontofoundry_api.domain.validation import validate_core_graph
+
+    before, candidate, target_id = typed_fact_swap(left_kind, left, right_kind, right)
+    ctx = context(before)
+    final = rewrite_references(
+        CoreDraft.model_validate(before), CoreDraft.model_validate(candidate)
+    ).model_dump(mode="json")
+
+    def update(kind, collection, previous, after):
+        # The wire after omits the element ID; the parser restores it.
+        definition = deepcopy(after)
+        definition.pop("id")
+        return {
+            "operation": "update",
+            "target_kind": kind,
+            "target_id": previous["id"],
+            "expected_target_hash": element_sha256(previous, collection=collection),
+            "before": previous,
+            "after": definition,
+        }
+
+    items = [
+        update("property", "properties", previous, after)
+        for previous, after in zip(
+            before["properties"], candidate["properties"], strict=True
+        )
+        if previous["technical_name"] != after["technical_name"]
+    ]
+    assert len(items) == 2
+    with pytest.raises(ProposalContractError, match="引用改写涉及批次外元素") as error:
+        parse(result(ctx, items), ctx)
+    assert error.value.code == "ELEMENT_INVALID"
+    facts = [f for f in before["material_objects"] if f["type_id"] == target_id]
+    for fact in facts:
+        after = next(f for f in final["material_objects"] if f["id"] == fact["id"])
+        items.append(update("material_object", "material_objects", fact, after))
+    parsed = parse(result(ctx, items), ctx)
+    assert len({item.atomic_group_id for item in parsed.items}) == 1
+    accepted = validate_core_graph(
+        CoreDraft.model_validate(apply_items(before, parsed.items))
+    )
+    for fact in accepted.material_objects:
+        if str(fact.type_id) == target_id:
+            assert type(fact.values["is_vip"]) is type(left)
+            assert type(fact.values["name"]) is type(right)
+            assert fact.values["is_vip"] == left
+            assert fact.values["name"] == right

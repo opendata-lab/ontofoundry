@@ -14,7 +14,11 @@ from pydantic import TypeAdapter
 
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
 from ontofoundry_api.domain.core import CoreDraft, MaterialEvidence
-from ontofoundry_api.domain.dependencies import reference_index, validate_candidate_graph
+from ontofoundry_api.domain.dependencies import (
+    reference_index,
+    strict_equal,
+    validate_candidate_graph,
+)
 from ontofoundry_api.domain.evidence import (
     EvidenceError,
     MaterialLookup,
@@ -391,7 +395,7 @@ def group_items(draft, items):
                 if dependent and dependent.id != changed.id:
                     deps[changed.id].add(dependent.id)
     untouched = set(original) - set(by_target)
-    if any(final.get(i) != original[i] for i in untouched if i in final):
+    if any(not strict_equal(final.get(i), original[i]) for i in untouched if i in final):
         raise ValueError("引用改写涉及批次外元素，请显式补齐受影响提案")
     parent = {i.id: i.id for i in items}
 

@@ -293,22 +293,22 @@ def rewrite_references(before: CoreDraft, candidate: CoreDraft) -> CoreDraft:
             final_values = rewrite_values(previous, previous.values)
         except ValueError:
             final_values = None
-        if not _strict_equal(fact.values, final_values):
+        if not strict_equal(fact.values, final_values):
             fact.values = rewrite_values(previous, fact.values)
     return result
 
 
-def _strict_equal(left, right):
+def strict_equal(left, right):
     """Compare JSON values without conflating boolean, integer and float kinds."""
     if type(left) is not type(right):
         return False
     if isinstance(left, dict):
         return left.keys() == right.keys() and all(
-            _strict_equal(value, right[key]) for key, value in left.items()
+            strict_equal(value, right[key]) for key, value in left.items()
         )
     if isinstance(left, list):
         return len(left) == len(right) and all(
-            _strict_equal(a, b) for a, b in zip(left, right, strict=True)
+            strict_equal(a, b) for a, b in zip(left, right, strict=True)
         )
     return left == right
 

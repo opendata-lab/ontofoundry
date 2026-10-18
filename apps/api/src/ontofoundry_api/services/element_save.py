@@ -11,6 +11,7 @@ from ontofoundry_api.domain.dependencies import (
     affected_metrics,
     reference_index,
     rewrite_references,
+    strict_equal,
 )
 from ontofoundry_api.domain.graph import DraftIndex
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
@@ -99,7 +100,10 @@ def _target_candidate(original, edited, kind, element_id):
             if identity in start[c] | end[c]:
                 continue
             # The client may omit automatic rewrites, or send precisely that rewrite.
-            if submitted.get(identity) not in (old.get(identity), required.get(identity)):
+            if not any(
+                strict_equal(submitted.get(identity), allowed)
+                for allowed in (old.get(identity), required.get(identity))
+            ):
                 _scope_error()
     return expected
 
@@ -144,6 +148,8 @@ def _include_missing_upstream(synced, merged, kind, element_id):
             dependencies.update(p.id for p in index.effective_properties(owner))
             dependencies.update(link.id for link in index.effective_links(owner))
             dependencies.update(rule.id for rule in index.effective_rules(owner))
+        if owner in index.objects:
+            # Navigated objects need their effective bindings and source datasets.
             dependencies.update(m.id for m in resolve_binding(graph, owner).mappings)
         for dependency in sorted(dependencies, key=str):
             pending.append(dependency)
@@ -212,8 +218,8 @@ def calculate_element_save(
             if identity in local:
                 continue
             if (
-                (identity not in after or previous == after[identity])
-                and current.get(identity) == published.get(identity)
+                (identity not in after or strict_equal(previous, after[identity]))
+                and strict_equal(current.get(identity), published.get(identity))
                 and UUID(identity) not in dataset_metrics
                 and identity not in imported
             ):
