@@ -100,40 +100,17 @@ export default tseslint.config(
       ],
     },
   },
-  // Design §7 exception: graph canvases allow inline `style=` for xyflow dynamic coordinates/dimensions.
+  // Migrated U0–U5 files enforce all visual consistency rules as errors.
   {
     files: [
-      "src/components/OntologyGraph.tsx",
-      "src/components/elements/ObjectRelationGraph.tsx",
-      "src/components/SemanticView.tsx",
-    ],
-    rules: {
-      "no-restricted-syntax": [
-        "warn",
-        ...nativeControlSelectors,
-        ...arbitraryClassSelectors,
-        ...importantClassSelectors,
-        ...colorLiteralSelectors,
-        tagColorSelector,
-      ],
-    },
-  },
-  // Design §7 exception: Markdown renderer allows typography/prose classes for external content.
-  {
-    files: ["src/components/Markdown.tsx"],
-    rules: {
-      "no-restricted-syntax": [
-        "warn",
-        ...nativeControlSelectors,
-        ...importantClassSelectors,
-        inlineStyleSelector,
-        tagColorSelector,
-      ],
-    },
-  },
-  // Migrated U0–U4 files enforce all visual consistency rules as errors.
-  {
-    files: [
+      "src/pages/BuilderPage.tsx",
+      "src/components/BuilderConversationEmpty.tsx",
+      "src/components/SessionPicker.tsx",
+      "src/components/TableMaterialPicker.tsx",
+      "src/pages/OntologyViewPage.tsx",
+      "src/components/OntologyOverview.tsx",
+      "src/components/Markdown.tsx",
+      "src/pages/InstancesPage.tsx",
       "src/pages/MappingsPage.tsx",
       "src/pages/TypeCatalogPage.tsx",
       "src/pages/ConnectionsPage.tsx",
@@ -178,6 +155,24 @@ export default tseslint.config(
         "error",
         ...nativeControlSelectors,
         ...visualConsistencySelectors,
+      ],
+    },
+  },
+  // Design §7: only canvas coordinates and dimensions may use JSX style.
+  {
+    files: [
+      "src/components/OntologyGraph.tsx",
+      "src/components/elements/ObjectRelationGraph.tsx",
+      "src/components/SemanticView.tsx",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        ...nativeControlSelectors,
+        ...arbitraryClassSelectors,
+        ...importantClassSelectors,
+        ...colorLiteralSelectors,
+        tagColorSelector,
       ],
     },
   },

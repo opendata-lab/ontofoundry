@@ -202,3 +202,15 @@ it("shows no reply hint for a run that produced its result", async () => {
   await screen.findByRole("button", { name: "开始建模" });
   expect(screen.queryByText(/请在对话中回复/)).toBeNull();
 });
+
+
+it("preserves a scenario while toggling the configuration panel", async () => {
+  renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  const input = await screen.findByRole("textbox", { name: "业务场景描述" });
+  fireEvent.change(input, { target: { value: "星河采购协同" } });
+  fireEvent.click(screen.getByRole("button", { name: "收起构建配置" }));
+  expect(screen.queryByRole("textbox", { name: "业务场景描述" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "展开构建配置" }));
+  expect(screen.getByRole("textbox", { name: "业务场景描述" })).toHaveValue("星河采购协同");
+  await waitFor(() => expect(screen.getByRole("button", { name: "开始建模" })).toBeEnabled());
+});

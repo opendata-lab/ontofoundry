@@ -85,6 +85,14 @@
 
 `BuilderPage`、`BuilderConversationEmpty`、`SessionPicker`、`TableMaterialPicker`、`OntologyViewPage`、`OntologyOverview`、`OntologyGraph`、`ObjectRelationGraph`、`SemanticView`、`InstancesPage`、`Markdown`。画布部分按设计第 7 节例外处理。
 
+### U5 完成记录（2026-10-18）
+
+- 改造本节列出的十一个页面与组件，构建页沿用三栏工作台，配置与会话使用并列 `Panel`，结果面板复用 U3；页头、面板工具栏和小节标题分别使用 `PageHeader`、`PanelToolbar` 和 `SectionTitle`。全局总览以分割线组织层级统计，语义视图保留资源管理器与画布，实例筛选和表格收进同一面板，详情使用无边框 Descriptions 与分区。会话与发布状态统一使用 `StatusMark`，正文、辅助信息和标题使用 13 / 12 / 16px 档位，Markdown 代码块引用现有颜色 tokens。
+- 保留会话切换、新建、上传、材料选择、场景输入、提案、发布入口、全局缩放、图谱拖动与缩放、语义资源筛选及实例列表和详情行为。移除 Tailwind 任意值、强制覆盖、非画布内联样式和颜色字面量；会话 SDK 通过公开自定义属性引用现有 tokens，不新增视觉数值或样式文件。画布仅保留节点尺寸、标签坐标与缩略图尺寸的 `style` 例外。十一个文件的视觉规则均升级为 error，Markdown 也执行完整规则。
+- 新增 `builder-canvas.spec.ts` 的 **5 个视觉用例、5 个截图断言**：空会话、有提案的构建页、全局总览、语义视图、实例浏览。复用 `fixtures.ts`，补充固定总览、材料和文档实例数据；仅拦截以 `/api/` 开头的路径，页签计数使用 `[role=tab][aria-selected]`。视口固定 1440×900，全局图复位到 100%，语义图适配后等待视口动画稳定；若协调者运行后仍不稳定，按任务要求收窄到工具栏和侧栏截图。
+- 新增场景描述在配置栏收起和展开后保留的功能测试，并更新总览统计测试，避免依赖已移除的 Statistic 类。使用 Node 22.19.0 统一检查：`vitest --run` 37 个文件、167 项通过；`tsc -b`（含视觉用例）、`lint`、`check:core-types`、`build` 与 `git diff --check` 通过。当前 **0 error、0 warn**，比 U4 减少 62 warn；仍有既有日期控件空值提示与构建大体积 chunk 提示。
+- 按设计第 3 节静态核对容器层级、对齐线、字号、状态与表格密度。本轮未启动服务、未连接数据库、未访问局域网、未启动 Chromium、未运行 `test:visual` / `test:visual:update`、未生成截图。**截图基准更新、1440×900 截图对比及浏览器视觉验收待协调者在沙箱外运行。** 未 commit 或 push。
+
 ## U6 收尾
 
 lint 规则全部改为 error；截图测试覆盖每个主要页面；删除不再使用的样式变量和类。

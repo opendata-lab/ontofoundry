@@ -46,7 +46,7 @@ describe("ontology view", () => {
   it("shows layer statistics and opens an object from the overview", async () => {
     show();
     expect(await screen.findByText("语义模型层")).toBeInTheDocument();
-    expect(screen.getByText("指标").closest(".ant-statistic")).toHaveTextContent("10");
+    expect(screen.getByText("指标").parentElement).toHaveTextContent("10");
     fireEvent.click(screen.getByRole("button", { name: "查看本体：客户" }));
     expect(open).toHaveBeenCalledWith({ kind: "object_type", id: draft.object_types[0].id, sessionId: null });
   });

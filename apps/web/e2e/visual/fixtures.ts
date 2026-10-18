@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { effectiveProperties } from "../../src/lib/coreModel";
+import { documentDisplayText } from "../../src/lib/instanceDisplay";
 import type { CoreDraft } from "../../src/api/core.generated";
 import type {
   DataAgentHealth,
@@ -541,6 +543,63 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
       } else {
         await route.fallback();
       }
+    },
+  );
+}
+
+
+export const INSTANCE_TYPE = ELEMENTS.object;
+export const INSTANCE_FACT = ELEMENT_DRAFT.material_objects.find((item) => item.type_id === INSTANCE_TYPE.id)!;
+export const INSTANCE_LABEL = documentDisplayText(ELEMENT_DRAFT, INSTANCE_FACT);
+
+/** Fixed overview, conversation and document instances share the existing virtual workspace. */
+export async function mockCanvasApi(page: Page, options: { emptySession?: boolean } = {}) {
+  await mockReviewApi(page);
+  const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
+  const overview: import("../../src/api/types").WorkspaceOverview = {
+    version: { ...FIXTURE_VERSIONS[0], counts: { ...FIXTURE_VERSIONS[0].counts, datasets: ELEMENT_DRAFT.datasets.length } },
+    graph: {
+      ...FIXTURE_VERSIONS[0],
+      nodes: ELEMENT_DRAFT.object_types.map((type) => ({
+        id: type.id, kind: "object_type", label: type.name, technical_name: type.technical_name,
+        description: type.description, tags: type.tags, attribute_count: effectiveProperties(ELEMENT_DRAFT, type.id).length,
+      })),
+      edges: [
+        ...ELEMENT_DRAFT.link_types.map((link) => ({
+          id: link.id, kind: "link_type" as const, label: link.name, technical_name: link.technical_name,
+          source: link.source_type_id, target: link.target_type_id, link_type_id: link.id,
+          description: link.description, multiplicity: link.multiplicity,
+        })),
+        ...ELEMENT_DRAFT.object_types.filter((type) => type.extends).map((type) => ({
+          id: `extends:${type.id}`, kind: "extends" as const, label: "继承", technical_name: "extends",
+          source: type.id, target: type.extends!,
+        })),
+      ],
+    },
+    details: {
+      object_count: ELEMENT_DRAFT.material_objects.length,
+      link_count: ELEMENT_DRAFT.material_links.length,
+      evidence_material_count: 1,
+      mapping_count: ELEMENT_DRAFT.mappings.length,
+      objects: ELEMENT_DRAFT.material_objects.map((fact) => ({
+        id: fact.id, type_id: fact.type_id, display_text: documentDisplayText(ELEMENT_DRAFT, fact),
+      })),
+      links: ELEMENT_DRAFT.material_links,
+      mappings: ELEMENT_DRAFT.mappings.map((mapping) => ({ id: mapping.id, type_id: mapping.type_id, binding_status: "bound" })),
+    },
+  };
+  const responses: Record<string, unknown> = {
+    [`${base}/overview`]: overview,
+    [`${base}/published-snapshot`]: ELEMENT_DRAFT,
+    [`${base}/materials`]: { items: [{ id: "material-visual-guide", name: "星河采购业务说明.md", byte_size: 1280, chunk_count: 6, sha256: "b".repeat(64) }] },
+  };
+  if (options.emptySession) responses[`${base}/sessions`] = { items: [] };
+  await page.route(
+    (url) => url.pathname.startsWith("/api/"),
+    async (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (Object.hasOwn(responses, pathname)) await route.fulfill({ json: responses[pathname] });
+      else await route.fallback();
     },
   );
 }

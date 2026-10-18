@@ -12,6 +12,7 @@ import {
   type ResourceKind,
   type SemanticResource,
 } from "../lib/semanticExplorer";
+import { PanelToolbar, SectionTitle } from "./layout";
 import { OntologyGraph, type SelectedGraphItem } from "./OntologyGraph";
 
 const { Text } = Typography;
@@ -160,13 +161,13 @@ export function SemanticView({
   const objects = resources.filter((r) => r.kind === "object").length;
   const relations = resources.filter((r) => r.kind === "relation").length;
   return (
-    <div className="flex h-full min-h-0 bg-canvas">
+    <div className="flex h-full min-h-0 bg-surface">
       <aside
         aria-label="资源管理器"
-        className={`flex min-h-0 flex-none flex-col border-r border-rule bg-surface transition-[width] ${collapsed ? "w-12" : "w-[300px] max-[1200px]:w-[260px]"}`}
+        className={`flex min-h-0 flex-none flex-col border-r border-rule bg-surface transition-all ${collapsed ? "w-16" : "w-80"}`}
       >
-        <header className="flex items-center gap-2 border-b border-rule-soft px-3 py-2">
-          {!collapsed && <Text strong className="flex-1">资源管理器</Text>}
+        <PanelToolbar>
+          {!collapsed && <SectionTitle title="资源管理器" />}
           <Tooltip title={collapsed ? "展开资源管理器" : "收起资源管理器"}>
             <Button
               size="small"
@@ -177,14 +178,14 @@ export function SemanticView({
               onClick={() => collapse(!collapsed)}
             />
           </Tooltip>
-        </header>
+        </PanelToolbar>
         {!collapsed && (
           <>
-            <div className="flex flex-col gap-2 px-3 py-2">
+            <div className="flex flex-col gap-2 px-4 py-2">
               <Segmented
                 size="small"
                 block
-                className="[&_.ant-segmented-item-label]:!px-1"
+                className="max-w-full overflow-x-auto"
                 value={filter}
                 onChange={(value) => setFilter(value as Filter)}
                 options={[
@@ -201,7 +202,7 @@ export function SemanticView({
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="min-h-0 flex-1 overflow-auto px-1 pb-2" aria-label="本体资源">
+            <div className="min-h-0 flex-1 overflow-auto px-4 pb-2" aria-label="本体资源">
               <Tree
                 blockNode
                 showLine={false}
@@ -216,12 +217,12 @@ export function SemanticView({
                 }}
               />
               {resourceError && (
-                <Text type="secondary" role="status" className="block px-3 py-2 text-xs">
+                <Text type="secondary" role="status" className="block px-4 py-2 text-xs">
                   {resourceError}
                 </Text>
               )}
             </div>
-            <footer className="flex justify-between border-t border-rule-soft px-3 py-2 text-xs text-muted">
+            <footer className="flex justify-between border-t border-rule-soft px-4 py-2 text-xs text-muted">
               <span>
                 {objects} 个对象 · {relations} 个关系
               </span>
@@ -232,17 +233,13 @@ export function SemanticView({
       </aside>
       <section className="relative min-w-0 flex-1" aria-label={listing ? `${RESOURCE_KIND_LABELS[listing]}列表` : "语义关系画布"}>
         {listing ? (
-          <div className="flex h-full flex-col gap-3 overflow-auto p-5">
-            <div className="flex items-center gap-3">
-              <Text strong className="text-base">
-                {RESOURCE_KIND_LABELS[listing]}
-              </Text>
-              <Text type="secondary" className="text-xs">
-                {listing === "metric" ? "指标只挂在一个数据集上，只使用该数据集的列" : "登记后供对象映射、关系映射表和指标使用"}
-              </Text>
+          <div className="flex h-full flex-col overflow-auto">
+            <PanelToolbar>
+              <SectionTitle title={RESOURCE_KIND_LABELS[listing]} note={listing === "metric" ? "指标只挂在一个数据集上，只使用该数据集的列" : "登记后供对象映射、关系映射表和指标使用"} />
               {canCreate && (
                 <Button
                   type="primary"
+                  size="small"
                   className="ml-auto"
                   icon={<Plus size={15} />}
                   onClick={() => onOpen({ kind: listing, id: "new", mode: "edit", sessionId: null })}
@@ -250,7 +247,7 @@ export function SemanticView({
                   新建{RESOURCE_KIND_LABELS[listing]}
                 </Button>
               )}
-            </div>
+            </PanelToolbar>
             <Table
               size="middle"
               rowKey="id"
@@ -263,7 +260,7 @@ export function SemanticView({
                   title: RESOURCE_KIND_LABELS[listing],
                   key: "name",
                   render: (_, r) => (
-                    <Button type="link" className="!h-auto !p-0" onClick={() => onOpen(r.detail)}>
+                    <Button type="link" className="h-auto p-0" onClick={() => onOpen(r.detail)}>
                       {r.name}
                     </Button>
                   ),
@@ -272,7 +269,7 @@ export function SemanticView({
                 {
                   title: listing === "metric" ? "数据集 · 计算方式" : "快照",
                   key: "subtitle",
-                  render: (_, r) => (r.subtitle ? <Tag className="!m-0">{r.subtitle}</Tag> : <Text type="secondary">—</Text>),
+                  render: (_, r) => (r.subtitle ? <Tag className="m-0">{r.subtitle}</Tag> : <Text type="secondary">—</Text>),
                 },
               ]}
             />
@@ -294,7 +291,7 @@ export function SemanticView({
               }}
             />
             {selection && (
-              <div className="absolute top-4 left-4 flex items-center gap-1 rounded-md border border-rule bg-surface py-1 pr-1 pl-3 shadow-[0_1px_3px_var(--color-shadow)]">
+              <div className="absolute top-4 left-4 flex items-center gap-1 rounded-md border border-rule bg-surface py-1 pr-1 pl-3 shadow-panel">
                 <Text strong>{selection.name}</Text>
                 <Tooltip title="打开详情">
                   <Button
@@ -312,7 +309,7 @@ export function SemanticView({
             )}
             <div
               role="status"
-              className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-full border border-rule bg-surface px-3 py-1 text-xs text-muted max-[1200px]:left-4 max-[1200px]:translate-x-0"
+              className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-sm border border-rule bg-surface px-3 py-1 text-xs text-muted"
             >
               {objects} 个对象 · {relations} 个关系
             </div>

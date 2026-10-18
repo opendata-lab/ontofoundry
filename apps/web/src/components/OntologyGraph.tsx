@@ -17,6 +17,7 @@ import {
   useInternalNode,
   useNodesState,
 } from "@xyflow/react";
+import { Button, Tag } from "antd";
 import { Box } from "lucide-react";
 import {
   createContext,
@@ -78,28 +79,26 @@ function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
   return (
     <div
       className={classes(
-        "flex min-h-[46px] w-[184px] items-center gap-2 rounded-md border bg-surface px-3 py-2 text-object transition-[opacity,box-shadow,border-color] duration-200",
-        String.raw`[&_.react-flow\_\_handle]:!size-px [&_.react-flow\_\_handle]:!min-h-px [&_.react-flow\_\_handle]:!min-w-px [&_.react-flow\_\_handle]:!border-0 [&_.react-flow\_\_handle]:!bg-transparent [&_.react-flow\_\_handle]:opacity-0`,
-        emphasis === "dimmed" ? "opacity-20 shadow-none" : "shadow-[0_1px_3px_var(--color-shadow)]",
+        "flex items-center gap-2 rounded-md border bg-surface px-3 py-2 text-object transition-all duration-200",
+        emphasis === "dimmed" ? "opacity-20 shadow-none" : "shadow-panel",
         emphasis === "match" || focused || selected ? "border-accent" : "border-rule",
-        (focused || selected) && "shadow-[0_0_0_3px_var(--color-accent-soft)]",
+        (focused || selected) && "ring-2 ring-accent-soft",
       )}
+      style={{ width: NODE_WIDTH, minHeight: NODE_HEIGHT }}
       title={item.description || item.label}
     >
-      <Handle type="target" position={Position.Left} />
+      <Handle className="opacity-0" type="target" position={Position.Left} />
       <span className="flex size-6 flex-none items-center justify-center rounded-xs bg-ink-2 text-surface">
         <Box size={14} />
       </span>
       <span className="grid min-w-0">
         <strong className="truncate text-sm text-ink">{item.label}</strong>
-        <small className="truncate font-mono text-[10px] text-muted">{item.technical_name}</small>
+        <small className="truncate font-mono text-xs text-muted">{item.technical_name}</small>
       </span>
       {!!item.attribute_count && (
-        <span className="ml-auto flex-none rounded-full bg-surface-soft px-[7px] py-px text-[10px] text-muted">
-          {item.attribute_count}
-        </span>
+        <Tag className="m-0 ml-auto flex-none">{item.attribute_count}</Tag>
       )}
-      <Handle type="source" position={Position.Right} />
+      <Handle className="opacity-0" type="source" position={Position.Right} />
     </div>
   );
 }
@@ -142,20 +141,20 @@ function OntologyEdgeView({
   const className = classes(
     "transition-opacity duration-200",
     extendsEdge
-      ? "!stroke-object [stroke-dasharray:8_4] [stroke-width:1.4]"
+      ? "stroke-object stroke-1"
       : strong
-        ? "!stroke-accent [stroke-width:2]"
-        : "!stroke-graph-edge [stroke-width:1.4]",
-    data.emphasis === "dimmed" && "opacity-[0.12]",
+        ? "stroke-accent stroke-2"
+        : "stroke-graph-edge stroke-1",
+    data.emphasis === "dimmed" && "opacity-10",
   );
   const labelClass = classes(
-    "nodrag nopan pointer-events-auto absolute max-w-[140px] truncate rounded-full border bg-surface px-2 py-px font-sans text-[11px] leading-normal",
+    "nodrag nopan pointer-events-auto absolute max-w-36 truncate rounded-xs font-sans text-xs leading-tight",
     extendsEdge
       ? "border-object-soft text-object"
       : strong
         ? "border-accent text-accent"
         : "border-rule text-muted hover:border-rule-strong hover:text-ink-2",
-    data.emphasis === "dimmed" && "pointer-events-none border-transparent opacity-[0.14]",
+    data.emphasis === "dimmed" && "pointer-events-none border-transparent opacity-10",
   );
   return (
     <>
@@ -165,10 +164,11 @@ function OntologyEdgeView({
         markerEnd={markerEnd}
         className={className}
         interactionWidth={18}
+        strokeDasharray={extendsEdge ? "8 4" : undefined}
       />
       <EdgeLabelRenderer>
-        <button
-          type="button"
+        <Button
+          size="small"
           className={labelClass}
           style={{
             transform: `translate(-50%, -50%) translate(${geometry.labelX}px, ${geometry.labelY}px)`,
@@ -179,7 +179,7 @@ function OntologyEdgeView({
           }}
         >
           {data.item.label}
-        </button>
+        </Button>
       </EdgeLabelRenderer>
     </>
   );
@@ -442,13 +442,12 @@ export function OntologyGraph({
         }}
         aria-label="语义图谱"
         className={classes(
-          "!bg-canvas [--xy-edge-stroke:var(--color-graph-edge)] [--xy-edge-stroke-selected:var(--color-accent)]",
-          String.raw`[&_.react-flow\_\_minimap]:rounded-md [&_.react-flow\_\_minimap]:border [&_.react-flow\_\_minimap]:border-rule [&_.react-flow\_\_minimap]:!bg-surface`,
-          String.raw`[&_.react-flow\_\_minimap-mask]:fill-ink/[0.07] [&_.react-flow\_\_minimap-mask]:stroke-rule-strong`,
-          String.raw`[&_.react-flow\_\_minimap-node]:fill-object-soft [&_.react-flow\_\_minimap-node]:stroke-rule-strong [&_.react-flow\_\_minimap-node]:[stroke-width:2]`,
-          String.raw`[&_.react-flow\_\_controls]:overflow-hidden [&_.react-flow\_\_controls]:rounded-sm [&_.react-flow\_\_controls]:border [&_.react-flow\_\_controls]:border-rule [&_.react-flow\_\_controls]:!shadow-none`,
-          String.raw`[&_.react-flow\_\_controls_button]:!size-8 [&_.react-flow\_\_controls_button]:!bg-surface [&_.react-flow\_\_controls_button]:!text-ink-2`,
-          String.raw`max-[1000px]:[&_.react-flow\_\_minimap]:hidden`,
+          "bg-canvas",
+          String.raw`[&_.react-flow\_\_minimap]:rounded-md [&_.react-flow\_\_minimap]:border [&_.react-flow\_\_minimap]:border-rule [&_.react-flow\_\_minimap]:bg-surface`,
+          String.raw`[&_.react-flow\_\_minimap-mask]:fill-ink/5 [&_.react-flow\_\_minimap-mask]:stroke-rule-strong`,
+          String.raw`[&_.react-flow\_\_minimap-node]:fill-object-soft [&_.react-flow\_\_minimap-node]:stroke-rule-strong [&_.react-flow\_\_minimap-node]:stroke-2`,
+          String.raw`[&_.react-flow\_\_controls]:overflow-hidden [&_.react-flow\_\_controls]:rounded-sm [&_.react-flow\_\_controls]:border [&_.react-flow\_\_controls]:border-rule [&_.react-flow\_\_controls]:shadow-none`,
+          String.raw`[&_.react-flow\_\_controls_button]:size-8 [&_.react-flow\_\_controls_button]:bg-surface [&_.react-flow\_\_controls_button]:text-ink-2`,
         )}
       >
         {!semantic && (
@@ -461,7 +460,7 @@ export function OntologyGraph({
         )}
         <Controls showInteractive={false} position="bottom-right">
           {semantic && (
-            <span className="flex h-7 items-center justify-center bg-surface px-1 text-[10px] text-muted">{zoom}%</span>
+            <span className="flex h-7 items-center justify-center bg-surface px-1 text-xs text-muted">{zoom}%</span>
           )}
         </Controls>
         {/* React Flow reads the map's size from style, and lays the viewport
@@ -471,11 +470,12 @@ export function OntologyGraph({
           position="bottom-right"
           pannable
           zoomable
-          nodeBorderRadius={3}
+          nodeBorderRadius={4}
+          className={semantic ? "mr-14 mb-4" : "mr-12"}
           style={
             semantic
-              ? { width: 147, height: 96, marginRight: 56, marginBottom: 17 }
-              : { width: 168, height: 104, marginRight: 52 }
+              ? { width: 147, height: 96 }
+              : { width: 168, height: 104 }
           }
         />
       </ReactFlow>
