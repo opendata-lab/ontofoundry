@@ -109,6 +109,7 @@
   --directory-max-width: 1080px;
   --settings-max-width: 880px;
   /* U3 existing review overlay and preview bounds. */
+  --model-category-min-width: 100px;
   --review-code-height: 360px;
   --review-detail-height: 64vh;
   --review-detail-width: 860px;
@@ -117,6 +118,18 @@
   --review-conflict-width: 280px;
   --review-filter-width: 152px;
   --review-graph-height: 420px;
+  /* U4 inspector frame stays stable across tabs and edit mode. */
+  --inspector-height: min(800px, calc(100dvh - var(--space-xl) * 2));
+  --inspector-expanded-height: calc(100dvh - var(--space-xs) * 2);
+  --inspector-overview-columns: minmax(0, 2fr) minmax(0, 3fr);
+  --inspector-overview-graph-height: 480px;
+  --inspector-property-columns: minmax(0, 11fr) minmax(0, 9fr);
+  --inspector-preview-columns: minmax(0, 3fr) minmax(0, 2fr);
+  --inspector-results-table-min-width: 640px;
+  --inspector-search-width: 240px;
+  --inspector-filter-width: 128px;
+  --inspector-cardinality-width: 80px;
+  --inspector-source-label-width: 96px;
   --icon-size: 16px;
   --icon-size-sm: 14px;
   --icon-size-xs: 12px;
@@ -132,6 +145,9 @@
   --spacing-review-evidence: var(--review-evidence-width);
   --spacing-review-filter: var(--review-filter-width);
   --spacing-review-graph: var(--review-graph-height);
+  --spacing-inspector-search: var(--inspector-search-width);
+  --spacing-inspector-filter: var(--inspector-filter-width);
+  --spacing-inspector-cardinality: var(--inspector-cardinality-width);
   --spacing-control-sm: var(--control-height-sm);
   --spacing-control-lg: var(--control-height-lg);
   --spacing-tab-dirty: var(--workspace-tab-dirty-size);
@@ -237,4 +253,133 @@
   display: grid;
   grid-template-columns: minmax(0, var(--review-conflict-width)) minmax(0, 1fr);
   gap: var(--space-md);
+}
+
+/* Scope the fixed frame to the element inspector, excluding secondary dialogs. */
+.ant-modal.element-inspector {
+  padding-bottom: 0;
+}
+.element-inspector-content {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  height: var(--inspector-height);
+  overflow: hidden;
+}
+.element-inspector-content-expanded {
+  height: var(--inspector-expanded-height);
+}
+.element-inspector-header {
+  flex-shrink: 0;
+  min-height: calc(var(--control-height) + var(--space-md));
+}
+
+/* Overview proportions follow the available dialog width, not the viewport. */
+.object-overview {
+  container-type: inline-size;
+}
+.object-overview-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-xl);
+}
+@container (min-width: 48rem) {
+  .object-overview-columns {
+    grid-template-columns: var(--inspector-overview-columns);
+  }
+}
+.object-overview-info {
+  overflow-wrap: anywhere;
+  & .ant-descriptions-item-label { white-space: nowrap; }
+  & .ant-descriptions-item-content { min-width: 0; overflow-wrap: anywhere; }
+}
+.object-overview-graph {
+  display: block;
+  width: 100%;
+  height: var(--inspector-overview-graph-height);
+}
+
+/* A stable list and detail workbench, shared by view and edit states. */
+.inspector-property-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+  overflow-wrap: anywhere;
+}
+.inspector-property-detail {
+  border-top: 1px solid var(--color-rule);
+  padding-top: var(--space-md);
+  & .ant-descriptions-item-label { white-space: nowrap; }
+  & .ant-descriptions-item-content { min-width: 0; overflow-wrap: anywhere; }
+}
+.inspector-instance-table table {
+  min-width: var(--inspector-results-table-min-width);
+}
+.inspector-toolbar {
+  padding-inline: 0;
+  padding-bottom: var(--space-sm);
+  & > div:first-child { flex: 1; flex-wrap: wrap; }
+}
+.inspector-toolbar-controls {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.inspector-search {
+  flex: 0 1 var(--inspector-search-width);
+  width: var(--inspector-search-width);
+  max-width: 100%;
+}
+.inspector-filter {
+  flex-shrink: 0;
+  min-width: var(--inspector-filter-width);
+}
+.inspector-source-row {
+  display: grid;
+  grid-template-columns: var(--inspector-source-label-width) minmax(0, 1fr) minmax(0, 1fr) var(--control-height);
+  align-items: center;
+  gap: var(--space-xs);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+}
+.form-row > * {
+  min-width: 0;
+}
+@container (min-width: 40rem) {
+  .form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inspector-property-workbench {
+    grid-template-columns: var(--inspector-property-columns);
+  }
+  .inspector-preview-workbench {
+    grid-template-columns: var(--inspector-preview-columns);
+  }
+  .inspector-workbench-full {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .inspector-property-detail {
+    position: sticky;
+    top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--color-rule);
+    padding-top: 0;
+    padding-left: var(--space-md);
+  }
+}
+
+/* Model categories remain visible as the results column narrows. */
+.model-result-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--model-category-min-width)), 1fr));
+  gap: var(--space-xs);
 }

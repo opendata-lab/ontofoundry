@@ -6,3 +6,5 @@ export { StatusMark, type StatusState } from "./StatusMark";
 export { ApplicationFrame } from "./ApplicationFrame";
 export { AsyncSurface } from "./AsyncSurface";
 export { DirectoryFrame } from "./DirectoryFrame";
+export { DetailWorkbench } from "./DetailWorkbench";
+export { FormRow } from "./FormRow";

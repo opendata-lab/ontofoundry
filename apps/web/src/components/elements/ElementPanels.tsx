@@ -1,15 +1,12 @@
 import { Button, Descriptions, Empty, Form, Input, Select, Table, Tag, TreeSelect, Typography } from "antd";
-import { SectionTitle } from "../layout";
+import { DetailWorkbench, PanelToolbar, SectionTitle } from "../layout";
 import { FileText, Plus, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Draft, Evidence, LinkType, ObjectType, Rule } from "../../api/types";
 import {
-  MULTIPLICITY,
   byId,
   children,
   effectiveProperties,
-  identifier,
-  joinSummary,
   lineage,
   mappingFor,
   remove,
@@ -18,12 +15,12 @@ import {
 } from "../../lib/coreModel";
 import { changeType, objectTree, rulesFor, type PanelProps } from "../../lib/elementModel";
 import { newId } from "../../lib/id";
-import { BINDING_MODES, objectMapping } from "../../lib/objectMapping";
+import { objectMapping } from "../../lib/objectMapping";
 import { DerivedConditionEditor, DerivedSummary } from "./DerivedConditionEditor";
 import { MappingStatusIcon } from "./MappingWidgets";
 import { ObjectRelationGraph } from "./ObjectRelationGraph";
 
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 export function EvidenceSection({ workspaceId, evidence }: { workspaceId: string; evidence: Evidence[] }) {
   if (!evidence.length) return null;
@@ -153,6 +150,7 @@ function ObjectBasicEditor(props: PanelProps<ObjectType>) {
   const titleChoices = effectiveProperties(draft, type.id).map((p) => ({ value: p.definition.id, label: p.definition.name }));
   return (
     <Form layout="vertical" component="div" className="max-w-settings">
+      <SectionTitle title="基本信息" className="mb-4" />
       <IdentityFields value={type} onChange={update} tags={{ value: type.tags, onChange: (tags) => update({ tags }) }} />
       <div className="grid grid-cols-2 gap-x-4">
         <Form.Item label="父对象" extra="子对象继承父对象的属性、关系和规则。">
@@ -201,162 +199,37 @@ export function ObjectBasicPanel(props: PanelProps<ObjectType>) {
   const parent = byId(draft.object_types, type.extends);
   const kids = children(draft, type.id);
   const title = titleProperty(draft, type.id);
-  const keys = identifier(draft, type.id);
   const record = objectMapping(draft, type);
   const items = [
+    { key: "name", label: "名称", children: type.name },
     { key: "technical", label: "技术名", children: <code>{type.technical_name}</code> },
-    {
-      key: "parent",
-      label: "父对象",
-      children: parent ? (
-        <ElementLink onClick={() => open({ kind: "object_type", id: parent.id })}>{parent.name}</ElementLink>
-      ) : (
-        <Text type="secondary">无（根对象）</Text>
-      ),
-    },
-    ...(kids.length
-      ? [
-          {
-            key: "children",
-            label: "子对象",
-            children: (
-              <span className="flex flex-wrap gap-x-3">
-                {kids.map((k) => (
-                  <ElementLink key={k.id} onClick={() => open({ kind: "object_type", id: k.id })}>
-                    {k.name}
-                  </ElementLink>
-                ))}
-              </span>
-            ),
-          },
-        ]
-      : []),
-    {
-      key: "identifier",
-      label: "标识",
-      children: keys.length ? keys.map((p) => p.name).join(" + ") : <Text type="secondary">未设置</Text>,
-    },
+    { key: "description", label: "描述", children: type.description ? <span className="whitespace-pre-wrap">{type.description}</span> : <Text type="secondary">暂无描述</Text> },
+    { key: "parent", label: "父对象", children: parent ? <ElementLink onClick={() => open({ kind: "object_type", id: parent.id })}>{parent.name}</ElementLink> : <Text type="secondary">无（根对象）</Text> },
+    ...(kids.length ? [{ key: "children", label: "子对象", children: <span className="flex flex-wrap gap-x-3">{kids.map((k) => <ElementLink key={k.id} onClick={() => open({ kind: "object_type", id: k.id })}>{k.name}</ElementLink>)}</span> }] : []),
     { key: "title", label: "标题属性", children: title?.name ?? <Text type="secondary">未指定</Text> },
-    {
-      key: "binding",
-      label: "实例来源",
-      children: (
-        <span className="flex flex-wrap items-center gap-2">
-          {BINDING_MODES[record.mode]}
-          {record.mode !== "virtual" && record.mode !== "unbound" && (
-            <MappingStatusIcon state={record.state} label={record.label} />
-          )}
-          {record.main?.dataset && <Text type="secondary">主数据集：{record.main.dataset.name}</Text>}
-        </span>
-      ),
-    },
     { key: "synonyms", label: "同义词", children: <TagsText items={type.synonyms} /> },
     { key: "tags", label: "标签", children: <TagsText items={type.tags} /> },
-    ...(parent
-      ? [{ key: "derived", label: "成员条件", span: "filled" as const, children: <DerivedSummary draft={draft} object={type} /> }]
-      : []),
   ];
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <div className="flex min-w-0 flex-col gap-4">
-        {type.description ? (
-          <Paragraph className="m-0 whitespace-pre-wrap">{type.description}</Paragraph>
-        ) : (
-          <Text type="secondary">暂无描述</Text>
-        )}
-        <Descriptions size="small" column={2} items={items} />
-        <EvidenceSection workspaceId={draft.workspace_id} evidence={type.evidence} />
+    <div className="object-overview">
+      <div className="object-overview-columns">
+        <div className="object-overview-info flex min-w-0 flex-col gap-4">
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="基本信息" className="min-h-7" />
+            <Descriptions size="small" column={1} items={items} />
+          </section>
+          <section className="flex flex-col gap-3 border-t border-rule pt-4">
+            <SectionTitle title="数据来源" />
+            <Descriptions size="small" column={1} items={[
+              { key: "dataset", label: "主数据集", children: record.main?.dataset ? <ElementLink onClick={() => open({ kind: "dataset", id: record.main!.dataset!.id })}>{record.main.dataset.name}</ElementLink> : <Text type="secondary">{record.mode === "virtual" ? "来自子对象" : "未绑定"}</Text> },
+              ...(record.mode !== "virtual" ? [{ key: "status", label: "映射状态", children: <MappingStatusIcon state={record.state} label={record.label} /> }] : []),
+              ...(parent ? [{ key: "derived", label: "成员条件", children: <DerivedSummary draft={draft} object={type} /> }] : []),
+            ]} />
+          </section>
+          {type.evidence.length > 0 && <div className="border-t border-rule pt-4"><EvidenceSection workspaceId={draft.workspace_id} evidence={type.evidence} /></div>}
+        </div>
+        <ObjectRelationGraph {...props} />
       </div>
-      <ObjectRelationGraph {...props} />
-    </div>
-  );
-}
-
-function LinkBasicEditor(props: PanelProps<LinkType>) {
-  const { draft, type } = props;
-  const update = (patch: Partial<LinkType>) => changeType(props, patch);
-  const objects = draft.object_types.map((o) => ({ value: o.id, label: o.name || o.technical_name }));
-  return (
-    <Form layout="vertical" component="div" className="max-w-settings">
-      <IdentityFields value={type} onChange={update} tags={{ value: type.tags, onChange: (tags) => update({ tags }) }} />
-      <div className="grid grid-cols-3 gap-x-4">
-        <Form.Item label="来源对象" required>
-          <Select
-            aria-label="来源对象"
-            showSearch
-            optionFilterProp="label"
-            value={type.source_type_id || undefined}
-            options={objects}
-            onChange={(source_type_id: string) => update({ source_type_id, data_join: null })}
-          />
-        </Form.Item>
-        <Form.Item label="目标对象" required>
-          <Select
-            aria-label="目标对象"
-            showSearch
-            optionFilterProp="label"
-            value={type.target_type_id || undefined}
-            options={objects}
-            onChange={(target_type_id: string) => update({ target_type_id, data_join: null })}
-          />
-        </Form.Item>
-        <Form.Item label="基数" required>
-          <Select
-            aria-label="基数"
-            value={type.multiplicity}
-            options={Object.entries(MULTIPLICITY).map(([value, label]) => ({ value, label }))}
-            onChange={(multiplicity: LinkType["multiplicity"]) => update({ multiplicity })}
-          />
-        </Form.Item>
-      </div>
-      <Form.Item label="反向名称" extra="从目标对象看这条关系时的名称，可不填。">
-        <Input
-          aria-label="反向名称"
-          value={type.inverse_name ?? ""}
-          onChange={(e) => update({ inverse_name: e.target.value || null })}
-        />
-      </Form.Item>
-    </Form>
-  );
-}
-
-export function LinkBasicPanel(props: PanelProps<LinkType>) {
-  const { draft, type, editing, open } = props;
-  if (editing) return <LinkBasicEditor {...props} />;
-  const source = byId(draft.object_types, type.source_type_id);
-  const target = byId(draft.object_types, type.target_type_id);
-  const endpoint = (object: ObjectType | undefined) =>
-    object ? <ElementLink onClick={() => open({ kind: "object_type", id: object.id })}>{object.name}</ElementLink> : "?";
-  return (
-    <div className="flex max-w-full flex-col gap-4">
-      {type.description ? (
-        <Paragraph className="m-0 whitespace-pre-wrap">{type.description}</Paragraph>
-      ) : (
-        <Text type="secondary">暂无描述</Text>
-      )}
-      <Descriptions
-        size="small"
-        column={2}
-        items={[
-          { key: "technical", label: "技术名", children: <code>{type.technical_name}</code> },
-          { key: "multiplicity", label: "基数", children: MULTIPLICITY[type.multiplicity] },
-          {
-            key: "ends",
-            label: "两端",
-            span: 2,
-            children: (
-              <span className="inline-flex items-center gap-2">
-                {endpoint(source)} → {endpoint(target)}
-              </span>
-            ),
-          },
-          { key: "inverse", label: "反向名称", children: type.inverse_name ?? <Text type="secondary">无</Text> },
-          { key: "join", label: "数据绑定", children: joinSummary(draft, type.data_join) },
-          { key: "synonyms", label: "同义词", children: <TagsText items={type.synonyms} /> },
-          { key: "tags", label: "标签", children: <TagsText items={type.tags} /> },
-        ]}
-      />
-      <EvidenceSection workspaceId={draft.workspace_id} evidence={type.evidence} />
     </div>
   );
 }
@@ -388,150 +261,94 @@ function isLocalRule(draft: Draft, type: ObjectType | LinkType, rule: Rule) {
   return rule.owner_kind === "property" && byId(draft.properties, rule.owner_id)?.owner_type_id === type.id;
 }
 
-export function RulesPanel(props: PanelProps) {
-  const { draft, type, editing, change } = props;
+export function RulesPanel(props: PanelProps & { initialRuleId?: string }) {
+  const { draft, type, editing, canEdit, change, initialRuleId } = props;
+  const [selectedId, setSelectedId] = useState<string | null>(initialRuleId ?? null);
+  const [query, setQuery] = useState("");
+  const [kind, setKind] = useState<"all" | Rule["rule_kind"]>("all");
   const rules = rulesFor(draft, type);
-  const setRule = (rule: Rule) => change({ ...draft, rules: draft.rules.map((r) => (r.id === rule.id ? rule : r)) });
+  const rows = rules.filter((r) => (kind === "all" || r.rule_kind === kind) &&
+    `${r.name} ${r.technical_name} ${r.expression} ${r.description}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const rule = rows.find((r) => r.id === selectedId) ?? rows[0];
+  const editable = rule && editing && isLocalRule(draft, type, rule);
+  const setRule = (value: Rule) => change({ ...draft, rules: draft.rules.map((r) => r.id === value.id ? value : r) });
   const owners = ruleOwners(draft, type);
   const addRule = () => {
-    const [kind, id] = owners[0].value.split(":");
-    change({
-      ...draft,
-      rules: [
-        ...draft.rules,
-        {
-          id: newId(),
-          name: "",
-          technical_name: "",
-          description: "",
-          evidence: [],
-          owner_kind: kind as Rule["owner_kind"],
-          owner_id: id,
-          rule_kind: "constraint",
-          expression: "",
-        },
-      ],
-    });
+    const [ownerKind, ownerId] = owners[0].value.split(":");
+    const id = newId();
+    setQuery("");
+    setKind("all");
+    setSelectedId(id);
+    change({ ...draft, rules: [...draft.rules, {
+      id, name: "", technical_name: "", description: "", evidence: [],
+      owner_kind: ownerKind as Rule["owner_kind"], owner_id: ownerId, rule_kind: "constraint", expression: "",
+    }] });
   };
-  if (!editing)
-    return rules.length ? (
-      <Table
-        size="small"
-        rowKey="id"
-        pagination={false}
-        dataSource={rules}
-        columns={[
-          {
-            title: "规则",
-            key: "name",
-            render: (_, r) => (
-              <div className="flex flex-col">
-                <span data-element-id={r.id}>{r.name}</span>
-                <code className="text-xs text-muted">{r.technical_name}</code>
-              </div>
-            ),
-          },
-          { title: "类型", key: "kind", width: 96, render: (_, r) => <Tag className="m-0">{RULE_KINDS[r.rule_kind]}</Tag> },
-          {
-            title: "所属",
-            key: "owner",
-            width: 160,
-            render: (_, r) => (
-              <span className="flex flex-col">
-                {ruleOwnerName(draft, r)}
-                {!isLocalRule(draft, type, r) && <Text type="secondary" className="text-xs">继承</Text>}
-              </span>
-            ),
-          },
-          {
-            title: "表达式",
-            key: "expression",
-            render: (_, r) => (
-              <div className="flex flex-col gap-1">
-                <code className="whitespace-pre-wrap break-all">{r.expression}</code>
-                {r.description && <Text type="secondary" className="text-xs">{r.description}</Text>}
-              </div>
-            ),
-          },
-        ]}
-      />
-    ) : (
-      <Empty description="没有规则" />
-    );
   return (
-    <div className="flex max-w-full flex-col gap-3">
-      {rules.map((rule) => {
-        const local = isLocalRule(draft, type, rule);
-        return (
-          <section key={rule.id} className="border-b border-rule pb-4" data-element-id={rule.id}>
-            {local ? (
-              <Form layout="vertical" component="div">
-                <div className="flex flex-wrap items-end gap-x-3">
-                  <Form.Item label="名称" required className="mb-2 min-w-36 flex-1">
-                    <Input aria-label="规则名称" value={rule.name} onChange={(e) => setRule({ ...rule, name: e.target.value })} />
-                  </Form.Item>
-                  <Form.Item label="技术名" required className="mb-2 min-w-36 flex-1">
-                    <Input
-                      aria-label="规则技术名"
-                      className="font-mono"
-                      value={rule.technical_name}
-                      onChange={(e) => setRule({ ...rule, technical_name: e.target.value.trim() })}
-                    />
-                  </Form.Item>
-                  <Form.Item label="类型" className="mb-2 min-w-36 flex-1">
-                    <Select
-                      aria-label="规则类型"
-                      value={rule.rule_kind}
-                      options={Object.entries(RULE_KINDS).map(([value, label]) => ({ value, label }))}
-                      onChange={(rule_kind: Rule["rule_kind"]) => setRule({ ...rule, rule_kind })}
-                    />
-                  </Form.Item>
-                  <Form.Item label="所属" className="mb-2 min-w-36 flex-1">
-                    <Select
-                      aria-label="规则所属"
-                      value={`${rule.owner_kind}:${rule.owner_id}`}
-                      options={owners}
-                      onChange={(value: string) => {
-                        const [owner_kind, owner_id] = value.split(":");
-                        setRule({ ...rule, owner_kind: owner_kind as Rule["owner_kind"], owner_id });
-                      }}
-                    />
-                  </Form.Item>
-                  <Button
-                    type="text"
-                    className="mb-2 size-8 flex-none self-end"
-                    aria-label={`删除规则 ${rule.name}`}
-                    icon={<Trash2 size={15} />}
-                    onClick={() => change({ ...draft, rules: draft.rules.filter((r) => r.id !== rule.id) })}
-                  />
-                </div>
-                <Form.Item label="表达式" required className="mb-2 min-w-36 flex-1">
-                  <Input.TextArea
-                    aria-label="规则表达式"
-                    className="font-mono"
-                    autoSize={{ minRows: 1, maxRows: 6 }}
-                    value={rule.expression}
-                    onChange={(e) => setRule({ ...rule, expression: e.target.value })}
-                  />
-                </Form.Item>
-                <Form.Item label="说明" className="mb-0">
-                  <Input aria-label="规则说明" value={rule.description} onChange={(e) => setRule({ ...rule, description: e.target.value })} />
-                </Form.Item>
-              </Form>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <span>
-                  {rule.name} <Text type="secondary">· 继承自{ruleOwnerName(draft, rule)}，在所属对象上修改</Text>
-                </span>
-                <code className="whitespace-pre-wrap break-all">{rule.expression}</code>
-              </div>
-            )}
-          </section>
-        );
-      })}
-      <Button type="dashed" icon={<Plus size={15} />} className="self-start" onClick={addRule}>
-        添加规则
-      </Button>
+    <div className="flex min-w-0 flex-col gap-3">
+      <PanelToolbar inset={false} className="inspector-toolbar" extra={editing ? <Button size="small" icon={<Plus size={14} />} onClick={addRule}>添加规则</Button> : undefined}>
+        <div className="inspector-toolbar-controls">
+          <Input.Search className="inspector-search w-inspector-search" size="small" aria-label="搜索规则" placeholder="搜索规则名称或内容" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Select className="inspector-filter min-w-inspector-filter" size="small" aria-label="筛选规则类型" value={kind} onChange={setKind} options={[{ value: "all", label: "全部类型" }, ...Object.entries(RULE_KINDS).map(([value, label]) => ({ value, label }))]} />
+        </div>
+      </PanelToolbar>
+      <DetailWorkbench detailLabel="选中规则详情" primary={
+        <>
+          <SectionTitle title="规则" note={query || kind !== "all" ? `${rows.length} / ${rules.length} 条` : `${rules.length} 条`} />
+          <Table<Rule>
+            size="small"
+            rowKey="id"
+            pagination={false}
+            dataSource={rows}
+            onRow={(r) => ({ onClick: () => setSelectedId(r.id), className: r.id === rule?.id ? "inspector-selection-row cursor-pointer" : "cursor-pointer" })}
+            locale={{ emptyText: <Empty description={query || kind !== "all" ? "没有匹配的规则" : !editing && canEdit ? "尚未定义规则，可通过顶部编辑添加" : "尚未定义规则"} /> }}
+            columns={[
+              { title: "规则", key: "name", render: (_, r) => <div className="flex min-w-0 flex-col" data-element-id={r.id}><span className="font-medium">{r.name || "未命名规则"}</span>{!isLocalRule(draft, type, r) && <Text type="secondary" className="text-xs">继承，只读</Text>}</div> },
+              { title: "类型", key: "kind", render: (_, r) => RULE_KINDS[r.rule_kind] },
+              { title: "所属", key: "owner", render: (_, r) => ruleOwnerName(draft, r) },
+            ]}
+          />
+        </>
+      } detail={rule ? (
+        <>
+          <SectionTitle title={rule.name || "未命名规则"} note={rule.technical_name}>
+            {editable && <Button danger type="text" size="small" icon={<Trash2 size={14} />} aria-label={`删除规则 ${rule.name}`} onClick={() => change({ ...draft, rules: draft.rules.filter((r) => r.id !== rule.id) })}>删除</Button>}
+          </SectionTitle>
+          {!isLocalRule(draft, type, rule) && <Text type="secondary">继承自{ruleOwnerName(draft, rule)}，在所属对象上修改。</Text>}
+          {editable ? (
+            <Form layout="vertical" component="div" size="small">
+              <SectionTitle title="基本信息" className="mb-3" />
+              <Form.Item className="mb-3" label="名称" required><Input aria-label="规则名称" value={rule.name} onChange={(e) => setRule({ ...rule, name: e.target.value })} /></Form.Item>
+              <Form.Item className="mb-3" label="技术名" required><Input aria-label="规则技术名" className="font-mono" value={rule.technical_name} onChange={(e) => setRule({ ...rule, technical_name: e.target.value.trim() })} /></Form.Item>
+              <Form.Item className="mb-3" label="类型"><Select aria-label="规则类型" value={rule.rule_kind} options={Object.entries(RULE_KINDS).map(([value, label]) => ({ value, label }))} onChange={(rule_kind: Rule["rule_kind"]) => setRule({ ...rule, rule_kind })} /></Form.Item>
+              <Form.Item className="mb-3" label="所属"><Select aria-label="规则所属" value={`${rule.owner_kind}:${rule.owner_id}`} options={owners} onChange={(value: string) => { const [owner_kind, owner_id] = value.split(":"); setRule({ ...rule, owner_kind: owner_kind as Rule["owner_kind"], owner_id }); }} /></Form.Item>
+              <SectionTitle title="规则内容" className="mb-3 border-t border-rule pt-4" />
+              <Form.Item className="mb-3" label="表达式" required><Input.TextArea aria-label="规则表达式" className="font-mono" autoSize={{ minRows: 4, maxRows: 12 }} value={rule.expression} onChange={(e) => setRule({ ...rule, expression: e.target.value })} /></Form.Item>
+              <Form.Item label="说明" className="mb-0"><Input.TextArea aria-label="规则说明" autoSize={{ minRows: 2, maxRows: 6 }} value={rule.description} onChange={(e) => setRule({ ...rule, description: e.target.value })} /></Form.Item>
+            </Form>
+          ) : (
+            <>
+              <section className="flex flex-col gap-3">
+                <SectionTitle title="基本信息" />
+                <Descriptions size="small" column={1} items={[
+                  { key: "technical", label: "技术名", children: <code>{rule.technical_name || "—"}</code> },
+                  { key: "kind", label: "类型", children: RULE_KINDS[rule.rule_kind] },
+                  { key: "owner", label: "所属", children: ruleOwnerName(draft, rule) },
+                ]} />
+              </section>
+              <section className="flex flex-col gap-3 border-t border-rule pt-4">
+                <SectionTitle title="规则内容" />
+                <code className="whitespace-pre-wrap break-words">{rule.expression || "尚未设置表达式"}</code>
+              </section>
+              <section className="flex flex-col gap-3 border-t border-rule pt-4">
+                <SectionTitle title="说明" />
+                <Text type="secondary" className="whitespace-pre-wrap">{rule.description || "暂无说明"}</Text>
+              </section>
+            </>
+          )}
+          <EvidenceSection workspaceId={draft.workspace_id} evidence={rule.evidence} />
+        </>
+      ) : <Empty description="选择规则查看完整内容" />} />
     </div>
   );
 }

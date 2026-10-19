@@ -7,6 +7,7 @@ import type { AssetTable, Assets, DataConnection, Dataset, Draft, ElementSaveRes
 import { usePageActive } from "../hooks/usePageTab";
 import { datasetFromTable, registerDataset, sameLocation } from "../lib/datasetEditing";
 import { StatusMark } from "./layout";
+import { DatasetSnapshotFields } from "./DatasetSnapshotFields";
 
 const { Text } = Typography;
 
@@ -33,7 +34,6 @@ function RegisterForm({
 }) {
   const [dataset, setDataset] = useState(() => datasetFromTable(connection, table, table.comment || table.name));
   const duplicates = sameLocation(draft, dataset);
-  const dates = (dataset.columns ?? []).filter((c) => /date|time/i.test(c.physical_type ?? ""));
   return (
     <Modal
       open
@@ -41,7 +41,7 @@ function RegisterForm({
       onCancel={onCancel}
       okText="登记"
       cancelText="取消"
-      okButtonProps={{ loading: busy, disabled: !dataset.name.trim() }}
+      okButtonProps={{ loading: busy, disabled: !dataset.name.trim() || dataset.snapshot_date_column === "" }}
       onOk={() => onSubmit(dataset)}
       destroyOnHidden
     >
@@ -58,16 +58,7 @@ function RegisterForm({
             onChange={(e) => setDataset({ ...dataset, description: e.target.value })}
           />
         </Form.Item>
-        <Form.Item label="每日快照日期列" extra="表里每天保存一份全量时选择">
-          <Select
-            aria-label="每日快照日期列"
-            allowClear
-            placeholder="不是快照表"
-            value={dataset.snapshot_date_column ?? undefined}
-            options={dates.map((c) => ({ value: c.name, label: c.comment ? `${c.comment}（${c.name}）` : c.name }))}
-            onChange={(column?: string) => setDataset({ ...dataset, snapshot_date_column: column ?? null })}
-          />
-        </Form.Item>
+        <DatasetSnapshotFields dataset={dataset} onChange={(patch) => setDataset((current) => ({ ...current, ...patch }))} />
         <Text type="secondary" className="text-xs">
           将带入 {dataset.columns?.length ?? 0} 个列的名称、类型和注释。
         </Text>

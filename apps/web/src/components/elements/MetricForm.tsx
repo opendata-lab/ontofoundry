@@ -117,6 +117,7 @@ export function MetricForm({
   ) : null;
   return (
     <Form layout="vertical" component="div" requiredMark className="max-w-settings">
+      <SectionTitle title="基本信息" className="mb-4" />
       <div className="grid grid-cols-2 gap-x-4">
         <Form.Item label="名称" required {...status("name")}>
           <Input aria-label="指标名称" value={metric.name} placeholder="例如：已完成订单金额" onChange={(e) => onChange({ ...metric, name: e.target.value })} />
@@ -151,6 +152,7 @@ export function MetricForm({
           />
         </Form.Item>
       </div>
+      <SectionTitle title="指标定义" className="mb-4 border-t border-rule pt-4" />
       <Form.Item label="计算方式" required>
         <Segmented
           block

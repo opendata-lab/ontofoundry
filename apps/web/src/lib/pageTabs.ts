@@ -30,9 +30,9 @@ export function tabTitle(href: string) {
     {
       view: "本体视图",
       objects: "本体对象",
-      relations: "本体关系",
+      relations: "本体对象",
       builder: "本体构建",
-      mappings: "数据映射",
+      mappings: "数据管理",
       delivery: "本体发布",
       settings: "空间设置",
     }[path[0]] ?? "本体视图"

@@ -108,7 +108,7 @@ export function draftGraph(draft: Draft): TypeGraph {
         id: r.id,
         kind: "link_type" as const,
         label: r.name,
-        technical_name: r.technical_name,
+        technical_name: r.name,
         source: r.source_type_id,
         target: r.target_type_id,
         link_type_id: r.id,

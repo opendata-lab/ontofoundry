@@ -5,7 +5,6 @@ import {
   Network,
   Search,
   Settings,
-  Rocket,
   Sparkles,
   PanelLeftClose,
   PanelLeftOpen,
@@ -33,7 +32,7 @@ import { ErrorSurface, LoadingSurface } from "./AsyncState";
 import { ApplicationFrame } from "./layout";
 
 const SEARCH_ICONS = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database };
-const SEARCH_PAGES = { object_type: "objects", link_type: "relations", metric: "view", dataset: "mappings" };
+const SEARCH_PAGES = { object_type: "objects", link_type: "objects", metric: "objects", dataset: "mappings" };
 
 // Follow the workflow: inspect, build and publish; connect data before mapping.
 const navigation = [
@@ -42,16 +41,14 @@ const navigation = [
     items: [
       { to: "view", label: "本体视图", icon: Network },
       { to: "objects", label: "本体对象", icon: Box },
-      { to: "relations", label: "本体关系", icon: GitBranch },
       { to: "builder", label: "本体构建", icon: Sparkles },
-      { to: "delivery", label: "本体发布", icon: Rocket },
     ],
   },
   {
     group: "数据管理",
     items: [
       { to: "connections", label: "数据连接", icon: Plug },
-      { to: "mappings", label: "数据映射", icon: Database },
+      { to: "mappings", label: "数据管理", icon: Database },
     ],
   },
   { group: "空间设置", items: [{ to: "settings", label: "空间设置", icon: Settings }] },
@@ -228,7 +225,7 @@ export function AppShell() {
                   onClick={() => {
                     setSearching(false);
                     navigate(
-                      `/workspaces/${workspaceId}/${SEARCH_PAGES[r.kind]}?inspect=${r.kind}:${r.definition.id}`,
+                      `/workspaces/${workspaceId}/${SEARCH_PAGES[r.kind]}?${r.kind === "link_type" ? "catalogTab=relations&" : r.kind === "metric" ? "catalogTab=metrics&" : ""}inspect=${r.kind}:${r.definition.id}`,
                     );
                   }}
                 >

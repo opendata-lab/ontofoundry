@@ -36,6 +36,12 @@ export const MULTIPLICITY: Record<LinkType["multiplicity"], string> = {
   many_to_many: "多对多",
 };
 
+/** A traversal is named for the role played by the object it returns. */
+export function linkDisplayName(link: LinkType, forward: boolean): string {
+  return (forward ? link.target_role_name : link.source_role_name)
+    || (forward ? link.name : `${link.name}（反向）`);
+}
+
 export const AGGREGATIONS: Record<Aggregation, string> = {
   count: "计数",
   sum: "求和",
@@ -122,8 +128,8 @@ export type EffectiveLink = Inherited<LinkType> & {
   direction: "forward" | "reverse";
 };
 
-/** Both directions; a self-link appears once, as forward. */
-export function effectiveLinks(draft: Draft, typeId: UUID): EffectiveLink[] {
+/** Self-links remain single definitions unless a direction-specific list requests both. */
+export function effectiveLinks(draft: Draft, typeId: UUID, bothSelfDirections = false): EffectiveLink[] {
   const owners = lineage(draft, typeId);
   const rank = new Map(owners.map((id, i) => [id, i]));
   const result: EffectiveLink[] = [];
@@ -141,6 +147,13 @@ export function effectiveLinks(draft: Draft, typeId: UUID): EffectiveLink[] {
       direction: forward ? "forward" : "reverse",
       inheritedFrom: owner === typeId ? null : owner,
     });
+    if (bothSelfDirections && link.source_type_id === link.target_type_id) {
+      result.push({
+        definition: link,
+        direction: "reverse",
+        inheritedFrom: owner === typeId ? null : owner,
+      });
+    }
   }
   return result;
 }

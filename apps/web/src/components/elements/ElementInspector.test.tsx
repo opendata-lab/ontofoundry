@@ -174,7 +174,7 @@ describe("object popup", () => {
 describe("relation, metric and dataset popups", () => {
   it("shows a relation's ends and its own data binding tab, and alerts when an endpoint is a virtual parent", async () => {
     const draft = example("06-inheritance");
-    const link = draft.link_types.find((l) => l.technical_name === "responsible_party")!;
+    const link = draft.link_types.find((l) => l.name === "responsible_party")!;
     show(draft, `inspect=link_type:${link.id}&inspectTab=mapping`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "数据绑定", "实例"]));

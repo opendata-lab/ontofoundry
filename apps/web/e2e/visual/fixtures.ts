@@ -56,7 +56,9 @@ function toStoredDraft(source: CoreDraft): Draft {
       synonyms: [],
       tags: [],
       evidence: [],
-      inverse_name: null,
+      verbalizes: [],
+      source_role_name: null,
+      target_role_name: null,
       data_join: null,
       ...l,
     })),
@@ -494,7 +496,7 @@ export const ELEMENT_DRAFT = structuredClone(FIXTURE_DRAFT);
 export const ELEMENTS = {
   object: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "person")!,
   derived: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "vip_party")!,
-  relation: ELEMENT_DRAFT.link_types.find((item) => item.technical_name === "signer")!,
+  relation: ELEMENT_DRAFT.link_types.find((item) => item.name === "signer")!,
   metric: ELEMENT_DRAFT.metrics.find((item) => item.technical_name === "vip_party_count")!,
   dataset: ELEMENT_DRAFT.datasets.find((item) => item.name === "contracts")!,
 };
@@ -566,7 +568,7 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
       })),
       edges: [
         ...ELEMENT_DRAFT.link_types.map((link) => ({
-          id: link.id, kind: "link_type" as const, label: link.name, technical_name: link.technical_name,
+          id: link.id, kind: "link_type" as const, label: link.name, technical_name: link.name,
           source: link.source_type_id, target: link.target_type_id, link_type_id: link.id,
           description: link.description, multiplicity: link.multiplicity,
         })),

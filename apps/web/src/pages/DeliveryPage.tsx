@@ -1,4 +1,5 @@
-import { Alert, Button, Empty, Table, Tabs, Typography } from "antd";
+import { useErrorMessage } from "../hooks/useErrorMessage";
+import { Button, Empty, Table, Tabs, Typography } from "antd";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle, StatusMark } from "../components/layout";
 import { Check, Copy, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -63,6 +64,7 @@ export function DeliveryPage() {
   const [versions, setVersions] = useState<VersionSummary[]>([]);
   const [result, setResult] = useState("");
   const { setError } = model;
+  useErrorMessage(model.error);
   usePageTab({ title: model.session ? `发布 · ${model.session.title}` : undefined });
   const loadVersions = useCallback(() => api.versions(workspace.id).then((r) => setVersions(r.items)), [workspace.id]);
   useEffect(() => {
@@ -130,7 +132,6 @@ export function DeliveryPage() {
                             </div>
                           )}
                           {publish}
-                          {model.error && <Alert type="error" showIcon message={model.error} />}
                         </div>
                       ),
                     },

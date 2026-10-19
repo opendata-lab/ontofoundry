@@ -3,7 +3,7 @@ import { SectionTitle } from "../layout";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { DerivedBranch, Draft, ObjectType, Operator } from "../../api/types";
-import { byId } from "../../lib/coreModel";
+import { byId, linkDisplayName } from "../../lib/coreModel";
 import {
   OPERATORS,
   branchSummary,
@@ -69,7 +69,7 @@ export function DerivedConditionEditor({
       label: "关联",
       options: context.links.map((l) => {
         const other = byId(draft.object_types, l.direction === "forward" ? l.link.target_type_id : l.link.source_type_id);
-        const name = l.direction === "reverse" && l.link.inverse_name ? l.link.inverse_name : l.link.name;
+        const name = linkDisplayName(l.link, l.direction === "forward");
         return { value: `l:${l.link.id}:${l.direction}`, label: `${name}（${other?.name ?? "?"}）` };
       }),
     },

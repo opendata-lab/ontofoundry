@@ -69,7 +69,8 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
     { key: "synonyms", label: "同义词", children: <TagsText items={metric.synonyms} /> },
   ];
   return (
-    <div className="flex max-w-settings flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
+      <SectionTitle title="指标定义" />
       {metric.description ? (
         <Paragraph className="m-0 whitespace-pre-wrap">{metric.description}</Paragraph>
       ) : (
@@ -102,7 +103,7 @@ export function MetricPanel({
   open: (request: ElementRequest) => void;
 }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col">
       {editing ? (
         <MetricForm
           draft={draft}

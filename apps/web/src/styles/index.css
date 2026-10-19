@@ -11,8 +11,20 @@
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/preflight.css" layer(base);
 @import "./tokens.css" layer(base);
+
 @import "@xyflow/react/dist/style.css" layer(components);
 @import "tailwindcss/utilities.css" layer(utilities);
+
+/* Utility-layer priority keeps selection visible when Ant Design applies hover styles. */
+@utility inspector-selection-row {
+  & > .ant-table-cell { background: var(--color-accent-soft); }
+}
+
+/* The Fabric reference uses compact labels rather than horizontal-form control heights. */
+@utility fabric-relationship-form {
+  & .ant-form-item-label { padding-bottom: var(--space-2xs); }
+  & .ant-form-item-label > label { height: auto; line-height: var(--leading-base); }
+}
 
 @layer base {
   html,

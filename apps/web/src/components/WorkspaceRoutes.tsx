@@ -1,5 +1,6 @@
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
+import { usePageActive } from "../hooks/usePageTab";
 import { pageLoaders } from "../lib/workspacePages";
 import { ElementInspector } from "./elements/ElementInspector";
 import { LegacyElementRoute } from "./elements/LegacyElementRoute";
@@ -44,6 +45,15 @@ const SettingsPage = lazy(() =>
   })),
 );
 
+function RelationCatalogRedirect() {
+  const [params] = useSearchParams();
+  const active = usePageActive();
+  if (!active) return null;
+  const next = new URLSearchParams(params);
+  next.set("catalogTab", "relations");
+  return <Navigate to={{ pathname: "../objects", search: `?${next}` }} replace />;
+}
+
 // Freeze each mounted page's route params and query string while another tab is active.
 export function WorkspaceRoutes({ href }: { href: string }) {
   return (
@@ -58,7 +68,7 @@ export function WorkspaceRoutes({ href }: { href: string }) {
         path="objects/:typeId/instances/:objectId"
         element={<InstancesPage />}
       />
-      <Route path="relations" element={<TypeCatalogPage kind="link_type" />} />
+      <Route path="relations" element={<RelationCatalogRedirect />} />
       <Route path="relations/:typeId" element={<LegacyElementRoute relation />} />
       <Route
         path="relations/:typeId/edit"

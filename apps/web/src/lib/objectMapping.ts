@@ -80,7 +80,7 @@ export function objectMapping(draft: Draft, object: ObjectType): ObjectMapping {
     inheritedFrom,
     ...bindingFor(draft, object.id, definition.technical_name),
   }));
-  const relations = effectiveLinks(draft, object.id).map(({ definition, direction, inheritedFrom }) => {
+  const relations = effectiveLinks(draft, object.id, true).map(({ definition, direction, inheritedFrom }) => {
     const local = inheritedFrom ? mapping?.inherited_link_bindings[definition.id] : undefined;
     return {
       definition,

@@ -7,8 +7,8 @@ const draft = example("06-inheritance");
 const party = draft.object_types.find((o) => o.technical_name === "party")!;
 const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
 const level = draft.properties.find((p) => p.technical_name === "level" && p.owner_type_id === party.id)!;
-const signer = draft.link_types.find((l) => l.technical_name === "signer")!;
-const contact = draft.link_types.find((l) => l.technical_name === "contact")!;
+const signer = draft.link_types.find((l) => l.name === "signer")!;
+const contact = draft.link_types.find((l) => l.name === "contact")!;
 
 describe("member condition form", () => {
   it("reads a single simple branch as rows and writes the same branch back", () => {

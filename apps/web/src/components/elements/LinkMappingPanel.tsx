@@ -1,7 +1,8 @@
-import { Alert, Button, Descriptions, Form, Segmented, Select, Typography } from "antd";
-import { Plus, Trash2 } from "lucide-react";
+import { SectionTitle } from "../layout";
+import { Alert, Button, Descriptions, Form, Segmented, Select, Table, Typography } from "antd";
+import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import type { DataJoin, Draft, LinkType, MappingTableJoin, UUID } from "../../api/types";
-import { bindingMode, byId, effectiveProperties, joinSummary } from "../../lib/coreModel";
+import { bindingMode, byId, effectiveProperties } from "../../lib/coreModel";
 import type { PanelProps } from "../../lib/elementModel";
 import { sourceColumns } from "../../lib/objectMapping";
 import { joinProblem, setLinkJoin } from "../../lib/objectMappingEditing";
@@ -11,7 +12,7 @@ const { Text } = Typography;
 type Key = MappingTableJoin["source_key"];
 
 
-function KeyEditor({
+export function KeyEditor({
   draft,
   typeId,
   value,
@@ -243,6 +244,22 @@ function MappingTableFields({
 /** The relation's own data binding (its data_join). */
 export function LinkMappingPanel(props: PanelProps<LinkType>) {
   const { draft, type, editing, change } = props;
+  const sourceName = byId(draft.object_types, type.source_type_id)?.name ?? "来源对象";
+  const targetName = byId(draft.object_types, type.target_type_id)?.name ?? "目标对象";
+  const propertyName = (id: string | undefined) => byId(draft.properties, id)?.name || "未指定属性";
+  const correspondence = (rows: { id: string; source: string; target: string }[], sourceLabel: string, targetLabel: string) => (
+    <Table
+      size="small"
+      rowKey="id"
+      pagination={false}
+      dataSource={rows}
+      columns={[
+        { title: sourceLabel, dataIndex: "source", key: "source" },
+        { title: "对应", key: "pair", align: "center", render: () => <ArrowRight size={14} className="mx-auto text-muted" /> },
+        { title: targetLabel, dataIndex: "target", key: "target" },
+      ]}
+    />
+  );
   const hasVirtualEndpoint =
     bindingMode(draft, type.source_type_id) === "virtual" ||
     bindingMode(draft, type.target_type_id) === "virtual";
@@ -255,25 +272,34 @@ export function LinkMappingPanel(props: PanelProps<LinkType>) {
   ) : null;
   if (!editing)
     return (
-      <div className="flex max-w-settings flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-4">
+        <SectionTitle title="数据绑定" note={type.data_join?.kind === "direct" ? "属性对应" : type.data_join?.kind === "mapping_table" ? "映射表" : undefined} />
         {virtualAlert}
-        <Descriptions
-          size="small"
-          column={1}
-          items={[
-            { key: "join", label: "数据绑定", children: joinSummary(draft, type.data_join) },
-            ...(type.data_join?.kind === "mapping_table"
-              ? [
-                  { key: "source", label: "来源端列", children: type.data_join.source_columns.join(", ") },
-                  { key: "target", label: "目标端列", children: type.data_join.target_columns.join(", ") },
-                ]
-              : []),
-          ]}
-        />
+        {!type.data_join && <Text type="secondary">未绑定</Text>}
+        {type.data_join?.kind === "direct" && (() => {
+          const join = type.data_join;
+          const rows = Array.from({ length: Math.max(join.source_property_ids.length, join.target_property_ids.length) }, (_, index) => ({
+            id: String(index), source: propertyName(join.source_property_ids[index]), target: propertyName(join.target_property_ids[index]),
+          }));
+          return correspondence(rows, `${sourceName} · 来源对象`, `${targetName} · 目标对象`);
+        })()}
+        {type.data_join?.kind === "mapping_table" && (() => {
+          const join = type.data_join;
+          const datasetName = byId(draft.datasets, join.dataset_id)?.name ?? "未指定映射表";
+          const keyName = (key: Key) => key.kind === "mapping_key" ? "实例键" : key.property_ids.map(propertyName).join(" + ") || "未指定属性";
+          return <>
+            <Descriptions size="small" column={1} items={[{ key: "dataset", label: "映射表", children: datasetName }]} />
+            {correspondence([
+              { id: "source", source: join.source_columns.join(" + ") || "未指定列", target: `${sourceName} · ${keyName(join.source_key)}` },
+              { id: "target", source: join.target_columns.join(" + ") || "未指定列", target: `${targetName} · ${keyName(join.target_key)}` },
+            ], "映射表字段", "对应对象及实例键")}
+          </>;
+        })()}
       </div>
     );
   return (
-    <div className="flex max-w-settings flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-4">
+      <SectionTitle title="数据绑定" />
       {virtualAlert}
       <LinkJoinEditor
         draft={draft}

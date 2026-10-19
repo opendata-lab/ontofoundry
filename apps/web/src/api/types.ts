@@ -701,6 +701,18 @@ export type Material = {
   created_at?: ISOTime;
   archived_at?: ISOTime | null;
 };
+export type MaterialUsage = {
+  object_types: number;
+  link_types: number;
+  properties: number;
+  rules: number;
+  metrics: number;
+  material_objects: number;
+  material_links: number;
+  references: string[];
+  can_delete: boolean;
+};
+export type ManagedMaterial = Material & { usage: MaterialUsage };
 export type Capabilities = {
   agent_configured: boolean;
   model: string;

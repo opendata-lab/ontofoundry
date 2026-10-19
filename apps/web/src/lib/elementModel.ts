@@ -78,7 +78,7 @@ export type RelationRow = {
 };
 
 export function relationsFor(draft: Draft, type: ObjectType): RelationRow[] {
-  return effectiveLinks(draft, type.id).map((link: EffectiveLink) => ({
+  return effectiveLinks(draft, type.id, true).map((link: EffectiveLink) => ({
     definition: link.definition,
     inherited: link.inheritedFrom !== null,
     inheritedFrom: link.inheritedFrom ?? undefined,

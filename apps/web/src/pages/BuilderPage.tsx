@@ -1,13 +1,11 @@
-import { FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Rocket, Sparkles } from "lucide-react";
-import { Alert, Button, Checkbox, Input, Segmented, Tooltip, Typography, Upload } from "antd";
+import { ArrowUp, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
+import { Alert, Button, Checkbox, Dropdown, Input, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import type { AgentConversationElement, CompleteDetail, ErrorDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
-import { ImportDialog } from "../components/ImportDialog";
 import { ModelResults } from "../components/ModelResults";
 import { BuilderConversationEmpty } from "../components/BuilderConversationEmpty";
 import { TableMaterialPicker } from "../components/TableMaterialPicker";
@@ -16,6 +14,7 @@ import { TagList } from "../components/TagList";
 import { useModeling } from "../hooks/useModeling";
 import { useProposals } from "../hooks/useProposals";
 import { usePageTab } from "../hooks/usePageTab";
+import { useErrorMessage } from "../hooks/useErrorMessage";
 import { createOntoFoundryConversationTransport } from "../lib/agentConversation";
 
 // Bridge the SDK's public custom properties to existing design tokens.
@@ -26,13 +25,14 @@ const CONVERSATION = [
   "[--dac-primary:var(--color-accent)] [--dac-primary-dark:var(--color-accent-hover)] [--dac-primary-hover:var(--color-accent-hover)] [--dac-primary-color:var(--color-accent)] [--dac-accent:var(--color-accent)] [--dac-user-bubble-bg:var(--color-accent-soft)]",
   "[--dac-user-bubble-color:var(--color-ink-2)] [--dac-bubble-radius:var(--radius-md)] [--dac-input-radius:var(--radius-sm)] [--dac-button-radius:var(--radius-sm)]",
   "[&::part(run-detail)]:hidden [&::part(root)]:justify-start [&::part(messages)]:flex-1 [&::part(messages)]:overflow-auto",
+  "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
-  const [importOpen, setImportOpen] = useState(false);
+  useErrorMessage(error);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [scenario, setScenario] = useState("");
@@ -40,9 +40,10 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
+  const [composerMode, setComposerMode] = useState<"model" | "chat">("model");
+  const [composerDraft, setComposerDraft] = useState("");
   const scenarioId = useId();
   const conversation = useRef<AgentConversationElement>(null);
-  const navigate = useNavigate();
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
     dirty: !!scenario.trim(),
@@ -83,20 +84,21 @@ export function BuilderPage() {
       setBusy(false);
     }
   };
-  // Ordinary composer messages are chat. Only this action asks DataAgent for a
-  // proposals batch: metadata.mode is what the BFF reads to pin the run and
-  // expect a result file, and it comes back on completion.
-  const startModeling = () => {
+  const send = () => {
     const el = conversation.current;
     if (!el) return;
-    const text = el.value.trim();
-    const content =
-      (scenario.trim() && text ? `业务场景：${scenario.trim()}\n本次需求：${text}` : text) || scenario.trim() || "基于已选材料开始建模";
-    void el.sendMessage(content, { metadata: { mode: "model" } });
-    setScenario("");
+    void el.sendMessage(el.value.trim() || (composerMode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
+      metadata: { mode: composerMode },
+    });
   };
-  const canModel =
-    !!capabilities?.agent_configured && !running && !busy && !uploading && (!!session?.material_ids.length || !!scenario.trim());
+  const blocked = !capabilities?.agent_configured || running || busy || uploading;
+  const canSend = !blocked && (composerMode === "model"
+    ? !!session?.material_ids.length || !!scenario.trim() || !!composerDraft.trim()
+    : !!composerDraft.trim());
+  const sendState = useRef({ mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length });
+  useLayoutEffect(() => {
+    sendState.current = { mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length };
+  });
   const attach = async (material: Material) => {
     const current = await model.ensure();
     setMaterials((ms) => [material, ...ms.filter((m) => m.id !== material.id)]);
@@ -118,6 +120,8 @@ export function BuilderPage() {
   useEffect(() => {
     const el = conversation.current;
     if (!el) return;
+
+    const onDraft = (event: Event) => setComposerDraft((event as CustomEvent<{ value: string }>).detail.value);
 
     const onRun = (event: Event) => {
       const { status } = (event as CustomEvent<RunChangeDetail>).detail;
@@ -153,10 +157,12 @@ export function BuilderPage() {
     };
 
     el.addEventListener("dataagent-run-change", onRun);
+    el.addEventListener("dataagent-draft-change", onDraft);
     el.addEventListener("dataagent-complete", onComplete);
     el.addEventListener("dataagent-error", onError);
     return () => {
       el.removeEventListener("dataagent-run-change", onRun);
+      el.removeEventListener("dataagent-draft-change", onDraft);
       el.removeEventListener("dataagent-complete", onComplete);
       el.removeEventListener("dataagent-error", onError);
     };
@@ -179,7 +185,29 @@ export function BuilderPage() {
     // Install the factory before the conversation key: useEndpoint builds a
     // transport when endpoint changes and intentionally does not rebuild one
     // merely because a late factory assignment arrived.
-    el.transportFactory = createOntoFoundryConversationTransport;
+    // Both the host button and the SDK submit path use the selected scene.
+    el.transportFactory = (endpoint) => {
+      const transport = createOntoFoundryConversationTransport(endpoint);
+      return {
+        ...transport,
+        async sendMessage(input) {
+          const current = sendState.current;
+          const mode = input.metadata?.mode ?? current.mode;
+          const context = current.scenario.trim();
+          const content = mode === "model" && context && input.content.trim() !== context
+            ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
+          const run = await transport.sendMessage({ ...input, content, metadata: { ...input.metadata, mode } });
+          if (mode === "model") setScenario((value) => value === current.scenario ? "" : value);
+          return run;
+        },
+      };
+    };
+    el.beforeSend = ({ content }) => {
+      const current = sendState.current;
+      return !current.blocked && (current.mode === "model"
+        ? current.hasMaterials || !!current.scenario.trim() || !!content.trim()
+        : !!content.trim());
+    };
     // A modeling run's deliverable is the draft, which the results panel to the
     // right already renders. The raw JSON behind it is not something to hand
     // the user as a file.
@@ -197,43 +225,8 @@ export function BuilderPage() {
       <PageHeader
         title="本体构建"
         note={session ? "最近保存: " + new Date(session.updated_at).toLocaleString("zh-CN", { hour12: false }) : "尚未开始"}
-      >
-        <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} />
-        <Tooltip title="新建会话">
-          <Button
-            aria-label="新建会话"
-            icon={<Plus size={15} />}
-            disabled={busy}
-            onClick={() =>
-              act(async () => {
-                await model.create();
-              })
-            }
-          />
-        </Tooltip>
-        <Button disabled={busy} onClick={() => setImportOpen(true)}>导入文件</Button>
-        {/* Only missing configuration requires user action. */}
-        {capabilities && !capabilities.agent_configured && <Link to="../settings">DataAgent 未配置，查看连通性</Link>}
-        <Button
-          type="primary"
-          icon={<Rocket size={14} />}
-          disabled={!session || running || busy}
-          onClick={() => navigate("../delivery?session=" + session?.id)}
-        >
-          发布本体
-        </Button>
-      </PageHeader>
-      <ImportDialog open={importOpen} workspaceId={workspace.id} maxFileMb={capabilities?.max_file_mb} onClose={() => setImportOpen(false)} onConfirmed={(result) => { setImportOpen(false); navigate(`../builder?session=${result.session_id}&panel=proposals`); model.reload(); }} />
+      />
       <PageBody>
-        {error && (
-          <Alert
-            type="error"
-            showIcon
-            closable={{ closeIcon: true, "aria-label": "关闭错误" }}
-            message={error}
-            onClose={() => setError("")}
-          />
-        )}
         {/* A modeling run that ended with questions instead of a result. The
           conversation's own run label only says the turn finished. */}
         {!running && session?.result_state === "awaiting_reply" && (
@@ -252,17 +245,17 @@ export function BuilderPage() {
               />
             </PanelToolbar>
             {!collapsed && (
-              <div className="flex flex-1 flex-col gap-4 overflow-auto p-4">
-                <section>
-                  <SectionTitle title="业务场景标签" className="mb-3" />
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
+                <section className="flex shrink-0 flex-col gap-3">
+                  <SectionTitle title="业务场景标签" />
                   <TagList tags={[workspace.name]} />
                 </section>
-                <section>
-                  <SectionTitle title="业务知识" className="mb-3" />
+                <section className="flex shrink-0 flex-col gap-3">
+                  <SectionTitle title="业务知识" />
                   <Segmented
                     size="small"
                     aria-label="建模材料来源"
-                    className="mb-3 max-w-full overflow-x-auto"
+                    className="max-w-full self-start overflow-x-auto"
                     value={materialMode}
                     onChange={(v) => setMaterialMode(String(v))}
                     options={[
@@ -272,6 +265,7 @@ export function BuilderPage() {
                   />
                   {materialMode === "upload" && (
                     <Upload.Dragger
+                      className="block w-full [&_.ant-upload-drag]:h-auto"
                       aria-label="上传业务知识材料"
                       accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv"
                       multiple
@@ -334,15 +328,15 @@ export function BuilderPage() {
                     </div>
                   )}
                 </section>
-                <section>
-                  <SectionTitle title="业务数据" className="mb-3" />
+                <section className="flex shrink-0 flex-col gap-3">
+                  <SectionTitle title="业务数据" />
                   <TableMaterialPicker
                     workspaceId={workspace.id}
                     disabled={busy || running}
                     onMaterial={(material) => act(() => attach(material))}
                   />
                 </section>
-                <section className="flex flex-col gap-3">
+                <section className="flex shrink-0 flex-col gap-3">
                   <SectionTitle title={<label htmlFor={scenarioId}>业务场景描述</label>} />
                   <Input.TextArea
                     id={scenarioId}
@@ -352,26 +346,43 @@ export function BuilderPage() {
                     value={scenario}
                     onChange={(e) => setScenario(e.target.value)}
                   />
-                  <Tooltip title={canModel ? undefined : "先上传或选择业务材料，或填写业务场景描述"}>
-                    <Button type="primary" block icon={<Sparkles size={15} />} disabled={!canModel} onClick={startModeling}>
-                      {running ? "建模中…" : "开始建模"}
-                    </Button>
-                  </Tooltip>
                 </section>
               </div>
             )}
           </Panel>
           <Panel fill className="min-w-0">
+            <PanelToolbar extra={<>
+              <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
+              <Tooltip title="新建会话">
+                <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
+                  onClick={() => act(async () => { await model.create(); })} />
+              </Tooltip>
+            </>}>
+              <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? "建模对话"}</span>} />
+            </PanelToolbar>
             {/* The endpoint is derived from sessionId, never from `session`.
               That object is null while a session loads, and an endpoint that
               momentarily goes empty reads as a conversation switch — the
               element would clear itself and reload for no reason. */}
-            <dataagent-conversation ref={conversation} placeholder="向智能体提问以辅助本体构建…" className={CONVERSATION}>
+            <dataagent-conversation ref={conversation} placeholder={composerMode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
               <BuilderConversationEmpty />
+              <div slot="composer-actions" className="flex w-full min-w-0 items-center gap-2">
+                <Dropdown trigger={["click"]} placement="topLeft" disabled={running || busy || uploading}
+                  menu={{ selectable: true, selectedKeys: [composerMode], items: [{ type: "group", label: "场景", children: [
+                    { key: "model", label: "本体建模", icon: <Sparkles size={15} /> },
+                    { key: "chat", label: "本体查询", icon: <Search size={15} /> },
+                  ] }], onClick: ({ key }) => setComposerMode(key as "model" | "chat") }}>
+                  <Button size="small" type="text" aria-label="选择场景" icon={<Plus size={15} />} disabled={running || busy || uploading} />
+                </Dropdown>
+                <span className="min-w-0 flex-1" role="status"><Tag color="blue" className="m-0">{composerMode === "model" ? "本体建模" : "本体查询"}</Tag></span>
+                {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
+                  <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
+                </Tooltip>}
+              </div>
             </dataagent-conversation>
           </Panel>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-            <ModelResults session={session} proposals={proposals} running={running} onRemodel={remodel} />
+            <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />
           </div>
         </div>
       </PageBody>

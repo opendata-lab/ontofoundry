@@ -1,3 +1,4 @@
+import { useErrorMessage } from "../hooks/useErrorMessage";
 import { Alert, Breadcrumb, Button, DatePicker, Descriptions, Empty, Input, Select, Table, Tag, Typography } from "antd";
 import dayjs from "dayjs";
 import { FileText, Network } from "lucide-react";
@@ -12,7 +13,7 @@ import { OntologyGraph } from "../components/OntologyGraph";
 import { usePageTab } from "../hooks/usePageTab";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
-import { bindingMode, byId, effectiveProperties, effectiveSources, isA, mappingFor } from "../lib/coreModel";
+import { bindingMode, byId, effectiveProperties, effectiveSources, isA, linkDisplayName, mappingFor } from "../lib/coreModel";
 import { documentDisplayText, documentSearchText } from "../lib/instanceDisplay";
 import { instanceCanvas, instanceNeighborhood, type InstanceEdge, type InstanceNode } from "../lib/instanceGraph";
 import { ensureMapping } from "../lib/objectMappingEditing";
@@ -63,6 +64,7 @@ export function InstancesPage() {
   const [list, setList] = useState<InstanceList | null>(null);
   const [neighborhood, setNeighborhood] = useState<InstanceNeighborhood | null>(null);
   const [dbError, setDbError] = useState("");
+  useErrorMessage(dbError);
   const [loading, setLoading] = useState(false);
   const [graphOpen, setGraphOpen] = useState(false);
   const key = useMemo(() => {
@@ -251,7 +253,7 @@ export function InstancesPage() {
           const link = byId(draft.link_types, l.type_id);
           return {
             id: l.id,
-            label: outgoing ? link?.name : (link?.inverse_name ?? `${link?.name ?? "关系"}（反向）`),
+            label: link ? linkDisplayName(link, outgoing) : "关系",
             other: availableObjects.find((o) => o.id === (outgoing ? l.target_id : l.source_id)),
           };
         })
@@ -309,7 +311,6 @@ export function InstancesPage() {
       </PageHeader>
       <PageBody>
         <Panel>
-          {objectId && dbError && <Alert type="error" showIcon message={dbError} />}
           {databaseDetail && neighborhood?.warnings.map((w) => <Alert key={w} type="info" showIcon message={w} />)}
           {neighborhood?.truncated && (
             <Alert type="warning" showIcon message="已达到查询范围上限，当前结果仅为部分关系。请缩小范围或选择新的中心实例。" />
@@ -366,7 +367,6 @@ export function InstancesPage() {
                   </Text>
                 )}
               </PanelToolbar>
-              {dbError && <Alert type="error" showIcon message={dbError} />}
               {source === "document" ? (
                 <Table
                   size="middle"

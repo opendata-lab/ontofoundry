@@ -1,6 +1,6 @@
-import { Button, Input, Popover, Table } from "antd";
+import { Button, Input, Modal, Popover, Table, Tooltip } from "antd";
 import { StatusMark, type StatusState } from "./layout";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, History } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ModelingSession, ModelingSessionSummary } from "../api/types";
 
@@ -29,11 +29,15 @@ export function SessionPicker({
   sessionId,
   sessions,
   onSelect,
+  presentation = "popover",
+  disabled = false,
 }: {
   session: ModelingSession | null;
   sessionId: string | null;
   sessions: ModelingSessionSummary[];
   onSelect: (id: string) => void;
+  presentation?: "popover" | "dialog";
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -51,15 +55,8 @@ export function SessionPicker({
     setOpen(false);
     setQuery("");
   };
-  return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      trigger="click"
-      placement="bottomLeft"
-      destroyOnHidden
-      content={
-        <div className="flex w-review-code max-w-full flex-col gap-2" role="dialog" aria-label="选择建模会话">
+  const content = (
+        <div className={`flex max-w-full flex-col gap-2 ${presentation === "dialog" ? "w-full" : "w-review-code"}`} role={presentation === "dialog" ? "region" : "dialog"} aria-label="选择建模会话">
           <Input.Search
             autoFocus
             allowClear
@@ -73,7 +70,7 @@ export function SessionPicker({
             size="small"
             rowKey="id"
             pagination={false}
-            scroll={{ y: 320 }}
+            scroll={{ y: "var(--review-code-height)" }}
             dataSource={visible}
             locale={{ emptyText: sessions.length ? "没有匹配的会话" : "暂无建模会话" }}
             rowClassName={(item) => `cursor-pointer ${item.id === sessionId ? "bg-accent-soft" : ""}`}
@@ -102,9 +99,20 @@ export function SessionPicker({
             ]}
           />
         </div>
-      }
-    >
-      <Button aria-haspopup="dialog" aria-expanded={open} className="max-w-xs">
+  );
+  if (presentation === "dialog") return <>
+    <Tooltip title="建模历史">
+      <Button size="small" type="text" aria-label="建模历史" aria-haspopup="dialog" aria-expanded={open}
+        disabled={disabled} icon={<History size={15} />} onClick={() => setOpen(true)} />
+    </Tooltip>
+    <Modal open={open} title="建模历史" width="var(--review-dialog-width)" footer={null}
+      closable={{ "aria-label": "关闭建模历史" }} onCancel={() => { setOpen(false); setQuery(""); }} destroyOnHidden>
+      {content}
+    </Modal>
+  </>;
+  return (
+    <Popover open={open} onOpenChange={setOpen} trigger="click" placement="bottomLeft" destroyOnHidden content={content}>
+      <Button disabled={disabled} aria-haspopup="dialog" aria-expanded={open} className="max-w-xs">
         <span className="truncate">{session?.title ?? (sessionId ? "正在加载会话…" : "选择建模会话")}</span>
         <ChevronDown size={14} aria-hidden="true" />
       </Button>

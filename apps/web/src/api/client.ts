@@ -26,6 +26,7 @@ import type {
   MappingPreview,
   MappingPreviewRequest,
   Material,
+  ManagedMaterial,
   MergeConflict,
   MetricPreview,
   MetricPreviewRequest,
@@ -224,6 +225,9 @@ export const modelingApi = {
   saveElement: (id: string, payload: ElementSave) =>
     workspaceRequest<ElementSaveResult>(id, "/element-saves", payload),
   materials: (id: string) => workspaceRequest<Items<Material>>(id, "/materials"),
+  materialOverview: (id: string) => workspaceRequest<Items<ManagedMaterial>>(id, "/materials/overview"),
+  materialDownloadUrl: (id: string, materialId: string) => `/api/v1/workspaces/${id}/materials/${materialId}`,
+  deleteMaterial: (id: string, materialId: string) => workspaceRequest<void>(id, `/materials/${materialId}`, undefined, "DELETE"),
   upload: (id: string, file: File) =>
     request<Material>(
       "/api/v1/workspaces/" + id + "/materials?name=" + encodeURIComponent(file.name),

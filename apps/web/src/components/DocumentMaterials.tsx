@@ -1,0 +1,114 @@
+import { App, Button, Empty, Input, Popconfirm, Select, Table, Tag, Tooltip, Typography, Upload } from "antd";
+import { Download, FileText, RefreshCw, Search, Trash2, Upload as UploadIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { modelingApi } from "../api/client";
+import type { ManagedMaterial, Workspace } from "../api/types";
+import { useErrorMessage } from "../hooks/useErrorMessage";
+import { usePageActive } from "../hooks/usePageTab";
+import { PanelToolbar } from "./layout";
+
+const sizeText = (size: number) => size < 1024 ? `${size} B` : size < 1024 * 1024
+  ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
+
+export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
+  const { message } = App.useApp();
+  const active = usePageActive();
+  const [materials, setMaterials] = useState<ManagedMaterial[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const revision = useRef(0);
+  useErrorMessage(error);
+  const load = useCallback(async () => {
+    const request = ++revision.current;
+    setError("");
+    setLoading(true);
+    try {
+      const result = await modelingApi.materialOverview(workspace.id);
+      if (request === revision.current) setMaterials(result.items);
+    } catch (e) {
+      if (request === revision.current) setError(e instanceof Error ? e.message : "文档读取失败");
+    } finally {
+      if (request === revision.current) setLoading(false);
+    }
+  }, [workspace.id]);
+  useEffect(() => {
+    if (active) void load();
+    return () => { revision.current++; };
+  }, [load, active]);
+  const upload = async (files: File[]) => {
+    setBusy(true);
+    setError("");
+    try {
+      for (const file of files) await modelingApi.upload(workspace.id, file);
+      void message.success("文档已上传");
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : "上传失败");
+    } finally {
+      await load();
+      setBusy(false);
+    }
+  };
+  const remove = async (material: ManagedMaterial) => {
+    setBusy(true);
+    setError("");
+    try {
+      await modelingApi.deleteMaterial(workspace.id, material.id);
+      void message.success("文档已删除");
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : "删除失败");
+    } finally {
+      await load();
+      setBusy(false);
+    }
+  };
+  const rows = materials.filter((material) => material.name.toLowerCase().includes(query.trim().toLowerCase())
+    && (filter === "all" || (filter === "unused" ? material.usage.can_delete : !material.usage.can_delete)));
+  return <>
+    <PanelToolbar extra={<>
+      <Select size="small" aria-label="文档使用情况" value={filter} onChange={setFilter} options={[
+        { value: "all", label: "全部文档" }, { value: "used", label: "已使用" }, { value: "unused", label: "未使用" },
+      ]} />
+      <Input size="small" type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索文档" placeholder="搜索文档名称" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <Tooltip title="刷新文档"><Button size="small" type="text" aria-label="刷新文档" disabled={busy} icon={<RefreshCw size={14} />} onClick={() => void load()} /></Tooltip>
+      <Upload accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv" multiple showUploadList={false} disabled={busy}
+        beforeUpload={(file, files) => { if (file === files[0]) void upload(files); return false; }}>
+        <Button size="small" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
+      </Upload>
+    </>}><Typography.Text type="secondary" className="text-xs">{materials.length} 个文档</Typography.Text></PanelToolbar>
+    <Table<ManagedMaterial> size="middle" rowKey="id" loading={loading} dataSource={rows} pagination={rows.length > 20 ? { pageSize: 20 } : false}
+      locale={{ emptyText: <Empty description={error ? "文档未加载，请刷新重试" : query || filter !== "all" ? "没有匹配的文档" : "尚未上传文档"} /> }}
+      expandable={{ expandedRowRender: (material) => <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
+        <span>属性 {material.usage.properties}</span><span>规则 {material.usage.rules}</span><span>指标 {material.usage.metrics}</span>
+        <span>引用位置：{material.usage.references.join("、") || "无"}</span>
+      </div> }}
+      columns={[
+        { title: "文档", key: "name", render: (_, material) => <div className="flex min-w-0 items-center gap-2">
+          <FileText size={15} className="shrink-0 text-muted" /><span className="wrap-anywhere">{material.name}</span>
+          {material.archived_at && <Tag className="m-0">已归档</Tag>}
+        </div> },
+        { title: <Tooltip title="历史版本、会话草稿及提案中，直接引用此文档的实体定义，按实体标识去重">实体</Tooltip>, key: "entities", render: (_, material) => material.usage.object_types },
+        { title: "关系", key: "relations", render: (_, material) => material.usage.link_types },
+        { title: "实体实例", key: "facts", render: (_, material) => material.usage.material_objects },
+        { title: "关系实例", key: "links", render: (_, material) => material.usage.material_links },
+        { title: "使用情况", key: "usage", render: (_, material) => <Tooltip title={material.usage.references.join("、") || "没有引用，可删除"}>
+          <Tag color={material.usage.can_delete ? "default" : "blue"} className="m-0">{material.usage.can_delete ? "未使用" : "已使用"}</Tag>
+        </Tooltip> },
+        { title: "大小", key: "size", render: (_, material) => sizeText(material.byte_size) },
+        { title: "上传时间", key: "created", render: (_, material) => material.created_at ? new Date(material.created_at).toLocaleString("zh-CN", { hour12: false }) : "—" },
+        { title: "操作", key: "actions", render: (_, material) => {
+          const reason = workspace.role !== "admin" ? "仅空间管理员可删除文档" : !material.usage.can_delete ? `被${material.usage.references.join("、")}引用，不能删除` : "删除文档";
+          const disabled = busy || workspace.role !== "admin" || !material.usage.can_delete;
+          return <div className="flex items-center gap-1">
+            <Tooltip title="下载文档"><Button size="small" type="text" aria-label={`下载 ${material.name}`} icon={<Download size={14} />} href={modelingApi.materialDownloadUrl(workspace.id, material.id)} /></Tooltip>
+            <Popconfirm title="删除文档？" description={`将永久删除“${material.name}”，此操作无法撤销。`} okText="删除" okButtonProps={{ danger: true }} disabled={disabled} onConfirm={() => remove(material)}>
+              <Tooltip title={reason}><span><Button size="small" type="text" danger aria-label={`删除 ${material.name}`} disabled={disabled} icon={<Trash2 size={14} />} /></span></Tooltip>
+            </Popconfirm>
+          </div>;
+        } },
+      ]} />
+    <div className="border-t border-rule px-4 py-2 text-xs text-muted">数量按历史版本、会话草稿和提案中的显式证据去重统计；展开行可查看属性、规则、指标及引用位置。数量为零的文档仍可能被会话或历史记录使用。</div>
+  </>;
+}

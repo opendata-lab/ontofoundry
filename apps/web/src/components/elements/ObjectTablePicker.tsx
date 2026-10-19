@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Select, Tag, Typography } from "antd";
+import { Alert, Button, Descriptions, Form, Popconfirm, Select, Tag, Tooltip, Typography } from "antd";
 import { Plus, Trash2 } from "lucide-react";
 import type { Dataset, Draft, ObjectType } from "../../api/types";
 import { byId, remove, type ResolvedSource } from "../../lib/coreModel";
@@ -12,7 +12,6 @@ import {
   setMainDataset,
   setMembershipSource,
 } from "../../lib/objectMappingEditing";
-import { BINDING_MODES } from "../../lib/objectMapping";
 
 const { Text } = Typography;
 
@@ -34,7 +33,7 @@ function KeyColumns({
       mode={columns.length ? "multiple" : "tags"}
       aria-label={label}
       disabled={!onChange || undefined}
-      placeholder={columns.length ? "按顺序选择键列" : "未登记列清单，输入列名"}
+      placeholder={columns.length ? "选择唯一键" : "输入唯一键列名"}
       value={value}
       options={columns.map((c) => ({ value: c, label: c }))}
       onChange={onChange}
@@ -80,14 +79,13 @@ export function MappingSources({
         size="small"
         column={1}
         items={[
-          { key: "mode", label: "实例来源", children: BINDING_MODES[mode] },
           ...record.sources.map((s) => ({
             key: `${s.ownerTypeId}:${s.id}`,
             label: sourceLabel(s, membership),
             children: (
               <span className="flex flex-wrap items-center gap-2">
                 {datasetLabel(s.dataset)}
-                {s.key_columns.length > 0 && <Text type="secondary">键列：{s.key_columns.join(", ")}</Text>}
+                {s.key_columns.length > 0 && <Tooltip title="按业务时点唯一识别记录的逻辑键，不要求数据库已声明主键约束"><Text type="secondary">唯一键：{s.key_columns.join(", ")}</Text></Tooltip>}
                 {s.dataset?.snapshot_date_column && <Tag className="m-0">每日快照</Tag>}
                 {s.ownerTypeId !== type.id && (
                   <Text type="secondary">来自{byId(draft.object_types, s.ownerTypeId)?.name}</Text>
@@ -102,13 +100,13 @@ export function MappingSources({
   if (mode === "virtual")
     return <Alert type="info" showIcon message="子对象已各自绑定数据集，本对象作为虚拟父对象不绑定主表" />;
   if (!draft.datasets.length)
-    return <Alert type="info" showIcon message="还没有登记数据集。请先在“数据映射 → 数据集”登记要使用的表或视图。" />;
+    return <Alert type="info" showIcon message="还没有登记数据集。请先在“数据管理 → 数据集”登记要使用的表或视图。" />;
   const main = own.find((s) => s.id === MAIN_SOURCE);
   const sides = own.filter((s) => s.id !== MAIN_SOURCE);
   const sourceRow = (s: ResolvedSource, title: string, removable: boolean) => (
-    <div key={s.id} className="flex items-center gap-2">
+    <div key={s.id} className="inspector-source-row">
       <Text type="secondary" className="w-24 flex-none">{title}</Text>
-      <Select
+      <Form.Item layout="vertical" label="数据集" className="mb-0 min-w-0 flex-1"><Select
         aria-label={`${title}数据集`}
         className="min-w-0 flex-1"
         showSearch
@@ -129,20 +127,24 @@ export function MappingSources({
                 },
           )
         }
-      />
-      <KeyColumns
+      /></Form.Item>
+      <Form.Item layout="vertical" label={<Tooltip title="用于在同一业务时点唯一识别记录，不要求数据库已声明物理主键约束">唯一键</Tooltip>} className="mb-0 min-w-0 flex-1"><KeyColumns
         dataset={s.dataset}
-        label={`${title}键列`}
+        label={`${title}唯一键`}
         value={s.key_columns}
         onChange={(columns) => change(setKeyColumns(draft, type.id, s.id, columns))}
-      />
+      /></Form.Item>
       {removable ? (
-        <Button
+        <Popconfirm title={s.id === MAIN_SOURCE ? "解除本对象的数据绑定？" : `移除${title}？`}
+          description={s.id === MAIN_SOURCE ? "同时移除本对象的附表及属性映射，保存后生效。" : "同时移除使用此表的属性绑定，保存后生效。"}
+          onConfirm={() => change(s.id === MAIN_SOURCE && mapping ? remove(draft, "mappings", mapping.id) : removeSource(draft, type.id, s.id))}>
+        <Tooltip title={s.id === MAIN_SOURCE ? "移除主表并解除本对象的数据绑定" : `移除${title}`}><Button
           type="text"
+          danger
           aria-label={`移除${title}`}
           icon={<Trash2 size={15} />}
-          onClick={() => change(removeSource(draft, type.id, s.id))}
-        />
+        /></Tooltip>
+        </Popconfirm>
       ) : (
         <span className="w-8 flex-none" />
       )}
@@ -150,6 +152,7 @@ export function MappingSources({
   );
   return (
     <div className="flex flex-col gap-3">
+      <Text type="secondary" className="text-xs">选择可唯一识别记录的列；组合键按顺序选择，附表键与主表逐列对应。快照表按同一快照时点识别。</Text>
       {shared && (
         <Alert
           type="info"
@@ -167,7 +170,7 @@ export function MappingSources({
       ))}
       {!shared &&
         (main ? (
-          sourceRow(main, "主表", false)
+          sourceRow(main, "主表", true)
         ) : (
           <div className="flex items-center gap-2">
             <Text type="secondary" className="w-24 flex-none">主表</Text>
@@ -214,11 +217,6 @@ export function MappingSources({
               onChange={(sourceId?: string) => change(setMembershipSource(draft, type.id, sourceId ?? null))}
             />
           </span>
-        )}
-        {mapping && (
-          <Button danger type="text" onClick={() => change(remove(draft, "mappings", mapping.id))}>
-            解除本对象的数据绑定
-          </Button>
         )}
       </div>
     </div>

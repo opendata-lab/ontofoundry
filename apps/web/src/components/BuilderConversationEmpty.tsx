@@ -12,7 +12,7 @@ export function BuilderConversationEmpty() {
       <h2 className="m-0 mb-3 text-base leading-tight font-semibold text-ink">开始本体构建</h2>
       <p className="m-0 text-sm leading-base text-ink-2">从业务问题出发，梳理对象、属性和关系。</p>
       <p className="m-0 mt-5 text-xs leading-base text-muted">
-        在左侧配置材料和场景，点击「开始建模」。也可以先在下方提问，明确建模范围。
+        在左侧配置材料和业务场景，在下方输入需求并发送。点击输入框内的加号，可切换本体建模或本体查询。
       </p>
     </section>
   );

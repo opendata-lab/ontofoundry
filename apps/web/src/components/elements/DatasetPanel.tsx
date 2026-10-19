@@ -1,10 +1,12 @@
-import { Alert, Descriptions, Form, Input, Select, Table, Tag, Typography } from "antd";
+import { Alert, Descriptions, Form, Input, Table, Tag, Typography } from "antd";
 import { SectionTitle } from "../layout";
 import type { Dataset, Draft } from "../../api/types";
-import { DATE_KINDS, physicalValueKind, upsert } from "../../lib/coreModel";
+import { upsert } from "../../lib/coreModel";
 import { DIALECTS } from "../../lib/datasetEditing";
 import type { ElementRequest } from "../../lib/elementInspector";
 import { ElementLink } from "./ElementPanels";
+import { DatasetLocationFields } from "./DatasetLocationFields";
+import { DatasetSnapshotFields } from "../DatasetSnapshotFields";
 
 const { Text, Paragraph } = Typography;
 
@@ -13,7 +15,7 @@ const location = (d: Dataset) => [d.schema_name, d.table_name].filter(Boolean).j
 
 function ColumnsTable({ dataset }: { dataset: Dataset }) {
   if (!dataset.columns)
-    return <Alert type="info" showIcon message="没有登记列清单。从数据目录重新登记可以带入列和注释。" />;
+    return <Alert type="info" showIcon message="未登记字段。从数据目录重新登记可以带入字段和注释。" />;
   return (
     <Table
       size="small"
@@ -57,47 +59,16 @@ export function DatasetPanel({
 }) {
   const update = (patch: Partial<Dataset>) => change(upsert(draft, "datasets", { ...dataset, ...patch }));
   const metrics = draft.metrics.filter((m) => m.kind !== "ratio" && m.dataset_id === dataset.id);
-  const dateColumns = (dataset.columns ?? []).filter((c) => {
-    const kind = physicalValueKind(c.physical_type ?? null);
-    return kind === null || DATE_KINDS.has(kind);
-  });
   if (editing)
     return (
-      <div className="flex max-w-settings flex-col gap-4">
-        <Form layout="vertical" component="div" requiredMark>
-          <div className="grid grid-cols-2 gap-x-4">
+      <div className="flex min-w-0 flex-col gap-4">
+        <Form layout="vertical" component="div" requiredMark className="max-w-settings">
+          <SectionTitle title="基本信息" className="mb-4" />
+          <DatasetLocationFields workspaceId={draft.workspace_id} dataset={dataset} onChange={update} nameField={
             <Form.Item label="名称" required>
               <Input aria-label="数据集名称" value={dataset.name} onChange={(e) => update({ name: e.target.value })} />
             </Form.Item>
-            <Form.Item label="数据库类型">
-              <Select
-                aria-label="数据库类型"
-                allowClear
-                placeholder="未指定"
-                value={dataset.dialect ?? undefined}
-                options={DIALECTS}
-                onChange={(dialect?: string) => update({ dialect: dialect ?? null })}
-              />
-            </Form.Item>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4">
-            <Form.Item label="库 / schema">
-              <Input
-                aria-label="库或 schema"
-                className="font-mono"
-                value={dataset.schema_name ?? ""}
-                onChange={(e) => update({ schema_name: e.target.value.trim() || null })}
-              />
-            </Form.Item>
-            <Form.Item label="表或视图" required>
-              <Input
-                aria-label="表或视图"
-                className="font-mono"
-                value={dataset.table_name}
-                onChange={(e) => update({ table_name: e.target.value.trim() })}
-              />
-            </Form.Item>
-          </div>
+          } />
           <Form.Item label="描述">
             <Input.TextArea
               aria-label="数据集描述"
@@ -107,38 +78,17 @@ export function DatasetPanel({
               onChange={(e) => update({ description: e.target.value })}
             />
           </Form.Item>
-          <Form.Item
-            label="每日快照日期列"
-            extra="表里每天保存一份全量时选择；浏览实例和不按时间的指标只取最新一天。"
-          >
-            {dataset.columns ? (
-              <Select
-                aria-label="每日快照日期列"
-                allowClear
-                placeholder="不是快照表"
-                value={dataset.snapshot_date_column ?? undefined}
-                options={dateColumns.map((c) => ({ value: c.name, label: c.comment ? `${c.comment}（${c.name}）` : c.name }))}
-                onChange={(column?: string) => update({ snapshot_date_column: column ?? null })}
-              />
-            ) : (
-              <Input
-                aria-label="每日快照日期列"
-                className="font-mono"
-                placeholder="不是快照表"
-                value={dataset.snapshot_date_column ?? ""}
-                onChange={(e) => update({ snapshot_date_column: e.target.value.trim() || null })}
-              />
-            )}
-          </Form.Item>
+          <DatasetSnapshotFields dataset={dataset} onChange={update} />
         </Form>
         <section className="flex flex-col gap-3 border-t border-rule pt-4">
-          <SectionTitle title="列清单" />
+          <SectionTitle title="字段" />
           <ColumnsTable dataset={dataset} />
         </section>
       </div>
     );
   return (
-    <div className="flex max-w-settings flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
+      <SectionTitle title="基本信息" />
       {dataset.description ? (
         <Paragraph className="m-0 whitespace-pre-wrap">{dataset.description}</Paragraph>
       ) : (
@@ -148,7 +98,8 @@ export function DatasetPanel({
         size="small"
         column={2}
         items={[
-          { key: "location", label: "物理位置", children: <code>{location(dataset)}</code> },
+          { key: "name", label: "名称", children: dataset.name },
+          { key: "location", label: "物理位置", span: 2, children: <code>{location(dataset)}</code> },
           {
             key: "dialect",
             label: "数据库类型",
@@ -177,7 +128,7 @@ export function DatasetPanel({
         ]}
       />
       <section className="flex flex-col gap-3 border-t border-rule pt-4">
-        <SectionTitle title="列清单" />
+        <SectionTitle title="字段" />
         <ColumnsTable dataset={dataset} />
       </section>
     </div>

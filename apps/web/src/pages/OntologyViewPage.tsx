@@ -1,5 +1,3 @@
-import { Button, Segmented } from "antd";
-import { Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
@@ -7,8 +5,6 @@ import type { Draft, WorkspaceOverview } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { PageBody, PageHeader, Panel, PanelToolbar, StatusMark } from "../components/layout";
 import { EmptyModel } from "../components/EmptyModel";
-import type { SelectedGraphItem } from "../components/OntologyGraph";
-import { OntologyOverview } from "../components/OntologyOverview";
 import { SemanticView } from "../components/SemanticView";
 import { useElementInspector } from "../hooks/useElementInspector";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -18,18 +14,12 @@ export function OntologyViewPage() {
   const { workspace } = useWorkspaceContext();
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"global" | "semantic">("global");
   const [attempt, setAttempt] = useState(0);
   const [model, setModel] = useState<Draft | null>(null);
   const [resourceError, setResourceError] = useState("");
   const [draftSession, setDraftSession] = useState<string | null>(null);
   const inspector = useElementInspector();
   const load = () => setAttempt((value) => value + 1);
-  const inspect = (selected: SelectedGraphItem) => {
-    if (selected?.category === "node") inspector.open({ kind: "object_type", id: selected.item.id, sessionId: null });
-    else if (selected?.category === "edge" && selected.item.kind === "link_type")
-      inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: null });
-  };
   useEffect(() => {
     let active = true;
     setError("");
@@ -88,49 +78,12 @@ export function OntologyViewPage() {
       <PageHeader
         title="本体视图"
         note={<StatusMark state={version ? "mapped" : "unmapped"} label={version ? `v${version.version} · 已发布` : "尚未发布"} />}
-      >
-        {workspace.role && (
-          <Link to="../delivery">
-            <Button type="primary" icon={<Rocket size={14} />}>
-              发布
-            </Button>
-          </Link>
-        )}
-      </PageHeader>
+      />
       <PageBody>
         <Panel fill>
-          <PanelToolbar extra={draftSession && <Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link>}>
-            <Segmented
-              aria-label="本体视图模式"
-              value={mode}
-              onChange={(value) => setMode(value as typeof mode)}
-              options={[
-                { value: "global", label: "全局" },
-                { value: "semantic", label: "语义视图" },
-              ]}
-            />
-          </PanelToolbar>
-          <div className="relative min-h-0 flex-1" role="tabpanel" aria-label={mode === "global" ? "全局" : "语义视图"}>
-            {overview && graph?.nodes.length && mode === "global" ? (
-              <OntologyOverview overview={overview} onSemantic={() => setMode("semantic")} onSelect={inspect} />
-            ) : graph && (graph.nodes.length || model?.metrics.length || model?.datasets.length) && mode === "semantic" ? (
-              <SemanticView
-                graph={graph}
-                model={model}
-                resourceError={resourceError}
-                canCreate={!!workspace.role}
-                onOpen={inspector.open}
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-4">
-                <EmptyModel text={graph?.nodes.length ? "没有匹配的本体" : "工作空间还没有已发布本体"} />
-                {workspace.role && (
-                  <Link to="../builder">
-                    <Button type="primary">开始建模</Button>
-                  </Link>
-                )}
-              </div>
-            )}
+          {draftSession && <PanelToolbar><Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link></PanelToolbar>}
+          <div className="min-h-0 flex-1">
+            {graph ? <SemanticView graph={graph} model={model} onOpen={inspector.open} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
           </div>
         </Panel>
       </PageBody>

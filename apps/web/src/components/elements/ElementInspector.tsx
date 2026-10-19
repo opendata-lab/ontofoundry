@@ -18,6 +18,7 @@ import {
 } from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
+import { useErrorMessage } from "../../hooks/useErrorMessage";
 import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
 import {
@@ -38,10 +39,11 @@ import { PanelToolbar, StatusMark } from "../layout";
 import { KIND } from "../proposals/elementMeta";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
-import { LinkBasicPanel, ObjectBasicPanel, RulesPanel } from "./ElementPanels";
+import { ObjectBasicPanel, RulesPanel } from "./ElementPanels";
 import { InspectorDialog } from "./InspectorDialog";
 import { joinProblem } from "../../lib/objectMappingEditing";
-import { LinkMappingPanel } from "./LinkMappingPanel";
+import { LinkOverviewPanel } from "./LinkOverviewPanel";
+import { LinkDetailsPanel } from "./LinkDetailsPanel";
 import { MappingStatusIcon } from "./MappingWidgets";
 import { MetricPanel } from "./MetricPanel";
 import { PropertiesPanel } from "./PropertyMappingTable";
@@ -124,12 +126,13 @@ function blank(draft: Draft, kind: InspectKind, id: string, owner: string | null
   if (kind === "link_type") {
     const source = byId(draft.object_types, owner)?.id ?? draft.object_types[0]?.id ?? "";
     return {
-      ...base,
-      tags: [],
+      id, name: "", description: "", synonyms: [], evidence: [],
+      verbalizes: [], tags: [],
       source_type_id: source,
       target_type_id: draft.object_types.find((o) => o.id !== source)?.id ?? source,
       multiplicity: "many_to_one",
-      inverse_name: null,
+      source_role_name: null,
+      target_role_name: null,
       data_join: null,
     };
   }
@@ -142,14 +145,23 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
   if (kind === "dataset") {
     const dataset = element as Dataset;
     if (!dataset.name.trim()) return "请填写数据集名称";
+    if (dataset.snapshot_date_column === "") return "请选择快照日期字段";
     return dataset.table_name ? null : "请填写表或视图";
   }
   if (kind === "metric") return Object.values(metricErrors(draft, element as Metric))[0] ?? null;
   const named = element as ObjectType | LinkType;
-  if (!named.name.trim() || !named.technical_name) return `请填写${NOUN[kind]}的名称和技术名`;
+  if (!named.name.trim() || ("technical_name" in named && !named.technical_name)) return kind === "link_type" ? "请填写关系标识" : `请填写${NOUN[kind]}的名称和技术名`;
   if (rulesFor(draft, named).some((r) => !r.name.trim() || !r.technical_name || !r.expression.trim()))
     return "有规则还没有填写名称、技术名和表达式";
-  if (kind === "link_type") return joinProblem((element as LinkType).data_join);
+  if (kind === "link_type") {
+    const relation = element as LinkType;
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(relation.name)) return "关系标识只能使用字母、数字和下划线，且不能以数字开头";
+    if ((relation.verbalizes ?? []).some((reading) => {
+      const tokens = [...reading.matchAll(/\{([^{}]+)\}/g)].map((match) => match[1]);
+      return !tokens.includes("source") || !tokens.includes("target") || tokens.some((token) => token !== "source" && token !== "target") || /[{}]/.test(reading.replace(/\{(?:source|target)\}/g, ""));
+    })) return "关系含义必须保留 {来源} 和 {目标} 两端占位符";
+    return joinProblem(relation.data_join);
+  }
   const object = element as ObjectType;
   const unnamed = draft.properties.find((p) => p.owner_type_id === object.id && (!p.name.trim() || !p.technical_name));
   if (unnamed) return "有属性还没有填写名称和技术名";
@@ -281,6 +293,7 @@ function Inspector({
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ReactNode>(null);
+  useErrorMessage(draft ? error : null);
   const [showErrors, setShowErrors] = useState(false);
   const [copyFallback, setCopyFallback] = useState(false);
   const [impactPreview, setImpactPreview] = useState<ImpactPreview | null>(null);
@@ -364,20 +377,23 @@ function Inspector({
         { key: "basic", label: "概览" },
         { key: "properties", label: "属性与映射", count: properties.length },
         { key: "relations", label: "关系", count: relations.length },
-        ...(rules.length || editing ? [{ key: "rules" as const, label: "规则", count: rules.length }] : []),
+        { key: "rules", label: "规则", count: rules.length },
         ...(member && !creating ? [{ key: "instances" as const, label: "实例" }] : []),
       ]
     : link
       ? [
           { key: "basic", label: "概览" },
-          ...(member ? [{ key: "mapping" as const, label: "数据绑定" }] : []),
-          ...(rules.length || editing ? [{ key: "rules" as const, label: "规则", count: rules.length }] : []),
-          ...(member && !creating ? [{ key: "instances" as const, label: "实例" }] : []),
+          ...(member ? [{ key: "mapping" as const, label: "映射" }] : []),
+          { key: "rules", label: "规则", count: rules.length },
         ]
       : [];
   const requestedTab = params.get("inspectTab") ?? resolved?.tab ?? "basic";
   const compatible =
-    requestedTab === "data" || (requestedTab === "mapping" && object)
+    link && ["definition", "instances"].includes(requestedTab)
+      ? "basic"
+      : link && requestedTab === "data"
+      ? "mapping"
+      : requestedTab === "data" || (requestedTab === "mapping" && object)
       ? "properties"
       : requestedTab === "overview" || requestedTab === "endpoints"
         ? "basic"
@@ -650,20 +666,24 @@ function Inspector({
     if (!panel) return null;
     if (object) {
       const props = panel as PanelProps<ObjectType>;
-      if (selectedTab === "properties") return <PropertiesPanel {...props} />;
-      if (selectedTab === "relations") return <RelationsPanel {...props} />;
-      if (selectedTab === "rules") return <RulesPanel {...panel} />;
+      if (selectedTab === "properties")
+        return <PropertiesPanel key={`${object.id}:${requestedKind === "property" ? id : "all"}`} {...props} initialPropertyId={requestedKind === "property" ? id : undefined} />;
+      if (selectedTab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
+      if (selectedTab === "rules") return <RulesPanel key={`${object.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
       if (selectedTab === "instances")
         return (
-          <ElementInstances key={object.id} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
+          <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
         );
       return <ObjectBasicPanel {...props} />;
     }
-    const props = panel as PanelProps<LinkType>;
-    if (selectedTab === "mapping") return <LinkMappingPanel {...props} />;
-    if (selectedTab === "rules") return <RulesPanel {...panel} />;
-    if (selectedTab === "instances") return <ElementInstances {...panel} canBrowseDatabase={!previewHash && !editing} />;
-    return <LinkBasicPanel {...props} />;
+    if (selectedTab === "rules") return <RulesPanel key={`${link?.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
+    if (selectedTab === "mapping") return <LinkDetailsPanel {...(panel as PanelProps<LinkType>)} showBinding={member} />;
+    return <LinkOverviewPanel
+      {...(panel as PanelProps<LinkType>)}
+      showInstances={member && !creating}
+      initialInstances={requestedTab === "instances"}
+      canBrowseDatabase={!previewHash && !editing}
+    />;
   })();
   return (
     <Modal
@@ -675,19 +695,13 @@ function Inspector({
       centered
       destroyOnHidden={false}
       closable={{ "aria-label": `关闭${NOUN[kind]}弹窗`, disabled: busy }}
-      classNames={{ body: "overflow-hidden" }}
-      footer={
-        editing ? (
-          <div className="flex items-center justify-end gap-2 border-t border-rule pt-3">
-            <Button disabled={busy} onClick={cancel}>
-              取消
-            </Button>
-            <Button type="primary" loading={busy} disabled={!element || (!dirty && !creating)} onClick={() => void save()}>
-              保存
-            </Button>
-          </div>
-        ) : null
-      }
+      className="element-inspector"
+      classNames={{
+        content: expanded ? "element-inspector-content element-inspector-content-expanded" : "element-inspector-content",
+        header: "element-inspector-header",
+        body: "flex min-h-0 flex-1 flex-col overflow-hidden",
+      }}
+      footer={null}
       title={
         <div className="flex items-start gap-3 pr-8">
           <span className="mt-1 text-accent">
@@ -698,11 +712,6 @@ function Inspector({
               <span className="text-lg">{title}</span>
               {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
             </span>
-            {draft && link && (
-              <Text type="secondary" className="text-xs font-normal">
-                {byId(draft.object_types, link.source_type_id)?.name} → {byId(draft.object_types, link.target_type_id)?.name}
-              </Text>
-            )}
             {record && record.mode !== "virtual" && record.mode !== "unbound" && (
               <span className="mt-1 flex items-center gap-2 text-xs font-normal">
                 <MappingStatusIcon state={record.state} label={record.label} />
@@ -718,6 +727,14 @@ function Inspector({
               <Button size="small" onClick={beginEdit} disabled={!loaded || busy}>
                 编辑
               </Button>
+            )}
+            {editing && (
+              <>
+                <Button size="small" disabled={busy} onClick={cancel}>取消</Button>
+                <Button size="small" type="primary" loading={busy} disabled={!element || (!dirty && !creating)} onClick={() => void save()}>
+                  保存
+                </Button>
+              </>
             )}
             {element && !creating && (
               <Button size="small" disabled={busy} onClick={() => void copy()}>
@@ -738,9 +755,9 @@ function Inspector({
         </div>
       }
     >
-      <div ref={body} aria-busy={busy} className="flex flex-col">
+      <div ref={body} aria-busy={busy} className="flex min-h-0 flex-1 flex-col">
         {tabs.length > 0 && (
-          <PanelToolbar>
+          <PanelToolbar className="shrink-0">
             <Tabs
               size="small"
               activeKey={selectedTab}
@@ -758,8 +775,8 @@ function Inspector({
             />
           </PanelToolbar>
         )}
-        <div className={`flex min-h-review-code flex-col gap-3 overflow-y-auto p-4 ${expanded ? "max-h-180" : "max-h-review-detail"}`}>
-          {error && (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+          {error && !draft && (
             <Alert
               type="error"
               showIcon

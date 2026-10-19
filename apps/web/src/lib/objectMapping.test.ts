@@ -34,7 +34,7 @@ describe("object mapping view", () => {
   });
   it("binds an inherited relation locally on a concrete child of a virtual parent and blocks editing on shared_parent", () => {
     const device = byName("device");
-    const link = draft.link_types.find((l) => l.technical_name === "responsible_party")!;
+    const link = draft.link_types.find((l) => l.name === "responsible_party")!;
     const responsible = draft.properties.find((p) => p.technical_name === "responsible_no")!;
     const partyNo = draft.properties.find((p) => p.technical_name === "party_no")!;
     const next = setInheritedLinkBinding(draft, device.id, link.id, {

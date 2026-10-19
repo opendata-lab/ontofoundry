@@ -64,12 +64,12 @@ export type Note = string
  */
 export type Evidence = (MaterialEvidence | ManualEvidence)[]
 export type Id3 = string
-export type InverseName = string | null
 /**
  * No one_to_many: a one-to-many link is built from the many side.
  */
 export type Multiplicity = 'one_to_one' | 'many_to_one' | 'many_to_many'
 export type Name2 = string
+export type SourceRoleName = string | null
 export type SourceTypeId = string
 /**
  * @maxItems 50
@@ -79,8 +79,12 @@ export type Synonyms = string[]
  * @maxItems 50
  */
 export type Tags = string[]
+export type TargetRoleName = string | null
 export type TargetTypeId = string
-export type TechnicalName = string
+/**
+ * @maxItems 50
+ */
+export type Verbalizes = string[]
 export type LinkTypes = LinkType[]
 export type BindingMode = 'independent' | 'shared_parent'
 export type Column = string
@@ -143,7 +147,7 @@ export type Name3 = string
  * @maxItems 50
  */
 export type Synonyms1 = string[]
-export type TechnicalName1 = string
+export type TechnicalName = string
 export type DenominatorId = string
 export type Description3 = string
 /**
@@ -158,7 +162,7 @@ export type NumeratorId = string
  * @maxItems 50
  */
 export type Synonyms2 = string[]
-export type TechnicalName2 = string
+export type TechnicalName1 = string
 export type DatasetId4 = string
 export type Description4 = string
 /**
@@ -173,7 +177,7 @@ export type Name5 = string
  * @maxItems 50
  */
 export type Synonyms3 = string[]
-export type TechnicalName3 = string
+export type TechnicalName2 = string
 /**
  * Ossie's seven built-in value types; core-1 adds no others.
  */
@@ -218,7 +222,7 @@ export type Synonyms4 = string[]
  * @maxItems 50
  */
 export type Tags1 = string[]
-export type TechnicalName4 = string
+export type TechnicalName3 = string
 export type TitlePropertyId = string | null
 export type ObjectTypes = ObjectType[]
 export type Description6 = string
@@ -235,7 +239,7 @@ export type Required = boolean
  * @maxItems 50
  */
 export type Synonyms5 = string[]
-export type TechnicalName5 = string
+export type TechnicalName4 = string
 export type Unique = boolean
 export type Properties = Property[]
 export type Description7 = string
@@ -249,7 +253,7 @@ export type Name8 = string
 export type OwnerId = string
 export type RuleOwnerKind = 'object_type' | 'property' | 'link_type'
 export type RuleKind = 'constraint' | 'derivation'
-export type TechnicalName6 = string
+export type TechnicalName5 = string
 export type Rules = Rule[]
 export type SchemaVersion = 'core-1'
 export type WorkspaceId = string
@@ -287,14 +291,15 @@ export interface LinkType {
   description?: Description1
   evidence?: Evidence
   id: Id3
-  inverse_name?: InverseName
   multiplicity: Multiplicity
   name: Name2
+  source_role_name?: SourceRoleName
   source_type_id: SourceTypeId
   synonyms?: Synonyms
   tags?: Tags
+  target_role_name?: TargetRoleName
   target_type_id: TargetTypeId
-  technical_name: TechnicalName
+  verbalizes?: Verbalizes
 }
 /**
  * Source properties equal target properties, pair by pair.
@@ -413,7 +418,7 @@ export interface SimpleMetric {
   measure?: ColumnReference | null
   name: Name3
   synonyms?: Synonyms1
-  technical_name: TechnicalName1
+  technical_name: TechnicalName
   time_field?: ColumnReference | null
 }
 export interface Condition {
@@ -437,7 +442,7 @@ export interface RatioMetric {
   name: Name4
   numerator_id: NumeratorId
   synonyms?: Synonyms2
-  technical_name: TechnicalName2
+  technical_name: TechnicalName1
 }
 export interface ExpressionMetric {
   dataset_id: DatasetId4
@@ -448,7 +453,7 @@ export interface ExpressionMetric {
   kind: Kind10
   name: Name5
   synonyms?: Synonyms3
-  technical_name: TechnicalName3
+  technical_name: TechnicalName2
   time_field?: ColumnReference | null
   value_kind?: ValueKind | null
 }
@@ -461,7 +466,7 @@ export interface ObjectType {
   name: Name6
   synonyms?: Synonyms4
   tags?: Tags1
-  technical_name: TechnicalName4
+  technical_name: TechnicalName3
   title_property_id?: TitlePropertyId
 }
 /**
@@ -501,7 +506,7 @@ export interface Property {
   owner_type_id: OwnerTypeId
   required?: Required
   synonyms?: Synonyms5
-  technical_name: TechnicalName5
+  technical_name: TechnicalName4
   unique?: Unique
   value_kind: ValueKind
 }
@@ -514,5 +519,5 @@ export interface Rule {
   owner_id: OwnerId
   owner_kind: RuleOwnerKind
   rule_kind: RuleKind
-  technical_name: TechnicalName6
+  technical_name: TechnicalName5
 }

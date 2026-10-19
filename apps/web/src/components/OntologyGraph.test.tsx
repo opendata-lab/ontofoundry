@@ -83,7 +83,7 @@ function graphOf(draft: Draft): TypeGraph {
         id: l.id,
         kind: "link_type" as const,
         label: l.name,
-        technical_name: l.technical_name,
+        technical_name: l.name,
         source: l.source_type_id,
         target: l.target_type_id,
         link_type_id: l.id,
@@ -105,7 +105,7 @@ function graphOf(draft: Draft): TypeGraph {
 const nodeOf = (graph: TypeGraph, name: string) =>
   graph.nodes.find((n) => n.technical_name === name)!;
 const linkOf = (draft: Draft, name: string) =>
-  draft.link_types.find((l) => l.technical_name === name)!;
+  draft.link_types.find((l) => l.name === name)!;
 // The node card is the element wrapping the label.
 const card = (label: string) =>
   screen.getByText(label, { selector: "strong" }).closest("div");

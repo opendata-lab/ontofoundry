@@ -1,6 +1,7 @@
-import { Alert, Button, Empty, Input, Segmented, Table, Tabs, Typography } from "antd";
+import { Alert, Button, Empty, Input, Table, Tabs, Tooltip, Typography } from "antd";
+import { Box, Braces, Database, FileText, GitBranch, Rocket, ShieldCheck, Sigma, TableProperties, Workflow, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Draft, ElementChange, ModelingSession, TargetKind, TypeGraph } from "../api/types";
 import { useElementInspector } from "../hooks/useElementInspector";
 import type { ProposalsState } from "../hooks/useProposals";
@@ -24,16 +25,16 @@ const CHANGE: Record<ElementChange["change"], { text: string; state: StatusState
   deleted: { text: "待删除", state: "error" },
 };
 
-const CATEGORIES: { key: TargetKind; text: string }[] = [
-  { key: "object_type", text: "对象" },
-  { key: "link_type", text: "关系" },
-  { key: "property", text: "属性" },
-  { key: "rule", text: "规则" },
-  { key: "metric", text: "指标" },
-  { key: "dataset", text: "数据集" },
-  { key: "mapping", text: "映射" },
-  { key: "material_object", text: "文档事实" },
-  { key: "material_link", text: "文档关系" },
+const CATEGORIES: { key: TargetKind; text: string; icon: LucideIcon; tone: string; background: string }[] = [
+  { key: "object_type", text: "实体", icon: Box, tone: "text-object", background: "bg-object-soft" },
+  { key: "link_type", text: "关系", icon: GitBranch, tone: "text-relation", background: "bg-relation-soft" },
+  { key: "property", text: "属性", icon: Braces, tone: "text-attribute", background: "bg-attribute-soft" },
+  { key: "rule", text: "规则", icon: ShieldCheck, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "metric", text: "指标", icon: Sigma, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "dataset", text: "数据集", icon: Database, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "mapping", text: "映射", icon: TableProperties, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "material_object", text: "文档事实", icon: FileText, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "material_link", text: "文档关系", icon: Workflow, tone: "text-ink-2", background: "bg-canvas" },
 ];
 
 function rowsOf(draft: Draft, kind: TargetKind): Row[] {
@@ -43,7 +44,7 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
       return draft.object_types.map((o) => row(o.id, o.name, o.technical_name, o.description));
     case "link_type":
       return draft.link_types.map((l) =>
-        row(l.id, l.name, l.technical_name, `${byId(draft.object_types, l.source_type_id)?.name ?? "?"} → ${byId(draft.object_types, l.target_type_id)?.name ?? "?"}`),
+        row(l.id, l.name, "", `${byId(draft.object_types, l.source_type_id)?.name ?? "?"} → ${byId(draft.object_types, l.target_type_id)?.name ?? "?"}`),
       );
     case "property":
       return draft.properties.map((p) =>
@@ -88,15 +89,18 @@ export function ModelResults({
   session,
   proposals,
   running = false,
+  busy = false,
   onRemodel = () => undefined,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
   running?: boolean;
+  busy?: boolean;
   onRemodel?: (text: string) => void;
 }) {
   const [params, setParams] = useSearchParams();
   const inspector = useElementInspector();
+  const navigate = useNavigate();
   const pending = session?.pending_proposal_count ?? 0;
   const requested = params.get("panel") as Panel | null;
   const [tab, setTabState] = useState<Panel>(requested ?? (proposals && pending > 0 ? "proposals" : "draft"));
@@ -150,6 +154,11 @@ export function ModelResults({
   const count = (k: TargetKind) => (draft ? rowsOf(draft, k).length : 0);
   const warnings = session?.result_warnings ?? [];
   const graph = draft ? (session?.graph?.nodes.length ? (session.graph as TypeGraph) : draftGraph(draft)) : null;
+  const canPublish = !!session && !!session.latest_batch_id && session.base_diff.length > 0 && !running && !busy;
+  const publish = <Tooltip title={canPublish ? undefined : running || busy ? "建模完成后再发布" : "接受提案并形成草稿修改后可发布"}>
+    <Button size="small" type="primary" className="shrink-0" icon={<Rocket size={14} />} disabled={!canPublish}
+      onClick={() => { if (session) navigate("../delivery?session=" + session.id); }}>发布本体</Button>
+  </Tooltip>;
   return (
     <aside className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       {warnings.map((text) => (
@@ -181,27 +190,27 @@ export function ModelResults({
               ),
               children: (
                 <div className="flex h-full min-h-0 flex-col">
-                  <PanelToolbar
-                    extra={
-                      <Input.Search
-                        allowClear
-                        size="small"
-                        aria-label="搜索模型"
-                        placeholder="搜索名称、技术名、描述"
-                        className="w-60"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                    }
-                  >
-                    <Segmented
-                      size="small"
-                      className="min-w-0 self-start overflow-x-auto"
-                      value={kind}
-                      onChange={(value) => setKind(value as TargetKind)}
-                      options={CATEGORIES.map((c) => ({ value: c.key, label: `${c.text} ${count(c.key)}` }))}
-                    />
-                  </PanelToolbar>
+                  <div className="flex shrink-0 flex-col gap-3 border-b border-rule p-4">
+                    <div className="model-result-categories" aria-label="模型分类">
+                      {CATEGORIES.map((category) => {
+                        const Icon = category.icon;
+                        const selected = kind === category.key;
+                        const total = count(category.key);
+                        return <Button key={category.key} aria-pressed={selected} aria-label={`${category.text} ${total}`}
+                          className={`h-auto min-w-0 justify-start gap-2 rounded-md px-2 py-2 text-xs ${selected ? "border-accent text-accent" : category.tone}`}
+                          onClick={() => setKind(category.key)}>
+                          <span className={`inline-flex size-5 flex-none items-center justify-center rounded-xs ${category.background} ${category.tone}`}><Icon size={14} /></span>
+                          <span className="min-w-0 truncate">{category.text}</span>
+                          <span className="ml-auto flex-none font-semibold tabular-nums">{total}</span>
+                        </Button>;
+                      })}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Input.Search allowClear size="small" aria-label="搜索模型" placeholder="搜索名称、技术名、描述"
+                        className="min-w-0 flex-1" value={query} onChange={(event) => setQuery(event.target.value)} />
+                      {publish}
+                    </div>
+                  </div>
                   <div className="min-h-0 flex-1 overflow-auto">
                     <Table
                       size="small"

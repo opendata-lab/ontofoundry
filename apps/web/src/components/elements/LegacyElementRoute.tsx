@@ -26,10 +26,11 @@ export function LegacyElementRoute({
     next.set("inspectTab", steps[Number(params.get("step") ?? 0)] ?? "basic");
   }
   next.delete("step");
+  if (relation) next.set("catalogTab", "relations");
   return (
     <Navigate
       replace
-      to={`/workspaces/${workspaceId}/${relation ? "relations" : "objects"}?${next}`}
+      to={`/workspaces/${workspaceId}/objects?${next}`}
     />
   );
 }

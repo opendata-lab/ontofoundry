@@ -61,7 +61,7 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
   );
   return (
     <section className="flex min-w-0 flex-col gap-2">
-      <SectionTitle title="关系">
+      <SectionTitle title="关系" className="min-h-7">
         {links.length > 0 && (
           <Button type="link" size="small" onClick={() => open({ kind: "object_type", id: type.id, tab: "relations" })}>
             全部关系
@@ -69,7 +69,7 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
         )}
       </SectionTitle>
       <div className="relative overflow-hidden rounded-md border border-rule bg-surface-raised">
-        <svg className="block h-80 w-full" viewBox={`0 0 ${width} ${height}`} aria-label={`${shortObjectName(type)}的关系图`}>
+        <svg className="object-overview-graph" viewBox={`0 0 ${width} ${height}`} aria-label={`${shortObjectName(type)}的关系图`}>
           <defs>
             {(["end", "start"] as const).map((side) => (
               <marker

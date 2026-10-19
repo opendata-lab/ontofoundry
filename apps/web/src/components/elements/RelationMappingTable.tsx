@@ -1,154 +1,118 @@
-import { Button, Empty, Table, Tag, Typography } from "antd";
-import { PanelToolbar, SectionTitle } from "../layout";
-import { Plus } from "lucide-react";
+import { Button, Descriptions, Empty, Input, Table, Typography } from "antd";
+import { DetailWorkbench, PanelToolbar, SectionTitle } from "../layout";
+import { ArrowRight, Plus } from "lucide-react";
 import { useState } from "react";
-import type { DataJoin, ObjectType } from "../../api/types";
-import { MULTIPLICITY, bindingMode, byId, joinSummary } from "../../lib/coreModel";
+import type { ObjectType } from "../../api/types";
+import { MULTIPLICITY, linkDisplayName, bindingMode, byId, joinSummary } from "../../lib/coreModel";
 import type { PanelProps } from "../../lib/elementModel";
 import { objectMapping, type MappedRelation } from "../../lib/objectMapping";
 import { setInheritedLinkBinding } from "../../lib/objectMappingEditing";
 import { relationEditReason } from "../../lib/relationEditing";
-import { ElementLink } from "./ElementPanels";
-import { InspectorDialog } from "./InspectorDialog";
-import { joinProblem } from "../../lib/objectMappingEditing";
+import { ElementLink, EvidenceSection } from "./ElementPanels";
 import { LinkJoinEditor } from "./LinkMappingPanel";
-import { ReadonlyIcon } from "./MappingWidgets";
 
 const { Text } = Typography;
+const relationKey = (relation: MappedRelation) => `${relation.definition.id}:${relation.direction}`;
 
-/** Every effective relation of an object, both directions, with its data binding. */
+/** Browse business connections before opening their complete definition and binding. */
 export function RelationsPanel(props: PanelProps<ObjectType>) {
   const { draft, type, editing, canEdit, change, open } = props;
-  const [binding, setBinding] = useState<{ relation: MappedRelation; join: DataJoin | null } | null>(null);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const relations = objectMapping(draft, type).relations;
   const concrete = bindingMode(draft, type.id) === "independent";
   const other = (r: MappedRelation) =>
     byId(draft.object_types, r.direction === "forward" ? r.definition.target_type_id : r.definition.source_type_id);
-  const endpoints = (r: MappedRelation) => {
+  const displayName = (r: MappedRelation) => linkDisplayName(r.definition, r.direction === "forward");
+  const rows = relations.filter((r) =>
+    `${displayName(r)} ${r.definition.name} ${r.definition.name} ${other(r)?.name ?? ""}`
+      .toLowerCase().includes(query.trim().toLowerCase()));
+  const selected = rows.find((r) => relationKey(r) === selectedId) ?? rows[0];
+  const reason = selected ? relationEditReason(draft, type.id, selected) : null;
+  const editable = editing && concrete && selected && !reason;
+  const endpoints = (r: MappedRelation) => ({
     // The inherited end is played by this object when it binds the relation locally.
-    const source = r.direction === "forward" ? type.id : r.definition.source_type_id;
-    const target = r.direction === "forward" ? r.definition.target_type_id : type.id;
-    return { source, target };
+    source: r.direction === "forward" ? type.id : r.definition.source_type_id,
+    target: r.direction === "forward" ? r.definition.target_type_id : type.id,
+  });
+  const endpoint = (id: string) => {
+    const object = byId(draft.object_types, id);
+    return object ? <ElementLink onClick={() => open({ kind: "object_type", id })}>{object.name}</ElementLink> : <Text type="secondary">对象不存在</Text>;
   };
   return (
-    <div className="flex flex-col gap-3">
-      <PanelToolbar className="px-0" extra={!editing && canEdit ? (
-        <Button
-          icon={<Plus size={15} />}
-          className="self-start"
-          onClick={() => open({ kind: "link_type", id: "new", owner: type.id, mode: "edit" })}
-        >
-          新建关系
-        </Button>
+    <div className="flex min-w-0 flex-col gap-3">
+      <PanelToolbar inset={false} className="inspector-toolbar" extra={!editing && canEdit ? (
+        <Button size="small" icon={<Plus size={14} />} onClick={() => open({ kind: "link_type", id: "new", owner: type.id, mode: "edit" })}>新建关系</Button>
       ) : undefined}>
-        <SectionTitle title="关系" />
+        <Input.Search className="inspector-search w-inspector-search" size="small" aria-label="搜索关系" placeholder="搜索关系或对端对象" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
       </PanelToolbar>
-      {relations.length ? (
-        <Table
-          size="small"
-          rowKey={(r) => r.definition.id}
-          pagination={false}
-          dataSource={relations}
-          columns={[
-            {
-              title: "关系",
-              key: "name",
-              render: (_, r) => (
-                <div className="flex flex-col" data-element-id={r.definition.id}>
-                  <ElementLink onClick={() => open({ kind: "link_type", id: r.definition.id })}>
-                    {r.direction === "reverse" && r.definition.inverse_name ? r.definition.inverse_name : r.definition.name}
-                  </ElementLink>
-                  <code className="text-xs text-muted">{r.definition.technical_name}</code>
+      <DetailWorkbench detailLabel="选中关系详情" primary={
+        <>
+          <SectionTitle title="关系" note={query ? `${rows.length} / ${relations.length} 条` : `${relations.length} 条`} />
+          <Table<MappedRelation>
+            size="small"
+            rowKey={relationKey}
+            pagination={false}
+            dataSource={rows}
+            onRow={(r) => ({ onClick: () => setSelectedId(relationKey(r)), className: relationKey(r) === (selected && relationKey(selected)) ? "inspector-selection-row cursor-pointer" : "cursor-pointer" })}
+            locale={{ emptyText: <Empty description={query ? "没有匹配的关系" : "尚未定义关系"} /> }}
+            columns={[
+              { title: "关系", key: "name", render: (_, r) => (
+                <div className="flex min-w-0 flex-col" data-element-id={r.definition.id}>
+                  <span className="font-medium">{displayName(r) || "未命名关系"}</span>
+                  <Text type="secondary" className="text-xs">{r.inheritedFrom ? `继承自${byId(draft.object_types, r.inheritedFrom)?.name ?? "父对象"}` : "本对象定义"}</Text>
                 </div>
-              ),
-            },
-            {
-              title: "对端对象",
-              key: "other",
-              render: (_, r) => {
-                const object = other(r);
-                return (
-                  <span className="inline-flex items-center gap-1">
-                    <Text type="secondary">{r.direction === "forward" ? "→" : "←"}</Text>
-                    {object ? (
-                      <ElementLink onClick={() => open({ kind: "object_type", id: object.id })}>{object.name}</ElementLink>
-                    ) : (
-                      "?"
-                    )}
-                  </span>
-                );
-              },
-            },
-            { title: "基数", key: "multiplicity", width: 88, render: (_, r) => MULTIPLICITY[r.definition.multiplicity] },
-            {
-              title: "定义",
-              key: "owner",
-              width: 140,
-              render: (_, r) =>
-                r.inheritedFrom ? (
-                  <Text type="secondary">继承自{byId(draft.object_types, r.inheritedFrom)?.name ?? "?"}</Text>
-                ) : (
-                  "本对象"
-                ),
-            },
-            {
-              title: "数据绑定",
-              key: "join",
-              render: (_, r) => {
-                const reason = relationEditReason(draft, type.id, r);
-                const editable = editing && concrete && !reason;
-                return (
-                  <span className="flex flex-wrap items-center gap-2">
-                    {joinSummary(draft, r.join)}
-                    {r.local && <Tag className="m-0">本对象绑定</Tag>}
-                    {editing && !editable && <ReadonlyIcon reason={reason ?? "先为本对象独立绑定数据集"} />}
-                    {editable && (
-                      <Button size="small" onClick={() => setBinding({ relation: r, join: r.local ? r.join : null })}>
-                        绑定
-                      </Button>
-                    )}
-                  </span>
-                );
-              },
-            },
-          ]}
-        />
-      ) : (
-        <Empty description="没有关系" />
-      )}
-      {binding && (
-        <InspectorDialog
-          wide
-          title={`绑定继承关系：${binding.relation.definition.name}`}
-          subtitle="只在本对象上生效，不改动父对象的关系定义。"
-          onClose={() => setBinding(null)}
-          footer={
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setBinding(null)}>取消</Button>
-              <Button
-                type="primary"
-                disabled={!!joinProblem(binding.join) || undefined}
-                onClick={() => {
-                  change(setInheritedLinkBinding(draft, type.id, binding.relation.definition.id, binding.join));
-                  setBinding(null);
-                }}
-              >
-                确定
-              </Button>
-            </div>
-          }
-        >
-          <LinkJoinEditor
-            draft={draft}
-            {...{
-              sourceTypeId: endpoints(binding.relation).source,
-              targetTypeId: endpoints(binding.relation).target,
-            }}
-            value={binding.join}
-            onChange={(join) => setBinding({ ...binding, join })}
+              ) },
+              { title: "对端对象", key: "other", render: (_, r) => <span>{r.direction === "forward" ? "→" : "←"} {other(r)?.name ?? "—"}</span> },
+              { title: "基数", key: "multiplicity", render: (_, r) => MULTIPLICITY[r.definition.multiplicity] },
+            ]}
           />
-        </InspectorDialog>
-      )}
+        </>
+      } detail={selected ? (
+        <>
+          <SectionTitle title={<ElementLink onClick={() => open({ kind: "link_type", id: selected.definition.id })}>{displayName(selected) || "未命名关系"}</ElementLink>} note={selected.definition.name} />
+          <section className="flex flex-col gap-3">
+            <SectionTitle title="两端与方向" />
+            <div className="flex flex-wrap items-center gap-2">
+              {endpoint(endpoints(selected).source)}
+              <ArrowRight size={14} className="shrink-0 text-muted" />
+              <Text>{selected.definition.name}</Text>
+              <ArrowRight size={14} className="shrink-0 text-muted" />
+              {endpoint(endpoints(selected).target)}
+            </div>
+          </section>
+          <section className="flex flex-col gap-3 border-t border-rule pt-4">
+            <SectionTitle title="基本信息" />
+            <Descriptions size="small" column={1} items={[
+              { key: "name", label: "关系标识", children: selected.definition.name || "未命名关系" },
+              { key: "source_role", label: "来源端角色名", children: selected.definition.source_role_name || "未设置" },
+              { key: "target_role", label: "目标端角色名", children: selected.definition.target_role_name || "未设置" },
+
+              { key: "multiplicity", label: "基数", children: MULTIPLICITY[selected.definition.multiplicity] },
+              { key: "owner", label: "定义来源", children: selected.inheritedFrom ? byId(draft.object_types, selected.inheritedFrom)?.name ?? "父对象" : "本对象" },
+              { key: "description", label: "描述", children: <span className="whitespace-pre-wrap">{selected.definition.description || "暂无描述"}</span> },
+            ]} />
+          </section>
+          <section className="flex flex-col gap-3 border-t border-rule pt-4">
+            <SectionTitle title="数据绑定" note={selected.local ? "本对象绑定" : undefined} />
+            {editable ? (
+              <LinkJoinEditor
+                draft={draft}
+                sourceTypeId={endpoints(selected).source}
+                targetTypeId={endpoints(selected).target}
+                value={selected.local ? selected.join : null}
+                onChange={(join) => change(setInheritedLinkBinding(draft, type.id, selected.definition.id, join))}
+              />
+            ) : (
+              <>
+                <Text className="whitespace-pre-wrap">{joinSummary(draft, selected.join)}</Text>
+                {editing && <Text type="secondary" className="text-xs">{reason ?? "先为本对象独立绑定数据集"}</Text>}
+              </>
+            )}
+          </section>
+          <EvidenceSection workspaceId={draft.workspace_id} evidence={selected.definition.evidence} />
+        </>
+      ) : <Empty description="选择关系查看定义与数据绑定" />} />
     </div>
   );
 }

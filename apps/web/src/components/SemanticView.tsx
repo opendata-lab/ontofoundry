@@ -1,6 +1,6 @@
 import { Button, Dropdown, Empty, Input, Segmented, Table, Tag, Tooltip, Tree, Typography } from "antd";
 import type { DataNode } from "antd/es/tree";
-import { Box, Database, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Sigma, Workflow, X } from "lucide-react";
+import { Box, Database, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Sigma, Workflow } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Draft, TypeGraph } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
@@ -160,81 +160,83 @@ export function SemanticView({
   const listing = filter === "metric" || filter === "dataset" ? filter : null;
   const objects = resources.filter((r) => r.kind === "object").length;
   const relations = resources.filter((r) => r.kind === "relation").length;
+  const expandExplorer = (
+    <Tooltip title="展开资源管理器">
+      <Button size="small" aria-label="展开资源管理器" aria-expanded={false}
+        icon={<PanelLeftOpen size={16} />} onClick={() => collapse(false)} />
+    </Tooltip>
+  );
   return (
     <div className="flex h-full min-h-0 bg-surface">
-      <aside
+      {!collapsed && <aside
         aria-label="资源管理器"
-        className={`flex min-h-0 flex-none flex-col border-r border-rule bg-surface transition-all ${collapsed ? "w-16" : "w-80"}`}
+        className="flex min-h-0 w-80 flex-none flex-col border-r border-rule bg-surface"
       >
         <PanelToolbar>
-          {!collapsed && <SectionTitle title="资源管理器" />}
-          <Tooltip title={collapsed ? "展开资源管理器" : "收起资源管理器"}>
+          <SectionTitle title="资源管理器" />
+          <Tooltip title="收起资源管理器">
             <Button
               size="small"
               type="text"
-              aria-label={collapsed ? "展开资源管理器" : "收起资源管理器"}
-              aria-expanded={!collapsed}
-              icon={collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-              onClick={() => collapse(!collapsed)}
+              aria-label="收起资源管理器"
+              aria-expanded={true}
+              icon={<PanelLeftClose size={16} />}
+              onClick={() => collapse(true)}
             />
           </Tooltip>
         </PanelToolbar>
-        {!collapsed && (
-          <>
-            <div className="flex flex-col gap-2 px-4 py-2">
-              <Segmented
-                size="small"
-                block
-                className="max-w-full overflow-x-auto"
-                value={filter}
-                onChange={(value) => setFilter(value as Filter)}
-                options={[
-                  { value: "all", label: "全部" },
-                  ...KINDS.map((kind) => ({ value: kind, label: RESOURCE_KIND_LABELS[kind] })),
-                ]}
-              />
-              <Input.Search
-                allowClear
-                size="small"
-                aria-label="名称筛选"
-                placeholder="名称筛选"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-            <div className="min-h-0 flex-1 overflow-auto px-4 pb-2" aria-label="本体资源">
-              <Tree
-                blockNode
-                showLine={false}
-                treeData={treeData}
-                expandedKeys={expanded}
-                onExpand={(keys) => setExpanded(keys.map(String))}
-                selectedKeys={selected ? [selected] : []}
-                onSelect={(keys) => {
-                  const resource = resources.find((r) => r.id === keys[0]);
-                  if (resource) select(resource);
-                  else setSelected(null);
-                }}
-              />
-              {resourceError && (
-                <Text type="secondary" role="status" className="block px-4 py-2 text-xs">
-                  {resourceError}
-                </Text>
-              )}
-            </div>
-            <footer className="flex justify-between border-t border-rule-soft px-4 py-2 text-xs text-muted">
-              <span>
-                {objects} 个对象 · {relations} 个关系
-              </span>
-              <span>Esc 清除</span>
-            </footer>
-          </>
-        )}
-      </aside>
+        <div className="flex flex-col gap-2 px-4 py-2">
+          <Segmented
+            size="small"
+            block
+            className="max-w-full overflow-x-auto"
+            value={filter}
+            onChange={(value) => setFilter(value as Filter)}
+            options={[
+              { value: "all", label: "全部" },
+              ...KINDS.map((kind) => ({ value: kind, label: RESOURCE_KIND_LABELS[kind] })),
+            ]}
+          />
+          <Input.Search
+            allowClear
+            size="small"
+            aria-label="名称筛选"
+            placeholder="名称筛选"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto px-4 pb-2" aria-label="本体资源">
+          <Tree
+            blockNode
+            showLine={false}
+            treeData={treeData}
+            expandedKeys={expanded}
+            onExpand={(keys) => setExpanded(keys.map(String))}
+            selectedKeys={selected ? [selected] : []}
+            onSelect={(keys) => {
+              const resource = resources.find((r) => r.id === keys[0]);
+              if (resource) select(resource);
+              else setSelected(null);
+            }}
+          />
+          {resourceError && (
+            <Text type="secondary" role="status" className="block px-4 py-2 text-xs">
+              {resourceError}
+            </Text>
+          )}
+        </div>
+        <footer className="flex justify-between border-t border-rule-soft px-4 py-2 text-xs text-muted">
+          <span>
+            {objects} 个对象 · {relations} 个关系
+          </span>
+        </footer>
+      </aside>}
       <section className="relative min-w-0 flex-1" aria-label={listing ? `${RESOURCE_KIND_LABELS[listing]}列表` : "语义关系画布"}>
         {listing ? (
           <div className="flex h-full flex-col overflow-auto">
             <PanelToolbar>
+              {collapsed && expandExplorer}
               <SectionTitle title={RESOURCE_KIND_LABELS[listing]} note={listing === "metric" ? "指标只挂在一个数据集上，只使用该数据集的列" : "登记后供对象映射、关系映射表和指标使用"} />
               {canCreate && (
                 <Button
@@ -290,23 +292,7 @@ export function SemanticView({
                 if (resource) onOpen(resource.detail);
               }}
             />
-            {selection && (
-              <div className="absolute top-4 left-4 flex items-center gap-1 rounded-md border border-rule bg-surface py-1 pr-1 pl-3 shadow-panel">
-                <Text strong>{selection.name}</Text>
-                <Tooltip title="打开详情">
-                  <Button
-                    size="small"
-                    type="text"
-                    aria-label="打开选中资源详情"
-                    icon={<PanelLeftOpen size={15} />}
-                    onClick={() => onOpen(selection.detail)}
-                  />
-                </Tooltip>
-                <Tooltip title="清除选择 · Esc">
-                  <Button size="small" type="text" aria-label="清除选择" icon={<X size={15} />} onClick={() => setSelected(null)} />
-                </Tooltip>
-              </div>
-            )}
+            {collapsed && <div className="absolute top-4 left-4 z-10">{expandExplorer}</div>}
             <div
               role="status"
               className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-sm border border-rule bg-surface px-3 py-1 text-xs text-muted"

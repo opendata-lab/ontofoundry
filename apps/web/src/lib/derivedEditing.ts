@@ -108,7 +108,7 @@ export function literal(value: Scalar): string {
 
 function pathText(draft: Draft, root: string, condition: PathCondition) {
   const hops = (condition.path.links ?? []).map((step) => {
-    const name = quoteName(byId(draft.link_types, step.link_type_id)?.technical_name ?? "?");
+    const name = quoteName(byId(draft.link_types, step.link_type_id)?.name ?? "?");
     return step.direction === "reverse" ? `REVERSE(${name})` : name;
   });
   const property = byId(draft.properties, condition.path.property_id)?.technical_name ?? "?";
@@ -125,7 +125,7 @@ function comparisonText(path: string, operator: Operator, values: Scalar[]) {
 }
 
 function linkText(draft: Draft, root: string, row: LinkRow) {
-  const name = quoteName(byId(draft.link_types, row.linkId)?.technical_name ?? "?");
+  const name = quoteName(byId(draft.link_types, row.linkId)?.name ?? "?");
   const hop = row.direction === "reverse" ? `REVERSE(${name})` : name;
   return `${row.has ? "" : "NOT "}EXISTS (${quoteName(root)}.${hop})`;
 }
@@ -232,7 +232,7 @@ function parseTerm(term: string, root: string, context: ReturnType<typeof derive
     const reverse = exists[3] !== undefined;
     const name = unquote(exists[3] ?? exists[4]).toLowerCase();
     const match = context.links.find(
-      (l) => l.link.technical_name.toLowerCase() === name && l.direction === (reverse ? "reverse" : "forward"),
+      (l) => l.link.name.toLowerCase() === name && l.direction === (reverse ? "reverse" : "forward"),
     );
     return match ? { key: newId(), kind: "link", linkId: match.link.id, direction: match.direction, has: !exists[1] } : null;
   }

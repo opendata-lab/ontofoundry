@@ -10,16 +10,18 @@ export function PanelToolbar({
   tabBar,
   extra,
   className = "",
+  inset = true,
 }: {
   children?: ReactNode;
   /** Keeps Ant Design's tab navigation within one wrapper of its Tabs root. */
   tabBar?: ReactNode;
   extra?: ReactNode;
   className?: string;
+  inset?: boolean;
 }) {
   return (
     <div
-      className={`flex min-h-10 flex-wrap items-center justify-between gap-3 border-b border-rule px-4 ${className}`.trim()}
+      className={`flex min-h-10 flex-wrap items-center justify-between gap-3 border-b border-rule ${inset ? "px-4" : ""} ${className}`.trim()}
     >
       {tabBar ?? (children && <div className="flex min-w-0 items-center gap-3">{children}</div>)}
       {extra && <div className="ml-auto flex flex-wrap items-center gap-2 py-1">{extra}</div>}
