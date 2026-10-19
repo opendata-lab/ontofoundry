@@ -36,7 +36,7 @@ make compose-up
 | API 文档 | http://127.0.0.1:8900/docs |
 | 健康检查 | http://127.0.0.1:8900/healthz |
 
-后端容器启动时自动执行 Alembic 数据库迁移。首次启动会创建制造供应链示例，开发身份为 `admin`。停止应用使用 `make compose-down`，数据库保存在 Compose volume 中。
+后端容器启动时自动执行 Alembic 数据库迁移。`apps/api/.env` 中 `ONTOFOUNDRY_SEED_DEMO=true` 时，首次启动会创建“星港销售”示例并通过开发身份 `admin` 登录；部署到内网时设为 `false`，从空空间开始。停止应用使用 `make compose-down`，数据库和上传材料分别保存在 Compose volume 中，重建容器不会丢失。需要清空全部数据并重新开始时运行 `make compose-reset`，它会删除这两个 volume。
 
 ### 从源码运行
 

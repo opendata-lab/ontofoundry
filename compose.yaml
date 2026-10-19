@@ -24,6 +24,11 @@ services:
       target: backend
     environment:
       ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
+      # Uploaded material and import artifacts are local files; keep them on a
+      # named volume so recreating the container does not orphan material rows.
+      ONTOFOUNDRY_DATA_DIR: /var/lib/ontofoundry/files
+      # A deployed space starts empty. Set true in apps/api/.env for the demo.
+      ONTOFOUNDRY_SEED_DEMO: ${ONTOFOUNDRY_SEED_DEMO:-false}
       # Agent capability now lives in an external OpenDataWorks DataAgent.
       # Leave the base URL unset and the application still runs — ontology
       # browsing, editing, publishing and MCP do not depend on it.
@@ -39,6 +44,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8900:8900"
+    volumes:
+      - ontofoundry-data:/var/lib/ontofoundry/files
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/healthz').read()"]
       interval: 10s
@@ -59,3 +66,4 @@ services:
 
 volumes:
   ontofoundry-postgres:
+  ontofoundry-data:

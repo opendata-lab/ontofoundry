@@ -1,7 +1,7 @@
 UV ?= uv
 NPM ?= npm
 
-.PHONY: install api-dev web-dev compose-up compose-down serve build test test-pg lint
+.PHONY: install api-dev web-dev compose-up compose-down compose-reset serve build test test-pg lint
 
 install:
 	cd apps/api && $(UV) sync --python 3.13 --locked
@@ -18,6 +18,11 @@ compose-up:
 
 compose-down:
 	docker compose stop of-frontend of-backend
+
+# Destructive: removes the database and uploaded material volumes, then starts empty.
+compose-reset:
+	docker compose --env-file apps/api/.env down -v
+	docker compose --env-file apps/api/.env up -d --build of-backend of-frontend
 
 
 
