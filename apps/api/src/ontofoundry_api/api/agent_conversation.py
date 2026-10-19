@@ -37,6 +37,10 @@ from ontofoundry_api.services.dataagent import (
     proposal_instructions,
     require_dataagent_configuration,
 )
+from ontofoundry_api.services.material_source import (
+    MaterialSourceMissing,
+    material_source_path,
+)
 from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.model_result import (
     exhaust_retriable_result,
@@ -868,13 +872,14 @@ async def send_message(
         for material in materials:
             if material.id in uploaded_ids and material.id in material_path_by_id:
                 continue
-            path = (
-                request.app.state.settings.data_dir / workspace_id / f"{material.sha256}.md"
-            )
-            if not path.is_file():
+            try:
+                path = material_source_path(
+                    db, request.app.state.settings, material
+                )
+            except MaterialSourceMissing:
                 raise DataAgentError(
                     f"建模材料源文件缺失: {material.name}", status_code=422
-                )
+                ) from None
             uploaded = await dataagent.upload(
                 topic_id,
                 f"{material.id}-{material.name}",

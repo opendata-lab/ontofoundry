@@ -27,6 +27,10 @@ from ontofoundry_api.services.import_integrity import payload_sha256
 from ontofoundry_api.services.import_matching import build_candidate_graph
 from ontofoundry_api.services.import_materials import store_import_materials
 from ontofoundry_api.services.import_proposals import build_import_batch
+from ontofoundry_api.services.material_source import (
+    MaterialSourceMissing,
+    material_source_path,
+)
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.proposals import store_batch
 
@@ -197,34 +201,40 @@ def import_view(db, record):
     )
 
 
-def check_artifacts(record, settings):
+def check_artifacts(record, settings, *, db):
     if record.content_sha256 != payload_sha256(preview_payload(record)):
         raise ConflictError("预览内容校验失败，请重新上传", code="IMPORT_CONTENT_CHANGED")
     path = settings.data_dir.resolve() / record.raw_artifact
-    if (
-        not path.is_file()
-        or hashlib.sha256(path.read_bytes()).hexdigest() != record.raw_sha256
-    ):
+    # A missing upload is not a changed upload: everything needed to confirm is
+    # stored in the database, and deployments can lose the data directory. A
+    # present file must still match the preview.
+    if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != record.raw_sha256:
         raise ConflictError("原始文件已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED")
     if record.formatted_sha256:
-        path = settings.data_dir / record.workspace_id / (record.formatted_sha256 + ".md")
-        if (
-            not path.is_file()
-            or hashlib.sha256(path.read_bytes()).hexdigest() != record.formatted_sha256
-        ):
+        material = db.get(MaterialRecord, record.material_id) if record.material_id else None
+        if material is None or material.sha256 != record.formatted_sha256:
+            raise ConflictError(
+                "引用材料已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED"
+            )
+        try:
+            path = material_source_path(db, settings, material)
+        except MaterialSourceMissing:
+            raise ConflictError(
+                "引用材料已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED"
+            ) from None
+        if hashlib.sha256(path.read_bytes()).hexdigest() != record.formatted_sha256:
             raise ConflictError(
                 "引用材料已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED"
             )
 
 
-def source_evidence(record, settings, *, changes=None, batch_id=None):
+def source_evidence(record, settings, *, changes=None, batch_id=None, db):
     if not record.material_id:
         return {}
-    lines = (
-        (settings.data_dir / record.workspace_id / (record.formatted_sha256 + ".md"))
-        .read_text()
-        .splitlines()
-    )
+    material = db.get(MaterialRecord, record.material_id)
+    if material is None or material.sha256 != record.formatted_sha256:
+        return {}
+    lines = material_source_path(db, settings, material).read_text().splitlines()
     result = {}
     allowed = {c["target_id"] for c in changes or record.preview_json["changes"]}
     for issue in record.report_json["issues"]:
@@ -280,7 +290,7 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
                 details=confirmed_view(record),
             )
         return confirmed_view(record)
-    check_artifacts(record, settings)
+    check_artifacts(record, settings, db=db)
     if (
         workspace.current_version_id != record.base_version_id
         or draft_sha256(baseline(db, workspace)) != record.base_version_sha256
@@ -358,7 +368,7 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
         record.preview_json["changes"],
         batch_id=batch_id,
         lookup=material_lookup(db, settings, workspace_id),
-        evidence_by_target=source_evidence(record, settings, batch_id=batch_id),
+        evidence_by_target=source_evidence(record, settings, batch_id=batch_id, db=db),
     )
     store_batch(
         db,

@@ -481,6 +481,30 @@ def check_resolutions(conflicts: list[dict], resolutions: dict[str, Any]) -> Non
                 )
 
 
+def revised_material_bookkeeping(item, material_ids):
+    """Release unselected upload bookkeeping once no run is using it.
+
+    A terminal run's proposal batch keeps its own material manifest, so this
+    session-level copy only blocks deletion of documents the user unchecked.
+    """
+    if item.task_status in ACTIVE_RUN_STATUSES:
+        return {}
+    selected = set(material_ids)
+    values = {}
+    uploaded = item.uploaded_material_ids or []
+    if any(material_id not in selected for material_id in uploaded):
+        values["uploaded_material_ids"] = [
+            material_id for material_id in uploaded if material_id in selected
+        ]
+    manifest = item.run_manifest_json
+    if manifest:
+        materials = manifest.get("materials") or []
+        kept = [entry for entry in materials if entry.get("id") in selected]
+        if len(kept) != len(materials):
+            values["run_manifest_json"] = {**manifest, "materials": kept}
+    return values
+
+
 @router.post("/sessions/{session_id}/resolve-merge")
 def resolve_merge(
     workspace_id: str,
@@ -691,6 +715,7 @@ def save_session(
             if not material or material.workspace_id != workspace_id:
                 raise HTTPException(422, "材料不属于当前空间")
         values["material_ids"] = body.material_ids
+        values.update(revised_material_bookkeeping(item, body.material_ids))
     result = revise(db, item, body.revision, **values)
     result["validation"] = validate_draft(draft, get_workspace(db, workspace_id))
     return result

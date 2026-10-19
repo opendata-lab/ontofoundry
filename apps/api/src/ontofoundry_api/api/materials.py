@@ -11,16 +11,20 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.modeling import require_member
+from ontofoundry_api.contracts.materials import MaterialOverview
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     MaterialChunkRecord,
     MaterialRecord,
     utc_now,
 )
-from ontofoundry_api.contracts.materials import MaterialOverview
-from ontofoundry_api.services.material_usage import material_references, material_usage
 from ontofoundry_api.services.errors import ConflictError
+from ontofoundry_api.services.material_source import (
+    MaterialSourceMissing,
+    material_source_path,
+)
 from ontofoundry_api.services.material_types import is_material_name, material_media_type
+from ontofoundry_api.services.material_usage import material_references, material_usage
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}/materials", tags=["materials"])
 
@@ -113,6 +117,12 @@ async def upload(
             )
         )
         if existing:
+            # Identical content still restores a source file lost by a
+            # deployment whose data directory was not persisted.
+            destination = root / workspace_id / (sha + ".md")
+            if not destination.is_file():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                path.replace(destination)
             return describe(existing)
         item = MaterialRecord(
             id=str(uuid4()),
@@ -168,7 +178,10 @@ def download(
         raise HTTPException(404, "材料不存在")
     path = request.app.state.settings.data_dir / workspace_id / (item.sha256 + ".md")
     if not path.is_file():
-        raise HTTPException(404, "源文件缺失，请联系管理员恢复备份")
+        try:
+            path = material_source_path(db, request.app.state.settings, item)
+        except MaterialSourceMissing:
+            raise HTTPException(404, "源文件缺失，请联系管理员恢复备份") from None
     return FileResponse(path, filename=item.name, media_type=material_media_type(item.name))
 
 

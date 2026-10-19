@@ -18,6 +18,11 @@ def store_text_material(db, settings, workspace_id, name, text):
         )
     )
     if existing:
+        # Re-uploading identical content must restore a source file that a
+        # deployment without a persistent data directory lost.
+        destination = settings.data_dir.resolve() / workspace_id / (sha + ".md")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(data)
         return existing
     item = MaterialRecord(
         id=str(uuid4()),

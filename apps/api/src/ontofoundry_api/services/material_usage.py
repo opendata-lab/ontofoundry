@@ -13,6 +13,11 @@ from ontofoundry_api.db_models import (
     ProposalBatchRecord,
     ProposalItemRecord,
 )
+from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
+
+# A run that is still being produced may yet cite its uploaded materials; once
+# it settles, its generated batch carries the manifest that matters.
+UNSETTLED_RESULT_STATES = {"processing", "awaiting_reply", "failed_retriable"}
 
 COLLECTIONS = {
     "object_types": "object_type", "link_types": "link_type",
@@ -75,7 +80,11 @@ def material_usage(db: Session, workspace_id: str, material_ids: set[str]) -> di
         mark("运行清单", row.material_manifest_json)
     for row in db.scalars(select(ModelingSessionRecord).where(ModelingSessionRecord.workspace_id == workspace_id)):
         mark("会话草稿", [row.draft_json, row.material_ids, row.candidates_json])
-        mark("运行清单", [row.run_manifest_json, row.uploaded_material_ids])
+        if (
+            row.task_status in ACTIVE_RUN_STATUSES
+            or row.result_state in UNSETTLED_RESULT_STATES
+        ):
+            mark("运行清单", [row.run_manifest_json, row.uploaded_material_ids])
         snapshot(row.draft_json)
     for row in db.scalars(select(OntologyVersionRecord).where(OntologyVersionRecord.workspace_id == workspace_id)):
         mark("已发布版本", row.snapshot_json)

@@ -32,6 +32,7 @@ from ontofoundry_api.services.import_matching import (
     rewrite_import_ids,
 )
 from ontofoundry_api.services.import_proposals import build_import_batch
+from ontofoundry_api.services.material_source import material_source_path
 from ontofoundry_api.services.material_store import store_text_material
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.proposals import (
@@ -273,7 +274,7 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         if replay["request_sha256"] != request_hash:
             raise ConflictError("同一补全请求不能提交不同内容", code="IDEMPOTENCY_CONFLICT")
         return {**confirmed_view(record), "batch_id": replay["batch_id"]}
-    check_artifacts(record, settings)
+    check_artifacts(record, settings, db=db)
     session = db.scalar(
         select(ModelingSessionRecord)
         .where(
@@ -526,11 +527,7 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
             "修订结果没有可生成的新提案", code="IMPORT_COMPLETION_UNCHANGED"
         )
     batch_id = str(uuid5(UUID(record.id), "completion:" + body.idempotency_key))
-    lines = (
-        (settings.data_dir / workspace_id / (correction_material.sha256 + ".md"))
-        .read_text()
-        .splitlines()
-    )
+    lines = material_source_path(db, settings, correction_material).read_text().splitlines()
     for target in target_ids:
         evidence[target] = [
             {
