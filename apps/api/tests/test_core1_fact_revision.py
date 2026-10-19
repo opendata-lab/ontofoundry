@@ -194,7 +194,7 @@ def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(clien
     link = next(
         relation
         for relation in draft["link_types"]
-        if relation["technical_name"] == "buyer"
+        if relation["name"] == "buyer"
     )
     batch = seed_batch(
         client,

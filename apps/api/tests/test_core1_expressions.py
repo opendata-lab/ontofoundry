@@ -139,9 +139,7 @@ def test_multihop_exists_rewrite_leaves_wrapper_and_string_unchanged():
     resolved = resolve_derived_expression(draft, employee.id, text)
     candidate = draft.model_copy(deep=True)
     next(o for o in candidate.object_types if o.id == employee.id).technical_name = "person"
-    next(
-        link for link in candidate.link_types if link.id == manager.id
-    ).technical_name = "boss"
+    next(link for link in candidate.link_types if link.id == manager.id).name = "boss"
     assert (
         render_references(resolved, candidate)
         == "EXISTS ( person.boss.REVERSE(boss) ) AND 'employee' <> ''"

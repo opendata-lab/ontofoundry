@@ -59,8 +59,7 @@ def test_navigation_imports_effective_mappings_and_datasets(
             link = {
                 **deepcopy(template),
                 "id": str(uuid4()),
-                "name": "关联" + name,
-                "technical_name": name,
+                "name": name,
                 "source_type_id": source["id"],
                 "target_type_id": target["id"],
                 "data_join": {

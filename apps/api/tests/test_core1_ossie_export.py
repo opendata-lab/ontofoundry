@@ -87,7 +87,7 @@ def test_case_insensitive_value_concept_names_reserve_all_objects_and_builtins()
     assert export(model).document is None
 
 
-def test_self_relation_uses_explicit_related_role_and_both_readings():
+def test_self_relation_keeps_explicit_role_names_and_both_readings():
     model = example_draft("05-self-and-parallel-links")
     result = export(model)
     value = json.loads(result.document)
@@ -99,12 +99,18 @@ def test_self_relation_uses_explicit_related_role_and_both_readings():
             c for c in value["ontology"] if c["concept"] == source.technical_name
         )
         relation = next(
-            r for r in component["relationships"] if r["name"] == link.technical_name
+            r for r in component["relationships"] if r["name"] == link.name
         )
-        assert relation["roles"][0]["name"] == "related"
-        assert ":related}" in relation["verbalizes"][0]
-        if link.inverse_name:
-            assert len(relation["verbalizes"]) == 2
+        assert relation["roles"][0]["name"] == link.target_role_name
+        assert len(relation["verbalizes"]) == len(link.verbalizes)
+        target = source.technical_name + ":" + link.target_role_name
+        assert all("{" + target + "}" in reading for reading in relation["verbalizes"])
+        assert value["ai_context"]["ontofoundry"]["link_role_names"][
+            source.technical_name + "." + link.name
+        ] == {
+            "source_role_name": link.source_role_name,
+            "target_role_name": link.target_role_name,
+        }
 
 
 def test_invalid_core_metric_cannot_be_silently_omitted():

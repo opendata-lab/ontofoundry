@@ -66,18 +66,22 @@ def test_business_definitions_survive_supported_ontology_exchange(name):
         (
             old[link.source_type_id],
             old[link.target_type_id],
-            link.technical_name,
+            link.name,
             str(link.multiplicity),
-            link.inverse_name,
+            link.source_role_name,
+            link.target_role_name,
+            tuple(link.verbalizes),
         )
         for link in model.link_types
     } == {
         (
             new[link.source_type_id],
             new[link.target_type_id],
-            link.technical_name,
+            link.name,
             str(link.multiplicity),
-            link.inverse_name,
+            link.source_role_name,
+            link.target_role_name,
+            tuple(link.verbalizes),
         )
         for link in restored.model.link_types
     }
@@ -294,6 +298,7 @@ def test_or_branches_reverse_exists_and_each_inheritance_level_survive():
                         "contact",
                         "customer",
                         roles=[{"concept": "customer", "name": "related"}],
+                        verbalizes=["{customer} contact {customer:related}"],
                         multiplicity="ManyToOne",
                     ),
                 ],

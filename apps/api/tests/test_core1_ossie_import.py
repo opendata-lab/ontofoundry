@@ -27,10 +27,10 @@ CTX = ImportContext(UUID("44444444-4444-4444-8444-444444444444"))
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def rel(name, target=None, **kwargs):
+def rel(name, target=None, *, source="customer", **kwargs):
     return {
         "name": name,
-        "verbalizes": ["{customer} " + name + (" {" + target + "}" if target else "")],
+        "verbalizes": ["{" + source + "} " + name + (" {" + target + "}" if target else "")],
         **({"roles": [{"concept": target}]} if target else {}),
         **kwargs,
     }
@@ -305,6 +305,7 @@ def test_membership_is_all_or_nothing_and_keeps_or_and_reverse_exists():
                     "contact",
                     "customer",
                     roles=[{"concept": "customer", "name": "related"}],
+                    verbalizes=["{customer} contact {customer:related}"],
                 ),
             ],
         ),
@@ -651,7 +652,7 @@ def test_composite_direct_join_reorders_source_columns_to_target_key():
             rel("code", "String"),
             rel("tenant_ref", "String"),
             rel("customer_ref", "String"),
-            rel("buyer", "customer", multiplicity="ManyToOne"),
+            rel("buyer", "customer", source="order", multiplicity="ManyToOne"),
         ],
     )
     customers = dataset(
@@ -782,8 +783,8 @@ def test_parallel_links_are_bound_by_exact_foreign_key_fields():
             rel("code", "String"),
             rel("billing_code", "String"),
             rel("shipping_code", "String"),
-            rel("billing", "customer", multiplicity="ManyToOne"),
-            rel("shipping", "customer", multiplicity="ManyToOne"),
+            rel("billing", "customer", source="order", multiplicity="ManyToOne"),
+            rel("shipping", "customer", source="order", multiplicity="ManyToOne"),
         ],
     )
     children = [
@@ -997,7 +998,7 @@ def test_unique_non_primary_property_can_be_a_direct_join_target():
         relationships=[
             rel("code", "String"),
             rel("buyer_email", "String"),
-            rel("buyer", "customer", multiplicity="ManyToOne"),
+            rel("buyer", "customer", source="order", multiplicity="ManyToOne"),
         ],
     )
     customers = dataset(
@@ -1064,7 +1065,7 @@ def test_conflicting_bindings_for_one_business_link_are_not_resolved_by_file_ord
             rel("code", "String"),
             rel("billing_code", "String"),
             rel("shipping_code", "String"),
-            rel("buyer", "customer", multiplicity="ManyToOne"),
+            rel("buyer", "customer", source="order", multiplicity="ManyToOne"),
         ],
     )
     children = [

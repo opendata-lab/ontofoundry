@@ -282,6 +282,7 @@ def export_document(model, ctx):
     for metric in model.metrics:
         labels(metric, "metric:" + metric.technical_name)
     extension["required"].sort()
+    extension["generated_link_readings"].sort()
     value = {
         "version": "0.2.0.dev0",
         "name": ctx.workspace_name,

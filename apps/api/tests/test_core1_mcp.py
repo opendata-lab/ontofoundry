@@ -144,7 +144,7 @@ def test_example06_physical_projection_carries_membership_and_local_inherited_li
     responsible = next(
         relation
         for relation in draft["link_types"]
-        if relation["technical_name"] == "responsible_party"
+        if relation["name"] == "responsible_party"
     )
     detail = call(
         client,
@@ -231,7 +231,7 @@ def test_metric_and_mapping_table_physical_projection_includes_datasets(client):
     link = next(
         relation
         for relation in session["draft"]["link_types"]
-        if relation["technical_name"] == "courses"
+        if relation["name"] == "courses"
     )
     element = call(client, "get_ontology", {"ids": [link["id"]], "include": ["physical"]})[
         "structuredContent"

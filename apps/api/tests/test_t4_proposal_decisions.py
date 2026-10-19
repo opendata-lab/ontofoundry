@@ -108,8 +108,7 @@ def chain(session: dict) -> list[dict]:
             "po-link",
             "link_type",
             {
-                "name": "供应方",
-                "technical_name": "supplied_by",
+                "name": "supplied_by",
                 "source_type_id": {"client_ref": "po"},
                 "target_type_id": supplier,
             },
@@ -199,7 +198,7 @@ def test_dependencies_must_be_accepted_together(client):
     draft = together.json()["session"]["draft"]
     assert {t["technical_name"] for t in draft["object_types"]} >= {"purchase_order"}
     assert any(p["technical_name"] == "order_no" for p in draft["properties"])
-    assert any(link["technical_name"] == "supplied_by" for link in draft["link_types"])
+    assert any(link["name"] == "supplied_by" for link in draft["link_types"])
 
 
 def test_rejecting_a_root_makes_dependents_conflict_and_restore_undoes_it(client):

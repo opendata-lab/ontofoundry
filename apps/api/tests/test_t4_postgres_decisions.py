@@ -128,7 +128,7 @@ def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
     assert (
         sum(
             item["id"] == link["target_id"]
-            and item["technical_name"] == "supplied_by"
+            and item["name"] == "supplied_by"
             and item["source_type_id"] == po["target_id"]
             and item["target_type_id"] == session["draft"]["object_types"][0]["id"]
             for item in draft["link_types"]

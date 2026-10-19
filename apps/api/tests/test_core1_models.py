@@ -127,7 +127,7 @@ def test_properties_and_outgoing_links_share_namespace():
     draft = example_draft("01-basic-sales")
     link = draft.link_types[0]
     prop = next(p for p in draft.properties if p.owner_type_id == link.source_type_id)
-    link.technical_name = prop.technical_name
+    link.name = prop.technical_name
     with pytest.raises(ValueError, match="共享命名空间"):
         validate_core_graph(draft)
 
