@@ -1,5 +1,4 @@
 import hashlib
-import json
 import tempfile
 from pathlib import Path
 from uuid import uuid4
@@ -14,15 +13,12 @@ from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
-    ImportRecord,
     MaterialChunkRecord,
     MaterialRecord,
-    ModelingSessionRecord,
-    OntologyVersionRecord,
-    ProposalBatchRecord,
-    ProposalItemRecord,
     utc_now,
 )
+from ontofoundry_api.contracts.materials import MaterialOverview
+from ontofoundry_api.services.material_usage import material_references, material_usage
 from ontofoundry_api.services.errors import ConflictError
 from ontofoundry_api.services.material_types import is_material_name, material_media_type
 
@@ -39,79 +35,6 @@ def describe(item):
         "created_at": item.created_at,
         "archived_at": item.archived_at,
     }
-
-
-def material_references(db: Session, workspace_id: str, material_id: str) -> list[str]:
-    """Where a material is cited: proposals, session drafts, published versions.
-
-    Ids are UUIDs, so a text search of the stored JSON cannot mistake one
-    material for another.
-    """
-    found = []
-    if db.scalar(
-        select(ImportRecord.id)
-        .where(
-            ImportRecord.workspace_id == workspace_id,
-            ImportRecord.material_id == material_id,
-        )
-        .limit(1)
-    ):
-        found.append("导入报告")
-    for label, rows in (
-        (
-            "提案",
-            db.scalars(
-                select(ProposalItemRecord).where(
-                    ProposalItemRecord.workspace_id == workspace_id
-                )
-            ),
-        ),
-        (
-            "运行清单",
-            db.scalars(
-                select(ProposalBatchRecord).where(
-                    ProposalBatchRecord.workspace_id == workspace_id
-                )
-            ),
-        ),
-        (
-            "会话草稿",
-            db.scalars(
-                select(ModelingSessionRecord).where(
-                    ModelingSessionRecord.workspace_id == workspace_id
-                )
-            ),
-        ),
-        (
-            "已发布版本",
-            db.scalars(
-                select(OntologyVersionRecord).where(
-                    OntologyVersionRecord.workspace_id == workspace_id
-                )
-            ),
-        ),
-    ):
-        for row in rows:
-            text = json.dumps(
-                [
-                    getattr(row, name, None)
-                    for name in (
-                        "evidence_json",
-                        "after_json",
-                        "before_json",
-                        "material_manifest_json",
-                        "draft_json",
-                        "material_ids",
-                        "snapshot_json",
-                    )
-                ],
-                ensure_ascii=False,
-                default=str,
-            )
-            if material_id in text:
-                found.append(label)
-                break
-    return found
 
 
 def store_text_material(db: Session, settings, workspace_id: str, name: str, text: str):
@@ -141,6 +64,20 @@ def list_materials(
             for m in db.scalars(query.order_by(MaterialRecord.created_at.desc())).all()
         ]
     }
+
+
+@router.get("/overview", response_model=MaterialOverview)
+def overview(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    materials = db.scalars(select(MaterialRecord).where(
+        MaterialRecord.workspace_id == workspace_id
+    ).order_by(MaterialRecord.created_at.desc())).all()
+    usage = material_usage(db, workspace_id, {item.id for item in materials})
+    return {"items": [{**describe(item), "usage": usage[item.id]} for item in materials]}
 
 
 @router.post("", status_code=201)

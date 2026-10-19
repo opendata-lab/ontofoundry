@@ -2729,18 +2729,6 @@
           "title": "Evidence",
           "type": "array"
         },
-        "inverse_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Inverse Name"
-        },
         "multiplicity": {
           "$ref": "#/$defs/AfterMultiplicity"
         },
@@ -2749,6 +2737,20 @@
           "minLength": 1,
           "title": "Name",
           "type": "string"
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
         },
         "source_type_id": {
           "anyOf": [
@@ -2791,6 +2793,20 @@
           "title": "Tags",
           "type": "array"
         },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
         "target_type_id": {
           "anyOf": [
             {
@@ -2812,16 +2828,19 @@
             }
           ]
         },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
+        "verbalizes": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Verbalizes",
+          "type": "array"
         }
       },
       "required": [
         "name",
-        "technical_name",
         "source_type_id",
         "target_type_id",
         "multiplicity"
@@ -2891,18 +2910,6 @@
           "title": "Id",
           "type": "string"
         },
-        "inverse_name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Inverse Name"
-        },
         "multiplicity": {
           "$ref": "#/$defs/Multiplicity"
         },
@@ -2911,6 +2918,20 @@
           "minLength": 1,
           "title": "Name",
           "type": "string"
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
         },
         "source_type_id": {
           "format": "uuid",
@@ -2937,22 +2958,39 @@
           "title": "Tags",
           "type": "array"
         },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
         "target_type_id": {
           "format": "uuid",
           "title": "Target Type Id",
           "type": "string"
         },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
+        "verbalizes": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Verbalizes",
+          "type": "array"
         }
       },
       "required": [
         "id",
         "name",
-        "technical_name",
         "source_type_id",
         "target_type_id",
         "multiplicity"

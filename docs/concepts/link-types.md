@@ -2,7 +2,9 @@
 
 [概念概览](README.md) · [主设计文档 §3.4](../design/2026-10-14-core-model-and-format-adapters.md)
 
-本文说明 core-1 的目标模型与行为，状态为设计定稿、待实施。JSON 示例中的业务和数据来源均为虚构；片段不是完整导入包，完整包形式见[格式与转换](formats.md)。字段表逐项说明何时填写、空值与默认行为。
+本文说明 core-1 的目标模型与行为，状态为当前实现。JSON 示例中的业务和数据来源均为虚构；片段不是完整导入包，完整包形式见[格式与转换](formats.md)。字段表逐项说明何时填写、空值与默认行为。
+
+2026-10-19 已确认并实施标识、角色及完整读法分离，当前以[关系读法设计](../design/2026-10-19-link-verbalizations.md)为准。
 
 ## 1. 概述
 
@@ -15,14 +17,15 @@
 | 字段 | 类型 | 填写要求 | 说明 |
 |---|---|---|---|
 | `id` | UUID | 必须提供。 | 此字段保存定义的稳定身份，改名不会改变它。 |
-| `name` | 字符串 | 必须提供。 | 这是向用户显示的业务名称。 |
-| `technical_name` | 字符串 | 必须提供。 | 这是所属对象内用于引用的技术名。 |
+| `name` | ASCII 标识符 | 必须提供。 | 对应 Ossie relationship.name，是所属对象内用于引用的唯一标识，例如 reports_to。 |
 | `description` | 字符串 | 可以省略。 | 此字段解释业务含义、范围和必要上下文。 |
-| `inverse_name` | 字符串 或 null | 可以为空或省略。 | 此字段给出从目标看向源的读法，填写时不能与正向名称相同。 |
+| `verbalizes` | 字符串数组 | 可省略，默认空数组。 | 完整业务句式，使用 {source}/{target} 引用两端；保留文字、尾部和顺序，最多 50 条，每条 4000 字符。 |
 | `synonyms` | 字符串数组 | 可省略，默认空数组。 | 这些业务别名用于搜索和问答理解。 |
 | `tags` | 字符串数组 | 可省略，默认空数组。 | 这些标签用于管理和整理定义。 |
 | `source_type_id` | UUID | 必须提供。 | 此字段引用关系的源对象类型。 |
 | `target_type_id` | UUID | 必须提供。 | 此字段引用关系的目标对象类型，可以与源对象相同。 |
+| `source_role_name` | 字符串 或 null | 可省略。 | 来源对象在本关系中的角色，例如下属。 |
+| `target_role_name` | 字符串 或 null | 可省略。 | 目标对象在本关系中的角色，例如主管。 |
 | `multiplicity` | 枚举 | 必须提供。 | 此字段选择 one_to_one、many_to_one 或 many_to_many，说明关系的声明基数。 |
 | `data_join` | DataJoin 或 null | 可以为空或省略。 | 此字段保存物理关联方式，没有可用绑定时为空。 |
 | `evidence` | Evidence 数组 | 可省略，默认空数组。 | 这些证据说明该定义的业务依据。 |
@@ -48,10 +51,9 @@
 ```json
 {
   "id": "00000000-0000-4000-8000-000000003001",
-  "name": "属于",
-  "technical_name": "customer",
+  "name": "customer",
   "description": "",
-  "inverse_name": "拥有",
+  "verbalizes": ["{source}属于{target}", "{target}拥有{source}"],
   "synonyms": [
     "下单客户"
   ],
@@ -100,7 +102,7 @@ LEFT JOIN dw.customers AS c ON o.customer_id = c.customer_id;
 
 反例：把它声明为一对一，与两张订单属于同一客户的事实冲突；声明不等于数据库已验证约束。
 
-正例：订单指向客户设为 many_to_one，正向名“属于”，反向名“拥有”。反例：为了从客户浏览订单，再建一条意义相同的反向关系，会产生两个独立定义。core-1 不存 one_to_many 枚举，统一从多的一端定义。
+正例：订单指向客户设为 many_to_one，关系标识 customer，正向含义“{source}属于{target}”，反向含义“{target}拥有{source}”。反例：为了从客户浏览订单，再建一条意义相同的反向关系，会产生两个独立定义。core-1 不存 one_to_many 枚举，统一从多的一端定义。
 
 没有附加信息的学生选课可以用 many_to_many 和映射表。选课若还有成绩、选课日期或重修次数，应把“选课记录”建为中间对象；三方供货事实也使用中间对象和多条二元关系。
 
@@ -130,4 +132,14 @@ Palantir 的 [Link type](https://www.palantir.com/docs/foundry/object-link-types
 
 Fabric 的 [Relationship type](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-create-relationship-types)支持来源/目标属性和 mapping table。自关联及基数强制的全部限制未核实，不能由概念相似推导一致。
 
-Ossie 的 [Relationships 与 roles](https://github.com/apache/ossie/blob/main/ontology/ontology.md#relationships)表达面更宽；二元实体关系可直接翻译，一元转布尔属性，多元重化为对象，角色名与部分读法按报告说明损失。
+Ossie 的 [Relationships 与 roles](https://github.com/apache/ossie/blob/main/ontology/ontology.md#relationships)表达面更宽；二元实体关系可直接翻译，一元转布尔属性，多元重化为对象，实体角色名已保留，二元实体关系完整读法保留，属性/值角色名及属性读法仍按报告说明损失。
+
+## 角色名称与关系读法
+
+对象类型说明参与者是什么，角色名说明它在这段关系中是什么，verbalizes 说明参与者如何联系。员工到员工的自关联可设置 name=reports_to、来源角色“下属”、目标角色“主管”，读法为 `{source}汇报给{target}`、`{target}管理{source}`。正向实例分组显示主管，反向显示下属；同一关系不会产生两个独立定义。
+
+角色名是可选业务语义，不猜测回填，也不是权限角色。未配置时回退到对象或关系标识。Ossie 目标角色写入原生 roles[0].name，隐式源角色经平台扩展保存；完整读法按端点机械转换占位符，不截取动词。
+
+界面在标题显示关系标识，编辑时提供输入，查看正文不重复。在两端对象下方同行显示角色名，再分别显示基数句和正反向关系含义。编辑使用 `{来源}`、`{目标}`，一行一条句式，并预览当前对象/角色名称。正反分组按首个端点占位符判定，编辑后按正向组、反向组排列；组内原顺序保留。读法未填时显示“未填写关系含义”。Ossie 要求至少一条读法，导出生成最小关联句并记录 generated_link_readings 交换元数据，重新导入原样的生成句恢复空列表；这不是核心业务字段。
+
+旧 JSON 的 technical_name 读取为新 name，旧中文 name/inverse_name 读取为正反完整模板。历史发布快照与原哈希不覆写，新写入只输出新结构。

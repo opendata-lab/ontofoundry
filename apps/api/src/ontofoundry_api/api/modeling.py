@@ -19,7 +19,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.core import CoreDraft
+from ontofoundry_api.domain.core import CoreDraft, LinkType
 from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.domain.models import OntologyDraft, Strict
 from ontofoundry_api.domain.snapshot import (
@@ -228,10 +228,12 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
 
 
 def session_draft(item) -> dict:
-    """Sessions are v3-only; historical versions still migrate on pure reads."""
+    """Normalize relationship fields on reads without rewriting session history."""
     if item.draft_json.get("schema_version") != "core-1":
         raise HTTPException(404, "旧建模会话已停用，请新建会话")
-    return deepcopy(item.draft_json)
+    draft = deepcopy(item.draft_json)
+    draft["link_types"] = [LinkType.read_previous_names(link) for link in draft.get("link_types", [])]
+    return draft
 
 
 def version_snapshot_sha256(db, workspace_id: str, version_id: str | None) -> str:

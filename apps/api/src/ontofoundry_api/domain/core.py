@@ -318,23 +318,53 @@ DataJoin = Annotated[DirectJoin | MappingTableJoin, Field(discriminator="kind")]
 
 class LinkType(Strict):
     id: UUID
-    name: Name
-    technical_name: TechnicalName
+    name: TechnicalName
     description: Description = ""
-    inverse_name: Annotated[str, AfterValidator(_display_name)] | None = None
+    verbalizes: list[Annotated[str, Field(min_length=1, max_length=4000)]] = Field(
+        default_factory=list, max_length=50
+    )
     synonyms: Labels
     source_type_id: UUID
     target_type_id: UUID
+    source_role_name: Name | None = None
+    target_role_name: Name | None = None
     multiplicity: Multiplicity
     tags: Labels
     data_join: DataJoin | None = None
     evidence: EvidenceList
 
-    @model_validator(mode="after")
-    def distinct_readings(self) -> LinkType:
-        if self.inverse_name is not None and self.inverse_name == self.name:
-            raise ValueError("反向名称不能与关系名称相同")
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def read_previous_names(cls, value):
+        if isinstance(value, dict) and "technical_name" in value:
+            value = dict(value)
+            identifier = value.pop("technical_name")
+            forward = value.get("name")
+            inverse = value.pop("inverse_name", None)
+            if "verbalizes" not in value:
+                value["verbalizes"] = (
+                    ["{source}" + forward + "{target}"] if forward else []
+                ) + (["{target}" + inverse + "{source}"] if inverse else [])
+            value["name"] = identifier
+        return value
+
+    @field_validator("verbalizes")
+    @classmethod
+    def complete_readings(cls, readings):
+        for reading in readings:
+            placeholders = set(re.findall(r"\{([^{}]+)\}", reading))
+            if placeholders != {"source", "target"}:
+                raise ValueError("关系读法必须包含 {source} 和 {target}，不能引用其他占位符")
+            if "{" in re.sub(r"\{(?:source|target)\}", "", reading) or "}" in re.sub(
+                r"\{(?:source|target)\}", "", reading
+            ):
+                raise ValueError("关系读法占位符不完整")
+        return readings
+
+    @property
+    def technical_name(self) -> str:
+        """Internal path algorithms use the identifier; never a second stored field."""
+        return self.name
 
 
 class RuleKind(StrEnum):

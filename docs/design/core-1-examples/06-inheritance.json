@@ -395,10 +395,8 @@
     "link_types": [
       {
         "id": "f5a20122-2802-5022-bbbe-cf801014c448",
-        "name": "签约方",
-        "technical_name": "signer",
+        "name": "signer",
         "description": "",
-        "inverse_name": null,
         "synonyms": [],
         "source_type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
         "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
@@ -413,14 +411,15 @@
             "8d008f70-5009-514b-86d8-c1d1d34d38bc"
           ]
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}签约方{target}"
+        ]
       },
       {
         "id": "783bb6f0-3678-528e-8742-d0a615fdf33e",
-        "name": "联络人",
-        "technical_name": "contact",
+        "name": "contact",
         "description": "子对象继承此关系及父表绑定，不另建关系。",
-        "inverse_name": null,
         "synonyms": [],
         "source_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
         "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
@@ -435,21 +434,25 @@
             "8d008f70-5009-514b-86d8-c1d1d34d38bc"
           ]
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}联络人{target}"
+        ]
       },
       {
         "id": "43ed6522-4af9-51ad-abc9-4a6c3959f508",
-        "name": "负责人",
-        "technical_name": "responsible_party",
+        "name": "responsible_party",
         "description": "虚拟父对象声明关系，具体子对象为同一关系 id 配置本地绑定。",
-        "inverse_name": null,
         "synonyms": [],
         "source_type_id": "a0fc0086-9f1b-5481-bc20-7aa89f3cf104",
         "target_type_id": "84122398-d13b-5228-a634-5e1e1168a901",
         "multiplicity": "many_to_one",
         "tags": [],
         "data_join": null,
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}负责人{target}"
+        ]
       }
     ],
     "rules": [

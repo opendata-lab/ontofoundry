@@ -27,8 +27,9 @@ def build_demo_draft():
             "link_types": [
                 {
                     "id": identity("buyer"),
-                    "name": "购买客户",
-                    "technical_name": "buyer",
+                    "name": "buyer",
+                    "target_role_name": "购买客户",
+                    "verbalizes": ["{source}由{target}购买", "{target}购买{source}"],
                     "source_type_id": identity("order"),
                     "target_type_id": identity("customer"),
                     "multiplicity": "many_to_one",

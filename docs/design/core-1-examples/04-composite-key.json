@@ -203,10 +203,8 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000003301",
-        "name": "所属订单",
-        "technical_name": "parent_order",
+        "name": "parent_order",
         "description": "",
-        "inverse_name": "明细",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001302",
         "target_type_id": "00000000-0000-4000-8000-000000001301",
@@ -229,14 +227,16 @@
           },
           "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}所属订单{target}",
+          "{target}明细{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003302",
-        "name": "商品",
-        "technical_name": "product",
+        "name": "product",
         "description": "",
-        "inverse_name": "出现在明细",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001302",
         "target_type_id": "00000000-0000-4000-8000-000000001303",
@@ -259,14 +259,16 @@
           },
           "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}商品{target}",
+          "{target}出现在明细{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003303",
-        "name": "发货明细",
-        "technical_name": "order_line",
+        "name": "order_line",
         "description": "",
-        "inverse_name": "发货单",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001304",
         "target_type_id": "00000000-0000-4000-8000-000000001302",
@@ -289,7 +291,11 @@
           },
           "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}发货明细{target}",
+          "{target}发货单{source}"
+        ]
       }
     ],
     "rules": [],

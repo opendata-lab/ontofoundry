@@ -5,7 +5,7 @@
 
 对象单父 extends 为 UUID/null；synonyms 是业务别名，description 是业务说明。
 属性归 owner_type_id，七种 value_kind；identifier 与 unique 分开，复合标识按属性 UUID 排序。
-关系只有 source_type_id/target_type_id 两端，三种基数；direct 按两组属性 UUID 配对，mapping_table 的两端列组各自匹配键宽。
+关系只有 source_type_id/target_type_id 两端，三种基数；可选 source_role_name/target_role_name 分别描述两端业务角色（例如来源下属、目标主管），不替代完整 verbalizes 关系含义；name 是所属对象内唯一 ASCII 关系标识，不填 technical_name/inverse_name，不猜测角色名。正向展示目标角色，反向展示来源角色；direct 按两组属性 UUID 配对，mapping_table 的两端列组各自匹配键宽。
 规则只归对象、属性或关系；约束不等于成员条件。derived_by 多分支 OR、每分支条件 AND；逐层限父成员。
 
 Dataset 扁平登记 name/dialect/schema_name/table_name/columns/snapshot_date_column；不填连接凭据、连接别名、采集时间。
@@ -20,3 +20,5 @@ expression 指标保留同数据集完整聚合算法，不擅自改写 NULL/去
 
 文档事实只存 id/type_id/values/evidence，无独立 name/display_text。缺编号合法；0/false 有值。
 同编号事实按 UUID 独立，不自动合并；如用户明确选择，更新已有事实并追加证据，保留证据 UUID。
+
+关系示例：name=reports_to，来源角色下属、目标角色主管，verbalizes=["{source}汇报给{target}", "{target}管理{source}"]。角色名可空，不从旧词语猜测；无读法时给空数组。每条读法必须包含两个端点，不使用未知占位符。

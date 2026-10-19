@@ -443,16 +443,20 @@ def group_items(draft, items, *, references_resolved=False):
             ):
                 continue
             fields = (
-                ("name",)
+                ("technical_name",)
+                if item.target_kind == "link_type"
+                else ("name",)
                 if item.target_kind == "dataset"
                 else ("technical_name",)
                 if item.target_kind == "rule"
                 else ("name", "technical_name")
             )
+            names = {"technical_name": item.after["name"]} if item.target_kind == "link_type" else item.after
+            old_names = {"technical_name": previous["name"]} if other.target_kind == "link_type" else previous
             if any(
-                k in item.after
-                and k in previous
-                and str(item.after[k]).casefold() == str(previous[k]).casefold()
+                k in names
+                and k in old_names
+                and str(names[k]).casefold() == str(old_names[k]).casefold()
                 for k in fields
             ):
                 union(item.id, other.id)

@@ -254,7 +254,10 @@ def search_types(
             not query
             or any(
                 query in str(item["definition"].get(k, "")).casefold()
-                for k in ("name", "technical_name", "description", "synonyms")
+                for k in (
+                    "name", "technical_name", "description", "synonyms",
+                    "source_role_name", "target_role_name", "verbalizes",
+                )
             )
         )
     ]
@@ -281,7 +284,7 @@ def get_type(
         found = [
             i
             for i in items
-            if i["definition"].get("technical_name", "").casefold() == type_id.casefold()
+            if i["definition"].get("technical_name", i["definition"].get("name", "")).casefold() == type_id.casefold()
         ]
     if not found:
         raise NotFoundError("没有找到该资源")
@@ -311,7 +314,7 @@ def _all_graph(snapshot):
             "kind": "link_type",
             "link_type_id": link_view["id"],
             "label": link_view["name"],
-            "technical_name": link_view["technical_name"],
+            "technical_name": link_view["name"],
             "source": link_view["source_type_id"],
             "target": link_view["target_type_id"],
             "multiplicity": link_view["multiplicity"],

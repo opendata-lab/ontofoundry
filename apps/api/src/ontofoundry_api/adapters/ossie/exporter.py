@@ -1,7 +1,9 @@
 """Compile the approved core-1 exchange subset and gate delivery on official validation."""
 
+import re
+
 from ontofoundry_api.adapters.exporting import ExportBuilder, file_stem
-from ontofoundry_api.domain.core import DerivedExpression
+from ontofoundry_api.domain.core import DerivedExpression, LinkType
 from ontofoundry_api.domain.expressions import (
     render_references,
     resolve_derived_expression,
@@ -109,7 +111,8 @@ def export_document(model, ctx):
     extension = {
         "version": "core-1",
         "display_names": {},
-        "inverse_names": {},
+        "link_role_names": {},
+        "generated_link_readings": [],
         "synonyms": {},
         "tags": {},
         "title_properties": {},
@@ -118,7 +121,8 @@ def export_document(model, ctx):
     components, owners = [], {}
 
     def labels(element, key):
-        extension["display_names"][key] = element.name
+        if not isinstance(element, LinkType):
+            extension["display_names"][key] = element.name
         if getattr(element, "synonyms", []):
             extension["synonyms"][key] = element.synonyms
         if getattr(element, "tags", []):
@@ -198,16 +202,28 @@ def export_document(model, ctx):
     for pos, link in enumerate(model.link_types):
         source = index.objects[link.source_type_id].technical_name
         target = index.objects[link.target_type_id].technical_name
-        role = target + ":related" if source == target else target
+        role_name = link.target_role_name
+        if (
+            role_name == source
+            or source == target and role_name is None
+            or role_name and any(char in role_name for char in "{}")
+        ):
+            role_name = "related" if source != "related" else "related_2"
+        role = target + (":" + role_name if role_name else "")
         raw = {
             "name": link.technical_name,
             "roles": [
-                {"concept": target, **({"name": "related"} if source == target else {})}
+                {"concept": target, **({"name": role_name} if role_name else {})}
             ],
-            "verbalizes": [f"{{{source}}}{link.name}{{{role}}}"],
+            "verbalizes": [
+                re.sub(
+                    r"\{(source|target)\}",
+                    lambda match: "{" + (source if match[1] == "source" else role) + "}",
+                    reading,
+                )
+                for reading in (link.verbalizes or ["{source}关联{target}"])
+            ],
         }
-        if link.inverse_name:
-            raw["verbalizes"].append(f"{{{role}}}{link.inverse_name}{{{source}}}")
         if str(link.multiplicity) != "many_to_many":
             raw["multiplicity"] = {"one_to_one": "OneToOne", "many_to_one": "ManyToOne"}[
                 str(link.multiplicity)
@@ -216,16 +232,21 @@ def export_document(model, ctx):
             raw["description"] = link.description
         owners[link.source_type_id]["relationships"].append(raw)
         owners[link.id] = raw
-        path = source + "." + link.technical_name
+        path = source + "." + link.name
+        if not link.verbalizes:
+            extension["generated_link_readings"].append(path)
         labels(link, path)
-        if link.inverse_name:
-            extension["inverse_names"][path] = link.inverse_name
+        if link.source_role_name or link.target_role_name or source == target:
+            extension["link_role_names"][path] = {
+                "source_role_name": link.source_role_name,
+                "target_role_name": link.target_role_name,
+            }
         report.issue(
             f"/link_types/{pos}",
             "converted",
             "link_types",
             "RT-20",
-            "输出二元关系、基数及正反读法；自关联使用 related 角色",
+            "输出二元关系、基数、完整读法及两端角色名",
             element=link,
         )
     for pos, rule in enumerate(model.rules):

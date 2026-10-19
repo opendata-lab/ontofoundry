@@ -164,10 +164,10 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000003401",
-        "name": "汇报给",
-        "technical_name": "manager",
+        "name": "manager",
         "description": "",
-        "inverse_name": "管理",
+        "source_role_name": "下属",
+        "target_role_name": "主管",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001401",
         "target_type_id": "00000000-0000-4000-8000-000000001401",
@@ -189,14 +189,16 @@
           },
           "dataset_id": "ea651ca1-1168-5a16-b739-7fdcb55416a4"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}汇报给{target}",
+          "{target}管理{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003402",
-        "name": "使用工位",
-        "technical_name": "desk",
+        "name": "desk",
         "description": "",
-        "inverse_name": "使用者",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001401",
         "target_type_id": "00000000-0000-4000-8000-000000001402",
@@ -218,14 +220,16 @@
           },
           "dataset_id": "d5ea21d1-29fd-5928-986f-bf4334306a43"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}使用工位{target}",
+          "{target}使用者{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003403",
-        "name": "买方",
-        "technical_name": "buyer",
+        "name": "buyer",
         "description": "",
-        "inverse_name": "买入交易",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001404",
         "target_type_id": "00000000-0000-4000-8000-000000001403",
@@ -247,14 +251,16 @@
           },
           "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}买方{target}",
+          "{target}买入交易{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003404",
-        "name": "卖方",
-        "technical_name": "seller",
+        "name": "seller",
         "description": "",
-        "inverse_name": "卖出交易",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001404",
         "target_type_id": "00000000-0000-4000-8000-000000001403",
@@ -276,7 +282,11 @@
           },
           "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}卖方{target}",
+          "{target}卖出交易{source}"
+        ]
       }
     ],
     "rules": [],

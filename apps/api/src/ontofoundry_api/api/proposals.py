@@ -33,7 +33,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.canonical import element_sha256
-from ontofoundry_api.domain.core import MaterialObject, Strict
+from ontofoundry_api.domain.core import LinkType, MaterialObject, Strict
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
@@ -101,7 +101,13 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
 
 
 def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict[str, Any]:
-    element = item.after_json or item.before_json or {}
+    before, after = item.before_json, item.after_json
+    legacy = item.target_kind == "link_type" and any(
+        isinstance(value, dict) and "technical_name" in value for value in (before, after)
+    )
+    if legacy:
+        before, after = (LinkType.read_previous_names(value) for value in (before, after))
+    element = after or before or {}
     status, reason = statuses[item.id]
     group = set(dependency_group(item.id, dependencies))
     if item.atomic_group_id:
@@ -124,13 +130,13 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         "target_id": item.target_id,
         "display_name": element_label(item.target_kind, element, elements),
         "owner_label": owner_label(item.target_kind, element, elements),
-        "before": item.before_json,
-        "after": item.after_json,
+        "before": before,
+        "after": after,
         # Agents may omit field_changes (display data); derive them then.
-        "field_changes": item.field_changes_json
+        "field_changes": (None if legacy else item.field_changes_json)
         or (
-            field_changes(item.before_json, item.after_json)
-            if item.before_json and item.after_json
+            field_changes(before, after)
+            if before and after
             else []
         ),
         "evidence": _evidence_view(

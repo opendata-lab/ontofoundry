@@ -45,7 +45,7 @@ def match_import(base: CoreDraft, source: CoreDraft, *, native: bool) -> dict[st
             value = str(item[name])
             return remap.get(value, value)
 
-        technical = str(item.get("technical_name", "")).casefold()
+        technical = str(item.get("name", "") if kind == "link_type" else item.get("technical_name", "")).casefold()
         if kind in {"object_type", "metric"}:
             return technical
         if kind == "property":
@@ -184,7 +184,9 @@ def build_candidate_graph(
         }:
             continue
         fields = (
-            ("name",)
+            ("technical_name",)
+            if kind == "link_type"
+            else ("name",)
             if kind == "dataset"
             else ("technical_name",)
             if kind == "rule"
@@ -197,9 +199,11 @@ def build_candidate_graph(
                 or namespace(kind, item) != namespace(old_kind, previous)
             ):
                 continue
+            names = {"technical_name": item["name"]} if kind == "link_type" else item
+            old_names = {"technical_name": previous["name"]} if old_kind == "link_type" else previous
             if any(
-                key in previous
-                and str(item.get(key, "")).casefold() == str(previous[key]).casefold()
+                key in old_names
+                and str(names.get(key, "")).casefold() == str(old_names[key]).casefold()
                 for key in fields
             ):
                 edges.setdefault(ident, set()).add(other)

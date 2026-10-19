@@ -170,6 +170,10 @@ def calculate_element_save(
     None means preflight; saving must pass the submitted list, even when empty.
     Confirmations never grant edit permission: only server-derived rewrites do.
     """
+    base, latest, original = (
+        CoreDraft.model_validate(snapshot).model_dump(mode="json")
+        for snapshot in (base, latest, original)
+    )
     candidate = _target_candidate(original, edited, kind, element_id)
     # Staging a reassignment must not authorize it for bounded publication.
     _check_member_boundaries(base, candidate, kind, element_id)

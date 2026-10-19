@@ -114,10 +114,8 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000003901",
-        "name": "所属客户",
-        "technical_name": "customer",
+        "name": "customer",
         "description": "引用客户唯一编码，不是物理 customer_id",
-        "inverse_name": "账户",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001901",
         "target_type_id": "00000000-0000-4000-8000-000000001902",
@@ -132,7 +130,11 @@
             "00000000-0000-4000-8000-000000002912"
           ]
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}所属客户{target}",
+          "{target}账户{source}"
+        ]
       }
     ],
     "rules": [],

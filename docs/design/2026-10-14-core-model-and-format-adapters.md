@@ -174,18 +174,22 @@ simple 的 conditions 非空，采用本节的 PathCondition 和值类型校验�
 
 ### 3.4 关系 `LinkType`
 
+2026-10-19 已确认并实施：以 [关系标识、角色名与完整读法](2026-10-19-link-verbalizations.md) 为准，替代此前 name/inverse_name 截取动词方案。
+
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `id`、`name`、`technical_name`、`description` | | `name` 就是正向读法里的动词，例如“属于” |
-| `inverse_name` | str / null | **新增**，反向读法里的动词，例如“拥有”；可空 |
+| `id`、`description` | | 稳定身份及说明 |
+| `name` | ASCII 标识符 | 对应 Ossie relationship.name，接替原 technical_name，所属对象内唯一，例如 reports_to |
+| `verbalizes` | list[str] | 完整正反业务句式，使用 {source}/{target}，保留正文、尾部及列表顺序；默认空列表，最多 50 条，每条 4000 字符 |
+| `source_role_name`、`target_role_name` | str / null | 两端在本关系中的角色名，可空；来源端下属、目标端主管。正向遍历显示目标角色，反向遍历显示来源角色。来源 Ossie roles.name，保留关系读法 |
 | `synonyms` | list[str] | **新增** |
 | `source_type_id`、`target_type_id` | UUID | 允许相同（自关联，例如 员工 汇报给 员工） |
-| `multiplicity` | enum | `one_to_one / many_to_one / many_to_many`。没有一对多：一对多关系一律从“多”的一端建成多对一，例如“订单 → 客户，多对一，名称‘属于’，反向名称‘拥有’”；界面上从客户一侧也能看到“拥有 订单” |
+| `multiplicity` | enum | `one_to_one / many_to_one / many_to_many`。没有一对多：一对多关系一律从“多”的一端建成多对一，例如订单 → 客户，多对一；完整读法“{source}属于{target}”“{target}拥有{source}”分别表达两个方向 |
 | `tags` | list[str] | |
 | `data_join` | DataJoin / null | 关系的数据绑定，见下 |
 | `evidence` | | |
 
-**删除**：`verbalizes`、`source_role_name`、`target_role_name`，以及 v3 的 `owner_ref`、`roles`、`endpoint_direction`、
+**删除**：关系的 `technical_name`、`inverse_name`（旧数据读取兼容），以及 v3 的 `owner_ref`、`roles`、`endpoint_direction`、
 `owner_role_name`、`legacy_multiplicity`。
 
 **`DataJoin`**：判别字段 `kind = direct | mapping_table`。参照 [Fabric “Use mapping table?”](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-create-relationship-types#create-relationship-type)（核查：2026-10-15）。
@@ -477,7 +481,7 @@ metrics, datasets, mappings, material_objects, material_links
 - expression 的全部列引用必须属于 dataset_id；不接受本体路径、SELECT、FROM、JOIN 或额外查询作用域，不推断 SQL 类型，不套用 simple 的 AND 限制。不能从本体绑定补出指标连接。
 - 数据集改名按 id 重建指标引用显示。删除数据集或列、调整来源位置及快照声明须检查直接引用与 ratio 间接依赖，修订归同一依赖组，最终图须合法。本体增删改和成员变化不触发指标定义依赖检查。
 - 数据集快照日期列和指标时间字段必须可定位，time_field 为日期类列引用；simple、expression 均限自己的 dataset_id 所指数据集列。ratio 出现 time_field 时拒绝，按两个分量各自时间字段归周期，允许不同。派生条件按 §3.2 校验，与指标独立。平台不检查数据集日期一致性或快照完整性。
-- `inverse_name` 非空时不得与 `name` 相同。
+- 关系 name 是所属对象内的 ASCII 标识；verbalizes 每条必须包含 {source}/{target} 两端，无未知或残缺占位符。
 - `rules.expression` 中的路径必须从规则所属对象出发，每段都存在。
 - **标识只由属性组成**：对象的标识是它全部 `identifier=true` 的属性（含从父对象继承的），组合起来唯一。关系不参与标识，只负责连接对象。
   标识只有一个属性时，该属性必须 `unique=true`；多个属性组成的复合标识不要求各自唯一。
@@ -588,7 +592,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
 导出时目标格式要求、核心模型里没有的信息，按以下顺序处理：
 
 1. **可选字段**：直接不写。
-2. **必填字段，能从核心模型推导**：推导生成（例如 Ossie 的 `verbalizes` 由名称生成）。
+2. **必填字段，能从核心模型推导**：推导生成（例如未填写关系读法时，Ossie 的必填 `verbalizes` 生成最小关联句，不回填模型）。
 3. **必填字段，推导不出**：本项报 error，不生成伪有效对象；若整份文件要求该项则不交付文件。
 
 导入时明确不承载的构造报 dropped，无法完整转换的条目报 error，均保留原文、定位及原因。报告 completion_status 只说明有无可补全事项；当前是否阻断从候选图及实际依赖实时推导，不另存 blocked，也不篡改历史报告。缺依赖时仍可发起补全。无法解析 JSON 时仅记录实际可取得的文件或行列定位，不伪造 JSON pointer；通用解析、版本不支持、原生缺材料等问题的 rule_id 可为空，由适配器 message 说明。
@@ -618,7 +622,7 @@ API：`POST /workspaces/{id}/imports/{adapter_id}`、`GET /workspaces/{id}/expor
      | 格式 | 匹配方式 |
      |---|---|
      | **原生格式** | 文件带着稳定 UUID，**分两轮匹配，结果必须一对一**：<br>① 先对**全部**导入元素按 UUID + 元素类型匹配，对上的双方都锁定；技术名不同算改名（update）。<br>② 再在**两边都未锁定**的元素之间按技术名匹配（规则见下行）；匹配上就沿用草稿里的 id，并把文件里对这个元素的引用改成该 id。<br>③ 仍对不上的保留文件里的 UUID 新建。<br>例：文件有 `alpha(id1)`、`beta(id2)`，草稿只有已改名为 `beta` 的 `id1`。第①轮 `alpha` 锁定 `id1`（改名回 `alpha`）；第②轮 `beta(id2)` 找不到未锁定的 `beta`，按③新建，最终状态为 `alpha(id1), beta(id2)`，合法；不按 id1 改名前的 beta 误判冲突，也不会把两个元素对应到 id1 |
-     | **Ossie 等外部格式** | 文件里没有我们的 UUID（适配器生成的 id 只在本次有效），**按技术名匹配**：对象按 `technical_name`，属性和关系按 `所属对象.technical_name`，规则按 `归属.technical_name`，指标按 `technical_name`，数据集按 `name` |
+     | **Ossie 等外部格式** | 文件里没有我们的 UUID（适配器生成的 id 只在本次有效），**按技术名匹配**：对象按 `technical_name`，属性按 `所属对象.technical_name`，关系按 `来源对象.name`，规则按 `归属.technical_name`，指标按 `technical_name`，数据集按 `name` |
 
      技术名匹配还包括：先重写对象 id，再按 type_id 一对一匹配未锁定映射，复用已有映射 id，不能为一个对象创建两份映射；UUID 首轮锁定不得被后续自然键匹配覆盖，冲突按候选最终图报告。文档事实、链接和证据没有自然匹配键，只按 UUID，不因业务编号或 quote 相同而合并，也不改变嵌套证据归属。
 
@@ -743,18 +747,17 @@ Ossie 的关系写在所属概念（owner）的 `relationships` 里，`roles` �
 
 | Ossie 关系字段 | 导入 |
 |---|---|
-| `name` | → `technical_name`；显示名取扩展块，没有则见下方读法 |
+| `name` | 二元实体关系 → 核心 name；属性仍 → technical_name，其显示名按扩展或一元读法提取 |
 | `description` | → `description` |
 | `requires` / `derived_by` | → `rules`（owner 为对应的属性 / 关系 / 中间对象） |
-| `roles[].name` | 独立角色字段不保存；先按角色绑定重写可解析引用，无法保留的角色语义待补全，原名留材料（RT-21） |
-| `verbalizes` | 提取动词，见下；其余 `dropped` |
+| `roles[].name` | 二元实体目标角色保存到 target_role_name，重化实体角色保存到生成关系的 target_role_name；源端从 link_role_names 扩展恢复；属性/值角色仍按 RT-21 报告独立名称不保存 |
+| `verbalizes` | 二元实体关系保留完整列表，只转换端点占位符；属性见下方例外 |
 
-**读法提取**（仅 b 和 d）：
+**读法处理**：
 
-- b：第一条按占位符顺序为 `{源…}文字{目标…}` 的读法，若扩展块没有显示名，则两个占位符之间的“文字”作为 `name`，尾部片段不保留并报告 RT-20；
-  第一条形如 `{目标…}文字{源…}` 的读法，“文字”作为 `inverse_name`。其他读法 `dropped`。
-- d：第一条形如 `{owner}文字` 的读法，若扩展块没有显示名，则“文字”作为属性 `name`。
-- a：读法全部 `dropped`，导出时重新生成。
+- b：完整 verbalizes 原序保存，Ossie 源概念和目标概念/角色占位符转换为 {source}/{target}；不截取动词，不丢弃尾部或额外读法。导出反向替换，角色改名不破坏引用。
+- d：第一条形如 `{owner}文字` 的读法，若扩展块没有显示名，则“文字”作为属性 name。
+- a：属性读法仍 dropped，导出时生成，按 RT-20 记录。
 
 **multiplicity**：
 
@@ -847,7 +850,7 @@ COUNT(ds.f) 和 COUNT(CASE WHEN 条件 THEN ds.f END) 保留 expression，不能
 
 ### 5.7 平台扩展块 `ai_context.ontofoundry`
 
-平台导出时写入（§6.6），导入时读取，只承载显示名、反向名称、同义词、标签、必填和实例标题属性技术名。业务上下文统一写入 description，扩展块不再写 instructions。其他工具可以忽略此扩展块。
+平台导出时写入（§6.6），导入时读取，只承载显示名、两端角色名、生成读法标记、同义词、标签、必填和实例标题属性技术名。业务上下文统一写入 description，扩展块不再写 instructions。其他工具可以忽略此扩展块。
 只读 `version = "core-1"`；旧版本（`1`–`4`）及其他内容一律不读，整块报 `dropped`（RT-03）。
 
 ### 5.8 id
@@ -917,9 +920,8 @@ COUNT(ds.f) 和 COUNT(CASE WHEN 条件 THEN ds.f END) 保留 expression，不能
 | `one_to_one` | 源对象 | `[{concept: 目标}]` | `OneToOne` |
 | `many_to_many` | 源对象 | `[{concept: 目标}]` | 不写（Ossie 中缺省即无唯一性约束） |
 
-- 自关联：角色名固定写 `related`，以便读法区分两个占位符。
-- 读法：`[{源}name{目标}]`，有 `inverse_name` 时再加 `{目标}inverse_name{源}`。
-  至少一条，满足 Ossie 必填。
+- 目标角色名写入 roles[0].name；自关联未填写时生成 related。源端角色名和精确空值由 link_role_names 扩展保留，生成占位符不回填为业务角色。详见角色名修订设计。
+- 读法：完整 verbalizes 逐条机械转换稳定端点占位符，保留文本及顺序。空列表时输出最小关联句满足 Ossie 至少一条的要求，并由 generated_link_readings 扩展记录；原样重新导入恢复空列表，不将生成句持久化为业务定义。
 - 关系上的规则 → 关系的 `requires` / `derived_by`。
 
 ### 6.4 规则
@@ -1001,12 +1003,12 @@ Ossie 没有快照字段。每个 Dataset 的 snapshot_date_column 和“各数�
       "version": "core-1",
       "display_names": {
         "sales_order": "订单",
-        "sales_order.amount": "金额",
-        "sales_order.customer": "属于"
+        "sales_order.amount": "金额"
       },
-      "inverse_names": {
-        "sales_order.customer": "拥有"
+      "link_role_names": {
+        "sales_order.customer": {"source_role_name": "订单", "target_role_name": "客户"}
       },
+      "generated_link_readings": [],
       "synonyms": {
         "sales_order": [
           "订单",
@@ -1079,7 +1081,7 @@ Ossie 的必填字段优先从核心推导；无法推导或无法合法表达�
 | `identify_by` 含关系成员 | ❌ 整组标识不导入，报“标识待补全” | — |
 | 值概念上的关系 | ❌ dropped | — |
 | `roles[].name` | ❌ dropped | 只在自关联时生成 |
-| `verbalizes` | 提取动词，其余 dropped | 由名称生成 |
+| `verbalizes` | 二元实体关系完整保留，转换端点占位符；属性读法仍按 RT-20 | 原文及顺序输出；空列表生成最小句并记录交换标记 |
 | `multiplicity` | ✅（属性 → unique；合法多元 ManyToOne / 无基数按角色推导标识）；多元 OneToOne 为输入 error | ✅ |
 | OntologyMap / SemanticModel | 只作适配器分组作用域，不建核心元素 | 按可确定来源作用域组织，RT-41 |
 | Dataset（包括未被引用者） | ✅ 一一登记，无法表示表位置时报 RT-63 error | ✅ 一一输出，RT-62；快照声明按 RT-60 写描述 |
@@ -1121,7 +1123,7 @@ Ossie 的必填字段优先从核心推导；无法推导或无法合法表达�
 | 未能解析的规则及成员派生 | 未定义角色变量、集合量化、递归及不闭合引用 | 整项 error，保留原文待补全，不生成残缺核心定义 | RT-31、RT-67 |
 | 多元关系 | 原结构、读法不还原；缺完整构键角色、无法表达的额外元组约束 | 结构改写 converted，未转换约束或标识逐项待补全，原文保留 | RT-27、RT-28 |
 | 一元及多值属性 | 一元转布尔不还原；无基数实体到值关系收窄为单值 | 报告结构或语义差异，原文保留；多电话号码不能称已完整保留 | RT-22、RT-26 |
-| 读法、角色、通用端点 | 额外 verbalizes、尾部、独立角色名，值类型关系及 Any 端点 | dropped；角色参与表达式时先按绑定转换，不能转换的整项待补全 | RT-20、RT-21、RT-29 |
+| 读法、角色、通用端点 | 属性读法、属性/值角色名，值类型关系及 Any 端点 | dropped；角色参与表达式时先按绑定转换，不能转换的整项待补全 | RT-20、RT-21、RT-29 |
 | 上下文及扩展 | 未归属说明、未承载上下文、非本期扩展及旧版本块；可归属 instructions 并入描述后不还原原字段 | 逐项报告，原片段保留 | RT-02、RT-03、RT-48、RT-59 |
 | 映射表达范围 | 新独立 mapping documents、嵌套 referent、多层 children、非支持字段方言、值类型映射、歧义身份或业务边、多来源不能折叠、跨来源计算 | 不支持入口 error；绑定 dropped 或 error，任意查询来源 RT-63 error；保留定义、Dataset 及原文 | RT-43、RT-45、RT-52、RT-53、RT-54、RT-63 |
 | 字段与物理元数据 | dimension、label、datatype、未使用 unique_keys、未承载逻辑字段及引擎元数据 | 报损失，说明文字不能自动恢复结构，原文保留 | RT-46、RT-66 |
@@ -1159,8 +1161,8 @@ Ossie 文件导入后再导出，**允许和原文件不同，但每一处不同
 
 | 编号 | 差异 | 原文件 | 再导出 |
 |---|---|---|---|
-| RT-20 | 读法重新生成 | `["{order}由{customer}下单", "{order}属于{customer}", "{customer}拥有{order}"]` | `["{order}由{customer}", "{customer}拥有{order}"]`（首条占位符之间为“由”，尾部“下单”不保留，不改选第二条；取自 `name` / `inverse_name`，见 §5.3 读法提取） |
-| RT-21 | 独立角色名不保存 | roles[].name | 先按变量绑定保留可解析语义；输出自关联 related，无法转换的角色引用待补全 |
+| RT-20 | 属性读法重新生成 | 属性的原始 verbalizes | 属性读法仍不独立存储；二元实体关系的完整文本、尾部、额外读法及顺序已保留，不再截取动词 |
+| RT-21 | 属性/值角色独立名称暂不保存 | 属性或值角色的 roles[].name | 二元实体及重化实体角色已保存；值角色先按变量绑定保留可解析语义，无法转换的角色引用待补全 |
 | RT-22 | 未写基数的实体到值关系收窄为单值属性 | 同一人可有多个电话链接 | 单个 Property 无法完整承载多值，明确报告损失 |
 | RT-23 | 值概念被替换：属性改为引用内置类型，标识属性改为引用适配器生成的值概念（§6.2 生成名） | `"roles": [{"concept": "money"}]`，`money extends Decimal` | `"roles": [{"concept": "Decimal"}]`，`money` 不再出现 |
 | RT-24 | 值类型有效 requires 实例化到使用属性；独立域的其他语义未承载 | 自身及祖先约束、多元值角色 | 能完整按变量绑定改写者 converted；不能转换的整条 error 待补全；未使用类型、描述、关系、identify_by、derived_by 等原文留材料 |
@@ -1291,7 +1293,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 
 | 内容 | 说明 |
 |---|---|
-| 核心模型 core-1 | §3 的全部元素和校验：二元关系、`unique`、`synonyms`、`inverse_name`、复合主键、新 `data_join`、扁平数据集登记、多来源和计算列、三种继承建法、实例标题、描述合并、结构化及表达式指标、数据集快照与 simple、expression 的时间字段、成员派生的路径与引用检查 |
+| 核心模型 core-1 | §3 的全部元素和校验：二元关系、`unique`、`synonyms`、关系 name/verbalizes 与两端角色名、复合主键、新 `data_join`、扁平数据集登记、多来源和计算列、三种继承建法、实例标题、描述合并、结构化及表达式指标、数据集快照与 simple、expression 的时间字段、成员派生的路径与引用检查 |
 | 清空数据 | 数据库迁移清空本体相关数据（§8） |
 | 增删改查 | 提案、草稿、合并、发布、元素编辑全部基于核心模型；前端删除角色、读法编辑器，增加反向名称、同义词、指标表单和数据集登记编辑，主附表、关系表统一选择 dataset；页面和弹窗结构遵守 §8A |
 | 查询 | 实例浏览按新 `data_join` 生成 JOIN（含多对多 join 表、复合主键）；结构化指标提供基础 SQL 参考（改写 `metric_query.py`），完整查询由 agent 组装；父绑定完整覆盖、虚拟父实例并集及成员扩展表同时验收 |
@@ -1351,7 +1353,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 编号 | 事项 | 一句话结论与章节 |
 |---|---|---|
 | 1 | 指标形式 | 指标独立寻址，常见口径用 simple（含 median）或 ratio，复杂口径用 expression，固定形式之外的 Ossie 指标原文保留（§3.6、§5.6） |
-| 2 | 反向名称 | 保留 inverse_name，让同一关系有正反两种读法（§3.4） |
+| 2 | 关系标识、角色与读法 | 2026-10-19：name 为唯一关系标识，保留 source_role_name / target_role_name 及完整 verbalizes，删除关系 technical_name/inverse_name 的重复职责；兼容读取旧 JSON，不覆写历史快照 |
 | 3 | 复合键 | 支持有序复合来源键、关系列组及由属性构成的复合标识（§3.4、§3.7、§5.5、§6.5） |
 | 4 | 导出名称 | Ossie 文档名称取工作空间名称（§6.1） |
 | 5 | 存量数据 | 清空测试本体数据，不迁移旧模型，保留工作空间、成员、材料和连接配置（§8） |
@@ -1361,7 +1363,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 9 | 关系基数 | 只保留一对一、多对一、多对多，一对多用反向读法表达（§3.4） |
 | 10 | 属性唯一性 | 属性基数改为 unique，时点业务唯一性不冒充历史整表唯一性（§3.3、§3.7） |
 | 11 | 值概念 | 删除 value_concept，只留七类型；自身及祖先可改写 requires 按变量绑定实例化到每个使用属性，含多元值角色；不恢复独立域或自动联动，不能改写者原文待补全（§5.2） |
-| 12 | 平台信息与备份 | Ossie 扩展块只放名称、反向名、同义词、标签、必填和标题信息，完整保留用含材料的原生包（§4.6、§6.6） |
+| 12 | 平台信息与备份 | Ossie 扩展块只放显示名、同义词、标签、必填、标题、两端角色名及生成读法标记；完整保留用含材料的原生包（§4.6、§6.6） |
 | 13 | 文件对比 | 不做原文件对比界面，差异由转换报告和 RT 规则说明，自动对比只用于测试（§7.2） |
 | 14 | 规则 | 规则采用受限 SQL 表达式与本体路径，保存 id 依赖并在改名时同步更新（§3.5） |
 | 15 | 同义词 | 对象、属性、关系、指标均有 synonyms（§3.2–§3.6） |
@@ -1531,7 +1533,7 @@ integrations/dataagent/skills/ontofoundry-modeling/
 |---|---|
 | 多方参与的事实（n 元关系） | 按 §5.3 建中间对象：角色顺序为 owner 后接 roles；ManyToOne 取除最后角色外全部角色表示为键，无基数取全部，均含值角色；实体角色展开有效完整标识，到各实体角色建多对一关系。不能把日期、数量一律排除在键外；事件对象另按实际业务身份建键 |
 | 是 / 否型事实（一元关系） | 布尔属性，例如“是否VIP” |
-| 一对多 | 从“多”的一端建多对一关系，`name` 写正向动词、`inverse_name` 写反向动词 |
+| 一对多 | 从“多”的一端建多对一关系，name 写稳定关系标识，verbalizes 写完整正反句式 |
 | 多对多（无附加信息） | 建 many_to_many 关系，data_join.kind=mapping_table，dataset_id 引用登记的中间表 |
 | 多对多（配对本身有信息） | 先判定业务身份再建中间对象；关系元组按 §5.3 构键，业务事件按实际身份（如事件编号，或含日期、尝试次数的组合）建键，不机械复用参与方编号 |
 | 复合标识 | 多个属性同时设为标识（关系不参与标识），映射的 `key_columns` 按顺序列出 |
@@ -1549,7 +1551,7 @@ integrations/dataagent/skills/ontofoundry-modeling/
 | 同义词 | 业务别名写进 `synonyms`（对象、属性、关系、指标都有），不写进名称或描述 |
 | 规则 | 挂在具体元素上，表达式用路径写法（`sales_order.customer.region`），不用 Ossie 角色写法 |
 
-技能里**不再出现**：`roles`、`owner_ref`、`verbalizes`、`ValueType`、`ConceptRef`、`concept_context`、`role_values`、
+技能里**不再出现**：`roles`、`owner_ref`、`ValueType`、`ConceptRef`、`concept_context`、`role_values`、
 `owner_columns / role_columns`、`OneToMany` 相关的坑。
 
 提示词同步改造：
@@ -1584,7 +1586,7 @@ AI 补全只发生在用户点击之后，导入本身始终是确定性的。
 |---|---|---|---|
 | 多元关系机械转成中间对象，名字是 `supplier_supplies` 这类拼接名 | RT-27 / RT-28 | 起业务名称（如“供货记录”）、写描述；给中间对象的各条关系起名和反向名；检查搬过来的规则表达式，按核心模型写法改写 | update 中间对象、关系、规则 |
 | 一元关系转成布尔属性 | RT-26 | 起业务名称（如“是否VIP”）、写描述 | update 属性 |
-| 读法里的其他说法被丢弃 | RT-20 | 提取成关系或对象的同义词；正向 / 反向名称不贴切时改写 | update 关系、对象 |
+| 属性读法未独立保存 | RT-20 | 按原文理解属性含义并补充描述或同义词；二元实体关系读法完整保留，不补猜正反动词 | update 属性、对象 |
 | 独立角色名未保存 | RT-21 | 自关联或中间对象的关系名不清楚时，参考角色名改名（如“汇报给”→“上级”） | update 关系 |
 | 值类型独立域未保留，部分约束无法改写 | RT-23 / RT-24 | 参考原文补充说明；只补尚未完整转换的属性约束，已实例化的约束不重复创建 | update 属性；create 规则 |
 | 无法解析的规则未生成核心提案 | RT-31 | 按路径写法改写表达式，挂到对应元素上 | create 规则 |

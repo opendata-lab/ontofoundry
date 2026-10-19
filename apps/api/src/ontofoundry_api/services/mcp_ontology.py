@@ -212,7 +212,10 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 and not matched
                 and not any(
                     q in str(d.get(k, "")).casefold()
-                    for k in ("name", "technical_name", "description")
+                    for k in (
+                        "name", "technical_name", "description",
+                        "source_role_name", "target_role_name", "verbalizes",
+                    )
                 )
             ):
                 continue
@@ -220,7 +223,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 "id": identity,
                 "kind": r["kind"],
                 "name": d["name"],
-                "technical_name": d["technical_name"],
+                "technical_name": d.get("technical_name", d["name"]),
                 "summary": d.get("description", ""),
                 "matched_synonyms": matched,
             }
@@ -250,7 +253,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 "id": identity,
                 "kind": r["kind"],
                 "name": d["name"],
-                "technical_name": d["technical_name"],
+                "technical_name": d.get("technical_name", d["name"]),
             }
             if wanted is not None:
                 for field in ("description", "synonyms", "binding_status"):

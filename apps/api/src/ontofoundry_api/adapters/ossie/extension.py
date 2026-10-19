@@ -45,6 +45,8 @@ def read_extension(translation):
         "version",
         "display_names",
         "inverse_names",
+        "link_role_names",
+        "generated_link_readings",
         "synonyms",
         "tags",
         "title_properties",
@@ -70,6 +72,21 @@ def read_extension(translation):
             if isinstance(data.get(key, {}), dict)
             else {}
         )
+    clean["link_role_names"] = {}
+    roles = data.get("link_role_names", {})
+    if isinstance(roles, dict):
+        for path, names in roles.items():
+            if not isinstance(path, str) or not isinstance(names, dict):
+                continue
+            clean["link_role_names"][path] = {
+                key: value
+                for key, value in names.items()
+                if key in {"source_role_name", "target_role_name"}
+                and (
+                    value is None
+                    or isinstance(value, str) and 0 < len(value.strip()) <= 240
+                )
+            }
     for key in ("synonyms", "tags"):
         clean[key] = (
             {
@@ -82,6 +99,9 @@ def read_extension(translation):
             if isinstance(data.get(key, {}), dict)
             else {}
         )
+    clean["generated_link_readings"] = [
+        path for path in data.get("generated_link_readings", []) if isinstance(path, str)
+    ] if isinstance(data.get("generated_link_readings", []), list) else []
     clean["required"] = (
         data.get("required", []) if isinstance(data.get("required", []), list) else []
     )

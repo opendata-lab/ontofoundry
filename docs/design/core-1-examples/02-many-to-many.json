@@ -165,10 +165,8 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000003101",
-        "name": "选修",
-        "technical_name": "courses",
+        "name": "courses",
         "description": "",
-        "inverse_name": "被选修",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001101",
         "target_type_id": "00000000-0000-4000-8000-000000001102",
@@ -190,14 +188,16 @@
           },
           "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}选修{target}",
+          "{target}被选修{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003102",
-        "name": "所属学生",
-        "technical_name": "student",
+        "name": "student",
         "description": "",
-        "inverse_name": "选课记录",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001103",
         "target_type_id": "00000000-0000-4000-8000-000000001101",
@@ -220,14 +220,16 @@
           },
           "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}所属学生{target}",
+          "{target}选课记录{source}"
+        ]
       },
       {
         "id": "00000000-0000-4000-8000-000000003103",
-        "name": "所选课程",
-        "technical_name": "course",
+        "name": "course",
         "description": "",
-        "inverse_name": "选课记录",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000001103",
         "target_type_id": "00000000-0000-4000-8000-000000001102",
@@ -250,7 +252,11 @@
           },
           "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}所选课程{target}",
+          "{target}选课记录{source}"
+        ]
       }
     ],
     "rules": [],

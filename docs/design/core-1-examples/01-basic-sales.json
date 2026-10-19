@@ -154,10 +154,8 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000003001",
-        "name": "属于",
-        "technical_name": "customer",
+        "name": "customer",
         "description": "",
-        "inverse_name": "拥有",
         "synonyms": [
           "下单客户"
         ],
@@ -181,7 +179,11 @@
           },
           "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}属于{target}",
+          "{target}拥有{source}"
+        ]
       }
     ],
     "rules": [

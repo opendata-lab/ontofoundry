@@ -24,6 +24,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.canonical import (
+    domain_sha256,
     element_sha256,
 )
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
@@ -249,11 +250,19 @@ def effective_statuses(
             return "pending", ""
         if found is None or found[0] != item.target_kind:
             return "conflict", "目标元素已被删除或类型已改变"
-        if (
-            element_sha256(found[1], collection=COLLECTIONS[ElementKind(found[0])])
-            != item.expected_target_hash
-        ):
-            return "stale", "目标在提案生成后已被修改"
+        collection = COLLECTIONS[ElementKind(found[0])]
+        current_hash = element_sha256(found[1], collection=collection)
+        if current_hash != item.expected_target_hash:
+            previous = item.before_json
+            legacy_unchanged = (
+                item.target_kind == "link_type"
+                and isinstance(previous, dict)
+                and "technical_name" in previous
+                and domain_sha256(previous) == item.expected_target_hash
+                and element_sha256(previous, collection=collection) == current_hash
+            )
+            if not legacy_unchanged:
+                return "stale", "目标在提案生成后已被修改"
         return "pending", ""
 
     def resolve(item_id: str, trail: tuple[str, ...] = ()) -> tuple[str, str]:

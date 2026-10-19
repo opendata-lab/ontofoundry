@@ -94,4 +94,10 @@ def element_sha256(element: dict, *, collection: str) -> str:
 
 
 def verify_snapshot_sha256(snapshot: dict, expected: str) -> bool:
-    return snapshot_sha256(snapshot) == expected
+    if snapshot_sha256(snapshot) == expected:
+        return True
+    # Published snapshots are immutable. Their previous representation retains
+    # its original digest while current reads normalize relationship names.
+    if any("technical_name" in link for link in snapshot.get("link_types", [])):
+        return domain_sha256(snapshot) == expected
+    return False

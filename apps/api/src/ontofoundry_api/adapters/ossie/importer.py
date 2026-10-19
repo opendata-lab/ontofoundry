@@ -258,55 +258,35 @@ class OntologyImporter:
             )
             return
         key = owner + "." + name
-        forward = reverse = None
-        selected = set()
-        source_role = owner
-        target_role = target + (
+        source_role = "{" + owner + "}"
+        target_role = "{" + target + (
             ":" + rel["roles"][0]["name"] if rel["roles"][0].get("name") else ""
-        )
-        for i, reading in enumerate(rel.get("verbalizes", [])):
-            match = re.fullmatch(r"\{([^{}]+)\}([^{}]+)\{([^{}]+)\}(.*)", reading)
-            if (
-                match
-                and match[1] == source_role
-                and match[3] == target_role
-                and forward is None
-            ):
-                forward = match[2].strip()
-                selected.add(i)
-                if match[4].strip():
-                    self.issue(
-                        path + f"/verbalizes/{i}",
-                        "dropped",
-                        "Verbalization",
-                        "RT-20",
-                        "首条正向读法尾部未承载",
-                    )
-            elif (
-                match
-                and match[1] == target_role
-                and match[3] == source_role
-                and reverse is None
-            ):
-                reverse = match[2].strip()
-                selected.add(i)
-        label = self.extension.name(key, forward or name)
-        inverse = self.extension.data.get("inverse_names", {}).get(key, reverse)
-        if inverse == label:
-            self.issue(
-                path,
-                "dropped",
-                "InverseName",
-                "RT-20",
-                "反向读法与正向显示名相同，核心不存相同反向名称",
+        ) + "}"
+        readings = [
+            re.sub(
+                r"\{[^{}]+\}",
+                lambda match: {source_role: "{source}", target_role: "{target}"}.get(
+                    match.group(), match.group()
+                ),
+                reading,
             )
-            inverse = None
-        tech, label = self.names(self.t.objects[owner], name, label)
+            for reading in rel.get("verbalizes", [])
+        ]
+        if (
+            key in self.extension.data.get("generated_link_readings", [])
+            and readings == ["{source}关联{target}"]
+        ):
+            readings = []
+        tech, _label = self.names(self.t.objects[owner], name, name)
+        role_names = self.extension.data.get("link_role_names", {}).get(key, {})
         link = LinkType(
             id=self.t.id("link:" + key),
-            name=label,
-            technical_name=tech,
-            inverse_name=inverse,
+            name=tech,
+            verbalizes=readings,
+            source_role_name=role_names.get("source_role_name"),
+            target_role_name=role_names.get(
+                "target_role_name", rel["roles"][0].get("name")
+            ),
             description=rel.get("description", ""),
             synonyms=self.extension.labels("synonyms", key),
             tags=self.extension.labels("tags", key),
@@ -319,14 +299,6 @@ class OntologyImporter:
         if self.t.accept("link_types", link, path):
             self.t.members[(owner, name)] = link
             self.origins.append((link, rel, path, "link:" + key))
-        if len(selected) < len(rel.get("verbalizes", [])):
-            self.issue(
-                path + "/verbalizes",
-                "dropped",
-                "Verbalization",
-                "RT-20",
-                "其余读法不单独保存",
-            )
 
     def import_relationships(self):
         # Parents precede children, so inherited names are already reserved.
@@ -405,6 +377,9 @@ class OntologyImporter:
                     )
                 for j, role in enumerate(roles):
                     if role.get("name"):
+                        member = self.t.members.get((owner, name))
+                        if isinstance(member, LinkType):
+                            continue
                         self.issue(
                             path + f"/roles/{j}/name",
                             "dropped",
@@ -545,15 +520,15 @@ class OntologyImporter:
                     )
                     if self.t.accept("properties", prop, path, rule="RT-28"):
                         props.append(prop)
-                ltech, llabel = self.names(obj, label, label)
+                ltech, _label = self.names(obj, label, label)
                 link = LinkType(
                     id=self.t.id(
                         "reified-link:" + owner + "." + name + "." + str(position)
                     ),
-                    name=llabel,
-                    technical_name=ltech,
+                    name=ltech,
                     source_type_id=obj.id,
                     target_type_id=target.id,
+                    target_role_name=role.get("name"),
                     multiplicity="many_to_one",
                     data_join=DirectJoin(
                         kind="direct",

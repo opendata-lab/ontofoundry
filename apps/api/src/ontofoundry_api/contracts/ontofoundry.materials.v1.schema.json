@@ -1,0 +1,135 @@
+{
+  "$defs": {
+    "ManagedMaterial": {
+      "additionalProperties": false,
+      "properties": {
+        "archived_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Archived At"
+        },
+        "byte_size": {
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "chunk_count": {
+          "title": "Chunk Count",
+          "type": "integer"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "title": "Sha256",
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/MaterialUsage"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "sha256",
+        "byte_size",
+        "chunk_count",
+        "created_at",
+        "archived_at",
+        "usage"
+      ],
+      "title": "ManagedMaterial",
+      "type": "object"
+    },
+    "MaterialUsage": {
+      "additionalProperties": false,
+      "properties": {
+        "can_delete": {
+          "title": "Can Delete",
+          "type": "boolean"
+        },
+        "link_types": {
+          "default": 0,
+          "title": "Link Types",
+          "type": "integer"
+        },
+        "material_links": {
+          "default": 0,
+          "title": "Material Links",
+          "type": "integer"
+        },
+        "material_objects": {
+          "default": 0,
+          "title": "Material Objects",
+          "type": "integer"
+        },
+        "metrics": {
+          "default": 0,
+          "title": "Metrics",
+          "type": "integer"
+        },
+        "object_types": {
+          "default": 0,
+          "title": "Object Types",
+          "type": "integer"
+        },
+        "properties": {
+          "default": 0,
+          "title": "Properties",
+          "type": "integer"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "title": "References",
+          "type": "array"
+        },
+        "rules": {
+          "default": 0,
+          "title": "Rules",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "references",
+        "can_delete"
+      ],
+      "title": "MaterialUsage",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.materials.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "items": {
+        "$ref": "#/$defs/ManagedMaterial"
+      },
+      "title": "Items",
+      "type": "array"
+    }
+  },
+  "required": [
+    "items"
+  ],
+  "title": "MaterialOverview",
+  "type": "object"
+}

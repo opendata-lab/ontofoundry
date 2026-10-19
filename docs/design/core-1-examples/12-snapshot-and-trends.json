@@ -179,10 +179,8 @@
     "link_types": [
       {
         "id": "00000000-0000-4000-8000-000000031101",
-        "name": "存放于",
-        "technical_name": "warehouse",
+        "name": "warehouse",
         "description": "组件按仓库编码指向一个仓库；两端各取自己的数据集日期，agent 处理日期不齐并说明，核心不强制日期相等。",
-        "inverse_name": "存放组件",
         "synonyms": [],
         "source_type_id": "00000000-0000-4000-8000-000000011101",
         "target_type_id": "00000000-0000-4000-8000-000000011201",
@@ -197,7 +195,11 @@
             "00000000-0000-4000-8000-000000021201"
           ]
         },
-        "evidence": []
+        "evidence": [],
+        "verbalizes": [
+          "{source}存放于{target}",
+          "{target}存放组件{source}"
+        ]
       }
     ],
     "rules": [],
