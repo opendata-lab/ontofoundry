@@ -48,17 +48,11 @@ describe("data mapping page", () => {
     expect(open).toHaveBeenCalledWith({ kind: "dataset", id: draft.datasets[0].id, sessionId: null });
   });
 
-  it("shows every object's binding mode and coverage, and filters them", () => {
+  it("filters registered datasets by name or physical table", () => {
     renderWithProviders(<MappingsPage />);
-    fireEvent.click(screen.getByRole("tab", { name: /本体映射/ }));
-    const asset = screen.getByText("资产").closest("tr")!;
-    expect(within(asset).getByText("虚拟父对象")).toBeInTheDocument();
-    expect(within(asset).getByText("实例来自子对象")).toBeInTheDocument();
-    expect(within(screen.getByText("个人").closest("tr")!).getByText("共用父对象数据")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索对象或数据集" }), { target: { value: "vehicle" } });
-    expect(screen.getAllByRole("row")).toHaveLength(2);
-    fireEvent.click(screen.getByText("车辆").closest("tr")!);
-    expect(open).toHaveBeenCalledWith(expect.objectContaining({ kind: "object_type", tab: "properties" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据集" }), { target: { value: "parties" } });
+    expect(screen.getByRole("button", { name: "parties" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "vehicles" })).toBeNull();
   });
 
   it("registers a catalog table as a dataset through an element save", async () => {

@@ -39,21 +39,24 @@ describe("应用框架", () => {
   it("保留导航链接、当前页标记及收起后的提示，支持展开", async () => {
     show();
     const nav = await screen.findByRole("navigation", { name: "工作空间导航" });
-    expect(within(nav).getByRole("link", { name: "数据映射" })).toHaveAttribute("aria-current", "page");
-    expect(within(nav).getByRole("link", { name: "本体发布" })).toHaveAttribute("href", "/workspaces/ws-shell-demo/delivery");
+    expect(within(nav).getByRole("link", { name: "数据管理" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "数据连接" })).toHaveAttribute("href", "/workspaces/ws-shell-demo/connections");
     fireEvent.click(screen.getByRole("button", { name: "收起导航" }));
-    expect(within(nav).getByTitle("数据映射")).toHaveAttribute("href", "/workspaces/ws-shell-demo/mappings");
+    expect(within(nav).getByTitle("数据管理")).toHaveAttribute("href", "/workspaces/ws-shell-demo/mappings");
     expect(within(nav).queryByText("本体管理")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "展开导航" }));
-    expect(within(nav).getByRole("link", { name: "数据映射" })).toBeVisible();
+    expect(within(nav).getByRole("link", { name: "数据管理" })).toBeVisible();
   });
 
   it("访客只能看到已发布本体和发布页面", async () => {
     vi.mocked(api.workspace).mockResolvedValue({ ...workspace, role: null });
     show();
     const nav = await screen.findByRole("navigation", { name: "工作空间导航" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(4);
-    expect(within(nav).queryByRole("link", { name: "数据映射" })).toBeNull();
+    expect(within(nav).getAllByRole("link")).toHaveLength(2);
+    expect(within(nav).getByRole("link", { name: "本体视图" })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "本体对象" })).toBeInTheDocument();
+    expect(within(nav).queryByRole("link", { name: "本体构建" })).toBeNull();
+    expect(within(nav).queryByRole("link", { name: "数据管理" })).toBeNull();
     expect(within(nav).queryByRole("link", { name: "空间设置" })).toBeNull();
   });
 

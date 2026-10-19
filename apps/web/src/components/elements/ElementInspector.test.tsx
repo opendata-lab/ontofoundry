@@ -72,7 +72,13 @@ describe("object popup", () => {
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() =>
-      expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "属性与映射4", "关系1", "实例"]),
+      expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual([
+        "概览",
+        "属性与映射4",
+        "关系1",
+        "规则0",
+        "实例",
+      ]),
     );
     expect(within(dialog).getByText("已映射")).toBeInTheDocument();
     expect(within(dialog).getByText("main.customer_id")).toBeInTheDocument();
@@ -135,7 +141,12 @@ describe("object popup", () => {
     const draft = example("01-basic-sales");
     show(draft, `inspect=object_type:${draft.object_types[0].id}`, null);
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "属性与映射4", "关系1"]));
+    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "概览",
+      "属性与映射4",
+      "关系1",
+      "规则0",
+    ]));
     expect(api.presentation).toHaveBeenCalledWith("w", "v1");
     expect(within(dialog).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
   });
@@ -172,15 +183,15 @@ describe("object popup", () => {
 });
 
 describe("relation, metric and dataset popups", () => {
-  it("shows a relation's ends and its own data binding tab, and alerts when an endpoint is a virtual parent", async () => {
+  it("shows a relation's ends and its own data binding tab, with mapping-table binding off by default", async () => {
     const draft = example("06-inheritance");
     const link = draft.link_types.find((l) => l.name === "responsible_party")!;
     show(draft, `inspect=link_type:${link.id}&inspectTab=mapping`);
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "数据绑定", "实例"]));
-    expect(
-      within(dialog).getByText("端点包含虚拟父对象：这条关系的数据绑定在各具体子对象的「关系」页分别配置，关系本身可不绑定。"),
-    ).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "映射", "规则0"]));
+    const mappingSwitch = within(dialog).getByRole("switch", { name: "使用映射表" });
+    expect(mappingSwitch).not.toBeChecked();
+    expect(within(dialog).getByText("未启用")).toBeInTheDocument();
   });
 
   it("creates a metric from the form, supports equal bounds in between filter, and shows expression result type wording", async () => {
@@ -258,9 +269,11 @@ describe("element save impact preview", () => {
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${vip.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findByRole("textbox", { name: "属性技术名" });
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${note.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${note.id}"]`)!;
-    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "note2" } });
+    fireEvent.click(row);
+    const technical = within(dialog).getByRole("textbox", { name: "属性技术名" });
+    fireEvent.change(technical, { target: { value: "note2" } });
     expect(within(dialog).getByRole("combobox", { name: "VIP说明列" })).toHaveValue("vip_note");
     if (editColumn)
       fireEvent.change(within(dialog).getByRole("combobox", { name: "VIP说明列" }), { target: { value: "party_name" } });
@@ -282,10 +295,12 @@ describe("element save impact preview", () => {
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
+    fireEvent.click(row);
+    const technical = within(dialog).getByRole("textbox", { name: "属性技术名" });
     for (const value of ["n", "na", "nam", "name", "name2"])
-      fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value } });
+      fireEvent.change(technical, { target: { value } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
@@ -309,9 +324,10 @@ describe("element save impact preview", () => {
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
-    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(row);
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
@@ -346,9 +362,10 @@ describe("element save impact preview", () => {
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
-    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(row);
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     const noticeText = await screen.findByText("确认后这些元素会随本次保存一并改写");
@@ -362,7 +379,7 @@ describe("element save impact preview", () => {
     fireEvent.click(within(confirmDialog).getByRole("button", { name: "取消" }));
     await waitFor(() => expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument());
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
-    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
+    expect(within(dialog).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     const confirmAgain = (await screen.findByText("确认后这些元素会随本次保存一并改写")).closest<HTMLElement>('[role="dialog"]')!;
@@ -423,15 +440,16 @@ describe("element save impact preview", () => {
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
-    fireEvent.change(within(row).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
+    fireEvent.click(row);
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性技术名" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
     expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
-    expect(within(row).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
+    expect(within(dialog).getByRole("textbox", { name: "属性技术名" })).toHaveValue("customer_code");
   });
 
   it("disables Ant Design controls while busy and re-runs preview instead of saving stale candidate when Select changes during delayed preview", async () => {
@@ -465,14 +483,12 @@ describe("element save impact preview", () => {
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
-    await within(dialog).findAllByRole("textbox", { name: "属性技术名" });
-    const cell = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
-    const row = cell.closest("tr")!;
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
+    fireEvent.click(dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!);
 
-    const techInput = within(row).getByRole("textbox", { name: "属性技术名" });
-    const valueKindSelect = within(row).getByRole("combobox", { name: `${customerNo.name}类型` });
-    const requiredCheckbox = within(row).getByRole("checkbox", { name: `${customerNo.name}必填` });
-    const otherSelect = within(dialog).getByRole("combobox", { name: "名称类型" });
+    const techInput = within(dialog).getByRole("textbox", { name: "属性技术名" });
+    const valueKindSelect = within(dialog).getByRole("combobox", { name: `${customerNo.name}类型` });
+    const requiredCheckbox = within(dialog).getByRole("checkbox", { name: `${customerNo.name}必填` });
 
     // Open the Select dropdown before clicking Save so its portal option is mounted, then click Save
     fireEvent.mouseDown(valueKindSelect);
@@ -487,9 +503,6 @@ describe("element save impact preview", () => {
     expect(valueKindSelect).toBeDisabled();
     expect(valueKindSelect.closest(".ant-select")).toHaveClass("ant-select-disabled");
     expect(requiredCheckbox).toBeDisabled();
-    expect(otherSelect).toBeDisabled();
-    fireEvent.mouseDown(otherSelect);
-    expect(otherSelect.closest(".ant-select")).not.toHaveClass("ant-select-open");
 
     // Simulate a late Select change arriving from the pre-opened portal while the first preview is still pending
     fireEvent.click(integerOption);

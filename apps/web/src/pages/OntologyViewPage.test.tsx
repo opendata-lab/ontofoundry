@@ -43,32 +43,33 @@ const show = () =>
   );
 
 describe("ontology view", () => {
-  it("shows layer statistics and opens an object from the overview", async () => {
+  it("shows resource statistics and opens an object from the resource explorer", async () => {
     show();
-    expect(await screen.findByText("语义模型层")).toBeInTheDocument();
-    expect(screen.getByText("指标").parentElement).toHaveTextContent("10");
-    fireEvent.click(screen.getByRole("button", { name: "查看本体：客户" }));
-    expect(open).toHaveBeenCalledWith({ kind: "object_type", id: draft.object_types[0].id, sessionId: null });
+    expect(await screen.findByText("资源管理器")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getAllByText("指标").some((el) => /指标\s*10/.test(el.parentElement?.textContent ?? ""))).toBe(true),
+    );
+    fireEvent.doubleClick(screen.getByText("客户"));
+    expect(open).toHaveBeenCalledWith({ kind: "object_type", id: draft.object_types[0].id, tab: "basic", sessionId: null });
   });
 
   it("offers no import or export while P2 adapters are offline", async () => {
     show();
-    await screen.findByText("语义模型层");
+    await screen.findByText("资源管理器");
     expect(screen.queryByRole("button", { name: /导入|导出/ })).not.toBeInTheDocument();
   });
 
   it("reads the published snapshot for members and the presentation for readers", async () => {
     show();
-    fireEvent.click(await screen.findByText("语义视图"));
     await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledWith("w"));
     expect(await screen.findByText("订单金额")).toBeInTheDocument();
     cleanup();
     context.workspace = { ...context.workspace, role: null };
     vi.mocked(api.overview).mockResolvedValue(overview());
     show();
-    expect((await screen.findAllByText("仅空间成员可见", { exact: false })).length).toBeGreaterThan(0);
-    expect(modelingApi.sessions).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(api.presentation).toHaveBeenCalledWith("w", "v2"));
+    expect(await screen.findByText("订单金额")).toBeInTheDocument();
+    expect(modelingApi.sessions).toHaveBeenCalledTimes(1);
   });
 
   it("points at a session whose accepted changes are not published yet", async () => {

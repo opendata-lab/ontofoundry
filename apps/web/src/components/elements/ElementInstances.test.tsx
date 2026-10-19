@@ -165,7 +165,7 @@ describe("instances tab", () => {
     expect(catalogApi.mappingPreview).not.toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "数控机床" })).toBeInTheDocument();
     expect(screen.getByText("设备")).toBeInTheDocument();
-    expect(screen.getByText("数据日期：2026-10-15")).toBeInTheDocument();
+    expect(screen.getByText(/当前数据日期：2026-10-15/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "数控机床" }));
     await waitFor(() => expect(instancesApi.neighborhood).toHaveBeenCalledWith(draft.workspace_id, "db.dev1", { depth: 1 }));

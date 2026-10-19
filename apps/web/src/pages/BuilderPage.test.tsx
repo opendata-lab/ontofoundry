@@ -110,7 +110,7 @@ it("reloads the session after an agent error advances the backend revision", asy
   expect(screen.getByRole("heading", { name: "本体构建" })).toBeInTheDocument();
 });
 
-it("starts a modeling run only from 开始建模, tagged so the BFF expects proposals", async () => {
+it("starts a modeling run from the composer 发送 action, tagged so the BFF expects proposals", async () => {
   context.model.session = { ...session(), material_ids: ["m1"] };
   const { container } = renderWithProviders(
     <MemoryRouter>
@@ -123,7 +123,7 @@ it("starts a modeling run only from 开始建模, tagged so the BFF expects prop
   const sendMessage = vi.fn();
   Object.defineProperty(conversation, "sendMessage", { value: sendMessage });
   Object.defineProperty(conversation, "value", { value: "", configurable: true });
-  const start = await screen.findByRole("button", { name: "开始建模" });
+  const start = await screen.findByRole("button", { name: "发送" });
   await waitFor(() => expect(start).toBeEnabled());
 
   fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), {
@@ -136,13 +136,13 @@ it("starts a modeling run only from 开始建模, tagged so the BFF expects prop
   });
 });
 
-it("keeps 开始建模 disabled without material or a scenario", async () => {
+it("keeps 发送 disabled without material or a scenario", async () => {
   renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
     </MemoryRouter>,
   );
-  expect(await screen.findByRole("button", { name: "开始建模" })).toBeDisabled();
+  expect(await screen.findByRole("button", { name: "发送" })).toBeDisabled();
 });
 
 it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {
@@ -187,9 +187,9 @@ it("says when the last modeling run is waiting for the user's reply", async () =
       <BuilderPage />
     </MemoryRouter>,
   );
-  expect(await screen.findByRole("status")).toHaveTextContent(
-    "智能体需要你确认后才能生成提案，请在对话中回复",
-  );
+  expect(
+    await screen.findByText("智能体需要你确认后才能生成提案，请在对话中回复"),
+  ).toBeInTheDocument();
 });
 
 it("shows no reply hint for a run that produced its result", async () => {
@@ -199,7 +199,7 @@ it("shows no reply hint for a run that produced its result", async () => {
       <BuilderPage />
     </MemoryRouter>,
   );
-  await screen.findByRole("button", { name: "开始建模" });
+  await screen.findByRole("button", { name: "发送" });
   expect(screen.queryByText(/请在对话中回复/)).toBeNull();
 });
 
@@ -212,5 +212,5 @@ it("preserves a scenario while toggling the configuration panel", async () => {
   expect(screen.queryByRole("textbox", { name: "业务场景描述" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "展开构建配置" }));
   expect(screen.getByRole("textbox", { name: "业务场景描述" })).toHaveValue("星河采购协同");
-  await waitFor(() => expect(screen.getByRole("button", { name: "开始建模" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
 });

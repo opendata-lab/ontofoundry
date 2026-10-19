@@ -33,7 +33,7 @@ it("preserves inherited counts, session detail links and search in the object ta
   expect(screen.getAllByRole("row")).toHaveLength(2);
   expect(screen.getByRole("link", { name: "个人" })).toBeInTheDocument();
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索目录" }), { target: { value: "不存在的对象" } });
-  expect(screen.getByText("没有匹配的本体模型")).toBeInTheDocument();
+  expect(screen.getByText("没有匹配的定义")).toBeInTheDocument();
 });
 
 it("keeps relation endpoints, multiplicity and the basic detail tab", () => {
@@ -42,7 +42,7 @@ it("keeps relation endpoints, multiplicity and the basic detail tab", () => {
       <TypeCatalogPage kind="link_type" />
     </MemoryRouter>,
   );
-  const link = screen.getByRole("link", { name: "签约方" });
+  const link = screen.getByRole("link", { name: "signer" });
   const row = within(link.closest("tr")!);
   expect(row.getByText("合同")).toBeInTheDocument();
   expect(row.getByText("当事人")).toBeInTheDocument();

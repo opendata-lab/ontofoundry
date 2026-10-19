@@ -37,10 +37,10 @@ const show = (s: ModelingSession | null) =>
 describe("modeling results", () => {
   it("counts every kind in the draft and searches within one", () => {
     show(session());
-    expect(screen.getByText("对象 2")).toBeInTheDocument();
-    expect(screen.getByText("指标 10")).toBeInTheDocument();
-    expect(screen.getByText("数据集 2")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("属性 8"));
+    expect(screen.getByRole("button", { name: "实体 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "指标 10" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "数据集 2" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "属性 8" }));
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索模型" }), { target: { value: "region" } });
     expect(screen.getAllByRole("row")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "所在地区" })).toBeInTheDocument();
@@ -75,12 +75,12 @@ describe("modeling results", () => {
 
   it("shows material_link rows with endpoint display names and Chinese binding mode labels for mappings", () => {
     show(session({ draft: example("07-instances-and-evidence") }));
-    fireEvent.click(screen.getByText(/^文档关系 /));
+    fireEvent.click(screen.getByRole("button", { name: /^文档关系 \d+$/ }));
     expect(screen.getByRole("button", { name: /RT-0103 → C001/ })).toBeInTheDocument();
 
     cleanup();
     show(session({ draft: example("06-inheritance") }));
-    fireEvent.click(screen.getByText(/^映射 /));
+    fireEvent.click(screen.getByRole("button", { name: /^映射 \d+$/ }));
     expect(screen.getAllByText("独立绑定").length).toBeGreaterThan(0);
     expect(screen.getAllByText("共用父对象数据").length).toBeGreaterThan(0);
     expect(screen.queryByText("independent")).not.toBeInTheDocument();
