@@ -10,7 +10,7 @@ describe("antd theme from tokens", () => {
     "--color-accent": "#0061ef",
     "--color-success": "oklch(43% 0.128 151)",
     "--font-body": '"PingFang SC", sans-serif',
-    "--text-sm": "13px",
+    "--text-sm": "14px",
     "--radius-sm": "6px",
     "--control-height": "32px",
   };
@@ -24,8 +24,8 @@ describe("antd theme from tokens", () => {
     });
   });
 
-  it("keeps the workbench compact with 13px text and small-radius buttons", () => {
-    expect(theme.token?.fontSize).toBe(13);
+  it("keeps the workbench compact with 14px text and small-radius buttons", () => {
+    expect(theme.token?.fontSize).toBe(14);
     expect(theme.components?.Button).toMatchObject({ borderRadius: 6, controlHeight: 32 });
   });
 

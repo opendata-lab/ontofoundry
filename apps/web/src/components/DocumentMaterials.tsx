@@ -1,11 +1,11 @@
 import { App, Button, Empty, Input, Popconfirm, Select, Table, Tag, Tooltip, Typography, Upload } from "antd";
-import { Download, FileText, RefreshCw, Search, Trash2, Upload as UploadIcon } from "lucide-react";
+import { Archive, ArchiveRestore, Download, FileText, RefreshCw, Search, Trash2, Upload as UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
 import type { ManagedMaterial, Workspace } from "../api/types";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { usePageActive } from "../hooks/usePageTab";
-import { PanelToolbar } from "./layout";
+import { PanelToolbar, StatusMark } from "./layout";
 
 const sizeText = (size: number) => size < 1024 ? `${size} B` : size < 1024 * 1024
   ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
@@ -64,12 +64,30 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
       setBusy(false);
     }
   };
+  const setArchived = async (material: ManagedMaterial, archived: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      if (archived) await modelingApi.archiveMaterial(workspace.id, material.id);
+      else await modelingApi.restoreMaterial(workspace.id, material.id);
+      void message.success(archived ? "文档已归档" : "文档已恢复");
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : archived ? "归档失败" : "恢复失败");
+    } finally {
+      await load();
+      setBusy(false);
+    }
+  };
   const rows = materials.filter((material) => material.name.toLowerCase().includes(query.trim().toLowerCase())
-    && (filter === "all" || (filter === "unused" ? material.usage.can_delete : !material.usage.can_delete)));
+    && (filter === "all"
+      || (filter === "archived" ? !!material.archived_at
+        : filter === "unused" ? material.usage.can_delete
+          : !material.usage.can_delete)));
   return <>
     <PanelToolbar extra={<>
       <Select size="small" aria-label="文档使用情况" value={filter} onChange={setFilter} options={[
         { value: "all", label: "全部文档" }, { value: "used", label: "已使用" }, { value: "unused", label: "未使用" },
+        { value: "archived", label: "已归档" },
       ]} />
       <Input size="small" type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索文档" placeholder="搜索文档名称" value={query} onChange={(e) => setQuery(e.target.value)} />
       <Tooltip title="刷新文档"><Button size="small" type="text" aria-label="刷新文档" disabled={busy} icon={<RefreshCw size={14} />} onClick={() => void load()} /></Tooltip>
@@ -94,7 +112,7 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
         { title: "实体实例", key: "facts", render: (_, material) => material.usage.material_objects },
         { title: "关系实例", key: "links", render: (_, material) => material.usage.material_links },
         { title: "使用情况", key: "usage", render: (_, material) => <Tooltip title={material.usage.references.join("、") || "没有引用，可删除"}>
-          <Tag color={material.usage.can_delete ? "default" : "blue"} className="m-0">{material.usage.can_delete ? "未使用" : "已使用"}</Tag>
+          <StatusMark state={material.usage.can_delete ? "unmapped" : "mapped"} label={material.usage.can_delete ? "未使用" : "已使用"} />
         </Tooltip> },
         { title: "大小", key: "size", render: (_, material) => sizeText(material.byte_size) },
         { title: "上传时间", key: "created", render: (_, material) => material.created_at ? new Date(material.created_at).toLocaleString("zh-CN", { hour12: false }) : "—" },
@@ -103,12 +121,14 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
           const disabled = busy || workspace.role !== "admin" || !material.usage.can_delete;
           return <div className="flex items-center gap-1">
             <Tooltip title="下载文档"><Button size="small" type="text" aria-label={`下载 ${material.name}`} icon={<Download size={14} />} href={modelingApi.materialDownloadUrl(workspace.id, material.id)} /></Tooltip>
+            {material.archived_at
+              ? <Tooltip title="恢复文档"><Button size="small" type="text" aria-label={`恢复 ${material.name}`} disabled={busy} icon={<ArchiveRestore size={14} />} onClick={() => void setArchived(material, false)} /></Tooltip>
+              : <Tooltip title="归档后不再出现在建模材料列表中，历史引用保留"><Button size="small" type="text" aria-label={`归档 ${material.name}`} disabled={busy} icon={<Archive size={14} />} onClick={() => void setArchived(material, true)} /></Tooltip>}
             <Popconfirm title="删除文档？" description={`将永久删除“${material.name}”，此操作无法撤销。`} okText="删除" okButtonProps={{ danger: true }} disabled={disabled} onConfirm={() => remove(material)}>
               <Tooltip title={reason}><span><Button size="small" type="text" danger aria-label={`删除 ${material.name}`} disabled={disabled} icon={<Trash2 size={14} />} /></span></Tooltip>
             </Popconfirm>
           </div>;
         } },
       ]} />
-    <div className="border-t border-rule px-4 py-2 text-xs text-muted">数量按历史版本、会话草稿和提案中的显式证据去重统计；展开行可查看属性、规则、指标及引用位置。数量为零的文档仍可能被会话或历史记录使用。</div>
   </>;
 }

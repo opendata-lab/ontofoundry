@@ -47,7 +47,10 @@ function renderPicker(onMaterial = vi.fn().mockResolvedValue(undefined)) {
 }
 
 const openPicker = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "选择数据表…" }));
+  const trigger = await screen.findByRole("button", { name: "选择数据表…" });
+  // The trigger stays disabled until the connection list arrives.
+  await waitFor(() => expect(trigger).toBeEnabled());
+  fireEvent.click(trigger);
   return screen.findByRole("group", { name: "选择数据表" });
 };
 

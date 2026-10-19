@@ -34,13 +34,7 @@ export function MappingsPage() {
     draft ? records.filter((r) => r.sources.some((s) => s.dataset_id === dataset.id)).length : 0;
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas">
-      <PageHeader title="数据管理" note={snapshot.sessionId ? "建模会话草稿" : "当前版本"}>
-        {workspace.role && tab === "datasets" && (
-          <Button icon={<Database size={14} />} onClick={() => setPicker(true)}>
-            从数据目录登记
-          </Button>
-        )}
-      </PageHeader>
+      <PageHeader title="数据管理" note={snapshot.sessionId ? "建模会话草稿" : undefined} />
       <PageBody>
         <Panel>
           <PanelToolbar
@@ -57,6 +51,11 @@ export function MappingsPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
+                {workspace.role && (
+                  <Button size="small" icon={<Database size={14} />} onClick={() => setPicker(true)}>
+                    从数据目录登记
+                  </Button>
+                )}
               </>
             }
           >
@@ -78,11 +77,7 @@ export function MappingsPage() {
               pagination={datasets.length > 20 ? { pageSize: 20 } : false}
               onRow={(d) => ({ onDoubleClick: () => openDataset(d.id) })}
               locale={{
-                emptyText: (
-                  <Empty description={query ? "没有匹配的数据集" : "还没有登记数据集"}>
-                    {workspace.role && !query && <Button onClick={() => setPicker(true)}>从数据目录登记</Button>}
-                  </Empty>
-                ),
+                emptyText: <Empty description={query ? "没有匹配的数据集" : "还没有登记数据集"} />,
               }}
               columns={[
                 {

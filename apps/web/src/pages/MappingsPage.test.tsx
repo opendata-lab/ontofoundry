@@ -20,13 +20,14 @@ vi.mock("react-router-dom", () => ({ Link: ({ children }: { children: unknown })
 vi.mock("../api/client", () => ({
   api: { workspace: vi.fn() },
   modelingApi: { saveElement: vi.fn(), get: vi.fn() },
-  catalogApi: { connections: vi.fn(), schemas: vi.fn(), assets: vi.fn(), refreshAssets: vi.fn() },
+  catalogApi: { connections: vi.fn(), schemas: vi.fn(), tables: vi.fn(), assets: vi.fn(), refreshAssets: vi.fn() },
   ApiError: class extends Error {},
 }));
 
 let draft: Draft;
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(catalogApi.tables).mockResolvedValue({ items: [] });
   draft = example("06-inheritance");
   vi.mocked(useSnapshot).mockReturnValue({
     draft,
@@ -103,5 +104,47 @@ describe("data mapping page", () => {
       ],
     });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("refreshes only the selected table and labels the action accordingly", async () => {
+    const assets: Assets = {
+      connection_id: "c",
+      version_id: null,
+      metadata_snapshot_id: "m",
+      observed_at: "2026-10-16T00:00:00Z",
+      error: null,
+      changes: [],
+      status: "ready",
+      items: [
+        {
+          name: "contacts",
+          schema: "crm",
+          comment: "联系人",
+          missing: false,
+          datasets: [],
+          columns: [{ name: "id", type: "bigint", primary_key: true, comment: "编号" }],
+        },
+      ],
+    };
+    vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
+    vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
+    vi.mocked(catalogApi.tables).mockResolvedValue({
+      items: [
+        { name: "contacts", schema: "crm", columns: [] },
+        { name: "orders", schema: "crm", columns: [] },
+      ],
+    });
+    vi.mocked(catalogApi.assets).mockResolvedValue(assets);
+    vi.mocked(catalogApi.refreshAssets).mockResolvedValue(assets);
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "从数据目录登记" }));
+    const dialog = await screen.findByRole("dialog", { name: "从数据目录登记数据集" });
+    await waitFor(() => expect(catalogApi.tables).toHaveBeenCalled());
+    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "选择数据表" }));
+    fireEvent.click(await screen.findByText("orders", { selector: ".ant-select-item-option-content" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "刷新" }));
+    await waitFor(() =>
+      expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "" }, ["orders"]),
+    );
   });
 });

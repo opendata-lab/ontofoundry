@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, Form, Input, Modal, Select, Table, Typography } from "antd";
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, catalogApi } from "../api/client";
@@ -59,7 +59,7 @@ function RegisterForm({
           />
         </Form.Item>
         <DatasetSnapshotFields dataset={dataset} onChange={(patch) => setDataset((current) => ({ ...current, ...patch }))} />
-        <Text type="secondary" className="text-xs">
+        <Text type="secondary" className="text-sm">
           将带入 {dataset.columns?.length ?? 0} 个列的名称、类型和注释。
         </Text>
         {duplicates.length > 0 && (
@@ -100,7 +100,8 @@ export function DatasetPicker({
   const [schemas, setSchemas] = useState<string[]>([]);
   const [schema, setSchema] = useState("");
   const [assets, setAssets] = useState<Assets | null>(null);
-  const [query, setQuery] = useState("");
+  const [tableNames, setTableNames] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [registering, setRegistering] = useState<AssetTable | null>(null);
@@ -128,13 +129,27 @@ export function DatasetPicker({
       live = false;
     };
   }, [open, connectionId, workspace.id]);
-  const load = (refresh = false) => {
+  useEffect(() => {
+    if (!open || !connectionId) return;
+    let live = true;
+    setSelected([]);
+    catalogApi
+      .tables(workspace.id, connectionId, { schema_name: schema || undefined })
+      .then((r) => live && setTableNames(r.items.map((t) => t.name)))
+      .catch(() => live && setTableNames([]));
+    return () => {
+      live = false;
+    };
+  }, [open, connectionId, schema, workspace.id]);
+  const load = (refresh = false, tables?: string[]) => {
     if (!connectionId) return;
     const id = ++request.current;
     setLoading(true);
     setError("");
     const params = { schema_name: schema };
-    (refresh ? catalogApi.refreshAssets(workspace.id, connectionId, params) : catalogApi.assets(workspace.id, connectionId, params))
+    (refresh
+      ? catalogApi.refreshAssets(workspace.id, connectionId, params, tables)
+      : catalogApi.assets(workspace.id, connectionId, params))
       .then((result) => id === request.current && setAssets(result))
       .catch((e: Error) => id === request.current && setError(e.message))
       .finally(() => id === request.current && setLoading(false));
@@ -144,10 +159,20 @@ export function DatasetPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, connectionId, schema]);
   const connection = connections?.find((c) => c.id === connectionId);
-  const normalized = query.trim().toLowerCase();
-  const tables = (assets?.items ?? []).filter(
-    (t) => !normalized || `${t.name} ${t.comment ?? ""}`.toLowerCase().includes(normalized),
-  );
+  const observed = new Map((assets?.items ?? []).map((t) => [t.name, t]));
+  const tables: AssetTable[] = selected.length
+    ? selected.map(
+        (name): AssetTable =>
+          observed.get(name) ?? {
+            name,
+            schema: schema || null,
+            columns: [],
+            missing: false,
+            datasets: [],
+          },
+      )
+    : (assets?.items ?? []);
+  const refreshLabel = selected.length === 1 ? "刷新" : selected.length > 1 ? "刷新所选表" : "刷新表结构";
   const register = async (dataset: Dataset) => {
     if (!draft) return;
     setSaving(true);
@@ -200,20 +225,27 @@ export function DatasetPicker({
               placeholder="默认 schema"
               value={schema || undefined}
               options={schemas.map((s) => ({ value: s, label: s }))}
-              onChange={(value?: string) => setSchema(value ?? "")}
+              onChange={(value?: string) => {
+                setSchema(value ?? "");
+                setAssets(null);
+              }}
             />
-            <Input
-              type="search"
+            <Select
+              mode="multiple"
+              aria-label="选择数据表"
+              className="min-w-56 flex-1"
+              showSearch
               allowClear
-              prefix={<Search size={14} className="text-muted" />}
-              aria-label="搜索数据表"
-              placeholder="表名或注释"
-              className="w-60"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              maxTagCount="responsive"
+              optionFilterProp="label"
+              placeholder={tableNames.length ? "选择数据表，可多选" : "先选择数据源和 schema"}
+              value={selected}
+              options={tableNames.map((name) => ({ value: name, label: name }))}
+              onChange={setSelected}
+              disabled={!connectionId}
             />
-            <Button className="ml-auto" icon={<RefreshCw size={14} />} loading={loading} disabled={!connectionId} onClick={() => load(true)}>
-              刷新表结构
+            <Button className="ml-auto" icon={<RefreshCw size={14} />} loading={loading} disabled={!connectionId} onClick={() => load(true, selected)}>
+              {refreshLabel}
             </Button>
           </div>
           {assets?.observed_at && (
@@ -238,13 +270,13 @@ export function DatasetPicker({
           )}
           {assets?.status === "unobserved" ? (
             <Empty description="还没有采集表结构">
-              <Button loading={loading} onClick={() => load(true)}>
-                采集表结构
+              <Button loading={loading} onClick={() => load(true, selected)}>
+                {selected.length ? refreshLabel : "采集表结构"}
               </Button>
             </Empty>
           ) : (
             <Table
-              size="small"
+              size="middle"
               rowKey={(t) => `${t.schema ?? ""}.${t.name}`}
               loading={loading}
               dataSource={tables}
@@ -304,7 +336,7 @@ export function DatasetPicker({
                   width: 110,
                   render: (_, t) =>
                     workspace.role ? (
-                      <Button size="small" disabled={t.missing || !draft || !connection} onClick={() => setRegistering(t)}>
+                      <Button size="small" disabled={t.missing || !t.columns.length || !draft || !connection} onClick={() => setRegistering(t)}>
                         登记
                       </Button>
                     ) : null,

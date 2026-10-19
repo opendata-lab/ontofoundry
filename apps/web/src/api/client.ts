@@ -228,6 +228,10 @@ export const modelingApi = {
   materialOverview: (id: string) => workspaceRequest<Items<ManagedMaterial>>(id, "/materials/overview"),
   materialDownloadUrl: (id: string, materialId: string) => `/api/v1/workspaces/${id}/materials/${materialId}`,
   deleteMaterial: (id: string, materialId: string) => workspaceRequest<void>(id, `/materials/${materialId}`, undefined, "DELETE"),
+  archiveMaterial: (id: string, materialId: string) =>
+    workspaceRequest<Material>(id, `/materials/${materialId}/archive`, {}),
+  restoreMaterial: (id: string, materialId: string) =>
+    workspaceRequest<Material>(id, `/materials/${materialId}/restore`, {}),
   upload: (id: string, file: File) =>
     request<Material>(
       "/api/v1/workspaces/" + id + "/materials?name=" + encodeURIComponent(file.name),
@@ -249,8 +253,14 @@ export const catalogApi = {
     workspaceRequest<Items<string>>(id, `/connections/${connectionId}/schemas`),
   assets: (id: string, connectionId: string, params?: { schema_name?: string; version_id?: string }) =>
     workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
-  refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }) =>
-    workspaceRequest<Assets>(id, `/connections/${connectionId}/assets/refresh` + query({ ...params }), undefined, "POST"),
+  /** Without tables, reads the whole schema (capped at 200); with tables, refreshes only them. */
+  refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }, tables?: string[]) =>
+    workspaceRequest<Assets>(
+      id,
+      `/connections/${connectionId}/assets/refresh` + query({ ...params }),
+      tables?.length ? { tables } : {},
+      "POST",
+    ),
   mappingPreview: (id: string, payload: MappingPreviewRequest) =>
     workspaceRequest<MappingPreview>(id, "/mapping-preview", payload),
 };

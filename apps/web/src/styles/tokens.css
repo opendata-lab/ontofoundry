@@ -38,9 +38,9 @@
   --font-body: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
 
-  /* Strictly 3 font-size tiers: 12px (aux/table header), 13px (body/control), 16px (page title) */
+  /* Strictly 3 font-size tiers: 12px (aux/table header), 14px (body/control), 16px (page title) */
   --text-xs: 12px;
-  --text-sm: 13px;
+  --text-sm: 14px;
   --text-base: 16px;
   --text-md: var(--text-sm);
   --text-lg: var(--text-base);
