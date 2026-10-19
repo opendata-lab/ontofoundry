@@ -3,6 +3,7 @@
 from time import monotonic
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
@@ -79,17 +80,23 @@ def retain_schema_changes(previous, latest):
     return list(pending.values())
 
 
-def read_structure(connection, schema_name):
+def read_structure(connection, schema_name, tables=None):
     inspector = inspect(connection)
-    names = sorted(
-        set(
-            inspector.get_table_names(schema=schema_name)
-            + inspector.get_view_names(schema=schema_name)
-        )
+    available = set(
+        inspector.get_table_names(schema=schema_name)
+        + inspector.get_view_names(schema=schema_name)
     )
-    if len(names) > 200:
-        raise HTTPException(422, "当前 schema 超过 200 张表，请选择更小的 schema")
-    tables, started = [], monotonic()
+    if tables is None:
+        names = sorted(available)
+        if len(names) > 200:
+            raise HTTPException(
+                422, "当前 schema 超过 200 张表，请先选择要刷新的表"
+            )
+    else:
+        # An explicitly selected table that no longer exists is omitted, which
+        # the diff reports as removed.
+        names = sorted(set(tables) & available)
+    structures, started = [], monotonic()
     for name in names:
         if monotonic() - started > 15:
             raise HTTPException(422, "结构读取超过时间预算，上次快照已保留")
@@ -100,7 +107,7 @@ def read_structure(connection, schema_name):
             comment = inspector.get_table_comment(name, schema=schema_name).get("text")
         except NotImplementedError:
             comment = None
-        tables.append(
+        structures.append(
             {
                 "name": name,
                 "schema": schema_name,
@@ -117,7 +124,29 @@ def read_structure(connection, schema_name):
                 ],
             }
         )
-    return {"tables": tables}
+    return {"tables": structures}
+
+
+def merge_structure(previous, observed, tables):
+    """Replace only the selected tables, keeping the rest of the snapshot."""
+    if tables is None:
+        return observed
+    selected = set(tables)
+    kept = [
+        table for table in previous.get("tables", []) if table["name"] not in selected
+    ]
+    return {"tables": sorted(kept + observed["tables"], key=lambda t: t["name"])}
+
+
+def previous_selection(previous, tables):
+    if tables is None:
+        return previous
+    selected = set(tables)
+    return {
+        "tables": [
+            table for table in previous.get("tables", []) if table["name"] in selected
+        ]
+    }
 
 
 @router.get("/schemas")
@@ -204,11 +233,16 @@ def assets(
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)
 
 
+class RefreshRequest(BaseModel):
+    tables: list[str] | None = Field(default=None, max_length=200)
+
+
 @router.post("/assets/refresh")
 def refresh(
     workspace_id: str,
     connection_id: str,
     request: Request,
+    body: RefreshRequest | None = None,
     schema_name: str = Query(default="", max_length=240),
     version_id: str | None = None,
     db: Session = Depends(get_db),
@@ -225,18 +259,22 @@ def refresh(
             changes_json=[],
         )
         db.add(record)
+    selected = body.tables if body and body.tables else None
     try:
         with connect_readonly(connection, request.app.state.settings) as conn:
-            observed = read_structure(conn, schema_name or None)
+            observed = read_structure(conn, schema_name or None, selected)
         record.changes_json = (
             retain_schema_changes(
                 record.changes_json,
-                schema_diff(record.snapshot_json, observed),
+                schema_diff(previous_selection(record.snapshot_json, selected), observed),
             )
             if record.observed_at
             else []
         )
-        record.snapshot_json, record.observed_at, record.error = observed, utc_now(), None
+        record.snapshot_json = merge_structure(
+            record.snapshot_json, observed, selected
+        )
+        record.observed_at, record.error = utc_now(), None
     except (HTTPException, ServiceError) as exc:
         record.error = str(exc)
     db.commit()
