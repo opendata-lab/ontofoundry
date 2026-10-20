@@ -8,8 +8,11 @@ to render an element that no longer exists in the newer snapshot.
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from ontofoundry_api.domain.canonical import canonical
+from ontofoundry_api.domain.core import CoreDraft, MaterialObject
+from ontofoundry_api.domain.instance_display import document_display_text
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 
 
@@ -22,10 +25,32 @@ def _index(snapshot):
 
 
 def element_label(kind, element, snapshot_elements):
-    if kind == "material_object":
-        return str(element.get("id", ""))
-    if kind == "material_link":
-        return f"{element.get('source_id', '')} → {element.get('target_id', '')}"
+    if kind in {"material_object", "material_link"}:
+        # A review context may contain deleted elements or only part of a batch.
+        draft = CoreDraft.model_validate(
+            {
+                "workspace_id": str(UUID(int=0)),
+                **{
+                    collection: [
+                        e for k, e in snapshot_elements.values() if k == member.value
+                    ]
+                    for member, collection in COLLECTIONS.items()
+                    if member.value in {"object_type", "property"}
+                },
+            }
+        )
+
+        def fact_label(fact):
+            return document_display_text(draft, MaterialObject.model_validate(fact))
+
+        if kind == "material_object":
+            return fact_label(element)
+        labels = []
+        for side in ("source_id", "target_id"):
+            identity = str(element.get(side, ""))
+            found = snapshot_elements.get(identity)
+            labels.append(fact_label(found[1]) if found else identity)
+        return " → ".join(labels)
     if kind == "mapping":
         owner = snapshot_elements.get(str(element.get("type_id")), ("", {}))[1]
         return str(owner.get("name") or element.get("id"))
@@ -76,7 +101,7 @@ def element_changes(left: dict[str, Any], right: dict[str, Any]) -> list[dict[st
             {
                 "element_kind": kind,
                 "element_id": element_id,
-                "label": element_label(kind, element, both),
+                "label": element_label(kind, element, old if after is None else both),
                 "owner_label": owner_label(kind, element, both),
                 "change": change,
                 "field_changes": field_changes(before[1], after[1])

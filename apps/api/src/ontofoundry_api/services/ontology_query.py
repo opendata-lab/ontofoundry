@@ -103,6 +103,106 @@ def binding_status(draft, type_id, db=None, workspace_id=None):
     return status
 
 
+def relationship_binding_status(
+    draft, link, *, source_type_id=None, target_type_id=None, db=None, workspace_id=None
+):
+    """Check concrete endpoint bindings and the effective join without storing state."""
+    from ontofoundry_api.services.dataset_sources import resolve_dataset
+    from ontofoundry_api.services.errors import ServiceError
+
+    index = DraftIndex(draft)
+    source_type_id = source_type_id or link.source_type_id
+    target_type_id = target_type_id or link.target_type_id
+    source_types = resolve_binding(draft, source_type_id).virtual_types or (source_type_id,)
+    target_types = resolve_binding(draft, target_type_id).virtual_types or (target_type_id,)
+    statuses = []
+    for source_id in source_types:
+        for target_id in target_types:
+            source = resolve_binding(draft, source_id)
+            target = resolve_binding(draft, target_id)
+            join = source.link_bindings.get(link.id, link.data_join)
+            if join is None or any(
+                binding_readiness(draft, identity).status != "bound"
+                for identity in (source_id, target_id)
+            ):
+                statuses.append("unbound")
+                continue
+            datasets = {
+                s.dataset_id
+                for binding in (source, target)
+                for s in binding.sources.values()
+            }
+
+            def columns_exist(dataset_id, columns):
+                dataset = index.datasets.get(dataset_id)
+                known = {c.name for c in dataset.columns or []} if dataset else set()
+                return bool(columns) and set(columns) <= known
+
+            def field_column(binding, field):
+                if field is None or field.kind != "column":
+                    return False
+                source = binding.sources.get(field.source_id)
+                return source is not None and columns_exist(
+                    source.dataset_id, [field.column]
+                )
+
+            def property_columns(binding, property_ids):
+                for identity in property_ids:
+                    prop = index.properties.get(identity)
+                    field = binding.fields.get(prop.technical_name) if prop else None
+                    if not field_column(binding, field):
+                        return False
+                return True
+
+            ready = all(
+                columns_exist(s.dataset_id, s.key_columns)
+                for binding in (source, target)
+                for s in binding.sources.values()
+            ) and all(
+                field_column(binding, field)
+                for binding in (source, target)
+                for field in binding.fields.values()
+                if field.kind == "column"
+            )
+            if join.kind == "direct":
+                ready = ready and property_columns(source, join.source_property_ids)
+                ready = ready and property_columns(target, join.target_property_ids)
+            else:
+                datasets.add(join.dataset_id)
+                for binding, columns, key in (
+                    (source, join.source_columns, join.source_key),
+                    (target, join.target_columns, join.target_key),
+                ):
+                    ready = ready and columns_exist(join.dataset_id, columns)
+                    if key.kind == "properties":
+                        ready = ready and len(columns) == len(key.property_ids)
+                        ready = ready and property_columns(binding, key.property_ids)
+                    else:
+                        ready = ready and binding.main is not None
+                        ready = ready and len(columns) == len(binding.main.key_columns)
+            if not ready:
+                statuses.append("unbound")
+                continue
+            if db is not None:
+                try:
+                    connections = {
+                        resolve_dataset(
+                            db, workspace_id, index.datasets[identity]
+                        ).connection.id
+                        for identity in datasets
+                    }
+                except ServiceError:
+                    statuses.append("unbound")
+                    continue
+                if len(connections) > 1:
+                    statuses.append("cross_connection")
+                    continue
+            statuses.append("bound")
+    if "cross_connection" in statuses:
+        return "cross_connection"
+    return "bound" if statuses and all(s == "bound" for s in statuses) else "unbound"
+
+
 def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspace_id=None):
     draft = CoreDraft.model_validate(snapshot)
     index = DraftIndex(draft)
@@ -147,17 +247,32 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
                     )
             properties.append(p)
         links = []
-        for link in index.effective_links(obj.id):
-            forward = index.is_a(obj.id, link.source_type_id)
+        directional_links = [
+            *((link, True) for link in index.outgoing_links(obj.id)),
+            *((link, False) for link in index.incoming_links(obj.id)),
+        ]
+        for link, forward in directional_links:
             owner = link.source_type_id if forward else link.target_type_id
+            source_id = obj.id if forward else link.source_type_id
+            target_id = link.target_type_id if forward else obj.id
             link_view = {
                 **dump(link),
                 "direction": "forward" if forward else "reverse",
                 "inherited_from": str(owner) if owner != obj.id else None,
-                "binding_status": status,
+                "binding_status": relationship_binding_status(
+                    draft,
+                    link,
+                    source_type_id=source_id,
+                    target_type_id=target_id,
+                    db=db,
+                    workspace_id=workspace_id,
+                )
+                if mappings
+                else "forbidden",
             }
             if mappings:
-                effective_join = binding.link_bindings.get(link.id, link.data_join)
+                source_binding = resolve_binding(draft, source_id)
+                effective_join = source_binding.link_bindings.get(link.id, link.data_join)
                 link_view["data_join"] = (
                     effective_join.model_dump(mode="json") if effective_join else None
                 )
@@ -194,7 +309,11 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
             **dump(link),
             "direction": "forward",
             "inherited_from": None,
-            "binding_status": "bound" if link.data_join else "unbound",
+            "binding_status": relationship_binding_status(
+                draft, link, db=db, workspace_id=workspace_id
+            )
+            if mappings
+            else "forbidden",
         }
         if not mappings:
             definition.pop("data_join", None)
@@ -255,8 +374,13 @@ def search_types(
             or any(
                 query in str(item["definition"].get(k, "")).casefold()
                 for k in (
-                    "name", "technical_name", "description", "synonyms",
-                    "source_role_name", "target_role_name", "verbalizes",
+                    "name",
+                    "technical_name",
+                    "description",
+                    "synonyms",
+                    "source_role_name",
+                    "target_role_name",
+                    "verbalizes",
                 )
             )
         )
@@ -284,7 +408,10 @@ def get_type(
         found = [
             i
             for i in items
-            if i["definition"].get("technical_name", i["definition"].get("name", "")).casefold() == type_id.casefold()
+            if i["definition"]
+            .get("technical_name", i["definition"].get("name", ""))
+            .casefold()
+            == type_id.casefold()
         ]
     if not found:
         raise NotFoundError("没有找到该资源")

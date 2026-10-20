@@ -206,10 +206,7 @@ def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[st
     which update and delete proposals must quote as expected_target_hash."""
     elements = draft
     return {
-        "run": {
-            key: manifest[key]
-            for key in ("run_token", "base_version_id", "source_session_revision")
-        },
+        "run": {k: v for k, v in proposal_header(manifest).items() if k != "items"},
         "draft": draft,
         "element_hashes": {
             str(element["id"]): element_sha256(element, collection=collection)

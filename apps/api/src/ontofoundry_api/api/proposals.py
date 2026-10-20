@@ -134,11 +134,7 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         "after": after,
         # Agents may omit field_changes (display data); derive them then.
         "field_changes": (None if legacy else item.field_changes_json)
-        or (
-            field_changes(before, after)
-            if before and after
-            else []
-        ),
+        or (field_changes(before, after) if before and after else []),
         "evidence": _evidence_view(
             db,
             workspace_id,
@@ -241,9 +237,9 @@ def read_batch(
     statuses = effective_statuses(items, dependencies, session.draft_json)
     elements = _session_elements(draft)
     for item in items:
-        for element in (item.after_json, item.before_json):
-            if element:
-                elements.setdefault(str(element["id"]), (item.target_kind, element))
+        element = item.after_json or item.before_json
+        if element:
+            elements[str(element["id"])] = (item.target_kind, element)
     return {
         **_batch_summary(batch, items, statuses),
         "items": [

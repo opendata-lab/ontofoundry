@@ -2,7 +2,7 @@
 
 A modeling run only reads materials, so tables reach DataAgent the same way a
 business document does. The text names everything a mapping proposal needs
-(data source, schema, table, key column, column names) and the evidence an
+(data source, schema, table, ordered key columns, column names) and the evidence an
 object or relation proposal cites (one table or column per line).
 """
 
@@ -83,17 +83,22 @@ def tables_markdown(
         f"本文由 OntoFoundry 从数据连接「{source}」（{kind}，数据库 {database}）读取，"
         "用于自下而上建模：根据表结构识别业务对象、属性和关系，并建立数据映射。",
         "",
-        f"- 数据源（connection_alias）：{source}",
-        f"- 模式（schema_name）：{schema or database}",
+        f"- 来源上下文（连接显示名称，不是模型字段）：{source}",
+        f"- Dataset.dialect：{kind}",
+        f"- Dataset.schema_name：{schema or database}",
         f"- 表数量：{len(tables)}",
+        "- Dataset 用 dialect/schema_name/table_name 登记位置；连接由服务端解析，不填写连接别名。",
+        "- 物理主键不等于业务标识；业务 identifier/unique 需根据业务语义确认。",
+        "- Mapping.sources 的 key_columns 是有序列数组，按位置与附来源或关系键配对；以下按元数据返回顺序列出物理主键候选，需核对逻辑键及其顺序。",
         "",
     ]
     for table in tables:
         name = table["name"]
         lines += [f"## 表 {name}", ""]
+        lines.append(f"- Dataset.table_name：{name}")
         lines.append(f"- 表说明：{table.get('comment') or '（无）'}")
         lines.append(
-            f"- 主键（key_column）：{', '.join(keys[name]) or '（无，需人工指定）'}"
+            f"- 物理主键候选（Mapping.sources[].key_columns，有序）：{keys[name] or '（无，需人工指定）'}"
         )
         if table.get("row_count") is not None:
             lines.append(f"- 行数：{table['row_count']}")

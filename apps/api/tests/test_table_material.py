@@ -53,10 +53,33 @@ def test_markdown_names_everything_a_mapping_proposal_needs():
         schema=None,
         tables=[CUSTOMERS, ORDERS],
     )
-    assert "数据源（connection_alias）：销售业务库" in text
-    assert "模式（schema_name）：demo_analytics" in text
-    assert "## 表 orders" in text and "- 主键（key_column）：id" in text
+    assert "来源上下文（连接显示名称，不是模型字段）：销售业务库" in text
+    assert "connection_alias" not in text and "key_column）" not in text
+    assert "物理主键不等于业务标识" in text
+    assert "Dataset.schema_name：demo_analytics" in text
+    assert "Dataset.dialect：mysql" in text
+    assert "Dataset.table_name：orders" in text
+    assert "## 表 orders" in text and "key_columns，有序）：['id']" in text
     assert "- orders.customer_id → customers.id（按命名推断）" in text
     assert "| customer_name | VARCHAR(128) | 否 |  |  | 星海贸易, 晨光零售 |" in text
     # Cell text cannot break the table.
     assert "订单 \\| 金额" in text
+
+
+def test_material_preserves_composite_key_order_and_no_key_hint():
+    text = tables_markdown(
+        source="星港来源",
+        kind="postgresql",
+        database="fictional_harbor",
+        schema="public",
+        tables=[
+            {
+                "name": "fictional_stock",
+                "columns": [column("zone", pk=True), column("item", pk=True)],
+            },
+            {"name": "fictional_notes", "columns": [column("note")]},
+        ],
+    )
+    assert "key_columns，有序）：['zone', 'item']" in text
+    assert "（无，需人工指定）" in text
+    assert "需核对逻辑键及其顺序" in text

@@ -88,7 +88,7 @@ def test_count_is_rows_not_nullable_column_count():
                 "technical_name",
                 d.object_types[0].technical_name.upper(),
             ),
-            "技术名",
+            "英文标识",
         ),
         (lambda d: setattr(d.properties[0], "owner_type_id", uuid4()), "归属"),
         (lambda d: setattr(d.object_types[0], "extends", uuid4()), "父对象"),

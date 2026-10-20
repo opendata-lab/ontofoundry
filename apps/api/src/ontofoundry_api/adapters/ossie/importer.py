@@ -176,7 +176,7 @@ class OntologyImporter:
                             "converted",
                             "ConceptName",
                             "RT-12",
-                            "技术名规范化并确定性消歧",
+                            "英文标识规范化并确定性消歧",
                             targets=[obj.id],
                         )
             if not progressed:
@@ -222,7 +222,7 @@ class OntologyImporter:
                     "converted",
                     "RelationshipName",
                     "RT-12",
-                    "属性技术名已规范化",
+                    "属性英文标识已规范化",
                     targets=[prop.id],
                 )
             if not unary and "multiplicity" not in rel:

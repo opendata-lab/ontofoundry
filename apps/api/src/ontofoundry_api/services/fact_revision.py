@@ -136,6 +136,7 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
             expected = body.expected_target_hash
         elif new_after:
             new_after = walk_references(
+                i.target_kind,
                 new_after,
                 lambda value: body.target_id if str(value) == item.target_id else value,
             )

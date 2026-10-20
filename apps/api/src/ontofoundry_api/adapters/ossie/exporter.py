@@ -87,7 +87,7 @@ def export_document(model, ctx):
                 "error",
                 "object_types",
                 None,
-                "对象技术名与 Ossie 内置概念冲突，请先改名",
+                "对象英文标识与 Ossie 内置概念冲突，请先改名",
                 element=obj,
             )
     if any(i.outcome == "error" for i in report.report.issues):
@@ -325,7 +325,7 @@ def export_document(model, ctx):
         "dropped",
         "EvidenceAndRuleMetadata",
         None,
-        "Ossie 不包含证据和材料，也不保存规则名、技术名与描述；这些内容未放入平台扩展块",
+        "Ossie 不包含证据和材料，也不保存规则名、英文标识与描述；这些内容未放入平台扩展块",
     )
     validation = validate_schema(value)
     if not validation:

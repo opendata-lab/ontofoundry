@@ -273,56 +273,73 @@ def item_fingerprint(operation, target_kind, target_id, after):
     )
 
 
-REF_FIELDS = {
-    "extends",
-    "title_property_id",
-    "owner_type_id",
-    "source_type_id",
-    "target_type_id",
-    "owner_id",
-    "dataset_id",
-    "numerator_id",
-    "denominator_id",
-    "property_id",
-    "link_type_id",
-    "type_id",
-    "source_id",
-    "target_id",
-}
-REF_ARRAYS = {"source_property_ids", "target_property_ids", "property_ids"}
+def walk_references(kind, value, resolve):
+    """Resolve only core references at paths defined by the element's type."""
+    result = deepcopy(value)
 
+    def refs(node, *names):
+        for name in names:
+            if node.get(name) is not None:
+                node[name] = resolve(node[name])
 
-def walk_references(value, resolve):
-    """Only typed reference positions; local source IDs and fact values stay intact."""
-    if isinstance(value, list):
-        return [walk_references(v, resolve) for v in value]
-    if not isinstance(value, dict):
-        return value
-    result = {}
-    for key, entry in value.items():
-        if key == "inherited_link_bindings":
-            if isinstance(entry, list):
-                result[key] = {
-                    resolve(e["link_type_id"]): walk_references(e["data_join"], resolve)
-                    for e in entry
-                }
-            else:
-                result[key] = {
-                    resolve(k): walk_references(v, resolve) for k, v in entry.items()
-                }
-        elif key in REF_ARRAYS:
-            result[key] = [resolve(v) for v in entry]
-        elif key in REF_FIELDS and entry is not None:
-            # ColumnBinding.source_id names a local source, not an element.
-            result[key] = (
-                entry
-                if key == "source_id" and value.get("kind") == "column"
-                else resolve(entry)
-            )
-        elif key in {"values", "evidence", "columns"}:
-            result[key] = deepcopy(entry)
+    def path(node):
+        refs(node, "property_id")
+        for step in node.get("links", []):
+            refs(step, "link_type_id")
+
+    def join(node):
+        if node is None:
+            return
+        if node["kind"] == "direct":
+            for name in ("source_property_ids", "target_property_ids"):
+                node[name] = [resolve(v) for v in node[name]]
         else:
-            result[key] = walk_references(entry, resolve)
+            refs(node, "dataset_id")
+            for side in ("source_key", "target_key"):
+                if node[side]["kind"] == "properties":
+                    node[side]["property_ids"] = [
+                        resolve(v) for v in node[side]["property_ids"]
+                    ]
+
+    if kind == "object_type":
+        refs(result, "extends", "title_property_id")
+        for branch in result.get("derived_by", []):
+            for condition in branch.get("conditions", []):
+                path(condition["path"])
+    elif kind == "property":
+        refs(result, "owner_type_id")
+    elif kind == "link_type":
+        refs(result, "source_type_id", "target_type_id")
+        join(result.get("data_join"))
+    elif kind == "rule":
+        refs(result, "owner_id")
+    elif kind == "metric":
+        refs(result, "dataset_id", "numerator_id", "denominator_id")
+        for name in ("measure", "time_field"):
+            if result.get(name) is not None:
+                refs(result[name], "dataset_id")
+        for condition in result.get("filters", []):
+            refs(condition["column"], "dataset_id")
+    elif kind == "mapping":
+        refs(result, "type_id")
+        for source in result.get("sources", []):
+            refs(source, "dataset_id")
+        # Field keys are property technical names; binding values contain only
+        # local source names or expressions, never core element references.
+        inherited = result.get("inherited_link_bindings", [])
+        entries = (
+            ((e["link_type_id"], e["data_join"]) for e in inherited)
+            if isinstance(inherited, list)
+            else inherited.items()
+        )
+        result["inherited_link_bindings"] = {}
+        for identity, binding in entries:
+            join(binding)
+            result["inherited_link_bindings"][resolve(identity)] = binding
+    elif kind == "material_object":
+        refs(result, "type_id")
+    elif kind == "material_link":
+        refs(result, "type_id", "source_id", "target_id")
     return result
 
 
@@ -451,8 +468,16 @@ def group_items(draft, items, *, references_resolved=False):
                 if item.target_kind == "rule"
                 else ("name", "technical_name")
             )
-            names = {"technical_name": item.after["name"]} if item.target_kind == "link_type" else item.after
-            old_names = {"technical_name": previous["name"]} if other.target_kind == "link_type" else previous
+            names = (
+                {"technical_name": item.after["name"]}
+                if item.target_kind == "link_type"
+                else item.after
+            )
+            old_names = (
+                {"technical_name": previous["name"]}
+                if other.target_kind == "link_type"
+                else previous
+            )
             if any(
                 k in names
                 and k in old_names
@@ -590,7 +615,7 @@ def parse_result(
             deps.add(ids[refs[ref]])
         after = raw_item["after"]
         if after is not None:
-            after = walk_references(after, resolve)
+            after = walk_references(raw_item["target_kind"], after, resolve)
             after["id"] = targets[n]
         try:
             if after is not None:

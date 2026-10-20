@@ -22,3 +22,12 @@ expression 指标保留同数据集完整聚合算法，不擅自改写 NULL/去
 同编号事实按 UUID 独立，不自动合并；如用户明确选择，更新已有事实并追加证据，保留证据 UUID。
 
 关系示例：name=reports_to，来源角色下属、目标角色主管，verbalizes=["{source}汇报给{target}", "{target}管理{source}"]。角色名可空，不从旧词语猜测；无读法时给空数组。每条读法必须包含两个端点，不使用未知占位符。
+
+
+## 标识、标题与实例值
+
+单属性业务标识必须同时设 identifier=true、required=true、unique=true。例如“星港客户”的 customer_no 唯一标识一个客户。复合标识则把各分量设 identifier=true、required=true，但分量不必单独 unique：虚构门店中 (region_no, store_no) 联合唯一，store_no 在不同区域可重复；只有业务保证单分量也唯一时才设 unique=true。标识分量顺序由属性 UUID 排序推导，不用物理键数组顺序替代。
+
+title_property_id 指向本对象或继承的属性 UUID，也可引用同批新增属性的 client_ref。例如客户指定 customer_name 作标题；不设置时继承祖先标题属性，再按完整业务标识、证据引文、UUID 逐级回退。标题只在读取时推导，不向文档对象添加 name/display_text。
+
+material_objects.values 的键是有效属性的 technical_name，不是属性 UUID、中文名称或 client_ref。例如属性 technical_name=customer_name 时写 values={"customer_name":"小岚"}。0/false 都有值，缺少完整标识仍可保存文档事实；关系事实最小提案例子见建模模式。

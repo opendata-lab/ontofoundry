@@ -111,7 +111,7 @@ def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
     stashed = response.json()
     assert stashed["revision"] == session["revision"] + 1
     assert not stashed["validation"]["publishable"]
-    assert any("技术名重复" in e["message"] for e in stashed["validation"]["errors"])
+    assert any("英文标识重复" in e["message"] for e in stashed["validation"]["errors"])
     assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == incomplete
     refused = decide(client, stashed, [(batch["items"][0]["id"], "accept")])
     assert (

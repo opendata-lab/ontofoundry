@@ -245,3 +245,161 @@ def test_typed_fact_swap_batch_must_include_rewritten_facts_at_ingestion(
                 assert type(fact.values["name"]) is type(right)
                 assert fact.values["is_vip"] == left
                 assert fact.values["name"] == right
+
+
+def mapping_name_collision_items():
+    names = [
+        "source_id",
+        "target_id",
+        "type_id",
+        "property_id",
+        "dataset_id",
+        "source_property_ids",
+        "inherited_link_bindings",
+        "values",
+        "evidence",
+        "kind",
+    ]
+    return [
+        create(
+            "collision-type",
+            "object_type",
+            {"name": "星港客户", "technical_name": "starport_customer"},
+        ),
+        *[
+            create(
+                "prop-" + name,
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "collision-type"},
+                    "name": "属性" + name,
+                    "technical_name": name,
+                    "value_kind": "string",
+                },
+            )
+            for name in names
+        ],
+        create(
+            "collision-dataset",
+            "dataset",
+            {
+                "name": "fictional_collision",
+                "table_name": "fictional_collision",
+                "columns": [{"name": name, "physical_type": "text"} for name in names],
+            },
+        ),
+        create(
+            "collision-mapping",
+            "mapping",
+            {
+                "type_id": {"client_ref": "collision-type"},
+                "binding_mode": "independent",
+                "sources": [
+                    {
+                        "id": "main",
+                        "dataset_id": {"client_ref": "collision-dataset"},
+                        "key_columns": ["source_id"],
+                    }
+                ],
+                "fields": {
+                    name: {"kind": "column", "source_id": "main", "column": name}
+                    for name in names
+                },
+            },
+        ),
+    ]
+
+
+def test_mapping_technical_names_are_not_reference_paths():
+    from ontofoundry_api.contracts.proposals import apply_items
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.validation import validate_core_graph
+
+    ctx = context(empty_snapshot(uuid4()))
+    items = mapping_name_collision_items()
+    parsed = parse(result(ctx, items), ctx)
+    assert parsed.items[-1].after["fields"] == items[-1]["after"]["fields"]
+    candidate = validate_core_graph(
+        CoreDraft.model_validate(apply_items(ctx.draft, parsed.items))
+    )
+    assert candidate.mappings[0].sources[0].dataset_id == candidate.datasets[0].id
+
+
+@pytest.mark.parametrize(
+    "name,reading",
+    [
+        ("汇报给", "{source}汇报给{target}"),
+        ("reports_to", "员工汇报给主管"),
+        ("reports_to", "{source}汇报给{other}{target}"),
+        ("reports_to", "{{source}}汇报给{target}"),
+        ("reports_to", "{source}汇报给{target}{"),
+    ],
+)
+def test_schema_rejects_invalid_relationship_names_and_readings(name, reading):
+    from jsonschema import Draft202012Validator
+
+    ctx = context()
+    identity = ctx.draft["object_types"][0]["id"]
+    payload = result(
+        ctx,
+        [
+            create(
+                "reports",
+                "link_type",
+                {
+                    "name": name,
+                    "source_type_id": identity,
+                    "target_type_id": identity,
+                    "multiplicity": "many_to_one",
+                    "verbalizes": [reading],
+                },
+            )
+        ],
+    )
+    assert list(Draft202012Validator(result_schema()).iter_errors(payload))
+    with pytest.raises(ProposalContractError) as error:
+        parse(payload, ctx)
+    assert error.value.code == "RESULT_SCHEMA_INVALID"
+
+
+def test_committed_proposal_schema_matches_runtime():
+    from pathlib import Path
+
+    import ontofoundry_api.contracts.proposals as contract
+
+    schema = json.loads(
+        Path(contract.__file__)
+        .with_name("ontofoundry.proposals.v1.schema.json")
+        .read_text()
+    )
+    assert schema == result_schema()
+
+
+def test_skill_fact_example_is_valid_as_a_complete_graph():
+    from pathlib import Path
+
+    text = (
+        Path(__file__).parents[3]
+        / "integrations/dataagent/skills/ontofoundry-modeling/references/modeling-patterns.md"
+    ).read_text()
+    items = json.loads(text.split("```json\n")[1].split("```")[0])
+    ctx = context(empty_snapshot(uuid4()))
+    parsed = parse(result(ctx, items), ctx)
+    assert parsed.items[-1].after["source_id"] == parsed.items[-3].target_id
+
+
+def test_import_id_rewrite_preserves_reference_named_mapping_fields():
+    from ontofoundry_api.contracts.proposals import apply_items
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.services.import_matching import rewrite_import_ids
+
+    ctx = context(empty_snapshot(uuid4()))
+    parsed = parse(result(ctx, mapping_name_collision_items()), ctx)
+    draft = CoreDraft.model_validate(apply_items(ctx.draft, parsed.items))
+    ids = {item.target_id: str(uuid4()) for item in parsed.items}
+    rewritten = rewrite_import_ids(draft, ids)
+    assert rewritten.mappings[0].fields == draft.mappings[0].fields
+    assert str(rewritten.mappings[0].type_id) == ids[str(draft.mappings[0].type_id)]
+    assert (
+        str(rewritten.mappings[0].sources[0].dataset_id) == ids[str(draft.datasets[0].id)]
+    )

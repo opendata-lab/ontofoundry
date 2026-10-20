@@ -50,7 +50,7 @@ def _display_name(value: str) -> str:
 def _technical_name(value: str) -> str:
     value = value.strip()
     if not TECHNICAL_NAME_RE.fullmatch(value):
-        raise ValueError("技术名只能包含 ASCII 字母、数字和下划线，且不能以数字开头")
+        raise ValueError("英文标识只能包含 ASCII 字母、数字和下划线，且不能以数字开头")
     return value
 
 
@@ -318,11 +318,23 @@ DataJoin = Annotated[DirectJoin | MappingTableJoin, Field(discriminator="kind")]
 
 class LinkType(Strict):
     id: UUID
-    name: TechnicalName
+    name: Annotated[
+        TechnicalName,
+        Field(json_schema_extra={"pattern": r"^[A-Za-z_][A-Za-z0-9_]*$"}),
+    ]
     description: Description = ""
-    verbalizes: list[Annotated[str, Field(min_length=1, max_length=4000)]] = Field(
-        default_factory=list, max_length=50
-    )
+    verbalizes: list[
+        Annotated[
+            str,
+            Field(
+                min_length=1,
+                max_length=4000,
+                json_schema_extra={
+                    "pattern": r"^(?=[\s\S]*\{source\})(?=[\s\S]*\{target\})(?:[^{}]|\{(?:source|target)\})*$"
+                },
+            ),
+        ]
+    ] = Field(default_factory=list, max_length=50)
     synonyms: Labels
     source_type_id: UUID
     target_type_id: UUID
@@ -354,7 +366,9 @@ class LinkType(Strict):
         for reading in readings:
             placeholders = set(re.findall(r"\{([^{}]+)\}", reading))
             if placeholders != {"source", "target"}:
-                raise ValueError("关系读法必须包含 {source} 和 {target}，不能引用其他占位符")
+                raise ValueError(
+                    "关系读法必须包含 {source} 和 {target}，不能引用其他占位符"
+                )
             if "{" in re.sub(r"\{(?:source|target)\}", "", reading) or "}" in re.sub(
                 r"\{(?:source|target)\}", "", reading
             ):

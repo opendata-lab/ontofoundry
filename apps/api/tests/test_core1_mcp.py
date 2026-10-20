@@ -264,3 +264,36 @@ def test_physical_projection_keeps_each_source_snapshot_declaration(client):
         datasets[s["dataset_id"]]["snapshot_date_column"] == "snapshot_date"
         for s in sources
     )
+
+
+def test_relationship_status_and_self_adjacency_use_shared_projection(client):
+    from core1_fixtures import example_draft
+
+    s = create_session(client)
+    draft = example_draft("05-self-and-parallel-links").model_dump(mode="json")
+    draft["workspace_id"] = s["workspace_id"]
+    draft["mappings"] = []
+    link = next(
+        link
+        for link in draft["link_types"]
+        if link["source_type_id"] == link["target_type_id"]
+    )
+    assert link["data_join"] is not None
+    response = publish(client, save(client, s, draft).json())
+    assert response.status_code == 200, response.text
+    detail = call(
+        client,
+        "get_ontology",
+        {
+            "ids": [link["id"], link["source_type_id"]],
+            "include": ["semantic", "physical", "adjacency"],
+        },
+    )["structuredContent"]
+    relationship = next(e for e in detail["elements"] if e["kind"] == "link_type")
+    assert relationship["binding_status"] == "unbound"
+    assert relationship["technical_name"] == relationship["definition"]["name"]
+    assert "technical_name" not in relationship["definition"]
+    obj = next(e for e in detail["elements"] if e["kind"] == "object_type")
+    views = [v for v in obj["links"]["items"] if v["id"] == link["id"]]
+    assert [v["direction"] for v in views] == ["forward", "reverse"]
+    assert all(v["binding_status"] == "unbound" for v in views)

@@ -299,6 +299,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     context = json.loads(
         next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-"))
     )
+    assert context["run"] == {k: v for k, v in result(manifest, []).items() if k != "items"}
     first = session["draft"]["object_types"][0]
     assert context["element_hashes"][first["id"]] == element_sha256(
         first, collection="object_types"
@@ -486,3 +487,35 @@ def test_proposals_marker_download_error_is_retriable(client, monkeypatch, statu
         f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
         f"output/ontofoundry-result-{RUN_TOKEN}.json",
     ]
+
+
+@pytest.mark.parametrize("repair", [True, False])
+def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch, repair):
+    from ontofoundry_api.services import model_result
+
+    session, manifest = proposals_run(client)
+    install_download(monkeypatch, [result(manifest, [])])
+
+    def broken(*args, **kwargs):
+        raise KeyError("client_ref")
+
+    sent = []
+
+    async def deliver(self, **kwargs):
+        sent.append(kwargs["content"])
+        if not repair:
+            raise DataAgentError("unavailable")
+        return {"task_id": "task-repair"}
+
+    monkeypatch.setattr(model_result, "parse_result", broken)
+    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
+    assert reconcile(client, session["id"]) == ("" if repair else "failed_permanent")
+    assert "RESULT_VALIDATION_FAILED" in sent[0]
+    assert row(client, session["id"]).draft_json == session["draft"]
+    batches, items, _ = stored(client, session["id"])
+    assert items == []
+    if repair:
+        assert batches == []
+        assert row(client, session["id"]).dataagent_task_id == "task-repair"
+    else:
+        assert batches[0].error_json["code"] == "RESULT_VALIDATION_FAILED"

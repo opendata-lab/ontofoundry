@@ -16,6 +16,10 @@ description: 基于材料和已有核心模型提出业务对象、属性、关�
 6. 用 `scripts/check_result.py --schema <本轮schema路径> --context <本轮上下文路径> <结果路径>` 检查后再结束。
 7. 结果写入本轮指定 `output/ontofoundry-result-<run_token>.json`。需要业务决定时写本轮 needs-input 文件并提具体问题；不编造缺失信息。
 
+本地检查覆盖本轮 JSON Schema（含关系 ASCII 标识与每条读法占位符）、create/update/delete 操作形态、client_ref/depends_on 闭合及重复目标；上下文提供的完整结果头逐项核对，提供 draft/element_hashes 时还核对目标类型、before 和 expected_target_hash。未提供的上下文无法离线验证。本地通过不代表最终图有效或可接受：继承、唯一性、引用类型及 UUID 是否存在、完整最终图、证据引文真实性、权限和接受时的并发变化仍由后端校验。
+
+MCP 关系公共外壳的 technical_name 是读取兼容字段（等于 name），不能复制到写入提案；写提案以 definition 与本轮 Schema 为准。
+
 MCP 只有 `search_ontology`、`get_ontology`、`search_objects`、`get_object`，仅供读取。
 版本由服务器固定，不传版本参数。它不查询业务数据库、不执行指标，不用事实分页计算数据库统计。
 

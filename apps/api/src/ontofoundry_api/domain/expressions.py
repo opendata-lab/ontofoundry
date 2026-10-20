@@ -139,10 +139,10 @@ def _path(tokens: list[Token], start: int) -> tuple[list[tuple[str, str]], int]:
         part = tokens[end + 1]
         if part.name.upper() == "REVERSE" and end + 4 < len(tokens):
             if tokens[end + 2].text != "(" or tokens[end + 4].text != ")":
-                raise ExpressionError("REVERSE 必须包含一个关系技术名")
+                raise ExpressionError("REVERSE 必须包含一个关系英文标识")
             name = tokens[end + 3]
             if name.kind not in {"word", "quoted"}:
-                raise ExpressionError("REVERSE 的关系技术名无效")
+                raise ExpressionError("REVERSE 的关系英文标识无效")
             parts.append((name.name, "reverse"))
             end += 5
         elif part.kind in {"word", "quoted"}:

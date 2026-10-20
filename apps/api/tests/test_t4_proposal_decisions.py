@@ -349,3 +349,78 @@ def test_batches_page_by_keyset_cursor(client):
     assert sorted(seen) == sorted(ids) and rest["next_cursor"] is None
     bad = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches?cursor=nope")
     assert bad.status_code == 422
+
+
+def test_mapping_with_reference_named_properties_can_be_accepted(client):
+    from test_t1_proposal_contract import mapping_name_collision_items
+
+    session = create_session(client)
+    items = mapping_name_collision_items()
+    batch = seed_batch(client, session, items)
+    response = decide(client, session, [(item["id"], "accept") for item in batch["items"]])
+    assert response.status_code == 200, response.text
+    mapping = next(
+        m
+        for m in response.json()["session"]["draft"]["mappings"]
+        if "property_id" in m["fields"]
+    )
+    assert mapping["fields"] == items[-1]["after"]["fields"]
+
+
+def test_document_proposal_labels_use_candidate_titles_and_endpoints(client):
+    session = create_session(client)
+    batch = seed_batch(
+        client,
+        session,
+        [
+            create(
+                "staff",
+                "object_type",
+                {
+                    "name": "星港员工",
+                    "technical_name": "starport_staff",
+                    "title_property_id": {"client_ref": "title"},
+                },
+            ),
+            create(
+                "title",
+                "property",
+                {
+                    "owner_type_id": {"client_ref": "staff"},
+                    "name": "姓名",
+                    "technical_name": "staff_name",
+                },
+            ),
+            create(
+                "reports",
+                "link_type",
+                {
+                    "name": "reports_to",
+                    "source_type_id": {"client_ref": "staff"},
+                    "target_type_id": {"client_ref": "staff"},
+                },
+            ),
+            create(
+                "lan",
+                "material_object",
+                {"type_id": {"client_ref": "staff"}, "values": {"staff_name": "小岚"}},
+            ),
+            create(
+                "zhou",
+                "material_object",
+                {"type_id": {"client_ref": "staff"}, "values": {"staff_name": "小舟"}},
+            ),
+            create(
+                "fact-link",
+                "material_link",
+                {
+                    "type_id": {"client_ref": "reports"},
+                    "source_id": {"client_ref": "lan"},
+                    "target_id": {"client_ref": "zhou"},
+                },
+            ),
+        ],
+    )
+    labels = {item["client_ref"]: item["display_name"] for item in batch["items"]}
+    assert labels["lan"] == "小岚" and labels["zhou"] == "小舟"
+    assert labels["fact-link"] == "小岚 → 小舟"

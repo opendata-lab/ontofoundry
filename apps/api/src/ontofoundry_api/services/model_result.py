@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import secrets
 from contextlib import suppress
 from datetime import timedelta
@@ -27,6 +28,8 @@ from ontofoundry_api.services.proposals import (
     store_batch,
     store_failed_batch,
 )
+
+logger = logging.getLogger(__name__)
 
 RESULT_LEASE = timedelta(minutes=5)
 
@@ -345,6 +348,14 @@ async def _consume_proposals(
             parsed = parse_result(content, context, material_lookup=lookup)
         except ProposalContractError as exc:
             parsed, failure = None, exc
+        except Exception:
+            logger.exception("Unexpected proposal result validation failure")
+            parsed, failure = (
+                None,
+                ProposalContractError(
+                    "RESULT_VALIDATION_FAILED", "建模结果校验异常，请按本轮契约重新生成"
+                ),
+            )
     if parsed is None:
         repaired = await _request_repair(
             app,

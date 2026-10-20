@@ -675,6 +675,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -740,6 +741,7 @@
           "items": {
             "maxLength": 4000,
             "minLength": 1,
+            "pattern": "^(?=[\\s\\S]*\\{source\\})(?=[\\s\\S]*\\{target\\})(?:[^{}]|\\{(?:source|target)\\})*$",
             "type": "string"
           },
           "maxItems": 50,

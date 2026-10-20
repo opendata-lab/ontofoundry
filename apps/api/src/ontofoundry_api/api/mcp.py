@@ -21,7 +21,11 @@ LEGACY_PROTOCOL_VERSIONS = (
     "2025-03-26",
 )
 META = "io.modelcontextprotocol/"
-INSTRUCTIONS = "只读核心本体和已接受的文档事实；数据库聚合由 DataAgent 自有查询工具执行。"
+INSTRUCTIONS = (
+    "只读核心本体和已接受的文档事实；数据库聚合由 DataAgent 自有查询工具执行。"
+    "关系公共外壳的 technical_name 是读取兼容字段（等于 name），不属于核心定义；"
+    "写提案以 definition 和本轮 proposal Schema 为准。"
+)
 TOOLS = {
     "search_ontology": "按名称和同义词搜索核心语义",
     "get_ontology": "读取核心定义、继承及授权物理投影",

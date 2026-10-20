@@ -159,7 +159,7 @@ def _names(items, label, *, display=True, technical=True):
         _require(len(names) == len(set(names)), f"{label}名称重复")
     if technical:
         names = [item.technical_name.casefold() for item in items]
-        _require(len(names) == len(set(names)), f"{label}技术名重复（含继承）")
+        _require(len(names) == len(set(names)), f"{label}英文标识重复（含继承）")
 
 
 def _unique_key(index: DraftIndex, type_id: UUID, ids: list[UUID]) -> bool:
@@ -371,7 +371,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
     rule_keys = set()
     for rule in draft.rules:
         key = (rule.owner_kind, rule.owner_id, rule.technical_name.casefold())
-        _require(key not in rule_keys, "同一归属下规则技术名重复")
+        _require(key not in rule_keys, "同一归属下规则英文标识重复")
         rule_keys.add(key)
         resolve_rule_expression(draft, rule)
     _mappings(draft, index)

@@ -90,7 +90,7 @@ make serve
 
 ### 接入 DataAgent
 
-[`integrations/dataagent/`](integrations/dataagent/README.md) 提供建模和问数 Agent 定义、`md2ossie` Skill 及安装说明。该目录需要保留在版本控制中，DataAgent 服务本身由外部环境部署。
+[`integrations/dataagent/`](integrations/dataagent/README.md) 提供建模和问数 Agent 定义、`ontofoundry-modeling` Skill 及安装说明。该目录需要保留在版本控制中，DataAgent 服务本身由外部环境部署。
 
 启用 AI 建模需要配置：
 
@@ -194,4 +194,4 @@ cp .env.example .env
 
 OntoFoundry 采用 [Apache License 2.0](LICENSE)。允许商业使用、修改和分发，具体授权与义务以许可证正文为准。
 
-第三方依赖和内置资源保留各自的许可证。Apache Ossie 及 `md2ossie` 的 `LICENSE`、`NOTICE` 和来源说明位于各自目录。
+第三方依赖和内置资源保留各自的许可证。Apache Ossie 的 [LICENSE](apps/api/src/ontofoundry_api/adapters/ossie/assets/vendor/apache-ossie/LICENSE) 和 [NOTICE](apps/api/src/ontofoundry_api/adapters/ossie/assets/vendor/apache-ossie/NOTICE) 位于内置资源目录；`ontofoundry-modeling` 的 [LICENSE](integrations/dataagent/skills/ontofoundry-modeling/LICENSE) 和 [NOTICE](integrations/dataagent/skills/ontofoundry-modeling/NOTICE) 位于技能源码目录。
