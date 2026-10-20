@@ -10,6 +10,7 @@ import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
 import { EvidenceSection } from "../components/elements/ElementPanels";
 import { OntologyGraph } from "../components/OntologyGraph";
+import { useElementDetail } from "../hooks/useElementDetail";
 import { usePageTab } from "../hooks/usePageTab";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -46,6 +47,7 @@ export function InstancesPage() {
   const { workspace } = useWorkspaceContext();
   const { typeId = "", objectId } = useParams();
   const navigate = useNavigate();
+  const detail = useElementDetail();
   const [params, setParams] = useSearchParams();
   const sessionId = params.get("session");
   const keyParam = params.get("key");
@@ -293,7 +295,7 @@ export function InstancesPage() {
         <Breadcrumb
           items={[
             { title: <Link to={"../objects" + suffix}>本体对象</Link> },
-            { title: <Link to={`../objects${suffix ? suffix + "&" : "?"}inspect=object_type:${type.id}`}>{type.name}</Link> },
+            { title: <Link to={detail.href({ kind: "object_type", id: type.id })}>{type.name}</Link> },
             { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
             ...(object ? [{ title: object.display_text }] : []),
           ]}

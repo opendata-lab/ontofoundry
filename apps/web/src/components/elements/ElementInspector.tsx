@@ -1,8 +1,7 @@
-import { Alert, Button, ConfigProvider, Input, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
+import { Alert, Button, ConfigProvider, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
 import { Box, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { createPath, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ApiError, api, modelingApi, publishApi } from "../../api/client";
 import {
   COLLECTION_BY_KIND,
@@ -21,13 +20,8 @@ import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { useErrorMessage } from "../../hooks/useErrorMessage";
 import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
-import {
-  inspectorHref,
-  notifyOntologySaved,
-  withoutInspector,
-  type ElementRequest,
-  type ElementTab,
-} from "../../lib/elementInspector";
+import { notifyOntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
+import { useElementDetail } from "../../hooks/useElementDetail";
 import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
 import { preservePropertyBindings, type PropertyBindingEdits } from "../../lib/propertyBindingEditing";
 import { newId } from "../../lib/id";
@@ -35,12 +29,11 @@ import { documentDisplayText } from "../../lib/instanceDisplay";
 import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
 import { objectMapping, shortObjectName } from "../../lib/objectMapping";
 import { newDataset } from "../../lib/datasetEditing";
-import { PanelToolbar, StatusMark } from "../layout";
+import { PageBody, PageHeader, Panel, PanelToolbar, StatusMark } from "../layout";
 import { KIND } from "../proposals/elementMeta";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
 import { ObjectBasicPanel, RulesPanel } from "./ElementPanels";
-import { InspectorDialog } from "./InspectorDialog";
 import { joinProblem } from "../../lib/objectMappingEditing";
 import { LinkOverviewPanel } from "./LinkOverviewPanel";
 import { LinkDetailsPanel } from "./LinkDetailsPanel";
@@ -150,9 +143,9 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
   }
   if (kind === "metric") return Object.values(metricErrors(draft, element as Metric))[0] ?? null;
   const named = element as ObjectType | LinkType;
-  if (!named.name.trim() || ("technical_name" in named && !named.technical_name)) return kind === "link_type" ? "请填写关系标识" : `请填写${NOUN[kind]}的名称和技术名`;
+  if (!named.name.trim() || ("technical_name" in named && !named.technical_name)) return kind === "link_type" ? "请填写关系标识" : `请填写${NOUN[kind]}的名称和英文标识`;
   if (rulesFor(draft, named).some((r) => !r.name.trim() || !r.technical_name || !r.expression.trim()))
-    return "有规则还没有填写名称、技术名和表达式";
+    return "有规则还没有填写名称、英文标识和表达式";
   if (kind === "link_type") {
     const relation = element as LinkType;
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(relation.name)) return "关系标识只能使用字母、数字和下划线，且不能以数字开头";
@@ -164,7 +157,7 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
   }
   const object = element as ObjectType;
   const unnamed = draft.properties.find((p) => p.owner_type_id === object.id && (!p.name.trim() || !p.technical_name));
-  if (unnamed) return "有属性还没有填写名称和技术名";
+  if (unnamed) return "有属性还没有填写名称和英文标识";
   const derived = branchProblem(draft, object.derived_by);
   if (derived) return derived;
   for (const join of Object.values(mappingFor(draft, object.id)?.inherited_link_bindings ?? {})) {
@@ -238,64 +231,87 @@ function errorText(e: unknown): ReactNode {
   return e instanceof Error ? e.message : "保存失败";
 }
 
-export function ElementInspector() {
-  const [params] = useSearchParams();
-  const target = params.get("inspect");
-  if (!target) return null;
-  const split = target.indexOf(":");
-  const kind = target.slice(0, split);
-  const id = target.slice(split + 1);
-  const sessionId =
-    params.get("inspectSource") === "published" ? null : (params.get("inspectSession") ?? params.get("session"));
-  const previewHash = params.get("inspectPreviewHash");
+/** The semantic graph's in-place view of one element; every other entry opens its page. */
+export function ElementModal({
+  request,
+  onChange,
+  onClose,
+}: {
+  request: ElementRequest;
+  onChange: (request: ElementRequest) => void;
+  onClose: () => void;
+}) {
+  const sessionId = request.sessionId ?? null;
   return (
-    <Inspector
-      key={`${kind}:${id}:${sessionId}:${previewHash}`}
-      kind={kind}
-      id={id}
+    <ElementView
+      key={`${request.kind}:${request.id}:${sessionId}:${request.previewHash}`}
+      variant="modal"
+      kind={request.kind}
+      id={request.id}
       sessionId={sessionId}
-      previewHash={previewHash}
+      previewHash={request.previewHash ?? null}
+      owner={request.owner ?? null}
+      startEditing={request.mode === "edit"}
+      tab={request.tab ?? null}
+      onTab={(tab) => onChange({ ...request, tab })}
+      onCreated={(next) => onChange({ ...request, ...next, mode: undefined })}
+      onClose={onClose}
     />
   );
 }
 
-function Inspector({
-  kind: requestedKind,
-  id,
-  sessionId,
-  previewHash,
-}: {
+type ViewProps = {
+  variant: "modal" | "page";
   kind: string;
   id: string;
   sessionId: string | null;
   previewHash: string | null;
-}) {
+  owner: string | null;
+  startEditing: boolean;
+  tab: string | null;
+  onTab: (tab: ElementTab) => void;
+  /** A new element was saved under this id. */
+  onCreated: (request: ElementRequest) => void;
+  onClose: () => void;
+};
+
+export function ElementView({
+  variant,
+  kind: requestedKind,
+  id,
+  sessionId,
+  previewHash,
+  owner,
+  startEditing,
+  tab: requestedTabKey,
+  onTab,
+  onCreated,
+  onClose,
+}: ViewProps) {
   const { workspace, refresh } = useWorkspaceContext();
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
+  const detail = useElementDetail();
   const active = usePageActive();
   const page = useContext(PageTabContext);
-  const reportElement = page?.updateElement;
+  const modal = variant === "modal";
+  // A page owns its tab's unsaved state; a modal reports on top of the page beneath it.
+  const reportElement = modal ? page?.updateElement : page?.update;
   const body = useRef<HTMLDivElement>(null);
   const creating = id === "new";
   const createdId = useRef(newId());
   const effectiveId = creating ? createdId.current : id;
-  const owner = params.get("inspectOwner");
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const draftRef = useRef<Draft | null>(null);
   const propertyBindings = useRef<PropertyBindingEdits>(new Map());
   draftRef.current = draft;
   const [editing, setEditing] = useState(
-    !previewHash && (creating || params.get("inspectMode") === "edit") && !!workspace.role,
+    !previewHash && (creating || startEditing) && !!workspace.role,
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ReactNode>(null);
   useErrorMessage(draft ? error : null);
   const [showErrors, setShowErrors] = useState(false);
-  const [copyFallback, setCopyFallback] = useState(false);
   const [impactPreview, setImpactPreview] = useState<ImpactPreview | null>(null);
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -349,19 +365,15 @@ function Inspector({
       live = false;
     };
   }, [workspace.id, workspace.role, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt]);
-  useLayoutEffect(() => {
-    reportElement?.({ dirty, busy });
-    return () => reportElement?.({ dirty: false, busy: false });
-  }, [dirty, busy, reportElement]);
   useEffect(() => {
-    if (!dirty && !busy) return;
+    if (!modal || (!dirty && !busy)) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty, busy]);
+  }, [modal, dirty, busy]);
 
   const resolved = draft ? resolve(draft, requestedKind, effectiveId) : null;
   const kind: InspectKind = resolved?.kind ?? (NEW_KINDS.includes(requestedKind as InspectKind) ? (requestedKind as InspectKind) : "object_type");
@@ -387,7 +399,7 @@ function Inspector({
           { key: "rules", label: "规则", count: rules.length },
         ]
       : [];
-  const requestedTab = params.get("inspectTab") ?? resolved?.tab ?? "basic";
+  const requestedTab = requestedTabKey ?? resolved?.tab ?? "basic";
   const compatible =
     link && ["definition", "instances"].includes(requestedTab)
       ? "basic"
@@ -399,15 +411,7 @@ function Inspector({
         ? "basic"
         : requestedTab;
   const selectedTab = tabs.find((t) => t.key === compatible)?.key ?? "basic";
-  const selectTab = (tab: ElementTab) =>
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        next.set("inspectTab", tab);
-        return next;
-      },
-      { replace: true },
-    );
+  const selectTab = onTab;
   useEffect(() => {
     if (!loaded || !body.current) return;
     Array.from(body.current.querySelectorAll<HTMLElement>("[data-element-id]"))
@@ -432,7 +436,12 @@ function Inspector({
   const close = () => {
     if (busy) return;
     discard();
-    void navigate(withoutInspector(createPath(location)), { replace: true });
+    onClose();
+  };
+  // References always lead to a detail page; a page keeps its own edits meanwhile.
+  const openPage = (request: ElementRequest) => {
+    if (modal) close();
+    detail.open({ ...request, sessionId, previewHash: previewHash ?? undefined });
   };
   const open = (request: ElementRequest) => {
     if (busy) return;
@@ -440,10 +449,7 @@ function Inspector({
       selectTab(request.tab ?? "basic");
       return;
     }
-    discard();
-    void navigate(
-      inspectorHref(createPath(location), { ...request, sessionId, previewHash: previewHash ?? undefined }),
-    );
+    openPage(request);
   };
   const buildCandidate = (
     sourceDraft: Draft | null = draftRef.current,
@@ -494,10 +500,7 @@ function Inspector({
     notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
     refresh();
     setNotice("已保存");
-    void navigate(
-      inspectorHref(createPath(location), { kind, id: payload.target_id, tab: selectedTab, sessionId }),
-      { replace: true },
-    );
+    if (creating) onCreated({ kind, id: payload.target_id, tab: selectedTab, sessionId });
   };
   const runPreviewAndSave = async () => {
     let current = buildCandidate();
@@ -600,26 +603,6 @@ function Inspector({
       setAttempt((n) => n + 1);
     }
   };
-  const elementLink = new URL(
-    element
-      ? inspectorHref(createPath(location), {
-          kind,
-          id: element.id,
-          tab: selectedTab,
-          sessionId,
-          previewHash: previewHash ?? undefined,
-        })
-      : createPath(location),
-    window.location.origin,
-  ).href;
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(elementLink);
-      setNotice("链接已复制");
-    } catch {
-      setCopyFallback(true);
-    }
-  };
   const change = (next: Draft) => {
     if (draftRef.current) next = preservePropertyBindings(draftRef.current, next, propertyBindings.current);
     draftRef.current = next;
@@ -685,6 +668,170 @@ function Inspector({
       canBrowseDatabase={!previewHash && !editing}
     />;
   })();
+  useLayoutEffect(() => {
+    reportElement?.(modal ? { dirty, busy } : { title: element?.name || title, dirty, busy });
+    return () => reportElement?.({ dirty: false, busy: false });
+  }, [modal, title, element?.name, dirty, busy, reportElement]);
+  const status = record && record.mode !== "virtual" && record.mode !== "unbound" && (
+    <span className="flex items-center gap-2 text-xs font-normal">
+      <MappingStatusIcon state={record.state} label={record.label} />
+      {record.main?.dataset && <Text type="secondary" className="text-xs">· 主数据集 {record.main.dataset.name}</Text>}
+    </span>
+  );
+  const control = modal ? "small" : "middle";
+  const actions = (
+    <>
+      {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
+      {!editing && member && !previewHash && element && (
+        <Button size={control} onClick={beginEdit} disabled={!loaded || busy}>
+          编辑
+        </Button>
+      )}
+      {editing && (
+        <>
+          <Button size={control} disabled={busy} onClick={cancel}>取消</Button>
+          <Button size={control} type="primary" loading={busy} disabled={!element || (!dirty && !creating)} onClick={() => void save()}>
+            保存
+          </Button>
+        </>
+      )}
+      {modal && element && !creating && (
+        <Button size="small" disabled={busy} onClick={() => openPage({ kind, id: element.id, tab: selectedTab })}>
+          打开详情
+        </Button>
+      )}
+      {modal && (
+        <Tooltip title={expanded ? "还原弹窗" : "展开弹窗"}>
+          <Button
+            size="small"
+            type="text"
+            disabled={busy}
+            aria-label={expanded ? "还原弹窗" : "展开弹窗"}
+            icon={expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            onClick={() => setExpanded(!expanded)}
+          />
+        </Tooltip>
+      )}
+    </>
+  );
+  const main = (
+    <div ref={body} aria-busy={busy} className="element-detail-body flex min-h-0 flex-1 flex-col">
+      {tabs.length > 0 && (
+        <PanelToolbar className="shrink-0">
+          <Tabs
+            activeKey={selectedTab}
+            onChange={(key) => !busy && selectTab(key as ElementTab)}
+            items={tabs.map((tab) => ({
+              key: tab.key,
+              disabled: busy,
+              label: (
+                <span>
+                  {tab.label}
+                  {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
+                </span>
+              ),
+            }))}
+          />
+        </PanelToolbar>
+      )}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+        {error && (
+          <Alert
+            type="error"
+            showIcon
+            message={error}
+            action={
+              !draft ? (
+                <Button size="small" onClick={() => setAttempt((n) => n + 1)}>
+                  重新读取
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+        {!loaded && !error && (
+          <div className="flex justify-center py-12" role="status" aria-label="正在读取">
+            <Spin />
+          </div>
+        )}
+        {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
+        {content && (
+          <ConfigProvider componentDisabled={busy}>
+            <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
+              {content}
+            </fieldset>
+          </ConfigProvider>
+        )}
+      </div>
+    </div>
+  );
+  const impact = impactPreview && draft && (
+    <Modal
+      open
+      title="确认保存影响"
+      okText="确认保存"
+      cancelText="取消"
+      okButtonProps={{ loading: busy }}
+      cancelButtonProps={{ disabled: busy }}
+      onOk={() => void confirmSave()}
+      onCancel={() => !busy && setImpactPreview(null)}
+      destroyOnHidden
+    >
+      <div className="flex flex-col gap-3">
+        <Text type="secondary">确认后这些元素会随本次保存一并改写</Text>
+        <List
+          size="small"
+          dataSource={impactPreview.items}
+          renderItem={(item) => (
+            <List.Item key={`${item.target_kind}:${item.target_id}`}>
+              <div className="flex flex-col gap-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <Tag className="m-0">
+                    {KIND[item.target_kind].label}
+                  </Tag>
+                  <strong>{affectedElementName(draft, loaded?.draft ?? draft, item)}</strong>
+                </span>
+                <Text type="secondary" className="text-xs">
+                  {item.reason}
+                </Text>
+              </div>
+            </List.Item>
+          )}
+        />
+      </div>
+    </Modal>
+  );
+  const heading = (
+    <span className="flex flex-wrap items-baseline gap-2" aria-label={element?.name || title}>
+      <span className={modal ? "text-lg" : undefined}>{title}</span>
+      {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
+    </span>
+  );
+  if (!modal)
+    return (
+      <div className="flex h-full min-h-0 flex-col bg-canvas">
+        <PageHeader
+          title={
+            <span className="flex items-center gap-2">
+              <Icon size={16} className="flex-none text-accent" />
+              {heading}
+            </span>
+          }
+          note={
+            <span className="flex items-center gap-3">
+              {status}
+              {previewHash ? "待发布预览" : sessionId ? "建模会话草稿" : null}
+            </span>
+          }
+        >
+          {actions}
+        </PageHeader>
+        <PageBody>
+          <Panel fill>{main}</Panel>
+        </PageBody>
+        {impact}
+      </div>
+    );
   return (
     <Modal
       open={active}
@@ -708,144 +855,15 @@ function Inspector({
             <Icon className="size-icon" />
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="flex flex-wrap items-baseline gap-2" aria-label={element?.name || title}>
-              <span className="text-lg">{title}</span>
-              {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
-            </span>
-            {record && record.mode !== "virtual" && record.mode !== "unbound" && (
-              <span className="mt-1 flex items-center gap-2 text-xs font-normal">
-                <MappingStatusIcon state={record.state} label={record.label} />
-                {record.main?.dataset && <Text type="secondary">{record.main.dataset.name}</Text>}
-              </span>
-            )}
+            {heading}
+            {status && <span className="mt-1">{status}</span>}
           </div>
-          <div className="flex items-center gap-1">
-            {notice && (
-              <StatusMark state="mapped" label={notice} className="font-normal" role="status" />
-            )}
-            {!editing && member && !previewHash && element && (
-              <Button size="small" onClick={beginEdit} disabled={!loaded || busy}>
-                编辑
-              </Button>
-            )}
-            {editing && (
-              <>
-                <Button size="small" disabled={busy} onClick={cancel}>取消</Button>
-                <Button size="small" type="primary" loading={busy} disabled={!element || (!dirty && !creating)} onClick={() => void save()}>
-                  保存
-                </Button>
-              </>
-            )}
-            {element && !creating && (
-              <Button size="small" disabled={busy} onClick={() => void copy()}>
-                复制链接
-              </Button>
-            )}
-            <Tooltip title={expanded ? "还原弹窗" : "展开弹窗"}>
-              <Button
-                size="small"
-                type="text"
-                disabled={busy}
-                aria-label={expanded ? "还原弹窗" : "展开弹窗"}
-                icon={expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-                onClick={() => setExpanded(!expanded)}
-              />
-            </Tooltip>
-          </div>
+          <div className="flex items-center gap-1">{actions}</div>
         </div>
       }
     >
-      <div ref={body} aria-busy={busy} className="flex min-h-0 flex-1 flex-col">
-        {tabs.length > 0 && (
-          <PanelToolbar className="shrink-0">
-            <Tabs
-              size="small"
-              activeKey={selectedTab}
-              onChange={(key) => !busy && selectTab(key as ElementTab)}
-              items={tabs.map((tab) => ({
-                key: tab.key,
-                disabled: busy,
-                label: (
-                  <span>
-                    {tab.label}
-                    {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
-                  </span>
-                ),
-              }))}
-            />
-          </PanelToolbar>
-        )}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-          {error && (
-            <Alert
-              type="error"
-              showIcon
-              message={error}
-              action={
-                !draft ? (
-                  <Button size="small" onClick={() => setAttempt((n) => n + 1)}>
-                    重新读取
-                  </Button>
-                ) : undefined
-              }
-            />
-          )}
-          {!loaded && !error && (
-            <div className="flex justify-center py-12" role="status" aria-label="正在读取">
-              <Spin />
-            </div>
-          )}
-          {loaded && !element && <Text type="secondary">此元素不存在，或已从当前内容中删除。</Text>}
-          {content && (
-            <ConfigProvider componentDisabled={busy}>
-              <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
-                {content}
-              </fieldset>
-            </ConfigProvider>
-          )}
-        </div>
-      </div>
-      {impactPreview && draft && (
-        <Modal
-          open
-          title="确认保存影响"
-          okText="确认保存"
-          cancelText="取消"
-          okButtonProps={{ loading: busy }}
-          cancelButtonProps={{ disabled: busy }}
-          onOk={() => void confirmSave()}
-          onCancel={() => !busy && setImpactPreview(null)}
-          destroyOnHidden
-        >
-          <div className="flex flex-col gap-3">
-            <Text type="secondary">确认后这些元素会随本次保存一并改写</Text>
-            <List
-              size="small"
-              dataSource={impactPreview.items}
-              renderItem={(item) => (
-                <List.Item key={`${item.target_kind}:${item.target_id}`}>
-                  <div className="flex flex-col gap-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <Tag className="m-0">
-                        {KIND[item.target_kind].label}
-                      </Tag>
-                      <strong>{affectedElementName(draft, loaded?.draft ?? draft, item)}</strong>
-                    </span>
-                    <Text type="secondary" className="text-xs">
-                      {item.reason}
-                    </Text>
-                  </div>
-                </List.Item>
-              )}
-            />
-          </div>
-        </Modal>
-      )}
-      {copyFallback && (
-        <InspectorDialog title="复制链接" onClose={() => setCopyFallback(false)}>
-          <Input aria-label="元素链接" autoFocus readOnly value={elementLink} onFocus={(e) => e.currentTarget.select()} />
-        </InspectorDialog>
-      )}
+      {main}
+      {impact}
     </Modal>
   );
 }

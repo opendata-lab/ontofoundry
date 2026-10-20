@@ -126,7 +126,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType> & { initialPropert
     change({ ...draft, properties: draft.properties.map((p) => p.id === value.id ? { ...p, ...patch } : p) });
   const bindingReason = (row: MappedProperty): string | null => {
     if (record.properties.filter((other) => other.property.technical_name === row.property.technical_name).length > 1)
-      return "技术名重复，请先完成改名";
+      return "英文标识重复，请先完成改名";
     if (record.mode === "virtual" || (record.mode === "unbound" && !record.mapping)) return "先在上方选择数据集";
     if (record.mode === "shared_parent" && row.inheritedFrom) return "继承属性使用父对象的数据绑定";
     return null;
@@ -142,7 +142,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType> & { initialPropert
     }] });
   };
   const constraints = (value: Property) => <span className="inline-flex flex-wrap gap-1">
-    {value.identifier && <Tooltip title="业务上识别实例的属性；多个标识属性共同组成业务标识，例如订单号＋行号"><Tag color="blue" className="m-0">标识</Tag></Tooltip>}
+    {value.identifier && <Tooltip title="业务上识别实例的属性；多个标识属性共同组成业务标识，例如订单号＋行号"><Tag className="m-0 border-accent bg-accent-soft text-accent">标识</Tag></Tooltip>}
     {value.unique && <Tooltip title="该属性值在同类对象实例中唯一"><Tag className="m-0">唯一</Tag></Tooltip>}
     {value.required && <Tooltip title="该属性为必填业务信息"><Tag className="m-0">必填</Tag></Tooltip>}
     {!value.identifier && !value.unique && !value.required && <Text type="secondary">—</Text>}
@@ -166,7 +166,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType> & { initialPropert
           <SectionTitle title="属性" note={`${record.properties.length} 个`}>
             {editing && <Button size="small" icon={<Plus size={14} />} onClick={addProperty}>添加属性</Button>}
           </SectionTitle>
-          <Input size="small" type="search" aria-label="搜索属性" placeholder="搜索名称或技术名" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Input size="small" type="search" aria-label="搜索属性" placeholder="搜索名称或英文标识" allowClear value={query} onChange={(e) => setQuery(e.target.value)} />
           <Table<MappedProperty>
             size="small"
             rowKey={(row) => row.property.id}
@@ -178,7 +178,7 @@ export function PropertiesPanel(props: PanelProps<ObjectType> & { initialPropert
               { title: "属性", key: "name", render: (_, row) => (
                 <div className="flex min-w-0 flex-col" data-element-id={row.property.id}>
                   <span className="font-medium">{row.property.name || "未命名属性"}</span>
-                  <code className="text-xs text-muted">{row.property.technical_name || "尚未设置技术名"}</code>
+                  <code className="text-xs text-muted">{row.property.technical_name || "尚未设置英文标识"}</code>
                   {row.inheritedFrom && <Text type="secondary" className="text-xs">继承自{byId(draft.object_types, row.inheritedFrom)?.name}</Text>}
                 </div>
               ) },
@@ -199,13 +199,13 @@ export function PropertiesPanel(props: PanelProps<ObjectType> & { initialPropert
                 {editable ? (
                   <Form layout="vertical" component="div" size="small">
                     <Form.Item className="mb-3" label="名称" required><Input aria-label="属性名称" value={property.name} onChange={(e) => setProperty(property, { name: e.target.value })} /></Form.Item>
-                    <Form.Item className="mb-3" label="技术名" required><Input aria-label="属性技术名" className="font-mono" value={property.technical_name} onChange={(e) => change(renameProperty(draft, property, e.target.value.trim()))} /></Form.Item>
+                    <Form.Item className="mb-3" label="英文标识" required><Input aria-label="属性英文标识" className="font-mono" value={property.technical_name} onChange={(e) => change(renameProperty(draft, property, e.target.value.trim()))} /></Form.Item>
                     <Form.Item className="mb-3" label="类型"><Select aria-label={`${property.name || "属性"}类型`} className="w-full" value={property.value_kind} options={Object.entries(VALUE_KINDS).map(([value, label]) => ({ value, label }))} onChange={(value_kind: ValueKind) => setProperty(property, { value_kind })} /></Form.Item>
                     <Form.Item label="描述" className="mb-0"><Input.TextArea aria-label={`${property.name || "属性"}描述`} autoSize={{ minRows: 2, maxRows: 6 }} value={property.description} onChange={(e) => setProperty(property, { description: e.target.value })} /></Form.Item>
                   </Form>
                 ) : <Descriptions size="small" column={1} items={[
                   { key: "name", label: "名称", children: property.name || "未命名属性" },
-                  { key: "technical", label: "技术名", children: <code>{property.technical_name || "—"}</code> },
+                  { key: "technical", label: "英文标识", children: <code>{property.technical_name || "—"}</code> },
                   { key: "kind", label: "类型", children: VALUE_KINDS[property.value_kind] },
                   { key: "description", label: "描述", children: property.description || <Text type="secondary">暂无描述</Text> },
                 ]} />}

@@ -11,7 +11,14 @@ import { OntologyViewPage } from "./OntologyViewPage";
 const context = vi.hoisted(() => ({ workspace: {} as Workspace, refresh: vi.fn() }));
 const { open } = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => context }));
-vi.mock("../hooks/useElementInspector", () => ({ useElementInspector: () => ({ open, href: () => "#" }) }));
+vi.mock("../hooks/useElementDetail", () => ({ useElementDetail: () => ({ open: vi.fn(), href: () => "#" }) }));
+// The graph opens elements in place; record what the popup was asked to show.
+vi.mock("../components/elements/ElementInspector", () => ({
+  ElementModal: ({ request }: { request: unknown }) => {
+    open(request);
+    return null;
+  },
+}));
 vi.mock("../api/client", () => ({
   api: { overview: vi.fn(), presentation: vi.fn() },
   modelingApi: { sessions: vi.fn(), snapshot: vi.fn() },

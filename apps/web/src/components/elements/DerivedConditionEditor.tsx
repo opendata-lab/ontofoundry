@@ -206,9 +206,9 @@ export function DerivedConditionEditor({
           />
           <Text type="secondary" className="text-xs">
             从 {context.parent?.technical_name ?? "父对象"} 出发引用属性和关联，例如{" "}
-            <code>{context.parent?.technical_name ?? "parent"}.属性技术名 = '值'</code>；有关联写{" "}
-            <code>EXISTS ({context.parent?.technical_name ?? "parent"}.关系技术名)</code>，反向关系写{" "}
-            <code>REVERSE(关系技术名)</code>。保存时由服务器校验。
+            <code>{context.parent?.technical_name ?? "parent"}.属性英文标识 = '值'</code>；有关联写{" "}
+            <code>EXISTS ({context.parent?.technical_name ?? "parent"}.关系英文标识)</code>，反向关系写{" "}
+            <code>REVERSE(关系英文标识)</code>。保存时由服务器校验。
           </Text>
         </>
       )}

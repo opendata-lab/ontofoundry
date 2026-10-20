@@ -3,12 +3,13 @@ import { ArrowRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError, publishApi } from "../../api/client";
 import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, TargetKind, VersionSummary } from "../../api/types";
-import { useElementInspector } from "../../hooks/useElementInspector";
+import type { ElementRequest } from "../../lib/elementInspector";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
 import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
 import { FieldDiff } from "../proposals/FieldDiff";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
+import { ElementModal } from "../elements/ElementInspector";
 import { ConflictResolver } from "./ConflictResolver";
 
 const { Text } = Typography;
@@ -263,7 +264,8 @@ export function PublishPanel({
   /** The session selector, shown where a pull request names its branch. */
   picker?: ReactNode;
 }) {
-  const inspector = useElementInspector();
+  // The release page shows changed elements in place; the popup leads on to their pages.
+  const [inspected, setInspected] = useState<ElementRequest | null>(null);
   const [preview, setPreview] = useState<PublishPreview | null>(null);
   const [previewedAt, setPreviewedAt] = useState<Date | null>(null);
   const [conflicts, setConflicts] = useState<{ items: MergeConflict[]; current: string | null } | null>(null);
@@ -474,7 +476,7 @@ export function PublishPanel({
                     names={names}
                     open={open}
                     onInspect={(c) =>
-                      inspector.open({
+                      setInspected({
                         kind: c.element_kind,
                         id: c.element_id,
                         sessionId: session.id,
@@ -659,6 +661,7 @@ export function PublishPanel({
       <Drawer open={showModel} width="var(--review-dialog-width)" title="本次将发布的模型" onClose={() => setShowModel(false)} destroyOnHidden>
         <pre className="m-0 font-mono text-xs leading-base whitespace-pre-wrap">{JSON.stringify(preview?.merged_model, null, 2)}</pre>
       </Drawer>
+      {inspected && <ElementModal request={inspected} onChange={setInspected} onClose={() => setInspected(null)} />}
     </div>
   );
 }

@@ -122,9 +122,9 @@ export function MetricForm({
         <Form.Item label="名称" required {...status("name")}>
           <Input aria-label="指标名称" value={metric.name} placeholder="例如：已完成订单金额" onChange={(e) => onChange({ ...metric, name: e.target.value })} />
         </Form.Item>
-        <Form.Item label="技术名" required {...status("technical_name")}>
+        <Form.Item label="英文标识" required {...status("technical_name")}>
           <Input
-            aria-label="指标技术名"
+            aria-label="指标英文标识"
             className="font-mono"
             value={metric.technical_name}
             onChange={(e) => onChange({ ...metric, technical_name: e.target.value.trim() })}

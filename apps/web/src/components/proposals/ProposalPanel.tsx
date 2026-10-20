@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Dropdown, Empty, Input, Modal, Segmented, Select, Tooltip, Typography } from "antd";
+import { Alert, Button, Checkbox, Dropdown, Empty, Input, Modal, Select, Tabs, Tooltip, Typography } from "antd";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
@@ -173,46 +173,51 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
         />
       )}
       {proposals.error && <Alert type="error" showIcon message={proposals.error} />}
-      <PanelToolbar
-        extra={
-          <>
-            <Select
-              mode="multiple"
-              size="small"
-              allowClear
-              aria-label="元素类型"
-              placeholder="全部类型"
-              maxTagCount={1}
-              className="min-w-review-filter"
-              value={kindFilter}
-              onChange={setKindFilter}
-              options={kinds.map((kind) => ({
-                value: kind,
-                label: `${reviewKindName(kind)} ${items.filter((i) => i.target_kind === kind && matchesStatus(i, status)).length}`,
-              }))}
-            />
-            <Input.Search
-              allowClear
-              size="small"
-              aria-label="搜索提案名称"
-              placeholder="搜索名称、技术名或所属对象…"
-              className="w-60"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </>
-        }
-      >
-        <Segmented
+      <Tabs
+        size="small"
+        activeKey={status}
+        onChange={(value) => setStatus(value as StatusFilter)}
+        renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
+        items={statusChoices.map((tab) => {
+          const count = statusBase.filter((item) => matchesStatus(item, tab.key)).length;
+          const alert = tab.key === "blocked" && count > 0;
+          return {
+            key: tab.key,
+            label: (
+              <span className={`text-xs ${alert ? "text-danger" : ""}`}>
+                {tab.label}
+                <span className={`ml-1 tabular-nums ${alert ? "text-danger" : "text-muted"}`}>{count}</span>
+              </span>
+            ),
+          };
+        })}
+      />
+      <div className="flex items-center gap-2 border-b border-rule px-4 py-2">
+        <Input.Search
+          allowClear
           size="small"
-          value={status}
-          onChange={(value) => setStatus(value as StatusFilter)}
-          options={statusChoices.map((tab) => ({
-            value: tab.key,
-            label: `${tab.label} ${statusBase.filter((item) => matchesStatus(item, tab.key)).length}`,
+          aria-label="搜索提案名称"
+          placeholder="搜索名称、英文标识或所属对象…"
+          className="min-w-0 flex-1"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <Select
+          mode="multiple"
+          size="small"
+          allowClear
+          aria-label="元素类型"
+          placeholder="全部类型"
+          maxTagCount={1}
+          className="min-w-review-filter"
+          value={kindFilter}
+          onChange={setKindFilter}
+          options={kinds.map((kind) => ({
+            value: kind,
+            label: `${reviewKindName(kind)} ${items.filter((i) => i.target_kind === kind && matchesStatus(i, status)).length}`,
           }))}
         />
-      </PanelToolbar>
+      </div>
       <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2">
         <Checkbox
           aria-label="选择当前筛选的全部提案"

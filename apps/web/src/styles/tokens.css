@@ -110,6 +110,9 @@
   --settings-max-width: 880px;
   /* U3 existing review overlay and preview bounds. */
   --model-category-min-width: 100px;
+  --model-category-max-columns: 4;
+  /* The results column stays narrower than the conversation. */
+  --builder-results-width: clamp(340px, 30%, 480px);
   --review-code-height: 360px;
   --review-detail-height: 64vh;
   --review-detail-width: 860px;
@@ -144,6 +147,7 @@
   --spacing-review-detail: var(--review-detail-height);
   --spacing-review-evidence: var(--review-evidence-width);
   --spacing-review-filter: var(--review-filter-width);
+  --spacing-builder-results: var(--builder-results-width);
   --spacing-review-graph: var(--review-graph-height);
   --spacing-inspector-search: var(--inspector-search-width);
   --spacing-inspector-filter: var(--inspector-filter-width);
@@ -269,6 +273,15 @@
 .element-inspector-content-expanded {
   height: var(--inspector-expanded-height);
 }
+/* Panel tabs mark the selected item by weight; workspace card tabs keep their own style. */
+.ant-tabs:not(.ant-tabs-card) .ant-tabs-tab-active .ant-tabs-tab-btn {
+  font-weight: 600;
+}
+
+/* Popup and detail page share one width container for the panel layouts. */
+.element-detail-body {
+  container-type: inline-size;
+}
 .element-inspector-header {
   flex-shrink: 0;
   min-height: calc(var(--control-height) + var(--space-md));
@@ -380,6 +393,13 @@
 /* Model categories remain visible as the results column narrows. */
 .model-result-categories {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--model-category-min-width)), 1fr));
+  /* At most four per row, fewer once a cell would drop below its minimum width. */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(
+      min(100%, max(var(--model-category-min-width), (100% - (var(--model-category-max-columns) - 1) * var(--space-xs)) / var(--model-category-max-columns))),
+      1fr
+    )
+  );
   gap: var(--space-xs);
 }

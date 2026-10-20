@@ -22,41 +22,35 @@ export type ElementRequest = {
   /** For a new link or metric: the object or dataset it starts from. */
   owner?: string;
 };
-const INSPECT_KEYS = [
-  "inspect",
-  "inspectTab",
-  "inspectMode",
-  "inspectSession",
-  "inspectSource",
-  "inspectPreviewHash",
-  "inspectOwner",
-  "mapping_source",
-  "mapping_table",
-  "mapping_schema",
-];
-export function withoutInspector(href: string) {
-  const url = new URL(href, "http://local");
-  INSPECT_KEYS.forEach((key) => url.searchParams.delete(key));
-  return url.pathname + url.search + url.hash;
+/** The address of an element's own detail page. */
+export function elementHref(workspaceId: string, request: ElementRequest) {
+  const params = new URLSearchParams();
+  if (request.tab) params.set("tab", request.tab);
+  if (request.mode === "edit") params.set("mode", "edit");
+  if (request.owner) params.set("owner", request.owner);
+  if (request.sessionId) params.set("session", request.sessionId);
+  if (request.previewHash) params.set("preview", request.previewHash);
+  const query = params.toString();
+  return `/workspaces/${workspaceId}/elements/${request.kind}/${encodeURIComponent(request.id)}${query ? `?${query}` : ""}`;
 }
-export function inspectorHref(href: string, request: ElementRequest) {
-  const url = new URL(withoutInspector(href), "http://local");
-  url.searchParams.set("inspect", `${request.kind}:${request.id}`);
-  if (request.tab) url.searchParams.set("inspectTab", request.tab);
-  if (request.mode === "edit") url.searchParams.set("inspectMode", "edit");
-  if (request.owner) url.searchParams.set("inspectOwner", request.owner);
-  const session =
-    request.sessionId === undefined
-      ? url.searchParams.get("session")
-      : request.sessionId;
-  url.searchParams.set("inspectSource", session ? "session" : "published");
-  if (session) url.searchParams.set("inspectSession", session);
-  if (request.previewHash) {
-    url.searchParams.set("inspectSource", "preview");
-    url.searchParams.set("inspectPreviewHash", request.previewHash);
-  }
-  return url.pathname + url.search + url.hash;
+
+/** Links copied before detail pages existed carried the element in `?inspect=`. */
+export function legacyInspectRequest(params: URLSearchParams): ElementRequest | null {
+  const target = params.get("inspect");
+  const split = target?.indexOf(":") ?? -1;
+  if (!target || split < 1) return null;
+  const source = params.get("inspectSource");
+  return {
+    kind: target.slice(0, split) as TargetKind,
+    id: target.slice(split + 1),
+    tab: (params.get("inspectTab") ?? undefined) as ElementTab | undefined,
+    mode: params.get("inspectMode") === "edit" ? "edit" : undefined,
+    owner: params.get("inspectOwner") ?? undefined,
+    sessionId: source === "published" ? null : (params.get("inspectSession") ?? params.get("session")),
+    previewHash: params.get("inspectPreviewHash") ?? undefined,
+  };
 }
+
 export const ONTOLOGY_SAVED = "ontofoundry:element-saved";
 export type OntologySaved = {
   workspaceId: string;

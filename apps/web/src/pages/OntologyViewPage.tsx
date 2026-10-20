@@ -6,9 +6,10 @@ import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { PageBody, PageHeader, Panel, PanelToolbar, StatusMark } from "../components/layout";
 import { EmptyModel } from "../components/EmptyModel";
 import { SemanticView } from "../components/SemanticView";
-import { useElementInspector } from "../hooks/useElementInspector";
+import { ElementModal } from "../components/elements/ElementInspector";
+import { useElementDetail } from "../hooks/useElementDetail";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
-import { ONTOLOGY_SAVED, type OntologySaved } from "../lib/elementInspector";
+import { ONTOLOGY_SAVED, type ElementRequest, type OntologySaved } from "../lib/elementInspector";
 
 export function OntologyViewPage() {
   const { workspace } = useWorkspaceContext();
@@ -18,7 +19,9 @@ export function OntologyViewPage() {
   const [model, setModel] = useState<Draft | null>(null);
   const [resourceError, setResourceError] = useState("");
   const [draftSession, setDraftSession] = useState<string | null>(null);
-  const inspector = useElementInspector();
+  const detail = useElementDetail();
+  // Kept in memory only: a reload returns to the plain graph.
+  const [inspected, setInspected] = useState<ElementRequest | null>(null);
   const load = () => setAttempt((value) => value + 1);
   useEffect(() => {
     let active = true;
@@ -83,10 +86,11 @@ export function OntologyViewPage() {
         <Panel fill>
           {draftSession && <PanelToolbar><Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link></PanelToolbar>}
           <div className="min-h-0 flex-1">
-            {graph ? <SemanticView graph={graph} model={model} onOpen={inspector.open} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
+            {graph ? <SemanticView graph={graph} model={model} onOpen={setInspected} onOpenPage={detail.open} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
           </div>
         </Panel>
       </PageBody>
+      {inspected && <ElementModal request={inspected} onChange={setInspected} onClose={() => setInspected(null)} />}
     </div>
   );
 }

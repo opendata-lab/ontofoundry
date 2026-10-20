@@ -60,7 +60,7 @@ export function acceptableIds(items: ProposalItem[]) {
 
 export const FIELD_LABELS: Record<string, string> = {
   name: "名称",
-  technical_name: "技术名",
+  technical_name: "英文标识",
   description: "描述",
   synonyms: "同义词",
   tags: "标签",

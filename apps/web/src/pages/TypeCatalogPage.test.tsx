@@ -25,10 +25,13 @@ it("preserves inherited counts, session detail links and search in the object ta
   );
   const person = screen.getByRole("link", { name: "个人" });
   const row = within(person.closest("tr")!);
-  expect(row.getByText("继承 当事人")).toBeInTheDocument();
-  expect(row.getAllByRole("cell")[1]).toHaveTextContent("6");
-  expect(row.getAllByRole("cell")[4]).toHaveTextContent("1");
-  expect(person.getAttribute("href")).toContain("inspectSession=session-demo");
+  const cells = row.getAllByRole("cell");
+  expect(cells[1]).toHaveTextContent("person");
+  expect(cells[2]).toHaveTextContent("当事人");
+  expect(cells[4]).toHaveTextContent("6");
+  expect(cells[7]).toHaveTextContent("1");
+  expect(person.getAttribute("href")).toContain("/elements/object_type/");
+  expect(person.getAttribute("href")).toContain("session=session-demo");
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索目录" }), { target: { value: "person" } });
   expect(screen.getAllByRole("row")).toHaveLength(2);
   expect(screen.getByRole("link", { name: "个人" })).toBeInTheDocument();
@@ -36,7 +39,7 @@ it("preserves inherited counts, session detail links and search in the object ta
   expect(screen.getByText("没有匹配的定义")).toBeInTheDocument();
 });
 
-it("keeps relation endpoints, multiplicity and the basic detail tab", () => {
+it("shows a relation's identifier, meaning, multiplicity and the basic detail tab", () => {
   renderWithProviders(
     <MemoryRouter initialEntries={["/relations"]}>
       <TypeCatalogPage kind="link_type" />
@@ -44,8 +47,8 @@ it("keeps relation endpoints, multiplicity and the basic detail tab", () => {
   );
   const link = screen.getByRole("link", { name: "signer" });
   const row = within(link.closest("tr")!);
-  expect(row.getByText("合同")).toBeInTheDocument();
-  expect(row.getByText("当事人")).toBeInTheDocument();
+  expect(row.getAllByRole("cell")[1]).toHaveTextContent(/合同.*当事人/);
   expect(row.getByText("多对一")).toBeInTheDocument();
-  expect(link.getAttribute("href")).toContain("inspectTab=basic");
+  expect(link.getAttribute("href")).toContain("/elements/link_type/");
+  expect(link.getAttribute("href")).toContain("tab=basic");
 });

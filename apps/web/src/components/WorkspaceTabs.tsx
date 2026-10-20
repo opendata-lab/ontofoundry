@@ -26,6 +26,7 @@ import {
   Network,
   Rocket,
   Settings,
+  Sigma,
   Sparkles,
   X,
 } from "lucide-react";
@@ -50,10 +51,12 @@ const TabPanel = memo(function TabPanel({
   tab,
   active,
   update,
+  close,
 }: {
   tab: PageTab;
   active: boolean;
   update: (id: string, meta: PageTabMeta) => void;
+  close: (id: string) => void;
 }) {
   const pageMeta = useRef<PageTabMeta>({});
   const elementMeta = useRef<PageTabMeta>({});
@@ -61,8 +64,6 @@ const TabPanel = memo(function TabPanel({
     ...pageMeta.current,
     dirty: !!pageMeta.current.dirty || !!elementMeta.current.dirty,
     busy: !!pageMeta.current.busy || !!elementMeta.current.busy,
-    elementDirty: !!elementMeta.current.dirty,
-    elementBusy: !!elementMeta.current.busy,
   }), [update, tab.id]);
   const setMeta = useCallback(
     (meta: PageTabMeta) => { pageMeta.current = meta; report(); },
@@ -73,8 +74,8 @@ const TabPanel = memo(function TabPanel({
     [report],
   );
   const context = useMemo(
-    () => ({ active, update: setMeta, updateElement: setElementMeta }),
-    [active, setMeta, setElementMeta],
+    () => ({ active, update: setMeta, updateElement: setElementMeta, close: () => close(tab.id) }),
+    [active, setMeta, setElementMeta, close, tab.id],
   );
   const location = useMemo(
     () => ({
@@ -154,22 +155,11 @@ export function WorkspaceTabs({
   const [notice, setNotice] = useState("");
   const busy = state.tabs.some((t) => t.busy);
   const dirty = state.tabs.some((t) => t.dirty);
-  const inspectionKey = (address: string) => {
-    const url = new URL(address, "http://local");
-    return JSON.stringify([url.pathname, url.searchParams.get("inspect"),
-      url.searchParams.get("inspectSession") ?? url.searchParams.get("session"),
-      url.searchParams.get("inspectSource"), url.searchParams.get("inspectPreviewHash")]);
-  };
   // Pages stay mounted in their tabs, so switching within the workspace does
   // not interrupt a request running in another tab. Protect only navigation
   // that would unmount the entire workspace.
   const blocker = useBlocker(
-    ({ nextLocation }) => {
-      const current = state.tabs.find((t) => t.id === state.active);
-      return ((busy || dirty) && !nextLocation.pathname.startsWith(base + "/")) ||
-        (!!(current?.elementDirty || current?.elementBusy) &&
-          inspectionKey(current.href) !== inspectionKey(createPath(nextLocation)));
-    },
+    ({ nextLocation }) => (busy || dirty) && !nextLocation.pathname.startsWith(base + "/"),
   );
   const blocked = blocker.state === "blocked";
   const blockingBusy = blocked && busy && !closing;
@@ -210,9 +200,7 @@ export function WorkspaceTabs({
       if (
         title === tab.title &&
         !!meta.dirty === !!tab.dirty &&
-          !!meta.busy === !!tab.busy
-          && !!meta.elementDirty === !!tab.elementDirty
-          && !!meta.elementBusy === !!tab.elementBusy
+        !!meta.busy === !!tab.busy
       )
         return current;
       return {
@@ -236,6 +224,10 @@ export function WorkspaceTabs({
       ?.querySelector<HTMLElement>(`#workspace-tab-${next.active}`)
       ?.focus();
   };
+  // Stable for the memoized panels; always closes against the latest state.
+  const removeLatest = useRef(remove);
+  removeLatest.current = remove;
+  const closeFromPage = useCallback((id: string) => removeLatest.current(id), []);
   const requestClose = (tab: PageTab) => {
     if (tab.busy) {
       setNotice(`「${tab.title}」的操作正在进行，请完成后再关闭页面。`);
@@ -265,7 +257,7 @@ export function WorkspaceTabs({
             // selectors cannot reach a page's own Tabs.
             <div ref={bar} className="workspace-tab-bar flex-none
                 [&>.ant-tabs-nav]:h-control-lg [&>.ant-tabs-nav]:mb-0 [&>.ant-tabs-nav]:bg-surface-soft [&>.ant-tabs-nav]:px-3 [&>.ant-tabs-nav]:pt-1 [&>.ant-tabs-nav]:before:border-rule-soft
-                [&_.ant-tabs-tab]:h-control-sm [&_.ant-tabs-tab]:m-0 [&_.ant-tabs-tab]:rounded-t-xs [&_.ant-tabs-tab]:rounded-b-none [&_.ant-tabs-tab]:border-transparent [&_.ant-tabs-tab]:bg-transparent [&_.ant-tabs-tab]:px-2 [&_.ant-tabs-tab]:py-0 [&_.ant-tabs-tab]:text-xs [&_.ant-tabs-tab]:leading-tight
+                [&_.ant-tabs-tab]:h-control-sm [&_.ant-tabs-tab]:m-0 [&_.ant-tabs-tab]:rounded-t-xs [&_.ant-tabs-tab]:rounded-b-none [&_.ant-tabs-tab]:border-transparent [&_.ant-tabs-tab]:bg-transparent [&_.ant-tabs-tab]:px-2 [&_.ant-tabs-tab]:py-0 [&_.ant-tabs-tab]:text-sm [&_.ant-tabs-tab]:leading-tight
                 [&_.ant-tabs-tab+.ant-tabs-tab]:ml-1 [&_.ant-tabs-tab:not(.ant-tabs-tab-active):hover]:bg-rule-soft
                 [&_.ant-tabs-tab.ant-tabs-tab-active]:border-rule-soft [&_.ant-tabs-tab.ant-tabs-tab-active]:border-b-surface [&_.ant-tabs-tab.ant-tabs-tab-active]:bg-surface
                 [&_.ant-tabs-tab-remove]:ml-1 [&_.ant-tabs-tab-remove]:inline-flex [&_.ant-tabs-tab-remove]:items-center [&_.ant-tabs-tab-remove]:p-0 [&_.ant-tabs-tab-remove]:text-muted [&_.ant-tabs-tab-remove:hover]:text-ink">
@@ -293,8 +285,13 @@ export function WorkspaceTabs({
             }
           }}
           items={state.tabs.map((tab) => {
-            const area = new URL(tab.href, "http://local").pathname.split("/")[3];
+            const [area, elementKind] = new URL(tab.href, "http://local").pathname.split("/").slice(3);
             const Icon =
+              {
+                link_type: GitBranch,
+                metric: Sigma,
+                dataset: Database,
+              }[area === "elements" ? elementKind : ""] ??
               {
                 view: Network,
                 relations: GitBranch,
@@ -306,14 +303,14 @@ export function WorkspaceTabs({
             return {
               key: tab.id,
               children: tab.visited ? (
-                <TabPanel tab={tab} active={state.active === tab.id} update={update} />
+                <TabPanel tab={tab} active={state.active === tab.id} update={update} close={closeFromPage} />
               ) : null,
               label: (
                 <span
                   title={tab.title + (tab.dirty ? " · 未保存" : "")}
-                  className="inline-flex min-w-0 items-center gap-2 text-xs whitespace-nowrap"
+                  className="inline-flex min-w-0 items-center gap-2 text-sm whitespace-nowrap"
                 >
-                  <Icon className="size-icon-sm flex-none" />
+                  <Icon className="size-icon flex-none" />
                   <span className="max-w-tab-title truncate">{tab.title}</span>
                   {tab.dirty && (
                     <i

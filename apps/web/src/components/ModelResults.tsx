@@ -3,7 +3,7 @@ import { Box, Braces, Database, FileText, GitBranch, Rocket, ShieldCheck, Sigma,
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { Draft, ElementChange, ModelingSession, TargetKind, TypeGraph } from "../api/types";
-import { useElementInspector } from "../hooks/useElementInspector";
+import type { ElementRequest } from "../lib/elementInspector";
 import type { ProposalsState } from "../hooks/useProposals";
 import { VALUE_KINDS, byId } from "../lib/coreModel";
 import { documentDisplayText } from "../lib/instanceDisplay";
@@ -11,6 +11,7 @@ import { METRIC_KINDS } from "../lib/metricEditing";
 import { BINDING_MODES } from "../lib/objectMapping";
 import { draftGraph } from "../lib/semanticExplorer";
 import { Panel as ResultPanel, PanelToolbar, StatusMark, type StatusState } from "./layout";
+import { ElementModal } from "./elements/ElementInspector";
 import { OntologyGraph } from "./OntologyGraph";
 import { ProposalPanel } from "./proposals/ProposalPanel";
 
@@ -99,7 +100,8 @@ export function ModelResults({
   onRemodel?: (text: string) => void;
 }) {
   const [params, setParams] = useSearchParams();
-  const inspector = useElementInspector();
+  // Draft rows and graph nodes open in place, like the semantic view.
+  const [inspected, setInspected] = useState<ElementRequest | null>(null);
   const navigate = useNavigate();
   const pending = session?.pending_proposal_count ?? 0;
   const requested = params.get("panel") as Panel | null;
@@ -166,7 +168,6 @@ export function ModelResults({
       ))}
       <ResultPanel fill>
         <Tabs
-          size="small"
           renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
           activeKey={tab}
           onChange={(key) => setTab(key as Panel)}
@@ -206,7 +207,7 @@ export function ModelResults({
                       })}
                     </div>
                     <div className="flex min-w-0 items-center gap-2">
-                      <Input.Search allowClear size="small" aria-label="搜索模型" placeholder="搜索名称、技术名、描述"
+                      <Input.Search allowClear size="small" aria-label="搜索模型" placeholder="搜索名称、英文标识、描述"
                         className="min-w-0 flex-1" value={query} onChange={(event) => setQuery(event.target.value)} />
                       {publish}
                     </div>
@@ -229,7 +230,7 @@ export function ModelResults({
                                   type="link"
                                   size="small"
                                   className="h-auto self-start p-0"
-                                  onClick={() => inspector.open({ kind: r.kind, id: r.id, sessionId: session.id })}
+                                  onClick={() => setInspected({ kind: r.kind, id: r.id, sessionId: session.id })}
                                 >
                                   {r.name || "未命名"}
                                 </Button>
@@ -243,11 +244,15 @@ export function ModelResults({
                         {
                           title: "说明",
                           key: "description",
-                          render: (_, r) => (
-                            <Text type="secondary" className="text-xs">
-                              {r.description || "—"}
-                            </Text>
-                          ),
+                          // Two lines keep rows compact in the narrow results column; hover shows the rest.
+                          render: (_, r) =>
+                            r.description ? (
+                              <Typography.Paragraph type="secondary" className="m-0 text-xs" ellipsis={{ rows: 2, tooltip: r.description }}>
+                                {r.description}
+                              </Typography.Paragraph>
+                            ) : (
+                              <Text type="secondary" className="text-xs">—</Text>
+                            ),
                         },
                         {
                           title: "",
@@ -283,9 +288,9 @@ export function ModelResults({
                       onSelect={(selected) => {
                         if (!selected || !session) return;
                         if (selected.category === "node")
-                          inspector.open({ kind: "object_type", id: selected.item.id, sessionId: session.id, tab: "properties" });
+                          setInspected({ kind: "object_type", id: selected.item.id, sessionId: session.id, tab: "properties" });
                         else if (selected.item.kind === "link_type")
-                          inspector.open({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: session.id });
+                          setInspected({ kind: "link_type", id: selected.item.link_type_id ?? selected.item.id, sessionId: session.id });
                       }}
                     />
                   ) : (
@@ -297,6 +302,7 @@ export function ModelResults({
           ]}
         />
       </ResultPanel>
+      {inspected && <ElementModal request={inspected} onChange={setInspected} onClose={() => setInspected(null)} />}
     </aside>
   );
 }

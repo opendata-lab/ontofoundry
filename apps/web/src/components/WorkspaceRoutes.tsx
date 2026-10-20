@@ -2,8 +2,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { usePageActive } from "../hooks/usePageTab";
 import { pageLoaders } from "../lib/workspacePages";
-import { ElementInspector } from "./elements/ElementInspector";
-import { LegacyElementRoute } from "./elements/LegacyElementRoute";
+import { LegacyElementRoute, LegacyInspectRedirect } from "./elements/LegacyElementRoute";
 const BuilderPage = lazy(() =>
   pageLoaders.BuilderPage().then((module) => ({
     default: module.BuilderPage,
@@ -37,6 +36,11 @@ const InstancesPage = lazy(() =>
 const DeliveryPage = lazy(() =>
   pageLoaders.DeliveryPage().then((module) => ({
     default: module.DeliveryPage,
+  })),
+);
+const ElementDetailPage = lazy(() =>
+  pageLoaders.ElementDetailPage().then((module) => ({
+    default: module.ElementDetailPage,
   })),
 );
 const SettingsPage = lazy(() =>
@@ -79,8 +83,9 @@ export function WorkspaceRoutes({ href }: { href: string }) {
       <Route path="mappings" element={<MappingsPage />} />
       <Route path="delivery" element={<DeliveryPage />} />
       <Route path="settings" element={<SettingsPage />} />
+      <Route path="elements/:kind/:id" element={<ElementDetailPage />} />
 
       <Route path="*" element={<Navigate to="../view" replace />} />
-    </Routes><ElementInspector /></>
+    </Routes><LegacyInspectRedirect /></>
   );
 }

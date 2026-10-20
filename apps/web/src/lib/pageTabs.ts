@@ -6,8 +6,6 @@ export type PageTab = {
   visited: boolean;
   dirty?: boolean;
   busy?: boolean;
-  elementDirty?: boolean;
-  elementBusy?: boolean;
 };
 export type TabState = { tabs: PageTab[]; active: string; recent: string[] };
 
@@ -17,11 +15,14 @@ export function tabKey(href: string) {
     url.pathname.replace(/\/$/, ""),
     url.searchParams.get("session"),
     url.searchParams.get("key"),
+    url.searchParams.get("preview"),
   ]);
 }
 
 export function tabTitle(href: string) {
   const path = new URL(href, "http://local").pathname.split("/").slice(3);
+  // Replaced by the element's name once its page loads.
+  if (path[0] === "elements") return path[2] === "new" ? "新建本体" : "本体详情";
   if (path.includes("edit")) return path[1] === "new" ? "新建本体" : "编辑本体";
   if (path.includes("instances"))
     return path.length > 3 ? "实例详情" : "实例列表";
@@ -42,10 +43,12 @@ export function tabTitle(href: string) {
 export function isTabPromotion(from: string, to: string) {
   const a = new URL(from, "http://local");
   const b = new URL(to, "http://local");
-  // Old detail/editor links now promote into their catalog with an inspector.
-  if (/\/(objects|relations)\/[^/]+(?:\/edit)?$/.test(a.pathname) &&
-      b.searchParams.has("inspect") &&
-      a.pathname.startsWith(b.pathname + "/") &&
+  // Old detail/editor links and `?inspect=` links become the element's page.
+  if (/\/elements\/[^/]+\/[^/]+$/.test(b.pathname) &&
+      (a.searchParams.has("inspect") || /\/(objects|relations)\/[^/]+(?:\/edit)?$/.test(a.pathname))) return true;
+  // A new element's page keeps its tab once saved.
+  if (/\/elements\/[^/]+\/new$/.test(a.pathname) &&
+      b.pathname.replace(/\/[^/]+$/, "") === a.pathname.replace(/\/new$/, "") &&
       a.searchParams.get("session") === b.searchParams.get("session")) return true;
   if (a.pathname === b.pathname && /\/(builder|delivery)$/.test(a.pathname))
     return !a.searchParams.has("session") && b.searchParams.has("session");

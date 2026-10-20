@@ -26,13 +26,13 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 import type { ResourceRead, User, Workspace } from "../api/types";
 import { WorkspaceContextProvider } from "../hooks/useWorkspaceContext";
+import { elementHref } from "../lib/elementInspector";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
 import { ApplicationFrame } from "./layout";
 
 const SEARCH_ICONS = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database };
-const SEARCH_PAGES = { object_type: "objects", link_type: "objects", metric: "objects", dataset: "mappings" };
 
 // Follow the workflow: inspect, build and publish; connect data before mapping.
 const navigation = [
@@ -202,7 +202,7 @@ export function AppShell() {
           allowClear
           prefix={<Search className="size-icon" />}
           aria-label="搜索关键词"
-          placeholder="名称、技术名、描述或同义词"
+          placeholder="名称、英文标识、描述或同义词"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -224,9 +224,7 @@ export function AppShell() {
                   className="h-auto justify-start gap-2 py-2 text-left whitespace-normal"
                   onClick={() => {
                     setSearching(false);
-                    navigate(
-                      `/workspaces/${workspaceId}/${SEARCH_PAGES[r.kind]}?${r.kind === "link_type" ? "catalogTab=relations&" : r.kind === "metric" ? "catalogTab=metrics&" : ""}inspect=${r.kind}:${r.definition.id}`,
-                    );
+                    navigate(elementHref(workspaceId, { kind: r.kind, id: r.definition.id, sessionId: null }));
                   }}
                 >
                   <Icon className="size-icon" />

@@ -28,7 +28,7 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
     return m ? <ElementLink onClick={() => open({ kind: "metric", id })}>{m.name}</ElementLink> : "?";
   };
   const items = [
-    { key: "technical", label: "技术名", children: <code>{metric.technical_name}</code> },
+    { key: "technical", label: "英文标识", children: <code>{metric.technical_name}</code> },
     { key: "kind", label: "计算方式", children: METRIC_KINDS[metric.kind] },
     {
       key: "dataset",

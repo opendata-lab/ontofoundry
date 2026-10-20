@@ -29,7 +29,7 @@ describe("metric form helpers", () => {
     expect(Object.keys(metricErrors(draft, blank)).sort()).toEqual(["dataset", "name", "technical_name"]);
     const orders = draft.datasets.find((d) => d.name === "orders")!;
     const sum = { ...newMetric("m", orders.id), name: "合计", technical_name: "order_amount", aggregation: "sum" as const };
-    expect(metricErrors(draft, sum)).toEqual({ technical_name: "技术名已被其他指标使用", measure: "请选择度量列" });
+    expect(metricErrors(draft, sum)).toEqual({ technical_name: "英文标识已被其他指标使用", measure: "请选择度量列" });
     const filtered = {
       ...sum,
       technical_name: "x",

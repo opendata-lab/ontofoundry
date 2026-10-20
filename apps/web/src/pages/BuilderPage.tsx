@@ -374,14 +374,14 @@ export function BuilderPage() {
                   ] }], onClick: ({ key }) => setComposerMode(key as "model" | "chat") }}>
                   <Button size="small" type="text" aria-label="选择场景" icon={<Plus size={15} />} disabled={running || busy || uploading} />
                 </Dropdown>
-                <span className="min-w-0 flex-1" role="status"><Tag color="blue" className="m-0">{composerMode === "model" ? "本体建模" : "本体查询"}</Tag></span>
+                <span className="min-w-0 flex-1" role="status"><Tag className="m-0 border-accent bg-accent-soft text-accent">{composerMode === "model" ? "本体建模" : "本体查询"}</Tag></span>
                 {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
                   <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
                 </Tooltip>}
               </div>
             </dataagent-conversation>
           </Panel>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
             <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />
           </div>
         </div>

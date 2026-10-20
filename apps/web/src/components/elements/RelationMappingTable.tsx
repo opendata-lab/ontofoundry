@@ -7,6 +7,7 @@ import { MULTIPLICITY, linkDisplayName, bindingMode, byId, joinSummary } from ".
 import type { PanelProps } from "../../lib/elementModel";
 import { objectMapping, type MappedRelation } from "../../lib/objectMapping";
 import { setInheritedLinkBinding } from "../../lib/objectMappingEditing";
+import { isForwardReading, renderLinkReading } from "../../lib/linkReadings";
 import { relationEditReason } from "../../lib/relationEditing";
 import { ElementLink, EvidenceSection } from "./ElementPanels";
 import { LinkJoinEditor } from "./LinkMappingPanel";
@@ -70,21 +71,23 @@ export function RelationsPanel(props: PanelProps<ObjectType>) {
         </>
       } detail={selected ? (
         <>
-          <SectionTitle title={<ElementLink onClick={() => open({ kind: "link_type", id: selected.definition.id })}>{displayName(selected) || "未命名关系"}</ElementLink>} note={selected.definition.name} />
+          <SectionTitle title={<ElementLink onClick={() => open({ kind: "link_type", id: selected.definition.id })}>{selected.definition.name || "未命名关系"}</ElementLink>} note={selected.direction === "forward" ? undefined : "反向"} />
           <section className="flex flex-col gap-3">
-            <SectionTitle title="两端与方向" />
+            <SectionTitle title="关系" />
             <div className="flex flex-wrap items-center gap-2">
               {endpoint(endpoints(selected).source)}
               <ArrowRight size={14} className="shrink-0 text-muted" />
-              <Text>{selected.definition.name}</Text>
-              <ArrowRight size={14} className="shrink-0 text-muted" />
               {endpoint(endpoints(selected).target)}
             </div>
+            {/* The meaning reads the link once; the identifier already heads this pane. */}
+            {(() => {
+              const reading = selected.definition.verbalizes.find(isForwardReading);
+              return reading ? <Text type="secondary">{renderLinkReading(draft, selected.definition, reading)}</Text> : null;
+            })()}
           </section>
           <section className="flex flex-col gap-3 border-t border-rule pt-4">
             <SectionTitle title="基本信息" />
             <Descriptions size="small" column={1} items={[
-              { key: "name", label: "关系标识", children: selected.definition.name || "未命名关系" },
               { key: "source_role", label: "来源端角色名", children: selected.definition.source_role_name || "未设置" },
               { key: "target_role", label: "目标端角色名", children: selected.definition.target_role_name || "未设置" },
 

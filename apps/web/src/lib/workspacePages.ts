@@ -13,6 +13,7 @@ export const pageLoaders = {
   InstancesPage: () => import("../pages/InstancesPage"),
   DeliveryPage: () => import("../pages/DeliveryPage"),
   SettingsPage: () => import("../pages/SettingsPage"),
+  ElementDetailPage: () => import("../pages/ElementDetailPage"),
 };
 
 export function preloadWorkspacePages() {

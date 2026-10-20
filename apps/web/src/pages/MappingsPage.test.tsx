@@ -13,7 +13,7 @@ const { open, workspace, refresh } = vi.hoisted(() => ({
   workspace: { id: "w", role: "admin", current_version: 1, version_id: "v1" },
 }));
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh }) }));
-vi.mock("../hooks/useElementInspector", () => ({ useElementInspector: () => ({ open }) }));
+vi.mock("../hooks/useElementDetail", () => ({ useElementDetail: () => ({ open }) }));
 vi.mock("../hooks/useSnapshot", () => ({ useSnapshot: vi.fn() }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
 vi.mock("react-router-dom", () => ({ Link: ({ children }: { children: unknown }) => children }));

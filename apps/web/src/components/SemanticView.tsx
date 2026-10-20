@@ -39,12 +39,16 @@ export function SemanticView({
   graph,
   model,
   onOpen,
+  onOpenPage,
   resourceError,
   canCreate = false,
 }: {
   graph: TypeGraph;
   model?: Draft | null;
+  /** The graph and its resource tree open elements in place. */
   onOpen: (request: ElementRequest) => void;
+  /** The metric and dataset lists open element pages. */
+  onOpenPage: (request: ElementRequest) => void;
   resourceError?: string;
   canCreate?: boolean;
 }) {
@@ -244,7 +248,7 @@ export function SemanticView({
                   size="small"
                   className="ml-auto"
                   icon={<Plus size={15} />}
-                  onClick={() => onOpen({ kind: listing, id: "new", mode: "edit", sessionId: null })}
+                  onClick={() => onOpenPage({ kind: listing, id: "new", mode: "edit", sessionId: null })}
                 >
                   新建{RESOURCE_KIND_LABELS[listing]}
                 </Button>
@@ -256,18 +260,18 @@ export function SemanticView({
               pagination={false}
               dataSource={visible}
               locale={{ emptyText: <Empty description={`还没有${RESOURCE_KIND_LABELS[listing]}`} /> }}
-              onRow={(resource) => ({ onDoubleClick: () => onOpen(resource.detail) })}
+              onRow={(resource) => ({ onDoubleClick: () => onOpenPage(resource.detail) })}
               columns={[
                 {
                   title: RESOURCE_KIND_LABELS[listing],
                   key: "name",
                   render: (_, r) => (
-                    <Button type="link" className="h-auto p-0" onClick={() => onOpen(r.detail)}>
+                    <Button type="link" className="h-auto p-0" onClick={() => onOpenPage(r.detail)}>
                       {r.name}
                     </Button>
                   ),
                 },
-                { title: listing === "metric" ? "技术名" : "物理位置", key: "technical", render: (_, r) => <code>{r.technical}</code> },
+                { title: listing === "metric" ? "英文标识" : "物理位置", key: "technical", render: (_, r) => <code>{r.technical}</code> },
                 {
                   title: listing === "metric" ? "数据集 · 计算方式" : "快照",
                   key: "subtitle",

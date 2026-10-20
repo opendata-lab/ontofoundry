@@ -122,9 +122,9 @@ function conditionValueMatches(value: Scalar, kind: ValueKind): boolean {
 export function metricErrors(draft: Draft, metric: Metric): MetricErrors {
   const errors: MetricErrors = {};
   if (!metric.name.trim()) errors.name = "请填写名称";
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(metric.technical_name)) errors.technical_name = "技术名只能使用字母、数字和下划线，且不能以数字开头";
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(metric.technical_name)) errors.technical_name = "英文标识只能使用字母、数字和下划线，且不能以数字开头";
   else if (draft.metrics.some((m) => m.id !== metric.id && m.technical_name.toLowerCase() === metric.technical_name.toLowerCase()))
-    errors.technical_name = "技术名已被其他指标使用";
+    errors.technical_name = "英文标识已被其他指标使用";
   if (isRatio(metric)) {
     const numerator = byId(draft.metrics, metric.numerator_id);
     const denominator = byId(draft.metrics, metric.denominator_id);

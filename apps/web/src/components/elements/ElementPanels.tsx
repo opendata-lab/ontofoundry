@@ -92,9 +92,9 @@ export function IdentityFields<T extends { name: string; technical_name: string;
         <Form.Item label="名称" required>
           <Input aria-label="名称" value={value.name} onChange={(e) => onChange({ name: e.target.value } as Partial<T>)} />
         </Form.Item>
-        <Form.Item label="技术名" required>
+        <Form.Item label="英文标识" required>
           <Input
-            aria-label="技术名"
+            aria-label="英文标识"
             className="font-mono"
             value={value.technical_name}
             onChange={(e) => onChange({ technical_name: e.target.value.trim() } as Partial<T>)}
@@ -202,7 +202,7 @@ export function ObjectBasicPanel(props: PanelProps<ObjectType>) {
   const record = objectMapping(draft, type);
   const items = [
     { key: "name", label: "名称", children: type.name },
-    { key: "technical", label: "技术名", children: <code>{type.technical_name}</code> },
+    { key: "technical", label: "英文标识", children: <code>{type.technical_name}</code> },
     { key: "description", label: "描述", children: type.description ? <span className="whitespace-pre-wrap">{type.description}</span> : <Text type="secondary">暂无描述</Text> },
     { key: "parent", label: "父对象", children: parent ? <ElementLink onClick={() => open({ kind: "object_type", id: parent.id })}>{parent.name}</ElementLink> : <Text type="secondary">无（根对象）</Text> },
     ...(kids.length ? [{ key: "children", label: "子对象", children: <span className="flex flex-wrap gap-x-3">{kids.map((k) => <ElementLink key={k.id} onClick={() => open({ kind: "object_type", id: k.id })}>{k.name}</ElementLink>)}</span> }] : []),
@@ -319,7 +319,7 @@ export function RulesPanel(props: PanelProps & { initialRuleId?: string }) {
             <Form layout="vertical" component="div" size="small">
               <SectionTitle title="基本信息" className="mb-3" />
               <Form.Item className="mb-3" label="名称" required><Input aria-label="规则名称" value={rule.name} onChange={(e) => setRule({ ...rule, name: e.target.value })} /></Form.Item>
-              <Form.Item className="mb-3" label="技术名" required><Input aria-label="规则技术名" className="font-mono" value={rule.technical_name} onChange={(e) => setRule({ ...rule, technical_name: e.target.value.trim() })} /></Form.Item>
+              <Form.Item className="mb-3" label="英文标识" required><Input aria-label="规则英文标识" className="font-mono" value={rule.technical_name} onChange={(e) => setRule({ ...rule, technical_name: e.target.value.trim() })} /></Form.Item>
               <Form.Item className="mb-3" label="类型"><Select aria-label="规则类型" value={rule.rule_kind} options={Object.entries(RULE_KINDS).map(([value, label]) => ({ value, label }))} onChange={(rule_kind: Rule["rule_kind"]) => setRule({ ...rule, rule_kind })} /></Form.Item>
               <Form.Item className="mb-3" label="所属"><Select aria-label="规则所属" value={`${rule.owner_kind}:${rule.owner_id}`} options={owners} onChange={(value: string) => { const [owner_kind, owner_id] = value.split(":"); setRule({ ...rule, owner_kind: owner_kind as Rule["owner_kind"], owner_id }); }} /></Form.Item>
               <SectionTitle title="规则内容" className="mb-3 border-t border-rule pt-4" />
@@ -331,7 +331,7 @@ export function RulesPanel(props: PanelProps & { initialRuleId?: string }) {
               <section className="flex flex-col gap-3">
                 <SectionTitle title="基本信息" />
                 <Descriptions size="small" column={1} items={[
-                  { key: "technical", label: "技术名", children: <code>{rule.technical_name || "—"}</code> },
+                  { key: "technical", label: "英文标识", children: <code>{rule.technical_name || "—"}</code> },
                   { key: "kind", label: "类型", children: RULE_KINDS[rule.rule_kind] },
                   { key: "owner", label: "所属", children: ruleOwnerName(draft, rule) },
                 ]} />

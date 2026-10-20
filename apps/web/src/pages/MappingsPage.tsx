@@ -6,7 +6,7 @@ import { DocumentMaterials } from "../components/DocumentMaterials";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { DatasetPicker } from "../components/DatasetPicker";
 import { PageBody, PageHeader, Panel, PanelToolbar } from "../components/layout";
-import { useElementInspector } from "../hooks/useElementInspector";
+import { useElementDetail } from "../hooks/useElementDetail";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { metricsOnDataset } from "../lib/coreModel";
@@ -17,7 +17,7 @@ const { Text } = Typography;
 
 export function MappingsPage() {
   const { workspace, refresh } = useWorkspaceContext();
-  const inspector = useElementInspector();
+  const detail = useElementDetail();
   const snapshot = useSnapshot(workspace);
   const draft = snapshot.draft;
   useErrorMessage(snapshot.error);
@@ -29,7 +29,7 @@ export function MappingsPage() {
   const datasets = (draft?.datasets ?? []).filter(
     (d) => !normalized || [d.name, d.table_name, d.schema_name ?? "", d.description].join(" ").toLowerCase().includes(normalized),
   );
-  const openDataset = (id: string) => inspector.open({ kind: "dataset", id, sessionId: snapshot.sessionId });
+  const openDataset = (id: string) => detail.open({ kind: "dataset", id, sessionId: snapshot.sessionId });
   const usage = (dataset: Dataset) =>
     draft ? records.filter((r) => r.sources.some((s) => s.dataset_id === dataset.id)).length : 0;
   return (

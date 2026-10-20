@@ -148,10 +148,10 @@ describe("proposal review", () => {
 
   it("filters by status, kind and search text", async () => {
     panel();
-    fireEvent.click(screen.getByText(/^冲突 1/));
+    fireEvent.click(screen.getByRole("tab", { name: /冲突\s*1/ }));
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(within(row("old")).getByText("目标在提案生成后已被修改")).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/^待审 4/));
+    fireEvent.click(screen.getByRole("tab", { name: /待审\s*4/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索提案名称" }), { target: { value: "purchase" } });
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });

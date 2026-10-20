@@ -1,6 +1,7 @@
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { usePageActive } from "../../hooks/usePageTab";
-import type { ElementTab } from "../../lib/elementInspector";
+import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
+import { elementHref, legacyInspectRequest, type ElementTab } from "../../lib/elementInspector";
 
 /** Keep old bookmarks, including dataset suggestions and numbered editor steps. */
 export function LegacyElementRoute({
@@ -10,27 +11,29 @@ export function LegacyElementRoute({
   relation?: boolean;
   editing?: boolean;
 }) {
-  const { workspaceId, typeId = "" } = useParams();
+  const { typeId = "" } = useParams();
   const [params] = useSearchParams();
+  const { workspace } = useWorkspaceContext();
   const active = usePageActive();
   if (!active) return null;
-  const next = new URLSearchParams(params);
   const steps: ElementTab[] = relation
     ? ["basic", "endpoints", "mapping"]
     : ["basic", "mapping", "properties", "mapping", "relations"];
-  next.set("inspect", `${relation ? "link_type" : "object_type"}:${typeId}`);
-  next.set("inspectSource", params.get("session") ? "session" : "published");
-  if (params.get("session")) next.set("inspectSession", params.get("session")!);
-  if (editing) {
-    next.set("inspectMode", "edit");
-    next.set("inspectTab", steps[Number(params.get("step") ?? 0)] ?? "basic");
-  }
-  next.delete("step");
-  if (relation) next.set("catalogTab", "relations");
-  return (
-    <Navigate
-      replace
-      to={`/workspaces/${workspaceId}/objects?${next}`}
-    />
-  );
+  const to = elementHref(workspace.id, {
+    kind: relation ? "link_type" : "object_type",
+    id: typeId,
+    sessionId: params.get("session"),
+    ...(editing ? { mode: "edit" as const, tab: steps[Number(params.get("step") ?? 0)] ?? "basic" } : {}),
+  });
+  return <Navigate replace to={to} />;
+}
+
+/** Links copied from the former URL-backed popup open the element's page instead. */
+export function LegacyInspectRedirect() {
+  const [params] = useSearchParams();
+  const { workspace } = useWorkspaceContext();
+  const active = usePageActive();
+  const request = legacyInspectRequest(params);
+  if (!active || !request) return null;
+  return <Navigate replace to={elementHref(workspace.id, request)} />;
 }

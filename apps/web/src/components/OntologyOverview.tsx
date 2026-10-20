@@ -3,7 +3,7 @@ import { ArrowUpRight, LockKeyhole, Maximize, Minus, Plus } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { WorkspaceOverview } from "../api/types";
-import { useElementInspector } from "../hooks/useElementInspector";
+import { useElementDetail } from "../hooks/useElementDetail";
 import { SectionTitle, StatusMark } from "./layout";
 import type { SelectedGraphItem } from "./OntologyGraph";
 
@@ -95,7 +95,7 @@ export function OntologyOverview({
   const [active, setActive] = useState<Layer | null>(null);
   const [zoom, setZoom] = useState(1);
   const pattern = useId().replace(/:/g, "");
-  const inspector = useElementInspector();
+  const detail = useElementDetail();
   const { details } = overview;
   const graph = overview.graph ?? { nodes: [], edges: [] };
   const counts = overview.version?.counts;
@@ -279,7 +279,7 @@ export function OntologyOverview({
                           label={"查看实例：" + o.display_text}
                           name={o.display_text}
                           showText={objects.length <= 8}
-                          onOpen={() => inspector.open({ kind: "material_object", id: o.id, sessionId: null })}
+                          onOpen={() => detail.open({ kind: "material_object", id: o.id, sessionId: null })}
                         />
                       ))}
                       {!objects.length && (
@@ -304,7 +304,7 @@ export function OntologyOverview({
                           label={"查看映射：" + typeName(m.type_id)}
                           name={typeName(m.type_id)}
                           showText={mappings.length <= 8}
-                          onOpen={() => inspector.open({ kind: "mapping", id: m.id, sessionId: null })}
+                          onOpen={() => detail.open({ kind: "mapping", id: m.id, sessionId: null })}
                         />
                       ))}
                       {!mappings.length && (
