@@ -74,7 +74,7 @@ test("proposal list groups filters, selection and compact rows in one result pan
   await review.getByRole("searchbox", { name: "搜索提案名称" }).fill("service_scope");
   await expect(review.getByRole("article")).toHaveCount(1);
   await review.getByRole("button", { name: "清除筛选", exact: true }).click();
-  await review.getByText("冲突 1", { exact: true }).click();
+  await review.getByRole("tab", { name: /^冲突\s*1$/, exact: false }).click();
   await expect(review.getByText("已过期", { exact: true })).toBeVisible();
 });
 
@@ -94,9 +94,8 @@ test("proposal detail and evidence popover show field changes, quotes and source
   await expect(page).toHaveScreenshot("proposal-evidence.png", { fullPage: true });
 
   await row.getByRole("button", { name: "查看 供应商 的证据（2 条）", exact: true }).click();
-  // Open via the row's keyboard action to avoid clicking a nested control.
-  await row.focus();
-  await row.press("Enter");
+  // Click the change text rather than the nested action controls.
+  await row.getByText("提供商品或服务的组织", { exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "字段差异", exact: true })).toBeVisible();
   await expect(dialog.getByRole("cell", { name: "提供商品或服务的组织", exact: true })).toBeVisible();

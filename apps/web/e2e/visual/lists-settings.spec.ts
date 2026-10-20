@@ -9,20 +9,21 @@ test("object catalog keeps inherited counts, filters and detail links", async ({
   await page.goto(`/workspaces/${WORKSPACE_ID}/objects`);
   await expect(page.getByRole("heading", { name: "本体对象", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "个人", exact: true })).toBeVisible();
-  await expect(page.getByText("继承 当事人").first()).toBeVisible();
+  await expect(page.getByRole("row").filter({ has: page.getByRole("link", { name: "个人", exact: true }) }).getByRole("cell", { name: "当事人", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "英文标识", exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("catalog-objects.png", { fullPage: true });
 
   await page.getByRole("searchbox", { name: "搜索目录" }).fill("person");
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(2);
-  await expect(page.getByRole("link", { name: "个人", exact: true })).toHaveAttribute("href", /inspect=object_type/);
+  await expect(page.getByRole("link", { name: "个人", exact: true })).toHaveAttribute("href", /elements\/object_type\//);
 });
 
 test("relation catalog aligns endpoints and multiplicity", async ({ page }) => {
   await page.goto(`/workspaces/${WORKSPACE_ID}/relations`);
-  await expect(page.getByRole("heading", { level: 1, name: "本体关系", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "签约方", exact: true })).toBeVisible();
-  await expect(page.getByRole("columnheader", { name: "关系端点" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "本体对象", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "signer", exact: true })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "关系含义" })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("catalog-relations.png", { fullPage: true });
 });

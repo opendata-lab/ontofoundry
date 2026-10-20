@@ -10,8 +10,8 @@ test("import upload, report expansion and explicit confirmation", async ({ page 
     if (route.request().url().includes("/confirm")) { confirmed = true; await route.fulfill({ json: { session_id: "fiction-session", batch_id: "fiction-batch", report_id: importPreview.import_id } }); }
     else await route.fulfill({ json: importPreview });
   });
-  await page.goto(`/workspaces/${WORKSPACE_ID}/builder`);
-  await page.getByRole("button", { name: "导入文件", exact: true }).click();
+  await page.goto(`/workspaces/${WORKSPACE_ID}/objects`);
+  await page.getByRole("button", { name: "导入", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "导入本体文件" });
   await dialog.locator('input[type="file"]').setInputFiles({ name: "fiction.json", mimeType: "application/json", buffer: Buffer.from("{}") });
   await expect(dialog.getByText("fiction.json", { exact: true })).toBeVisible();
@@ -27,7 +27,7 @@ test("import upload, report expansion and explicit confirmation", async ({ page 
   await expect(page).toHaveScreenshot("import-confirm.png", { fullPage: true });
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole("button", { name: "导入文件", exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "导入文件", exact: true }).click();
+  await expect(page.getByRole("button", { name: "导入", exact: true })).toBeFocused();
+  await page.getByRole("button", { name: "导入", exact: true }).click();
   await expect(page.getByRole("button", { name: "预览转换", exact: true })).toBeDisabled();
 });

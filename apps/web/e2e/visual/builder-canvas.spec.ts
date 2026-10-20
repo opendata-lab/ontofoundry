@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { INSTANCE_FACT, INSTANCE_LABEL, INSTANCE_TYPE, mockCanvasApi, REVIEW_SESSION_ID, WORKSPACE_ID } from "./fixtures";
+import { ELEMENTS, INSTANCE_FACT, INSTANCE_LABEL, INSTANCE_TYPE, mockCanvasApi, REVIEW_SESSION_ID, WORKSPACE_ID } from "./fixtures";
 
 const base = `/workspaces/${WORKSPACE_ID}`;
 
@@ -13,7 +13,7 @@ test("builder empty session aligns configuration, guidance and results", async (
   await mockCanvasApi(page, { emptySession: true });
   await page.goto(`${base}/builder`);
   await expect(page.getByRole("heading", { name: "开始本体构建", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "开始建模", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "发送", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "发布本体", exact: true })).toBeDisabled();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("builder-empty-session.png", { fullPage: true });
@@ -30,29 +30,64 @@ test("builder proposals retain session and material controls", async ({ page }) 
   await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(3);
   await page.getByText("选择已上传材料", { exact: true }).click();
   await expect(page.getByRole("checkbox", { name: /星河采购业务说明.md/ })).toBeChecked();
-  await expect(page.getByRole("button", { name: "供应商范围修订", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "供应商范围修订", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "建模历史", exact: true }).click();
+  const history = page.getByRole("dialog", { name: "建模历史", exact: true });
+  await expect(history.getByRole("cell", { name: "供应商范围修订", exact: true })).toBeVisible();
+  await history.getByRole("row").filter({ hasText: "供应商范围修订" }).click();
+  await expect(history).not.toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的页面" }).locator("[role=tab][aria-selected]")).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("builder-with-proposals.png", { fullPage: true });
+
+  await page.getByRole("tab", { name: /^本体草稿/ }).click();
+  await expect(page.getByRole("button", { name: "发布本体", exact: true })).toBeEnabled();
+  await expect(page.getByLabel("模型分类", { exact: true }).getByRole("button")).toHaveCount(9);
+  await page.getByRole("button", { name: "供应商", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("提供商品或服务的组织", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "打开详情", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
+  await expect(page).toHaveScreenshot("builder-result-modal.png", { fullPage: true });
 });
 
-test("global overview groups layer statistics and preserves zoom controls", async ({ page }) => {
+test("semantic canvas releases explorer space and preserves zoom controls", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/view`);
-  await expect(page.getByRole("heading", { name: "语义模型层", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "适配全局图", exact: true }).click();
-  await expect(page.getByLabel("全局图缩放", { exact: true })).toContainText("100%");
+  const canvas = page.getByLabel("语义关系画布", { exact: true });
+  await expect(canvas.locator(".react-flow__node")).toHaveCount(11);
+  const expanded = await canvas.boundingBox();
+  await page.getByRole("button", { name: "收起资源管理器", exact: true }).click();
+  await expect(page.getByRole("tree")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "展开资源管理器", exact: true })).toBeVisible();
+  await expect.poll(async () => (await canvas.boundingBox())!.width).toBeGreaterThan(expanded!.width);
+  // Resizing and fit view both settle in script, outside CSS animation control.
+  const settled = async (read: () => Promise<unknown>) => {
+    let previous: unknown = null;
+    await expect.poll(async () => {
+      const current = JSON.stringify(await read());
+      const same = current === previous;
+      previous = current;
+      return same;
+    }, { intervals: [250] }).toBe(true);
+  };
+  await settled(() => canvas.boundingBox());
+  await page.getByRole("button", { name: "适应画布", exact: true }).click();
+  const viewport = canvas.locator(".react-flow__viewport");
+  await settled(() => viewport.getAttribute("style"));
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot("ontology-global.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("ontology-semantic-collapsed.png", { fullPage: true });
 
-  await page.getByRole("button", { name: "放大全局图", exact: true }).click();
-  await expect(page.getByLabel("全局图缩放", { exact: true })).toContainText("120%");
+  const before = await viewport.getAttribute("style");
+  await page.getByRole("button", { name: "放大", exact: true }).click();
+  await expect(viewport).not.toHaveAttribute("style", before!);
+  await page.getByRole("button", { name: "展开资源管理器", exact: true }).click();
+  await expect(page.getByRole("tree")).toBeVisible();
 });
 
 test("semantic overview aligns resource explorer and fixed canvas", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/view`);
-  await page.getByText("语义视图", { exact: true }).click();
   await expect(page.getByRole("tree")).toBeVisible();
   await expect(page.getByLabel("语义关系画布", { exact: true }).locator(".react-flow__node")).toHaveCount(11);
   await page.getByRole("button", { name: "适应画布", exact: true }).click();
@@ -67,6 +102,15 @@ test("semantic overview aligns resource explorer and fixed canvas", async ({ pag
     .toBe(true);
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("ontology-semantic.png", { fullPage: true });
+
+  await page.getByLabel("本体资源", { exact: true }).locator(`[data-resource="${ELEMENTS.object.id}"]`).dblclick();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("标题属性", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
+  await expect(page).toHaveScreenshot("ontology-element-modal.png", { fullPage: true });
+  await dialog.getByRole("button", { name: "打开详情", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/elements/object_type/${ELEMENTS.object.id}`));
+  await expect(dialog).not.toBeVisible();
 });
 
 test("instance browser aligns filters, table and detail sections", async ({ page }) => {

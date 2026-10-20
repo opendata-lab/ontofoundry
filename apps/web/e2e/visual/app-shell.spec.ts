@@ -22,14 +22,15 @@ test("multiple open pages retain one unsaved tab and leave page tabs unchanged",
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
   await expect(page.getByRole("button", { name: "parties" })).toBeVisible();
-  const innerTab = page.getByRole("tab", { name: /本体映射/ });
+  const innerTab = page.getByRole("tab", { name: /^数据集/ });
   const innerMetrics = await innerTab.evaluate((tab) => {
     const style = getComputedStyle(tab);
     return { height: style.height, padding: style.padding, fontSize: style.fontSize, background: style.backgroundColor };
   });
 
   const navigation = page.getByRole("navigation", { name: "工作空间导航" });
-  await navigation.getByRole("link", { name: "本体发布", exact: true }).click();
+  await navigation.getByRole("link", { name: "本体对象", exact: true }).click();
+  await page.getByRole("button", { name: "发布", exact: true }).click();
   await expect(page.getByText("选择待发布的本体", { exact: true })).toBeVisible();
   await navigation.getByRole("link", { name: "空间设置", exact: true }).click();
   await page.getByRole("textbox", { name: "空间名称", exact: true }).fill("星河零售示例空间 · 草稿");
@@ -41,9 +42,9 @@ test("multiple open pages retain one unsaved tab and leave page tabs unchanged",
     return body.scrollTop;
   });
   expect(scrollTop).toBeGreaterThan(0);
-  await navigation.getByRole("link", { name: "数据映射", exact: true }).click();
+  await navigation.getByRole("link", { name: "数据管理", exact: true }).click();
   await expect(page.getByRole("button", { name: "parties" })).toBeVisible();
-  await expect(strip.locator("[role=tab][aria-selected]")).toHaveCount(3);
+  await expect(strip.locator("[role=tab][aria-selected]")).toHaveCount(4);
   await expect(strip.getByLabel("未保存")).toHaveCount(1);
   expect(await innerTab.evaluate((tab) => {
     const style = getComputedStyle(tab);
@@ -56,7 +57,7 @@ test("multiple open pages retain one unsaved tab and leave page tabs unchanged",
     expect(controls).toBeTruthy();
     await expect(page.locator(`[id="${controls}"]`)).toHaveCount(1);
   }
-  const panel = page.locator(`#${await strip.getByRole("tab", { name: "数据映射", exact: true }).getAttribute("aria-controls")}`);
+  const panel = page.locator(`#${await strip.getByRole("tab", { name: "数据管理", exact: true }).getAttribute("aria-controls")}`);
   await expect(panel).toBeVisible();
   const table = page.getByRole("table");
   const bounds = await table.boundingBox();
