@@ -54,8 +54,9 @@ flowchart TD
 | [证据与实例](evidence-and-instances.md) | 文档事实怎样保存和追溯？ |
 | [查询语义](query-semantics.md) | MCP 返回什么，agent 怎样查数？ |
 | [格式与转换](formats.md) | 怎样备份、交换与理解转换损失？ |
+| [与 Ossie 的关系](ossie-compatibility.md) | 为什么按元素建模，对外怎样兼容和介绍 Ossie？ |
 
-Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主设计 §7 例外表](../design/2026-10-14-core-model-and-format-adapters.md#首版不承载的-ossie-能力)，成功完整转换的条目与原文待补全条目分别报告。
+Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主设计 §7 例外表](../design/2026-10-14-core-model-and-format-adapters.md#首版不承载的-ossie-能力)，成功完整转换的条目与原文待补全条目分别报告。建模按元素提案进行、Ossie 只在导入导出边界出现的原因与对外表述，见[与 Ossie 的关系](ossie-compatibility.md)。
 
 ## 2. 字段
 
