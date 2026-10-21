@@ -1,0 +1,1029 @@
+{
+  "schema_version": "core-1",
+  "workspace_id": "72100000-0000-4000-8000-000000009000",
+  "object_types": [
+    {
+      "id": "72100000-0000-4000-8000-000000000001",
+      "name": "supplier",
+      "display_name": "供应商",
+      "description": "维护合作主体的资质与联络信息。",
+      "synonyms": [
+        "供货伙伴"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000102"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000002",
+      "name": "purchase_order",
+      "display_name": "采购订单",
+      "description": "记录与合作主体约定的订购承诺。",
+      "synonyms": [
+        "进货单"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000201"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000003",
+      "name": "purchase_order_line",
+      "display_name": "采购订单明细",
+      "description": "记录每个订购品项的数量与价款。",
+      "synonyms": [
+        "进货行"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000301"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000004",
+      "name": "material",
+      "display_name": "物料",
+      "description": "维护可订购品项的规格与计量口径。",
+      "synonyms": [
+        "采购品项"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000402"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000005",
+      "name": "receipt",
+      "display_name": "收货",
+      "description": "记录实际交付的批次与检验结论。",
+      "synonyms": [
+        "到货登记"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000501"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000006",
+      "name": "payment",
+      "display_name": "付款",
+      "description": "记录实际资金结算的业务凭证。",
+      "synonyms": [
+        "结款记录"
+      ],
+      "title_property_id": "72100000-0000-4000-8000-000000000601"
+    }
+  ],
+  "properties": [
+    {
+      "id": "72100000-0000-4000-8000-000000000101",
+      "name": "supplier_code",
+      "display_name": "供应商编码",
+      "description": "稳定识别合作主体的业务编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000001",
+      "value_kind": "string",
+      "synonyms": [
+        "供方编码"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000102",
+      "name": "supplier_name",
+      "display_name": "供应商名称",
+      "description": "合作主体的登记名称。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000001",
+      "value_kind": "string",
+      "synonyms": [
+        "供方名称"
+      ],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000103",
+      "name": "bank_account",
+      "display_name": "结算账号",
+      "description": "记录对公账户，用于核对结算去向。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000001",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000201",
+      "name": "order_no",
+      "display_name": "采购订单号",
+      "description": "业务单据的唯一编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000002",
+      "value_kind": "string",
+      "synonyms": [
+        "单据号"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000202",
+      "name": "supplier_code",
+      "display_name": "订单供方编码",
+      "description": "指定合作主体。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000002",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000203",
+      "name": "ordered_at",
+      "display_name": "下单日期",
+      "description": "订购承诺成立的日期。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000002",
+      "value_kind": "date",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000204",
+      "name": "purchase_amount",
+      "display_name": "订单金额",
+      "description": "本单约定的含税金额。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000002",
+      "value_kind": "decimal",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000205",
+      "name": "promised_at",
+      "display_name": "承诺日期",
+      "description": "记录交期承诺，作为履约核对依据。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000002",
+      "value_kind": "date",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000301",
+      "name": "line_no",
+      "display_name": "明细行号",
+      "description": "明细的唯一业务编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000003",
+      "value_kind": "string",
+      "synonyms": [
+        "行次编码"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000302",
+      "name": "order_no",
+      "display_name": "所属订单号",
+      "description": "所属业务单据的编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000003",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000303",
+      "name": "material_code",
+      "display_name": "订购物料编码",
+      "description": "指定订购品项。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000003",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000304",
+      "name": "line_amount",
+      "display_name": "明细金额",
+      "description": "扣减前的行价款。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000003",
+      "value_kind": "decimal",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000305",
+      "name": "rebate_amount",
+      "display_name": "折让金额",
+      "description": "议定减免的行价款。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000003",
+      "value_kind": "decimal",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000401",
+      "name": "material_code",
+      "display_name": "物料编码",
+      "description": "品项的唯一业务编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000004",
+      "value_kind": "string",
+      "synonyms": [
+        "品项编码"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000402",
+      "name": "material_name",
+      "display_name": "物料名称",
+      "description": "品项的业务名称。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000004",
+      "value_kind": "string",
+      "synonyms": [
+        "品项名称"
+      ],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000403",
+      "name": "minimum_quantity",
+      "display_name": "起订数量",
+      "description": "记录最小订购批量，限定一次订购的数量下限。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000004",
+      "value_kind": "integer",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000501",
+      "name": "receipt_no",
+      "display_name": "收货单号",
+      "description": "交付批次的唯一业务编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000005",
+      "value_kind": "string",
+      "synonyms": [
+        "到货编号"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000502",
+      "name": "line_no",
+      "display_name": "收货明细行号",
+      "description": "本次交付对应的订购行次。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000005",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000503",
+      "name": "received_at",
+      "display_name": "到货日期",
+      "description": "实际交付日期。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000005",
+      "value_kind": "date",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000504",
+      "name": "accepted",
+      "display_name": "验收合格",
+      "description": "记录质检放行结论，通过时为真。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000005",
+      "value_kind": "boolean",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000601",
+      "name": "payment_no",
+      "display_name": "付款单号",
+      "description": "资金凭证的唯一业务编号。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000006",
+      "value_kind": "string",
+      "synonyms": [
+        "结款编号"
+      ],
+      "identifier": true,
+      "unique": true,
+      "required": true,
+      "value_type_id": "72100000-0000-4000-8000-000000008001"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000602",
+      "name": "order_no",
+      "display_name": "结算订单号",
+      "description": "本次结算所依据的单据。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000006",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000603",
+      "name": "paid_at",
+      "display_name": "结算日期",
+      "description": "实际资金划出的日期。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000006",
+      "value_kind": "date",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000604",
+      "name": "paid_amount",
+      "display_name": "实付金额",
+      "description": "已划出的资金数额。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000006",
+      "value_kind": "decimal",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000000605",
+      "name": "bank_reference",
+      "display_name": "回单编号",
+      "description": "用于查找银行回执并核验资金去向。",
+      "owner_type_id": "72100000-0000-4000-8000-000000000006",
+      "value_kind": "string",
+      "synonyms": [],
+      "identifier": false,
+      "unique": false,
+      "required": false
+    }
+  ],
+  "link_types": [
+    {
+      "id": "72100000-0000-4000-8000-000000001001",
+      "name": "ordered_from",
+      "display_name": "订单归属供方",
+      "description": "",
+      "synonyms": [
+        "归属供方"
+      ],
+      "source_type_id": "72100000-0000-4000-8000-000000000002",
+      "target_type_id": "72100000-0000-4000-8000-000000000001",
+      "source_role_name": "业务记录",
+      "target_role_name": "归属对象",
+      "multiplicity": "many_to_one",
+      "data_join": {
+        "kind": "direct",
+        "source_property_ids": [
+          "72100000-0000-4000-8000-000000000202"
+        ],
+        "target_property_ids": [
+          "72100000-0000-4000-8000-000000000101"
+        ]
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000001002",
+      "name": "line_of_order",
+      "display_name": "明细归属订单",
+      "description": "",
+      "synonyms": [],
+      "source_type_id": "72100000-0000-4000-8000-000000000003",
+      "target_type_id": "72100000-0000-4000-8000-000000000002",
+      "source_role_name": "业务记录",
+      "target_role_name": "归属对象",
+      "multiplicity": "many_to_one",
+      "data_join": {
+        "kind": "direct",
+        "source_property_ids": [
+          "72100000-0000-4000-8000-000000000302"
+        ],
+        "target_property_ids": [
+          "72100000-0000-4000-8000-000000000201"
+        ]
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000001003",
+      "name": "line_material",
+      "display_name": "明细订购品项",
+      "description": "",
+      "synonyms": [],
+      "source_type_id": "72100000-0000-4000-8000-000000000003",
+      "target_type_id": "72100000-0000-4000-8000-000000000004",
+      "source_role_name": "业务记录",
+      "target_role_name": "归属对象",
+      "multiplicity": "many_to_one",
+      "data_join": {
+        "kind": "direct",
+        "source_property_ids": [
+          "72100000-0000-4000-8000-000000000303"
+        ],
+        "target_property_ids": [
+          "72100000-0000-4000-8000-000000000401"
+        ]
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000001004",
+      "name": "receipt_of_line",
+      "display_name": "交付对应行次",
+      "description": "",
+      "synonyms": [],
+      "source_type_id": "72100000-0000-4000-8000-000000000005",
+      "target_type_id": "72100000-0000-4000-8000-000000000003",
+      "source_role_name": "业务记录",
+      "target_role_name": "归属对象",
+      "multiplicity": "many_to_one",
+      "data_join": {
+        "kind": "direct",
+        "source_property_ids": [
+          "72100000-0000-4000-8000-000000000502"
+        ],
+        "target_property_ids": [
+          "72100000-0000-4000-8000-000000000301"
+        ]
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000001005",
+      "name": "payment_of_order",
+      "display_name": "结款对应单据",
+      "description": "",
+      "synonyms": [],
+      "source_type_id": "72100000-0000-4000-8000-000000000006",
+      "target_type_id": "72100000-0000-4000-8000-000000000002",
+      "source_role_name": "业务记录",
+      "target_role_name": "归属对象",
+      "multiplicity": "many_to_one",
+      "data_join": {
+        "kind": "direct",
+        "source_property_ids": [
+          "72100000-0000-4000-8000-000000000602"
+        ],
+        "target_property_ids": [
+          "72100000-0000-4000-8000-000000000201"
+        ]
+      }
+    }
+  ],
+  "datasets": [
+    {
+      "id": "72100000-0000-4000-8000-000000002001",
+      "name": "fable_supplier_rows",
+      "display_name": "青岚供应商数据集",
+      "description": "虚构青岚采购协同工作空间的供应商来源。",
+      "table_name": "fictional_qinglan_supplier",
+      "columns": [
+        {
+          "name": "supplier_code",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "supplier_name",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "bank_account",
+          "physical_type": "varchar"
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000002002",
+      "name": "fable_purchase_order_rows",
+      "display_name": "青岚采购订单数据集",
+      "description": "虚构青岚采购协同工作空间的采购订单来源。",
+      "table_name": "fictional_qinglan_purchase_order",
+      "columns": [
+        {
+          "name": "order_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "supplier_code",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "ordered_at",
+          "physical_type": "date"
+        },
+        {
+          "name": "purchase_amount",
+          "physical_type": "decimal(18,2)"
+        },
+        {
+          "name": "promised_at",
+          "physical_type": "date"
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000002003",
+      "name": "fable_purchase_order_line_rows",
+      "display_name": "青岚采购订单明细数据集",
+      "description": "虚构青岚采购协同工作空间的采购订单明细来源。",
+      "table_name": "fictional_qinglan_purchase_order_line",
+      "columns": [
+        {
+          "name": "line_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "order_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "material_code",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "line_amount",
+          "physical_type": "decimal(18,2)"
+        },
+        {
+          "name": "rebate_amount",
+          "physical_type": "decimal(18,2)"
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000002004",
+      "name": "fable_material_rows",
+      "display_name": "青岚物料数据集",
+      "description": "虚构青岚采购协同工作空间的物料来源。",
+      "table_name": "fictional_qinglan_material",
+      "columns": [
+        {
+          "name": "material_code",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "material_name",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "minimum_quantity",
+          "physical_type": "integer"
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000002005",
+      "name": "fable_receipt_rows",
+      "display_name": "青岚收货数据集",
+      "description": "虚构青岚采购协同工作空间的收货来源。",
+      "table_name": "fictional_qinglan_receipt",
+      "columns": [
+        {
+          "name": "receipt_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "line_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "received_at",
+          "physical_type": "date"
+        },
+        {
+          "name": "accepted",
+          "physical_type": "boolean"
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000002006",
+      "name": "fable_payment_rows",
+      "display_name": "青岚付款数据集",
+      "description": "虚构青岚采购协同工作空间的付款来源。",
+      "table_name": "fictional_qinglan_payment",
+      "columns": [
+        {
+          "name": "payment_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "order_no",
+          "physical_type": "varchar"
+        },
+        {
+          "name": "paid_at",
+          "physical_type": "date"
+        },
+        {
+          "name": "paid_amount",
+          "physical_type": "decimal(18,2)"
+        },
+        {
+          "name": "bank_reference",
+          "physical_type": "varchar"
+        }
+      ]
+    }
+  ],
+  "mappings": [
+    {
+      "id": "72100000-0000-4000-8000-000000003001",
+      "type_id": "72100000-0000-4000-8000-000000000001",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002001",
+          "key_columns": [
+            "supplier_code"
+          ]
+        }
+      ],
+      "fields": {
+        "supplier_code": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "supplier_code"
+        },
+        "supplier_name": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "supplier_name"
+        },
+        "bank_account": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "bank_account"
+        }
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000003002",
+      "type_id": "72100000-0000-4000-8000-000000000002",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002002",
+          "key_columns": [
+            "order_no"
+          ]
+        }
+      ],
+      "fields": {
+        "order_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "order_no"
+        },
+        "supplier_code": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "supplier_code"
+        },
+        "ordered_at": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "ordered_at"
+        },
+        "purchase_amount": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "purchase_amount"
+        },
+        "promised_at": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "promised_at"
+        }
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000003003",
+      "type_id": "72100000-0000-4000-8000-000000000003",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002003",
+          "key_columns": [
+            "line_no"
+          ]
+        }
+      ],
+      "fields": {
+        "line_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "line_no"
+        },
+        "order_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "order_no"
+        },
+        "material_code": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "material_code"
+        },
+        "line_amount": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "line_amount"
+        },
+        "rebate_amount": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "rebate_amount"
+        }
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000003004",
+      "type_id": "72100000-0000-4000-8000-000000000004",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002004",
+          "key_columns": [
+            "material_code"
+          ]
+        }
+      ],
+      "fields": {
+        "material_code": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "material_code"
+        },
+        "material_name": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "material_name"
+        },
+        "minimum_quantity": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "minimum_quantity"
+        }
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000003005",
+      "type_id": "72100000-0000-4000-8000-000000000005",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002005",
+          "key_columns": [
+            "receipt_no"
+          ]
+        }
+      ],
+      "fields": {
+        "receipt_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "receipt_no"
+        },
+        "line_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "line_no"
+        },
+        "received_at": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "received_at"
+        },
+        "accepted": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "accepted"
+        }
+      }
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000003006",
+      "type_id": "72100000-0000-4000-8000-000000000006",
+      "binding_mode": "independent",
+      "sources": [
+        {
+          "id": "main",
+          "dataset_id": "72100000-0000-4000-8000-000000002006",
+          "key_columns": [
+            "payment_no"
+          ]
+        }
+      ],
+      "fields": {
+        "payment_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "payment_no"
+        },
+        "order_no": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "order_no"
+        },
+        "paid_at": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "paid_at"
+        },
+        "paid_amount": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "paid_amount"
+        },
+        "bank_reference": {
+          "kind": "column",
+          "source_id": "main",
+          "column": "bank_reference"
+        }
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "id": "72100000-0000-4000-8000-000000004001",
+      "name": "purchase_total",
+      "display_name": "采购金额",
+      "description": "",
+      "synonyms": [
+        "购货总额"
+      ],
+      "kind": "simple",
+      "dataset_id": "72100000-0000-4000-8000-000000002002",
+      "aggregation": "sum",
+      "measure": {
+        "dataset_id": "72100000-0000-4000-8000-000000002002",
+        "column": "purchase_amount"
+      },
+      "time_field": {
+        "dataset_id": "72100000-0000-4000-8000-000000002002",
+        "column": "ordered_at"
+      },
+      "filters": []
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004002",
+      "name": "order_count",
+      "display_name": "订购单数",
+      "description": "",
+      "synonyms": [],
+      "kind": "simple",
+      "dataset_id": "72100000-0000-4000-8000-000000002002",
+      "aggregation": "count",
+      "measure": null,
+      "time_field": {
+        "dataset_id": "72100000-0000-4000-8000-000000002002",
+        "column": "ordered_at"
+      },
+      "filters": []
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004003",
+      "name": "receipt_count",
+      "display_name": "交付批次数",
+      "description": "",
+      "synonyms": [],
+      "kind": "simple",
+      "dataset_id": "72100000-0000-4000-8000-000000002005",
+      "aggregation": "count",
+      "measure": null,
+      "time_field": {
+        "dataset_id": "72100000-0000-4000-8000-000000002005",
+        "column": "received_at"
+      },
+      "filters": []
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004004",
+      "name": "accepted_count",
+      "display_name": "合格批次数",
+      "description": "",
+      "synonyms": [],
+      "kind": "simple",
+      "dataset_id": "72100000-0000-4000-8000-000000002005",
+      "aggregation": "count",
+      "measure": null,
+      "time_field": {
+        "dataset_id": "72100000-0000-4000-8000-000000002005",
+        "column": "received_at"
+      },
+      "filters": [
+        {
+          "column": {
+            "dataset_id": "72100000-0000-4000-8000-000000002005",
+            "column": "accepted"
+          },
+          "operator": "eq",
+          "values": [
+            true
+          ]
+        }
+      ]
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004005",
+      "name": "acceptance_ratio",
+      "display_name": "验收通过率",
+      "description": "合格交付批次数占全部交付批次数的比例。",
+      "synonyms": [
+        "履约比例"
+      ],
+      "kind": "ratio",
+      "numerator_id": "72100000-0000-4000-8000-000000004004",
+      "denominator_id": "72100000-0000-4000-8000-000000004003"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004006",
+      "name": "discounted_total",
+      "display_name": "折后行金额",
+      "description": "汇总行价款扣除议定减免后的金额。",
+      "synonyms": [
+        "净行价款"
+      ],
+      "kind": "expression",
+      "dataset_id": "72100000-0000-4000-8000-000000002003",
+      "expression": "SUM(fable_purchase_order_line_rows.line_amount) - SUM(fable_purchase_order_line_rows.rebate_amount)",
+      "value_kind": "decimal"
+    },
+    {
+      "id": "72100000-0000-4000-8000-000000004007",
+      "name": "settled_total",
+      "display_name": "付款金额",
+      "description": "",
+      "synonyms": [
+        "已结款额"
+      ],
+      "kind": "simple",
+      "dataset_id": "72100000-0000-4000-8000-000000002006",
+      "aggregation": "sum",
+      "measure": {
+        "dataset_id": "72100000-0000-4000-8000-000000002006",
+        "column": "paid_amount"
+      },
+      "time_field": {
+        "dataset_id": "72100000-0000-4000-8000-000000002006",
+        "column": "paid_at"
+      },
+      "filters": []
+    }
+  ],
+  "rules": [
+    {
+      "id": "72100000-0000-4000-8000-000000008002",
+      "name": "supplier_code_required",
+      "display_name": "供方编号必填",
+      "description": "合作主体必须具备可追溯编号。",
+      "owner_kind": "property",
+      "owner_id": "72100000-0000-4000-8000-000000000101",
+      "rule_kind": "constraint",
+      "expression": "supplier.supplier_code IS NOT NULL"
+    }
+  ],
+  "value_types": [
+    {
+      "id": "72100000-0000-4000-8000-000000008001",
+      "name": "business_code",
+      "display_name": "业务编码值域",
+      "description": "业务凭证和合作主体编号共用的文本值域。",
+      "value_kind": "string"
+    }
+  ],
+  "material_objects": [],
+  "material_links": []
+}

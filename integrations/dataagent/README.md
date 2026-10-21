@@ -58,3 +58,8 @@ PYTHONDONTWRITEBYTECODE=1 apps/api/.venv/bin/python integrations/dataagent/skill
 - 跨表口径按技能提议“基于表达式的数据集 + 单数据集指标”，写法用 `scripts/show_example.py dataset --variant query`。
 - 技能与平台需同版部署：旧技能不认识 `tables_file` 和基于表达式的数据集。
 - 分步建模：Agent 在工作区 `modeling/` 写 plan.md、entities.json／issues.json、notes.md、parts/01–05 片段和 checks/。脚本 `init_workflow.py`（建骨架、还原上一轮计划）、`check_part.py`（片段快速检查）、`prepare_result.py <目录>`（按文件名合并片段）。等待用户确认时平台保存计划，下一次建模运行以 `prior_plan_file` 交回。
+
+## 2026-10-21 本体检索（问数方法）
+
+平台的 `search_ontology` 改为关键词召回、一层关系扩展和规则重排，返回命中原因与 `unmatched_terms`（见 `docs/design/2026-10-21-ontology-search.md`）。问数提示词的“取定义的顺序”随之更新：原句检索、按 id 读取所需定义、自行识别未匹配片段中的实体名称与时间。部署平台新版本后，把更新后的 [问数提示词](agents/agent_ontofoundry_qa.md) 同步到已有问数 Agent 的管理后台并发布；不涉及技能包和建模 Agent。拆分 Skill 后，这部分方法迁入 semantic-grounding。
+
