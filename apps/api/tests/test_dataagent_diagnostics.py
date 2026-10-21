@@ -66,7 +66,7 @@ def _dataagent_client(
             502,
             "DataAgent 上找不到该 Agent",
             (
-                "创建 agent_id=agent-missing、安装 ontofoundry-modeling Skill，"
+                "创建 agent_id=agent-missing、安装 ontology-discovery 与 entity-extraction Skill，"
                 "并确认其可见性允许 Widget 访问"
             ),
         ),
@@ -190,7 +190,7 @@ def test_health_reports_missing_agent_without_using_topic_filter(client, monkeyp
         "ok": False,
         "message": "DataAgent 上找不到该 Agent",
         "hint": (
-            "创建 agent_id=missing-agent、安装 ontofoundry-modeling Skill，"
+            "创建 agent_id=missing-agent、安装 ontology-discovery 与 entity-extraction Skill，"
             "并确认其可见性允许 Widget 访问"
         ),
     }

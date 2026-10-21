@@ -744,6 +744,8 @@ export type Material = {
   sha256: SHA256;
   created_at?: ISOTime;
   archived_at?: ISOTime | null;
+  /** upload: a document someone uploaded; table_receipt: table structures a modeling run used. */
+  origin?: "upload" | "table_receipt";
 };
 export type MaterialUsage = {
   object_types: number;

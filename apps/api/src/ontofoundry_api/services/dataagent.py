@@ -259,7 +259,7 @@ class DataAgentClient:
                 "DataAgent 上找不到该 Agent",
                 status_code=502,
                 hint=(
-                    f"创建 agent_id={agent_id}、安装 ontofoundry-modeling Skill，"
+                    f"创建 agent_id={agent_id}、安装 ontology-discovery 与 entity-extraction Skill，"
                     "并确认其可见性允许 Widget 访问"
                 ),
             ) from exc

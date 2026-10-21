@@ -19,7 +19,7 @@ from ontofoundry_api.services.modeling_input import build_work_pack, execution_i
 
 FIXTURES = (
     Path(__file__).resolve().parents[3]
-    / "integrations/dataagent/skills/ontofoundry-modeling/tests/fixtures"
+    / "integrations/dataagent/tests/fixtures"
 )
 
 
@@ -122,7 +122,7 @@ def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatc
     session, _ = proposals_run(client)
     marker = json.loads(
         (
-            FIXTURES.parent.parent / "references/examples/protocol/needs-input.json"
+            FIXTURES.parent.parent / "shared/references/examples/protocol/needs-input.json"
         ).read_bytes()
     )
     marker["run_token"] = RUN_TOKEN

@@ -33,6 +33,7 @@ def describe(item):
     return {
         "id": item.id,
         "name": item.name,
+        "origin": item.origin,
         "sha256": item.sha256,
         "byte_size": item.byte_size,
         "chunk_count": item.chunk_count,
@@ -129,6 +130,7 @@ async def upload(
             workspace_id=workspace_id,
             name=Path(name).name,
             sha256=sha,
+            origin="upload",
             byte_size=size,
         )
         db.add(item)

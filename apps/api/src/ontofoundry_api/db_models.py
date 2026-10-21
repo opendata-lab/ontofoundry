@@ -144,6 +144,9 @@ class MaterialRecord(Base):
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     name: Mapped[str] = mapped_column(String(240))
     sha256: Mapped[str] = mapped_column(String(64))
+    origin: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="upload", server_default="upload"
+    )
     byte_size: Mapped[int] = mapped_column(Integer)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

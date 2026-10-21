@@ -8,11 +8,13 @@ from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
 from ontofoundry_api.contracts.exports import exports_schema
 from ontofoundry_api.contracts.imports import imports_schema
+from ontofoundry_api.contracts.materials import MaterialOverview
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.contracts.read_models import read_models_schema
 
 TARGET = Path(__file__).with_name("ontofoundry.proposals.v1.schema.json")
 READ_TARGET = Path(__file__).with_name("ontofoundry.api-read.v1.schema.json")
+MATERIAL_TARGET = Path(__file__).with_name("ontofoundry.materials.v1.schema.json")
 
 
 def export(*, check=False):
@@ -56,6 +58,17 @@ def export(*, check=False):
             raise SystemExit("接口读模型 schema 与模型不一致，请重新生成")
     else:
         READ_TARGET.write_text(read_payload)
+    material_schema = MaterialOverview.model_json_schema(mode="serialization")
+    material_schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
+    material_schema["$id"] = MATERIAL_TARGET.name
+    material_payload = json.dumps(
+        material_schema, ensure_ascii=False, indent=2, sort_keys=True
+    ) + "\n"
+    if check:
+        if not MATERIAL_TARGET.exists() or MATERIAL_TARGET.read_text() != material_payload:
+            raise SystemExit("材料接口 schema 与模型不一致，请重新生成")
+    else:
+        MATERIAL_TARGET.write_text(material_payload)
 
 
 if __name__ == "__main__":

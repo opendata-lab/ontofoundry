@@ -2,6 +2,7 @@
 
 import hashlib
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -9,7 +10,10 @@ from sqlalchemy import select
 from ontofoundry_api.db_models import MaterialChunkRecord, MaterialRecord
 
 
-def store_text_material(db, settings, workspace_id, name, text):
+def store_text_material(
+    db, settings, workspace_id, name, text,
+    *, origin: Literal["upload", "table_receipt"] = "upload",
+):
     data = text.encode("utf-8")
     sha = hashlib.sha256(data).hexdigest()
     existing = db.scalar(
@@ -29,6 +33,7 @@ def store_text_material(db, settings, workspace_id, name, text):
         workspace_id=workspace_id,
         name=Path(name).name[:240],
         sha256=sha,
+        origin=origin,
         byte_size=len(data),
     )
     db.add(item)

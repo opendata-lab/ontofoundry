@@ -19,7 +19,7 @@ from ontofoundry_api.services.modeling_input import scenario_facts
 
 EXAMPLES = (
     Path(__file__).resolve().parents[3]
-    / "integrations/dataagent/skills/ontofoundry-modeling/references/examples/protocol"
+    / "integrations/dataagent/shared/references/examples/protocol"
 )
 PRIOR = {
     "plan_md": "场景：全量\n虚构订单与会员",
@@ -247,9 +247,11 @@ def test_scenario_facts_first_then_added_material_and_table_are_in_pack(
         ],
     )
     second = send(client, session["id"])
+    receipt_ids = [m["id"] for m in second["materials"] if m["id"] != material["id"]]
+    assert len(receipt_ids) == 1
     expected = {
         "draft_empty": True,
-        "new_material_ids": [material["id"]],
+        "new_material_ids": [material["id"], *receipt_ids],
         "new_table_keys": ["t1"],
     }
     assert second["input_files"]["scenario_facts"] == expected

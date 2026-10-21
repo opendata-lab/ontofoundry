@@ -19,6 +19,7 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [origin, setOrigin] = useState<"upload" | "table_receipt">("upload");
   const revision = useRef(0);
   useErrorMessage(error);
   const load = useCallback(async () => {
@@ -79,13 +80,17 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
       setBusy(false);
     }
   };
-  const rows = materials.filter((material) => material.name.toLowerCase().includes(query.trim().toLowerCase())
+  const rows = materials.filter((material) => (material.origin ?? "upload") === origin
+    && material.name.toLowerCase().includes(query.trim().toLowerCase())
     && (filter === "all"
       || (filter === "archived" ? !!material.archived_at
         : filter === "unused" ? material.usage.can_delete
           : !material.usage.can_delete)));
   return <>
     <PageToolbar extra={<>
+      <Select aria-label="文档来源" value={origin} onChange={setOrigin} options={[
+        { value: "upload", label: "上传的文档" }, { value: "table_receipt", label: "表结构收据" },
+      ]} />
       <Select aria-label="文档使用情况" value={filter} onChange={setFilter} options={[
         { value: "all", label: "全部文档" }, { value: "used", label: "已使用" }, { value: "unused", label: "未使用" },
         { value: "archived", label: "已归档" },
@@ -97,11 +102,11 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
         beforeUpload={(file, files) => { if (file === files[0]) void upload(files); return false; }}>
         <Button type="primary" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
       </Upload>
-      <Typography.Text type="secondary" className="text-xs">{materials.length} 个文档</Typography.Text>
+      <Typography.Text type="secondary" className="text-xs">{materials.filter((m) => (m.origin ?? "upload") === "upload").length} 个文档</Typography.Text>
     </PageToolbar>
     <Panel>
     <Table<ManagedMaterial> size="middle" rowKey="id" loading={loading} dataSource={rows} pagination={rows.length > 20 ? { pageSize: 20 } : false}
-      locale={{ emptyText: <Empty description={error ? "文档未加载，请刷新重试" : query || filter !== "all" ? "没有匹配的文档" : "尚未上传文档"} /> }}
+      locale={{ emptyText: <Empty description={error ? "文档未加载，请刷新重试" : origin === "table_receipt" && !query && filter === "all" ? "还没有表结构收据：建模运行使用已同步的表时自动生成" : query || filter !== "all" ? "没有匹配的文档" : "尚未上传文档"} /> }}
       expandable={{ expandedRowRender: (material) => <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
         <span>属性 {material.usage.properties}</span><span>规则 {material.usage.rules}</span><span>指标 {material.usage.metrics}</span>
         <span>引用位置：{material.usage.references.join("、") || "无"}</span>

@@ -940,7 +940,7 @@ def capabilities(
         "model": f"DataAgent · {config.dataagent_agent_id}" if configured else "",
         "max_file_mb": config.max_file_mb,
         "connections_configured": True,
-        "skills": ["ontofoundry-modeling"],
+        "skills": ["ontology-discovery", "entity-extraction"],
     }
 
 

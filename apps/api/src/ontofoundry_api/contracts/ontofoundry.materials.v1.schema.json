@@ -36,6 +36,14 @@
           "title": "Name",
           "type": "string"
         },
+        "origin": {
+          "enum": [
+            "upload",
+            "table_receipt"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
         "sha256": {
           "title": "Sha256",
           "type": "string"
@@ -47,6 +55,7 @@
       "required": [
         "id",
         "name",
+        "origin",
         "sha256",
         "byte_size",
         "chunk_count",

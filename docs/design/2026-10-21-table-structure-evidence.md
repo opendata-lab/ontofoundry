@@ -35,3 +35,18 @@
 
 - 不新增核心证据类型或“表角色”字段。
 - 不保存业务数据行，不接入外部血缘。
+
+## 6. 实施结果
+
+- 范围：实施 TE-01 至 TE-04 的后端。表结构收据使用普通材料的存储、分块、哈希去重、材料查找、证据行号校验、用量统计、归档和删除保护；不增加核心证据类型。收据随运行占用声明一并写入 manifest，工作包材料索引和 `tables_file` 指向同一份上传内容，后台同步不会改变本轮内容。
+- 来源字段：`origin` 是本平台自创的材料管理元数据，不是核心业务语义，也不是查询执行优化。删除它将无法可靠区分上传文档与平台生成收据；材料名称和 JSON 内容均不能可靠替代。材料列表、概览、上传、归档和恢复响应返回 `upload` 或 `table_receipt`；迁移为已有记录填入 `upload`，并保留数据库默认值。前端已有兼容的可选类型，无需修改。
+- 固定格式：沿用现有 `tables_file` 字段，显式按固定顺序生成各层对象，`indent=2`、`ensure_ascii=False`、UTF-8、无额外末尾换行。表按连接 ID、库名、表名排序后编号；外键按约束列和引用目标的固定内容排序，保留物理列、主键列和外键内部列的顺序。连接配置、凭据、同步时间和业务数据不写入收据。
+- 命名规则：单连接为“表结构收据 · <连接名> · <YYYY-MM-DD>”；多连接将本轮全部表存为一份材料，名称为“表结构收据 · 多连接（N） · <YYYY-MM-DD>”，N 按连接 ID 去重计数。日期取首次创建时的 UTC 日期，单连接名称中的路径分隔符替换为全角字符，连接名最多保留 200 字符。名称和日期不参与内容哈希，相同内容沿用首份记录的名称及来源；跨来源同内容也不重复建记录。
+- 偏离设计之处：无语义或契约层面的偏离。补充了表排序、外键排序、多连接命名、UTC 日期和跨来源去重规则；证据校验同时显式拒绝小于 1 或倒序的行号。TE-05、TE-06、DataAgent 技能与提示词、前端筛选和证据弹窗均不在本次后端范围。
+- 测试结果：全部编辑完成后，在 `apps/api` 执行 `.venv/bin/python -m pytest -q`，最终 **1112 通过、17 跳过、0 失败、0 错误**，耗时 104.65 秒，另有 3 条现有依赖或模型警告；`.venv/bin/ruff check src tests evals` 全部通过。新增 12 个用例覆盖重复组装、勾选顺序和日期变化、结构变更后的历史证据、多连接命名、JSON 键和外键排序、manifest 与上传字节一致、后台同步隔离、非法行号/引文/哈希/空间、来源读接口、证据用量与删除保护、归档后源文件恢复和 Alembic 升降级。
+- 回归修复：首轮全量测试发现已有后端测试仍引用 DataAgent 拆分前的资源路径；仅修改 4 个后端测试文件的只读资源路径，并调整增量场景的材料清单断言，未修改 `integrations/dataagent`。第二轮全量测试通过。
+- 验证边界：迁移在 SQLite 旧表结构上通过实际 Alembic 命令验证，包含既有数据回填、数据库默认值、降级再升级；17 项依赖未配置的可丢弃 PostgreSQL/MySQL 环境的测试跳过，PostgreSQL 实库全链路迁移与真实 DataAgent 建模未执行。未启动、重启或重建外部环境，未提交或推送。
+- 改动文件（仓库相对路径）：
+  - 后端：`apps/api/src/ontofoundry_api/` 下的 `api/agent_conversation.py`、`api/materials.py`、`services/modeling_input.py`、`services/material_store.py`、`domain/evidence.py`、`db_models.py`、`contracts/materials.py`、`contracts/export_schema.py`、`contracts/ontofoundry.materials.v1.schema.json`、`alembic/versions/20261021_000001_material_origin.py`。
+  - 测试：`apps/api/tests/` 下的 `test_table_structure_receipts.py`、`test_linked_tables.py`、`test_modeling_input.py`、`test_harness_prompts.py`、`test_stepwise_modeling.py`、`test_t1_proposal_contract.py`。
+  - 文档：本文及 `docs/plans/2026-10-21-table-structure-evidence-plan.md`。前端现有未提交改动保持原样。

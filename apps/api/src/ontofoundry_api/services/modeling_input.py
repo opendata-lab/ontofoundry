@@ -6,7 +6,9 @@ import hashlib
 import json
 from typing import Any
 
+from ontofoundry_api.db_models import MaterialRecord, utc_now
 from ontofoundry_api.services.dataagent import DataAgentError
+from ontofoundry_api.services.material_store import store_text_material
 
 PACK_LIMIT = 8 * 1024
 READ_LIMIT = 8 * 1024
@@ -241,7 +243,11 @@ def scenario_facts(
 def linked_tables_payload(details: list[dict]) -> tuple[list[dict], bytes]:
     """Catalog entries for the work pack and the full structure file."""
     catalog, full = [], []
-    for number, item in enumerate(details, 1):
+    ordered = sorted(
+        details,
+        key=lambda item: (item["connection"].id, item["schema_name"] or "", item["table"]["name"]),
+    )
+    for number, item in enumerate(ordered, 1):
         table, connection = item["table"], item["connection"]
         ref = f"{item['schema_name']}.{table['name']}" if item["schema_name"] else table["name"]
         # The key is the only way to select a table, so same-named tables never collide.
@@ -270,7 +276,9 @@ def linked_tables_payload(details: list[dict]) -> tuple[list[dict], bytes]:
                 "primary_key": table.get("primary_key") or [c["name"] for c in table.get("columns", []) if c.get("primary_key")],
                 "foreign_keys": [
                     {k: f.get(k) for k in ("constrained_columns", "referred_schema", "referred_table", "referred_columns")}
-                    for f in table.get("foreign_keys", [])
+                    for f in sorted(table.get("foreign_keys", []), key=lambda f: encode({
+                        k: f.get(k) for k in ("constrained_columns", "referred_schema", "referred_table", "referred_columns")
+                    }))
                 ],
                 "columns": [
                     {"name": c["name"], "type": c.get("type"), "nullable": c.get("nullable"), "comment": c.get("comment") or ""}
@@ -278,4 +286,23 @@ def linked_tables_payload(details: list[dict]) -> tuple[list[dict], bytes]:
                 ],
             }
         )
-    return catalog, encode({"tables": full})
+    # Dict insertion order fixes keys; physical column and key-column order is retained.
+    return catalog, json.dumps({"tables": full}, indent=2, ensure_ascii=False).encode("utf-8")
+
+
+def store_linked_tables_receipt(
+    db, settings, workspace_id: str, linked_tables: list[dict],
+) -> tuple[list[dict], MaterialRecord]:
+    """Pin registered structure as ordinary material in the caller's transaction."""
+    from ontofoundry_api.services.dataset_sources import linked_table_details
+
+    details = linked_table_details(db, workspace_id, linked_tables)
+    catalog, content = linked_tables_payload(details)
+    connections = {item["connection"].id: item["connection"].name for item in details}
+    label = next(iter(connections.values())) if len(connections) == 1 else f"多连接（{len(connections)}）"
+    label = label.replace("/", "／").replace("\\", "＼")[:200]
+    name = f"表结构收据 · {label} · {utc_now().date().isoformat()}"
+    material = store_text_material(
+        db, settings, workspace_id, name, content.decode("utf-8"), origin="table_receipt",
+    )
+    return catalog, material

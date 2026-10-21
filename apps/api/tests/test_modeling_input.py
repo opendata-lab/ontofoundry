@@ -20,7 +20,7 @@ from ontofoundry_api.services.modeling_input import (
 
 FIXTURES = (
     Path(__file__).resolve().parents[3]
-    / "integrations/dataagent/skills/ontofoundry-modeling/tests/fixtures"
+    / "integrations/dataagent/tests/fixtures"
 )
 
 

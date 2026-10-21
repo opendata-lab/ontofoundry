@@ -108,8 +108,8 @@ def test_work_pack_catalog_is_compact_and_full_columns_go_to_the_tables_file(cli
             [link(connection_id, "stores"), link(connection_id, "orders"), link(connection_id, "orders")],
         )
     catalog, body = linked_tables_payload(details)
-    # Link order is kept and duplicates collapse.
-    assert [(c["key"], c["table"]) for c in catalog] == [("t1", "retail.stores"), ("t2", "retail.orders")]
+    # Stable table order makes the same selection produce the same receipt.
+    assert [(c["key"], c["table"]) for c in catalog] == [("t1", "retail.orders"), ("t2", "retail.stores")]
     assert all("columns" not in c and c["column_count"] == 2 for c in catalog)
     full = json.loads(body)["tables"]
     assert full[1]["connection_id"] == connection_id and full[1]["dialect"] == "mysql"

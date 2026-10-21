@@ -38,7 +38,7 @@ def check_material_evidence(evidence: dict, lookup: MaterialLookup, where: str) 
             "EVIDENCE_INVALID", f"{where}：材料哈希缺失或与已保存的材料不一致"
         )
     start, end = evidence["locator"]["line_start"], evidence["locator"]["line_end"]
-    if end > len(lines):
+    if start < 1 or end < start or end > len(lines):
         raise EvidenceError("EVIDENCE_INVALID", f"{where}：证据行号超出材料范围")
     quote = " ".join((evidence.get("quote") or "").split())
     window = " ".join(" ".join(lines[start - 1 : end]).split())

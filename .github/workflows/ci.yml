@@ -55,8 +55,8 @@ jobs:
       - name: Validate modeling skill and executable examples offline
         working-directory: apps/api
         run: |
-          uv run --python 3.13 pytest -q ../../integrations/dataagent/skills/ontofoundry-modeling/tests
-          uv run --python 3.13 python ../../integrations/dataagent/skills/ontofoundry-modeling/scripts/offline_budget.py
+          uv run --python 3.13 pytest -q ../../integrations/dataagent/tests
+          uv run --python 3.13 python ../../integrations/dataagent/scripts/offline_budget.py
 
   node:
     name: Node (runtime + web)

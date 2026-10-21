@@ -1,6 +1,7 @@
 """Derived material usage for workspace source management."""
 
 from datetime import datetime
+from typing import Literal
 
 from ontofoundry_api.domain.core import Strict
 
@@ -20,6 +21,7 @@ class MaterialUsage(Strict):
 class ManagedMaterial(Strict):
     id: str
     name: str
+    origin: Literal["upload", "table_receipt"]
     sha256: str
     byte_size: int
     chunk_count: int

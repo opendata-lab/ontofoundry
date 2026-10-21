@@ -380,11 +380,11 @@ def test_skill_fact_example_is_valid_as_a_complete_graph():
     import hashlib
     from pathlib import Path
 
-    skill = Path(__file__).parents[3] / "integrations/dataagent/skills/ontofoundry-modeling"
+    integration = Path(__file__).parents[3] / "integrations/dataagent"
     items = json.loads(
-        (skill / "references/examples/create-material_link.json").read_bytes()
+        (integration / "shared/references/examples/create-material_link.json").read_bytes()
     )
-    material = (skill / "tests/fixtures/material.md").read_bytes()
+    material = (integration / "tests/fixtures/material.md").read_bytes()
     ctx = context(empty_snapshot(uuid4()))
     parsed = parse(
         result(ctx, items),

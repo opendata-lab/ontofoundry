@@ -52,6 +52,7 @@ from ontofoundry_api.services.modeling_input import (
     execution_input,
     material_index,
     scenario_facts,
+    store_linked_tables_receipt,
     upload_work_pack,
 )
 from ontofoundry_api.services.proposals import proposal_context, proposal_header
@@ -804,7 +805,8 @@ async def send_message(
         "repair_budget_required": mode == "model",
         "producer": {
             "agent_id": request.app.state.settings.dataagent_agent_id,
-            "skill": "ontofoundry-modeling",
+            # The agent picks among its mounted skills per task.
+            "skill": "ontology-discovery+entity-extraction",
             "mode": mode,
         },
         "result_contract": request.app.state.settings.modeling_result_contract
@@ -815,6 +817,15 @@ async def send_message(
     if proposals:
         # Results are parsed against exactly the draft this run was given.
         manifest["pinned_draft"] = draft
+
+    table_catalog, table_receipt = None, None
+    if proposals and item.linked_tables:
+        table_catalog, table_receipt = store_linked_tables_receipt(
+            db, request.app.state.settings, workspace_id, item.linked_tables
+        )
+        if all(material.id != table_receipt.id for material in materials):
+            materials.append(table_receipt)
+        manifest["materials"] = [{"id": m.id, "sha256": m.sha256} for m in materials]
 
     changed = db.execute(
         update(ModelingSessionRecord)
@@ -899,9 +910,13 @@ async def send_message(
             else:
                 uploaded = await dataagent.upload(
                     topic_id,
-                    f"{material.id}-{material.name}",
+                    f"ontofoundry-tables-{run_token}.json"
+                    if table_receipt is not None and material.id == table_receipt.id
+                    else f"{material.id}-{material.name}",
                     source_bytes,
-                    material_media_type(material.name),
+                    "application/json"
+                    if table_receipt is not None and material.id == table_receipt.id
+                    else material_media_type(material.name),
                 )
                 path_in_topic = str(uploaded.get("rel_path") or material.name)
                 material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
@@ -947,24 +962,7 @@ async def send_message(
                     "version_id": access["version_id"],
                     "file": str(uploaded_access.get("rel_path") or ""),
                 }
-            table_catalog, tables_file = None, None
-            if item.linked_tables:
-                from ontofoundry_api.services.dataset_sources import linked_table_details
-                from ontofoundry_api.services.errors import ServiceError
-                from ontofoundry_api.services.modeling_input import linked_tables_payload
-
-                try:
-                    details = linked_table_details(db, workspace_id, item.linked_tables)
-                except ServiceError as exc:
-                    raise DataAgentError(exc.message, status_code=422) from exc
-                table_catalog, tables_body = linked_tables_payload(details)
-                uploaded_tables = await dataagent.upload(
-                    topic_id,
-                    f"ontofoundry-tables-{run_token}.json",
-                    tables_body,
-                    "application/json",
-                )
-                tables_file = str(uploaded_tables.get("rel_path") or "")
+            tables_file = material_path_by_id[table_receipt.id] if table_receipt is not None else None
             facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
             prior_plan_file = None
             if prior_plan:

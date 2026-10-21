@@ -35,6 +35,8 @@ packages = ["src/ontofoundry_api"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Offline evaluation sets live beside the tests and are imported as `evals`.
+pythonpath = ["."]
 addopts = "--strict-markers"
 
 [tool.ruff]
