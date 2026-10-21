@@ -17,8 +17,24 @@ INCREMENTAL_QUERIES = [
     [f"property:refund.{name}" for name in ("refund_no", "order_no", "refund_date", "refund_amount", "reason")],
 ]
 
-SKILL = Path(__file__).resolve().parents[1]
-ROOT = SKILL.parents[3]
+BASE = Path(__file__).resolve().parents[1]
+SKILL = BASE / "shared"
+ROOT = BASE.parents[1]
+import sys
+sys.path.insert(0, str(SKILL / "scripts"))
+
+
+def resource(path):
+    """Locate the sole source of a runtime reference or offline fixture."""
+    if path.startswith("tests/"):
+        return BASE / path
+    if path == "SKILL.md":
+        return BASE / "skills/ontology-discovery/SKILL.md"
+    shared = SKILL / path
+    if shared.exists():
+        return shared
+    skill = "entity-extraction" if path == "references/extract-facts.md" else "ontology-discovery"
+    return BASE / "skills" / skill / path
 EXPECTED = {
     "task_dd4fe3ae4f894cc983abeccf": (201573, 1175808, 22794, 44),
     "task_fac43c47c66b4b2f939e08c9": (124881, 1011584, 36904, 39),
@@ -150,11 +166,11 @@ def byte_report():
     )
     from read_input import render_lines, render_tables
 
-    context = json.loads((SKILL / "tests/fixtures/budget-context.json").read_bytes())
+    context = json.loads(resource("tests/fixtures/budget-context.json").read_bytes())
     context["execution"] = execution_input(context["run"]["run_token"])
     materials = []
     for index in (1, 2):
-        content = (SKILL / f"tests/fixtures/budget-material-{index}.md").read_bytes()
+        content = resource(f"tests/fixtures/budget-material-{index}.md").read_bytes()
         materials.append(
             material_index(
                 {
@@ -193,7 +209,7 @@ def byte_report():
     )
     examples = ["facts", "mapping", "metrics", "rules"]
     selected = b"".join(
-        (SKILL / f"references/examples/{name}.json").read_bytes() for name in examples
+        resource(f"references/examples/{name}.json").read_bytes() for name in examples
     )
     agent_file = (
         ROOT / "integrations/dataagent/agents/agent_ontofoundry.md"
@@ -213,7 +229,7 @@ def byte_report():
     ]
     decisions = {}
     for name in method_paths:
-        body = (SKILL / f"references/{name}.md").read_text()
+        body = resource(f"references/{name}.md").read_text()
         lines = body.splitlines()
         start = lines.index("## 决策") + 1
         end = next(
@@ -226,7 +242,7 @@ def byte_report():
         "平台提示": measure(prompt),
         "已知Agent提示": measure(system_body),
         **{
-            label: measure((SKILL / path).read_bytes())
+            label: measure(resource(path).read_bytes())
             for label, path in common.items()
         },
         "工作包": measure(encode(pack)),
@@ -235,7 +251,7 @@ def byte_report():
         "带原行号材料": measure(
             b"".join(
                 render_lines(
-                    (SKILL / f"tests/fixtures/budget-material-{i}.md").read_text()
+                    resource(f"tests/fixtures/budget-material-{i}.md").read_text()
                 ).encode()
                 for i in (1, 2)
             )
@@ -255,10 +271,12 @@ def byte_report():
         # Examples carry display_name so the agent learns to fill Chinese names.
         "选中示例": (len(selected), SELECTED_EXAMPLES_LIMIT),
         "方法决策段": (len(method_bytes), 6000),
-        "核心语义": (len((SKILL / "references/core-model.md").read_bytes()), 4500),
+        "核心语义": (len(resource("references/core-model.md").read_bytes()), 4500),
     }
     for name, limit in zip(method_paths, [3000, 3000, 3200, 2500]):
-        limits[name] = (len((SKILL / f"references/{name}.md").read_bytes()), limit)
+        limits[name] = (len(resource(f"references/{name}.md").read_bytes()), limit)
+    for name in ("entity-extraction", "semantic-grounding"):
+        limits[name + "入口"] = (len((BASE / "skills" / name / "SKILL.md").read_bytes()), 4000)
     routes = {}
     for task, method, sample in [
         ("名称修改", None, "operations"),
@@ -267,7 +285,7 @@ def byte_report():
         ("单主题指标规则", "extract-metrics-rules", "metrics"),
     ]:
         extra = len(decisions[method]) if method else 0
-        example_bytes = len((SKILL / f"references/examples/{sample}.json").read_bytes())
+        example_bytes = len(resource(f"references/examples/{sample}.json").read_bytes())
         # Reuse the same six-table fixture as a conservative, comparable route.
         route_total = (
             len(system_body.encode())
@@ -302,7 +320,7 @@ def byte_report():
             "pass": size <= limit,
             "scope": "计划轮首阶段完整材料与协议入口，表目录由工作包给出",
         }
-    fixture = SKILL / "tests/fixtures/extract-retail"
+    fixture = resource("tests/fixtures/extract-retail")
     extract_context = json.loads((fixture / "context.json").read_bytes())
     extract_material = (fixture / "material.md").read_bytes()
     extract_materials = [material_index(
@@ -334,11 +352,12 @@ def byte_report():
     kit = SKILL / "references/extract-kit"
     extract_inputs = {
         "已知Agent提示": system_body.encode(), "平台提示": extract_prompt.encode(),
-        "技能入口": (SKILL / "SKILL.md").read_bytes(), "工作包": encode(extract_pack),
+        "技能入口": resource("SKILL.md").read_bytes(),
+        "工作包": encode(extract_pack),
         "带原行号材料": (render_lines(extract_material.decode()) + "\n").encode(),
         "前轮计划": (fixture / "prior-plan.json").read_bytes(),
         "表结构": (render_tables(json.dumps({"tables": extract_tables}), ",".join(t["key"] for t in extract_tables)) + "\n").encode(),
-        "原则": (SKILL / "references/principles.md").read_bytes(),
+        "原则": resource("references/principles.md").read_bytes(),
         **{f"写法包/{name}": (kit / name).read_bytes() for name in ["guide.md", "values.json", "01.json", "02.json", "03.json", "04.json", "05.json"]},
     }
     extract_components = {name: measure(data) for name, data in extract_inputs.items()}
@@ -382,10 +401,11 @@ def byte_report():
     )
     incremental_inputs = {
         "已知Agent提示": system_body.encode(), "平台提示": incremental_prompt.encode(),
-        "技能入口": (SKILL / "SKILL.md").read_bytes(), "工作包": encode(incremental_pack),
+        "技能入口": resource("SKILL.md").read_bytes(),
+        "工作包": encode(incremental_pack),
         "带原行号材料": extract_inputs["带原行号材料"],
         "表结构": (render_tables(json.dumps({"tables": incremental_tables}), ",".join(t["key"] for t in incremental_tables)) + "\n").encode(),
-        "原则": (SKILL / "references/principles.md").read_bytes(),
+        "原则": resource("references/principles.md").read_bytes(),
         **{f"写法包/{name}": (kit / name).read_bytes() for name in ("incremental.md", "values.json", "update.json")},
         **{f"工作包索引/{i}": page for i, page in enumerate(incremental_pages)},
     }
@@ -413,6 +433,59 @@ def byte_report():
             "stages": {"输入与查询及包": [2, 3], "写片段与即检": [2, 2], "合并与说明": [2, 3]},
             "basis": "可执行路径估计，没有模型行为实测；分页、歧义重查增加轮数",
         },
+    }
+    # The retail fixtures contain definitions, not concrete instances. Dynamic
+    # selection does not load entity-extraction for those routes. This separate
+    # document fixture counts both complete skill entries and all shared inputs.
+    from ontofoundry_api.domain.snapshot import empty_snapshot
+    from ontofoundry_api.domain.canonical import snapshot_sha256
+    combined_context = json.loads(resource("tests/fixtures/context.json").read_bytes())
+    combined_context["draft"] = empty_snapshot(combined_context["run"]["workspace_id"])
+    combined_context["element_hashes"] = {}
+    combined_context["run"]["source_draft_sha256"] = snapshot_sha256(combined_context["draft"])
+    combined_context["execution"] = execution_input(combined_context["run"]["run_token"])
+    combined_material = resource("tests/fixtures/material.md").read_bytes()
+    combined_materials = [material_index(
+        {"id": "11111111-1111-4111-8111-111111111111", "sha256": hashlib.sha256(combined_material).hexdigest()},
+        combined_material, "inputs/material.md",
+    )]
+    combined_pack, combined_pages = build_work_pack(
+        combined_context, combined_materials,
+        context_file="inputs/context.json", schema_file="inputs/schema.json",
+        prior_plan_file="inputs/combined-plan.json",
+    )
+    if combined_pages:
+        raise ValueError("组合预算样本不应分页")
+    combined_prompt = build_turn_prompt(
+        "确认员工类型与汇报关系，并抽取材料中的实例。", mode="model",
+        workspace_id=combined_context["run"]["workspace_id"],
+        session_id=combined_context["run"]["session_id"], context_file="inputs/context.json",
+        context_bytes=len(encode(combined_context)), material_files=[],
+        run_token=combined_context["run"]["run_token"],
+        proposal_prompt=proposal_instructions(
+            run_token=combined_context["run"]["run_token"], header=combined_context["run"],
+            materials=combined_materials, schema_file="inputs/schema.json", mcp=None,
+            work_pack_file="inputs/work-pack.json",
+        ),
+    )
+    combined_reads = {
+        "已知Agent提示": system_body.encode(), "平台提示": combined_prompt.encode(),
+        "技能入口": resource("SKILL.md").read_bytes(),
+        "实例技能入口": (BASE / "skills/entity-extraction/SKILL.md").read_bytes(),
+        "工作包": encode(combined_pack), "带原行号材料": render_lines(combined_material.decode()).encode(),
+        "前轮计划": resource("tests/fixtures/combined-plan.json").read_bytes(),
+        "原则": resource("references/principles.md").read_bytes(),
+        "实例方法": resource("references/extract-facts.md").read_bytes(),
+        "实例正例": resource("references/examples/facts.json").read_bytes(),
+        **{f"写法包/{name}": (kit / name).read_bytes() for name in
+           ("guide.md", "values.json", "01.json", "02.json", "03.json", "04.json", "05.json")},
+    }
+    combined_bytes = sum(len(value) for value in combined_reads.values())
+    routes["定义与实例组合"] = {
+        "bytes": combined_bytes, "limit": EXTRACT_ROUTE_LIMIT,
+        "pass": combined_bytes <= EXTRACT_ROUTE_LIMIT and all(len(value) <= 8192 for value in combined_reads.values()),
+        "components": {key: measure(value) for key, value in combined_reads.items()},
+        "scope": "具体文档陈述：两技能入口、完整工作包／材料／前轮计划、原则、固定包全量及实例方法和正例；不裁剪既有路线样本",
     }
     total = sum(v["bytes"] for v in components.values())
     from ontofoundry_api.contracts.proposals import result_schema
@@ -448,7 +521,7 @@ def byte_report():
             "work_pack": measure(encode(pack)),
             "materials": measure(
                 b"".join(
-                    (SKILL / f"tests/fixtures/budget-material-{i}.md").read_bytes()
+                    resource(f"tests/fixtures/budget-material-{i}.md").read_bytes()
                     for i in (1, 2)
                 )
             ),

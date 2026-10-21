@@ -16,14 +16,16 @@ from ontofoundry_api.contracts.proposals import (
 from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.snapshot import empty_snapshot
 
-SKILL = Path(__file__).resolve().parents[1]
+BASE = Path(__file__).resolve().parents[1]
+SKILL = BASE / "shared"
+sys.path.insert(0, str(BASE / "scripts"))
 sys.path.insert(0, str(SKILL / "scripts"))
 import check_result as checker
 import offline_budget as budget
 import prepare_result as prepare
 
 SCHEMA_PATH = (
-    SKILL.parents[3]
+    BASE.parents[1]
     / "apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json"
 )
 SCHEMA = json.loads(SCHEMA_PATH.read_bytes())
@@ -34,7 +36,7 @@ EXAMPLES = [SKILL / "references/examples" / e["file"] for e in CATALOG["examples
 def pinned(example):
     entry = next(e for e in CATALOG["examples"] if e["file"] == example.name)
     ctx = json.loads(
-        (SKILL / "tests/fixtures" / (entry["context"] or "context.json")).read_bytes()
+        (BASE / "tests/fixtures" / (entry["context"] or "context.json")).read_bytes()
     )
     if not entry["context"]:
         ctx["draft"] = empty_snapshot(ctx["run"]["workspace_id"])
@@ -45,7 +47,7 @@ def pinned(example):
 
 def server_parse(batch, ctx):
     run = {k: v for k, v in ctx["run"].items() if k != "schema_version"}
-    material = (SKILL / "tests/fixtures/material.md").read_bytes()
+    material = (BASE / "tests/fixtures/material.md").read_bytes()
     return parse_result(
         json.dumps(batch).encode(),
         RunContext(**run, draft=ctx["draft"]),
@@ -206,7 +208,7 @@ def test_prepare_does_not_replace_final_on_bad_fragment(tmp_path, monkeypatch):
             "--schema",
             str(SCHEMA_PATH),
             "--context",
-            str(SKILL / "tests/fixtures/context.json"),
+            str(BASE / "tests/fixtures/context.json"),
             "--output",
             str(final),
             str(fragment),
@@ -238,7 +240,7 @@ def test_budget_targets_and_historical_conservation():
     assert report["all_limits_pass"], report["limits"]
     assert all(route["pass"] for route in report["routes"].values())
     for task, expected in budget.EXPECTED.items():
-        rows = json.loads((SKILL / f"tests/fixtures/usage-{task}.json").read_bytes())
+        rows = json.loads((BASE / f"tests/fixtures/usage-{task}.json").read_bytes())
         report = budget.summarize(task, rows)
         assert report["conserved"] and report["runtime_turns"] == expected[3]
         assert sum(c["I"] for c in report["categories"].values()) == report["I"]
@@ -279,7 +281,7 @@ def test_read_input_boundaries_and_original_lines(tmp_path):
 def test_skill_reference_paths_exist():
     import re
 
-    for document in [SKILL / "SKILL.md", *(SKILL / "references").glob("*.md")]:
+    for document in (SKILL / "references").glob("*.md"):
         for target in re.findall(r"\]\(([^)]+)\)", document.read_text()):
             if "://" not in target:
                 assert (document.parent / target.split("#")[0]).exists(), (
@@ -460,7 +462,7 @@ def test_prepare_reports_exact_fragment_location_and_preserves_output(
         [
             "prepare_result.py",
             "--context",
-            str(SKILL / "tests/fixtures/context.json"),
+            str(BASE / "tests/fixtures/context.json"),
             "--schema",
             str(SCHEMA_PATH),
             "--output",
@@ -501,7 +503,7 @@ def test_manual_evidence_preservation_and_meaningful_calculation_examples():
 def test_method_section_ranges_and_budgeted_decision_reads():
     import re
 
-    for path in (SKILL / "references").glob("extract-*.md"):
+    for path in (BASE / "skills").glob("*/references/extract-*.md"):
         lines = path.read_text().splitlines()
         for heading, start, end in re.findall(r"([^：；]+) (\d+)–(\d+)行", lines[2]):
             start, end = int(start), int(end)

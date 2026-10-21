@@ -1,3 +1,6 @@
+from pathlib import Path
+BASE = Path(__file__).resolve().parents[1]
+
 """Stepwise workspace, fragment and protocol contracts, entirely offline."""
 
 import importlib
@@ -243,7 +246,7 @@ def test_prepare_empty_directory_fails_and_preserves_output(tmp_path, monkeypatc
             monkeypatch,
             prepare,
             "--context",
-            SKILL / "tests/fixtures/context.json",
+            BASE / "tests/fixtures/context.json",
             "--schema",
             SCHEMA_PATH,
             "--output",
@@ -308,6 +311,13 @@ def test_new_protocol_examples_are_registered():
 def test_stepwise_routes_and_updated_limits_pass():
     report = offline_budget.byte_report()
     assert report["all_limits_pass"]
+    for name in ("技能入口", "entity-extraction入口", "semantic-grounding入口"):
+        assert report["limits"][name]["limit"] == 4000
+    assert report["limits"]["系统正文"]["limit"] == 450
+    combined = report["routes"]["定义与实例组合"]
+    assert combined["limit"] == 36000 and combined["pass"]
+    assert {"技能入口", "实例技能入口", "工作包", "带原行号材料", "前轮计划", "实例方法", "实例正例"} <= combined["components"].keys()
+    assert combined["bytes"] == sum(c["bytes"] for c in combined["components"].values())
     for name, limit in (("第一步（计划）", 18500), ("第二步（抽取）", 36000)):
         route = report["routes"][name]
         assert route["limit"] == limit and route["bytes"] <= limit and route["pass"]

@@ -1,0 +1,303 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "workspace_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "version_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ]
+      }
+    },
+    "object_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ]
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mention": {
+            "type": "string",
+            "minLength": 1
+          },
+          "object_type_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "enum": [
+              "MATCHED",
+              "AMBIGUOUS",
+              "NOT_FOUND"
+            ]
+          },
+          "entity_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "display": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "match": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          }
+        },
+        "required": [
+          "mention",
+          "object_type_id",
+          "status",
+          "entity_ref",
+          "display",
+          "match"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "MATCHED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "entity_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "display": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "match": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "entity_ref": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "filters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operator": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {},
+          "value_from": {
+            "type": "string",
+            "pattern": "^entities\\[[0-9]+\\]$"
+          }
+        },
+        "required": [
+          "property_id",
+          "operator"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "value"
+            ],
+            "not": {
+              "required": [
+                "value_from"
+              ]
+            }
+          },
+          {
+            "required": [
+              "value_from"
+            ],
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "time_range": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "field": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "dataset_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "column": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "dataset_id",
+                "column"
+              ]
+            }
+          },
+          "required": [
+            "text",
+            "field"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unresolved": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text",
+          "reason"
+        ]
+      }
+    },
+    "clarification": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    }
+  },
+  "required": [
+    "workspace_id",
+    "version_id",
+    "question",
+    "metrics",
+    "object_types",
+    "entities",
+    "filters",
+    "time_range",
+    "unresolved",
+    "clarification"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "entities": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "const": "AMBIGUOUS"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "clarification": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "semantic-grounding 结构化理解",
+  "description": "依据语义锚定设计 §5；名称仅展示，所有本体引用使用 id；AMBIGUOUS 必须追问，不进入统计查询。"
+}

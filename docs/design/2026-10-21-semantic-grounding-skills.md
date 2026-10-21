@@ -1,6 +1,6 @@
 # 语义锚定：原子化 Skill 与场景组合
 
-日期：2026-10-21。状态：已确认，待实施。来源：用户 2026-10-21 与 ChatGPT 的讨论（Semantic Grounding Service、semantic-extraction 目录结构）及当日决定。
+日期：2026-10-21。状态：已确认，离线实施完成，待真实运行验收。来源：用户 2026-10-21 与 ChatGPT 的讨论（Semantic Grounding Service、semantic-extraction 目录结构）及当日决定。
 
 ## 1. 定位
 
@@ -96,3 +96,21 @@ integrations/dataagent/
 
 - 不新建流程引擎、Agent 运行时或第二套提案格式。
 - 不把向量召回、实体匹配逻辑写进 Skill。
+
+## 8. 实施结果
+
+2026-10-21：源码按 SG-01、SG-06 拆为三个技能，旧 ontofoundry-modeling 目录删除。共享参考、全部七个脚本、examples/protocol、extract-kit、依赖和许可只存 shared；测试迁到 integrations/dataagent/tests，offline_budget 迁到 scripts，不进入任何包。ontology-discovery 保留原执行清单编号、调用和 01–05 片段路径；entity-extraction 与其同运行共用片段、修正预算并合为一个结果。两个 Agent 采用 SG-02 动态选择技能，问数检索顺序与查询语义移入 semantic-grounding。
+
+两个抽取 Schema 由 generate_output_schemas.py 从同版平台契约按类型裁剪并保留可达依赖，打包前生成。技能子集用于描述输出，最终组合结果仍按工作包完整平台 Schema 校验，符合 SG-15。semantic-grounding Schema 对 §5 的空数组补齐未解析项 text/reason、筛选字面值 value、空时间 null 和实体状态 NOT_FOUND（沿用实体消歧设计 ER-03），不新增模型字段；AMBIGUOUS 强制非空 clarification。所有本体引用带 id，名称仅展示。
+
+SG-07、SG-12 以三个独立 ZIP 加管理员插件 ZIP 落地，plugin.json 列版本、最低平台版本、能力基线、四个已上线 MCP 工具与两个 Agent 配置；install.sh 只复制三技能并校验，打印后台人工登记、发布和重启步骤。版本最低值沿用当前平台 0.1.0，并补充 2026-10-21 能力基线，因为仓库尚未通过版本号区分开发快照。共享 core-model 的仓库相对文档链接改为纯文本来源说明，避免安装包链接失效。
+
+与设计的偏离及原因：SG-01 的 resolve_entity 调用暂不进入技能，按路线图步骤 5 才启用；当前仅使用已上线读取工具和授权查询能力核对候选，不能声称已有统一实体消歧。问数结构化理解已定义协议并要求 Agent 输出，自动持久化到问数运行记录未在本次实现，因为范围禁止修改 apps，且问数上线属于后续步骤。单独实例运行入口、新实例库契约与权限须由平台任务接续。目录清单补入现有 extract-tables（按本次要求），其余方法主要移动，实例方法仅统一对外“实例”用语。后台同步、重启及新会话真实验收未执行；真实 DeepSeek 运行须先确认预算。
+
+离线验证结果在统一测试与打包完成后记录于下文。
+
+共享速查表原有专属方法链接改为方法名与所属技能说明，避免单技能安装的悬空链接；不复制专属文档。离线预算原零售夹具只有定义、没有具体实例，按 SG-02 不加载 entity-extraction；新增具体文档陈述的组合预算路线，完整计入两个技能入口、工作包、材料、前轮计划、原则、固定包以及实例方法和正例。保留全部原预算上限与原夹具，不用扩大阈值吸收重复读取。
+
+统一离线验证：`PYTHONDONTWRITEBYTECODE=1 apps/api/.venv/bin/python -m pytest -q integrations/dataagent`：313 passed（41.44 秒）；`scripts/offline_budget.py` 返回 0，全部上限通过；`make -C integrations/dataagent zip` 返回 0，生成三个技能 ZIP 和 ontofoundry-dataagent-plugin.zip。三个 ZIP 分别在隔离临时目录通过 show_example 01–05、check_part、prepare_result；另验证两技能定义／实例片段合并为同一个结果、生成 Schema 与平台契约一致、插件安装结构及损坏包拒绝安装。
+
+预算实测（UTF-8 字节，不是模型 token）：建模 Agent 系统正文 402/450；ontology-discovery 入口 3949/4000、entity-extraction 3272/4000、semantic-grounding 3975/4000；计划路线 18408/18500、抽取 35854/36000、增量 44546/50000、定义与实例组合 34047/36000。保留原阈值，并对三个入口统一采用 4000 上限。旧清单正文（仅替换技能路径）及七个共享脚本与拆分前逐一比较一致。dist 为忽略的本地构建产物，不提交。未修改 apps，未 commit/push。

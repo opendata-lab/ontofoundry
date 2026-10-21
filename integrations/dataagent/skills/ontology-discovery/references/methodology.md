@@ -19,6 +19,6 @@ scenario_facts 是客观事实；场景由你结合用户意图判断，写在 p
 | 类型／英文改名 | [类型](extract-types.md) |
 | 表／绑定 | [表](extract-tables.md)、[映射](extract-mappings.md) |
 | 聚合／约束 | [指标规则](extract-metrics-rules.md) |
-| 文档事实 | [事实](extract-facts.md) |
+| 文档实例 | entity-extraction |
 
 仅改中文名称读完整目标及 update 正例。抽取轮不回读本文件或 core-model，只按 SKILL 固定包路线。Schema 只给检查器；未覆盖写法查已有正例，仍无覆盖则说明缺项并交付合法范围。

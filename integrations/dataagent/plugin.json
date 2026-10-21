@@ -1,0 +1,27 @@
+{
+  "name": "ontofoundry-dataagent",
+  "version": "0.1.0",
+  "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
+  "minimum_platform_version": "0.1.0",
+  "platform_baseline": "2026-10-21 core-1：工作包、完整提案 v1、分步片段、execution 修正预算、本体关键词检索四工具；仅版本号不足以确认这些能力",
+  "installation": "manual-admin",
+  "skills": [
+    {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
+    {"name": "entity-extraction", "path": "skills/entity-extraction"},
+    {"name": "semantic-grounding", "path": "skills/semantic-grounding"}
+  ],
+  "mcp_services": [
+    {
+      "name": "OntoFoundry",
+      "url_template": "<ONTOFOUNDRY_BASE_URL>/api/v1/ontology/workspaces/<workspace_id>/mcp",
+      "tools": ["search_ontology", "get_ontology", "search_objects", "get_object"],
+      "authentication": "管理员使用平台授权凭据配置；建模使用工作包中的运行级 MCP 配置，禁止把真实令牌写进包",
+      "registration": "由管理员在 DataAgent 管理后台登记；安装脚本不访问后台"
+    }
+  ],
+  "agents": [
+    {"name": "agent_ontofoundry", "config": "agents/agent_ontofoundry.md", "skills": ["ontology-discovery", "entity-extraction"], "max_turns": 40},
+    {"name": "agent_ontofoundry_qa", "config": "agents/agent_ontofoundry_qa.md", "skills": ["semantic-grounding"]}
+  ],
+  "limitations": ["DataAgent 暂不支持整包原生加载", "实体消歧与问数结构化结果持久化待路线图步骤 5", "现有 Agent 由管理员配置发布，平台不新建或修改 Agent"]
+}

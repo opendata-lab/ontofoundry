@@ -8,9 +8,9 @@ from uuid import uuid4
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[5]
+ROOT = Path(__file__).resolve().parents[3]
 spec = importlib.util.spec_from_file_location(
-    "skill_checker", Path(__file__).parents[1] / "scripts/check_result.py"
+    "skill_checker", Path(__file__).parents[1] / "shared/scripts/check_result.py"
 )
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
@@ -238,7 +238,7 @@ def test_relationship_schema_accepts_complete_readings(readings):
 def test_document_fact_reference_example_is_checkable():
     result = payload()
     result["items"] = json.loads(
-        (Path(__file__).parents[1] / "references/examples/facts.json").read_bytes()
+        (Path(__file__).parents[1] / "shared/references/examples/facts.json").read_bytes()
     )
     for item in result["items"]:
         item.setdefault("before", None)

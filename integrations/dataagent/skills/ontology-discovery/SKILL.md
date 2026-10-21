@@ -1,10 +1,10 @@
 ---
-name: ontofoundry-modeling
-description: 根据材料和已有模型提出 core-1 增量提案，供用户审阅。
+name: ontology-discovery
+description: 从文档、表结构发现实体类型、属性、关系、数据集、映射、指标、规则，判断新增还是复用已有定义，提出供审阅的增量提案。
 ---
 # 建模执行清单
 
-技能目录 `.claude/skills/ontofoundry-modeling`；脚本用 `"$DATAAGENT_PYTHON_BIN" .claude/skills/ontofoundry-modeling/scripts/<脚本>`。文件写 modeling/。stdout≤8 KiB，同回合多条调用，不拼接输出。
+技能目录 `.claude/skills/ontology-discovery`；脚本用 `"$DATAAGENT_PYTHON_BIN" .claude/skills/ontology-discovery/scripts/<脚本>`。文件写 modeling/。stdout≤8 KiB，同回合多条调用，不拼接输出。
 
 小改动／补齐已有实体／无新增实体先走③增量；否则有 prior_plan_file 走③抽取，新增实体或优化走①②；一次完成列清单后③。
 

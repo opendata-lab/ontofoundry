@@ -1,3 +1,6 @@
+from pathlib import Path
+BASE = Path(__file__).resolve().parents[1]
+
 """Fixed extraction examples and conservative/incremental proofs, without services."""
 
 import hashlib
@@ -14,7 +17,7 @@ from test_stepwise_workflow import check_part, init_workflow, invoke, lookup, wr
 from test_workflow import SCHEMA, SCHEMA_PATH, SKILL, checker, pinned, prepare
 
 KIT = SKILL / "references/extract-kit"
-RETAIL = SKILL / "tests/fixtures/extract-retail"
+RETAIL = BASE / "tests/fixtures/extract-retail"
 PART_NAMES = ["01-types", "02-links", "03-datasets", "04-metrics-rules", "05-facts"]
 MATERIAL_ID = "0b2f2b9b-938b-4452-8a7a-45587024538d"
 

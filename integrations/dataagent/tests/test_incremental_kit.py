@@ -1,3 +1,6 @@
+from pathlib import Path
+BASE = Path(__file__).resolve().parents[1]
+
 """Offline incremental authoring through public examples and exact element reads."""
 
 import hashlib
@@ -152,7 +155,7 @@ def test_incremental_examples_pass_all_three_validators(parts, tmp_path, monkeyp
         assert all("before" not in i and "expected_target_hash" not in i for i in payload)
         payloads.append(payload)
     payloads += [[] for _ in range(5 - len(payloads))]
-    library = SKILL / "tests/fixtures/extract-library"
+    library = BASE / "tests/fixtures/extract-library"
     ctx = json.loads((library / "v1-context.json").read_bytes())
     parsed = prove(payloads, ctx, (KIT / "material.md").read_bytes(), "11111111-1111-4111-8111-111111111111", tmp_path, monkeypatch)
     if "edit" in parts:
@@ -283,7 +286,7 @@ def test_incremental_read_budget_counts_public_outputs_and_enforces_limit(monkey
 
 
 def test_skill_incremental_instructions_and_guide_are_bounded():
-    skill = (SKILL / "SKILL.md").read_bytes()
+    skill = (BASE / "skills/ontology-discovery/SKILL.md").read_bytes()
     assert len(skill) <= 4000
     assert "不读 context_file 全文、脚本源码或 Schema" in skill.decode()
     for args in [("--incremental-guide",), ("--part", "edit"), ("--part", "update")]:
@@ -293,7 +296,7 @@ def test_skill_incremental_instructions_and_guide_are_bounded():
 
 
 def test_library_base_is_independent_and_incremental_references_are_explicit():
-    library = SKILL / "tests/fixtures/extract-library"
+    library = BASE / "tests/fixtures/extract-library"
     initial = json.loads((library / "context.json").read_bytes())
     ctx = json.loads((library / "v1-context.json").read_bytes())
     parts = load_parts(KIT, kit=True)

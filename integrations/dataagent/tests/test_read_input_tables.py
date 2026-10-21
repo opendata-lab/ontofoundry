@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/read_input.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "shared/scripts/read_input.py"
 
 
 def table(key, connection_id, connection, column):
