@@ -7,7 +7,7 @@ import { ReviewEvidence } from "./EvidencePopover";
 import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
 import { OPERATION, STATUS } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
-import { ProposalSourceIssues } from "./ProposalSourceIssues";
+import { useSourceIssues } from "./ProposalSourceIssues";
 import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
@@ -87,6 +87,7 @@ export function ProposalDetail({
   actions,
   onRevise,
   onReviseDataset,
+  onReviseContent,
   workspaceId,
   onClose,
 }: {
@@ -99,6 +100,7 @@ export function ProposalDetail({
   actions: CardActions;
   onRevise: (candidate: DuplicateCandidate, after: MaterialObject) => Promise<boolean>;
   onReviseDataset: (dataset: Dataset) => Promise<boolean>;
+  onReviseContent: (after: Record<string, unknown>) => Promise<boolean>;
   workspaceId: string;
   onClose: () => void;
 }) {
@@ -106,6 +108,7 @@ export function ProposalDetail({
   const byIdMap = new Map(items.map((entry) => [entry.id, entry]));
   const deps = requiredIds(item);
   const changes = reviewChanges(item);
+  const source = useSourceIssues({ item, workspaceId, busy, fields: new Set(changes.map((c) => c.path)), onReviseDataset });
   const reason = item.reason.trim();
   const blocked = acceptanceBlock(item, byIdMap);
   const canRevise =
@@ -142,7 +145,8 @@ export function ProposalDetail({
         {["conflict", "stale"].includes(item.status) && (
           <Alert type="warning" showIcon message={`${STATUS[item.status]}：${item.status_reason || "当前目标已发生变化，请重新评估"}`} />
         )}
-        <ProposalSourceIssues item={item} workspaceId={workspaceId} busy={busy} onReviseDataset={onReviseDataset} />
+        {source.notes}
+        {source.dialogs}
         {canRevise && (
           <section className="flex flex-col gap-2 border-b border-rule pb-4">
             <SectionTitle title="可能重复的已有事实" />
@@ -173,7 +177,18 @@ export function ProposalDetail({
         )}
         <section className="flex flex-col gap-2 border-b border-rule pb-4">
           <SectionTitle title="字段差异" note={`${changes.length} 处改动`} />
-          <FieldDiff changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
+          <FieldDiff
+            changes={changes}
+            beforeLabel="修改前"
+            names={elementNames(draft, items)}
+            annotations={source.marks}
+            editDisabled={busy}
+            onEdit={
+              item.status === "pending" && (item.operation === "create" || item.operation === "update") && item.after
+                ? (path, value) => onReviseContent({ ...(item.after as Record<string, unknown>), [path]: value })
+                : undefined
+            }
+          />
         </section>
         {reason && (
           <section className="flex flex-col gap-1 border-b border-rule pb-4">

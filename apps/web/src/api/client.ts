@@ -294,6 +294,7 @@ export const instancesApi = {
 };
 
 export const proposalsApi = {
+  reviseContent: (workspaceId: string, sessionId: string, proposalId: string, after: Record<string, unknown>, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/after`, { after, expected_session_revision: revision }, "PUT"),
   reviseDataset: (workspaceId: string, sessionId: string, proposalId: string, dataset: Dataset, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/dataset`, { dataset, expected_session_revision: revision }, "PUT"),
   batches: (s: Pick<ModelingSession, "id" | "workspace_id">, params?: { limit?: number; cursor?: string }) =>
     request<Items<ProposalBatch> & { next_cursor: string | null }>(

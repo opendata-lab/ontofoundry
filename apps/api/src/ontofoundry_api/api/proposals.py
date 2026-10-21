@@ -772,6 +772,28 @@ def revise_fact_proposal(
     return read_batch(workspace_id, session_id, batch_id, db, user)
 
 
+class ProposalContentRevision(BaseModel):
+    after: dict
+    expected_session_revision: int
+
+
+@router.put("/proposals/{proposal_id}/after")
+def revise_proposal_content(
+    workspace_id: str,
+    session_id: str,
+    proposal_id: str,
+    body: ProposalContentRevision,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id)
+    from ontofoundry_api.services.proposal_revision import revise_proposal
+
+    return revise_proposal(
+        db, workspace_id, session_id, proposal_id, body.after, body.expected_session_revision
+    )
+
+
 class DatasetProposalRevision(BaseModel):
     dataset: __import__("ontofoundry_api.domain.core", fromlist=["Dataset"]).Dataset
     expected_session_revision: int

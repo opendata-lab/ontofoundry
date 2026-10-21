@@ -152,3 +152,33 @@ def test_assets_keep_a_recorded_missing_table_missing(client, tmp_path, monkeypa
     items = {t["name"]: t for t in client.get(ROOT + f"/connections/{connection_id}/assets").json()["items"]}
     assert items["fiction_01"]["missing"] is True
     assert items["fiction_00"]["missing"] is False
+
+
+def test_assets_expose_per_table_observation_and_keep_unselected_times(client, tmp_path, monkeypatch):
+    engine = source_database(tmp_path, 2)
+    connection_id, _ = install(client, monkeypatch, engine)
+    sync(client, connection_id, {"scope": "all"})
+    before = registered(client, connection_id)
+    sync(client, connection_id, {"scope": "selected", "tables": ["fiction_00"]})
+    response = client.get(ROOT + f"/connections/{connection_id}/assets").json()
+    items = {t["name"]: t for t in response["items"]}
+    assert items["fiction_00"]["observed_at"] > before["fiction_00"]["observed_at"]
+    assert items["fiction_01"]["observed_at"] == before["fiction_01"]["observed_at"]
+    assert response["observed_at"] and len(items) == 3
+
+
+def test_visible_schemas_respects_postgresql_allowlist_and_mysql_database(monkeypatch):
+    from types import SimpleNamespace
+
+    from ontofoundry_api.services import metadata_catalog
+
+    monkeypatch.setattr(metadata_catalog, "inspect", lambda _: SimpleNamespace(
+        get_schema_names=lambda: ["fiction_sales", "fiction_crm", "information_schema"]
+    ))
+    source = object()
+    postgres = SimpleNamespace(kind="postgresql", config_json={"schemas": ["fiction_sales", "fiction_hidden"]})
+    assert metadata_catalog.visible_schemas(postgres, source) == ["fiction_sales"]
+    postgres.config_json = {}
+    assert metadata_catalog.visible_schemas(postgres, source) == ["fiction_crm", "fiction_sales", "information_schema"]
+    mysql = SimpleNamespace(kind="mysql", config_json={"database": "fiction_crm"})
+    assert metadata_catalog.visible_schemas(mysql, source) == ["fiction_crm"]

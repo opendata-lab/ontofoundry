@@ -1,7 +1,6 @@
 """Observed source schemas and their links to a published ontology."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
-from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -11,6 +10,7 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MetadataSnapshotRecord
 from ontofoundry_api.services.access import require_mappings
 from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.metadata_catalog import visible_schemas
 from ontofoundry_api.services.metadata_sync import (
     create_job,
     get_job,
@@ -37,10 +37,9 @@ def schemas(
     user: Principal = Depends(current_principal),
 ):
     require_mappings(db, workspace_id, user)
-    with connect_readonly(
-        get_connection(db, workspace_id, connection_id), request.app.state.settings
-    ) as conn:
-        return {"items": inspect(conn).get_schema_names()}
+    connection = get_connection(db, workspace_id, connection_id)
+    with connect_readonly(connection, request.app.state.settings) as conn:
+        return {"items": visible_schemas(connection, conn)}
 
 
 def asset_response(db, wid, connection, record, version_id=None, schema_name=""):

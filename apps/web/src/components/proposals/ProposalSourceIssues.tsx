@@ -1,9 +1,9 @@
 import { Alert, Button, Form, Input, Modal } from "antd";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { Dataset, ProposalItem } from "../../api/types";
 import { DatasetLocationFields } from "../elements/DatasetLocationFields";
-import { SectionTitle } from "../layout";
-import { TableSyncPanel } from "../TableSyncPanel";
+import { StatusMark } from "../layout";
+import { TableSyncDialog } from "../TableSyncDialog";
 
 const TITLE: Record<string, string> = {
   SOURCE_NOT_REGISTERED: "表未同步",
@@ -13,47 +13,74 @@ const TITLE: Record<string, string> = {
   COLUMN_NOT_FOUND: "列不存在",
 };
 
-/** Derived source problems on a proposal, with the two fixes a reviewer can apply. */
-export function ProposalSourceIssues({ item, workspaceId, busy, onReviseDataset }: {
+/** "/table_name" or "/fields/amount/column" -> the top-level field the diff row shows. */
+const fieldOf = (path: string) => path.replace(/^\//, "").split("/")[0] ?? "";
+
+/**
+ * Source problems placed next to the field they concern. After a sync or a
+ * revision the proposals reload and the mark disappears where it was shown.
+ */
+export function useSourceIssues({ item, workspaceId, busy, fields, onReviseDataset }: {
   item: ProposalItem;
   workspaceId: string;
   busy: boolean;
+  /** Fields the diff shows; problems elsewhere stay in a note above it. */
+  fields: ReadonlySet<string>;
   onReviseDataset: (dataset: Dataset) => Promise<boolean>;
-}) {
-  const issues = (item.source_diagnostics ?? []).filter((d) => d.severity === "error");
+}): { marks: Record<string, ReactNode>; notes: ReactNode; dialogs: ReactNode } {
   const [syncing, setSyncing] = useState<{ connection?: string; schema?: string; table?: string } | null>(null);
   const [editing, setEditing] = useState<Dataset | null>(null);
-  if (!issues.length || item.status !== "pending") return null;
+  const issues = item.status === "pending" ? (item.source_diagnostics ?? []).filter((d) => d.severity === "error") : [];
   const dataset = item.target_kind === "dataset" && item.operation !== "delete" ? (item.after as Dataset | null) : null;
-  return (
-    <section className="flex flex-col gap-2 border-b border-rule pb-4">
-      <SectionTitle title="数据来源" note="处理后会自动重新校验，未处理时不能接受" />
-      {issues.map((issue) => (
-        <Alert
-          key={`${issue.code}:${issue.path}:${issue.details?.table_name ?? ""}`}
-          type="error"
-          showIcon
-          message={`${TITLE[issue.code] ?? "来源未就绪"}：${issue.message}`}
-          action={
-            issue.code === "SOURCE_NOT_REGISTERED" && issue.details?.connection_id ? (
-              <Button size="small" disabled={busy} onClick={() => setSyncing({
-                connection: issue.details?.connection_id, schema: issue.details?.schema_name, table: issue.details?.table_name,
-              })}>
-                去同步
-              </Button>
-            ) : undefined
-          }
-        />
-      ))}
-      {dataset && (
-        <div>
-          <Button size="small" disabled={busy} onClick={() => setEditing({ ...dataset })}>修改连接和表</Button>
-        </div>
+
+  const mark = (issue: (typeof issues)[number]) => (
+    <span key={`${issue.code}:${issue.path}`} className="inline-flex flex-wrap items-center gap-2">
+      <StatusMark state="error" label={TITLE[issue.code] ?? "来源未就绪"} title={issue.message} />
+      {issue.code === "SOURCE_NOT_REGISTERED" && issue.details?.connection_id && (
+        <Button
+          type="link"
+          size="small"
+          className="h-auto p-0"
+          disabled={busy}
+          onClick={() => setSyncing({ connection: issue.details?.connection_id, schema: issue.details?.schema_name, table: issue.details?.table_name })}
+        >
+          去同步
+        </Button>
       )}
+      {dataset && (
+        <Button type="link" size="small" className="h-auto p-0" disabled={busy} onClick={() => setEditing({ ...dataset })}>
+          修改连接和表
+        </Button>
+      )}
+    </span>
+  );
+
+  const marks: Record<string, ReactNode> = {};
+  const unplaced: typeof issues = [];
+  for (const issue of issues) {
+    const field = fieldOf(issue.path);
+    if (fields.has(field)) marks[field] = <>{marks[field]}{mark(issue)}</>;
+    else unplaced.push(issue);
+  }
+  const notes = unplaced.length ? (
+    <Alert
+      type="error"
+      showIcon
+      message={<div className="flex flex-col gap-1">{unplaced.map((issue) => <span key={`${issue.code}:${issue.path}`}>{TITLE[issue.code] ?? "来源未就绪"}：{issue.message}</span>)}</div>}
+      action={<div className="flex flex-col gap-1">{unplaced.map(mark)}</div>}
+    />
+  ) : null;
+
+  const dialogs = (
+    <>
       {syncing && (
-        <Modal open title="同步数据表" width="var(--review-dialog-width)" footer={null} onCancel={() => setSyncing(null)}>
-          <TableSyncPanel workspaceId={workspaceId} initialConnection={syncing.connection} initialSchema={syncing.schema ?? ""} initialTable={syncing.table} />
-        </Modal>
+        <TableSyncDialog
+          workspaceId={workspaceId}
+          initialConnection={syncing.connection}
+          initialSchema={syncing.schema ?? ""}
+          initialTable={syncing.table}
+          onClose={() => setSyncing(null)}
+        />
       )}
       {editing && (
         <Modal
@@ -75,6 +102,7 @@ export function ProposalSourceIssues({ item, workspaceId, busy, onReviseDataset 
           </Form>
         </Modal>
       )}
-    </section>
+    </>
   );
+  return { marks, notes, dialogs };
 }

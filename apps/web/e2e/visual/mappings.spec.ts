@@ -51,3 +51,25 @@ test.describe("MappingsPage visual consistency", () => {
     await expect(page).toHaveScreenshot("mappings-objects.png", { fullPage: true });
   });
 });
+
+test("sync dialog walks through connection, schemas, tables and results", async ({ page }) => {
+  await mockMappingsApi(page);
+  await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
+  await expect(page.getByRole("cell", { name: "parties", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "同步数据表" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("button", { name: "下一步" })).toBeEnabled();
+  await expect(page).toHaveScreenshot("tables-sync-connection.png");
+  await dialog.getByRole("button", { name: "下一步" }).click();
+  await dialog.getByRole("checkbox", { name: /public ·/ }).check();
+  await dialog.getByRole("checkbox", { name: /fiction_archive ·/ }).check();
+  await expect(page).toHaveScreenshot("tables-sync-schemas.png");
+  await dialog.getByRole("button", { name: "下一步" }).click();
+  await dialog.getByRole("button", { name: "全选全部" }).click();
+  await dialog.getByRole("checkbox", { name: "fiction_archive.fiction_stores" }).uncheck();
+  await expect(page).toHaveScreenshot("tables-sync-tables.png");
+  await dialog.getByRole("button", { name: "开始同步" }).click();
+  await expect(dialog.getByText("同步完成", { exact: true })).toHaveCount(2);
+  await dialog.getByText("查看每张表结果").first().click();
+  await expect(page).toHaveScreenshot("tables-sync-results.png");
+});

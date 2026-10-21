@@ -254,6 +254,9 @@ export async function mockMappingsApi(page: Page) {
     [`${base}/members`]: { items: FIXTURE_MEMBERS },
     [`${base}/settings/dataagent-health`]: FIXTURE_HEALTH,
     [`${base}/versions`]: { items: FIXTURE_VERSIONS },
+    [`${base}/connections/conn-visual-retail/schemas`]: { items: ["public", "fiction_archive"] },
+    [`${base}/connections/conn-visual-retail/tables`]: { items: [{ name: "parties" }, { name: "daily_sales" }, { name: "fiction_stores" }] },
+    [`${base}/connections/conn-visual-retail/assets/sync-jobs`]: { id: "visual-sync", connection_id: "conn-visual-retail", schema_name: "public", scope: "all", state: "succeeded", total: 3, processed: 3, available: 3, failed: 0, duration_ms: 240, error: null, batches: [{ id: "visual-batch", ordinal: 0, state: "succeeded", attempt: 1, duration_ms: 240, error: null, tables: ["parties", "daily_sales", "fiction_stores"], results: [{ table_name: "parties", state: "succeeded" }, { table_name: "daily_sales", state: "succeeded" }, { table_name: "fiction_stores", state: "succeeded" }] }] },
     [`${base}/connections/conn-visual-retail/assets`]: {
       connection_id: "conn-visual-retail",
       version_id: null,
@@ -263,9 +266,9 @@ export async function mockMappingsApi(page: Page) {
       changes: [],
       status: "ready",
       items: [
-        { name: "parties", schema: "public", comment: "当事人主数据", missing: false, datasets: [], columns: [{ name: "party_id", type: "varchar(32)", primary_key: true, nullable: false }, { name: "party_name", type: "varchar(120)", primary_key: false, nullable: false }, { name: "level", type: "varchar(16)", primary_key: false, nullable: true }] },
-        { name: "daily_sales", schema: "public", comment: "门店日销售汇总", missing: false, datasets: [], columns: [{ name: "stat_date", type: "date", primary_key: true, nullable: false }, { name: "store_id", type: "varchar(16)", primary_key: true, nullable: false }, { name: "amount", type: "numeric(12,2)", primary_key: false, nullable: true }] },
-        { name: "legacy_refunds", schema: "public", comment: "已下线的退款表", missing: true, datasets: [], columns: [{ name: "refund_id", type: "varchar(32)", primary_key: true, nullable: false }] },
+        { name: "parties", schema: "public", observed_at: "2026-10-17T02:00:00Z", comment: "当事人主数据", missing: false, datasets: [], columns: [{ name: "party_id", type: "varchar(32)", primary_key: true, nullable: false }, { name: "party_name", type: "varchar(120)", primary_key: false, nullable: false }, { name: "level", type: "varchar(16)", primary_key: false, nullable: true }] },
+        { name: "daily_sales", schema: "public", observed_at: "2026-10-17T02:00:00Z", comment: "门店日销售汇总", missing: false, datasets: [], columns: [{ name: "stat_date", type: "date", primary_key: true, nullable: false }, { name: "store_id", type: "varchar(16)", primary_key: true, nullable: false }, { name: "amount", type: "numeric(12,2)", primary_key: false, nullable: true }] },
+        { name: "legacy_refunds", schema: "public", observed_at: "2026-10-17T02:00:00Z", comment: "已下线的退款表", missing: true, datasets: [], columns: [{ name: "refund_id", type: "varchar(32)", primary_key: true, nullable: false }] },
       ],
     },
   };
@@ -274,8 +277,14 @@ export async function mockMappingsApi(page: Page) {
   await page.route(
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
-      const { pathname } = new URL(route.request().url());
-      await route.fulfill({ json: responses[pathname] ?? { items: [] } });
+      const { pathname, searchParams } = new URL(route.request().url());
+      if (pathname.endsWith("/assets/sync-jobs") && route.request().method() === "GET") {
+        await route.fulfill({ json: { items: [] } });
+      } else if (pathname.endsWith("/assets") && searchParams.get("schema_name") === "fiction_archive") {
+        await route.fulfill({ json: { ...(responses[pathname] as object), items: [], observed_at: null } });
+      } else {
+        await route.fulfill({ json: responses[pathname] ?? { items: [] } });
+      }
     },
   );
 }

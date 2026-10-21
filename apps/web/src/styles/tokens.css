@@ -466,3 +466,14 @@
     & > :last-child { grid-column: 2; grid-row: 1; justify-self: end; }
   }
 }
+
+/* Data management shares the compact panel and dialog spacing scale. */
+:root {
+  --data-tables-sidebar-width: 256px;
+  --data-tables-dialog-width: 960px;
+  --data-tables-step-height: 420px;
+}
+.data-tables-layout { display: grid; grid-template-columns: var(--data-tables-sidebar-width) minmax(0, 1fr); gap: var(--space-md); align-items: start; }
+.data-tables-layout .ant-menu-item { height: auto; line-height: inherit; padding-block: var(--space-xs); }
+.data-tables-step { height: var(--data-tables-step-height); overflow: auto; }
+@media (max-width: 960px) { .data-tables-layout { grid-template-columns: minmax(0, 1fr); } }

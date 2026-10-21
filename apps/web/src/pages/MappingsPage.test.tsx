@@ -1,8 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { catalogApi } from "../api/client";
-import type { Assets, SyncJob } from "../api/types";
+import type { Assets, SyncJob, ProposalItem } from "../api/types";
 import { renderWithProviders } from "../test/renderWithProviders";
+import { TableSyncDialog } from "../components/TableSyncDialog";
+import { useSourceIssues } from "../components/proposals/ProposalSourceIssues";
 import { MappingsPage } from "./MappingsPage";
 
 const { workspace } = vi.hoisted(() => ({
@@ -65,42 +67,148 @@ const job = (patch: Partial<SyncJob>): SyncJob => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
-  vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
+  vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm", "sales"] });
   vi.mocked(catalogApi.tables).mockResolvedValue({
     items: [
       { name: "contacts", schema: "crm", columns: [] },
       { name: "orders", schema: "crm", columns: [] },
     ],
   });
-  vi.mocked(catalogApi.assets).mockResolvedValue(assets);
+  vi.mocked(catalogApi.assets).mockImplementation(async (_w, _c, params) => params?.schema_name === "sales" ? { ...assets, items: [{ ...assets.items[0], name: "sales_orders", schema: "sales", comment: "虚构订单", columns: [], observed_at: "2026-10-20T00:00:00Z" }] } : { ...assets, items: assets.items.map((t) => ({ ...t, observed_at: "2026-10-16T00:00:00Z" })) });
   vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
+async function choose(label: string, option: string) {
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: label }));
+  fireEvent.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }));
+}
+async function openTables() {
+  fireEvent.click(await screen.findByRole("button", { name: "同步数据表" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: /crm ·/ }));
+  fireEvent.click(screen.getByRole("checkbox", { name: /sales ·/ }));
+  fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+  await screen.findByRole("checkbox", { name: "crm.contacts" });
+}
+
 describe("data management page", () => {
-  it("separates tables from documents and lists registered tables with their state", async () => {
+  it("browses all schemas, switches libraries, searches names and comments, and sorts", async () => {
     renderWithProviders(<MappingsPage />);
-    expect(screen.getByRole("tab", { name: "数据表" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "文档" })).toBeInTheDocument();
-    expect(await screen.findByText("contacts")).toBeInTheDocument();
-    expect(screen.getByText("已登记")).toBeInTheDocument();
+    expect(await screen.findByText("sales_orders", {}, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getByText("当前不可见或不存在")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /crm ·/ }));
+    expect(screen.queryByText("sales_orders")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: /全部库/ }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "虚构订单" } });
+    expect(screen.getByText("sales_orders")).toBeInTheDocument();
+    expect(screen.queryByText("contacts")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "contacts" } });
+    expect(screen.getByText("contacts")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "" } });
+    await choose("排序方向", "降序");
+    const firstName = () => within(screen.getAllByRole("row")[1]).getAllByRole("cell")[0].textContent;
+    expect(firstName()).toBe("sales_orders");
+    await choose("排序字段", "列数");
+    expect(firstName()).toBe("contacts");
+    await choose("排序字段", "最近同步时间");
+    expect(firstName()).toBe("sales_orders");
+    expect(catalogApi.tables).not.toHaveBeenCalled();
   });
 
-  it("runs a full sync when no table is chosen", async () => {
+  it("submits one full and one partial task, allows back navigation and refreshes on close", async () => {
+    vi.mocked(catalogApi.refreshAssets).mockImplementation(async (_w, _c, params) => job({ id: params?.schema_name ?? "", schema_name: params?.schema_name }));
+    renderWithProviders(<MappingsPage />);
+    await openTables();
+    fireEvent.click(screen.getByRole("button", { name: "全选全部" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "sales.orders" }));
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(await screen.findByRole("checkbox", { name: "sales.contacts" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "sales.orders" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
+    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledTimes(2));
+    expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "crm" }, []);
+    expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "sales" }, ["contacts"]);
+    const count = vi.mocked(catalogApi.assets).mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    await waitFor(() => expect(vi.mocked(catalogApi.assets).mock.calls.length).toBeGreaterThan(count));
+  });
+
+  it("polls progress, prevents duplicate submission, retries failures and expands table results", async () => {
     vi.mocked(catalogApi.refreshAssets).mockResolvedValue(job({ state: "queued", total: null, processed: 0, available: 0 }));
+    vi.mocked(catalogApi.syncJob).mockResolvedValue(job({ state: "partial_failed", available: 44, failed: 1, batches: [{ id: "batch", ordinal: 0, state: "failed", attempt: 1, duration_ms: 20, error: "虚构读取失败", tables: ["contacts"], results: [{ table_name: "contacts", state: "failed", error: "虚构表权限不足" }] }] }));
+    vi.mocked(catalogApi.retrySync).mockResolvedValue(job({ state: "succeeded" }));
     renderWithProviders(<MappingsPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "全量同步" }));
-    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "" }, []));
-    expect(await screen.findByText(/正在发现数据表/)).toBeInTheDocument();
+    await openTables();
+    fireEvent.click(screen.getByRole("button", { name: "全选全部" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
+    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "上一步" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "开始同步" })).not.toBeInTheDocument();
+    await screen.findAllByText(/成功 44，失败 1/, {}, { timeout: 4000 });
+    fireEvent.click(screen.getAllByText("查看每张表结果")[0]);
+    expect(await screen.findByText("虚构表权限不足")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "重试失败批次" })[0]);
+    await waitFor(() => expect(catalogApi.retrySync).toHaveBeenCalledWith("w", "c", "j"));
+    expect(await screen.findByText("同步完成")).toBeInTheDocument();
   });
 
-  it("offers a retry for failed batches and shows progress", async () => {
-    vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [job({ state: "partial_failed", available: 44, failed: 1 })] });
-    vi.mocked(catalogApi.retrySync).mockResolvedValue(job({ state: "queued" }));
+  it("only retries the schema whose task creation failed", async () => {
+    vi.mocked(catalogApi.refreshAssets).mockResolvedValueOnce(job({})).mockRejectedValueOnce(new Error("虚构网络错误")).mockResolvedValue(job({}));
     renderWithProviders(<MappingsPage />);
-    expect(await screen.findByText(/已处理 45\/45，可用 44，失败 1/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "重试失败批次" }));
-    await waitFor(() => expect(catalogApi.retrySync).toHaveBeenCalledWith("w", "c", "j"));
+    await openTables();
+    fireEvent.click(screen.getByRole("button", { name: "全选全部" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
+    fireEvent.click(await screen.findByRole("button", { name: "重试创建任务" }));
+    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(catalogApi.refreshAssets).mock.calls[2][2]).toEqual({ schema_name: "sales" });
+  });
+
+  it("preselects connection, schema and table through the proposal sync entry", async () => {
+    const item = { status: "pending", operation: "create", target_kind: "property", source_diagnostics: [{ severity: "error", code: "SOURCE_NOT_REGISTERED", message: "虚构表未登记", path: "source", details: { connection_id: "c", schema_name: "crm", table_name: "contacts" } }] } as ProposalItem;
+    function Issues() {
+      const source = useSourceIssues({ item, workspaceId: "w", busy: false, fields: new Set(), onReviseDataset: vi.fn() });
+      return <>{source.notes}{source.dialogs}</>;
+    }
+    renderWithProviders(<Issues />);
+    fireEvent.click(screen.getByRole("button", { name: "去同步" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
+    expect(screen.getByRole("combobox", { name: "同步连接" }).closest(".ant-select")).toHaveTextContent("主库");
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(screen.getByRole("checkbox", { name: /crm ·/ })).toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(await screen.findByRole("checkbox", { name: "crm.contacts" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "crm.orders" })).not.toBeChecked();
+  });
+
+  it("paginates registered tables after twenty rows", async () => {
+    vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
+    vi.mocked(catalogApi.assets).mockResolvedValue({ ...assets, items: Array.from({ length: 25 }, (_, i) => ({ ...assets.items[0], name: `fiction_${String(i).padStart(2, "0")}` })) });
+    renderWithProviders(<MappingsPage />);
+    expect(await screen.findByText("fiction_00")).toBeInTheDocument();
+    expect(screen.queryByText("fiction_24")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTitle("2"));
+    expect(await screen.findByText("fiction_24")).toBeInTheDocument();
+  });
+
+  it("allows full sync of an empty schema to update missing observations", async () => {
+    vi.mocked(catalogApi.tables).mockResolvedValue({ items: [] });
+    vi.mocked(catalogApi.refreshAssets).mockResolvedValue(job({ total: 0, processed: 0, available: 0 }));
+    renderWithProviders(<TableSyncDialog workspaceId="w" initialConnection="c" initialSchema="crm" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "全选当前库 crm" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
+    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "crm" }, []));
+  });
+
+  it("restores an active task when reopening the dialog", async () => {
+    vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [job({ state: "running" })] });
+    renderWithProviders(<TableSyncDialog workspaceId="w" initialConnection="c" onClose={vi.fn()} />);
+    expect(await screen.findAllByText("同步中")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "上一步" })).toBeDisabled();
   });
 });

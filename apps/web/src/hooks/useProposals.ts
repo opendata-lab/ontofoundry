@@ -176,6 +176,28 @@ export function useProposals(
     }
   };
 
+  /** Replace a pending proposal's content before it is decided; the server re-validates it. */
+  const reviseContent = async (proposalId: string, after: Record<string, unknown>) => {
+    const current = sessionRef.current;
+    if (!current) return false;
+    setBusy(true);
+    setError("");
+    try {
+      await proposalsApi.reviseContent(current.workspace_id, current.id, proposalId, after, current.revision);
+      const fresh = await modelingApi.get(current.workspace_id, current.id);
+      sessionRef.current = fresh;
+      onSession(fresh);
+      reload();
+      return true;
+    } catch (e) {
+      setItemErrors({ [proposalId]: e instanceof Error ? e.message : "修改提案失败" });
+      if (e instanceof ApiError && e.status === 409) onStale();
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /** Change a pending dataset proposal's connection or table, then re-check dependents. */
   const reviseDataset = async (proposalId: string, dataset: Dataset) => {
     const current = sessionRef.current;
@@ -209,6 +231,7 @@ export function useProposals(
     reload,
     decide,
     revise,
+    reviseContent,
     reviseDataset,
   };
 }

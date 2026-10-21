@@ -92,6 +92,7 @@ function state(extra: Partial<ProposalsState> = {}): ProposalsState {
     selected: "b",
     select: vi.fn(),
     reviseDataset: vi.fn(),
+    reviseContent: vi.fn(),
     detail: batch(),
     error: "",
     itemErrors: {},

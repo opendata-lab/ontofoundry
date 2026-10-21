@@ -559,6 +559,7 @@ export type SchemaChange = {
   after: Json;
 };
 export type AssetTable = DataTable & {
+  observed_at?: ISOTime | null;
   comment?: string | null;
   missing: boolean;
   datasets: DatasetRead[];
