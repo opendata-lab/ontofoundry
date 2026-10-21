@@ -9,7 +9,7 @@
 3. **关系扩展与摘要**：实现 4.3 一层扩展和第 3 节各类型摘要；新增 `expand` 参数，默认 `true`。
 4. **向量**：配置项；embedding 客户端（OpenAI 兼容、超时、批量）；数据库镜像换为 `pgvector/pgvector:pg17`（compose.yaml、scripts/offline-compose.yaml、CI 服务）；Alembic 迁移启用 vector 扩展并新增向量缓存表；按 `(模型, 文本哈希)` 读写；检索时余弦计算与阈值；发布成功后后台补算。未配置或失败时降级并在 `retrieval` 中标明。
 5. **契约**：MCP 工具输入 Schema 与描述更新；返回结构写入 api-read 契约并导出 JSON Schema；前端如有调用同步类型。
-6. **问数方法**：写入 query-understanding Skill（见 `docs/design/2026-10-21-semantic-grounding-skills.md`）：先 search_ontology，按 id 调 get_ontology，不读全量；unmatched_terms 中的实体提及交给 resolve_entity。Skill 拆分完成前，先临时改 `agents/agent_ontofoundry_qa.md`，同步到 DataAgent 并发布。
+6. **问数方法**：写入 semantic-grounding Skill（见 `docs/design/2026-10-21-semantic-grounding-skills.md`）：先 search_ontology，按 id 调 get_ontology，不读全量；unmatched_terms 中的实体提及交给 resolve_entity。Skill 拆分完成前，先临时改 `agents/agent_ontofoundry_qa.md`，同步到 DataAgent 并发布。
 7. **验收集**：虚构采购协同领域的种子本体与至少 20 道题及期望 id，离线脚本输出两种召回方式的前 10 召回率与返回大小。
 8. **统一验证**：后端 pytest、ruff、契约检查；用内网 embedding 服务跑一次验收集；新会话中问数 Agent 真实问答一轮（DeepSeek 预算，先确认）。
 

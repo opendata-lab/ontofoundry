@@ -15,7 +15,8 @@
 
 | 编号 | 决定 | 状态 |
 |---|---|---|
-| SG-01 | 拆为三个独立 Skill：`schema-extraction`、`instance-extraction`、`query-understanding`；每个 Skill 自带输出 Schema，单独打包、单独安装。 | 已确认 |
+| SG-01 | 拆为三个独立 Skill，每个自带输出 Schema，单独打包、单独安装：`ontology-discovery` 从文档、表结构发现对象类型、属性、关系（及数据集、映射、指标、规则），判断新增还是复用；`entity-extraction` 按本体约束抽取实体、属性值和关系实例，并调用 `resolve_entity` 消歧；`semantic-grounding` 把用户问题中的业务术语映射到本体对象和指标。 | 已确认 |
+| SG-08 | Skill 负责执行策略，Tool 负责确定性能力：检索、候选召回、判级、校验在平台 Python 服务中完成；Skill 只决定何时调用、如何使用结果，Agent 只在工具返回语义歧义（如 `AMBIGUOUS`）时辅助判断或追问用户。 | 已确认（2026-10-21） |
 | SG-02 | 场景由 Workflow 组合 Skill，不在 Skill 内判断场景；Workflow 落在 DataAgent 已有 Agent 的配置（系统提示词 + 引用的 Skill 列表）与平台的运行类型上，不新建流程引擎。 | 已确认 |
 | SG-03 | 共享匹配能力做成平台 MCP 工具：`search_ontology`、`get_ontology`、`search_objects`、`resolve_entity`。 | 已确认 |
 | SG-04 | 不新增 `submit_proposal` 工具：提案仍由运行结束时的结果文件整批提交，平台整批校验入库（绑定运行标识，避免半途提交与重复提交）。 | 已确认（2026-10-21） |
@@ -31,15 +32,15 @@ integrations/dataagent/
 │   ├── references/              # core-model.md、principles.md、quick-reference.md、取值表
 │   └── scripts/                 # init_workflow、read_input、show_element、show_example、check_part、prepare_result
 ├── skills/
-│   ├── schema-extraction/       # 类型、属性、关系、数据集、映射、指标、规则
+│   ├── ontology-discovery/       # 类型、属性、关系、数据集、映射、指标、规则
 │   │   ├── SKILL.md
 │   │   ├── references/          # methodology、extract-types、extract-mappings、extract-metrics-rules、modeling-patterns、reading-ossie、import-completion
 │   │   └── output-schema.json   # 提案 Schema 中定义类元素的子集
-│   ├── instance-extraction/     # 文档事实与事实关系
+│   ├── entity-extraction/     # 文档事实与事实关系
 │   │   ├── SKILL.md
 │   │   ├── references/          # extract-facts
 │   │   └── output-schema.json   # 提案 Schema 中事实类元素的子集
-│   └── query-understanding/     # 问题到本体的映射
+│   └── semantic-grounding/     # 问题到本体的映射
 │       ├── SKILL.md
 │       └── output-schema.json   # 结构化理解结果，见 §5
 └── agents/                      # 每个文件即一个 Workflow
@@ -54,13 +55,13 @@ integrations/dataagent/
 
 | Workflow | Agent | Skill | 平台运行 | 产出 |
 |---|---|---|---|---|
-| 建模 | `agent_ontofoundry` | schema-extraction（材料含可抽事实时加 instance-extraction） | 建模会话的计划／抽取／补齐 | 定义提案（及事实提案） |
-| 事实抽取 | `agent_ontofoundry_facts`（新增） | instance-extraction | 对已发布版本、选定材料发起的抽取运行 | 事实提案 |
-| 问数 | `agent_ontofoundry_qa` | query-understanding | DataAgent 问数会话 | 结构化理解结果 → DataAgent 自有查询工具执行 |
+| 建模 | `agent_ontofoundry` | ontology-discovery（材料含可抽事实时加 entity-extraction） | 建模会话的计划／抽取／补齐 | 定义提案（及事实提案） |
+| 事实抽取 | `agent_ontofoundry_facts`（新增） | entity-extraction | 对已发布版本、选定材料发起的抽取运行 | 事实提案 |
+| 问数 | `agent_ontofoundry_qa` | semantic-grounding | DataAgent 问数会话 | 结构化理解结果 → DataAgent 自有查询工具执行 |
 
 事实抽取 Workflow 需要平台新增一个运行入口（选择材料、绑定已发布版本、事实只引用已有类型），提案进入同一审阅流程。
 
-## 5. query-understanding 输出
+## 5. semantic-grounding 输出
 
 ```json
 {

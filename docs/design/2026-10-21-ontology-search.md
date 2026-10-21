@@ -22,6 +22,7 @@
 | OS-04 | 不返回数值分数或置信度，只返回顺序与命中原因（`match`）。 | 已确认（沿用“分数需标注校准”的判断） |
 | OS-05 | 未被任何定义覆盖的查询片段原样放入 `unmatched_terms`，不推测它是筛选值还是时间范围，由 Agent 判断。 | 已确认 |
 | OS-06 | 向量存于 pgvector：数据库镜像由 `postgres:17-alpine` 换为 `pgvector/pgvector:pg17`（compose、离线包、CI 同步），迁移中 `CREATE EXTENSION IF NOT EXISTS vector`。列不固定维度，不建 HNSW 索引：先按当前版本可见元素的文本哈希过滤再算余弦，元素数百个时无需索引；规模上来后按模型维度建索引。 | 已确认（2026-10-21） |
+| OS-08 | 同一检索服务提供两个入口：MCP 工具 `search_ontology`（Agent）与 REST `POST /api/v1/ontology/workspaces/{workspace_id}/search`（界面与其他系统），参数与返回一致。不新增 `/extractions/validate`、`POST /proposals`、`/facts/ingest`：校验随 Skill（SG-05），提案随运行整批提交（SG-04），事实只经提案审阅写入（FS-04）。 | 已确认（2026-10-21） |
 | OS-07 | Entity Resolver（实例消歧）另写设计文档，与本文衔接：本文的 `unmatched_terms` 是它的输入之一。 | 已确认 |
 
 ## 3. 接口

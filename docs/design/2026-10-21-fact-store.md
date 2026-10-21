@@ -63,7 +63,7 @@
 
 前端：`api/types.ts`、`lib/coreModel.ts`、`DocumentMaterials`、`ModelResults`、`TranslationReport`、`ElementInspector`、`ElementInstances`、`ProposalDetail`、`reviewMeta`、`PublishPanel`。
 
-建模 Skill：事实片段（`05-facts`）的输出结构与合并脚本按新契约调整，拆分 Skill 时归入 instance-extraction。
+建模 Skill：事实片段（`05-facts`）的输出结构与合并脚本按新契约调整，拆分 Skill 时归入 entity-extraction。
 
 ## 7. 不做
 

@@ -13,6 +13,7 @@
 | 编号 | 决定 | 状态 |
 |---|---|---|
 | ER-01 | 新增 MCP 工具 `resolve_entity`，输入 `mention`、`object_type_id`（UUID，不接受英文标识或名称），可选 `limit`（默认 10，上限 50）。空间与版本由令牌绑定。 | 已确认 |
+| ER-08 | 同一解析服务提供两个入口：MCP 工具 `resolve_entity` 与 REST `POST /api/v1/ontology/workspaces/{workspace_id}/entities/resolve`。候选检索、判级、定状态全部在 Python 服务中确定性完成；Skill 只负责何时调用、`AMBIGUOUS` 时如何追问，不在提示词里做匹配。 | 已确认（2026-10-21） |
 | ER-02 | 匹配级别：① 业务标识属性精确命中；② 标题属性精确命中；③ 标题属性包含命中。语义（向量）召回与上下文消歧本期不做。 | 已确认 |
 | ER-03 | 状态：`MATCHED`（① 或 ② 唯一命中；或仅有一条 ③ 包含命中）、`AMBIGUOUS`（同一最高级别多条命中）、`NOT_FOUND`。仅一条包含命中时视为 `MATCHED`，调用方在回答中写明按哪个实例理解。 | 已确认 |
 | ER-04 | 不输出数值分数；每个候选返回命中级别与命中的属性和值。分数待有标注样本校准后再考虑。 | 已确认 |
@@ -50,8 +51,8 @@
 
 ## 5. 与其他能力的衔接
 
-- `search_ontology` 返回的 `unmatched_terms` 由 query-understanding Skill 判断哪些是实体提及，再调用 `resolve_entity`。
-- instance-extraction 写事实前可调用它检查是否已有同一实例，有则用已有 UUID 更新，不重复创建；仍以人工审阅为准。
+- `search_ontology` 返回的 `unmatched_terms` 由 semantic-grounding Skill 判断哪些是实体提及，再调用 `resolve_entity`。
+- entity-extraction 写事实前可调用它检查是否已有同一实例，有则用已有 UUID 更新，不重复创建；仍以人工审阅为准。
 
 ## 6. 验收
 
