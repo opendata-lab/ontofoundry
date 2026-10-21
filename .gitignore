@@ -21,3 +21,6 @@ apps/web/test-results/
 .local-runtime/
 # Local screenshots and acceptance output; tracked historical images stay tracked.
 /output/
+
+# Design prototypes stay local (AGENTS.md)
+docs/design/prototypes/
