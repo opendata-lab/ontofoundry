@@ -125,6 +125,24 @@ def table_rows(workspace_id: str, connection_id: str, request: Request, table_na
     return preview_table(db, get_connection(db, workspace_id, connection_id), schema_name, table_name, request.app.state.settings)
 
 
+@router.get("/assets/impact")
+def impact(workspace_id: str, connection_id: str, schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    """Published definitions touched by the latest recorded structure changes (SC-01)."""
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.domain.snapshot import empty_snapshot
+    from ontofoundry_api.services.metadata_sync import normalize_schema
+    from ontofoundry_api.services.schema_impact import schema_impact
+
+    require_mappings(db, workspace_id, user)
+    connection = get_connection(db, workspace_id, connection_id)
+    schema = normalize_schema(connection, schema_name)
+    record = db.get(MetadataSnapshotRecord, (connection_id, schema))
+    space = get_workspace(db, workspace_id)
+    snapshot = snapshot_of(current_version(db, workspace_id)) if space.current_version_id else empty_snapshot(workspace_id)
+    items = schema_impact(CoreDraft.model_validate(snapshot), connection, schema, record.changes_json or [] if record else [])
+    return {"connection_id": connection_id, "schema_name": schema, "items": items}
+
+
 @router.post("/assets/sync-jobs", status_code=202)
 def sync_job(workspace_id: str, connection_id: str, body: SyncRequest, request: Request, background: BackgroundTasks, schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
     require_mappings(db, workspace_id, user)

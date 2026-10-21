@@ -610,6 +610,16 @@ export type OntologySearchResult = {
   total: number;
   next_cursor: string | null;
 };
+/** A recorded structure change and the published definitions it touches (SC-01). */
+export type SchemaImpactItem = {
+  table: string;
+  column: string | null;
+  kind: "added" | "removed" | "changed";
+  before: Json;
+  after: Json;
+  datasets: { id: UUID; name: string }[];
+  affected: { kind: TargetKind; id: UUID; name: string; display_name: string | null; via: "column" | "table" }[];
+};
 export type TableRows = { columns: string[]; items: Record<string, Json>[]; limit: number };
 export type Assets = {
   connection_id: UUID;

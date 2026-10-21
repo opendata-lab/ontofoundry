@@ -9,6 +9,7 @@ import type {
   Assets,
   TableRows,
   OntologySearchKind,
+  SchemaImpactItem,
   OntologySearchResult,
   Capabilities,
   Comparison,
@@ -301,6 +302,8 @@ export const catalogApi = {
     workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
   refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }, tables?: string[]) =>
     workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ ...params }), tables?.length ? { scope: "selected", tables } : { scope: "all" }),
+  schemaImpact: (id: string, connectionId: string, schemaName?: string) =>
+    workspaceRequest<{ connection_id: string; schema_name: string; items: SchemaImpactItem[] }>(id, `/connections/${connectionId}/assets/impact` + query({ schema_name: schemaName })),
   tableRows: (id: string, connectionId: string, params: { table_name: string; schema_name?: string }) =>
     workspaceRequest<TableRows>(id, `/connections/${connectionId}/assets/rows` + query({ ...params })),
   syncJobs: (id: string, connectionId: string, schema_name?: string) => workspaceRequest<Items<SyncJob>>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ schema_name })),

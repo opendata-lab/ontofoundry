@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { catalogApi } from "../api/client";
+import { catalogApi, modelingApi } from "../api/client";
 import type { Assets, Dataset, SyncJob, ProposalItem } from "../api/types";
 import { useState } from "react";
 import { renderWithProviders } from "../test/renderWithProviders";
@@ -14,7 +14,8 @@ const { workspace } = vi.hoisted(() => ({
 }));
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh: vi.fn() }) }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
-vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams()] }));
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
+vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams()], useNavigate: () => navigate }));
 vi.mock("../components/DocumentMaterials", () => ({ DocumentMaterials: () => <div>文档列表</div> }));
 vi.mock("../api/client", () => ({
   catalogApi: {
@@ -27,7 +28,9 @@ vi.mock("../api/client", () => ({
     refreshAssets: vi.fn(),
     retrySync: vi.fn(),
     tableRows: vi.fn(),
+    schemaImpact: vi.fn(),
   },
+  modelingApi: { create: vi.fn(), save: vi.fn() },
 }));
 
 const assets: Assets = {
@@ -110,6 +113,27 @@ describe("data management page", () => {
     expect(await within(dialog).findByText("虚构联系人")).toBeInTheDocument();
     expect(within(dialog).getByText("NULL")).toBeInTheDocument();
     expect(catalogApi.tableRows).toHaveBeenCalledWith("w", "c", { table_name: "contacts", schema_name: "crm" });
+  });
+
+  it("lists structure changes with the definitions they touch and starts a modeling session for the table", async () => {
+    vi.mocked(catalogApi.schemaImpact).mockResolvedValue({ connection_id: "c", schema_name: "crm", items: [
+      { table: "contacts", column: "phone", kind: "removed", before: null, after: null, datasets: [{ id: "d", name: "contacts" }],
+        affected: [{ kind: "property", id: "p", name: "phone", display_name: "联系电话", via: "column" }] },
+      { table: "other", column: null, kind: "added", before: null, after: null, datasets: [], affected: [] },
+    ] });
+    vi.mocked(modelingApi.create).mockResolvedValue({ id: "s1", workspace_id: "w", draft: {} } as never);
+    vi.mocked(modelingApi.save).mockResolvedValue({} as never);
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "contacts" }, { timeout: 10000 }));
+    const dialog = await screen.findByRole("dialog", { name: "表详情 · contacts" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: "结构变化" }));
+    expect(await within(dialog).findByText("列 phone消失")).toBeInTheDocument();
+    expect(within(dialog).getByText("联系电话（phone）· 引用该列")).toBeInTheDocument();
+    expect(within(dialog).queryByText(/整张表/)).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "发起局部建模" }));
+    await waitFor(() => expect(navigate).toHaveBeenCalledWith("/workspaces/w/builder?session=s1"));
+    expect(modelingApi.create).toHaveBeenCalledWith("w", "结构变化：contacts");
+    expect(modelingApi.save).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }), {}, { linked_tables: [{ connection_id: "c", schema_name: "crm", table_name: "contacts" }] });
   });
 
   it("keeps the schema and table when the new connection has synced them, and clears them otherwise", async () => {
