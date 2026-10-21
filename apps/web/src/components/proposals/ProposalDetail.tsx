@@ -2,7 +2,7 @@ import { Alert, Button, Descriptions, Modal, Table, Typography } from "antd";
 import { useState } from "react";
 import type { Dataset, DuplicateCandidate, Draft, MaterialObject, ProposalItem } from "../../api/types";
 import { byId, effectiveProperties } from "../../lib/coreModel";
-import { SectionTitle } from "../layout";
+import { SectionTitle, StatusMark } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
 import { OPERATION, STATUS } from "./elementMeta";
@@ -12,6 +12,7 @@ import { useConnectionNames } from "../../hooks/useConnectionNames";
 import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
+const SIMILAR_MATCH: Record<string, string> = { name_in_query: "名称包含", query_in_name: "名称相近", description: "描述提到" };
 
 
 function ReviseDialog({
@@ -111,6 +112,12 @@ export function ProposalDetail({
   const changes = reviewChanges(item);
   const connectionNames = useConnectionNames(workspaceId);
   const source = useSourceIssues({ item, workspaceId, busy, fields: new Set(changes.map((c) => c.path)), onReviseDataset });
+  // A declared rule the synced source column does not hold, beside that field (AR-03).
+  const physicalMarks = Object.fromEntries((item.physical_differences ?? []).map((d) => [
+    d.path,
+    <StatusMark key={d.path} state="partial" label={`来源列 ${d.column} 允许为空`}
+      title={`${d.connection_name} · ${[d.schema, d.table].filter(Boolean).join(".")}.${d.column}，同步于 ${d.observed_at ? new Date(d.observed_at).toLocaleString("zh-CN", { hour12: false }) : "未知时间"}；业务声明为必填，是否一致由审阅判断`} />,
+  ]));
   const reason = item.reason.trim();
   const blocked = acceptanceBlock(item, byIdMap);
   const canRevise =
@@ -183,7 +190,7 @@ export function ProposalDetail({
             changes={changes}
             beforeLabel="修改前"
             names={new Map([...connectionNames, ...elementNames(draft, items)])}
-            annotations={source.marks}
+            annotations={{ ...source.marks, ...physicalMarks }}
             editDisabled={busy}
             onEdit={
               item.status === "pending" && (item.operation === "create" || item.operation === "update") && item.after
@@ -192,6 +199,20 @@ export function ProposalDetail({
             }
           />
         </section>
+        {!!item.similar_definitions?.length && (
+          <section className="flex flex-col gap-2 border-b border-rule pb-4">
+            <SectionTitle title="可能已有的定义" note="供参考，确认重复时拒绝本提案并在对话中要求复用" />
+            <ul className="m-0 flex list-none flex-col gap-1 p-0">
+              {item.similar_definitions.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center gap-2">
+                  <span>{d.display_name || d.name}</span>
+                  <code className="text-xs text-muted">{d.name}</code>
+                  <Text type="secondary" className="text-xs">{SIMILAR_MATCH[d.match.by] ?? "名称相近"}「{d.match.text}」</Text>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {reason && (
           <section className="flex flex-col gap-1 border-b border-rule pb-4">
             <SectionTitle title="提案理由" />

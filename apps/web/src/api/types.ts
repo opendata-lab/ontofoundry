@@ -512,6 +512,10 @@ export type ProposalItem = {
   dependency_group: UUID[];
   atomic_group_id: UUID | null;
   duplicate_candidates: DuplicateCandidate[];
+  /** Existing definitions of the same kind a new definition may duplicate (read-only hint). */
+  similar_definitions?: { id: UUID; kind: TargetKind; display_name: string | null; name: string; match: { by: string; text: string } }[];
+  /** Where a declared rule (required) differs from the synced source column (nullable). */
+  physical_differences?: { path: string; declared: string; observed: string; column: string; table: string; schema: string | null; connection_name: string; observed_at: ISOTime | null }[];
   status: ProposalStatus;
   stored_status: "pending" | "accepted" | "rejected" | "superseded";
   status_reason: string;

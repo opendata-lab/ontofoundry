@@ -91,7 +91,7 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
     return views
 
 
-def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict[str, Any]:
+def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignment=None) -> dict[str, Any]:
     before, after = item.before_json, item.after_json
     element = after or before or {}
     status, reason = statuses[item.id]
@@ -132,6 +132,9 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         "reason": item.reason or "",
         "atomic_group_id": item.atomic_group_id,
         "duplicate_candidates": duplicate_candidates(db, item),
+        # Review hints derived on read, never stored (AR-04).
+        "similar_definitions": alignment.similar_definitions(item) if alignment else [],
+        "physical_differences": alignment.physical_differences(item, elements) if alignment else [],
         "depends_on": dependencies.get(item.id, []),
         "dependency_group": sorted(group),
         "status": status,
@@ -241,10 +244,14 @@ def read_batch(
         element = item.after_json or item.before_json
         if element:
             elements[str(element["id"])] = (item.target_kind, element)
+    from ontofoundry_api.services.proposal_alignment import AlignmentContext
+
+    alignment = AlignmentContext(db, workspace_id, draft)
     return {
         **_batch_summary(batch, items, statuses),
         "items": [
-            _item_view(db, workspace_id, i, statuses, dependencies, elements) for i in items
+            _item_view(db, workspace_id, i, statuses, dependencies, elements, alignment)
+            for i in items
         ],
     }
 

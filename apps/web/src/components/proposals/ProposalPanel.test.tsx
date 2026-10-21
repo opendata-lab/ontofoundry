@@ -191,6 +191,25 @@ describe("proposal review", () => {
     expect(customer).toBeDefined();
   });
 
+  it("shows similar existing definitions and a nullable source column beside a required property", () => {
+    const proposal = item({
+      id: "sp",
+      target_kind: "property",
+      display_name: "供货商名称",
+      after: element({ display_name: "供货商名称", name: "supplier_name", required: true }),
+      field_changes: [{ path: "required", before: null, after: true }],
+      similar_definitions: [{ id: "p1", kind: "property", display_name: "供应商名称", name: "vendor_name", match: { by: "query_in_name", text: "供应商名称" } }],
+      physical_differences: [{ path: "required", declared: "required", observed: "nullable", column: "supplier_name", table: "fiction_orders", schema: "public", connection_name: "虚构采购库", observed_at: null }],
+    });
+    panel(state({ detail: batch([proposal]) }));
+    fireEvent.click(row("supplier_name"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("可能已有的定义")).toBeInTheDocument();
+    expect(within(dialog).getByText("vendor_name")).toBeInTheDocument();
+    expect(within(dialog).getByText("名称相近「供应商名称」")).toBeInTheDocument();
+    expect(within(dialog).getByText("来源列 supplier_name 允许为空")).toBeInTheDocument();
+  });
+
   it("opens evidence without opening the row and keeps source identifiers and manual confirmation available in detail", async () => {
     const manual = {
       kind: "manual" as const,
