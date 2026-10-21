@@ -7,6 +7,7 @@ import type {
   ImportConfirmed,
   ImportCompletionRequest,
   Assets,
+  TableRows,
   Capabilities,
   Comparison,
   DataConnection,
@@ -258,6 +259,8 @@ export const catalogApi = {
     workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
   refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }, tables?: string[]) =>
     workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ ...params }), tables?.length ? { scope: "selected", tables } : { scope: "all" }),
+  tableRows: (id: string, connectionId: string, params: { table_name: string; schema_name?: string }) =>
+    workspaceRequest<TableRows>(id, `/connections/${connectionId}/assets/rows` + query({ ...params })),
   syncJobs: (id: string, connectionId: string, schema_name?: string) => workspaceRequest<Items<SyncJob>>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ schema_name })),
   syncJob: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}`),
   retrySync: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}/retry`, {}),
@@ -294,7 +297,7 @@ export const instancesApi = {
 };
 
 export const proposalsApi = {
-  reviseContent: (workspaceId: string, sessionId: string, proposalId: string, after: Record<string, unknown>, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/after`, { after, expected_session_revision: revision }, "PUT"),
+  reviseContent: (workspaceId: string, sessionId: string, proposalId: string, fields: Record<string, unknown>, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/after`, { fields, expected_session_revision: revision }, "PATCH"),
   reviseDataset: (workspaceId: string, sessionId: string, proposalId: string, dataset: Dataset, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/dataset`, { dataset, expected_session_revision: revision }, "PUT"),
   batches: (s: Pick<ModelingSession, "id" | "workspace_id">, params?: { limit?: number; cursor?: string }) =>
     request<Items<ProposalBatch> & { next_cursor: string | null }>(

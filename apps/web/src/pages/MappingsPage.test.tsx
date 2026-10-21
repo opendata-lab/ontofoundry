@@ -1,11 +1,13 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { catalogApi } from "../api/client";
-import type { Assets, SyncJob, ProposalItem } from "../api/types";
+import type { Assets, Dataset, SyncJob, ProposalItem } from "../api/types";
+import { useState } from "react";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { TableSyncDialog } from "../components/TableSyncDialog";
 import { useSourceIssues } from "../components/proposals/ProposalSourceIssues";
 import { MappingsPage } from "./MappingsPage";
+import { DatasetLocationFields } from "../components/elements/DatasetLocationFields";
 
 const { workspace } = vi.hoisted(() => ({
   workspace: { id: "w", role: "admin", current_version: 1, version_id: "v1" },
@@ -24,6 +26,7 @@ vi.mock("../api/client", () => ({
     syncJob: vi.fn(),
     refreshAssets: vi.fn(),
     retrySync: vi.fn(),
+    tableRows: vi.fn(),
   },
 }));
 
@@ -94,6 +97,38 @@ async function openTables() {
 }
 
 describe("data management page", () => {
+  it("opens a table's details, columns and first rows on demand", async () => {
+    vi.mocked(catalogApi.tableRows).mockResolvedValue({ columns: ["id", "name"], items: [{ id: 1, name: "虚构联系人" }, { id: 2, name: null }], limit: 100 });
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "contacts" }, { timeout: 10000 }));
+    const dialog = await screen.findByRole("dialog", { name: "表详情 · contacts" });
+    expect(within(dialog).getByText("联系人")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("tab", { name: "字段（1）" }));
+    expect(within(dialog).getByText("编号")).toBeInTheDocument();
+    expect(catalogApi.tableRows).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("tab", { name: "数据" }));
+    expect(await within(dialog).findByText("虚构联系人")).toBeInTheDocument();
+    expect(within(dialog).getByText("NULL")).toBeInTheDocument();
+    expect(catalogApi.tableRows).toHaveBeenCalledWith("w", "c", { table_name: "contacts", schema_name: "crm" });
+  });
+
+  it("keeps the schema and table when the new connection has synced them, and clears them otherwise", async () => {
+    vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库" }, { id: "c2", name: "备库" }, { id: "c3", name: "归档库" }] as never });
+    vi.mocked(catalogApi.schemas).mockImplementation(async (_w, id) => ({ items: id === "c3" ? ["sales"] : ["crm", "sales"] }));
+    let latest: Dataset = { source_kind: "table", connection_id: "c", schema_name: "crm", table_name: "contacts", columns: [] } as never;
+    function Controlled() {
+      const [dataset, setDataset] = useState<Dataset>(latest);
+      latest = dataset;
+      return <DatasetLocationFields workspaceId="w" dataset={dataset} nameField={null} onChange={(patch) => setDataset((d) => ({ ...d, ...patch }))} />;
+    }
+    renderWithProviders(<Controlled />);
+    await choose("数据库连接", "备库");
+    await waitFor(() => expect(latest.columns).toEqual([{ name: "id", physical_type: "bigint", comment: "编号" }]));
+    expect(latest).toMatchObject({ connection_id: "c2", schema_name: "crm", table_name: "contacts" });
+    await choose("数据库连接", "归档库");
+    await waitFor(() => expect(latest).toMatchObject({ connection_id: "c3", schema_name: null, table_name: "", columns: null }));
+  });
+
   it("browses all schemas, switches libraries, searches names and comments, and sorts", async () => {
     renderWithProviders(<MappingsPage />);
     expect(await screen.findByText("sales_orders", {}, { timeout: 10000 })).toBeInTheDocument();

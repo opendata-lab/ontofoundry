@@ -61,6 +61,9 @@ def test_structure_reads_have_no_table_cap_and_selected_reads_only_selected(monk
             return [{"name": "id", "type": "int", "nullable": False, "comment": None}]
 
     monkeypatch.setattr(metadata_sync, "inspect", lambda connection: Inspector())
+    from ontofoundry_api.services import metadata_catalog
+
+    monkeypatch.setattr(metadata_catalog, "inspect", lambda connection: Inspector())
     # Full syncs run as batched background jobs, so a large schema is no longer refused.
     assert len(metadata_sync.read_structure(object(), None)["tables"]) == 250
     observed = metadata_sync.read_structure(object(), None, ["fictional_7"])

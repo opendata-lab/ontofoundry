@@ -58,6 +58,15 @@ export function InlineValueEditor({ path, label, value, display, disabled, onSav
       }
     }
     if (kind === "text" && next === "") next = null;
+    // An empty structured field (columns, measure…) has no type to infer from; accept JSON input.
+    if (kind === "text" && value == null && typeof next === "string" && /^\s*[[{]/.test(next)) {
+      try {
+        next = JSON.parse(next);
+      } catch {
+        setError("JSON 无法解析");
+        return;
+      }
+    }
     setSaving(true);
     const ok = await onSave(next);
     setSaving(false);

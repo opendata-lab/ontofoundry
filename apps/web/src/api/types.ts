@@ -559,11 +559,14 @@ export type SchemaChange = {
   after: Json;
 };
 export type AssetTable = DataTable & {
+  kind?: "table" | "view";
+  primary_key?: string[];
   observed_at?: ISOTime | null;
   comment?: string | null;
   missing: boolean;
   datasets: DatasetRead[];
 };
+export type TableRows = { columns: string[]; items: Record<string, Json>[]; limit: number };
 export type Assets = {
   connection_id: UUID;
   version_id: UUID | null;

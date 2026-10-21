@@ -8,6 +8,7 @@ import { ProposalActions, ProposalStatusMark, type CardActions } from "./Proposa
 import { OPERATION, STATUS } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
 import { useSourceIssues } from "./ProposalSourceIssues";
+import { useConnectionNames } from "../../hooks/useConnectionNames";
 import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
@@ -100,7 +101,7 @@ export function ProposalDetail({
   actions: CardActions;
   onRevise: (candidate: DuplicateCandidate, after: MaterialObject) => Promise<boolean>;
   onReviseDataset: (dataset: Dataset) => Promise<boolean>;
-  onReviseContent: (after: Record<string, unknown>) => Promise<boolean>;
+  onReviseContent: (fields: Record<string, unknown>) => Promise<boolean>;
   workspaceId: string;
   onClose: () => void;
 }) {
@@ -108,6 +109,7 @@ export function ProposalDetail({
   const byIdMap = new Map(items.map((entry) => [entry.id, entry]));
   const deps = requiredIds(item);
   const changes = reviewChanges(item);
+  const connectionNames = useConnectionNames(workspaceId);
   const source = useSourceIssues({ item, workspaceId, busy, fields: new Set(changes.map((c) => c.path)), onReviseDataset });
   const reason = item.reason.trim();
   const blocked = acceptanceBlock(item, byIdMap);
@@ -180,12 +182,12 @@ export function ProposalDetail({
           <FieldDiff
             changes={changes}
             beforeLabel="修改前"
-            names={elementNames(draft, items)}
+            names={new Map([...connectionNames, ...elementNames(draft, items)])}
             annotations={source.marks}
             editDisabled={busy}
             onEdit={
               item.status === "pending" && (item.operation === "create" || item.operation === "update") && item.after
-                ? (path, value) => onReviseContent({ ...(item.after as Record<string, unknown>), [path]: value })
+                ? (path, value) => onReviseContent({ [path]: value })
                 : undefined
             }
           />

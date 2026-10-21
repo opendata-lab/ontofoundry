@@ -773,11 +773,13 @@ def revise_fact_proposal(
 
 
 class ProposalContentRevision(BaseModel):
-    after: dict
+    model_config = {"extra": "forbid"}
+    # Top-level fields to replace; the rest of the proposed content stays as stored.
+    fields: dict = Field(min_length=1)
     expected_session_revision: int
 
 
-@router.put("/proposals/{proposal_id}/after")
+@router.patch("/proposals/{proposal_id}/after")
 def revise_proposal_content(
     workspace_id: str,
     session_id: str,
@@ -790,7 +792,7 @@ def revise_proposal_content(
     from ontofoundry_api.services.proposal_revision import revise_proposal
 
     return revise_proposal(
-        db, workspace_id, session_id, proposal_id, body.after, body.expected_session_revision
+        db, workspace_id, session_id, proposal_id, body.fields, body.expected_session_revision
     )
 
 

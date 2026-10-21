@@ -135,8 +135,12 @@ def registered_table_catalog(db, workspace_id, draft=None):
             used.setdefault(key, []).append({"id": dataset["id"], "name": dataset["name"], "display_name": dataset.get("display_name")})
     items = []
     snapshots = db.scalars(select(MetadataSnapshotRecord).where(MetadataSnapshotRecord.connection_id.in_(list(connections)))) if connections else []
+    from ontofoundry_api.services.metadata_catalog import schema_allowed
+
     for snapshot in snapshots:
         connection = connections[snapshot.connection_id]
+        if not schema_allowed(connection, snapshot.schema_name):
+            continue
         for table in snapshot.snapshot_json.get("tables", []):
             if table.get("missing"):
                 continue

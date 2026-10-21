@@ -15,6 +15,12 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.services.errors import MetadataSyncError, ServiceError
+from ontofoundry_api.services.metadata_catalog import (
+    is_doris,
+    list_tables,
+    read_doris_table,
+    require_schema,
+)
 from ontofoundry_api.services.readonly import connect_readonly
 
 _LOCKS = {}
@@ -104,6 +110,8 @@ def previous_selection(previous, tables):
 
 
 def read_table(connection, schema_name, name, kind=None):
+    if is_doris(connection):
+        return read_doris_table(connection, schema_name, name, utc_now().isoformat())
     inspector = inspect(connection)
     if not inspector.has_table(name, schema=schema_name):
         return {"name": name, "schema": schema_name, "missing": True, "observed_at": utc_now().isoformat()}
@@ -122,8 +130,7 @@ def read_table(connection, schema_name, name, kind=None):
 
 
 def read_structure(connection, schema_name, tables=None):
-    inspector = inspect(connection)
-    names = tables if tables is not None else sorted(set(inspector.get_table_names(schema=schema_name) + inspector.get_view_names(schema=schema_name)))
+    names = tables if tables is not None else list_tables(connection, schema_name)
     return {"tables": [read_table(connection, schema_name, name) for name in names]}
 
 
@@ -133,6 +140,7 @@ def normalize_schema(connection, schema):
 
 def create_job(db, workspace_id, connection, schema_name, body, user_id):
     schema = normalize_schema(connection, schema_name)
+    require_schema(connection, schema)
     active = db.scalar(select(MetadataSyncJobRecord).where(MetadataSyncJobRecord.connection_id == connection.id, MetadataSyncJobRecord.schema_name == schema, MetadataSyncJobRecord.state.in_(ACTIVE)))
     if active:
         raise MetadataSyncError("该连接和 Schema 已有同步任务", code="SYNC_ALREADY_RUNNING", details={"job_id": active.id})
@@ -228,8 +236,7 @@ def run_job(factory, job_id, settings):
                     names = job.selected_json
                 else:
                     with connect_readonly(connection, settings, timeout_ms=15000) as conn:
-                        inspector = inspect(conn)
-                        names = sorted(set(inspector.get_table_names(schema=job.schema_name or None) + inspector.get_view_names(schema=job.schema_name or None)))
+                        names = list_tables(conn, job.schema_name or None)
                 job.inventory_json = names
                 for ordinal, offset in enumerate(range(0, len(names), 20)):
                     db.add(MetadataSyncBatchRecord(id=str(uuid4()), job_id=job.id, ordinal=ordinal, table_names_json=names[offset:offset + 20], state="queued", results_json=[], history_json=[]))

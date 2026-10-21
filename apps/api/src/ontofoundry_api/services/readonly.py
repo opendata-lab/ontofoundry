@@ -41,6 +41,8 @@ def connect_readonly(item, settings, *, timeout_ms=None):
         )
         try:
             with engine.connect() as connection:
+                # Catalog readers pick the right statements for the source.
+                connection.info["source_kind"] = item.kind
                 if item.kind == "postgresql":
                     connection.execute(text("SET TRANSACTION READ ONLY"))
                 elif item.kind == "mysql":

@@ -1,4 +1,5 @@
 import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Radio, Table, Typography } from "antd";
+import { useConnectionNames } from "../../hooks/useConnectionNames";
 import { Eye, ScanLine } from "lucide-react";
 import { useRef, useState } from "react";
 import { datasetApi } from "../../api/client";
@@ -26,6 +27,7 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
   currentSignature.current = signature;
   const result = checked?.signature === signature ? checked.result : null;
   const rows = preview?.signature === signature ? preview.result : null;
+  const connectionNames = useConnectionNames(draft.workspace_id);
   const update = (patch: Partial<Dataset>) => {
     generation.current += 1;
     setBusy(null);
@@ -111,7 +113,7 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
         { key: "name", label: "名称", children: editing ? <Input aria-label="数据集名称" value={dataset.display_name ?? ""} onChange={(event) => update({ display_name: event.target.value })} /> : dataset.display_name || dataset.name },
         { key: "id", label: "英文标识", children: editing ? <Input aria-label="数据集英文标识" value={dataset.name} onChange={(event) => update({ name: event.target.value })} /> : dataset.name },
         { key: "source", label: "来源方式", children: source ? "基于表达式" : "基于表" },
-        { key: "connection", label: "连接", children: dataset.connection_id ? "已绑定连接" : "未绑定连接" },
+        { key: "connection", label: "连接", children: dataset.connection_id ? connectionNames.get(dataset.connection_id) ?? "已绑定连接" : "未绑定连接" },
         { key: "dialect", label: "引擎", children: dataset.dialect ?? "未指定" },
         { key: "snapshot", label: "快照日期列", children: editing ? <DatasetSnapshotFields dataset={dataset} onChange={update} /> : dataset.snapshot_date_column ?? "不是快照" },
         { key: "description", label: "描述", span: 2, children: editing ? <Input.TextArea aria-label="数据集描述" value={dataset.description} autoSize={{ minRows: 1, maxRows: 6 }} onChange={(event) => update({ description: event.target.value })} /> : dataset.description || "暂无描述" },

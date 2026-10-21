@@ -1,9 +1,10 @@
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from sqlalchemy import (
-    inspect,
+    func,
     select,
     text,
 )
@@ -31,7 +32,7 @@ def get_connection(db, wid, cid):
 
 
 class ConnectionCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
     kind: str = Field(pattern="^(postgresql|mysql|doris)$")
     host: str = Field(min_length=1, max_length=240)
     port: int = Field(ge=1, le=65535)
@@ -72,7 +73,8 @@ def create_connection(
     if db.scalar(
         select(ConnectionRecord).where(
             ConnectionRecord.workspace_id == workspace_id,
-            ConnectionRecord.name == body.name,
+            # The name is shown instead of the id, so it must not differ only by case or spaces.
+            func.lower(func.trim(ConnectionRecord.name)) == body.name.lower(),
         )
     ):
         raise HTTPException(409, "本空间已有同名数据连接，请换一个名称")
@@ -118,40 +120,21 @@ def tables(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    with connect_readonly(
-        get_connection(db, workspace_id, connection_id), request.app.state.settings
-    ) as conn:
-        inspector = inspect(conn)
-        names = sorted(
-            set(
-                inspector.get_table_names(schema=schema_name)
-                + inspector.get_view_names(schema=schema_name)
-            )
-        )
+    from ontofoundry_api.services.metadata_catalog import list_tables, require_schema
+    from ontofoundry_api.services.metadata_sync import normalize_schema, read_table
+
+    connection = get_connection(db, workspace_id, connection_id)
+    # Omitting the schema means the connection's default one, for every engine.
+    schema_name = normalize_schema(connection, schema_name or "") or None
+    require_schema(connection, schema_name)
+    with connect_readonly(connection, request.app.state.settings) as conn:
+        names = list_tables(conn, schema_name)
         if table:
             if table not in names:
                 raise HTTPException(404, "数据表不存在")
-            pks = inspector.get_pk_constraint(table, schema=schema_name).get(
-                "constrained_columns", []
-            )
-            return {
-                "items": [
-                    {
-                        "name": table,
-                        "schema": schema_name,
-                        "columns": [
-                            {
-                                "name": c["name"],
-                                "type": str(c["type"]),
-                                "primary_key": c["name"] in pks,
-                                "nullable": c.get("nullable"),
-                                "comment": c.get("comment"),
-                            }
-                            for c in inspector.get_columns(table, schema=schema_name)
-                        ],
-                    }
-                ]
-            }
+            # One reader for every engine, the same one sync uses.
+            observed = read_table(conn, schema_name, table)
+            return {"items": [{"name": table, "schema": schema_name, "columns": observed.get("columns", [])}]}
         return {"items": [{"name": n, "schema": schema_name, "columns": []} for n in names]}
 
 

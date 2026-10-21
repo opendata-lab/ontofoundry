@@ -177,20 +177,23 @@ export function useProposals(
   };
 
   /** Replace a pending proposal's content before it is decided; the server re-validates it. */
-  const reviseContent = async (proposalId: string, after: Record<string, unknown>) => {
+  const reviseContent = async (proposalId: string, fields: Record<string, unknown>) => {
     const current = sessionRef.current;
     if (!current) return false;
     setBusy(true);
     setError("");
+    setItemErrors((errors) => Object.fromEntries(Object.entries(errors).filter(([id]) => id !== proposalId)));
     try {
-      await proposalsApi.reviseContent(current.workspace_id, current.id, proposalId, after, current.revision);
+      // Only the edited field is sent; the server merges it into the stored content.
+      await proposalsApi.reviseContent(current.workspace_id, current.id, proposalId, fields, current.revision);
       const fresh = await modelingApi.get(current.workspace_id, current.id);
       sessionRef.current = fresh;
       onSession(fresh);
       reload();
       return true;
     } catch (e) {
-      setItemErrors({ [proposalId]: e instanceof Error ? e.message : "修改提案失败" });
+      const reasons = e instanceof ApiError ? e.errors.map((issue) => `${issue.path ?? ""}：${issue.message}`).filter(Boolean) : [];
+      setItemErrors({ [proposalId]: [e instanceof Error ? e.message : "修改提案失败", ...reasons].join("；") });
       if (e instanceof ApiError && e.status === 409) onStale();
       return false;
     } finally {

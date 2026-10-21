@@ -1,4 +1,4 @@
-import { Table, Typography } from "antd";
+import { Table, Tooltip, Typography } from "antd";
 import type { ReactNode } from "react";
 import type { FieldChange } from "../../api/types";
 import { fieldLabel } from "./elementMeta";
@@ -18,7 +18,8 @@ const cell = (value: unknown, removed: boolean, names?: Map<string, string>) =>
     <Text type="secondary">（空）</Text>
   ) : (
     <span className={`text-xs whitespace-pre-wrap break-all ${removed ? "text-danger line-through" : "text-success"}`}>
-      {typeof value === "string" && names?.has(value) ? names.get(value) : valueText(value)}
+      {/* Shown by name; the change itself is the id, kept in the tooltip for same-named items. */}
+      {typeof value === "string" && names?.has(value) ? <Tooltip title={value}><span>{names.get(value)}</span></Tooltip> : valueText(value)}
     </span>
   );
 

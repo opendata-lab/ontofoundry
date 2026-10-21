@@ -182,3 +182,66 @@ def test_visible_schemas_respects_postgresql_allowlist_and_mysql_database(monkey
     assert metadata_catalog.visible_schemas(postgres, source) == ["fiction_crm", "fiction_sales", "information_schema"]
     mysql = SimpleNamespace(kind="mysql", config_json={"database": "fiction_crm"})
     assert metadata_catalog.visible_schemas(mysql, source) == ["fiction_crm"]
+
+
+def test_table_rows_preview_reads_only_synced_tables_up_to_the_limit(client, tmp_path, monkeypatch):
+    from ontofoundry_api.services import table_preview
+
+    engine = source_database(tmp_path, 1)
+    with engine.begin() as conn:
+        for i in range(120):
+            conn.exec_driver_sql(f"INSERT INTO fiction_00 (label) VALUES ('虚构{i}')")
+    connection_id, _ = install(client, monkeypatch, engine)
+    monkeypatch.setattr(table_preview, "connect_readonly", metadata_sync.connect_readonly)
+    url = ROOT + f"/connections/{connection_id}/assets/rows"
+    assert client.get(url, params={"table_name": "fiction_00"}).json()["error"]["code"] == "TABLE_NOT_REGISTERED"
+    sync(client, connection_id, {"scope": "selected", "tables": ["fiction_00"]})
+    body = client.get(url, params={"table_name": "fiction_00"}).json()
+    assert body["columns"] == ["id", "label"] and body["limit"] == 100
+    assert len(body["items"]) == 100 and body["items"][0]["label"] == "虚构0"
+    assert client.get(url, params={"table_name": "fiction_view"}).status_code == 404
+
+
+def test_catalog_reads_stay_inside_the_configured_schemas(client, tmp_path, monkeypatch):
+    from ontofoundry_api.services import table_preview
+
+    engine = source_database(tmp_path, 1)
+    connection_id, _ = install(client, monkeypatch, engine)
+    monkeypatch.setattr(table_preview, "connect_readonly", metadata_sync.connect_readonly)
+    with client.app.state.session_factory() as db:
+        db.get(ConnectionRecord, connection_id).config_json = {"database": "fiction_sales"}
+        db.add(MetadataSnapshotRecord(connection_id=connection_id, schema_name="fiction_hidden", snapshot_json={"tables": [{"name": "fiction_00", "columns": []}]}, changes_json=[]))
+        db.commit()
+    rows = client.get(ROOT + f"/connections/{connection_id}/assets/rows", params={"table_name": "fiction_00", "schema_name": "fiction_hidden"})
+    assert rows.status_code == 403 and rows.json()["error"]["code"] == "SCHEMA_NOT_ALLOWED"
+    job = client.post(ROOT + f"/connections/{connection_id}/assets/sync-jobs", params={"schema_name": "fiction_hidden"}, json={"scope": "all"})
+    assert job.status_code == 403
+    listed = client.get(ROOT + "/registered-tables").json()["items"]
+    assert not [t for t in listed if t["connection_id"] == connection_id]
+
+
+def test_binary_preview_values_are_hex():
+    from ontofoundry_api.services.table_preview import preview_value
+
+    assert preview_value(b"\xff\x00") == "0xff00" and preview_value(7) == 7
+
+
+def test_doris_catalog_reads_filter_each_schema_explicitly():
+    from ontofoundry_api.services.metadata_catalog import list_tables, read_doris_table
+
+    engine = sa.create_engine("sqlite://")
+    with engine.connect() as conn:
+        conn.exec_driver_sql("ATTACH ':memory:' AS information_schema")
+        conn.exec_driver_sql("CREATE TABLE information_schema.tables (TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE, TABLE_COMMENT)")
+        conn.exec_driver_sql("CREATE TABLE information_schema.columns (TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, COLUMN_TYPE, DATA_TYPE, IS_NULLABLE, COLUMN_COMMENT, COLUMN_KEY, ORDINAL_POSITION)")
+        conn.exec_driver_sql("INSERT INTO information_schema.tables VALUES ('fiction_main', 'orders', 'BASE TABLE', '虚构订单'), ('fiction_main', 'orders_view', 'VIEW', ''), ('fiction_archive', 'archived', 'BASE TABLE', '')")
+        conn.exec_driver_sql("INSERT INTO information_schema.columns VALUES ('fiction_main', 'orders', 'amount', '', 'decimal', 'YES', '', 'DUP', 2), ('fiction_main', 'orders', 'id', 'bigint', 'bigint', 'NO', '编号', 'PRI', 1), ('fiction_archive', 'orders', 'other', 'int', 'int', 'YES', '', '', 1)")
+        conn.info["source_kind"] = "doris"
+        assert list_tables(conn, "fiction_main") == ["orders", "orders_view"]
+        assert list_tables(conn, "fiction_archive") == ["archived"]
+        table = read_doris_table(conn, "fiction_main", "orders", "2026-10-21T00:00:00")
+        assert table["kind"] == "table" and table["comment"] == "虚构订单"
+        assert [(c["name"], c["type"], c["nullable"], c["primary_key"]) for c in table["columns"]] == [("id", "bigint", False, True), ("amount", "decimal", True, False)]
+        assert table["primary_key"] == ["id"]
+        assert read_doris_table(conn, "fiction_main", "orders_view", "t")["kind"] == "view"
+        assert read_doris_table(conn, "fiction_archive", "orders", "t")["missing"] is True

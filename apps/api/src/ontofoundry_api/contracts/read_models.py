@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, JsonValue, TypeAdapter
 
 from ontofoundry_api.domain.core import (
     BindingMode,
@@ -53,9 +53,17 @@ class ElementSaveImpact(Strict):
     affected_items: list[AffectedItemImpact]
 
 
+class TableRowsRead(Strict):
+    """First rows of one synced source table, read-only and bounded."""
+
+    columns: list[str]
+    items: list[dict[str, JsonValue]]
+    limit: int = Field(ge=1, le=100)
+
+
 def read_models_schema():
     schema = TypeAdapter(
-        MembershipRead | EffectiveLinkRead | EffectiveBindingRead | ElementSaveImpact
+        MembershipRead | EffectiveLinkRead | EffectiveBindingRead | ElementSaveImpact | TableRowsRead
     ).json_schema(mode="serialization")
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = "ontofoundry.api-read.v1.schema.json"

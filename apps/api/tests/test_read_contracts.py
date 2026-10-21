@@ -32,6 +32,7 @@ def test_read_schema_artifact_and_check_detect_drift(tmp_path, monkeypatch):
             "EffectiveLinkRead",
             "EffectiveBindingRead",
             "ElementSaveImpact",
+            "TableRowsRead",
         )
     }
     export_schema.export(check=True)

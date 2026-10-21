@@ -1,14 +1,18 @@
-import { Alert, Empty, Form, Input, Menu, Select, Table, Typography } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Empty, Form, Input, Menu, Select, Table, Typography } from "antd";
+import { Search } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { catalogApi } from "../api/client";
-import type { DataConnection } from "../api/types";
+import type { AssetTable, DataConnection } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
 import { loadSchemaAssets, syncTime, type SchemaAssets } from "../lib/metadataSync";
-import { DataTablesLayout, StatusMark } from "./layout";
+import { DataTablesLayout, PageToolbar, StatusMark } from "./layout";
+import { TableDetailDialog } from "./TableDetailDialog";
 
 
-export function TableSyncPanel({ workspaceId, initialConnection, initialSchema = "", refreshKey = 0, onConnectionChange }: {
+export function TableSyncPanel({ workspaceId, initialConnection, initialSchema = "", refreshKey = 0, onConnectionChange, actions }: {
   workspaceId: string; initialConnection?: string; initialSchema?: string; refreshKey?: number; onConnectionChange?: (id: string) => void;
+  /** Primary page actions, placed where the documents tab puts its upload button. */
+  actions?: ReactNode;
 }) {
   const active = usePageActive();
   const [connections, setConnections] = useState<DataConnection[]>([]);
@@ -20,6 +24,7 @@ export function TableSyncPanel({ workspaceId, initialConnection, initialSchema =
   const [direction, setDirection] = useState("asc");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [detail, setDetail] = useState<AssetTable & { schema: string } | null>(null);
   useEffect(() => {
     let live = true;
     catalogApi.connections(workspaceId).then(({ items }) => { if (live) { setConnections(items); setConnectionId((id) => id || items[0]?.id || ""); } }).catch((e: Error) => { if (live) setError(e.message); });
@@ -39,12 +44,19 @@ export function TableSyncPanel({ workspaceId, initialConnection, initialSchema =
   }), [groups, schema, search, sort, direction]);
   const latest = groups.map((g) => g.assets.observed_at).filter((t): t is string => !!t).sort().at(-1);
   const controls = <>
-    <Form layout="vertical" component="div"><Form.Item label="数据连接" className="mb-0"><Select aria-label="数据连接" placeholder="选择数据连接" value={connectionId || undefined} options={connections.map((c) => ({ value: c.id, label: `${c.name} · ${c.kind}` }))} onChange={(id) => { setConnectionId(id); setSchema(""); }} /></Form.Item></Form>
+    <Form layout="vertical" component="div"><Form.Item label="数据连接" className="mb-0"><Select aria-label="数据连接" placeholder="选择数据连接" value={connectionId || undefined} options={connections.map((c) => ({ value: c.id, label: c.name }))} onChange={(id) => { setConnectionId(id); setSchema(""); }} /></Form.Item></Form>
     <div><Typography.Text strong>库</Typography.Text><Menu aria-label="库列表" className="border-0" selectedKeys={[schema]} onClick={({ key }) => setSchema(key)} items={[{ key: "", label: <div><div>全部库 · {groups.reduce((n, g) => n + g.assets.items.length, 0)} 张</div><Typography.Text type="secondary" className="text-xs">{syncTime(latest)}</Typography.Text></div> }, ...groups.map((g) => ({ key: g.schema, label: <div><div>{g.schema} · {g.assets.items.length} 张</div><Typography.Text type="secondary" className="text-xs">{syncTime(g.assets.observed_at)}</Typography.Text></div> }))]} /></div>
-    <Form layout="vertical" component="div"><Form.Item label="搜索" ><Input.Search aria-label="搜索表名或注释" placeholder="表名或注释" allowClear value={search} onChange={(e) => setSearch(e.target.value)} /></Form.Item><Form.Item label="排序字段"><Select aria-label="排序字段" value={sort} onChange={setSort} options={[{ value: "name", label: "表名" }, { value: "time", label: "最近同步时间" }, { value: "columns", label: "列数" }]} /></Form.Item><Form.Item label="排序方向" className="mb-0"><Select aria-label="排序方向" value={direction} onChange={setDirection} options={[{ value: "asc", label: "升序" }, { value: "desc", label: "降序" }]} /></Form.Item></Form>
+    <Form layout="vertical" component="div"><Form.Item label="排序字段"><Select aria-label="排序字段" value={sort} onChange={setSort} options={[{ value: "name", label: "表名" }, { value: "time", label: "最近同步时间" }, { value: "columns", label: "列数" }]} /></Form.Item><Form.Item label="排序方向" className="mb-0"><Select aria-label="排序方向" value={direction} onChange={setDirection} options={[{ value: "asc", label: "升序" }, { value: "desc", label: "降序" }]} /></Form.Item></Form>
   </>;
-  return <DataTablesLayout controls={controls}><div className="flex flex-col gap-3">
+  return <>
+    <PageToolbar extra={<Input type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索表名或注释" placeholder="搜索表名或注释" value={search} onChange={(e) => setSearch(e.target.value)} />}>
+      {actions}
+      <Typography.Text type="secondary" className="text-xs">{rows.length} 张表</Typography.Text>
+    </PageToolbar>
+    <DataTablesLayout controls={controls}><div className="flex flex-col gap-3">
     {error && <Alert type="error" showIcon message={error} />}
-    <Table size="middle" rowKey={(t) => JSON.stringify([t.schema, t.name])} dataSource={rows} loading={loading} pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={search ? "没有匹配的数据表" : "还没有已登记数据表，请点击同步数据表"} /> }} columns={[{ title: "表名", dataIndex: "name" }, { title: "库", dataIndex: "schema" }, { title: "列数", key: "columns", render: (_, t) => t.columns.length }, { title: "状态", key: "state", render: (_, t) => <StatusMark state={t.missing ? "error" : "mapped"} label={t.missing ? "当前不可见或不存在" : "已登记"} /> }, { title: "最近同步时间", key: "time", render: (_, t) => syncTime(t.observed_at) }, { title: "说明", dataIndex: "comment" }]} />
-  </div></DataTablesLayout>;
+    <Table size="middle" rowKey={(t) => JSON.stringify([t.schema, t.name])} dataSource={rows} loading={loading} pagination={rows.length > 20 ? { pageSize: 20, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={search ? "没有匹配的数据表" : "还没有已登记数据表，请点击同步数据表"} /> }} columns={[{ title: "表名", key: "name", render: (_, t) => <Button type="link" size="small" className="h-auto p-0" onClick={() => setDetail(t)}>{t.name}</Button> }, { title: "库", dataIndex: "schema" }, { title: "列数", key: "columns", render: (_, t) => t.columns.length }, { title: "状态", key: "state", render: (_, t) => <StatusMark state={t.missing ? "error" : "mapped"} label={t.missing ? "当前不可见或不存在" : "已登记"} /> }, { title: "最近同步时间", key: "time", render: (_, t) => syncTime(t.observed_at) }, { title: "说明", dataIndex: "comment" }]} />
+  </div></DataTablesLayout>
+    {detail && <TableDetailDialog workspaceId={workspaceId} connectionId={connectionId} schema={detail.schema} table={detail} onClose={() => setDetail(null)} />}
+  </>;
 }

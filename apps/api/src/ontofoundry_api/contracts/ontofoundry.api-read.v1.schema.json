@@ -330,6 +330,7 @@
       "title": "ExpressionBinding",
       "type": "object"
     },
+    "JsonValue": {},
     "LinkStep": {
       "additionalProperties": false,
       "properties": {
@@ -653,6 +654,42 @@
       ],
       "title": "PropertiesKey",
       "type": "object"
+    },
+    "TableRowsRead": {
+      "additionalProperties": false,
+      "description": "First rows of one synced source table, read-only and bounded.",
+      "properties": {
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "limit": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Limit",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "columns",
+        "items",
+        "limit"
+      ],
+      "title": "TableRowsRead",
+      "type": "object"
     }
   },
   "$id": "ontofoundry.api-read.v1.schema.json",
@@ -669,6 +706,9 @@
     },
     {
       "$ref": "#/$defs/ElementSaveImpact"
+    },
+    {
+      "$ref": "#/$defs/TableRowsRead"
     }
   ],
   "title": "OntoFoundry interface read models v1"

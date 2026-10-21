@@ -4,11 +4,11 @@ from test_modeling import ROOT, create_session
 from test_t4_proposal_decisions import chain, current, decide, seed_batch, update
 
 
-def revise(client, session, item, after, revision=None):
-    return client.put(
+def revise(client, session, item, fields, revision=None):
+    return client.patch(
         ROOT + f"/sessions/{session['id']}/proposals/{item['id']}/after",
         json={
-            "after": after,
+            "fields": fields,
             "expected_session_revision": session["revision"] if revision is None else revision,
         },
     )
@@ -18,9 +18,11 @@ def test_revised_content_is_what_gets_accepted(client):
     session = create_session(client)
     target = session["draft"]["object_types"][0]
     (item,) = seed_batch(client, session, [update("object_type", target, description="提案描述")])["items"]
-    after = {**item["after"], "display_name": "审阅后名称", "description": "审阅后描述"}
-
-    response = revise(client, session, item, after)
+    # Two saves of different fields in a row: the second keeps the first.
+    response = revise(client, session, item, {"display_name": "审阅后名称"})
+    assert response.status_code == 200, response.text
+    session = current(client, session)
+    response = revise(client, session, item, {"description": "审阅后描述"})
     assert response.status_code == 200, response.text
     session = current(client, session)
     detail = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{item['batch_id']}").json()
@@ -38,8 +40,9 @@ def test_identity_and_evidence_stay_with_the_proposal(client):
     session = create_session(client)
     items = seed_batch(client, session, chain(session))["items"]
     po = items[0]
-    after = {**po["after"], "id": "00000000-0000-4000-8000-000000000000", "evidence": [], "display_name": "采购单"}
-    assert revise(client, session, po, after).status_code == 200
+    locked = revise(client, session, po, {"id": "00000000-0000-4000-8000-000000000000", "evidence": []})
+    assert locked.status_code == 422 and locked.json()["error"]["code"] == "FIELD_NOT_EDITABLE"
+    assert revise(client, session, po, {"display_name": "采购单"}).status_code == 200
     session = current(client, session)
     detail = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{po['batch_id']}").json()
     revised = next(i for i in detail["items"] if i["id"] == po["id"])
@@ -55,13 +58,13 @@ def test_invalid_content_stale_revision_and_decided_items_are_refused(client):
     target = session["draft"]["object_types"][0]
     (item,) = seed_batch(client, session, [update("object_type", target, description="提案描述")])["items"]
 
-    invalid = revise(client, session, item, {**item["after"], "name": ""})
+    invalid = revise(client, session, item, {"name": ""})
     assert invalid.status_code == 422 and invalid.json()["error"]["code"] == "VALIDATION_FAILED"
 
-    stale = revise(client, session, item, item["after"], revision=session["revision"] - 1)
+    stale = revise(client, session, item, {"description": "过期修改"}, revision=session["revision"] - 1)
     assert stale.status_code == 409 and stale.json()["error"]["code"] == "SESSION_REVISION_CHANGED"
 
     assert decide(client, session, [(item["id"], "reject")]).status_code == 200
     session = current(client, session)
-    decided = revise(client, session, item, item["after"])
+    decided = revise(client, session, item, {"description": "已决定后修改"})
     assert decided.status_code == 409 and decided.json()["error"]["code"] == "PROPOSAL_NOT_DECIDABLE"

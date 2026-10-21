@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.connections import connect_readonly, get_connection
 from ontofoundry_api.contracts.metadata_sync import SyncRequest
+from ontofoundry_api.contracts.read_models import TableRowsRead
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MetadataSnapshotRecord
-from ontofoundry_api.services.access import require_mappings
+from ontofoundry_api.services.access import require_instances, require_mappings
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.metadata_catalog import visible_schemas
 from ontofoundry_api.services.metadata_sync import (
@@ -114,6 +115,14 @@ def assets(
     schema_name = normalize_schema(connection, schema_name)
     record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)
+
+
+@router.get("/assets/rows", response_model=TableRowsRead)
+def table_rows(workspace_id: str, connection_id: str, request: Request, table_name: str = Query(min_length=1, max_length=240), schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_mappings(db, workspace_id, user)
+    require_instances(db, workspace_id, user)
+    from ontofoundry_api.services.table_preview import preview_table
+    return preview_table(db, get_connection(db, workspace_id, connection_id), schema_name, table_name, request.app.state.settings)
 
 
 @router.post("/assets/sync-jobs", status_code=202)
