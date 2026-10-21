@@ -1,8 +1,6 @@
-import { displayName } from "../lib/coreModel";
 import {
   Box,
   Database,
-  GitBranch,
   Network,
   Search,
   Settings,
@@ -12,28 +10,24 @@ import {
   ChevronDown,
   Globe,
   Plug,
-  Sigma,
 } from "lucide-react";
 import {
   NavLink,
   useParams,
   Link,
-  useNavigate,
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { Avatar, Button, Empty, Input, Modal, Tooltip } from "antd";
+import { Avatar, Button, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
-import type { ResourceRead, User, Workspace } from "../api/types";
+import type { User, Workspace } from "../api/types";
 import { WorkspaceContextProvider } from "../hooks/useWorkspaceContext";
-import { elementHref } from "../lib/elementInspector";
+import { OntologySearchDialog } from "./OntologySearchDialog";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
 import { ApplicationFrame } from "./layout";
-
-const SEARCH_ICONS = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database };
 
 // Follow the workflow: inspect, build and publish; connect data before mapping.
 const navigation = [
@@ -64,10 +58,7 @@ export function AppShell() {
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ResourceRead[]>([]);
   const [searching, setSearching] = useState(false);
-  const navigate = useNavigate();
   const load = useCallback(() => {
     setError("");
     Promise.all([api.workspace(workspaceId), api.me()])
@@ -90,15 +81,7 @@ export function AppShell() {
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, []);
-  const openSearch = useCallback(() => {
-    setQuery("");
-    setResults([]);
-    setSearching(true);
-    api
-      .types(workspaceId)
-      .then((r) => setResults(r.items))
-      .catch(() => setResults([]));
-  }, [workspaceId]);
+  const openSearch = useCallback(() => setSearching(true), []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -191,54 +174,7 @@ export function AppShell() {
       <WorkspaceContextProvider.Provider value={{ workspace, user, refresh: load }}>
         <WorkspaceTabs key={`${user.id}:${workspaceId}`} workspaceId={workspaceId} userId={user.id} />
       </WorkspaceContextProvider.Provider>
-      <Modal
-        open={searching}
-        onCancel={() => setSearching(false)}
-        title="搜索已发布本体"
-        footer={null}
-        destroyOnHidden
-      >
-        <Input
-          autoFocus
-          allowClear
-          prefix={<Search className="size-icon" />}
-          aria-label="搜索关键词"
-          placeholder="名称、英文标识、描述或同义词"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <div className="mt-3 flex max-h-app-search flex-col overflow-auto">
-          {results
-            .filter((r) => {
-              const d = r.definition as { name: string; display_name?: string | null; description?: string; synonyms?: string[] };
-              return [(d.display_name || d.name), d.name ?? "", d.description ?? "", ...(d.synonyms ?? [])]
-                .join(" ")
-                .toLowerCase()
-                .includes(query.toLowerCase());
-            })
-            .map((r) => {
-              const Icon = SEARCH_ICONS[r.kind];
-              return (
-                <Button
-                  key={r.kind + r.definition.id}
-                  type="text"
-                  className="h-auto justify-start gap-2 py-2 text-left whitespace-normal"
-                  onClick={() => {
-                    setSearching(false);
-                    navigate(elementHref(workspaceId, { kind: r.kind, id: r.definition.id, sessionId: null }));
-                  }}
-                >
-                  <Icon className="size-icon" />
-                  <span>{displayName(r.definition)}</span>
-                  <code className="text-xs text-muted">
-                    {"name" in r.definition ? r.definition.name : ""}
-                  </code>
-                </Button>
-              );
-            })}
-          {!results.length && <Empty description="暂无已发布本体" />}
-        </div>
-      </Modal>
+      <OntologySearchDialog workspaceId={workspaceId} open={searching} onClose={() => setSearching(false)} />
     </ApplicationFrame>
   );
 }

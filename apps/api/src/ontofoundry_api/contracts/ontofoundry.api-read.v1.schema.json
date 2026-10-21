@@ -29,6 +29,19 @@
       "title": "AffectedItemImpact",
       "type": "object"
     },
+    "Aggregation": {
+      "enum": [
+        "sum",
+        "avg",
+        "median",
+        "min",
+        "max",
+        "count",
+        "count_distinct"
+      ],
+      "title": "Aggregation",
+      "type": "string"
+    },
     "BindingMode": {
       "enum": [
         "independent",
@@ -65,6 +78,69 @@
         "column"
       ],
       "title": "ColumnBinding",
+      "type": "object"
+    },
+    "ColumnReference": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "column"
+      ],
+      "title": "ColumnReference",
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/ColumnReference"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "operator"
+      ],
+      "title": "Condition",
       "type": "object"
     },
     "DerivedExpression": {
@@ -546,6 +622,82 @@
       "title": "MembershipRead",
       "type": "object"
     },
+    "Multiplicity": {
+      "description": "No one_to_many: a one-to-many link is built from the many side.",
+      "enum": [
+        "one_to_one",
+        "many_to_one",
+        "many_to_many"
+      ],
+      "title": "Multiplicity",
+      "type": "string"
+    },
+    "OntologySearchRead": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/SearchItemRead"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        },
+        "retrieval": {
+          "$ref": "#/$defs/SearchRetrievalRead"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        },
+        "unmatched_terms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unmatched Terms",
+          "type": "array"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Id"
+        },
+        "workspace_id": {
+          "format": "uuid",
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "version_id",
+        "items",
+        "total",
+        "next_cursor",
+        "retrieval",
+        "unmatched_terms"
+      ],
+      "title": "OntologySearchRead",
+      "type": "object"
+    },
     "Operator": {
       "enum": [
         "eq",
@@ -655,6 +807,542 @@
       "title": "PropertiesKey",
       "type": "object"
     },
+    "SearchDatasetRead": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "SearchDatasetRead",
+      "type": "object"
+    },
+    "SearchExpansionMatchRead": {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "const": "expansion",
+          "title": "By",
+          "type": "string"
+        },
+        "via": {
+          "$ref": "#/$defs/SearchViaRead"
+        }
+      },
+      "required": [
+        "by",
+        "via"
+      ],
+      "title": "SearchExpansionMatchRead",
+      "type": "object"
+    },
+    "SearchItemRead": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchDatasetRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "definition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchMetricDefinitionRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Display Name"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identifier"
+        },
+        "kind": {
+          "enum": [
+            "object_type",
+            "property",
+            "link_type",
+            "rule",
+            "metric",
+            "dataset",
+            "value_type"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "match": {
+          "discriminator": {
+            "mapping": {
+              "description": "#/$defs/SearchTextMatchRead",
+              "expansion": "#/$defs/SearchExpansionMatchRead",
+              "name_in_query": "#/$defs/SearchTextMatchRead",
+              "query_in_name": "#/$defs/SearchTextMatchRead",
+              "vector": "#/$defs/SearchTextMatchRead"
+            },
+            "propertyName": "by"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SearchTextMatchRead"
+            },
+            {
+              "$ref": "#/$defs/SearchExpansionMatchRead"
+            }
+          ],
+          "title": "Match"
+        },
+        "matched_synonyms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Matched Synonyms",
+          "type": "array"
+        },
+        "multiplicity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Multiplicity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchReferenceRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Id"
+        },
+        "owner_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Kind"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchReferenceRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
+        },
+        "source_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Type Id"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "synonyms": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Synonyms"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SearchReferenceRead"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "target_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Type Id"
+        },
+        "title_property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Property Id"
+        },
+        "value_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValueKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "value_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type Id"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "display_name",
+        "name",
+        "summary",
+        "matched_synonyms",
+        "match"
+      ],
+      "title": "SearchItemRead",
+      "type": "object"
+    },
+    "SearchMetricDefinitionRead": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Aggregation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "denominator_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Denominator Id"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expression"
+        },
+        "filters": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Condition"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Filters"
+        },
+        "kind": {
+          "enum": [
+            "simple",
+            "ratio",
+            "expression"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "measure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "numerator_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Numerator Id"
+        },
+        "time_field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "SearchMetricDefinitionRead",
+      "type": "object"
+    },
+    "SearchReferenceRead": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "SearchReferenceRead",
+      "type": "object"
+    },
+    "SearchRetrievalRead": {
+      "additionalProperties": false,
+      "properties": {
+        "keyword": {
+          "title": "Keyword",
+          "type": "boolean"
+        },
+        "vector": {
+          "title": "Vector",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "keyword",
+        "vector"
+      ],
+      "title": "SearchRetrievalRead",
+      "type": "object"
+    },
+    "SearchTextMatchRead": {
+      "additionalProperties": false,
+      "properties": {
+        "by": {
+          "enum": [
+            "name_in_query",
+            "query_in_name",
+            "description",
+            "vector"
+          ],
+          "title": "By",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "by",
+        "text"
+      ],
+      "title": "SearchTextMatchRead",
+      "type": "object"
+    },
+    "SearchViaRead": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "metric_dataset_bound_type",
+            "metric_numerator",
+            "metric_denominator",
+            "object_title_property",
+            "object_link_type",
+            "property_owner",
+            "link_source_type",
+            "link_target_type"
+          ],
+          "title": "Relation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "relation"
+      ],
+      "title": "SearchViaRead",
+      "type": "object"
+    },
     "TableRowsRead": {
       "additionalProperties": false,
       "description": "First rows of one synced source table, read-only and bounded.",
@@ -690,6 +1378,20 @@
       ],
       "title": "TableRowsRead",
       "type": "object"
+    },
+    "ValueKind": {
+      "description": "Ossie's seven built-in value types; core-1 adds no others.",
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
     }
   },
   "$id": "ontofoundry.api-read.v1.schema.json",
@@ -709,6 +1411,9 @@
     },
     {
       "$ref": "#/$defs/TableRowsRead"
+    },
+    {
+      "$ref": "#/$defs/OntologySearchRead"
     }
   ],
   "title": "OntoFoundry interface read models v1"

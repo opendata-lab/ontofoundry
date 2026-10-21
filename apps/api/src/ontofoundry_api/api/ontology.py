@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, ontology_directory_principal
 from ontofoundry_api.api.auth import ontology_principal as current_principal
+from ontofoundry_api.contracts.read_models import OntologySearchRead, OntologySearchRequest
 from ontofoundry_api.database import get_db
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
@@ -24,6 +25,7 @@ from ontofoundry_api.services.ontology_query import (
     type_graph,
     version_summary,
 )
+from ontofoundry_api.services.ontology_search import search_ontology
 from ontofoundry_api.services.workspaces import list_accessible_workspaces
 
 router = APIRouter(prefix="/api/v1/ontology/workspaces", tags=["ontology"])
@@ -48,6 +50,23 @@ def accessible_workspaces(
             for item in items
         ]
     }
+
+
+@router.post(
+    "/{workspace_id}/search",
+    response_model=OntologySearchRead,
+    response_model_exclude_unset=True,
+)
+def search(
+    workspace_id: str,
+    options: OntologySearchRequest,
+    request: Request,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    return search_ontology(
+        session, workspace_id, principal, options, request.app.state.settings
+    )
 
 
 @router.get("/{workspace_id}/objects")

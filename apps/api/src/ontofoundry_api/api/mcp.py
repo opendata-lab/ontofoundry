@@ -27,7 +27,7 @@ INSTRUCTIONS = (
     "写提案以 definition 和本轮 proposal Schema 为准。"
 )
 TOOLS = {
-    "search_ontology": "按名称、英文标识和同义词搜索核心语义；kinds 可选 object_type、property、link_type、rule、metric、dataset、value_type",
+    "search_ontology": "按问题中的名称、英文标识、同义词和描述检索核心语义，按相关程度排序；expand 默认 true，只扩展一层关系并用 match.via 标明来源；返回 retrieval 与未覆盖原文 unmatched_terms；kinds 在扩展排序后过滤，可选 object_type、property、link_type、rule、metric、dataset、value_type；limit/cursor 分页，空间与版本由令牌绑定",
     "get_ontology": "读取核心定义、继承及授权物理投影；数据集含来源方式、表位置或 SQL、列和被引用元素，值类型含基础类型、约束和使用属性",
     "search_objects": "按事实 UUID 分页搜索已接受的文档事实",
     "get_object": "读取文档事实、证据与直接邻接",

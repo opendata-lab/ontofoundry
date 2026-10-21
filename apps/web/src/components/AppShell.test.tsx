@@ -27,10 +27,13 @@ function show() {
 beforeEach(() => {
   vi.spyOn(api, "workspace").mockResolvedValue(workspace);
   vi.spyOn(api, "me").mockResolvedValue(user);
-  vi.spyOn(api, "types").mockResolvedValue({
-    items: [], workspace_id: workspace.id, version_id: "version-demo", version_sha256: "demo-sha",
-    version_content_sha256: "demo-content-sha", normalized_snapshot_sha256: "demo-snapshot-sha",
-    next_cursor: null, ambiguous: false,
+  vi.spyOn(api, "searchOntology").mockResolvedValue({
+    workspace_id: workspace.id, version_id: "version-demo", retrieval: { keyword: true, vector: false },
+    items: [
+      { id: "metric-demo", kind: "metric", display_name: "采购金额", name: "purchase_amount", summary: "", matched_synonyms: [], match: { by: "name_in_query", text: "采购金额" } },
+      { id: "type-demo", kind: "object_type", display_name: "供应商", name: "supplier", summary: "", matched_synonyms: [], match: { by: "expansion", via: { id: "metric-demo", relation: "metric_dataset_bound_type" } } },
+    ],
+    unmatched_terms: ["星河电子近三个月的"], total: 2, next_cursor: null,
   });
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -60,19 +63,24 @@ describe("应用框架", () => {
     expect(within(nav).queryByRole("link", { name: "空间设置" })).toBeNull();
   });
 
-  it("快捷键和顶栏搜索均可打开搜索，空结果与关闭保持可用", async () => {
+  it("快捷键和顶栏搜索均可打开搜索，按问题检索并说明命中原因，关闭后清空", async () => {
     show();
     await screen.findByText("页面区域");
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     let dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("暂无已发布本体")).toBeVisible();
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "搜索关键词" }), { target: { value: "示例" } });
+    expect(within(dialog).getByText("输入名称、同义词或一句业务问题")).toBeVisible();
+    expect(api.searchOntology).not.toHaveBeenCalled();
+    fireEvent.change(within(dialog).getByRole("textbox", { name: "搜索关键词" }), { target: { value: "星河电子近三个月的采购金额" } });
+    expect(await within(dialog).findByText("命中「采购金额」")).toBeVisible();
+    expect(within(dialog).getByText("由「采购金额」扩展：指标数据集绑定的实体")).toBeVisible();
+    expect(within(dialog).getByText("未匹配到定义：星河电子近三个月的")).toBeVisible();
+    expect(api.searchOntology).toHaveBeenCalledWith(workspace.id, { query: "星河电子近三个月的采购金额", limit: 20 });
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "搜索本体" }));
     dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByRole("textbox", { name: "搜索关键词" })).toHaveValue("");
-    expect(api.types).toHaveBeenCalledTimes(2);
+    expect(within(dialog).queryByText("命中「采购金额」")).toBeNull();
   });
 
   it("读取失败时可以重试并恢复整个框架", async () => {

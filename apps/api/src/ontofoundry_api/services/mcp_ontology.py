@@ -1,14 +1,13 @@
-
 """Four read-only ontology tools with authorization-bound segmented pagination."""
 
 import json
-from contextlib import suppress
 from copy import deepcopy
 from typing import Literal
 from uuid import UUID
 
 from pydantic import Field
 
+from ontofoundry_api.contracts.read_models import OntologySearchRequest
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import CoreDraft, Strict
 from ontofoundry_api.domain.graph import DraftIndex
@@ -27,9 +26,12 @@ from ontofoundry_api.services.ontology_query import (
     resource_items,
     snapshot_of,
 )
+from ontofoundry_api.services.ontology_search import search_ontology
 from ontofoundry_api.services.workspaces import get_workspace
 
-Kind = Literal["object_type", "property", "link_type", "rule", "metric", "dataset", "value_type"]
+Kind = Literal[
+    "object_type", "property", "link_type", "rule", "metric", "dataset", "value_type"
+]
 
 
 class Paging(Strict):
@@ -37,9 +39,7 @@ class Paging(Strict):
     limit: int = Field(default=20, ge=1, le=100)
 
 
-class SearchOntology(Paging):
-    query: str = Field(max_length=240)
-    kinds: list[Kind] | None = None
+SearchOntology = OntologySearchRequest
 
 
 class GetOntology(Paging):
@@ -193,8 +193,14 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 definition["sources"] = [
                     s.model_dump(mode="json") for s in binding.sources.values()
                 ]
-    lookup = {r["definition"]["id"]: r for r in resources if mappings or r["kind"] != "dataset"}
-    for kind, collection in (("property", "properties"), ("rule", "rules"), ("value_type", "value_types")):
+    lookup = {
+        r["definition"]["id"]: r for r in resources if mappings or r["kind"] != "dataset"
+    }
+    for kind, collection in (
+        ("property", "properties"),
+        ("rule", "rules"),
+        ("value_type", "value_types"),
+    ):
         for e in snapshot.get(collection, []):
             definition = deepcopy(e)
             if not instances:
@@ -202,67 +208,16 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             if kind == "value_type":
                 # Constraints and usage are derived on read, never stored on the type.
                 definition["constraints"] = [
-                    r["expression"] for r in snapshot["rules"] if r["owner_kind"] == "value_type" and r["owner_id"] == e["id"]
+                    r["expression"]
+                    for r in snapshot["rules"]
+                    if r["owner_kind"] == "value_type" and r["owner_id"] == e["id"]
                 ]
                 definition["used_by_property_ids"] = [
-                    p["id"] for p in snapshot["properties"] if p.get("value_type_id") == e["id"]
+                    p["id"]
+                    for p in snapshot["properties"]
+                    if p.get("value_type_id") == e["id"]
                 ]
             lookup[e["id"]] = {"kind": kind, "definition": definition}
-    if name == "search_ontology":
-        hits = []
-        for identity, r in lookup.items():
-            d = r["definition"]
-            if args.kinds and r["kind"] not in args.kinds:
-                continue
-            q = args.query.casefold()
-            leaf_names = []
-            if r["kind"] == "dataset" and d.get("query_sql"):
-                from ontofoundry_api.services.dataset_sql import (
-                    parse_query,
-                    physical_tables,
-                )
-                with suppress(ServiceError, ValueError):
-                    leaf_names = [ref.name for ref in physical_tables(parse_query(d["query_sql"], d.get("dialect")))]
-            matched = [s for s in d.get("synonyms", []) if q in s.casefold()]
-            if (
-                q
-                and not matched
-                and not any(q in name.casefold() for name in leaf_names)
-                and not any(
-                    q in str(d.get(k, "")).casefold()
-                    for k in (
-                        "display_name",
-                        "name",
-                        "description",
-                        "table_name",
-                        "source_role_name",
-                        "target_role_name",
-                        "verbalizes",
-                    )
-                )
-            ):
-                continue
-            hit = {
-                "id": identity,
-                "kind": r["kind"],
-                "display_name": d.get("display_name"),
-                "name": d["name"],
-                "summary": d.get("description", ""),
-                "matched_synonyms": matched,
-            }
-            owner = d.get("owner_type_id", d.get("source_type_id", d.get("owner_id")))
-            if owner:
-                hit.update(owner_id=owner, owner_kind=d.get("owner_kind", "object_type"))
-            if r["kind"] == "metric" and mappings:
-                metric = next(m for m in draft.metrics if str(m.id) == identity)
-                from ontofoundry_api.services.metric_query import dataset_for
-
-                ds = dataset_for(draft, metric)
-                hit["dataset"] = {"id": str(ds.id), "name": ds.name}
-            hits.append(hit)
-        hits.sort(key=lambda h: (h["kind"], h["id"]))
-        data = page(hits, [], offset)
-        return {**envelope, **data}
     if name == "get_ontology":
         values = []
         wanted = {str(i) for i in args.ids} if args.ids is not None else None
@@ -321,9 +276,16 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                             from ontofoundry_api.services.dataset_sources import (
                                 dataset_references,
                             )
+
                             refs = dataset_references(draft, identity)
-                            d["referenced_by"] = [{"category": category, **ref} for category, values in refs.items() for ref in values]
-                            element["referenced_by"] = page(d["referenced_by"], [len(values), "referenced_by"])
+                            d["referenced_by"] = [
+                                {"category": category, **ref}
+                                for category, values in refs.items()
+                                for ref in values
+                            ]
+                            element["referenced_by"] = page(
+                                d["referenced_by"], [len(values), "referenced_by"]
+                            )
                     element["definition"] = definition
                 for key in ("properties", "child_types"):
                     if key in d:
@@ -481,6 +443,15 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
 
 def invoke(db, workspace_id, principal, name, arguments, settings):
     args = INPUTS[name].model_validate(arguments)
+    if name == "search_ontology":
+        return search_ontology(
+            db,
+            workspace_id,
+            principal,
+            args,
+            settings,
+            pinned_version_id=principal.pinned_version_id,
+        )
     space = get_workspace(db, workspace_id)
     version_id = (
         principal.pinned_version_id

@@ -98,7 +98,7 @@ test("proposal detail and evidence popover show field changes, quotes and source
   await row.getByText("提供商品或服务的组织", { exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "字段差异", exact: true })).toBeVisible();
-  await expect(dialog.getByRole("cell", { name: "提供商品或服务的组织", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("cell").getByText("提供商品或服务的组织", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "提案理由", exact: true })).toBeVisible();
   await expect(dialog.getByRole("heading", { name: "星河采购业务说明.md", exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "接受 供应商", exact: true })).toBeEnabled();

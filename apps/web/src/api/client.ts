@@ -8,6 +8,8 @@ import type {
   ImportCompletionRequest,
   Assets,
   TableRows,
+  OntologySearchKind,
+  OntologySearchResult,
   Capabilities,
   Comparison,
   DataConnection,
@@ -185,6 +187,11 @@ export const api = {
     workspaceId: string,
     params?: { kind?: ResourceKind; q?: string; version_id?: string },
   ) => request<TypeList>(ontologyPath(workspaceId) + "/types" + query({ ...params })),
+  /** Ranked search over the published ontology; the same service as the MCP search_ontology tool. */
+  searchOntology: (
+    workspaceId: string,
+    body: { query: string; kinds?: OntologySearchKind[]; expand?: boolean; limit?: number; cursor?: string },
+  ) => request<OntologySearchResult>(ontologyPath(workspaceId) + "/search", json("POST", body)),
   type: (workspaceId: string, typeId: string, versionId?: string) =>
     request<TypeDetail>(
       ontologyPath(workspaceId) + "/types/" + encodeURIComponent(typeId) + query({ version_id: versionId }),

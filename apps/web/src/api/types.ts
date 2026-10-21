@@ -566,6 +566,35 @@ export type AssetTable = DataTable & {
   missing: boolean;
   datasets: DatasetRead[];
 };
+export type OntologySearchKind = "object_type" | "property" | "link_type" | "rule" | "metric" | "dataset" | "value_type";
+/** Why an element is in the results: matched directly, or reached in one step from a match. */
+export type OntologySearchMatch =
+  | { by: "name_in_query" | "query_in_name" | "description" | "vector"; text: string; via?: undefined }
+  | { by: "expansion"; via: { id: UUID; relation: string }; text?: undefined };
+type OntologySearchRef = { id: UUID; name: string; display_name?: string | null };
+export type OntologySearchHit = {
+  id: UUID;
+  kind: OntologySearchKind;
+  display_name?: string | null;
+  name: string;
+  summary: string;
+  matched_synonyms: string[];
+  match: OntologySearchMatch;
+  owner?: OntologySearchRef | null;
+  source?: OntologySearchRef | null;
+  target?: OntologySearchRef | null;
+  synonyms?: string[] | null;
+  dataset?: { id: UUID; name: string } | null;
+};
+export type OntologySearchResult = {
+  workspace_id: UUID;
+  version_id: UUID | null;
+  retrieval: { keyword: boolean; vector: boolean };
+  items: OntologySearchHit[];
+  unmatched_terms: string[];
+  total: number;
+  next_cursor: string | null;
+};
 export type TableRows = { columns: string[]; items: Record<string, Json>[]; limit: number };
 export type Assets = {
   connection_id: UUID;

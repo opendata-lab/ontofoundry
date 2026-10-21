@@ -20,3 +20,13 @@
 - 权限：无映射权限不返回数据集；无实例权限不返回证据。
 - 召回来源接口：可注册额外实现，返回 `retrieval` 正确标明使用的召回方式。
 - `unmatched_terms` 只含未被定义名覆盖的片段。
+
+## 实施结果
+
+- 已完成步骤 1–5 的后端部分：关键词检索迁入 `services/ontology_search.py`，REST 与 MCP 复用同一服务、输入读模型与返回读模型；支持 NFKC、去空白、英文小写、英文标识下划线拆词、三类关键词命中、规则排序、一层关系扩展、各类型摘要和保留原文位置的 `unmatched_terms`。
+- REST 新增 `POST /api/v1/ontology/workspaces/{workspace_id}/search`，请求字段为 `query`、`kinds`、`expand`、`limit`、`cursor`；使用当前发布版。MCP 继续服从令牌固定版本。返回保留 `workspace_id`、`version_id`、`items`、`total`、`next_cursor`，新增 `retrieval` 与 `unmatched_terms`。类型过滤在扩展排序后执行，未覆盖片段在过滤和分页前统一计算。
+- 召回来源为可插拔接口，本期默认仅注册关键词来源；`retrieval` 固定为 `{"keyword": true, "vector": false}`。游标签名绑定空间、版本、查询参数、权限指纹，并记录召回方式，后续页沿用该方式。没有更换数据库镜像、新建向量表、迁移或增加 embedding 配置。
+- 摘要只返回允许字段；无映射权限时，召回来源看不到数据集、指标物理列或表达式，也不经数据集映射扩展实体；比率分子分母引用仍为语义信息。检索摘要不附带证据。保留原 `matched_synonyms`、`owner_id`、`owner_kind` 兼容字段。
+- 契约已加入 `OntologySearchRead` 并导出 api-read JSON Schema，MCP 输入 Schema 与工具说明同步更新。空查询继续兼容原 MCP 的浏览行为。统一服务对超出单页预算的响应抛出 `ServiceError`，保证两个入口返回相同结构。
+- 偏离与范围说明：按本任务明确限制未改前端类型或 DataAgent；未实施步骤 6–8 的技能发布、独立验收脚本、召回率对比和真实 Agent 问答；向量能力按已确认决定延后。未新增本体模型概念或存储字段。
+- 测试：新增虚构采购协同领域测试，覆盖长句、同义词、英文拆词、规范化原文映射、描述弱匹配、排序、类型过滤、分页、游标、各类一层扩展、直接命中优先、权限裁剪、固定版本与 REST/MCP 一致性。统一验证结果：在 `apps/api` 执行 `.venv/bin/python -m pytest -q`，1091 通过、17 跳过、0 失败、0 错误，耗时 104.24 秒；跳过项依赖未配置的可丢弃 PostgreSQL/MySQL 环境，另有 3 条现有依赖或模型警告。`.venv/bin/ruff check src tests` 与 `.venv/bin/python -m ontofoundry_api.contracts.export_schema --check` 均通过。未启动、重启或重建外部环境。
