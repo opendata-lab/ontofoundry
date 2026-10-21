@@ -5,14 +5,12 @@ from uuid import uuid4
 
 import pytest
 
-from ontofoundry_api.domain.core import CoreDraft
-from ontofoundry_api.services.element_diff import element_changes
+from ontofoundry_api.services.element_diff import element_changes, element_label
 
 
 def fact_draft():
     obj, title, identifier, lan, zhou, link = [str(uuid4()) for _ in range(6)]
-    return CoreDraft.model_validate(
-        {
+    return {
             "workspace_id": str(uuid4()),
             "object_types": [
                 {
@@ -57,28 +55,13 @@ def fact_draft():
                 {"id": link, "type_id": str(uuid4()), "source_id": lan, "target_id": zhou}
             ],
         }
-    ).model_dump(mode="json")
 
 
-@pytest.mark.parametrize("operation", ["created", "updated", "deleted"])
-def test_document_fact_and_link_labels_in_publish_differences(operation):
+def test_instances_are_absent_from_version_differences():
     draft = fact_draft()
     blank = deepcopy(draft)
     blank["material_objects"], blank["material_links"] = [], []
-    if operation == "created":
-        before, after = blank, draft
-    elif operation == "deleted":
-        before, after = draft, blank
-    else:
-        before, after = deepcopy(draft), draft
-        before["material_objects"][0]["values"]["staff_name"] = "原姓名"
-        before["material_links"][0]["source_id"] = before["material_objects"][1]["id"]
-    original = deepcopy((before, after))
-    changes = element_changes(before, after)
-    labels = {c["element_id"]: c["label"] for c in changes}
-    assert labels[draft["material_objects"][0]["id"]] == "小岚"
-    assert labels[draft["material_links"][0]["id"]] == "小岚 → 小舟"
-    assert (before, after) == original
+    assert element_changes(blank, draft) == []
 
 
 @pytest.mark.parametrize("fallback", ["identity", "quote", "uuid"])
@@ -102,17 +85,5 @@ def test_document_diff_title_fallbacks(fallback):
             }
         ]
         expected = "星港会议中的员工"
-    before = deepcopy(draft)
-    before["material_objects"] = []
-    changes = element_changes(before, draft)
-    assert next(c["label"] for c in changes if c["element_id"] == fact["id"]) == expected
-
-
-def test_deleted_fact_keeps_title_when_the_title_property_is_deleted_too():
-    before = fact_draft()
-    after = deepcopy(before)
-    fact = after["material_objects"].pop(0)
-    after["object_types"][0]["title_property_id"] = None
-    after["properties"] = [p for p in after["properties"] if p["name"] != "staff_name"]
-    changes = element_changes(before, after)
-    assert next(c["label"] for c in changes if c["element_id"] == fact["id"]) == "小岚"
+    elements = {e["id"]: (k, e) for k, c in [("object_type", "object_types"), ("property", "properties"), ("material_object", "material_objects")] for e in draft[c]}
+    assert element_label("material_object", fact, elements) == expected

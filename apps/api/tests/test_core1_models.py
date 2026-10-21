@@ -3,7 +3,12 @@
 from uuid import uuid4
 
 import pytest
-from core1_fixtures import example_draft, example_draft_json, example_names
+from core1_fixtures import (
+    example_draft,
+    example_draft_json,
+    example_instances,
+    example_names,
+)
 from pydantic import ValidationError
 
 from ontofoundry_api.domain.bindings import binding_readiness, resolve_binding
@@ -38,10 +43,10 @@ def test_design_examples_are_valid_core_graphs(name):
     assert validate_core_graph(draft) is draft
 
 
-def test_empty_draft_has_ten_collections():
+def test_empty_draft_has_eight_collections():
     draft = empty_draft(uuid4())
-    # schema_version, workspace_id and ten element collections (value_types last).
-    assert len(draft.model_dump()) == 12
+    # schema_version, workspace_id and eight element collections (value_types last).
+    assert len(draft.model_dump()) == 10
     assert validate_core_graph(draft)
 
 
@@ -163,17 +168,18 @@ def test_virtual_parent_and_inherited_binding_keep_original_ids():
 
 def test_virtual_parent_cannot_hold_direct_fact():
     draft = example_draft("06-inheritance")
-    draft.material_objects.append(
-        MaterialObject(id=uuid4(), type_id=obj(draft, "asset").id)
-    )
+    from ontofoundry_api.domain.instances import validate_instances
+    fact = MaterialObject(id=uuid4(), type_id=obj(draft, "asset").id)
     with pytest.raises(ValueError, match="虚拟父"):
-        validate_core_graph(draft)
+        validate_instances(draft, [fact.model_dump(mode="json")], [])
 
 
 def test_compatible_subtype_fact_endpoint_is_valid():
     draft = example_draft("06-inheritance")
-    assert draft.material_links
-    validate_core_graph(draft)
+    from ontofoundry_api.domain.instances import validate_instances
+    instances = example_instances("06-inheritance")
+    assert instances["material_links"]
+    validate_instances(draft, instances["material_objects"], instances["material_links"])
 
 
 def test_bound_parent_cannot_have_independent_child():

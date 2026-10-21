@@ -871,7 +871,7 @@ def test_directed_source_fixtures_for_examples_03_06_07(path):
         assert len(result.model.object_types[1].derived_by) == 2
         assert result.model.object_types[1].derived_by[0].kind == "simple"
     else:
-        assert result.model.material_objects == []
+        assert "material_objects" not in result.model.model_dump()
         assert result.model.properties[0].value_kind == "boolean"
 
 
@@ -1059,7 +1059,7 @@ def test_reviewed_source_baselines_and_required_translation_rules(case):
     result = OssieAdapter().import_document((FIXTURES / case.source).read_bytes(), CTX)
     assert {key: len(getattr(result.model, key)) for key in case.counts} == case.counts
     assert case.rules <= {issue.rule_id for issue in result.report.issues}
-    assert not result.model.material_objects
+    assert "material_objects" not in result.model.model_dump()
     validate_core_graph(result.model)
 
 

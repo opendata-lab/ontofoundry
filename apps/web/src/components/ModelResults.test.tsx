@@ -68,6 +68,14 @@ describe("modeling results", () => {
     expect(screen.getByTestId("semantic-graph")).toHaveTextContent("2");
   });
 
+  it("marks instances that wait for this session's definitions to be published", () => {
+    const draft = example("07-instances-and-evidence");
+    draft.material_objects = draft.material_objects.map((o, n) => ({ ...o, state: n === 0 ? "staged" : "active" }));
+    show(session({ draft }));
+    fireEvent.click(screen.getByRole("button", { name: /^文档实例 \d+$/ }));
+    expect(screen.getAllByText(/^待发布 · /)).toHaveLength(1);
+  });
+
   it("has an honest empty state before generation", () => {
     show(null);
     expect(screen.getByText("暂无构建结果")).toBeInTheDocument();

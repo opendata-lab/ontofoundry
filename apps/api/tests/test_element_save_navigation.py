@@ -97,6 +97,8 @@ def test_navigation_imports_effective_mappings_and_datasets(
             ]
         validate_core_graph(CoreDraft.model_validate(latest))
         initial = create_session(client)
+        from pr23_fixtures import clear_instances
+        clear_instances(client, initial["workspace_id"])
         latest["workspace_id"] = initial["workspace_id"]
         base = {**latest, **{c: [] for c in COLLECTIONS.values()}}
         base["object_types"] = [

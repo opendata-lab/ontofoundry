@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.contracts.materials import MaterialUsage
 from ontofoundry_api.db_models import (
     ImportRecord,
+    InstanceEvidenceRecord,
+    InstanceHistoryRecord,
     ModelingSessionRecord,
     OntologyVersionRecord,
     ProposalBatchRecord,
@@ -69,6 +71,14 @@ def material_usage(db: Session, workspace_id: str, material_ids: set[str]) -> di
         for material_id in mentioned(value):
             references[material_id].add(label)
 
+    for row in db.scalars(select(InstanceEvidenceRecord).where(
+        InstanceEvidenceRecord.workspace_id == workspace_id,
+        InstanceEvidenceRecord.material_id.in_(material_ids))):
+        references[row.material_id].add("实例证据")
+        elements[row.material_id]["material_object" if row.owner_kind == "instance" else "material_link"].add(row.owner_id)
+    for row in db.scalars(select(InstanceHistoryRecord).where(InstanceHistoryRecord.workspace_id == workspace_id)):
+        mark("实例历史", [row.before, row.after])
+        element("material_object" if row.owner_kind == "instance" else "material_link", row.owner_id, [row.before, row.after])
     for row in db.scalars(select(ImportRecord).where(ImportRecord.workspace_id == workspace_id)):
         mark("导入报告", row.material_id)
     for row in db.scalars(select(ProposalItemRecord).where(ProposalItemRecord.workspace_id == workspace_id)):
@@ -90,7 +100,7 @@ def material_usage(db: Session, workspace_id: str, material_ids: set[str]) -> di
         mark("已发布版本", row.snapshot_json)
         snapshot(row.snapshot_json)
 
-    order = ["导入报告", "提案", "运行清单", "会话草稿", "已发布版本"]
+    order = ["实例证据", "实例历史", "导入报告", "提案", "运行清单", "会话草稿", "已发布版本"]
     return {material_id: MaterialUsage(
         **{collection: len(elements[material_id][kind]) for collection, kind in COLLECTIONS.items()},
         references=[label for label in order if label in references[material_id]],

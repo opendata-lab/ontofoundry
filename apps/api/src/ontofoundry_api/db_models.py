@@ -43,6 +43,7 @@ class WorkspaceRecord(Base):
     name: Mapped[str] = mapped_column(String(120), unique=True)
     description: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    instance_change_sequence: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     current_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -103,6 +104,8 @@ class ModelingSessionRecord(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    abandoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    abandoned_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     title: Mapped[str] = mapped_column(String(240), default="新的建模会话")
     base_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     revision: Mapped[int] = mapped_column(Integer, default=0)
@@ -302,6 +305,8 @@ class ProposalItemRecord(Base):
     operation: Mapped[str] = mapped_column(String(8))
     target_kind: Mapped[str] = mapped_column(String(24))
     target_id: Mapped[str] = mapped_column(String(36), index=True)
+    expected_instance_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    accepted_instance_revision: Mapped[int | None] = mapped_column(Integer, nullable=True)
     expected_target_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     before_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     after_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -488,3 +493,88 @@ class MetadataSyncBatchRecord(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class InstanceLifecycle:
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    state: Mapped[str] = mapped_column(String(8), nullable=False)
+    session_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_by: Mapped[str] = mapped_column(String(36))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class DocumentInstanceRecord(InstanceLifecycle, Base):
+    __tablename__ = "document_instances"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_document_instance_scope"),
+        ForeignKeyConstraint(["workspace_id", "session_id"],
+            ["modeling_sessions.workspace_id", "modeling_sessions.id"]),
+        CheckConstraint("state IN ('staged', 'active', 'deleted')", name="ck_document_instance_state"),
+        CheckConstraint("state <> 'staged' OR session_id IS NOT NULL", name="ck_document_instance_session"),
+        CheckConstraint("revision > 0", name="ck_document_instance_revision"),
+    )
+    type_id: Mapped[str] = mapped_column(String(36), index=True)
+    values: Mapped[dict] = mapped_column(JSON)
+
+
+class InstanceLinkRecord(InstanceLifecycle, Base):
+    __tablename__ = "instance_links"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_instance_link_scope"),
+        ForeignKeyConstraint(["workspace_id", "session_id"],
+            ["modeling_sessions.workspace_id", "modeling_sessions.id"]),
+        ForeignKeyConstraint(["workspace_id", "source_instance_id"],
+            ["document_instances.workspace_id", "document_instances.id"]),
+        ForeignKeyConstraint(["workspace_id", "target_instance_id"],
+            ["document_instances.workspace_id", "document_instances.id"]),
+        CheckConstraint("state IN ('staged', 'active', 'deleted')", name="ck_instance_link_state"),
+        CheckConstraint("state <> 'staged' OR session_id IS NOT NULL", name="ck_instance_link_session"),
+        CheckConstraint("revision > 0", name="ck_instance_link_revision"),
+    )
+    link_type_id: Mapped[str] = mapped_column(String(36), index=True)
+    source_instance_id: Mapped[str] = mapped_column(String(36), index=True)
+    target_instance_id: Mapped[str] = mapped_column(String(36), index=True)
+
+
+class InstanceEvidenceRecord(Base):
+    __tablename__ = "instance_evidence"
+    __table_args__ = (
+        CheckConstraint("owner_kind IN ('instance', 'link')", name="ck_instance_evidence_owner"),
+        CheckConstraint("kind IN ('material', 'manual')", name="ck_instance_evidence_kind"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    owner_kind: Mapped[str] = mapped_column(String(8), index=True)
+    owner_id: Mapped[str] = mapped_column(String(36), index=True)
+    kind: Mapped[str] = mapped_column(String(8))
+    material_id: Mapped[str | None] = mapped_column(ForeignKey("materials.id"), nullable=True, index=True)
+    material_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    line_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    line_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    heading: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    quote: Mapped[str | None] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class InstanceHistoryRecord(Base):
+    __tablename__ = "instance_history"
+    __table_args__ = (
+        PrimaryKeyConstraint("owner_kind", "owner_id", "revision"),
+        CheckConstraint("owner_kind IN ('instance', 'link')", name="ck_instance_history_owner"),
+    )
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    owner_kind: Mapped[str] = mapped_column(String(8))
+    owner_id: Mapped[str] = mapped_column(String(36))
+    revision: Mapped[int] = mapped_column(Integer)
+    operation: Mapped[str] = mapped_column(String(24))
+    before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    proposal_item_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    actor: Mapped[str] = mapped_column(String(36))
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

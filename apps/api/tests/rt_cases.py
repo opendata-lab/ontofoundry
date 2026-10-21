@@ -39,7 +39,7 @@ OSSIE_IMPORT_CASES = (
     ),
     ImportCase(
         "core1_ossie/07-document-source.ossie.json",
-        {"object_types": 1, "properties": 1, "material_objects": 0},
+        {"object_types": 1, "properties": 1},
         frozenset({"RT-26"}),
     ),
 )

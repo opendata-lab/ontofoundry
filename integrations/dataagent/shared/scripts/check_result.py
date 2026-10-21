@@ -17,10 +17,39 @@ COLLECTIONS = {
     "metric": "metrics",
     "dataset": "datasets",
     "mapping": "mappings",
-    "material_object": "material_objects",
-    "material_link": "material_links",
     "value_type": "value_types",
 }
+INSTANCE_KINDS = frozenset({"material_object", "material_link"})
+TARGET_KINDS = COLLECTIONS.keys() | INSTANCE_KINDS
+
+
+def same_json(left, right):
+    """Keep boolean and numeric instance values distinct when checking a copy."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(same_json(v, right[k]) for k, v in left.items())
+    if isinstance(left, list):
+        return len(left) == len(right) and all(same_json(a, b) for a, b in zip(left, right))
+    return left == right
+
+
+def pinned_targets(context):
+    """Index definitions and revision-bound instances from their pinned sources."""
+    targets = {
+        (kind, e["id"]): (e, context.get("element_hashes", {}).get(e["id"]))
+        for kind, collection in COLLECTIONS.items()
+        for e in context.get("draft", {}).get(collection, [])
+    }
+    for entry in context.get("instance_baseline", {}).get("items", []):
+        if entry["state"] == "active" or (
+            entry["state"] == "staged"
+            and entry["session_id"] == context.get("run", {}).get("session_id")
+        ):
+            targets[(entry["target_kind"], entry["target_id"])] = (entry["element"], entry["hash"])
+    return targets
+
+
 HEADER_FIELDS = (
     "schema_version",
     "workspace_id",
@@ -46,7 +75,7 @@ def example_command(kind="object_type", operation="create", after=None, pointer=
     import shlex
 
     script = shlex.quote(str(Path(__file__).resolve().with_name("show_example.py")))
-    kind = kind if kind in COLLECTIONS else "object_type"
+    kind = kind if kind in TARGET_KINDS else "object_type"
     operation = operation if operation in {"create", "update", "delete"} else "create"
     after = after if isinstance(after, dict) else {}
     fields = set(pointer.split("/"))
@@ -238,58 +267,27 @@ def check_result(result, schema, context=None):
                         result.get(key),
                     )
                 )
-        draft = context.get("draft")
-        existing = {
-            element["id"]: (kind, element)
-            for kind, collection in COLLECTIONS.items()
-            for element in (draft or {}).get(collection, [])
-        }
+        existing = pinned_targets(context)
         for index, item in enumerate(items):
             if item["operation"] not in {"update", "delete"}:
                 continue
             base = f"/items/{index}"
             target = item.get("target_id")
-            if draft is not None:
-                found = existing.get(target)
-                if found is None:
-                    errors.append(
-                        diagnostic(
-                            base + "/target_id",
-                            "CHECK",
-                            "目标在固定草稿中",
-                            target,
-                            item,
-                        )
-                    )
-                else:
-                    for field, expected, actual in (
-                        ("target_kind", found[0], item["target_kind"]),
-                        ("before", found[1], item.get("before")),
-                    ):
-                        if expected != actual:
-                            errors.append(
-                                diagnostic(
-                                    base + "/" + field,
-                                    "CHECK 固定草稿不一致",
-                                    expected,
-                                    actual,
-                                    item,
-                                )
-                            )
-            hashes = context.get("element_hashes")
-            if hashes is not None and (
-                target not in hashes
-                or hashes[target] != item.get("expected_target_hash")
+            found = existing.get((item["target_kind"], target))
+            if found is None:
+                errors.append(diagnostic(
+                    base + "/target_id", "TARGET_NOT_FOUND",
+                    "固定草稿中的定义或实例基线中的实例", target, item,
+                ))
+                continue
+            for field, code, expected in (
+                ("before", "BEFORE_MISMATCH", found[0]),
+                ("expected_target_hash", "TARGET_HASH_MISMATCH", found[1]),
             ):
-                errors.append(
-                    diagnostic(
-                        base + "/expected_target_hash",
-                        "CHECK 目标哈希不一致",
-                        hashes.get(target, "目标不存在"),
-                        item.get("expected_target_hash"),
-                        item,
-                    )
-                )
+                if not same_json(expected, item.get(field)):
+                    errors.append(diagnostic(
+                        base + "/" + field, code, expected, item.get(field), item,
+                    ))
     return errors
 
 

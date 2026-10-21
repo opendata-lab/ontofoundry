@@ -100,12 +100,14 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     else:
         snapshot = empty_snapshot(workspace_id)
     envelope = {"workspace_id": workspace_id, "version_id": version_id or None}
+    from ontofoundry_api.services.instance_store import change_sequence
     context = [
         workspace_id,
         version_id or None,
         name,
         args.model_dump(mode="json", exclude={"cursor"}),
         authorization_fingerprint(db, workspace_id, principal),
+        change_sequence(db, workspace_id) if name in {"search_objects", "get_object"} else None,
     ]
     offset, section = decode_cursor(settings, args.cursor, context)
     mappings = can_read_mappings(db, workspace_id, principal)
@@ -370,10 +372,15 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             ),
         }
     require_instances(db, workspace_id, principal)
+    from ontofoundry_api.domain.core import MaterialLink, MaterialObject
+    from ontofoundry_api.services.instance_store import visible
+    stored = visible(db, workspace_id, draft)
+    envelope.update({k: v for k, v in stored.items() if k not in {"objects", "links"}})
     if name == "search_objects":
         objects = [
             o
-            for o in draft.material_objects
+            for entry in stored["objects"]
+            for o in [MaterialObject.model_validate(entry["element"])]
             if (args.type_id is None or index.is_a(o.type_id, args.type_id))
             and args.q.casefold()
             in (
@@ -399,9 +406,10 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 offset,
             ),
         }
-    fact = next((o for o in draft.material_objects if o.id == args.id), None)
+    entry = next((e for e in stored["objects"] if e["target_id"] == str(args.id)), None)
+    fact = MaterialObject.model_validate(entry["element"]) if entry else None
     if fact is None:
-        raise ServiceError("文档事实不存在", code="not_found", status_code=404)
+        raise ServiceError("文档实例不存在", code="not_found", status_code=404, details={k: stored[k] for k in ("filtered_count", "warnings", "instance_change_sequence")})
     item = {
         "id": str(fact.id),
         "type_id": str(fact.type_id),
@@ -417,7 +425,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
         "evidence": [e.model_dump(mode="json") for e in fact.evidence],
         "adjacency": [],
     }
-    for link in draft.material_links:
+    for entry in stored["links"]:
+        link = MaterialLink.model_validate(entry["element"])
         for direction, endpoint in (
             ("forward", link.source_id),
             ("reverse", link.target_id),
@@ -458,12 +467,14 @@ def invoke(db, workspace_id, principal, name, arguments, settings):
         if principal.pinned_version_id is not None
         else space.current_version_id
     )
+    from ontofoundry_api.services.instance_store import change_sequence
     context = [
         workspace_id,
         version_id or None,
         name,
         args.model_dump(mode="json", exclude={"cursor"}),
         authorization_fingerprint(db, workspace_id, principal),
+        change_sequence(db, workspace_id) if name in {"search_objects", "get_object"} else None,
     ]
     offset, section = decode_cursor(settings, args.cursor, context)
     if section and section.get("kind") == "wire_field":

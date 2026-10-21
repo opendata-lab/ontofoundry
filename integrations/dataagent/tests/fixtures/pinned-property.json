@@ -5,9 +5,9 @@
     "workspace_id": "22222222-2222-4222-8222-222222222222",
     "session_id": "44444444-4444-4444-8444-444444444444",
     "base_version_id": null,
-    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "base_version_sha256": "03d8fc56eee3845fe7a6aaa5fb8180d4bcb50d944472efdc8ea4ee9f58a4fd86",
     "source_session_revision": 1,
-    "source_draft_sha256": "29cdb670441980d2887d04eb4fcbe6b1cb0f1495fc0b6975de7f5549333b35f5"
+    "source_draft_sha256": "3f80bcd51f13bac977597b20817e2045cfff8975cf643a05661e49020f4f4b19"
   },
   "draft": {
     "schema_version": "core-1",
@@ -47,12 +47,14 @@
     "metrics": [],
     "datasets": [],
     "mappings": [],
-    "material_objects": [],
-    "material_links": [],
     "value_types": []
   },
   "element_hashes": {
     "8400cead-d71d-54a1-adc9-7a249d570a36": "4c24f68e080a53dc7c00f9fa751870b591938b1839f884e485445a56ee4d4e87",
     "1c6c45d9-5ba3-55fb-bc80-3ef014cd1a37": "853e63b1e7854cd5e211fde3eda57e2a676220fca07382adce73d6147f5025f1"
+  },
+  "instance_baseline": {
+    "change_sequence": 0,
+    "items": []
   }
 }

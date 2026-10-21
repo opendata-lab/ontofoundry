@@ -166,15 +166,6 @@ def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
                 mapping.type_id,
                 index.links[link_id].target_type_id,
             )
-    for fact in draft.material_objects:
-        add(fact.id, fact.type_id, "type_id")
-        for name in fact.values:
-            prop = index.property_by_name(fact.type_id, name)
-            if prop:
-                add(fact.id, prop.id, f"values.{name}")
-    for fact in draft.material_links:
-        for name in ("type_id", "source_id", "target_id"):
-            add(fact.id, getattr(fact, name), name)
     return {owner: tuple(values) for owner, values in refs.items()}
 
 
@@ -284,30 +275,6 @@ def rewrite_references(
         if mapping.fields != final_fields:
             mapping.fields = rewrite_fields(previous, mapping.fields)
 
-    def rewrite_values(previous, values):
-        rewritten = {}
-        for name, value in values.items():
-            prop = old.property_by_name(previous.type_id, name)
-            if prop and prop.id in new.properties and name in previous.values:
-                name = new.properties[prop.id].name
-            if name in rewritten:
-                raise ValueError("属性改名后的事实值键冲突")
-            rewritten[name] = value
-        return rewritten
-
-    old_facts = {fact.id: fact for fact in before.material_objects}
-    for fact in result.material_objects:
-        if fact.id in explicit_ids:
-            continue
-        previous = old_facts.get(fact.id)
-        if previous is None:
-            continue
-        try:
-            final_values = rewrite_values(previous, previous.values)
-        except ValueError:
-            final_values = None
-        if not strict_equal(fact.values, final_values):
-            fact.values = rewrite_values(previous, fact.values)
     return result
 
 

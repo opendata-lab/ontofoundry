@@ -1,0 +1,175 @@
+{
+  "06-inheritance": {
+    "material_objects": [
+      {
+        "id": "00000000-0000-4000-8000-000000008501",
+        "type_id": "94da776b-5292-54a9-9bcd-eac5dbc42077",
+        "values": {
+          "name": "张三",
+          "id_card_no": null,
+          "phone": "13800000000",
+          "party_no": "P-001"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009501",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 12,
+              "line_end": 12
+            },
+            "quote": "甲方：张三，联系电话 13800000000"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008502",
+        "type_id": "46eff2b2-13b4-51da-ac94-808b149c1857",
+        "values": {
+          "contract_no": "HT-2026-001",
+          "amount": 120000,
+          "signer_no": "P-001"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009502",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 10,
+              "line_end": 11
+            },
+            "quote": "合同编号 HT-2026-001，金额 12 万元"
+          }
+        ]
+      }
+    ],
+    "material_links": [
+      {
+        "id": "00000000-0000-4000-8000-000000008551",
+        "type_id": "f5a20122-2802-5022-bbbe-cf801014c448",
+        "source_id": "00000000-0000-4000-8000-000000008502",
+        "target_id": "00000000-0000-4000-8000-000000008501",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009503",
+            "material_id": "mat_contract_notes",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 12,
+              "line_end": 12
+            },
+            "quote": "甲方：张三"
+          }
+        ]
+      }
+    ]
+  },
+  "07-instances-and-evidence": {
+    "material_objects": [
+      {
+        "id": "00000000-0000-4000-8000-000000008601",
+        "type_id": "00000000-0000-4000-8000-000000001601",
+        "values": {
+          "customer_no": "C001",
+          "name": "星海贸易",
+          "is_vip": true
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009611",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "星海贸易（C001，VIP 客户）"
+          },
+          {
+            "kind": "manual",
+            "id": "00000000-0000-4000-8000-000000009612",
+            "note": "已与销售确认为 VIP",
+            "created_by": "u_zhangsan",
+            "created_at": "2026-10-12T09:30:00Z"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008602",
+        "type_id": "00000000-0000-4000-8000-000000001602",
+        "values": {
+          "return_no": "RT-0103",
+          "refund": 168,
+          "registered_on": "2026-01-03"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009613",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 6
+            },
+            "quote": "1 月 3 日，星海贸易退回经典手冲壶一个，退款 168 元，单号 RT-0103"
+          }
+        ]
+      },
+      {
+        "id": "00000000-0000-4000-8000-000000008603",
+        "type_id": "00000000-0000-4000-8000-000000001602",
+        "values": {
+          "registered_on": "2026-01-15"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009614",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "1 月 15 日远山咖啡也办理了退货，金额待财务确认"
+          }
+        ]
+      }
+    ],
+    "material_links": [
+      {
+        "id": "00000000-0000-4000-8000-000000008651",
+        "type_id": "00000000-0000-4000-8000-000000003601",
+        "source_id": "00000000-0000-4000-8000-000000008602",
+        "target_id": "00000000-0000-4000-8000-000000008601",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "00000000-0000-4000-8000-000000009615",
+            "material_id": "mat_returns_jan",
+            "material_sha256": "3f1c2a0b9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "星海贸易退回经典手冲壶"
+          }
+        ]
+      }
+    ]
+  }
+}

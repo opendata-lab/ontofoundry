@@ -440,6 +440,17 @@
       ],
       "expected_local": "pass",
       "expected_server": "pass"
+    },
+    {
+      "file": "instance-baseline.json",
+      "topics": [
+        "instances",
+        "operations",
+        "instance-baseline"
+      ],
+      "context": "pinned-material_link.json",
+      "expected_local": "pass",
+      "expected_server": "pass"
     }
   ],
   "lookup": {

@@ -63,11 +63,6 @@ def version_summary(version, *, include_mappings=True, include_instances=True):
         counts.update(
             datasets=len(snapshot["datasets"]), mappings=len(snapshot["mappings"])
         )
-    if include_instances:
-        counts.update(
-            material_objects=len(snapshot["material_objects"]),
-            material_links=len(snapshot["material_links"]),
-        )
     return {
         **envelope(version),
         "version": version.version_number,
@@ -488,7 +483,7 @@ def type_graph(version, *, focus_id=None, depth=1):
 
 
 def workspace_overview(
-    version, *, include_private=False, include_mappings=None, include_instances=None
+    version, *, include_private=False, include_mappings=None, include_instances=None, db=None
 ):
     if version is None:
         return {"version": None, "graph": None, "details": None}
@@ -506,13 +501,19 @@ def workspace_overview(
         )
     if instances:
         draft = CoreDraft.model_validate(snapshot)
+        from ontofoundry_api.domain.core import MaterialLink, MaterialObject
+        from ontofoundry_api.services.instance_store import visible
+        stored = visible(db, version.workspace_id, draft) if db is not None else {"objects": [], "links": [], "filtered_count": 0}
+        objects = [MaterialObject.model_validate(i["element"]) for i in stored["objects"]]
+        links = [MaterialLink.model_validate(i["element"]) for i in stored["links"]]
         details.update(
-            object_count=len(draft.material_objects),
-            link_count=len(draft.material_links),
+            filtered_count=stored["filtered_count"],
+            object_count=len(objects),
+            link_count=len(links),
             evidence_material_count=len(
                 {
                     e.material_id
-                    for f in [*draft.material_objects, *draft.material_links]
+                    for f in [*objects, *links]
                     for e in f.evidence
                     if e.kind == "material"
                 }
@@ -523,7 +524,7 @@ def workspace_overview(
                     "type_id": str(f.type_id),
                     "display_text": document_display_text(draft, f),
                 }
-                for f in draft.material_objects[:24]
+                for f in objects[:24]
             ],
             links=[
                 {
@@ -531,7 +532,7 @@ def workspace_overview(
                     for k, v in f.model_dump(mode="json").items()
                     if k in {"id", "type_id", "source_id", "target_id"}
                 }
-                for f in draft.material_links[:48]
+                for f in links[:48]
             ],
         )
     return {

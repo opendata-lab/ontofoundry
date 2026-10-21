@@ -15,6 +15,8 @@ def candidate_for(db, session):
     draft = deepcopy(session.draft_json)
     items = db.scalars(select(ProposalItemRecord).where(ProposalItemRecord.session_id == session.id, ProposalItemRecord.status == "pending").order_by(ProposalItemRecord.created_at, ProposalItemRecord.ordinal)).all()
     for item in items:
+        if ElementKind(item.target_kind) not in COLLECTIONS:
+            continue
         collection = COLLECTIONS[ElementKind(item.target_kind)]
         draft[collection] = [e for e in draft[collection] if e["id"] != item.target_id]
         if item.after_json:

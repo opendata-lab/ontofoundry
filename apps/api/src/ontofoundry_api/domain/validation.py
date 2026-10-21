@@ -461,25 +461,4 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
             for condition in metric.filters:
                 kind = _column(index, metric.dataset_id, condition.column.column)
                 _condition(condition.operator, condition.values, kind)
-    facts = {fact.id: fact for fact in draft.material_objects}
-    mappings = {m.type_id for m in draft.mappings}
-    for fact in draft.material_objects:
-        _require(fact.type_id in index.objects, "事实对象类型不存在")
-        _require(
-            not (fact.type_id not in mappings and index.children(fact.type_id)),
-            "虚拟父对象不能保存直接事实",
-        )
-        props = {p.name: p for p in index.effective_properties(fact.type_id)}
-        for name, value in fact.values.items():
-            _require(name in props, "事实引用了无效属性")
-            _require(check_scalar(value, props[name].value_kind), "事实属性值类型不符")
-    for fact in draft.material_links:
-        link = index.links.get(fact.type_id)
-        _require(link is not None, "事实关系类型不存在")
-        _require(fact.source_id in facts and fact.target_id in facts, "事实关系端点不存在")
-        _require(
-            index.is_a(facts[fact.source_id].type_id, link.source_type_id)
-            and index.is_a(facts[fact.target_id].type_id, link.target_type_id),
-            "事实关系端点类型不兼容",
-        )
     return draft

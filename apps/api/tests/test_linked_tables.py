@@ -145,6 +145,7 @@ def test_publish_rechecks_datasets_saved_directly_into_the_session(client):
             "expected_session_revision": session["revision"],
             "expected_current_version_id": preview.json()["current_version_id"],
             "expected_merged_snapshot_sha256": preview.json()["merged_snapshot_sha256"],
+            "expected_instance_change_sequence": preview.json()["instance_change_sequence"],
         },
     )
     assert published.status_code == 422, published.text

@@ -200,6 +200,8 @@ async def rpc(
                 else "invalid_arguments"
             )
             structured = {"code": code, "message": str(exc)}
+            if isinstance(exc, ServiceError):
+                structured.update({k: v for k, v in exc.details.items() if k in {"filtered_count", "warnings", "instance_change_sequence"}})
             result = {
                 "content": [
                     {"type": "text", "text": json.dumps(structured, ensure_ascii=False)}

@@ -76,12 +76,12 @@ def build_demo_draft():
                     "measure": {"dataset_id": identity("sales"), "column": "amount"},
                 }
             ],
-            "material_objects": [
-                {
-                    "id": identity("customer_fact"),
-                    "type_id": identity("customer"),
-                    "values": {"label": "星港商店"},
-                }
-            ],
+
         }
     )
+
+
+def build_demo_instance():
+    return {"id": str(uuid5(DEMO_WORKSPACE_ID, "customer_fact")),
+            "type_id": str(uuid5(DEMO_WORKSPACE_ID, "customer")),
+            "values": {"label": "星港商店"}, "evidence": []}

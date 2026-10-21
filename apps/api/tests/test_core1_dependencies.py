@@ -3,7 +3,7 @@
 import pytest
 from core1_fixtures import example_draft
 
-from ontofoundry_api.domain.core import Aggregation, ExpressionMetric, ValueKind
+from ontofoundry_api.domain.core import Aggregation, ExpressionMetric
 from ontofoundry_api.domain.dependencies import (
     affected_metrics,
     reference_index,
@@ -66,40 +66,9 @@ def test_property_rename_rewrites_rules_binding_keys_and_fact_values():
     result = validate_candidate_graph(before, candidate)
     assert "party.telephone" in result.rules[0].expression
     assert any("telephone" in m.fields for m in result.mappings)
-    assert all("phone" not in f.values for f in result.material_objects)
     assert before.rules[0].expression != result.rules[0].expression
 
 
-def test_atomic_property_name_swap_does_not_merge_values():
-    before = example_draft("07-instances-and-evidence")
-    candidate = before.model_copy(deep=True)
-    fact = next(f for f in before.material_objects if len(f.values) > 1)
-    names = list(fact.values)[:2]
-    props = [
-        next(
-            p
-            for p in candidate.properties
-            if p.name == name and p.owner_type_id == fact.type_id
-        )
-        for name in names
-    ]
-    # Same scalar kinds make the swap a pure rename.
-    same_kind = [
-        p
-        for p in candidate.properties
-        if p.owner_type_id == fact.type_id and p.value_kind == props[0].value_kind
-    ]
-    assert len(same_kind) >= 2
-    p1, p2 = same_kind[:2]
-    a, b = p1.name, p2.name
-    p1.name, p2.name = b, a
-    result = validate_candidate_graph(before, candidate)
-    for original in before.material_objects:
-        current = next(f for f in result.material_objects if f.id == original.id)
-        if a in original.values:
-            assert current.values[b] == original.values[a]
-        if b in original.values:
-            assert current.values[a] == original.values[b]
 
 
 def test_deleted_reference_must_be_revised_together():
@@ -175,54 +144,9 @@ def test_exact_final_property_swap_rewrite_is_not_interpreted_again():
     assert rewrite_references(before, final) == final
     assert validate_candidate_graph(before, final) == final
     assert final == saved
-    for previous in before.material_objects:
-        current = next(f for f in final.material_objects if f.id == previous.id)
-        for prop in before.properties:
-            if prop.owner_type_id != previous.type_id or prop.name not in previous.values:
-                continue
-            renamed = next(p for p in final.properties if p.id == prop.id)
-            assert current.values[renamed.name] == previous.values[prop.name]
 
 
-@pytest.mark.parametrize(
-    ("left_kind", "left", "right_kind", "right"),
-    [
-        ("boolean", True, "integer", 1),
-        ("boolean", False, "integer", 0),
-        ("integer", 1, "float", 1.0),
-        ("integer", 0, "decimal", 0.0),
-    ],
-)
-def test_final_fact_swap_requires_identical_scalar_types(
-    left_kind, left, right_kind, right
-):
-    from ontofoundry_api.domain.dependencies import rewrite_references
-    from ontofoundry_api.domain.validation import validate_core_graph
 
-    before = example_draft("07-instances-and-evidence")
-    first, second = [
-        next(p for p in before.properties if p.name == name) for name in ("name", "is_vip")
-    ]
-    first.value_kind, second.value_kind = ValueKind(left_kind), ValueKind(right_kind)
-    for fact in before.material_objects:
-        if fact.type_id == first.owner_type_id:
-            fact.values[first.name] = left
-            fact.values[second.name] = right
-    validate_core_graph(before)
-    candidate = before.model_copy(deep=True)
-    a, b = [
-        next(p for p in candidate.properties if p.id == old.id) for old in (first, second)
-    ]
-    a.name, b.name = b.name, a.name
-    final = validate_candidate_graph(before, candidate)
-    for fact in final.material_objects:
-        if fact.type_id == first.owner_type_id:
-            assert type(fact.values[b.name]) is type(right)
-            assert type(fact.values[a.name]) is type(left)
-            assert fact.values[a.name] == left
-            assert fact.values[b.name] == right
-    assert rewrite_references(before, final).model_dump_json() == final.model_dump_json()
-    assert candidate.model_dump_json() != final.model_dump_json()
 
 
 def test_ambiguous_binding_swap_is_accepted_as_exact_final_form_first():

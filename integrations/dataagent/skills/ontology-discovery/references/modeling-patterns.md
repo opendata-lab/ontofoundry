@@ -10,4 +10,4 @@
 
 ## 定点补读
 
-[主管与协作关联](examples/link-joins.json)、[同行计算](examples/expression-binding.json)、[事实复用](examples/reuse-fact.json) 均按触发分支读取。仅改名称无需全读；字段写法通过 show_example，不在本文件复制 JSON。
+[主管与协作关联](examples/link-joins.json)、[同行计算](examples/expression-binding.json)、[实例复用](examples/reuse-fact.json) 均按触发分支读取。仅改名称无需全读；字段写法通过 show_example，不在本文件复制 JSON。

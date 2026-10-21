@@ -16,6 +16,8 @@ from typing import Any
 from ontofoundry_api.domain.canonical import canonical
 from ontofoundry_api.domain.models import COLLECTIONS
 
+EVIDENCE_COLLECTIONS = tuple(COLLECTIONS.values())
+
 MaterialLookup = Callable[[str], tuple[str, list[str]] | None]
 """material_id -> (sha256, text lines) within one workspace, or None."""
 
@@ -48,10 +50,12 @@ def check_material_evidence(evidence: dict, lookup: MaterialLookup, where: str) 
         )
 
 
-def _evidence_by_element(draft: dict[str, Any]) -> dict[str, dict[str, dict]]:
+def _evidence_by_element(
+    draft: dict[str, Any], collections=EVIDENCE_COLLECTIONS
+) -> dict[str, dict[str, dict]]:
     return {
         str(element["id"]): {str(e["id"]): e for e in element.get("evidence") or []}
-        for collection in COLLECTIONS.values()
+        for collection in collections
         for element in draft.get(collection) or []
     }
 
@@ -63,12 +67,13 @@ def reconcile_draft_evidence(
     lookup: MaterialLookup,
     actor_id: str,
     now: datetime,
+    collections=EVIDENCE_COLLECTIONS,
 ) -> dict[str, Any]:
     """Check a draft about to be saved against the stored one; stamp new
     manual evidence with the author and time. Returns the draft to store."""
-    before = _evidence_by_element(previous)
+    before = _evidence_by_element(previous, collections)
     owners = {eid: owner for owner, entries in before.items() for eid in entries}
-    for collection in COLLECTIONS.values():
+    for collection in collections:
         for element in draft.get(collection) or []:
             element_id = str(element["id"])
             old = before.get(element_id, {})

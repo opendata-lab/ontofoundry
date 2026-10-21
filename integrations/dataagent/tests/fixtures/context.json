@@ -5,9 +5,9 @@
     "workspace_id": "22222222-2222-4222-8222-222222222222",
     "session_id": "44444444-4444-4444-8444-444444444444",
     "base_version_id": null,
-    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "base_version_sha256": "03d8fc56eee3845fe7a6aaa5fb8180d4bcb50d944472efdc8ea4ee9f58a4fd86",
     "source_session_revision": 1,
-    "source_draft_sha256": "f4fa36c4bedbef0cc26f01a49a38b176f8187845f6f061b84e4ac2f500c20c46"
+    "source_draft_sha256": "c490d7a9274ed7fc3be0743fc35599b64eab5e68936ec95d478b6c079d99f5a8"
   },
   "draft": {
     "schema_version": "core-1",
@@ -32,11 +32,13 @@
     "metrics": [],
     "datasets": [],
     "mappings": [],
-    "material_objects": [],
-    "material_links": [],
     "value_types": []
   },
   "element_hashes": {
     "33333333-3333-4333-8333-333333333333": "66c7bed9d30bc0137907bf2f1370ad8190192d69048b4155b92d96edb93272c4"
+  },
+  "instance_baseline": {
+    "change_sequence": 0,
+    "items": []
   }
 }

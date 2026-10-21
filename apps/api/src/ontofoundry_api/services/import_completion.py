@@ -74,10 +74,11 @@ def pending_candidate(db, session):
         items,
         dependency_map(db, batches, session.workspace_id, session.id),
         session.draft_json,
+        __import__("ontofoundry_api.services.instance_store", fromlist=["baseline"]).baseline(db, session.workspace_id, session.id),
     )
     data = deepcopy(session.draft_json)
     for item in items:
-        if statuses[item.id][0] != "pending":
+        if item.target_kind not in {k.value for k in COLLECTIONS} or statuses[item.id][0] != "pending":
             continue
         collection = COLLECTIONS[
             next(k for k in COLLECTIONS if k.value == item.target_kind)

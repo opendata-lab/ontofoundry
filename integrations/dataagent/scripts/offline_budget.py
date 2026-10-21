@@ -281,7 +281,7 @@ def byte_report():
     for task, method, sample in [
         ("名称修改", None, "operations"),
         ("单主题映射", "extract-mappings", "mapping"),
-        ("单主题事实", "extract-facts", "facts"),
+        ("单主题实例", "extract-facts", "facts"),
         ("单主题指标规则", "extract-metrics-rules", "metrics"),
     ]:
         extra = len(decisions[method]) if method else 0

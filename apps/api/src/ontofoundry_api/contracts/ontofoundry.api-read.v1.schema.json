@@ -1,5 +1,40 @@
 {
   "$defs": {
+    "AffectedInstanceRead": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "material_object",
+            "material_link"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "reason"
+      ],
+      "title": "AffectedInstanceRead",
+      "type": "object"
+    },
     "AffectedItemImpact": {
       "additionalProperties": false,
       "properties": {
@@ -345,6 +380,13 @@
     "ElementSaveImpact": {
       "additionalProperties": false,
       "properties": {
+        "affected_instances": {
+          "items": {
+            "$ref": "#/$defs/AffectedInstanceRead"
+          },
+          "title": "Affected Instances",
+          "type": "array"
+        },
         "affected_items": {
           "items": {
             "$ref": "#/$defs/AffectedItemImpact"
@@ -363,6 +405,11 @@
           ],
           "title": "Current Version Id"
         },
+        "instance_change_sequence": {
+          "minimum": 0,
+          "title": "Instance Change Sequence",
+          "type": "integer"
+        },
         "session_revision": {
           "anyOf": [
             {
@@ -376,6 +423,8 @@
         }
       },
       "required": [
+        "instance_change_sequence",
+        "affected_instances",
         "current_version_id",
         "session_revision",
         "affected_items"

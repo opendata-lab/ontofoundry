@@ -76,15 +76,6 @@ def test_object_without_properties_is_a_warning(client):
         "title_property_id": None,
     }
     draft["object_types"].append(bare)
-    # A concept named in a document, with an instance known only by name.
-    draft["material_objects"] = [
-        {
-            "id": str(uuid4()),
-            "type_id": bare["id"],
-            "values": {},
-            "evidence": [],
-        }
-    ]
     report = include_instance_validation(
         {"errors": [], "warnings": [], "publishable": True},
         OntologyDraft.model_validate(draft),

@@ -16,6 +16,7 @@ from ontofoundry_api.contracts.proposals import apply_items
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.dependencies import reference_index
+from ontofoundry_api.domain.instances import definitions, instance_hash, instance_references
 from test_extract_kit import KIT, MATERIAL_ID, RETAIL, atoms, load_parts, parse, prove
 from test_stepwise_workflow import lookup, write_json
 from test_workflow import SKILL, budget, checker, pinned, prepare, server_parse
@@ -257,10 +258,19 @@ def test_reference_projection_uses_existing_semantic_paths(filename):
     path = SKILL / "references/examples" / filename
     ctx = pinned(path)
     batch = server_parse(prepare.assemble(ctx, [json.loads(path.read_bytes())]), ctx)
-    ctx["draft"] = apply_items(ctx["draft"], batch.items)
+    combined = apply_items(ctx["draft"], batch.items)
+    ctx["draft"] = definitions(combined)
+    ctx["instance_baseline"] = {"change_sequence": 1, "items": [
+        {"target_kind": kind, "target_id": e["id"], "element": e,
+         "revision": 1, "state": "active", "session_id": None, "hash": instance_hash(e, 1)}
+        for kind in checker.INSTANCE_KINDS for e in combined.get(kind + "s", [])
+    ]}
     expected = {}
-    for owner, refs in reference_index(CoreDraft.model_validate(ctx["draft"])).items():
-        for ref in refs:
+    model = CoreDraft.model_validate(ctx["draft"])
+    refs = dict(reference_index(model))
+    refs.update(instance_references(model, combined.get("material_objects", []), combined.get("material_links", [])))
+    for owner, references in refs.items():
+        for ref in references:
             expected.setdefault(str(ref.target_id), set()).add(str(owner))
     assert dict(ElementIndex(ctx).reverse_refs()) == expected
 

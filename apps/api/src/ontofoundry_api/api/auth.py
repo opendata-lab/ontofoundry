@@ -159,7 +159,7 @@ def _run_principal(
         _principal(user),
         service_token_id=f"run:{grant.run_token}",
         service_workspace_id=grant.workspace_id,
-        scopes=frozenset(["ontology:read"]),
+        scopes=frozenset(["ontology:read", "instances:read", "mappings:read"]),
         pinned_version_id=grant.version_id or "",
     )
 

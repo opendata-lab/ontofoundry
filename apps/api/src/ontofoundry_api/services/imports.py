@@ -182,6 +182,8 @@ def import_view(db, record):
         current_import_blocked,
     )
 
+    if record.preview_json.get("invalidated"):
+        raise ServiceError("导入转换结果已失效，请重新导入", code="IMPORT_INVALIDATED", status_code=409)
     changes = record.preview_json["changes"]
     blocked = current_import_blocked(db, record)
     return ImportPreview.model_validate(
@@ -286,6 +288,8 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
         .execution_options(populate_existing=True)
     )
     record = get_import(db, workspace_id, adapter_id, import_id, lock=True)
+    if record.preview_json.get("invalidated"):
+        raise ServiceError("导入转换结果已失效，请重新导入", code="IMPORT_INVALIDATED", status_code=409)
     if (
         body.content_sha256 != record.content_sha256
         or (

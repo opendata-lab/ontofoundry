@@ -40,8 +40,6 @@ def test_thirteen_native_exports_preserve_every_core_definition_and_uuid(name):
         "link_types",
         "rules",
         "metrics",
-        "material_objects",
-        "material_links",
     ):
         for item in expected[collection]:
             item["evidence"] = [
@@ -57,6 +55,4 @@ def test_native_import_applies_only_explicit_destination_workspace():
     destination = UUID("33333333-3333-4333-8333-333333333333")
     result = NativeAdapter().import_document(exported.document, ImportContext(destination))
     assert result.model.workspace_id == destination
-    assert [o.id for o in result.model.material_objects] == [
-        o.id for o in source.material_objects
-    ]
+    assert [o.id for o in result.model.object_types] == [o.id for o in source.object_types]

@@ -336,16 +336,6 @@ def export_document(model, ctx):
             report.report.issues[pos] = issue.model_copy(
                 update={"target_path": f"/ontology/{positions[obj.name]}"}
             )
-    for collection in ("material_objects", "material_links"):
-        for pos, fact in enumerate(getattr(model, collection)):
-            report.issue(
-                f"/{collection}/{pos}",
-                "dropped",
-                collection,
-                None,
-                "Ossie 不包含文档事实实例，请使用原生单文件保留定义",
-                element=fact,
-            )
     report.issue(
         "",
         "dropped",

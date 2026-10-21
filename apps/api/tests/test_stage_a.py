@@ -3,7 +3,7 @@
 from uuid import uuid4
 
 import pytest
-from test_modeling import ONTOLOGY, create_session, publish, save
+from test_modeling import ONTOLOGY, create_session, publish
 
 from ontofoundry_api.domain.core import CoreDraft, MaterialObject, ObjectType, Property
 from ontofoundry_api.domain.instance_display import business_identity, document_display_text
@@ -50,7 +50,7 @@ def test_display_zero_false_missing_identity_and_uuid():
 def test_two_facts_same_business_key_survive_publication_and_pagination(client):
     s = create_session(client)
     typ = s["draft"]["object_types"][0]["id"]
-    s["draft"]["material_objects"] = [
+    values = [
         {
             "id": str(uuid4()),
             "type_id": typ,
@@ -59,11 +59,12 @@ def test_two_facts_same_business_key_survive_publication_and_pagination(client):
         }
         for _ in range(2)
     ]
-    s = save(client, s, s["draft"]).json()
+    from pr23_fixtures import seed_instances
+    seed_instances(client, s, {"material_objects": values})
     assert publish(client, s).status_code == 200
-    first = client.get(SERVICE + "/objects", params={"limit": 1}).json()
+    first = client.get(SERVICE + "/objects", params={"limit": 1, "q": "相同名称"}).json()
     second = client.get(
-        SERVICE + "/objects", params={"limit": 1, "cursor": first["next_cursor"]}
+        SERVICE + "/objects", params={"limit": 1, "q": "相同名称", "cursor": first["next_cursor"]}
     ).json()
     assert first["items"][0]["id"] != second["items"][0]["id"]
     assert first["items"][0]["display_text"] == second["items"][0]["display_text"]

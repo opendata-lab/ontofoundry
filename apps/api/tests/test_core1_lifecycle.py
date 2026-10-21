@@ -27,8 +27,6 @@ def test_all_examples_save_publish_read(client, name):
         "link_types",
         "rules",
         "metrics",
-        "material_objects",
-        "material_links",
     ):
         for e in draft[collection]:
             e["evidence"] = []
@@ -52,6 +50,7 @@ def test_all_examples_save_publish_read(client, name):
             "expected_session_revision": session["revision"],
             "expected_current_version_id": body["current_version_id"],
             "expected_merged_snapshot_sha256": body["merged_snapshot_sha256"],
+            "expected_instance_change_sequence": body["instance_change_sequence"],
         },
     )
     assert response.status_code == 200, response.text
@@ -85,7 +84,7 @@ def test_atomic_name_swap_expands_and_undo_restores(client):
     assert undo.json()["session"]["draft"] == s["draft"]
 
 
-@pytest.mark.parametrize("kind", ["material_object", "mapping"])
+@pytest.mark.parametrize("kind", ["mapping"])
 def test_unnamed_independent_proposals_do_not_share_atomic_decisions(client, kind):
     from copy import deepcopy
 

@@ -324,7 +324,10 @@ def preview_element_save(db, workspace_id, body):
         raise ServiceError(
             "内容校验失败：" + str(exc), code="ELEMENT_VALIDATION_FAILED", status_code=422
         ) from exc
+    from ontofoundry_api.services.instance_store import publish_impact
+    impact = publish_impact(db, workspace_id, calculation.merged, body.session_id)
     return {
+        **impact,
         "current_version_id": space.current_version_id,
         "session_revision": body.expected_session_revision,
         "affected_items": calculation.affected_items,

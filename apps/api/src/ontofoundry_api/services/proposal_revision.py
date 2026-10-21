@@ -50,6 +50,8 @@ def revise_proposal(db, workspace_id, session_id, proposal_id, fields, expected_
     )
     if session is None:
         fail("SESSION_NOT_FOUND", "会话不存在", 404)
+    from ontofoundry_api.services.instance_store import require_open_session
+    require_open_session(session)
     if session.revision != expected_revision:
         fail("SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重试")
     item = db.get(ProposalItemRecord, proposal_id)
@@ -57,7 +59,8 @@ def revise_proposal(db, workspace_id, session_id, proposal_id, fields, expected_
         fail("PROPOSAL_NOT_FOUND", "提案不属于当前会话", 404)
     items = batch_items(db, [item.batch_id], workspace_id, session_id)
     dependencies = dependency_map(db, [item.batch_id], workspace_id, session_id)
-    status = effective_statuses(items, dependencies, session.draft_json)[item.id][0]
+    status = effective_statuses(items, dependencies, session.draft_json,
+        __import__("ontofoundry_api.services.instance_store", fromlist=["baseline"]).baseline(db, workspace_id, session_id))[item.id][0]
     if status != "pending" or item.operation not in {"create", "update"} or item.after_json is None:
         fail("PROPOSAL_NOT_DECIDABLE", "只有待审阅的新增或修改提案可以修改")
     locked = sorted(k for k in fields if k in LOCKED_FIELDS or k.endswith("_id"))

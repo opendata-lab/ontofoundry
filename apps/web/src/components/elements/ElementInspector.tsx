@@ -339,7 +339,7 @@ export function ElementView({
           const preview = await publishApi.preview(session);
           if (preview.merged_snapshot_sha256 !== previewHash)
             throw new Error("待发布内容已变化，请关闭弹窗并重新预览");
-          source = { draft: preview.merged_model, session: null, versionId: preview.current_version_id };
+          source = { draft: { ...preview.merged_model, material_objects: session.draft.material_objects, material_links: session.draft.material_links }, session: null, versionId: preview.current_version_id };
         } else source = { draft: session.draft, session, versionId: current.version_id };
       } else {
         const model = workspace.role

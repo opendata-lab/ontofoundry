@@ -3,12 +3,8 @@
 from copy import deepcopy
 
 import pytest
-from pr23_fixtures import typed_fact_swap
 
-from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.dependencies import strict_equal
-from ontofoundry_api.domain.validation import validate_core_graph
-from ontofoundry_api.services.element_save import calculate_element_save
 from ontofoundry_api.services.merge import merge_snapshots
 
 
@@ -73,34 +69,3 @@ def test_missing_is_distinct_from_null(base, latest, draft, expected, conflict_c
     merged, conflicts = merge_snapshots(base, latest, draft)
     assert strict_equal(merged, expected)
     assert len(conflicts) == conflict_count
-
-
-@pytest.mark.parametrize(
-    "left_kind,left,right_kind,right",
-    [
-        ("boolean", True, "integer", 1),
-        ("boolean", False, "integer", 0),
-        ("integer", 1, "float", 1.0),
-        ("integer", 0, "decimal", 0.0),
-    ],
-)
-def test_element_save_merges_typed_rewrites_with_latest_description(
-    left_kind, left, right_kind, right
-):
-    base, candidate, target_id = typed_fact_swap(left_kind, left, right_kind, right)
-    latest = deepcopy(base)
-    target = next(o for o in latest["object_types"] if o["id"] == target_id)
-    target["description"] = "另一会话更新的虚构客户说明"
-    inputs = deepcopy([base, latest, candidate])
-    result = calculate_element_save(base, latest, base, candidate, "object_type", target_id)
-    facts = [f for f in base["material_objects"] if f["type_id"] == target_id]
-    assert {i["target_id"] for i in result.affected_items} == {f["id"] for f in facts}
-    for raw in (result.merged, result.session_draft):
-        graph = validate_core_graph(CoreDraft.model_validate(raw))
-        obj = next(o for o in graph.object_types if str(o.id) == target_id)
-        assert obj.description == target["description"]
-        for fact in graph.material_objects:
-            if str(fact.type_id) == target_id:
-                assert strict_equal(fact.values["is_vip"], left)
-                assert strict_equal(fact.values["name"], right)
-    assert strict_equal([base, latest, candidate], inputs)

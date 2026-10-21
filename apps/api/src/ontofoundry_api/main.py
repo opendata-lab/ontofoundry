@@ -107,6 +107,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
+                        from ontofoundry_api.services.demo import build_demo_instance
+                        from ontofoundry_api.services.instance_store import write
+                        instance = build_demo_instance()
+                        write(session, workspace.id, None, "material_object", instance["id"], instance,
+                            expected_revision=None, actor=DEV_USER_ID, state="active")
+                        session.commit()
         from ontofoundry_api.services.metadata_sync import interrupt_jobs
 
         with session_factory() as sync_db:

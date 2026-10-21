@@ -11,6 +11,6 @@ description: 按已有本体约束从文档抽取文档实例、属性值和关�
 3. 只引用已确认的类型和属性，UUID 引用已有定义，同批新定义用 client_ref。身份不明或同号多记录时保留证据并请用户确认，不擅自合并或更新；只有明确指向 UUID 才更新，保留已有人工证据。原文金额未知不能补值，0 与 false 是真实值。证据使用原材料 id/hash/行号/quote，不从聊天回答编造。
 4. 写 `modeling/parts/05-facts.json` 裸数组，无实例写 []，运行 `check_part.py --work-pack <工作包> modeling/parts/05-facts.json`。只写变化，及时检查，notes≤2 KB，压缩后先读 plan/notes。
 5. 同一运行组合 ontology-discovery 时，共享 modeling/、execution 和修正计数；定义片段 01–04 与实例片段 05 合并为一个结果文件，不分别提交、不覆盖其他 Skill 片段。发现缺少业务概念时按任务加载 ontology-discovery 提出定义提案与相关实例提案，交人工审阅。单独抽取时只交本次片段。output-schema.json 是本技能的实例子集说明；检查器始终用工作包 schema_file（平台完整提案契约），允许组合输出。
-6. `prepare_result.py --schema <schema_file> --context <context_file> --output <result_file> modeling/parts/`，自动补 before/hash，通过才写入。最多两轮修正，共用 execution；只改报错片段再合并，加 --repair（平台已计次的新上下文首次不加），不删除计数。中文说明实例、证据、歧义与未交付项；技术失败不冒充业务提问或成功。
+6. `prepare_result.py --schema <schema_file> --context <context_file> --output <result_file> modeling/parts/`，定义按 draft/element_hashes、实例按 instance_baseline 自动补 before/hash，通过才写入。最多两轮修正，共用 execution；只改报错片段再合并，加 --repair（平台已计次的新上下文首次不加），不删除计数。中文说明实例、证据、歧义与未交付项；技术失败不冒充业务提问或成功。
 
 匹配、授权和确定性判级归平台工具；当前仅使用已上线的读取工具，不假设实例消歧服务已可用。Schema 只给检查器，未覆盖按报错命令定点查正例。业务数据库行不自动写成文档实例，不因名称近似认定同一身份。

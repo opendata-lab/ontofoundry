@@ -1,5 +1,5 @@
-import { ArrowUp, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Input, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
+import { ArrowUp, Ban, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
+import { Alert, Button, Checkbox, Dropdown, Input, Popconfirm, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
@@ -389,9 +389,29 @@ export function BuilderPage() {
                 <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
                   onClick={() => act(async () => { await model.create(); })} />
               </Tooltip>
+              {session && !session.abandoned_at && (
+                <Popconfirm
+                  title="放弃这个会话？"
+                  description={`将丢弃本会话 ${session.draft.material_objects.filter((o) => o.state === "staged").length + session.draft.material_links.filter((l) => l.state === "staged").length} 条待发布实例；已发布的本体和已生效的实例不受影响。放弃后不能再在本会话中建模或发布。`}
+                  okText="放弃会话"
+                  okButtonProps={{ danger: true }}
+                  cancelText="取消"
+                  onConfirm={() => act(async () => {
+                    await modelingApi.abandon(session);
+                    setSession(await modelingApi.get(session.workspace_id, session.id));
+                  })}
+                >
+                  <Tooltip title="放弃会话">
+                    <Button size="small" type="text" aria-label="放弃会话" icon={<Ban size={15} />} disabled={busy || uploading || running} />
+                  </Tooltip>
+                </Popconfirm>
+              )}
             </>}>
               <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? "建模对话"}</span>} />
             </PanelToolbar>
+            {session?.abandoned_at && (
+              <Alert type="warning" showIcon banner message="本会话已放弃，待发布实例已丢弃，不能继续建模或发布。请新建会话。" />
+            )}
             {/* The endpoint is derived from sessionId, never from `session`.
               That object is null while a session loads, and an endpoint that
               momentarily goes empty reads as a conversation switch — the

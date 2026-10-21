@@ -339,8 +339,13 @@ export function PublishPanel({
   const sourceErrors = (preview?.dataset_checks ?? []).flatMap((c) =>
     c.diagnostics.map((d) => ({ message: `数据集 ${c.display_name || c.name}：${d.message}` })),
   );
-  const errors = [...(preview?.validation.errors ?? []), ...sourceErrors];
-  const publishable = !!preview?.validation.publishable && !sourceErrors.length;
+  // Instances that would no longer fit the new definitions block publishing (IS-05).
+  const instanceNames = elementNames(null, session.draft);
+  const instanceErrors = (preview?.affected_instances ?? []).map((a) => ({
+    message: `${a.target_kind === "material_link" ? "关系实例" : "文档实例"} ${instanceNames.get(a.target_id) ?? a.target_id}：${a.reason}，请先处理这些实例再发布`,
+  }));
+  const errors = [...(preview?.validation.errors ?? []), ...sourceErrors, ...instanceErrors];
+  const publishable = !!preview?.validation.publishable && !sourceErrors.length && !instanceErrors.length;
   const warnings = preview?.validation.warnings ?? [];
   const current = preview ? versionLabel(preview.current_version_number) : "…";
   // The session is behind when versions were published after it started.

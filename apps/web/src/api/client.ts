@@ -205,7 +205,8 @@ export const api = {
   presentation: (workspaceId: string, versionId: string) =>
     request<{ version: VersionSummary; model: Draft }>(
       `/api/v1/workspaces/${workspaceId}/versions/${versionId}/presentation`,
-    ),
+    // A past version shows its definitions; instances are live and not part of it.
+    ).then((r): { version: VersionSummary; model: Draft } => ({ ...r, model: { ...r.model, ...NO_INSTANCES } })),
   comparison: (workspaceId: string, rightId: string, leftId?: string) =>
     request<Comparison>(
       `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),
@@ -219,22 +220,56 @@ export function workspaceRequest<T>(id: string, suffix: string, body?: unknown, 
   );
 }
 
+// Document instances live in their own store, not in the core-1 draft. Views keep
+// reading them from the draft, so they are merged in after each load and removed
+// before a draft is sent back.
+type InstanceSet = { change_sequence: number; items: { target_kind: "material_object" | "material_link"; state: string; revision: number; element: Record<string, unknown> }[] };
+async function instancesFor(workspaceId: string, sessionId?: string | null): Promise<Pick<Draft, "material_objects" | "material_links">> {
+  try {
+    const set = await workspaceRequest<InstanceSet>(workspaceId, sessionId ? `/sessions/${sessionId}/instance-baseline` : "/instances");
+    const pick = (kind: string) => set.items.filter((i) => i.target_kind === kind).map((i) => ({ ...i.element, state: i.state, revision: i.revision }));
+    return { material_objects: pick("material_object") as Draft["material_objects"], material_links: pick("material_link") as Draft["material_links"] };
+  } catch {
+    // Without instance permission the definitions still show; there are no instances to list.
+    return { material_objects: [], material_links: [] };
+  }
+}
+async function withInstances(draft: Draft, sessionId?: string | null): Promise<Draft> {
+  return { ...draft, ...(await instancesFor(draft.workspace_id, sessionId)) };
+}
+async function sessionWithInstances<T extends { session: ModelingSession | null }>(result: T): Promise<T> {
+  return result.session ? { ...result, session: await withSessionInstances(result.session) } : result;
+}
+async function withSessionInstances(session: ModelingSession): Promise<ModelingSession> {
+  return { ...session, draft: await withInstances(session.draft, session.id) };
+}
+const NO_INSTANCES: Pick<Draft, "material_objects" | "material_links"> = { material_objects: [], material_links: [] };
+export function definitionsOnly(draft: Draft) {
+  const { material_objects: _objects, material_links: _links, ...definitions } = draft;
+  void _objects; void _links;
+  return definitions;
+}
+
 export const modelingApi = {
   sessions: (id: string) => workspaceRequest<Items<ModelingSessionSummary>>(id, "/sessions"),
   create: (id: string, title = "新的建模会话") =>
-    workspaceRequest<ModelingSession>(id, "/sessions", { title }),
-  get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid),
+    workspaceRequest<ModelingSession>(id, "/sessions", { title }).then(withSessionInstances),
+  get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid).then(withSessionInstances),
   /** Saves the whole session draft; it does not publish. */
   save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[] } = {}) =>
-    request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft, ...extra })),
+    request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft: definitionsOnly(draft), ...extra })).then(withSessionInstances),
+  /** Abandons a session: drops its staged instances; published content is untouched. */
+  abandon: (s: Pick<ModelingSession, "id" | "workspace_id">) =>
+    request<{ session_id: string; abandoned_at: string; abandoned_by: string }>(sessionPath(s) + "/abandon", json("POST", {})),
   validate: (s: ModelingSession) => request<ValidationReport>(sessionPath(s) + "/validate", json("POST", {})),
-  snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
+  snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot").then((d) => withInstances(d)),
   /** Previews cross-aggregate impact read-only before saving an element. */
   previewElementSave: (id: string, payload: ElementSave) =>
     workspaceRequest<ElementSaveImpact>(id, "/element-saves/preview", payload),
   /** Saves one aggregate and publishes it right away (current-version CAS). */
   saveElement: (id: string, payload: ElementSave) =>
-    workspaceRequest<ElementSaveResult>(id, "/element-saves", payload),
+    workspaceRequest<ElementSaveResult>(id, "/element-saves", payload)
+      .then(async (r) => sessionWithInstances({ ...r, draft: await withInstances(r.draft, r.session?.id) })),
   materials: (id: string) => workspaceRequest<Items<Material>>(id, "/materials"),
   materialOverview: (id: string) => workspaceRequest<Items<ManagedMaterial>>(id, "/materials/overview"),
   materialDownloadUrl: (id: string, materialId: string) => `/api/v1/workspaces/${id}/materials/${materialId}`,
@@ -320,7 +355,7 @@ export const proposalsApi = {
         expected_session_revision: s.revision,
         decisions,
       }),
-    ),
+    ).then(sessionWithInstances),
   /** Turns a pending duplicate-fact create into an update of an existing fact. */
   reviseFact: (s: ModelingSession, proposalId: string, payload: FactProposalRevision) =>
     request<ProposalBatchDetail>(
@@ -331,7 +366,8 @@ export const proposalsApi = {
 
 export const publishApi = {
   preview: (s: ModelingSession) =>
-    request<PublishPreview>(sessionPath(s) + "/preview", json("POST", { expected_session_revision: s.revision })),
+    request<PublishPreview>(sessionPath(s) + "/preview", json("POST", { expected_session_revision: s.revision }))
+      .then((p): PublishPreview => ({ ...p, merged_model: { ...p.merged_model, ...NO_INSTANCES } })),
   publish: (session: ModelingSession, preview: PublishPreview, message: string) =>
     request<PublishResult>(
       sessionPath(session) + "/publish",
@@ -339,9 +375,10 @@ export const publishApi = {
         expected_session_revision: preview.session_revision,
         expected_current_version_id: preview.current_version_id,
         expected_merged_snapshot_sha256: preview.merged_snapshot_sha256,
+        expected_instance_change_sequence: preview.instance_change_sequence,
         message,
       }),
-    ),
+    ).then(sessionWithInstances),
   resolve: (s: ModelingSession, currentVersionId: string | null, resolutions: Record<string, Resolution>) =>
     request<ModelingSession>(
       sessionPath(s) + "/resolve-merge",
@@ -350,7 +387,7 @@ export const publishApi = {
         expected_current_version_id: currentVersionId,
         resolutions,
       }),
-    ),
+    ).then(withSessionInstances),
 };
 
 export const metricsApi = {

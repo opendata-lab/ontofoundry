@@ -637,8 +637,6 @@ class CoreDraft(Strict):
     metrics: list[Metric] = Field(default_factory=list)
     datasets: list[Dataset] = Field(default_factory=list)
     mappings: list[DataMapping] = Field(default_factory=list)
-    material_objects: list[MaterialObject] = Field(default_factory=list)
-    material_links: list[MaterialLink] = Field(default_factory=list)
     value_types: list[ValueType] = Field(default_factory=list)
 
 
@@ -650,8 +648,6 @@ COLLECTIONS = (
     "metrics",
     "datasets",
     "mappings",
-    "material_objects",
-    "material_links",
     "value_types",
 )
 

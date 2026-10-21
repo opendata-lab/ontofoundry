@@ -29,7 +29,7 @@ def load_parts(directory, kit=False):
 def parse(batch, ctx, material, material_id):
     return parse_result(
         json.dumps(batch).encode(),
-        RunContext(**{k: v for k, v in ctx["run"].items() if k != "schema_version"}, draft=ctx["draft"]),
+        RunContext(**{k: v for k, v in ctx["run"].items() if k != "schema_version"}, draft=ctx["draft"], instance_baseline=ctx["instance_baseline"]),
         lambda mid: (hashlib.sha256(material).hexdigest(), material.decode().splitlines())
         if mid == material_id else None,
     )
@@ -167,11 +167,11 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
             assert all(not p["unique"] for p in group)
             shapes.add("复合标识")
     assert parts[-1] == []
-    shapes.add("空事实")
+    shapes.add("空实例")
     assert shapes == {
         "单标识", "复合标识", "值类型引用属性", "规则/value_type", "规则/property", "规则/link_type",
         "跨关系约束", "direct与正反读法", "表列", "未同步无列", "UNION各带日期", "普通映射", "复合键映射",
-        "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "空事实",
+        "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "空实例",
     }
     covered = set().union(*(atoms(i) for i in items))
     for version in ("conservative", "supplemented"):

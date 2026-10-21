@@ -180,6 +180,8 @@ def test_export_scopes_follow_each_dataset_connection(client):
     with client.app.state.session_factory() as db:
         first, second = connection(db, "虚构来源一"), connection(db, "虚构来源二")
         db.commit()
+    from pr23_fixtures import clear_instances
+    clear_instances(client, str(DEMO_WORKSPACE_ID))
     model, together = scopes([first] * 2)
     assert len(together["ontology_mappings"]) == 1
     assert any(r["from"] != r["to"] for r in together["ontology_mappings"][0]["semantic_model"]["relationships"])

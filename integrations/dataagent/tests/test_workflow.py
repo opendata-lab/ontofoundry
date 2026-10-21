@@ -50,7 +50,7 @@ def server_parse(batch, ctx):
     material = (BASE / "tests/fixtures/material.md").read_bytes()
     return parse_result(
         json.dumps(batch).encode(),
-        RunContext(**run, draft=ctx["draft"]),
+        RunContext(**run, draft=ctx["draft"], instance_baseline=ctx["instance_baseline"]),
         lambda mid: (
             (hashlib.sha256(material).hexdigest(), material.decode().splitlines())
             if mid == "11111111-1111-4111-8111-111111111111"
@@ -86,7 +86,7 @@ def test_every_example_through_cli_and_final_graph(example, tmp_path):
 
 def test_examples_cover_targets_and_operations():
     items = [item for p in EXAMPLES for item in json.loads(p.read_bytes())]
-    assert {i["target_kind"] for i in items} == set(checker.COLLECTIONS)
+    assert {i["target_kind"] for i in items} == set(checker.TARGET_KINDS)
     assert {i["operation"] for i in items} == {"create", "update", "delete"}
 
 
@@ -329,7 +329,7 @@ def test_catalog_discovers_all_examples_and_core_topics():
         assert any(topic in entry["topics"] for entry in CATALOG["examples"])
 
 
-@pytest.mark.parametrize("kind", sorted(checker.COLLECTIONS))
+@pytest.mark.parametrize("kind", sorted(checker.TARGET_KINDS))
 @pytest.mark.parametrize("operation", ["create", "update", "delete"])
 def test_lookup_output_is_bounded_and_passes_both_validators(kind, operation):
     command = [
@@ -359,7 +359,7 @@ def test_unknown_lookup_lists_choices():
         check=False,
     )
     assert completed.returncode == 1 and len(completed.stdout) <= 8192
-    assert all(k in completed.stdout.decode() for k in checker.COLLECTIONS)
+    assert all(k in completed.stdout.decode() for k in checker.TARGET_KINDS)
 
 
 @pytest.mark.parametrize(

@@ -150,7 +150,7 @@ def test_fact_losses_are_per_instance_and_metadata_notice_is_once_without_reusin
         for i in result.report.issues
         if i.construct in {"material_objects", "material_links"}
     ]
-    assert len(losses) == len(model.material_objects) + len(model.material_links)
+    assert losses == []
     assert all(
         i.outcome == "dropped" and i.rule_id is None and len(i.target_element_ids) == 1
         for i in losses

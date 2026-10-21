@@ -12,7 +12,7 @@
 
 ## 身份与更新
 
-坑：编号01的两个UUID仍2实例，按编号合并会丢1实例；链接端点应引用具体实例而非类型。values 用有效属性name，标题按定义推导，不单存展示文字。只有用户明确指向UUID才更新，保留已有人工证据及UUID，不由聊天回答生成作者／确认时间。
+坑：编号01的两个UUID仍2实例，按编号合并会丢1实例；链接端点应引用具体实例而非类型。values 用有效属性name，标题按定义推导，不单存展示文字。更新／删除按 target_kind+target_id 查 proposal_context.instance_baseline：before 原样复制 element，expected_target_hash 复制 hash（含 revision，不手算）；定义仍查 draft/element_hashes。片段可省 before/hash，由 prepare_result 补齐；after 去顶层 id，保留人工证据及UUID，不编造作者／确认时间。
 
 需问：同号金额50与80无修订说明，选择保留2实例，还是更新指定UUID为80并追加证据？推荐无明确修订依据先保留独立；影响已有实例时等待用户决定。
 

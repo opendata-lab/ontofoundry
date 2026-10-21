@@ -5,9 +5,9 @@
     "workspace_id": "22222222-2222-4222-8222-222222222222",
     "session_id": "44444444-4444-4444-8444-444444444444",
     "base_version_id": null,
-    "base_version_sha256": "ffb9eca49698a12de21eaa185d63997eff098c9bb5837ec9ae0e637cf2d7a4da",
+    "base_version_sha256": "03d8fc56eee3845fe7a6aaa5fb8180d4bcb50d944472efdc8ea4ee9f58a4fd86",
     "source_session_revision": 1,
-    "source_draft_sha256": "b7f86d08fcaa303e99251426cbf3b642a34b3b3ac6aa191211bb03bd5b40d7ee"
+    "source_draft_sha256": "3f1c58dcc25f821db772b7eb5dfa906953f25c1adf9225dab513384db736cb1c"
   },
   "draft": {
     "schema_version": "core-1",
@@ -290,8 +290,6 @@
       }
     ],
     "mappings": [],
-    "material_objects": [],
-    "material_links": [],
     "value_types": []
   },
   "element_hashes": {
@@ -301,5 +299,9 @@
     "66666666-6666-4666-8666-000000000003": "42069467609a3c34efc887242a8a796c9a62957239997245fabf1d2478e7b946",
     "66666666-6666-4666-8666-000000000004": "653ccb018592b9466e1e986bbe9e6d786242bacde40a58e4a45d2f41e691a366",
     "66666666-6666-4666-8666-000000000005": "15203cdb4e813890619a4aff987ca9ec6e4687d016e21d7ad51764e019af7d8b"
+  },
+  "instance_baseline": {
+    "change_sequence": 0,
+    "items": []
   }
 }

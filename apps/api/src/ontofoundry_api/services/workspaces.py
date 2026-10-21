@@ -174,8 +174,16 @@ def publish_draft(
     user_id: str,
     message: str,
     commit: bool = True,
+    session_id: str | None = None,
 ) -> OntologyVersionRecord:
-    workspace = get_workspace(session, workspace_id)
+    from ontofoundry_api.services import instance_store
+    workspace = instance_store.lock_workspace(session, workspace_id)
+    if session_id:
+        from ontofoundry_api.db_models import ModelingSessionRecord
+        editing = session.get(ModelingSessionRecord, session_id)
+        if editing is None or editing.workspace_id != workspace_id:
+            raise NotFoundError("会话不存在")
+        instance_store.require_open_session(editing)
     previous_version_id = workspace.current_version_id
     if str(draft.workspace_id) != workspace.id:
         raise PublishValidationError(
@@ -200,6 +208,7 @@ def publish_draft(
     if not report["publishable"]:
         raise PublishValidationError("核心校验未通过，版本未发布", report)
 
+    instance_store.check_publish(session, workspace_id, draft.model_dump(mode="json"), session_id)
     next_version = (
         session.scalar(
             select(func.max(OntologyVersionRecord.version_number)).where(
@@ -236,6 +245,8 @@ def publish_draft(
     if changed.rowcount != 1:
         session.rollback()
         raise ConflictError("发布版本已变化，请重新比较后发布")
+    if session_id:
+        instance_store.activate(session, workspace_id, session_id, user_id, draft)
     if commit:
         session.commit()
     return version

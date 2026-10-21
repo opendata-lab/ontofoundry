@@ -750,6 +750,9 @@ async def send_message(
 ) -> dict[str, Any]:
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
+    if item.abandoned_at is not None:
+        from ontofoundry_api.services.errors import ServiceError
+        raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     _require_configured(request)
 
     materials = [
@@ -817,6 +820,8 @@ async def send_message(
     if proposals:
         # Results are parsed against exactly the draft this run was given.
         manifest["pinned_draft"] = draft
+        from ontofoundry_api.services.instance_store import baseline
+        manifest["instance_baseline"] = baseline(db, workspace_id, session_id)
 
     table_catalog, table_receipt = None, None
     if proposals and item.linked_tables:

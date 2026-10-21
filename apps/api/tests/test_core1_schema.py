@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from ontofoundry_api.contracts.export_core_schema import TARGET, core_schema, schema_text
 from ontofoundry_api.domain.core import COLLECTIONS, MaterialObject, Operator
-from ontofoundry_api.domain.core_canonical import canonical, draft_sha256, element_sha256
+from ontofoundry_api.domain.core_canonical import draft_sha256, element_sha256
 
 
 def test_generated_schema_matches_authoritative_models():
@@ -86,17 +86,16 @@ def test_condition_order_and_between_bounds_are_preserved():
 
 
 def test_user_null_false_zero_and_literal_bytes_survive_canonicalization():
-    draft = example_draft("09-empty")
     fact = MaterialObject(
         id=uuid4(),
         type_id=uuid4(),
         values={"null": None, "zero": 0, "false": False, "name": "e\u0301"},
     )
-    draft.material_objects.append(fact)
-    normalized = json.loads(canonical(draft))
-    assert normalized["material_objects"][0]["values"] == fact.values
-    assert '"null":null' in canonical(draft)
-    assert '"false":false' in canonical(draft)
+    from ontofoundry_api.domain.canonical import canonical as content_canonical
+    normalized = json.loads(content_canonical(fact))
+    assert normalized["values"] == fact.values
+    assert '"null":null' in content_canonical(fact)
+    assert '"false":false' in content_canonical(fact)
 
 
 def test_hash_fills_model_defaults_and_is_deterministic():

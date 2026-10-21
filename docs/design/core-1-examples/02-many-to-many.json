@@ -472,8 +472,6 @@
         "membership_source_id": null,
         "inherited_link_bindings": {}
       }
-    ],
-    "material_objects": [],
-    "material_links": []
+    ]
   }
 }

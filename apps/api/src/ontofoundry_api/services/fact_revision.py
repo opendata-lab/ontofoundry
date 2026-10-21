@@ -13,8 +13,9 @@ from ontofoundry_api.contracts.proposals import (
     walk_references,
 )
 from ontofoundry_api.db_models import ModelingSessionRecord, ProposalItemRecord, utc_now
-from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
-from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
+from ontofoundry_api.domain.canonical import canonical, domain_sha256
+from ontofoundry_api.domain.evidence import EvidenceError
+from ontofoundry_api.services import instance_store
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.proposals import (
@@ -39,6 +40,8 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
     )
     if session is None:
         fail("SESSION_NOT_FOUND", "会话不存在", 404)
+    from ontofoundry_api.services.instance_store import require_open_session
+    require_open_session(session)
     if session.revision != body.expected_session_revision:
         fail("SESSION_REVISION_CHANGED", "草稿已更新")
     item = db.get(ProposalItemRecord, proposal_id)
@@ -46,17 +49,17 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
         fail("PROPOSAL_NOT_FOUND", "提案不属于当前会话", 422)
     items = batch_items(db, [item.batch_id], workspace_id, session_id)
     dependencies = dependency_map(db, [item.batch_id], workspace_id, session_id)
-    statuses = effective_statuses(items, dependencies, session.draft_json)
+    instance_baseline = instance_store.baseline(db, workspace_id, session_id)
+    statuses = effective_statuses(items, dependencies, session.draft_json, instance_baseline)
     if (
         statuses[item.id][0] != "pending"
         or item.target_kind != "material_object"
         or item.operation != "create"
     ):
         fail("PROPOSAL_NOT_DECIDABLE", "只允许修订当前有效的事实新增提案")
-    target = next(
-        (o for o in session.draft_json["material_objects"] if o["id"] == body.target_id),
-        None,
-    )
+    entry = next((e for e in instance_baseline["items"] if e["target_id"] == body.target_id
+                  and e["target_kind"] == "material_object"), None)
+    target = entry["element"] if entry else None
     if (
         target is None
         or body.after.id != UUID(body.target_id)
@@ -64,28 +67,18 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
         or target["type_id"] != item.after_json["type_id"]
     ):
         fail("VALIDATION_FAILED", "事实目标、类型或 after.id 不匹配", 422)
-    if element_sha256(target, collection="material_objects") != body.expected_target_hash:
+    if entry["hash"] != body.expected_target_hash:
         fail("PROPOSAL_STALE", "事实目标已变化")
     after = body.after.model_dump(mode="json")
     supplied = {e["id"]: e for e in after["evidence"]}
     for e in [*target["evidence"], *item.after_json["evidence"]]:
         if e["id"] not in supplied or canonical(e) != canonical(supplied[e["id"]]):
             fail("EVIDENCE_INVALID", "必须保留原事实和选定提案的证据 UUID 与内容", 422)
-    candidate = deepcopy(session.draft_json)
-    candidate["material_objects"] = [
-        after if e["id"] == body.target_id else e for e in candidate["material_objects"]
-    ]
     try:
-        candidate = reconcile_draft_evidence(
-            session.draft_json,
-            candidate,
-            lookup=material_lookup(db, settings, workspace_id),
-            actor_id=actor.id,
-            now=utc_now(),
-        )
+        after = instance_store.reconcile_evidence(target, after, "material_object",
+            lookup=material_lookup(db, settings, workspace_id), actor=actor.id, now=utc_now())
     except EvidenceError as exc:
         raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
-    after = next(e for e in candidate["material_objects"] if e["id"] == body.target_id)
     selected = {item.id}
     changed = True
     while changed:
@@ -160,7 +153,11 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
             )
         )
     try:
-        group_items(session.draft_json, parsed)
+        for old_item, new_item in zip([i for i in items if i.id in selected], parsed, strict=True):
+            new_item.expected_instance_revision = old_item.expected_instance_revision
+            if new_item.target_id == body.target_id:
+                new_item.expected_instance_revision = entry["revision"]
+        group_items(instance_store.session_snapshot(db, workspace_id, session_id, session.draft_json), parsed)
     except ValueError as exc:
         fail("VALIDATION_FAILED", str(exc), 422)
     manifest = {

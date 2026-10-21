@@ -45,12 +45,16 @@ export type PathCondition = Core.PathCondition;
 export type DerivedSimple = Core.DerivedSimple;
 export type DerivedExpression = Core.DerivedExpression;
 export type DerivedBranch = DerivedSimple | DerivedExpression;
-export type MaterialObject = Stored<Core.MaterialObject>;
-export type MaterialLink = Stored<Core.MaterialLink>;
 export type MaterialEvidence = Core.MaterialEvidence;
 export type ManualEvidence = Core.ManualEvidence;
 export type EvidenceLocator = Core.EvidenceLocator;
 export type Evidence = MaterialEvidence | ManualEvidence;
+/** Lifecycle of a document instance in the instance store (IS-04). */
+type InstanceState = { state?: "staged" | "active"; revision?: number };
+/** A document instance: read from the instance store, not part of the core-1 draft. */
+export type MaterialObject = { id: UUID; type_id: UUID; values: Record<string, Scalar>; evidence: Evidence[] } & InstanceState;
+/** A relation instance between two document instances. */
+export type MaterialLink = { id: UUID; type_id: UUID; source_id: UUID; target_id: UUID; evidence: Evidence[] } & InstanceState;
 
 export type TargetKind =
   | "object_type"
@@ -103,7 +107,7 @@ export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
   value_type: "value_types",
 };
 
-/** A core-1 draft as the server returns it: all nine collections present. */
+/** A core-1 draft with the live document instances merged in for display (see api/client.ts). */
 export type Draft = {
   schema_version: "core-1";
   workspace_id: UUID;
@@ -362,6 +366,8 @@ export type ElementChange = {
 };
 
 export type ModelingSession = {
+  /** Set once the session is explicitly abandoned (IS-10); it then accepts no writes, runs or publishing. */
+  abandoned_at?: ISOTime | null;
   import_source?: ImportSource | null;
   id: UUID;
   workspace_id: UUID;
@@ -422,8 +428,13 @@ export type PublishPreview = {
   next_version_number: number;
   current_version_sha256: SHA256;
   merged_snapshot_sha256: SHA256;
+  /** Definitions only; instances are live and not part of a version (empty here). */
   merged_model: Draft;
   validation: ValidationReport;
+  /** Instance set version the preview saw; publishing sends it back. */
+  instance_change_sequence: number;
+  /** Instances that would no longer fit the published definitions; these block publishing. */
+  affected_instances: { target_kind: "material_object" | "material_link"; target_id: UUID; revision: number; reason: string }[];
   changes: ElementChange[];
   labels: Record<UUID, string>;
   impacts: Impact[];

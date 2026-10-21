@@ -509,6 +509,9 @@ async def _consume_proposals(
 ) -> str:
     """Store an ontofoundry.proposals/v1 result as a batch. Never touches the
     draft: a session edited during the run only makes affected items stale."""
+    if manifest.get("invalidated") or "pinned_draft" not in manifest:
+        return _finish_failure(app, session_id, task_id, claimed_at,
+            state="failed_permanent", detail="运行固定上下文已失效，请重新运行")
     context = RunContext(
         workspace_id=manifest["workspace_id"],
         session_id=manifest["session_id"],
@@ -518,6 +521,7 @@ async def _consume_proposals(
         source_session_revision=manifest["source_session_revision"],
         source_draft_sha256=manifest["source_draft_sha256"],
         draft=manifest["pinned_draft"],
+        instance_baseline=manifest.get("instance_baseline", {}),
     )
     if manifest.get("repair_budget_required"):
         try:

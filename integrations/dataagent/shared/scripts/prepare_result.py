@@ -5,7 +5,7 @@ import json
 from copy import deepcopy
 from pathlib import Path
 
-from check_result import COLLECTIONS, atomic_write, diagnostic, encode, validate_file
+from check_result import atomic_write, diagnostic, encode, pinned_targets, same_json, validate_file
 
 
 class PrepareInputError(ValueError):
@@ -14,11 +14,7 @@ class PrepareInputError(ValueError):
 
 def assemble(context, fragments):
     items, refs = [], set()
-    existing = {
-        e["id"]: (kind, e)
-        for kind, collection in COLLECTIONS.items()
-        for e in context["draft"].get(collection, [])
-    }
+    existing = pinned_targets(context)
     for fragment_index, fragment in enumerate(fragments):
         if not isinstance(fragment, list):
             raise PrepareInputError(
@@ -33,11 +29,11 @@ def assemble(context, fragments):
             index = len(items)
             item = deepcopy(raw)
 
-            def fail(field, expected, actual, index=index, item=item):
+            def fail(field, expected, actual, code="PREPARE_INPUT", index=index, item=item):
                 raise PrepareInputError(
                     diagnostic(
                         f"/items/{index}/{field}",
-                        "PREPARE_INPUT",
+                        code,
                         expected,
                         actual,
                         item,
@@ -51,17 +47,16 @@ def assemble(context, fragments):
                     fail(field, "必填字段", "缺失")
             if item["operation"] in {"update", "delete"}:
                 target = item.get("target_id")
-                if not isinstance(target, str) or target not in existing:
-                    fail("target_id", "固定草稿中存在的目标 UUID", target)
-                kind, before = existing[target]
-                if item["target_kind"] != kind:
-                    fail("target_kind", kind, item["target_kind"])
-                for field, value in (
-                    ("before", before),
-                    ("expected_target_hash", context["element_hashes"][target]),
+                found = existing.get((item["target_kind"], target)) if isinstance(target, str) else None
+                if found is None:
+                    fail("target_id", "固定草稿中的定义或实例基线中的实例 UUID", target, "TARGET_NOT_FOUND")
+                before, target_hash = found
+                for field, value, code in (
+                    ("before", before, "BEFORE_MISMATCH"),
+                    ("expected_target_hash", target_hash, "TARGET_HASH_MISMATCH"),
                 ):
-                    if field in item and item[field] != value:
-                        fail(field, value, item[field])
+                    if field in item and not same_json(item[field], value):
+                        fail(field, value, item[field], code)
                     item[field] = deepcopy(value)
                 if item["operation"] == "delete":
                     item.setdefault("after", None)

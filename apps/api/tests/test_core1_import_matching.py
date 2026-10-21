@@ -143,21 +143,6 @@ def test_empty_and_repeat_import_never_propose_delete():
     assert empty.model == base and same.model == base
 
 
-def test_same_business_values_and_quote_never_merge_facts_or_evidence():
-    data = example_draft_json("07-instances-and-evidence")
-    base = CoreDraft.model_validate(data)
-    source = deepcopy(data)
-    fact = source["material_objects"][0]
-    previous_id = fact["id"]
-    fact["id"] = str(uuid4())
-    fact["evidence"] = [{**e, "id": str(uuid4())} for e in fact["evidence"]]
-    for edge in source["material_links"]:
-        for key in ("source_id", "target_id"):
-            if edge[key] == previous_id:
-                edge[key] = fact["id"]
-    result = build_candidate_graph(base, CoreDraft.model_validate(source), native=True)
-    assert len(result.model.material_objects) == len(base.material_objects) + 1
-    assert result.id_map[fact["id"]] == fact["id"]
 
 
 def test_mapping_uuid_lock_cannot_be_replaced_by_type_key():
@@ -184,8 +169,6 @@ def test_all_typed_ids_rewrite_and_expressions_keep_string_literals():
             "metrics",
             "datasets",
             "mappings",
-            "material_objects",
-            "material_links",
         )
         for e in getattr(base, c)
     }

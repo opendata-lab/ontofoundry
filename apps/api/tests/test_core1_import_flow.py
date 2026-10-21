@@ -129,6 +129,7 @@ def publish(client, wid, current):
             "expected_session_revision": current["revision"],
             "expected_current_version_id": p["current_version_id"],
             "expected_merged_snapshot_sha256": p["merged_snapshot_sha256"],
+            "expected_instance_change_sequence": p["instance_change_sequence"],
         },
     )
     assert response.status_code == 200, response.text

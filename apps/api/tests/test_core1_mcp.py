@@ -104,7 +104,8 @@ def test_large_fact_value_is_segmented_and_reassembled(client):
     from uuid import uuid4
 
     s = create_session(client)
-    fact = s["draft"]["material_objects"][0]
+    fact = client.get(ONTOLOGY + "/objects").json()["items"][0]
+    fact = {k: v for k, v in fact.items() if k in {"id", "type_id", "values", "evidence"}}
     # An untitled long value is large enough to exceed the wire budget by itself.
     s["draft"]["object_types"][0]["title_property_id"] = None
     extra = {
@@ -117,7 +118,9 @@ def test_large_fact_value_is_segmented_and_reassembled(client):
     s["draft"]["properties"].append(extra)
     text = "虚构业务说明" * 20000
     fact["values"]["detail"] = text
-    assert publish(client, save(client, s, s["draft"]).json()).status_code == 200
+    s = publish(client, save(client, s, s["draft"]).json()).json()["session"]
+    from pr23_fixtures import seed_instances
+    seed_instances(client, s, {"material_objects": [fact]})
     args = {"id": fact["id"], "include": ["properties"]}
     first = call(client, "get_object", args)["structuredContent"]
     assert len(json.dumps(first, ensure_ascii=False).encode()) < 120000
@@ -273,6 +276,8 @@ def test_relationship_status_and_self_adjacency_use_shared_projection(client):
     draft = example_draft("05-self-and-parallel-links").model_dump(mode="json")
     draft["workspace_id"] = s["workspace_id"]
     draft["mappings"] = []
+    from pr23_fixtures import clear_instances
+    clear_instances(client, s["workspace_id"])
     link = next(
         link
         for link in draft["link_types"]

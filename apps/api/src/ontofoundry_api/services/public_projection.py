@@ -14,7 +14,6 @@ def authorized_snapshot(snapshot, *, mappings, instances):
         for link in result["link_types"]:
             link.pop("data_join", None)
     if not instances:
-        result.update(material_objects=[], material_links=[])
         for collection in ("object_types", "properties", "link_types", "rules", "metrics"):
             for item in result[collection]:
                 item["evidence"] = []

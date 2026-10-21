@@ -44,6 +44,7 @@ def publish_together(client, sessions):
                 "expected_session_revision": session["revision"],
                 "expected_current_version_id": fixed["current_version_id"],
                 "expected_merged_snapshot_sha256": fixed["merged_snapshot_sha256"],
+                "expected_instance_change_sequence": fixed["instance_change_sequence"],
             },
         )
 

@@ -34,7 +34,5 @@ def test_unpublished_overview_and_empty_session(client):
             "metrics",
             "datasets",
             "mappings",
-            "material_objects",
-            "material_links",
-        )
+                )
     )

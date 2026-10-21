@@ -5,9 +5,9 @@
     "workspace_id": "22222222-2222-4222-8222-222222222222",
     "session_id": "44444444-4444-4444-8444-444444444444",
     "base_version_id": null,
-    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "base_version_sha256": "03d8fc56eee3845fe7a6aaa5fb8180d4bcb50d944472efdc8ea4ee9f58a4fd86",
     "source_session_revision": 1,
-    "source_draft_sha256": "f3495f3e2606fb4bca4035deb1f2e4ce9f71e9a9577b23c13d4440cc4896d050"
+    "source_draft_sha256": "e486dde5ac4088293d880b02889347edec08ea8a0ea64fdb77952ea3ac1a8b97"
   },
   "draft": {
     "schema_version": "core-1",
@@ -141,8 +141,6 @@
         "inherited_link_bindings": {}
       }
     ],
-    "material_objects": [],
-    "material_links": [],
     "value_types": []
   },
   "element_hashes": {
@@ -152,5 +150,9 @@
     "551bde02-6af3-5d1c-b582-41cddfb77ca8": "72d3b1a222e83dbf26b418b279b909b963b14d107baaa51fc08ae3eabee92d9d",
     "8836c879-377f-5cd1-9040-711707a5896d": "8b107ea7d50b5d2d992aac16cf8386777cdb7db75cb87baaee9de9a87b1dcafc",
     "f1b248ca-e610-53f3-b7c4-db9ba272eeb3": "0637b49f3ec37713a7b33361548526306b81801337ddb766a5f058f8e38aa908"
+  },
+  "instance_baseline": {
+    "change_sequence": 0,
+    "items": []
   }
 }

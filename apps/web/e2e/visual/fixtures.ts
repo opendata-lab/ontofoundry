@@ -22,13 +22,32 @@ import type {
 
 export const WORKSPACE_ID = "ws-visual-demo";
 
-function readExample(fileName: string): CoreDraft {
+type ExampleInstances = { material_objects?: Partial<Draft["material_objects"][number]>[]; material_links?: Partial<Draft["material_links"][number]>[] };
+
+// Instances left core-1 for the instance store; the backend fixture keeps the examples' instances.
+const INSTANCE_FIXTURES = JSON.parse(
+  readFileSync(new URL("../../../api/tests/fixtures/document_instances.json", import.meta.url), "utf8"),
+) as Record<string, ExampleInstances>;
+
+function readExample(fileName: string): CoreDraft & ExampleInstances {
   const fileUrl = new URL(`../../../../docs/design/core-1-examples/${fileName}`, import.meta.url);
   const parsed = JSON.parse(readFileSync(fileUrl, "utf8")) as { draft: CoreDraft };
-  return structuredClone(parsed.draft);
+  return structuredClone({ ...parsed.draft, ...(INSTANCE_FIXTURES[fileName.replace(/\.json$/, "")] ?? {}) });
 }
 
-function toStoredDraft(source: CoreDraft): Draft {
+/** Serves the instance store reads the client merges into drafts; other requests pass through. */
+async function mockInstances(page: Page, draft: Draft) {
+  const items = [
+    ...draft.material_objects.map((element) => ({ target_kind: "material_object", element })),
+    ...draft.material_links.map((element) => ({ target_kind: "material_link", element })),
+  ].map((item) => ({ ...item, target_id: item.element.id, revision: 1, state: "active", session_id: null, hash: "0".repeat(64) }));
+  await page.route(
+    (url) => url.pathname.startsWith("/api/") && /\/(instances|instance-baseline)$/.test(url.pathname),
+    (route) => route.fulfill({ json: { change_sequence: 1, items } }),
+  );
+}
+
+function toStoredDraft(source: CoreDraft & ExampleInstances): Draft {
   return {
     schema_version: "core-1",
     workspace_id: source.workspace_id,
@@ -90,8 +109,8 @@ function toStoredDraft(source: CoreDraft): Draft {
       ...m,
       sources: (m.sources ?? []).map((s) => ({ key_columns: [], ...s })),
     })),
-    material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o })),
-    material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l })),
+    material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o }) as Draft["material_objects"][number]),
+    material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l }) as Draft["material_links"][number]),
     value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
   };
 }
@@ -520,6 +539,7 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
       }
     },
   );
+  await mockInstances(page, FIXTURE_DRAFT);
 }
 
 export const ELEMENT_DRAFT = structuredClone(FIXTURE_DRAFT);
@@ -577,6 +597,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
       }
     },
   );
+  await mockInstances(page, ELEMENT_DRAFT);
 }
 
 
@@ -634,4 +655,5 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
       else await route.fallback();
     },
   );
+  await mockInstances(page, ELEMENT_DRAFT);
 }

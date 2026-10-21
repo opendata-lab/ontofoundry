@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 from build_packages import SKILLS, build
-from generate_output_schemas import SOURCE, TARGETS, generate
+from generate_output_schemas import INSTANCE_SOURCE, SOURCE, TARGETS, generate
 from test_workflow import SCHEMA, pinned
 
 
@@ -72,6 +72,31 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path):
     assert batch["workspace_id"] == context["run"]["workspace_id"]
     run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "result.json")
 
+    # Exercise baseline reads and mixed instance/definition edits in every ZIP.
+    context = pinned(BASE / "shared/references/examples/instance-baseline.json")
+    (tmp_path / "context.json").write_text(json.dumps(context))
+    output = run(scripts / "show_example.py", tmp_path, "material_object", "--operation", "update", "--with-deps")
+    assert json.loads(output)[0]["target_kind"] == "material_object"
+    entries = context["instance_baseline"]["items"]
+    selected = json.loads(run(scripts / "show_element.py", tmp_path, "--work-pack", "work-pack.json", *[f'{e["target_kind"]}:{e["target_id"]}' for e in entries]))
+    assert [e["hash"] for e in selected["elements"]] == [e["hash"] for e in entries]
+    edits = json.loads((skill / "references/examples/instance-baseline.json").read_bytes())
+    # Omitted guards must also be filled by the isolated script.
+    for item in edits:
+        item.pop("before", None)
+        item.pop("expected_target_hash", None)
+    (tmp_path / "edits.json").write_text(json.dumps(edits))
+    run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", "edits.json")
+    run(scripts / "prepare_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "--output", "mixed.json", "edits.json")
+    run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "mixed.json")
+    mixed = json.loads((tmp_path / "mixed.json").read_bytes())
+    assert {i["target_kind"] for i in mixed["items"]} == {"property", "material_object", "material_link"}
+    for item in mixed["items"]:
+        if item["target_kind"] in {"material_object", "material_link"}:
+            entry = next(e for e in entries if e["target_id"] == item["target_id"])
+            assert item["before"] == entry["element"]
+            assert item["expected_target_hash"] == entry["hash"]
+
 
 def _pack(tmp_path):
     path = tmp_path / "work-pack.json"
@@ -113,6 +138,16 @@ def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_pat
     for name in TARGETS:
         schema = json.loads((tmp_path / "changed" / name / "output-schema.json").read_bytes())
         assert schema["properties"]["run_token"]["maxLength"] == 97
+
+
+def test_schema_generation_rejects_instance_contract_drift(tmp_path):
+    instances = json.loads(INSTANCE_SOURCE.read_bytes())
+    instances["$defs"]["MaterialObject"]["properties"]["values"]["maxProperties"] = 17
+    path = tmp_path / "instances.json"
+    path.write_text(json.dumps(instances))
+    with pytest.raises(ValueError, match="Instance/proposal contracts differ: MaterialObject"):
+        generate(SOURCE, tmp_path / "output", instance_source=path)
+    assert not (tmp_path / "output").exists()
 
 
 def grounding():

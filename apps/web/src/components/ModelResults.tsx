@@ -38,6 +38,9 @@ const CATEGORIES: { key: TargetKind; text: string; icon: LucideIcon; tone: strin
   { key: "material_link", text: "关系实例", icon: Workflow, tone: "text-ink-2", background: "bg-canvas" },
 ];
 
+// Instances accepted against definitions this session has not published yet (IS-04).
+const staged = (instance: { state?: string }) => (instance.state === "staged" ? "待发布 · " : "");
+
 function rowsOf(draft: Draft, kind: TargetKind): Row[] {
   const row = (id: string, name: string, technical: string, description: string): Row => ({ id, kind, name, technical, description });
   switch (kind) {
@@ -67,7 +70,7 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
         ),
       );
     case "material_object":
-      return draft.material_objects.map((o) => row(o.id, documentDisplayText(draft, o), "", (byId(draft.object_types, o.type_id)?.display_name || byId(draft.object_types, o.type_id)?.name) ?? ""));
+      return draft.material_objects.map((o) => row(o.id, documentDisplayText(draft, o), "", staged(o) + ((byId(draft.object_types, o.type_id)?.display_name || byId(draft.object_types, o.type_id)?.name) ?? "")));
     case "material_link":
       return draft.material_links.map((l) => {
         const source = byId(draft.material_objects, l.source_id);
@@ -76,7 +79,7 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
           l.id,
           `${source ? documentDisplayText(draft, source) : "?"} → ${target ? documentDisplayText(draft, target) : "?"}`,
           "",
-          (byId(draft.link_types, l.type_id)?.display_name || byId(draft.link_types, l.type_id)?.name) ?? "",
+          staged(l) + ((byId(draft.link_types, l.type_id)?.display_name || byId(draft.link_types, l.type_id)?.name) ?? ""),
         );
       });
     default:

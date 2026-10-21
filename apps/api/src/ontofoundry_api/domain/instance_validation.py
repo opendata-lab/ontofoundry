@@ -93,13 +93,7 @@ def instance_issues(draft: OntologyDraft) -> list[dict]:
 
 
 def _instance_findings(draft: OntologyDraft) -> list[dict]:
-    return [
-        issue
-        for index, obj in enumerate(draft.material_objects)
-        for issue in value_issues(
-            draft, obj.type_id, obj.values, f"$.material_objects[{index}].values"
-        )
-    ]
+    return []
 
 
 def completeness_warnings(draft: OntologyDraft) -> list[dict]:

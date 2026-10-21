@@ -67,6 +67,8 @@ def test_save_impact_schema_accepts_server_result_and_rejects_missing_hash():
     response = {
         "current_version_id": None,
         "session_revision": 3,
+        "instance_change_sequence": 0,
+        "affected_instances": [],
         "affected_items": calculation.affected_items,
     }
     assert len(response["affected_items"]) == 6

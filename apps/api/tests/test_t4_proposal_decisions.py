@@ -32,7 +32,10 @@ def seed_batch(
         "source_draft_sha256": snapshot_sha256(draft),
         "materials": [],
     }
-    context = RunContext(**{k: manifest[k] for k in list(manifest)[:7]}, draft=draft)
+    from ontofoundry_api.services.instance_store import baseline
+    with client.app.state.session_factory() as db:
+        instances = baseline(db, session["workspace_id"], session["id"])
+    context = RunContext(**{k: manifest[k] for k in list(manifest)[:7]}, draft=draft, instance_baseline=instances)
     result = {
         "schema_version": SCHEMA_VERSION,
         **{k: manifest[k] for k in list(manifest)[:7]},

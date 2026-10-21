@@ -329,6 +329,8 @@ def test_direct_hits_win_over_expansion_and_summaries(draft):
 
 @pytest.fixture
 def published(client, draft):
+    from pr23_fixtures import clear_instances
+    clear_instances(client, str(draft.workspace_id))
     session = create_session(client)
     response = save(client, session, draft.model_dump(mode="json"))
     assert response.status_code == 200, response.text

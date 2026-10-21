@@ -111,22 +111,6 @@ export type KeyColumns = string[]
 export type Sources = MappingSource[]
 export type TypeId = string
 export type Mappings = DataMapping[]
-/**
- * @maxItems 50
- */
-export type Evidence1 = (MaterialEvidence | ManualEvidence)[]
-export type Id6 = string
-export type SourceId1 = string
-export type TargetId = string
-export type TypeId1 = string
-export type MaterialLinks = MaterialLink[]
-/**
- * @maxItems 50
- */
-export type Evidence2 = (MaterialEvidence | ManualEvidence)[]
-export type Id7 = string
-export type TypeId2 = string
-export type MaterialObjects = MaterialObject[]
 export type Aggregation = 'sum' | 'avg' | 'median' | 'min' | 'max' | 'count' | 'count_distinct'
 export type DatasetId2 = string
 export type Description2 = string
@@ -134,19 +118,19 @@ export type DisplayName2 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence3 = (MaterialEvidence | ManualEvidence)[]
+export type Evidence1 = (MaterialEvidence | ManualEvidence)[]
 export type Column1 = string
 export type DatasetId3 = string
 export type Operator = 'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'in' | 'not_in' | 'between' | 'is_null' | 'not_null'
 /**
  * @maxItems 200
  */
-export type Values1 = (string | number | boolean | null)[]
+export type Values = (string | number | boolean | null)[]
 /**
  * @maxItems 50
  */
 export type Filters = Condition[]
-export type Id8 = string
+export type Id6 = string
 export type Kind8 = 'simple'
 export type Name3 = string
 /**
@@ -159,8 +143,8 @@ export type DisplayName3 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence4 = (MaterialEvidence | ManualEvidence)[]
-export type Id9 = string
+export type Evidence2 = (MaterialEvidence | ManualEvidence)[]
+export type Id7 = string
 export type Kind9 = 'ratio'
 export type Name4 = string
 export type NumeratorId = string
@@ -174,9 +158,9 @@ export type DisplayName4 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence5 = (MaterialEvidence | ManualEvidence)[]
+export type Evidence3 = (MaterialEvidence | ManualEvidence)[]
 export type Expression1 = string
-export type Id10 = string
+export type Id8 = string
 export type Kind10 = 'expression'
 export type Name5 = string
 /**
@@ -203,7 +187,7 @@ export type PropertyId = string
 /**
  * @maxItems 200
  */
-export type Values2 = (string | number | number | boolean | null)[]
+export type Values1 = (string | number | number | boolean | null)[]
 export type Kind11 = 'simple'
 export type Expression2 = string
 export type Kind12 = 'expression'
@@ -216,9 +200,9 @@ export type DisplayName5 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence6 = (MaterialEvidence | ManualEvidence)[]
+export type Evidence4 = (MaterialEvidence | ManualEvidence)[]
 export type Extends = string | null
-export type Id11 = string
+export type Id9 = string
 export type Name6 = string
 /**
  * @maxItems 50
@@ -235,8 +219,8 @@ export type DisplayName6 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence7 = (MaterialEvidence | ManualEvidence)[]
-export type Id12 = string
+export type Evidence5 = (MaterialEvidence | ManualEvidence)[]
+export type Id10 = string
 export type Identifier = boolean
 export type Name7 = string
 export type OwnerTypeId = string
@@ -253,9 +237,9 @@ export type DisplayName7 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence8 = (MaterialEvidence | ManualEvidence)[]
+export type Evidence6 = (MaterialEvidence | ManualEvidence)[]
 export type Expression3 = string
-export type Id13 = string
+export type Id11 = string
 export type Name8 = string
 export type OwnerId = string
 export type RuleOwnerKind = 'object_type' | 'property' | 'link_type' | 'value_type'
@@ -267,8 +251,8 @@ export type DisplayName8 = string | null
 /**
  * @maxItems 50
  */
-export type Evidence9 = (MaterialEvidence | ManualEvidence)[]
-export type Id14 = string
+export type Evidence7 = (MaterialEvidence | ManualEvidence)[]
+export type Id12 = string
 export type Name9 = string
 export type ValueTypes = ValueType[]
 export type WorkspaceId = string
@@ -277,8 +261,6 @@ export interface CoreDraft {
   datasets?: Datasets
   link_types?: LinkTypes
   mappings?: Mappings
-  material_links?: MaterialLinks
-  material_objects?: MaterialObjects
   metrics?: Metrics
   object_types?: ObjectTypes
   properties?: Properties
@@ -406,25 +388,6 @@ export interface MappingSource {
   id: Id5
   key_columns?: KeyColumns
 }
-export interface MaterialLink {
-  evidence?: Evidence1
-  id: Id6
-  source_id: SourceId1
-  target_id: TargetId
-  type_id: TypeId1
-}
-/**
- * A document fact. Its display text is derived on read, not stored.
- */
-export interface MaterialObject {
-  evidence?: Evidence2
-  id: Id7
-  type_id: TypeId2
-  values?: Values
-}
-export interface Values {
-  [k: string]: string | number | boolean | null
-}
 /**
  * value_kind is derived on read and not accepted as input.
  */
@@ -433,9 +396,9 @@ export interface SimpleMetric {
   dataset_id: DatasetId2
   description?: Description2
   display_name?: DisplayName2
-  evidence?: Evidence3
+  evidence?: Evidence1
   filters?: Filters
-  id: Id8
+  id: Id6
   kind: Kind8
   measure?: ColumnReference | null
   name: Name3
@@ -445,7 +408,7 @@ export interface SimpleMetric {
 export interface Condition {
   column: ColumnReference
   operator: Operator
-  values?: Values1
+  values?: Values
 }
 export interface ColumnReference {
   column: Column1
@@ -458,8 +421,8 @@ export interface RatioMetric {
   denominator_id: DenominatorId
   description?: Description3
   display_name?: DisplayName3
-  evidence?: Evidence4
-  id: Id9
+  evidence?: Evidence2
+  id: Id7
   kind: Kind9
   name: Name4
   numerator_id: NumeratorId
@@ -469,9 +432,9 @@ export interface ExpressionMetric {
   dataset_id: DatasetId4
   description?: Description4
   display_name?: DisplayName4
-  evidence?: Evidence5
+  evidence?: Evidence3
   expression: Expression1
-  id: Id10
+  id: Id8
   kind: Kind10
   name: Name5
   synonyms?: Synonyms3
@@ -482,9 +445,9 @@ export interface ObjectType {
   derived_by?: DerivedBy
   description?: Description5
   display_name?: DisplayName5
-  evidence?: Evidence6
+  evidence?: Evidence4
   extends?: Extends
-  id: Id11
+  id: Id9
   name: Name6
   synonyms?: Synonyms4
   tags?: Tags1
@@ -500,7 +463,7 @@ export interface DerivedSimple {
 export interface PathCondition {
   operator: Operator
   path: Path
-  values?: Values2
+  values?: Values1
 }
 /**
  * From a context object, through links, to one property. Ontology rules and
@@ -521,8 +484,8 @@ export interface DerivedExpression {
 export interface Property {
   description?: Description6
   display_name?: DisplayName6
-  evidence?: Evidence7
-  id: Id12
+  evidence?: Evidence5
+  id: Id10
   identifier?: Identifier
   name: Name7
   owner_type_id: OwnerTypeId
@@ -535,9 +498,9 @@ export interface Property {
 export interface Rule {
   description?: Description7
   display_name?: DisplayName7
-  evidence?: Evidence8
+  evidence?: Evidence6
   expression: Expression3
-  id: Id13
+  id: Id11
   name: Name8
   owner_id: OwnerId
   owner_kind: RuleOwnerKind
@@ -549,8 +512,8 @@ export interface Rule {
 export interface ValueType {
   description?: Description8
   display_name?: DisplayName8
-  evidence?: Evidence9
-  id: Id14
+  evidence?: Evidence7
+  id: Id12
   name: Name9
   value_kind: ValueKind
 }

@@ -284,7 +284,7 @@ def test_material_origin_alembic_upgrade_backfills_existing_and_defaults_new_row
     ini = Path(__file__).parents[1] / "src/ontofoundry_api/alembic.ini"
     alembic = Config(str(ini))
     command.stamp(alembic, "20261020_000002")
-    command.upgrade(alembic, "head")
+    command.upgrade(alembic, "20261021_000001")
     column = next(c for c in inspect(engine).get_columns("materials") if c["name"] == "origin")
     assert column["nullable"] is False and column["default"] == "'upload'"
     with engine.begin() as connection:
@@ -297,5 +297,5 @@ def test_material_origin_alembic_upgrade_backfills_existing_and_defaults_new_row
     assert client.get(ROOT + f"/materials/{uploaded['id']}").text == "虚构迁移前材料"
     command.downgrade(alembic, "20261020_000002")
     assert "origin" not in {c["name"] for c in inspect(engine).get_columns("materials")}
-    command.upgrade(alembic, "head")
+    command.upgrade(alembic, "20261021_000001")
     assert {m["origin"] for m in client.get(ROOT + "/materials").json()["items"]} == {"upload"}

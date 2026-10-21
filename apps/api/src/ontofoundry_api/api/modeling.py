@@ -67,6 +67,7 @@ class ElementSave(Strict):
     expected_session_revision: int | None = None
     draft: dict
     affected_items: list[AffectedItem] = Field(default_factory=list)
+    expected_instance_change_sequence: int | None = None
 
 
 @router.post("/element-saves/preview", response_model=ElementSaveImpact)
@@ -99,6 +100,10 @@ def save_element(
             code="VERSION_CHANGED",
             status_code=409,
         )
+    if body.expected_instance_change_sequence is not None:
+        from ontofoundry_api.services.instance_store import change_sequence
+        if body.expected_instance_change_sequence != change_sequence(db, workspace_id):
+            raise ServiceError("实例集合在预览后已变化，请重新预览", code="PREVIEW_OUTDATED", status_code=409)
     latest = version_snapshot(db, workspace_id, space.current_version_id)
     item = None
     if body.session_id:
@@ -163,6 +168,7 @@ def save_element(
             draft=model,
             user_id=user.id,
             message="保存本体元素",
+            session_id=item.id if item else None,
             commit=False,
         )
         if item:
@@ -357,6 +363,8 @@ def session_data(item):
         "result_warnings": item.result_warnings,
         "result_claimed_at": item.result_claimed_at,
         "updated_at": item.updated_at,
+        "abandoned_at": item.abandoned_at,
+        "abandoned_by": item.abandoned_by,
         "graph": {
             "workspace_id": item.workspace_id,
             "version_id": item.base_version_id or "",
@@ -368,6 +376,8 @@ def session_data(item):
 
 
 def blocks_edits(item):
+    if item.abandoned_at is not None:
+        raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     return False
 
 
@@ -430,6 +440,7 @@ class SessionPublish(Strict):
     expected_session_revision: int
     expected_current_version_id: str | None = None
     expected_merged_snapshot_sha256: str | None = None
+    expected_instance_change_sequence: int | None = None
     message: str = Field(default="", max_length=240)
 
     @property
@@ -792,6 +803,11 @@ def publish_session(
                 details={"current_version_id": space.current_version_id},
             )
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
+    from ontofoundry_api.services.instance_store import change_sequence
+    if body.expected_instance_change_sequence != change_sequence(db, workspace_id):
+        raise ServiceError("实例集合在预览后已变化，请重新预览", code="PREVIEW_OUTDATED", status_code=409)
+    if item.abandoned_at is not None:
+        raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     if body.strict and space.current_version_id != body.expected_current_version_id:
         # Even a change that would merge cleanly is content the user has not
         # seen: never publish it silently (design §9.3).
@@ -867,6 +883,7 @@ def publish_session(
             draft=model,
             user_id=user.id,
             message=body.message,
+            session_id=session_id,
             commit=False,
         )
         item.base_version_id = version.id
@@ -1006,6 +1023,15 @@ def preview_definition(
             },
         )
     report = validate_draft(merge.merged, space)
+    from ontofoundry_api.services.instance_store import publish_impact
+    instance_impact = {"instance_change_sequence": 0, "affected_instances": []}
+    if report["publishable"]:
+        instance_impact = publish_impact(db, workspace_id, merge.merged, session_id)
+        if instance_impact["affected_instances"]:
+            report = {**report, "publishable": False}
+    else:
+        from ontofoundry_api.services.instance_store import change_sequence
+        instance_impact["instance_change_sequence"] = change_sequence(db, workspace_id)
     current = current_version(db, workspace_id) if space.current_version_id else None
     changes = element_changes(merge.latest, merge.merged)
     base = (
@@ -1031,6 +1057,7 @@ def preview_definition(
         + 1,
         "current_version_sha256": snapshot_sha256(merge.latest),
         "merged_snapshot_sha256": merge.merged_sha256,
+        **instance_impact,
         "merged_model": merge.merged,
         "validation": report,
         "changes": changes,

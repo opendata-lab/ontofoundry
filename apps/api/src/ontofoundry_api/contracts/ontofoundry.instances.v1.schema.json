@@ -1,0 +1,570 @@
+{
+  "$defs": {
+    "AbandonSessionRead": {
+      "additionalProperties": false,
+      "properties": {
+        "abandoned_at": {
+          "format": "date-time",
+          "title": "Abandoned At",
+          "type": "string"
+        },
+        "abandoned_by": {
+          "title": "Abandoned By",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "abandoned_at",
+        "abandoned_by"
+      ],
+      "title": "AbandonSessionRead",
+      "type": "object"
+    },
+    "AffectedInstanceRead": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "material_object",
+            "material_link"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "reason"
+      ],
+      "title": "AffectedInstanceRead",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "InstanceBaseline": {
+      "additionalProperties": false,
+      "properties": {
+        "change_sequence": {
+          "minimum": 0,
+          "title": "Change Sequence",
+          "type": "integer"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/InstanceBaselineItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "change_sequence",
+        "items"
+      ],
+      "title": "InstanceBaseline",
+      "type": "object"
+    },
+    "InstanceBaselineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "element": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialObject"
+            },
+            {
+              "$ref": "#/$defs/MaterialLink"
+            }
+          ],
+          "title": "Element"
+        },
+        "hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Hash",
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Session Id"
+        },
+        "state": {
+          "enum": [
+            "staged",
+            "active",
+            "deleted"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "material_object",
+            "material_link"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "revision",
+        "state",
+        "session_id",
+        "element",
+        "hash"
+      ],
+      "title": "InstanceBaselineItem",
+      "type": "object"
+    },
+    "InstanceHistoryRead": {
+      "additionalProperties": false,
+      "properties": {
+        "actor": {
+          "title": "Actor",
+          "type": "string"
+        },
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstanceHistorySnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InstanceHistorySnapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "owner_id": {
+          "format": "uuid",
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "enum": [
+            "instance",
+            "link"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
+        },
+        "proposal_item_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Proposal Item Id"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "owner_kind",
+        "owner_id",
+        "revision",
+        "operation",
+        "before",
+        "after",
+        "proposal_item_id",
+        "actor",
+        "at"
+      ],
+      "title": "InstanceHistoryRead",
+      "type": "object"
+    },
+    "InstanceHistorySnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "element": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialObject"
+            },
+            {
+              "$ref": "#/$defs/MaterialLink"
+            }
+          ],
+          "title": "Element"
+        },
+        "revision": {
+          "minimum": 1,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Session Id"
+        },
+        "state": {
+          "enum": [
+            "staged",
+            "active",
+            "deleted"
+          ],
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "element",
+        "state",
+        "revision",
+        "session_id"
+      ],
+      "title": "InstanceHistorySnapshot",
+      "type": "object"
+    },
+    "InstancePublishImpact": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_instances": {
+          "items": {
+            "$ref": "#/$defs/AffectedInstanceRead"
+          },
+          "title": "Affected Instances",
+          "type": "array"
+        },
+        "instance_change_sequence": {
+          "minimum": 0,
+          "title": "Instance Change Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "instance_change_sequence",
+        "affected_instances"
+      ],
+      "title": "InstancePublishImpact",
+      "type": "object"
+    },
+    "ManualEvidence": {
+      "additionalProperties": false,
+      "description": "A member vouching for a fact. Author and time are written by the server.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "MaterialEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "material_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Material Id",
+          "type": "string"
+        },
+        "material_sha256": {
+          "title": "Material Sha256",
+          "type": "string"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "material_id",
+        "material_sha256",
+        "locator"
+      ],
+      "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "MaterialLink": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "source_id": {
+          "format": "uuid",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "format": "uuid",
+          "title": "Target Id",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "source_id",
+        "target_id"
+      ],
+      "title": "MaterialLink",
+      "type": "object"
+    },
+    "MaterialObject": {
+      "additionalProperties": false,
+      "description": "A document fact. Its display text is derived on read, not stored.",
+      "properties": {
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        },
+        "values": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "type_id"
+      ],
+      "title": "MaterialObject",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.instances.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/InstanceBaseline"
+    },
+    {
+      "$ref": "#/$defs/InstanceHistoryRead"
+    },
+    {
+      "$ref": "#/$defs/AbandonSessionRead"
+    },
+    {
+      "$ref": "#/$defs/InstancePublishImpact"
+    }
+  ],
+  "title": "OntoFoundry instance store v1"
+}

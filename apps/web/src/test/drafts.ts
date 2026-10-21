@@ -5,7 +5,10 @@ import type { CoreDraft } from "../api/core.generated";
 import type { Draft, Metric } from "../api/types";
 import { core1Example } from "./core1Fixtures";
 
-export function storedDraft(source: CoreDraft): Draft {
+/** Instances are no longer part of core-1; tests may still pass some to display. */
+type WithInstances = { material_objects?: Partial<Draft["material_objects"][number]>[]; material_links?: Partial<Draft["material_links"][number]>[] };
+
+export function storedDraft(source: CoreDraft & WithInstances): Draft {
   return {
     schema_version: "core-1",
     workspace_id: source.workspace_id,
@@ -67,8 +70,8 @@ export function storedDraft(source: CoreDraft): Draft {
       ...m,
       sources: (m.sources ?? []).map((s) => ({ key_columns: [], ...s })),
     })),
-    material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o })),
-    material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l })),
+    material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o }) as Draft["material_objects"][number]),
+    material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l }) as Draft["material_links"][number]),
     value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
   };
 }

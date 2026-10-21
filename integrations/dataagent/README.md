@@ -27,7 +27,7 @@ PYTHONDONTWRITEBYTECODE=1 apps/api/.venv/bin/python integrations/dataagent/scrip
 make -C integrations/dataagent zip
 ```
 
-make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json`，只读不修改 apps。两个抽取技能按 target_kind 裁剪，保留所有可达定义和其余约束，禁止手工维护；semantic-grounding Schema 对应设计 §5。最终组合结果仍按工作包的完整平台 Schema 校验，不按技能子集拒收其他提案。
+make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ontofoundry_api/contracts/ontofoundry.proposals.v1.schema.json`，只读不修改 apps。实例内容以 `ontofoundry.instances.v1.schema.json` 为准，生成器核对它与提案中实例元素定义一致，契约漂移时拒绝生成。两个抽取技能按 target_kind 裁剪，保留所有可达定义和其余约束，禁止手工维护；semantic-grounding Schema 对应设计 §5。最终组合结果仍按工作包的完整平台 Schema 校验，不按技能子集拒收其他提案。
 
 产物（dist 已忽略，不提交）：
 
@@ -46,6 +46,8 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 4. 已有 [建模 Agent](agents/agent_ontofoundry.md) 挂载 ontology-discovery、entity-extraction，max_turns=40，动态选择和组合；已有 [问数 Agent](agents/agent_ontofoundry_qa.md) 挂载 semantic-grounding。同步“系统提示词：”后的正文并发布。问数正文已瘦身，检索顺序和查询语义在技能里，必须成套部署。
 5. 停用并备份移走旧 ontofoundry-modeling，由运维重启 DataAgent，检查三技能 capabilities。自动测试和安装脚本不操作后台、不重启外部系统。
 6. 获授权后在新会话做真实建模与问数验收，DeepSeek 预算先确认。检查证据、完整结果、歧义追问、授权边界、真实 U/C/O 及压缩缓存；离线 bytes/3 不是实际 usage。
+
+工作包 `proposal_context.instance_baseline` 固定 active 与本会话 staged 实例（不含其他会话 staged／deleted）；`draft` 和 `element_hashes` 只含定义。更新／删除按 target_kind+target_id 定位，before 复制 element，expected_target_hash 复制含 revision 的 hash；不存在或不一致分别报 TARGET_NOT_FOUND、BEFORE_MISMATCH、TARGET_HASH_MISMATCH。输出仍为 ontofoundry.proposals/v1，不增加头字段。
 
 实例抽取沿用 material_object／material_link 契约，界面说明称“文档实例”“关系实例”。同运行定义与实例片段共享 modeling/ 和 execution，由 prepare_result.py 合为一个结果文件，最多两轮修正，平台拒收后保留累计计数。平台只引用已有 Agent，不新建、不修改其配置。
 

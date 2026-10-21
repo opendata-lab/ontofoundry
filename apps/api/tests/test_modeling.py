@@ -42,6 +42,7 @@ def publish(client, session):
             "expected_session_revision": session["revision"],
             "expected_current_version_id": body["current_version_id"],
             "expected_merged_snapshot_sha256": body["merged_snapshot_sha256"],
+            "expected_instance_change_sequence": body["instance_change_sequence"],
         },
     )
 

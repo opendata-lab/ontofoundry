@@ -27,7 +27,8 @@ from ontofoundry_api.domain.canonical import (
     domain_sha256,
     element_sha256,
 )
-from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
+from ontofoundry_api.domain.instances import INSTANCE_KINDS, definitions, instance_hash
+from ontofoundry_api.domain.models import COLLECTIONS, PROPOSAL_COLLECTIONS, ElementKind
 
 
 def store_batch(
@@ -45,6 +46,9 @@ def store_batch(
     Older pending items aimed at a target this batch also proposes to change
     are superseded; history is kept.
     """
+    if manifest.get("invalidated"):
+        from ontofoundry_api.services.errors import ServiceError
+        raise ServiceError("运行固定上下文已失效，请重新运行", code="RUN_CONTEXT_INVALIDATED", status_code=409)
     existing = db.scalar(
         select(ProposalBatchRecord).where(
             ProposalBatchRecord.workspace_id == workspace_id,
@@ -114,6 +118,7 @@ def store_batch(
                 target_kind=item.target_kind,
                 target_id=item.target_id,
                 expected_target_hash=item.expected_target_hash,
+                expected_instance_revision=item.expected_instance_revision,
                 before_json=item.before,
                 after_json=item.after,
                 field_changes_json=item.field_changes,
@@ -208,6 +213,7 @@ def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[st
     return {
         "run": {k: v for k, v in proposal_header(manifest).items() if k != "items"},
         "draft": draft,
+        "instance_baseline": manifest.get("instance_baseline", {"change_sequence": 0, "items": []}),
         "element_hashes": {
             str(element["id"]): element_sha256(element, collection=collection)
             for collection in COLLECTIONS.values()
@@ -222,7 +228,7 @@ def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[st
 def _elements(draft: dict[str, Any]) -> dict[str, tuple[str, dict]]:
     return {
         str(element["id"]): (kind.value, element)
-        for kind, collection in COLLECTIONS.items()
+        for kind, collection in PROPOSAL_COLLECTIONS.items()
         for element in draft.get(collection) or []
     }
 
@@ -231,9 +237,13 @@ def effective_statuses(
     items: list[ProposalItemRecord],
     dependencies: dict[str, list[str]],
     draft: dict[str, Any],
+    instance_baseline: dict | None = None,
 ) -> dict[str, tuple[str, str]]:
     """item id -> (effective status, reason). Pure; see module docstring."""
+    from ontofoundry_api.domain.instances import baseline_elements
     elements = _elements(draft)
+    elements.update(baseline_elements(instance_baseline))
+    revisions = {i["target_id"]: i["revision"] for i in (instance_baseline or {}).get("items", [])}
     by_id = {item.id: item for item in items}
     result: dict[str, tuple[str, str]] = {}
 
@@ -247,8 +257,10 @@ def effective_statuses(
             return "pending", ""
         if found is None or found[0] != item.target_kind:
             return "conflict", "目标元素已被删除或类型已改变"
-        collection = COLLECTIONS[ElementKind(found[0])]
-        current_hash = element_sha256(found[1], collection=collection)
+        collection = PROPOSAL_COLLECTIONS[ElementKind(found[0])]
+        current_hash = (instance_hash(found[1], revisions[item.target_id])
+            if found[0] in INSTANCE_KINDS and item.target_id in revisions
+            else element_sha256(found[1], collection=collection))
         if current_hash != item.expected_target_hash:
             previous = item.before_json
             legacy_unchanged = (
@@ -320,10 +332,11 @@ def dependency_map(
     if session is not None:
         items = batch_items(db, batch_ids, workspace_id, session_id)
         by_target = {i.target_id: i for i in items}
-        candidate = deepcopy(session.draft_json)
+        from ontofoundry_api.services.instance_store import session_snapshot
+        candidate = deepcopy(session_snapshot(db, workspace_id, session_id, session.draft_json))
         for item in items:
             if item.status in {"pending", "accepted"}:
-                collection = COLLECTIONS[ElementKind(item.target_kind)]
+                collection = PROPOSAL_COLLECTIONS[ElementKind(item.target_kind)]
                 candidate[collection] = [
                     e for e in candidate[collection] if e["id"] != item.target_id
                 ]
@@ -332,8 +345,9 @@ def dependency_map(
         try:
             from ontofoundry_api.domain.core import CoreDraft
             from ontofoundry_api.domain.dependencies import reference_index
-
-            references = reference_index(CoreDraft.model_validate(candidate))
+            from ontofoundry_api.domain.instances import instance_references
+            model = CoreDraft.model_validate(definitions(candidate))
+            references = {**reference_index(model), **instance_references(model, candidate["material_objects"], candidate["material_links"])}
             for owner, refs in references.items():
                 item = by_target.get(str(owner))
                 if item is None:
@@ -423,7 +437,8 @@ def proposal_state(db: Session, workspace_id: str, session_id: str) -> tuple:
             ProposalItemRecord.session_id == session_id,
         )
     ).all()
-    return tuple(sorted(map(tuple, batches))), tuple(sorted(map(tuple, items)))
+    from ontofoundry_api.services.instance_store import change_sequence
+    return tuple(sorted(map(tuple, batches))), tuple(sorted(map(tuple, items))), change_sequence(db, workspace_id)
 
 
 def pending_summary(
@@ -441,7 +456,8 @@ def pending_summary(
     ids = [row.id for row in batches]
     items = batch_items(db, ids, workspace_id, session_id)
     statuses = effective_statuses(
-        items, dependency_map(db, ids, workspace_id, session_id), draft
+        items, dependency_map(db, ids, workspace_id, session_id), draft,
+        __import__("ontofoundry_api.services.instance_store", fromlist=["baseline"]).baseline(db, workspace_id, session_id)
     )
     # The batch to show by default: the newest one that can be acted on.
     available = [row.id for row in batches if row.status == "available"]

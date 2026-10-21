@@ -42,6 +42,8 @@ def test_old_head_cutover_sqlite_is_idempotent_preserves_unrelated_rows(client):
     engine = client.app.state.engine
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
+        for table in ("instance_history", "instance_evidence", "instance_links", "document_instances"):
+            conn.exec_driver_sql(f"DELETE FROM {table}")
         conn.exec_driver_sql("ALTER TABLE proposal_items DROP COLUMN atomic_group_id")
         conn.exec_driver_sql(
             "ALTER TABLE ontology_versions ADD COLUMN ossie_json JSON NOT NULL DEFAULT '{}'"

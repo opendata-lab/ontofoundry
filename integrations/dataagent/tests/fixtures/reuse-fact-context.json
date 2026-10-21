@@ -5,9 +5,9 @@
     "workspace_id": "22222222-2222-4222-8222-222222222222",
     "session_id": "44444444-4444-4444-8444-444444444444",
     "base_version_id": null,
-    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "base_version_sha256": "03d8fc56eee3845fe7a6aaa5fb8180d4bcb50d944472efdc8ea4ee9f58a4fd86",
     "source_session_revision": 1,
-    "source_draft_sha256": "0c64fe123a68b48f3fdc269bb1503b971feed804ca4a63c20e6361b9efdb885a"
+    "source_draft_sha256": "10781b94b6faed2ec4abf7af72bd9625bb0ed36c8466a31a00e454b01de680e4"
   },
   "draft": {
     "schema_version": "core-1",
@@ -47,42 +47,51 @@
     "metrics": [],
     "datasets": [],
     "mappings": [],
-    "material_objects": [
-      {
-        "id": "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34",
-        "type_id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
-        "values": {
-          "staff_name": "小岚"
-        },
-        "evidence": [
-          {
-            "kind": "material",
-            "id": "7239caac-0a20-5af3-9fde-bf4d89ff39eb",
-            "material_id": "11111111-1111-4111-8111-111111111111",
-            "material_sha256": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
-            "locator": {
-              "heading": null,
-              "line_start": 1,
-              "line_end": 1
-            },
-            "quote": "澄页图书馆的小岚向小舟汇报。"
-          },
-          {
-            "kind": "manual",
-            "id": "99999999-9999-4999-8999-999999999999",
-            "note": "已确认姓名",
-            "created_by": "fictional-reviewer",
-            "created_at": "2026-10-20T00:00:00Z"
-          }
-        ]
-      }
-    ],
-    "material_links": [],
     "value_types": []
   },
   "element_hashes": {
     "5976dd92-f3af-5662-bf15-fa58ce5b18c7": "6136f1e5ed7a1a4236150b4b753c8a6991b9661e45a640943732283e5a9b5466",
-    "ad90d83c-75fe-5039-a87b-4aff9c675b37": "73c1b81f3609c6460431f5e762978269d5d258ba3ba6d9e5269351a507d81419",
-    "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34": "afe3bbbc04f7de66dff1785ff7c213ee9ea9f9b58d27daec8e756505de7823f3"
+    "ad90d83c-75fe-5039-a87b-4aff9c675b37": "73c1b81f3609c6460431f5e762978269d5d258ba3ba6d9e5269351a507d81419"
+  },
+  "instance_baseline": {
+    "change_sequence": 12,
+    "items": [
+      {
+        "target_kind": "material_object",
+        "target_id": "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34",
+        "revision": 3,
+        "state": "active",
+        "session_id": null,
+        "element": {
+          "id": "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34",
+          "type_id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
+          "values": {
+            "staff_name": "小岚"
+          },
+          "evidence": [
+            {
+              "kind": "material",
+              "id": "7239caac-0a20-5af3-9fde-bf4d89ff39eb",
+              "material_id": "11111111-1111-4111-8111-111111111111",
+              "material_sha256": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
+              "locator": {
+                "heading": null,
+                "line_start": 1,
+                "line_end": 1
+              },
+              "quote": "澄页图书馆的小岚向小舟汇报。"
+            },
+            {
+              "kind": "manual",
+              "id": "99999999-9999-4999-8999-999999999999",
+              "note": "已确认姓名",
+              "created_by": "fictional-reviewer",
+              "created_at": "2026-10-20T00:00:00Z"
+            }
+          ]
+        },
+        "hash": "bb46218b996a618773acc5ad9c914a0b79fd16e77b9214e84f74db220469134e"
+      }
+    ]
   }
 }

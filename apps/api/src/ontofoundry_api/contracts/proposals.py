@@ -25,9 +25,19 @@ from ontofoundry_api.domain.evidence import (
     MaterialLookup,
     check_material_evidence,
 )
+from ontofoundry_api.domain.instances import (
+    INSTANCE_KINDS,
+    baseline_elements,
+    combined_snapshot,
+    definitions,
+    instance_hash,
+    instance_references,
+    validate_instances,
+)
 from ontofoundry_api.domain.models import (
     COLLECTIONS,
     ELEMENT_MODELS,
+    PROPOSAL_COLLECTIONS,
     ElementKind,
     OntologyDraft,
 )
@@ -227,6 +237,7 @@ class RunContext:
     source_session_revision: int
     source_draft_sha256: str
     draft: dict[str, Any]  # the pinned session draft
+    instance_baseline: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -246,6 +257,7 @@ class ParsedItem:
     fingerprint: str
     depends_on: list[str] = field(default_factory=list)
     atomic_group_id: str | None = None
+    expected_instance_revision: int | None = None
 
 
 @dataclass
@@ -347,9 +359,9 @@ def walk_references(kind, value, resolve):
 def apply_items(draft, items):
     candidate = deepcopy(draft)
     for item in items:
-        collection = COLLECTIONS[ElementKind(item.target_kind)]
+        collection = PROPOSAL_COLLECTIONS[ElementKind(item.target_kind)]
         candidate[collection] = [
-            e for e in candidate[collection] if e["id"] != item.target_id
+            e for e in candidate.get(collection, []) if e["id"] != item.target_id
         ]
         if item.after is not None:
             candidate[collection].append(deepcopy(item.after))
@@ -358,19 +370,28 @@ def apply_items(draft, items):
 
 def group_items(draft, items, *, references_resolved=False):
     """Group cyclic references and edits requiring simultaneous final-graph validation."""
-    before = CoreDraft.model_validate(draft)
+    before = CoreDraft.model_validate(definitions(draft))
     candidate = (
-        OntologyDraft.model_validate(apply_items(draft, items))
+        OntologyDraft.model_validate(definitions(apply_items(draft, items)))
         if references_resolved
         else validate_candidate_graph(
-            before, CoreDraft.model_validate(apply_items(draft, items))
+            before, CoreDraft.model_validate(definitions(apply_items(draft, items)))
         )
     )
+    instance_candidate = apply_items(draft, [i for i in items if i.target_kind in INSTANCE_KINDS])
+    objects = instance_candidate.get("material_objects", [])
+    links = instance_candidate.get("material_links", [])
+    object_lookup = {o["id"]: o for o in objects}
+    changed_links = [i.after for i in items if i.target_kind == "material_link" and i.after is not None]
+    relevant_ids = {i.target_id for i in items if i.target_kind == "material_object" and i.after is not None}
+    relevant_ids.update(e for link in changed_links for e in (link["source_id"], link["target_id"]))
+    validate_instances(candidate, [object_lookup[i] for i in relevant_ids if i in object_lookup], changed_links)
     final = {
         str(e.id): e.model_dump(mode="json")
         for c in COLLECTIONS.values()
         for e in getattr(candidate, c)
     }
+    final.update({e["id"]: e for e in [*objects, *links]})
     by_target = {i.target_id: i for i in items}
     previous_evidence = {
         str(e.id): str(item.id)
@@ -385,7 +406,7 @@ def group_items(draft, items, *, references_resolved=False):
                     str(evidence.id)
                 ] != str(element.id):
                     raise ValueError("证据 UUID 不能转移归属")
-    refs = reference_index(candidate)
+    refs = {**reference_index(candidate), **instance_references(candidate, objects, links)}
     deps = {i.id: set(i.depends_on) for i in items}
     for item in items:
         if item.after is not None:
@@ -397,10 +418,10 @@ def group_items(draft, items, *, references_resolved=False):
             dependency = by_target.get(str(ref.target_id))
             if dependency and dependency.id != item.id:
                 deps[item.id].add(dependency.id)
-    original = {e["id"]: e for c in COLLECTIONS.values() for e in draft[c]}
+    original = {e["id"]: e for c in PROPOSAL_COLLECTIONS.values() for e in draft.get(c, [])}
     # Renames and deletions must include the changed reverse references. A
     # partial accept must never leave an old textual name dangling.
-    old_refs = reference_index(before)
+    old_refs = {**reference_index(before), **instance_references(before, draft.get("material_objects", []), draft.get("material_links", []))}
     for owner, references in old_refs.items():
         for reference in references:
             changed = by_target.get(str(reference.target_id))
@@ -561,6 +582,9 @@ def parse_result(
                 actual=data[name],
             )
     existing = {e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft.get(c, [])}
+    existing.update({identity: (ElementKind(kind), element)
+        for identity, (kind, element) in baseline_elements(context.instance_baseline).items()})
+    instance_entries = {i["target_id"]: i for i in context.instance_baseline.get("items", [])}
     batch_id = batch_id_for(context.session_id, context.run_token)
     refs, targets = {}, {}
     for n, item in enumerate(data["items"]):
@@ -637,14 +661,16 @@ def parse_result(
                     expected=current,
                     actual=item["before"],
                 )
-            if element_sha256(current, collection=COLLECTIONS[kind]) != item.get(
+            expected_hash = (instance_hash(current, instance_entries[target]["revision"])
+                if kind.value in INSTANCE_KINDS else element_sha256(current, collection=COLLECTIONS[kind]))
+            if expected_hash != item.get(
                 "expected_target_hash"
             ):
                 fail(
                     "TARGET_HASH_MISMATCH",
                     "目标哈希不一致",
                     pointer=current_pointer + "/expected_target_hash",
-                    expected=element_sha256(current, collection=COLLECTIONS[kind]),
+                    expected=expected_hash,
                     actual=item.get("expected_target_hash"),
                 )
             targets[n] = target
@@ -773,7 +799,10 @@ def parse_result(
             )
         )
     try:
-        group_items(context.draft, parsed)
+        for item in parsed:
+            if item.target_kind in INSTANCE_KINDS and item.operation != "create":
+                item.expected_instance_revision = instance_entries[item.target_id]["revision"]
+        group_items(combined_snapshot(context.draft, context.instance_baseline), parsed)
     except ValueError as exc:
         raise ProposalContractError(
             "ELEMENT_INVALID",

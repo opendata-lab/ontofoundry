@@ -37,3 +37,8 @@ def example_draft_json(name: str) -> dict:
 
 def example_draft(name: str) -> CoreDraft:
     return CoreDraft.model_validate(example_draft_json(name))
+
+
+def example_instances(name):
+    source = Path(__file__).parent / "fixtures" / "document_instances.json"
+    return json.loads(source.read_text()).get(name, {"material_objects": [], "material_links": []})

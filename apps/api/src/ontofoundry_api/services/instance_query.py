@@ -7,12 +7,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ontofoundry_api.domain.core import MaterialLink, MaterialObject
 from ontofoundry_api.domain.graph import DraftIndex
 from ontofoundry_api.domain.instance_display import document_display_text
 from ontofoundry_api.domain.instance_validation import value_issues
 from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
+from ontofoundry_api.services.instance_store import change_sequence, visible
 from ontofoundry_api.services.ontology_query import version_hashes
 
 
@@ -70,11 +72,12 @@ def parse_ref(ref):
     raise ServiceError("实例引用无效", code="INVALID_OBJECT_REF", status_code=422)
 
 
-def document_object(obj, draft):
+def document_object(obj, draft, entry=None):
     return {
         **obj.model_dump(mode="json"),
         "ref": "doc." + str(obj.id),
         "source": "document",
+        **({"revision": entry["revision"], "state": entry["state"]} if entry else {}),
         "display_text": document_display_text(draft, obj),
     }
 
@@ -107,7 +110,7 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
         raise NotFoundError("对象类型不存在")
     if options.source == "document" and options.snapshot_date:
         raise ServiceError(
-            "文档事实不接受快照日期", code="VALIDATION_FAILED", status_code=422
+            "文档实例不接受快照日期", code="VALIDATION_FAILED", status_code=422
         )
     context = [
         version.workspace_id,
@@ -118,7 +121,9 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
         options.q,
         options.snapshot_date,
         permission_fingerprint,
+        change_sequence(db, version.workspace_id) if options.source == "document" else None,
     ]
+    stored = visible(db, version.workspace_id, draft) if options.source == "document" else {}
     offset, _ = decode_cursor(settings, options.cursor, context)
     if options.source == "database":
         if not options.type_id:
@@ -143,7 +148,8 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
     else:
         rows = [
             o
-            for o in draft.material_objects
+            for entry in stored["objects"]
+            for o in [MaterialObject.model_validate(entry["element"])]
             if (not options.type_id or index.is_a(o.type_id, options.type_id))
             and options.q.casefold()
             in (
@@ -153,14 +159,16 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
             ).casefold()
         ]
         rows.sort(key=lambda o: o.id.bytes)
-        items = [document_object(o, draft) for o in rows[offset : offset + options.limit]]
+        entries = {e["target_id"]: e for e in stored["objects"]}
+        items = [document_object(o, draft, entries[str(o.id)]) for o in rows[offset : offset + options.limit]]
         more, dates = len(rows) > offset + options.limit, []
     truncated = more and offset + options.limit > 10000
     return {
         **envelope(version),
         "items": items,
         "source": options.source,
-        "data_mode": "live" if options.source == "database" else "snapshot",
+        "data_mode": "live",
+        **{k: v for k, v in stored.items() if k not in {"objects", "links"}},
         "snapshot_dates": dates,
         "next_cursor": encode_cursor(settings, context, offset + options.limit)
         if more and not truncated
@@ -180,15 +188,17 @@ def get_object(db, version, ref, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
     draft = read_snapshot(version.snapshot_json, version.workspace_id)
     dates = []
+    stored = visible(db, version.workspace_id, draft) if source == "document" else {}
     if source == "document":
         if snapshot_date:
             raise ServiceError(
-                "文档事实不接受快照日期", code="VALIDATION_FAILED", status_code=422
+                "文档实例不接受快照日期", code="VALIDATION_FAILED", status_code=422
             )
-        fact = next((o for o in draft.material_objects if str(o.id) == identity), None)
+        entry = next((e for e in stored["objects"] if e["target_id"] == identity), None)
+        fact = MaterialObject.model_validate(entry["element"]) if entry else None
         if fact is None:
-            raise NotFoundError("该版本中没有此文档事实")
-        item = document_object(fact, draft)
+            raise NotFoundError("该版本中没有此文档实例", details={"filtered_count": stored["filtered_count"], "warnings": stored["warnings"]})
+        item = document_object(fact, draft, entry)
     else:
         from ontofoundry_api.services.instance_plan import query_instances
 
@@ -209,7 +219,8 @@ def get_object(db, version, ref, settings, snapshot_date=None):
         **envelope(version),
         "item": item,
         "snapshot_dates": dates,
-        "data_mode": "live" if source == "database" else "snapshot",
+        "data_mode": "live",
+        **{k: v for k, v in stored.items() if k not in {"objects", "links"}},
         "quality_issues": value_issues(draft, UUID(item["type_id"]), item["values"], ref),
     }
 
@@ -217,6 +228,7 @@ def get_object(db, version, ref, settings, snapshot_date=None):
 def object_neighborhood(db, version, ref, depth, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
     draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    stored = visible(db, version.workspace_id, draft) if source == "document" else {}
     if source == "database":
         from types import SimpleNamespace
 
@@ -233,28 +245,30 @@ def object_neighborhood(db, version, ref, depth, settings, snapshot_date=None):
         )
     else:
         center = get_object(db, version, ref, settings, snapshot_date)["item"]
-        visible, frontier, edges, truncated = {identity}, {identity}, {}, False
+        visible_ids, frontier, edges, truncated = {identity}, {identity}, {}, False
         for _ in range(depth):
             following = set()
-            for link in draft.material_links:
+            for entry in stored["links"]:
+                link = MaterialLink.model_validate(entry["element"])
                 ends = {str(link.source_id), str(link.target_id)}
                 if not frontier.intersection(ends):
                     continue
-                if len(visible | ends) > 100 or (
+                if len(visible_ids | ends) > 100 or (
                     len(edges) >= 300 and str(link.id) not in edges
                 ):
                     truncated = True
                     continue
-                following.update(ends - visible)
-                visible.update(ends)
+                following.update(ends - visible_ids)
+                visible_ids.update(ends)
                 edges[str(link.id)] = link.model_dump(mode="json")
             frontier = following
         result = {
             "center_id": center["id"],
             "objects": [
-                document_object(o, draft)
-                for o in draft.material_objects
-                if str(o.id) in visible
+                document_object(o, draft, entry)
+                for entry in stored["objects"]
+                for o in [MaterialObject.model_validate(entry["element"])]
+                if str(o.id) in visible_ids
             ],
             "links": list(edges.values()),
             "source": "document",
@@ -266,6 +280,7 @@ def object_neighborhood(db, version, ref, depth, settings, snapshot_date=None):
     return {
         **envelope(version),
         **result,
-        "data_mode": "live" if source == "database" else "snapshot",
+        "data_mode": "live",
+        **{k: v for k, v in stored.items() if k not in {"objects", "links"}},
         "quality_issues": [],
     }

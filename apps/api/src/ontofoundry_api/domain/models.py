@@ -38,42 +38,34 @@ class ElementKind(StrEnum):
     VALUE_TYPE = "value_type"
 
 
-COLLECTIONS = dict(
-    zip(
-        ElementKind,
-        (
-            "object_types",
-            "properties",
-            "link_types",
-            "rules",
-            "metrics",
-            "datasets",
-            "mappings",
-            "material_objects",
-            "material_links",
-            "value_types",
-        ),
-        strict=True,
-    )
-)
-ELEMENT_MODELS = dict(
-    zip(
-        ElementKind,
-        (
-            ObjectType,
-            Property,
-            LinkType,
-            Rule,
-            SimpleMetric | RatioMetric | ExpressionMetric,
-            Dataset,
-            DataMapping,
-            MaterialObject,
-            MaterialLink,
-            ValueType,
-        ),
-        strict=True,
-    )
-)
+# Ontology collections never contain instance data.
+COLLECTIONS = {
+    ElementKind.OBJECT_TYPE: "object_types",
+    ElementKind.PROPERTY: "properties",
+    ElementKind.LINK_TYPE: "link_types",
+    ElementKind.RULE: "rules",
+    ElementKind.METRIC: "metrics",
+    ElementKind.DATASET: "datasets",
+    ElementKind.MAPPING: "mappings",
+    ElementKind.VALUE_TYPE: "value_types",
+}
+INSTANCE_COLLECTIONS = {
+    ElementKind.MATERIAL_OBJECT: "material_objects",
+    ElementKind.MATERIAL_LINK: "material_links",
+}
+PROPOSAL_COLLECTIONS = {**COLLECTIONS, **INSTANCE_COLLECTIONS}
+ELEMENT_MODELS = {
+    ElementKind.OBJECT_TYPE: ObjectType,
+    ElementKind.PROPERTY: Property,
+    ElementKind.LINK_TYPE: LinkType,
+    ElementKind.RULE: Rule,
+    ElementKind.METRIC: SimpleMetric | RatioMetric | ExpressionMetric,
+    ElementKind.DATASET: Dataset,
+    ElementKind.MAPPING: DataMapping,
+    ElementKind.VALUE_TYPE: ValueType,
+    ElementKind.MATERIAL_OBJECT: MaterialObject,
+    ElementKind.MATERIAL_LINK: MaterialLink,
+}
 
 
 class OntologyDraft(CoreDraft):

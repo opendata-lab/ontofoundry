@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from check_result import COLLECTIONS
+from check_result import TARGET_KINDS, pinned_targets
 
 LIMIT = 8192
 PAGE_BYTES = 3000
@@ -28,11 +28,9 @@ def encode(value):
 class ElementIndex:
     def __init__(self, context):
         self.context = context
-        self.elements = {
-            e["id"]: (kind, e)
-            for kind, collection in COLLECTIONS.items()
-            for e in context["draft"].get(collection, [])
-        }
+        targets = pinned_targets(context)
+        self.elements = {identity: (kind, e) for (kind, identity), (e, _) in targets.items()}
+        self.hashes = {identity: h for (_, identity), (_, h) in targets.items()}
 
     def lineage(self, identity):
         seen = set()
@@ -81,9 +79,9 @@ class ElementIndex:
         matches = [i for i in self.elements if selector in self.selectors(i)]
         if len(matches) == 1:
             return matches[0], None
-        candidates = matches or [i for i, (k, _) in self.elements.items() if kind not in COLLECTIONS or kind == k]
+        candidates = matches or [i for i, (k, _) in self.elements.items() if kind not in TARGET_KINDS or kind == k]
         return None, {
-            "查询": selector, "错误": "英文标识有歧义" if matches else "元素不存在（仅支持精确英文标识或 id）",
+            "查询": selector, **({"code": "TARGET_NOT_FOUND"} if not matches else {}), "错误": "英文标识有歧义" if matches else "元素不存在（仅支持精确英文标识或 id）",
             "候选精确写法": sorted(self.exact_selector(i) for i in candidates),
         }
 
@@ -201,7 +199,7 @@ class ElementIndex:
         reverse = self.reverse_refs()
         return {"elements": [{
             "kind": self.elements[i][0], "selector": self.exact_selector(i),
-            "definition": self.elements[i][1], "hash": self.context["element_hashes"][i],
+            "definition": self.elements[i][1], "hash": self.hashes[i],
             "referenced_by": [{"id": r, **({"name": self.elements[r][1]["name"]} if "name" in self.elements[r][1] else {})} for r in sorted(reverse[i])],
         } for i in identities]}, 0
 

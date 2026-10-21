@@ -3,7 +3,8 @@
 Shape follows the item schema, client_ref is unique within the fragment and
 references inside the fragment are closed. References to other fragments are
 listed as "待合并检查" rather than reported as errors; the merged check in
-prepare_result.py decides them. Repair budgets are never touched.
+prepare_result.py decides them. Pinned before/hash checks use definitions and the independent instance baseline.
+Repair budgets are never touched.
 """
 
 import argparse

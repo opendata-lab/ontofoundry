@@ -59,6 +59,7 @@ def overview(
     )
     return workspace_overview(
         version,
+        db=session,
         include_mappings=can_read_mappings(session, workspace_id, principal),
         include_instances=can_read_instances(session, workspace_id, principal),
     )

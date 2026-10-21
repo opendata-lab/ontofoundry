@@ -32,6 +32,8 @@ function preview(extra: Partial<PublishPreview> = {}): PublishPreview {
     current_version_sha256: "c".repeat(64),
     merged_snapshot_sha256: "m".repeat(64),
     merged_model: emptyDraft("w"),
+    instance_change_sequence: 0,
+    affected_instances: [],
     validation: {
       standard: "core-1",
       schema_status: "passed",
@@ -119,6 +121,18 @@ async function publishFromHeader(version: number, note = "") {
 }
 
 describe("publish panel", () => {
+  it("blocks publishing while instances would no longer fit the new definitions", async () => {
+    vi.spyOn(publishApi, "preview").mockResolvedValue(preview({
+      affected_instances: [{ target_kind: "material_object", target_id: "i1", revision: 2, reason: "属性 联系电话 将被删除" }],
+    }));
+    renderPanel();
+    expect(await screen.findByRole("button", { name: "发布 v3" })).toBeDisabled();
+    expect(screen.getByText("校验未通过 · 1 个错误")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /检查/ }));
+    expect(screen.getByRole("alert")).toHaveTextContent("文档实例 i1：属性 联系电话 将被删除，请先处理这些实例再发布");
+  });
+
+
   it("shows what publishing changes and publishes with exactly the previewed values", async () => {
     vi.spyOn(publishApi, "preview").mockResolvedValue(preview());
     const publish = vi.spyOn(publishApi, "publish").mockResolvedValue({
