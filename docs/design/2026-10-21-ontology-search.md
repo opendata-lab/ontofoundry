@@ -17,12 +17,12 @@
 | 编号 | 决定 | 状态 |
 |---|---|---|
 | OS-01 | 继续使用现有 MCP 工具名 `search_ontology`，扩展而不是新增工具；空间与版本由 MCP 令牌绑定（含固定版本），不接受空间名称参数；返回信封保留 `workspace_id`、`version_id`。 | 已确认 |
-| OS-02 | 召回：关键词召回 + 向量召回并行，合并后做一层关系扩展，再按规则重排。 | 已确认 |
-| OS-03 | 向量来自内网已有、兼容 OpenAI `/v1/embeddings` 的服务；未配置或调用失败时只用关键词召回，检索照常可用，并在返回中注明。 | 已确认 |
+| OS-02 | 召回：本期只做关键词召回，合并后做一层关系扩展，再按规则重排。召回来源做成可插拔接口（输入查询与当前版本可见元素，输出命中元素与命中原因），向量召回作为后续的另一个实现接入，不改扩展与重排。 | 已确认（2026-10-21，向量延后） |
+| OS-03 | 向量召回延后实现。后续方案：向量来自内网兼容 OpenAI `/v1/embeddings` 的服务（可选配置），未配置或失败时只用关键词召回。本期返回中保留 `retrieval` 字段，固定为 `{"keyword": true, "vector": false}`。 | 已确认（2026-10-21，向量延后） |
 | OS-04 | 不返回数值分数或置信度，只返回顺序与命中原因（`match`）。 | 已确认（沿用“分数需标注校准”的判断） |
-| OS-05 | 未被任何定义覆盖的查询片段原样放入 `unmatched_terms`，不推测它是筛选值还是时间范围，由 Agent 判断。 | 已确认 |
-| OS-06 | 向量存于 pgvector：数据库镜像由 `postgres:17-alpine` 换为 `pgvector/pgvector:pg17`（compose、离线包、CI 同步），迁移中 `CREATE EXTENSION IF NOT EXISTS vector`。列不固定维度，不建 HNSW 索引：先按当前版本可见元素的文本哈希过滤再算余弦，元素数百个时无需索引；规模上来后按模型维度建索引。 | 已确认（2026-10-21） |
-| OS-08 | 同一检索服务提供两个入口：MCP 工具 `search_ontology`（Agent）与 REST `POST /api/v1/ontology/workspaces/{workspace_id}/search`（界面与其他系统），参数与返回一致。不新增 `/extractions/validate`、`POST /proposals`、`/facts/ingest`：校验随 Skill（SG-05），提案随运行整批提交（SG-04），事实只经提案审阅写入（FS-04）。 | 已确认（2026-10-21） |
+| OS-05 | 未被任何定义名覆盖的原文片段放入 `unmatched_terms`（不切词、不推测是筛选值还是时间范围），由 semantic-grounding Skill 再识别实体提及与时间。 | 已确认（2026-10-21，按 Codex 评审细化） |
+| OS-06 | 后续实现时向量存于 pgvector（本期不换镜像，离线包体积不变；`pgvector/pgvector:pg17` 基于 Debian，比 `postgres:17-alpine` 大约 100 多 MB，需届时评估）：数据库镜像由 `postgres:17-alpine` 换为 `pgvector/pgvector:pg17`（compose、离线包、CI 同步），迁移中 `CREATE EXTENSION IF NOT EXISTS vector`。列不固定维度，不建 HNSW 索引：先按当前版本可见元素的文本哈希过滤再算余弦，元素数百个时无需索引；规模上来后按模型维度建索引。 | 已确认（2026-10-21） |
+| OS-08 | 同一检索服务提供两个入口：MCP 工具 `search_ontology`（Agent）与 REST `POST /api/v1/ontology/workspaces/{workspace_id}/search`（界面与其他系统），参数与返回一致。不新增 `/extractions/validate`、`POST /proposals`、`/facts/ingest`：校验随 Skill（SG-05），提案随运行整批提交（SG-04），实例只经提案审阅写入（IS-04）。 | 已确认（2026-10-21） |
 | OS-07 | Entity Resolver（实例消歧）另写设计文档，与本文衔接：本文的 `unmatched_terms` 是它的输入之一。 | 已确认 |
 
 ## 3. 接口
@@ -34,7 +34,7 @@
 ```
 
 - `kinds` 沿用 core-1 的 `object_type`、`property`、`link_type`、`rule`、`metric`、`dataset`、`value_type`，不另起 `relation_type`。
-- `limit`、`cursor` 沿用现有分页。
+- `limit`、`cursor` 沿用现有分页。游标同时记录本次的召回方式（是否用了向量）；后续页沿用第一页的召回方式，向量服务状态变化不改变已开始的翻页。
 
 输出：
 
@@ -48,13 +48,10 @@
      "summary": "…", "definition": {"kind": "simple", "aggregation": "sum", "measure": "…", "time_field": "…", "filters": []},
      "dataset": {"id": "…", "name": "purchase_orders"}},
     {"id": "…", "kind": "object_type", "display_name": "供应商", "name": "supplier",
-     "match": {"by": "expansion", "via": {"id": "…", "relation": "metric_dataset_bound_type"}}},
-    {"id": "…", "kind": "property", "display_name": "供应商名称", "name": "supplier_name",
-     "owner": {"id": "…", "display_name": "供应商"}, "synonyms": ["供应商全称"],
-     "match": {"by": "expansion", "via": {"id": "…", "relation": "title_property"}}}
+     "match": {"by": "expansion", "via": {"id": "…", "relation": "metric_dataset_bound_type"}}}
   ],
-  "unmatched_terms": ["星河电子", "近三个月"],
-  "total": 3, "next_cursor": null
+  "unmatched_terms": ["星河电子近三个月的"],
+  "total": 2, "next_cursor": null
 }
 ```
 
@@ -82,7 +79,7 @@
 
 规范化只做机械处理：Unicode NFKC、去空白、英文小写。英文标识另按下划线拆词，如 `purchase_amount` 可被 “purchase amount” 命中。
 
-### 4.2 向量召回
+### 4.2 向量召回（后续实现，本期不做）
 
 - 元素文本 = 类型中文名 + 显示名 + 英文标识 + 同义词 + 描述（property 加所属实体名，link_type 加两端实体名）。
 - 以 `(模型, 文本 SHA-256)` 为键缓存向量，跨版本复用；文本不变的元素发布新版本时不重算。
@@ -106,7 +103,7 @@
 
 1. 定义名出现在查询中，或查询完全等于检索名；
 2. 查询出现在定义名中；
-3. 向量召回（按相似度降序，但相似度不对外返回）；
+3. 向量召回（后续实现；按相似度降序，相似度不对外返回）；
 4. 描述命中；
 5. 关系扩展。
 
@@ -114,9 +111,9 @@
 
 ### 4.5 unmatched_terms
 
-从查询中移除所有被 4.1 第 1 类命中覆盖的片段，剩余部分按标点和空白切分，去掉单字虚词（的、和、与、及、在、了），其余原样返回。
+从原始查询中去掉被 4.1 第 1 类命中覆盖的片段（规范化匹配时保留到原文位置的映射），剩余的连续原文按标点和空白分段后原样返回，不切词、不去虚词。例如“星河电子近三个月的采购金额”返回 `["星河电子近三个月的"]`，由 Skill 再识别其中的“星河电子”与“近三个月”。
 
-## 5. 存储
+## 5. 存储（后续实现向量时）
 
 新增一张表（Alembic 迁移），不改本体模型：
 
@@ -144,3 +141,5 @@
 - 不对实例数据做向量化；实例消歧见 Entity Resolver 设计。
 - 不引入 ES、独立向量库或中文分词依赖。
 - 已有数据卷升级：同为 PostgreSQL 17，换镜像不需导出导入；现场若使用外部数据库，需由管理员先安装 pgvector 扩展，否则迁移失败并提示。
+- 镜像替换范围包括离线打包脚本 `scripts/create-offline-package.sh`（写死了 `POSTGRES_IMAGE`，CI 用它生成 `infra.tar`），以及包内镜像说明与 embedding 环境变量透传。
+- 测试：应用和测试用 `create_all` 建库，不经过 Alembic；PostgreSQL 测试库建库前执行 `CREATE EXTENSION IF NOT EXISTS vector`，向量集成测试只在 PostgreSQL 客户端运行；SQLite 测试只覆盖关键词路径，向量存储在 SQLite 下不可用时自动降级。另需验证一次真实 Alembic 升级。
