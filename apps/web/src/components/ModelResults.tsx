@@ -34,8 +34,8 @@ const CATEGORIES: { key: TargetKind; text: string; icon: LucideIcon; tone: strin
   { key: "metric", text: "指标", icon: Sigma, tone: "text-ink-2", background: "bg-canvas" },
   { key: "dataset", text: "数据集", icon: Database, tone: "text-ink-2", background: "bg-canvas" },
   { key: "mapping", text: "映射", icon: TableProperties, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "material_object", text: "文档事实", icon: FileText, tone: "text-ink-2", background: "bg-canvas" },
-  { key: "material_link", text: "文档关系", icon: Workflow, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "material_object", text: "文档实例", icon: FileText, tone: "text-ink-2", background: "bg-canvas" },
+  { key: "material_link", text: "关系实例", icon: Workflow, tone: "text-ink-2", background: "bg-canvas" },
 ];
 
 function rowsOf(draft: Draft, kind: TargetKind): Row[] {

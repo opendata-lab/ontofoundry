@@ -8,8 +8,8 @@ export const KIND: Record<TargetKind, { label: string; color: string }> = {
   metric: { label: "指标", color: "magenta" },
   dataset: { label: "数据集", color: "geekblue" },
   mapping: { label: "映射", color: "orange" },
-  material_object: { label: "文档事实", color: "gold" },
-  material_link: { label: "事实关系", color: "gold" },
+  material_object: { label: "文档实例", color: "gold" },
+  material_link: { label: "关系实例", color: "gold" },
   value_type: { label: "值类型", color: "lime" },
 };
 

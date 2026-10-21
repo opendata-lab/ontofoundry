@@ -22,7 +22,7 @@ type PageTab = "publish" | "history" | "service";
 const MCP_TOOLS = [
   ["search_ontology", "按名称、同义词和描述搜索对象、属性、关系、规则和指标"],
   ["get_ontology", "读取本体定义及其引用"],
-  ["search_objects", "搜索文档事实实例"],
+  ["search_objects", "搜索文档实例"],
   ["get_object", "读取一个实例的属性、关联和证据"],
 ] as const;
 

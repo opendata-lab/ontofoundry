@@ -322,7 +322,7 @@ function LinkInstances({ draft, type, open }: PanelProps<LinkType>) {
           dataSource={rows}
           pagination={rows.length > PAGE_SIZE ? { pageSize: PAGE_SIZE, size: "small", onChange: () => setSelectedId(null) } : false}
           onRow={(row) => ({ onClick: () => setSelectedId(row.id), className: row.id === selectedId ? "inspector-selection-row cursor-pointer" : "cursor-pointer" })}
-          locale={{ emptyText: <Empty description={query ? "没有匹配的关系实例" : "没有文档中的关系事实"} /> }}
+          locale={{ emptyText: <Empty description={query ? "没有匹配的关系实例" : "没有文档中的关系实例"} /> }}
           columns={[
             { title: type.source_role_name || "来源实例", key: "source", render: (_, row) => name(row.source_id) },
             { title: type.target_role_name || "目标实例", key: "target", render: (_, row) => name(row.target_id) },

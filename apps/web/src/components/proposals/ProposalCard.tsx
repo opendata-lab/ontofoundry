@@ -140,7 +140,7 @@ export function ProposalCard({
             </Tooltip>
           )}
           {item.duplicate_candidates.length > 0 && item.status === "pending" && (
-            <Tooltip title="可能与已有事实重复，打开详情可改为更新已有事实">
+            <Tooltip title="可能与已有实例重复，打开详情可改为更新已有实例">
               <StatusMark state="partial" label="可能重复" />
             </Tooltip>
           )}

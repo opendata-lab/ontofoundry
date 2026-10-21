@@ -75,7 +75,7 @@ describe("modeling results", () => {
 
   it("shows material_link rows with endpoint display names and Chinese binding mode labels for mappings", () => {
     show(session({ draft: example("07-instances-and-evidence") }));
-    fireEvent.click(screen.getByRole("button", { name: /^文档关系 \d+$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^关系实例 \d+$/ }));
     expect(screen.getByRole("button", { name: /RT-0103 → C001/ })).toBeInTheDocument();
 
     cleanup();

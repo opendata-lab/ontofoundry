@@ -443,7 +443,7 @@ describe("element save impact preview", () => {
     const noticeText = await screen.findByText("确认后这些元素会随本次保存一并改写");
     const confirmDialog = noticeText.closest<HTMLElement>('[role="dialog"]')!;
     expect(within(confirmDialog).getByText("确认保存影响")).toBeInTheDocument();
-    expect(within(confirmDialog).getByText("文档事实")).toBeInTheDocument();
+    expect(within(confirmDialog).getByText("文档实例")).toBeInTheDocument();
     expect(within(confirmDialog).getByText("C001")).toBeInTheDocument();
     expect(within(confirmDialog).getByText("当前元素修改需要同步此依赖的定义或引用")).toBeInTheDocument();
     expect(modelingApi.saveElement).not.toHaveBeenCalled();

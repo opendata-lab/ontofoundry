@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { TranslationIssue, TranslationReportData } from "../api/types";
 import { StatusMark } from "./layout";
 
-const CONSTRUCTS: Record<string, string> = { object_types: "对象", properties: "属性", link_types: "关系", rules: "规则", metrics: "指标", datasets: "数据集", mappings: "映射", material_objects: "文档事实", material_links: "文档关系", ObjectType: "对象", Metric: "指标", Dataset: "数据集", DatasetMetadata: "数据集元数据", document: "整个文件", Document: "文件信息", InputItem: "来源定义", OntologyMap: "映射分组", ObjectMapping: "对象映射", RelationshipBinding: "关系绑定", material_evidence: "材料证据" };
+const CONSTRUCTS: Record<string, string> = { object_types: "对象", properties: "属性", link_types: "关系", rules: "规则", metrics: "指标", datasets: "数据集", mappings: "映射", material_objects: "文档实例", material_links: "关系实例", ObjectType: "对象", Metric: "指标", Dataset: "数据集", DatasetMetadata: "数据集元数据", document: "整个文件", Document: "文件信息", InputItem: "来源定义", OntologyMap: "映射分组", ObjectMapping: "对象映射", RelationshipBinding: "关系绑定", material_evidence: "材料证据" };
 export function TranslationReport({ report, idMap = {} }: { report: TranslationReportData; idMap?: Record<string, string> }) {
   const [filter, setFilter] = useState("all");
   const outcomes = { converted: "已转换", dropped: report.direction === "export" ? "未导出" : "未导入", error: "需处理" };

@@ -87,7 +87,7 @@ export function LinkOverviewPanel(props: PanelProps<LinkType> & {
       </div>}
     </ContentBlock>}
     {showInstances && <ContentBlock ref={instances} aria-label="关系实例">
-      <SectionTitle title="关系实例" note={`${draft.material_links.filter((item) => item.type_id === type.id).length} 条文档事实`} />
+      <SectionTitle title="关系实例" note={`${draft.material_links.filter((item) => item.type_id === type.id).length} 条文档实例`} />
       <ElementInstances key={`${type.id}:${editing ? "edit" : "read"}`} {...props} canBrowseDatabase={canBrowseDatabase} />
     </ContentBlock>}
     <EvidenceSection workspaceId={draft.workspace_id} evidence={type.evidence} />

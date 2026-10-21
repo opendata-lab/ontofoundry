@@ -36,7 +36,7 @@ function ReviseDialog({
   return (
     <Modal
       open
-      title={`改为更新已有事实：${candidate.display_text}`}
+      title={`改为更新已有实例：${candidate.display_text}`}
       onCancel={onCancel}
       okText="改为更新"
       cancelText="取消"
@@ -45,11 +45,11 @@ function ReviseDialog({
       width="var(--review-dialog-width)"
     >
       {!after ? (
-        <Alert type="error" showIcon message="当前会话中找不到这个事实，请刷新后重试。" />
+        <Alert type="error" showIcon message="当前会话中找不到这个实例，请刷新后重试。" />
       ) : (
         <div className="flex flex-col gap-3">
           <p className="m-0 text-xs text-muted">
-            提案不再新建事实，而是更新已有事实：保留已有证据，追加本提案的证据；提案中有值的属性覆盖已有值。修订后会生成新的待审提案。
+            提案不再新建实例，而是更新已有实例：保留已有证据，追加本提案的证据；提案中有值的属性覆盖已有值。修订后会生成新的待审提案。
           </p>
           <Table
             size="small"
@@ -151,9 +151,9 @@ export function ProposalDetail({
         {source.dialogs}
         {canRevise && (
           <section className="flex flex-col gap-2 border-b border-rule pb-4">
-            <SectionTitle title="可能重复的已有事实" />
+            <SectionTitle title="可能重复的已有实例" />
             <Text type="secondary" className="text-xs">
-              确认是同一个实例时，把这条新建提案改为更新已有事实，不会自动合并。
+              确认是同一个实例时，把这条新建提案改为更新已有实例，不会自动合并。
             </Text>
             <Table
               size="small"
@@ -161,7 +161,7 @@ export function ProposalDetail({
               pagination={false}
               dataSource={item.duplicate_candidates}
               columns={[
-                { title: "已有事实", key: "display", render: (_, c) => c.display_text },
+                { title: "已有实例", key: "display", render: (_, c) => c.display_text },
                 { title: "类型", key: "type", render: (_, c) => (byId(draft.object_types, c.type_id)?.display_name || byId(draft.object_types, c.type_id)?.name) },
                 {
                   title: "",

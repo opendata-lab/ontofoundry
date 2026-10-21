@@ -236,7 +236,7 @@ describe("proposal review", () => {
     fireEvent.click(screen.getByRole("button", { name: "改为更新" }));
     // antd labels every dialog with the same id under test, so pick it by content.
     await waitFor(() => expect(screen.getAllByRole("dialog")).toHaveLength(2));
-    const confirm = screen.getAllByRole("dialog").find((d) => d.textContent?.includes("提案不再新建事实"))!;
+    const confirm = screen.getAllByRole("dialog").find((d) => d.textContent?.includes("提案不再新建实例"))!;
     expect(within(confirm).getByText("星海贸易有限公司")).toBeInTheDocument();
     fireEvent.click(within(confirm).getByRole("button", { name: "改为更新" }));
     await waitFor(() => expect(proposals.revise).toHaveBeenCalled());
