@@ -9,8 +9,8 @@ export function isForwardReading(reading: string): boolean {
 }
 
 export function renderLinkReading(draft: Draft, link: LinkType, reading: string): string {
-  const source = link.source_role_name || byId(draft.object_types, link.source_type_id)?.name || "来源对象";
-  const target = link.target_role_name || byId(draft.object_types, link.target_type_id)?.name || "目标对象";
+  const source = link.source_role_name || (byId(draft.object_types, link.source_type_id)?.display_name || byId(draft.object_types, link.source_type_id)?.name) || "来源对象";
+  const target = link.target_role_name || (byId(draft.object_types, link.target_type_id)?.display_name || byId(draft.object_types, link.target_type_id)?.name) || "目标对象";
   return reading.replace(/\{(source|target)\}/g, (_, endpoint: string) => endpoint === "source" ? source : target);
 }
 

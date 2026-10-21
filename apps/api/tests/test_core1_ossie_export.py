@@ -7,7 +7,9 @@ from uuid import uuid4
 import pytest
 from core1_fixtures import example_draft, example_names
 
+from ontofoundry_api.adapters.archive import read_archive, read_ossie
 from ontofoundry_api.adapters.base import ExportContext
+from ontofoundry_api.adapters.ossie.exporter import BASES
 from ontofoundry_api.adapters.ossie.importer import OssieAdapter
 from ontofoundry_api.adapters.ossie.validator import validate_schema, validate_semantics
 
@@ -41,7 +43,7 @@ def test_example_delivery_is_officially_valid_or_explicitly_unavailable(name):
         assert result.document is not None, [
             i.model_dump() for i in result.report.issues if i.outcome == "error"
         ]
-        value = json.loads(result.document)
+        value = json.loads(read_ossie(result.document)[0])
         assert not validate_schema(value)
         assert not [i for i in validate_semantics(value) if i["severity"] == "error"]
         datasets = [
@@ -60,54 +62,40 @@ def test_example_delivery_is_officially_valid_or_explicitly_unavailable(name):
         assert result.document == export(model).document
 
 
-def test_case_insensitive_value_concept_names_reserve_all_objects_and_builtins():
+def test_identifiers_use_builtin_concepts_and_object_names_avoid_builtins():
     model = example_draft("01-basic-sales")
-    prop = next(p for p in model.properties if p.identifier)
+    prop = next(p for p in model.properties if p.identifier and p.value_type_id is None)
     owner = next(o for o in model.object_types if o.id == prop.owner_type_id)
-    collision = owner.technical_name + "_" + prop.technical_name + "_value"
-    copy = model.object_types[0].model_copy(
-        update={
-            "id": uuid4(),
-            "name": "名称碰撞",
-            "technical_name": collision.upper(),
-            "title_property_id": None,
-        }
-    )
-    model.object_types.append(copy)
     result = export(model)
     assert result.document is not None
-    values = [
-        c["concept"]
-        for c in json.loads(result.document)["ontology"]
-        if c["type"] == "ValueType"
-    ]
-    assert collision + "_2" in values
-    assert len({v.casefold() for v in values}) == len(values)
-    model.object_types[-1].technical_name = "sTrInG"
+    ontology = json.loads(read_ossie(result.document)[0])["ontology"]
+    # No helper ValueType is invented for an identifier on a built-in type.
+    assert [c for c in ontology if c["type"] == "ValueType"] == []
+    component = next(c for c in ontology if c["concept"] == owner.name)
+    relation = next(r for r in component["relationships"] if r["name"] == prop.name)
+    assert prop.name in component["identify_by"]
+    assert relation["roles"] == [{"concept": BASES[str(prop.value_kind)]}]
+    model.object_types[0].name = "sTrInG"
     assert export(model).document is None
 
 
 def test_self_relation_keeps_explicit_role_names_and_both_readings():
     model = example_draft("05-self-and-parallel-links")
     result = export(model)
-    value = json.loads(result.document)
+    value = json.loads(read_ossie(result.document)[0])
     for link in model.link_types:
         if link.source_type_id != link.target_type_id:
             continue
         source = next(o for o in model.object_types if o.id == link.source_type_id)
-        component = next(
-            c for c in value["ontology"] if c["concept"] == source.technical_name
-        )
-        relation = next(
-            r for r in component["relationships"] if r["name"] == link.name
-        )
+        component = next(c for c in value["ontology"] if c["concept"] == source.name)
+        relation = next(r for r in component["relationships"] if r["name"] == link.name)
         assert relation["roles"][0]["name"] == link.target_role_name
         assert len(relation["verbalizes"]) == len(link.verbalizes)
-        target = source.technical_name + ":" + link.target_role_name
+        target = source.name + ":" + link.target_role_name
         assert all("{" + target + "}" in reading for reading in relation["verbalizes"])
-        assert value["ai_context"]["ontofoundry"]["link_role_names"][
-            source.technical_name + "." + link.name
-        ] == {
+        assert json.loads(read_archive(result.document)["ontofoundry-extension.json"])[
+            "link_role_names"
+        ][source.name + "." + link.name] == {
             "source_role_name": link.source_role_name,
             "target_role_name": link.target_role_name,
         }
@@ -126,7 +114,7 @@ def test_unknown_connections_do_not_get_guessed_from_similar_table_names():
     model = example_draft("01-basic-sales")
     result = export(model, scopes=False)
     assert result.document is not None
-    value = json.loads(result.document)
+    value = json.loads(read_ossie(result.document)[0])
     assert len(value["ontology_mappings"]) == len(model.datasets)
     assert all(
         r["from"] == r["to"]
@@ -167,5 +155,5 @@ def test_fact_losses_are_per_instance_and_metadata_notice_is_once_without_reusin
         i.outcome == "dropped" and i.rule_id is None and len(i.target_element_ids) == 1
         for i in losses
     )
-    assert sum(i.construct == "EvidenceAndRuleMetadata" for i in result.report.issues) == 1
+    assert sum(i.construct == "EvidenceMetadata" for i in result.report.issues) == 1
     assert all(i.rule_id != "RT-19" for i in result.report.issues)

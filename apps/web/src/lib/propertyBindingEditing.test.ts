@@ -5,14 +5,14 @@ import { preservePropertyBindings, type PropertyBindingEdits } from "./propertyB
 describe("shared parent property bindings", () => {
   it("keeps ancestor bindings through a rename and a subsequent column edit", () => {
     const before = example("06-inheritance");
-    const vip = before.object_types.find((o) => o.technical_name === "vip_party")!;
+    const vip = before.object_types.find((o) => o.name === "vip_party")!;
     const note = before.properties.find((p) => p.owner_type_id === vip.id)!;
     const mapping = before.mappings.find((m) => m.type_id === vip.id)!;
     expect(mapping.sources).toEqual([]);
     const edits: PropertyBindingEdits = new Map();
     const renamed = preservePropertyBindings(before, {
       ...before,
-      properties: before.properties.map((p) => p.id === note.id ? { ...p, technical_name: "note2" } : p),
+      properties: before.properties.map((p) => p.id === note.id ? { ...p, name: "note2" } : p),
     }, edits);
     expect(renamed.mappings.find((m) => m.id === mapping.id)!.fields).toEqual({ note2: mapping.fields.note });
     const rebound = preservePropertyBindings(renamed, {
@@ -31,9 +31,9 @@ describe("shared parent property bindings", () => {
 
   it("removes a binding when its ancestor source is removed in the next graph", () => {
     const before = example("06-inheritance");
-    const vip = before.object_types.find((o) => o.technical_name === "vip_party")!;
+    const vip = before.object_types.find((o) => o.name === "vip_party")!;
     const next = structuredClone(before);
-    next.properties.find((p) => p.owner_type_id === vip.id)!.technical_name = "note2";
+    next.properties.find((p) => p.owner_type_id === vip.id)!.name = "note2";
     next.mappings = next.mappings.filter((m) => m.type_id === vip.id);
     const result = preservePropertyBindings(before, next, new Map());
     expect(result.mappings[0].fields).toEqual({});

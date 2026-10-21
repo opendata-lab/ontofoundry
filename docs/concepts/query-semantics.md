@@ -12,6 +12,8 @@
 
 需要查业务库时使用授权绑定和 agent 的数据库工具；需要找材料里记录的退货单时使用文档事实工具。不能用文档事实翻页代替数据库聚合，也不能从被裁剪的表达式旁路获取表名。版本由服务端解析：建模固定版本，问数取当前发布版本；agent 不传 version_id 自选版本。
 
+基于表达式的数据集在查询时作为子查询使用：`(只读 SELECT) AS 数据集`，平台的实例浏览、指标预览、MCP 返回的 SQL 参考都按这个方式编译；查询 Agent 也应如此，不展开或改写其中的连接。MCP 的 `search_ontology`、`get_ontology` 可以按 `dataset` 类型检索数据集，详情包括来源方式、表位置或 SQL、列、快照日期列和引用它的元素，不包含连接 id 或凭据。
+
 ## 2. 字段
 
 | 字段 | 类型 | 填写要求 | 说明 |
@@ -53,7 +55,7 @@ search_objects 按已接受事实的 UUID 返回，保留实际 type_id；父类
     {
       "kind": "object_type",
       "id": "00000000-0000-4000-8000-000000001002",
-      "technical_name": "sales_order",
+      "name": "sales_order",
       "description": "订单按既定指标口径统计。",
       "extends": null,
       "child_types": [],
@@ -84,7 +86,7 @@ search_objects 按已接受事实的 UUID 返回，保留实际 type_id；父类
       "properties": [
         {
           "id": "00000000-0000-4000-8000-000000002012",
-          "technical_name": "amount",
+          "name": "amount",
           "value_kind": "decimal",
           "binding": {
             "kind": "column",

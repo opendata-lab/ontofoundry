@@ -56,7 +56,7 @@ def test_metric_identifiers_escape_driver_percent_without_touching_binds(
         column.name = renamed[column.name]
     if snapshot:
         dataset.snapshot_date_column = "stat%date"
-    metric = next(m for m in draft.metrics if m.technical_name == "core_commit_count")
+    metric = next(m for m in draft.metrics if m.name == "core_commit_count")
     metric.aggregation = aggregation
     metric.measure.column = "amount%"
     metric.filters[0].column.column = "repo%"

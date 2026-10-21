@@ -28,12 +28,12 @@ def test_fact_value_semantics(kind, value, valid):
 
 
 def test_display_zero_false_missing_identity_and_uuid():
-    o = ObjectType(id=uuid4(), name="记录", technical_name="record")
+    o = ObjectType(id=uuid4(), display_name="记录", name="record")
     p = Property(
         id=uuid4(),
         owner_type_id=o.id,
-        name="编号",
-        technical_name="code",
+        display_name="编号",
+        name="code",
         value_kind="integer",
         identifier=True,
         unique=True,

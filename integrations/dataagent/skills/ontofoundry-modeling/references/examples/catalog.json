@@ -1,0 +1,505 @@
+{
+  "examples": [
+    {
+      "file": "create-dataset.json",
+      "context": null,
+      "topics": [
+        "create-dataset"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-link_type.json",
+      "context": null,
+      "topics": [
+        "create-link_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-mapping.json",
+      "context": null,
+      "topics": [
+        "create-mapping"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-material_link.json",
+      "context": null,
+      "topics": [
+        "create-material_link"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-material_object.json",
+      "context": null,
+      "topics": [
+        "create-material_object"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-metric.json",
+      "context": null,
+      "topics": [
+        "create-metric"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-object_type.json",
+      "context": null,
+      "topics": [
+        "create-object_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-property.json",
+      "context": null,
+      "topics": [
+        "create-property"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-rule.json",
+      "context": null,
+      "topics": [
+        "create-rule"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "cross-dataset-events.json",
+      "context": null,
+      "topics": [
+        "cross-dataset-events"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-dataset.json",
+      "context": "pinned-dataset.json",
+      "topics": [
+        "delete-dataset"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-link_type.json",
+      "context": "pinned-link_type.json",
+      "topics": [
+        "delete-link_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-mapping.json",
+      "context": "pinned-mapping.json",
+      "topics": [
+        "delete-mapping"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-material_link.json",
+      "context": "pinned-material_link.json",
+      "topics": [
+        "delete-material_link"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-material_object.json",
+      "context": "pinned-material_object.json",
+      "topics": [
+        "delete-material_object"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-metric.json",
+      "context": "pinned-metric.json",
+      "topics": [
+        "delete-metric"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-object_type.json",
+      "context": "pinned-object_type.json",
+      "topics": [
+        "delete-object_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-property.json",
+      "context": "pinned-property.json",
+      "topics": [
+        "delete-property"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-rule.json",
+      "context": "pinned-rule.json",
+      "topics": [
+        "delete-rule"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete.json",
+      "context": "context.json",
+      "topics": [
+        "delete"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "derivation.json",
+      "context": null,
+      "topics": [
+        "derivation"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "expression-binding.json",
+      "context": null,
+      "topics": [
+        "expression-binding"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "fact-values.json",
+      "context": null,
+      "topics": [
+        "fact-values"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "facts.json",
+      "context": null,
+      "topics": [
+        "facts"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "identifiers.json",
+      "context": null,
+      "topics": [
+        "identifiers"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "inheritance.json",
+      "context": null,
+      "topics": [
+        "inheritance"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "link-joins.json",
+      "context": null,
+      "topics": [
+        "link-joins"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "mapping.json",
+      "context": null,
+      "topics": [
+        "mapping"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "membership.json",
+      "context": null,
+      "topics": [
+        "membership"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "metric-semantics.json",
+      "context": null,
+      "topics": [
+        "metric-semantics"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "metrics.json",
+      "context": null,
+      "topics": [
+        "metrics"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "operations.json",
+      "context": "context.json",
+      "topics": [
+        "operations"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "registration.json",
+      "context": null,
+      "topics": [
+        "registration"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "reified-event.json",
+      "context": null,
+      "topics": [
+        "reified-event"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "reuse-fact.json",
+      "context": "reuse-fact-context.json",
+      "topics": [
+        "reuse-fact"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "rules.json",
+      "context": null,
+      "topics": [
+        "rules"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-dataset.json",
+      "context": "pinned-dataset.json",
+      "topics": [
+        "update-dataset"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-link_type.json",
+      "context": "pinned-link_type.json",
+      "topics": [
+        "update-link_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-mapping.json",
+      "context": "pinned-mapping.json",
+      "topics": [
+        "update-mapping"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-material_link.json",
+      "context": "pinned-material_link.json",
+      "topics": [
+        "update-material_link"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-material_object.json",
+      "context": "pinned-material_object.json",
+      "topics": [
+        "update-material_object"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-metric.json",
+      "context": "pinned-metric.json",
+      "topics": [
+        "update-metric"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-object_type.json",
+      "context": "pinned-object_type.json",
+      "topics": [
+        "update-object_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-property.json",
+      "context": "pinned-property.json",
+      "topics": [
+        "update-property"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-rule.json",
+      "context": "pinned-rule.json",
+      "topics": [
+        "update-rule"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "virtual-parent.json",
+      "context": null,
+      "topics": [
+        "virtual-parent"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "create-value_type.json",
+      "context": null,
+      "topics": [
+        "create-value_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "update-value_type.json",
+      "context": "pinned-value_type.json",
+      "topics": [
+        "update-value_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    },
+    {
+      "file": "delete-value_type.json",
+      "context": "pinned-value_type.json",
+      "topics": [
+        "delete-value_type"
+      ],
+      "expected_local": "pass",
+      "expected_server": "pass"
+    }
+  ],
+  "lookup": {
+    "object_type": {
+      "create": "create-object_type.json",
+      "update": "update-object_type.json",
+      "delete": "delete-object_type.json"
+    },
+    "property": {
+      "create": "create-property.json",
+      "update": "update-property.json",
+      "delete": "delete-property.json"
+    },
+    "link_type": {
+      "create": "create-link_type.json",
+      "update": "update-link_type.json",
+      "delete": "delete-link_type.json"
+    },
+    "dataset": {
+      "create": "create-dataset.json",
+      "update": "update-dataset.json",
+      "delete": "delete-dataset.json"
+    },
+    "mapping": {
+      "create": "create-mapping.json",
+      "update": "update-mapping.json",
+      "delete": "delete-mapping.json"
+    },
+    "metric": {
+      "create": "create-metric.json",
+      "update": "update-metric.json",
+      "delete": "delete-metric.json"
+    },
+    "rule": {
+      "create": "create-rule.json",
+      "update": "update-rule.json",
+      "delete": "delete-rule.json"
+    },
+    "material_object": {
+      "create": "create-material_object.json",
+      "update": "update-material_object.json",
+      "delete": "delete-material_object.json"
+    },
+    "material_link": {
+      "create": "create-material_link.json",
+      "update": "update-material_link.json",
+      "delete": "delete-material_link.json"
+    },
+    "value_type": {
+      "create": "create-value_type.json",
+      "update": "update-value_type.json",
+      "delete": "delete-value_type.json"
+    }
+  },
+  "protocols": [
+    "protocol/needs-input.json",
+    "protocol/needs-input-entities.json",
+    "protocol/needs-input-issues.json",
+    "protocol/entities.json",
+    "protocol/issues.json"
+  ],
+  "future_topics": {}
+}

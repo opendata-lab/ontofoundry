@@ -105,7 +105,19 @@ def preview_import(db, settings, workspace_id, actor_id, adapter_id, filename, r
     if workspace is None:
         raise NotFoundError("工作空间不存在")
     base = baseline(db, workspace)
-    result = adapter.import_document(raw, ImportContext(UUID(workspace_id)))
+    from ontofoundry_api.db_models import ConnectionRecord, MetadataSnapshotRecord
+    connections = tuple({"id": c.id, "name": c.name, "kind": c.kind, "default_schema": c.config_json.get("schema_name") or ("public" if c.kind == "postgresql" else c.config_json.get("database"))} for c in db.scalars(select(ConnectionRecord).where(ConnectionRecord.workspace_id == workspace_id)))
+    ids = [c["id"] for c in connections]
+    registered = tuple({"connection_id": snap.connection_id, "schema_name": snap.schema_name, **table} for snap in db.scalars(select(MetadataSnapshotRecord).where(MetadataSnapshotRecord.connection_id.in_(ids))) for table in snap.snapshot_json.get("tables", []) if not table.get("missing"))
+    result = adapter.import_document(raw, ImportContext(UUID(workspace_id), connections, registered))
+    if result.bundled_materials:
+        from ontofoundry_api.services.material_store import store_text_material
+
+        for entry in result.bundled_materials:
+            store_text_material(
+                db, settings, workspace_id, entry["name"], entry["data"].decode("utf-8")
+            )
+        db.flush()
     if result.pending_material_evidence:
         lookup = material_lookup(db, settings, workspace_id)
 
@@ -124,7 +136,7 @@ def preview_import(db, settings, workspace_id, actor_id, adapter_id, filename, r
     candidate = build_candidate_graph(
         CoreDraft.model_validate(base),
         result.model,
-        native=adapter.id == "ontofoundry-core-1",
+        native=adapter.id in {"ontofoundry-core-1", "ontofoundry-core-1-package"},
         registered=identities(db, workspace_id),
     )
     record = ImportRecord(
@@ -208,10 +220,15 @@ def check_artifacts(record, settings, *, db):
     # A missing upload is not a changed upload: everything needed to confirm is
     # stored in the database, and deployments can lose the data directory. A
     # present file must still match the preview.
-    if path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() != record.raw_sha256:
+    if (
+        path.is_file()
+        and hashlib.sha256(path.read_bytes()).hexdigest() != record.raw_sha256
+    ):
         raise ConflictError("原始文件已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED")
     if record.formatted_sha256:
-        material = db.get(MaterialRecord, record.material_id) if record.material_id else None
+        material = (
+            db.get(MaterialRecord, record.material_id) if record.material_id else None
+        )
         if material is None or material.sha256 != record.formatted_sha256:
             raise ConflictError(
                 "引用材料已失效，请重新上传", code="IMPORT_ARTIFACT_CHANGED"

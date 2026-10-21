@@ -55,7 +55,7 @@ def valid_value(kind: str, value) -> bool:
 def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list[dict]:
     issues = []
     for attribute in draft.effective_properties(type_id):
-        value = values.get(attribute.technical_name)
+        value = values.get(attribute.name)
         code = None
         # A fact taken from a document is identified by what the text says and
         # where; documents rarely carry system numbers. A missing value is
@@ -67,20 +67,20 @@ def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list
             code, severity, message = (
                 "INSTANCE_REQUIRED",
                 "warning",
-                f"{attribute.name} 待补全：原文未提供",
+                f"{attribute.display_name or attribute.name} 待补全：原文未提供",
             )
         elif value is not None and not valid_value(attribute.value_kind, value):
             code, severity, message = (
                 "INSTANCE_VALUE_TYPE",
                 "error",
-                f"{attribute.name} 必须是 {attribute.value_kind} 类型",
+                f"{attribute.display_name or attribute.name} 必须是 {attribute.value_kind} 类型",
             )
         if code:
             issues.append(
                 {
                     "severity": severity,
                     "code": code,
-                    "path": f"{path}.{attribute.technical_name}",
+                    "path": f"{path}.{attribute.name}",
                     "message": message,
                 }
             )
@@ -114,7 +114,7 @@ def completeness_warnings(draft: OntologyDraft) -> list[dict]:
             "severity": "warning",
             "code": "OBJECT_WITHOUT_PROPERTIES",
             "path": f"$.object_types[{index}]",
-            "message": f"业务对象“{item.name}”还没有属性，可从数据表补全（自下而上）或人工添加",
+            "message": f"业务对象“{item.display_name or item.name}”还没有属性，可从数据表补全（自下而上）或人工添加",
         }
         for index, item in enumerate(draft.object_types)
         if str(item.id) not in parents and not draft.effective_properties(item.id)

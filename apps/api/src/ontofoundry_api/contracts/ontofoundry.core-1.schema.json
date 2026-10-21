@@ -225,6 +225,20 @@
           "default": null,
           "title": "Columns"
         },
+        "connection_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Connection Id"
+        },
         "description": {
           "default": "",
           "maxLength": 8000,
@@ -244,6 +258,19 @@
           "default": null,
           "title": "Dialect"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
@@ -252,8 +279,23 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
+        },
+        "query_sql": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query Sql"
         },
         "schema_name": {
           "anyOf": [
@@ -282,17 +324,33 @@
           "default": null,
           "title": "Snapshot Date Column"
         },
-        "table_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Table Name",
+        "source_kind": {
+          "default": "table",
+          "enum": [
+            "table",
+            "query"
+          ],
+          "title": "Source Kind",
           "type": "string"
+        },
+        "table_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Name"
         }
       },
       "required": [
         "id",
-        "name",
-        "table_name"
+        "name"
       ],
       "title": "Dataset",
       "type": "object"
@@ -489,6 +547,19 @@
           "title": "Description",
           "type": "string"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "evidence": {
           "items": {
             "discriminator": {
@@ -530,6 +601,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -542,12 +614,6 @@
           "maxItems": 50,
           "title": "Synonyms",
           "type": "array"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
         },
         "time_field": {
           "anyOf": [
@@ -575,7 +641,6 @@
       "required": [
         "id",
         "name",
-        "technical_name",
         "kind",
         "dataset_id",
         "expression"
@@ -641,6 +706,19 @@
           "maxLength": 8000,
           "title": "Description",
           "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
         },
         "evidence": {
           "items": {
@@ -1138,6 +1216,19 @@
           "title": "Description",
           "type": "string"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "evidence": {
           "items": {
             "discriminator": {
@@ -1181,6 +1272,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -1204,12 +1296,6 @@
           "title": "Tags",
           "type": "array"
         },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
         "title_property_id": {
           "anyOf": [
             {
@@ -1226,8 +1312,7 @@
       },
       "required": [
         "id",
-        "name",
-        "technical_name"
+        "name"
       ],
       "title": "ObjectType",
       "type": "object"
@@ -1350,6 +1435,19 @@
           "title": "Description",
           "type": "string"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "evidence": {
           "items": {
             "discriminator": {
@@ -1385,6 +1483,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -1408,12 +1507,6 @@
           "title": "Synonyms",
           "type": "array"
         },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
-        },
         "unique": {
           "default": false,
           "title": "Unique",
@@ -1421,13 +1514,25 @@
         },
         "value_kind": {
           "$ref": "#/$defs/ValueKind"
+        },
+        "value_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type Id"
         }
       },
       "required": [
         "id",
         "owner_type_id",
         "name",
-        "technical_name",
         "value_kind"
       ],
       "title": "Property",
@@ -1447,6 +1552,19 @@
           "maxLength": 8000,
           "title": "Description",
           "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
         },
         "evidence": {
           "items": {
@@ -1483,6 +1601,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -1500,18 +1619,11 @@
           "maxItems": 50,
           "title": "Synonyms",
           "type": "array"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
         }
       },
       "required": [
         "id",
         "name",
-        "technical_name",
         "kind",
         "numerator_id",
         "denominator_id"
@@ -1527,6 +1639,19 @@
           "maxLength": 8000,
           "title": "Description",
           "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
         },
         "evidence": {
           "items": {
@@ -1564,6 +1689,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -1577,18 +1703,11 @@
         },
         "rule_kind": {
           "$ref": "#/$defs/RuleKind"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
         }
       },
       "required": [
         "id",
         "name",
-        "technical_name",
         "owner_kind",
         "owner_id",
         "rule_kind",
@@ -1609,7 +1728,8 @@
       "enum": [
         "object_type",
         "property",
-        "link_type"
+        "link_type",
+        "value_type"
       ],
       "title": "RuleOwnerKind",
       "type": "string"
@@ -1631,6 +1751,19 @@
           "maxLength": 8000,
           "title": "Description",
           "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
         },
         "evidence": {
           "items": {
@@ -1686,6 +1819,7 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
         },
@@ -1698,12 +1832,6 @@
           "maxItems": 50,
           "title": "Synonyms",
           "type": "array"
-        },
-        "technical_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Technical Name",
-          "type": "string"
         },
         "time_field": {
           "anyOf": [
@@ -1720,7 +1848,6 @@
       "required": [
         "id",
         "name",
-        "technical_name",
         "kind",
         "dataset_id",
         "aggregation"
@@ -1741,6 +1868,75 @@
       ],
       "title": "ValueKind",
       "type": "string"
+    },
+    "ValueType": {
+      "additionalProperties": false,
+      "description": "A named value domain shared by properties: base kind plus owned constraint rules.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "value_kind"
+      ],
+      "title": "ValueType",
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1832,6 +2028,13 @@
       "default": "core-1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "value_types": {
+      "items": {
+        "$ref": "#/$defs/ValueType"
+      },
+      "title": "Value Types",
+      "type": "array"
     },
     "workspace_id": {
       "format": "uuid",

@@ -19,6 +19,7 @@ from ontofoundry_api.domain.core import (
     Rule,
     SimpleMetric,
     Strict,
+    ValueType,
     _display_name,
 )
 from ontofoundry_api.domain.graph import DraftIndex
@@ -34,6 +35,7 @@ class ElementKind(StrEnum):
     MAPPING = "mapping"
     MATERIAL_OBJECT = "material_object"
     MATERIAL_LINK = "material_link"
+    VALUE_TYPE = "value_type"
 
 
 COLLECTIONS = dict(
@@ -49,6 +51,7 @@ COLLECTIONS = dict(
             "mappings",
             "material_objects",
             "material_links",
+            "value_types",
         ),
         strict=True,
     )
@@ -66,6 +69,7 @@ ELEMENT_MODELS = dict(
             DataMapping,
             MaterialObject,
             MaterialLink,
+            ValueType,
         ),
         strict=True,
     )

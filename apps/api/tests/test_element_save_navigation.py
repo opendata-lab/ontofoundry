@@ -38,7 +38,7 @@ def test_navigation_imports_effective_mappings_and_datasets(
             for element in latest[collection]:
                 if "evidence" in element:
                     element["evidence"] = []
-        objects = {o["technical_name"]: o for o in latest["object_types"]}
+        objects = {o["name"]: o for o in latest["object_types"]}
         vip, party, supplier, partner = [
             objects[name] for name in ("vip_party", "party", "supplier", "channel_partner")
         ]
@@ -47,7 +47,7 @@ def test_navigation_imports_effective_mappings_and_datasets(
             return next(
                 p
                 for p in latest["properties"]
-                if p["owner_type_id"] == obj["id"] and p["technical_name"] == name
+                if p["owner_type_id"] == obj["id"] and p["name"] == name
             )
 
         template = latest["link_types"][1]
@@ -229,7 +229,7 @@ def test_navigation_imports_effective_mappings_and_datasets(
         expected_objects = {"vip_party", "party", "supplier", "asset", "contract"}
         if hops == 2:
             expected_objects.add("channel_partner")
-        assert {o["technical_name"] for o in synced["object_types"]} == expected_objects
+        assert {o["name"] for o in synced["object_types"]} == expected_objects
         if existing_mapping:
             assert (
                 next(o for o in synced["object_types"] if o["id"] == supplier["id"])[

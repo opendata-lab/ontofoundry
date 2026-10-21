@@ -295,7 +295,7 @@ def test_postgres_populated_cutover_preserves_platform_rows(postgres_cutover_dat
                    ('cutover-item-property', 'cutover-batch', 'cutover-space',
                     'cutover-session', 1, 'property', repeat('1', 64), 'create',
                     'property', 'cutover-property',
-                    '{"owner_type_id":"cutover-object","technical_name":"order_no"}',
+                    '{"owner_type_id":"cutover-object","name":"order_no"}',
                     '[]', 'accepted', 'cutover-user', '2026-10-02T09:00:00Z', 2);
             INSERT INTO proposal_item_dependencies
                 (workspace_id, session_id, batch_id, item_id, depends_on_item_id)

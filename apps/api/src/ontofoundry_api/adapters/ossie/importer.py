@@ -7,20 +7,26 @@ import re
 from collections import Counter
 from uuid import UUID
 
+from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.adapters.base import ImportOnlyAdapter, ReportBuilder
-from ontofoundry_api.adapters.documents import escape_pointer, parse_document
+from ontofoundry_api.adapters.documents import (
+    SourceDocument,
+    escape_pointer,
+    parse_document,
+)
 from ontofoundry_api.domain.core import (
     DirectJoin,
     LinkType,
     ObjectType,
     Property,
     ValueKind,
+    ValueType,
     empty_draft,
 )
 from ontofoundry_api.domain.graph import DraftIndex
 
 from .extension import read_extension
-from .ids import display_name, technical_name
+from .ids import identifier_name
 from .translation import Translation
 from .validator import BUILTIN_VALUE_CONCEPTS, validate_schema, validate_semantics
 
@@ -48,6 +54,7 @@ class OntologyImporter:
         self.origins = []
         self.invalid = set()
         self.value_cache = {}
+        self.value_types = {}
         self.role_bindings = {}
 
     def issue(self, *args, **kwargs):
@@ -71,30 +78,57 @@ class OntologyImporter:
             index = DraftIndex(self.t.model)
             members = [*index.effective_properties(obj.id), *index.outgoing_links(obj.id)]
             self.t.names[obj.id] = (
-                {p.technical_name.casefold() for p in members},
+                {p.name.casefold() for p in members},
                 {p.name.casefold() for p in members},
             )
         return self.t.names[obj.id]
 
     def names(self, obj, raw_name, label):
         names, labels = self.member_names(obj)
-        return technical_name(raw_name, names), display_name(label, labels)
+        return identifier_name(raw_name, names), label
+
+    def import_value_types(self):
+        """Ossie value types become shared core value types (no type inheritance)."""
+        self.value_types = {}
+        for name, c in self.concepts.items():
+            if c["type"] != "ValueType" or name in BUILTINS:
+                continue
+            kind = self.value_kind(name)
+            if kind is None:
+                self.issue(
+                    self.paths[name],
+                    "dropped",
+                    "ValueType",
+                    "RT-35",
+                    "值类型无法沿全部祖先闭合为唯一兼容基础类型",
+                    completion=True,
+                )
+                continue
+            value_type = ValueType(
+                id=self.t.id("value-type:" + name),
+                name=identifier_name(name, set()),
+                display_name=self.extension.name(name, None),
+                description=c.get("description", ""),
+                value_kind=kind,
+            )
+            if self.t.accept("value_types", value_type, self.paths[name], rule="RT-23", message="值类型按共享值域导入"):
+                self.value_types[name] = value_type
+                if any(p not in BUILTINS for p in c.get("extends", [])):
+                    self.issue(
+                        self.paths[name] + "/extends",
+                        "converted",
+                        "ValueType",
+                        "RT-24",
+                        "值类型之间的继承折叠为基础类型，祖先约束复制到本值类型",
+                        targets=[value_type.id],
+                    )
 
     def import_objects(self):
         pending = [n for n, c in self.concepts.items() if c["type"] == "EntityType"]
+        self.import_value_types()
         for name, c in self.concepts.items():
             if c["type"] == "ValueType":
-                self.issue(
-                    self.paths[name],
-                    "converted" if self.value_kind(name) else "dropped",
-                    "ValueType",
-                    "RT-23" if self.value_kind(name) else "RT-35",
-                    "值类型折叠为使用属性的基础类型；共享域身份不进入核心"
-                    if self.value_kind(name)
-                    else "值类型无法沿全部祖先闭合为唯一兼容基础类型",
-                    completion=self.value_kind(name) is None,
-                )
-                for field in ("relationships", "derived_by", "identify_by", "description"):
+                for field in ("relationships", "derived_by", "identify_by"):
                     if c.get(field):
                         self.issue(
                             self.paths[name] + "/" + field,
@@ -142,13 +176,13 @@ class OntologyImporter:
                         "按文件顺序保留首个父类，不自动改写额外父类",
                         completion=True,
                     )
-                tech = technical_name(name, self.object_names)
-                label = display_name(self.extension.name(name, name), self.object_labels)
+                tech = identifier_name(name, self.object_names)
+                label = self.extension.name(name, None)
                 try:
                     obj = ObjectType(
                         id=self.t.id("object:" + name),
-                        name=label,
-                        technical_name=tech,
+                        display_name=label,
+                        name=tech,
                         description=c.get("description", ""),
                         extends=self.t.objects[parent].id
                         if parent in self.t.objects
@@ -191,23 +225,20 @@ class OntologyImporter:
                     )
                 break
 
-    def import_property(self, owner, name, rel, path, kind, *, unary=False):
+    def import_property(self, owner, name, rel, path, kind, *, unary=False, concept=None):
         obj = self.t.objects[owner]
+        shared = self.value_types.get(concept) if concept else None
         key = owner + "." + name
-        label = self.extension.name(key, name)
-        if unary and label == name:
-            reading = rel.get("verbalizes", [""])[0]
-            match = re.fullmatch(r"\{" + re.escape(owner) + r"\}(.*)", reading)
-            if match and match[1].strip():
-                label = match[1].strip()
+        label = self.extension.name(key, None)
         tech, label = self.names(obj, name, label)
         prop = Property(
             id=self.t.id("property:" + key),
             owner_type_id=obj.id,
-            name=label,
-            technical_name=tech,
+            display_name=label,
+            name=tech,
             description=rel.get("description", ""),
             value_kind=kind,
+            value_type_id=shared.id if shared else None,
             required=self.extension.required(key),
             unique=rel.get("multiplicity") == "OneToOne",
             synonyms=self.extension.labels("synonyms", key),
@@ -259,9 +290,12 @@ class OntologyImporter:
             return
         key = owner + "." + name
         source_role = "{" + owner + "}"
-        target_role = "{" + target + (
-            ":" + rel["roles"][0]["name"] if rel["roles"][0].get("name") else ""
-        ) + "}"
+        target_role = (
+            "{"
+            + target
+            + (":" + rel["roles"][0]["name"] if rel["roles"][0].get("name") else "")
+            + "}"
+        )
         readings = [
             re.sub(
                 r"\{[^{}]+\}",
@@ -272,16 +306,16 @@ class OntologyImporter:
             )
             for reading in rel.get("verbalizes", [])
         ]
-        if (
-            key in self.extension.data.get("generated_link_readings", [])
-            and readings == ["{source}关联{target}"]
-        ):
+        if key in self.extension.data.get("generated_link_readings", []) and readings == [
+            "{source}关联{target}"
+        ]:
             readings = []
         tech, _label = self.names(self.t.objects[owner], name, name)
         role_names = self.extension.data.get("link_role_names", {}).get(key, {})
         link = LinkType(
             id=self.t.id("link:" + key),
             name=tech,
+            display_name=self.extension.name(key, None),
             verbalizes=readings,
             source_role_name=role_names.get("source_role_name"),
             target_role_name=role_names.get(
@@ -355,7 +389,7 @@ class OntologyImporter:
                     ):
                         kind = self.value_kind(roles[0]["concept"])
                         if kind:
-                            self.import_property(owner, name, rel, path, kind)
+                            self.import_property(owner, name, rel, path, kind, concept=roles[0]["concept"])
                         else:
                             self.issue(
                                 path,
@@ -482,11 +516,11 @@ class OntologyImporter:
                 completion=True,
             )
             return
-        tech = technical_name(owner + "_" + name, self.object_names)
+        tech = identifier_name(owner + "_" + name, self.object_names)
         obj = ObjectType(
             id=self.t.id("reified:" + owner + "." + name),
-            name=display_name(owner + "_" + name, self.object_labels),
-            technical_name=tech,
+            display_name=None,
+            name=tech,
             description=rel.get("description", ""),
         )
         if not self.t.accept("object_types", obj, path, rule="RT-27"):
@@ -505,7 +539,7 @@ class OntologyImporter:
                 for identifier in identifiers:
                     ptech, plabel = self.names(
                         obj,
-                        label + "_" + identifier.technical_name,
+                        label + "_" + identifier.name,
                         label + "·" + identifier.name,
                     )
                     prop = Property(
@@ -513,8 +547,8 @@ class OntologyImporter:
                             "reified-property:" + role_key + ":" + str(identifier.id)
                         ),
                         owner_type_id=obj.id,
-                        name=plabel,
-                        technical_name=ptech,
+                        display_name=None,
+                        name=ptech,
                         value_kind=identifier.value_kind,
                         required=True,
                     )
@@ -546,9 +580,10 @@ class OntologyImporter:
                 prop = Property(
                     id=self.t.id("reified-property:" + role_key),
                     owner_type_id=obj.id,
-                    name=plabel,
-                    technical_name=ptech,
+                    display_name=None,
+                    name=ptech,
                     value_kind=self.value_kind(role["concept"]),
+                    value_type_id=self.value_types[role["concept"]].id if role["concept"] in self.value_types else None,
                     required=True,
                 )
                 if self.t.accept("properties", prop, path, rule="RT-27"):
@@ -557,11 +592,11 @@ class OntologyImporter:
             if target:
                 for original, prop in zip(identifiers, props, strict=True):
                     original_name = self.t.property_sources.get(
-                        original.id, ("", original.technical_name, "")
+                        original.id, ("", original.name, "")
                     )[1]
-                    bindings[(label, original_name)] = prop.technical_name
+                    bindings[(label, original_name)] = prop.name
             elif props:
-                bindings[("", label)] = props[0].technical_name
+                bindings[("", label)] = props[0].name
             representations.append(props)
         determinant = range(
             len(roles) - 1 if rel.get("multiplicity") == "ManyToOne" else len(roles)
@@ -683,15 +718,34 @@ class OssieAdapter(ImportOnlyAdapter):
 
     id = "ossie-0.2"
     label = "Apache Ossie 0.2"
-    file_extensions = (".ossie.json", ".json")
+    file_extensions = (".ossie.zip", ".zip", ".ossie.json", ".json")
 
     def detect(self, raw):
-        return b'"ontology"' in raw
+        try:
+            document, _ = read_ossie(raw)
+        except ValueError:
+            return False
+        return b'"ontology"' in document
 
     def import_document(self, raw, ctx):
         report = ReportBuilder(self.id, ctx.workspace_id, hashlib.sha256(raw).hexdigest())
-        source = parse_document(raw, report)
         empty = empty_draft(ctx.workspace_id)
+        try:
+            document, extension_raw = read_ossie(raw)
+            extension_source = (
+                SourceDocument.parse(extension_raw) if extension_raw is not None else None
+            )
+            extension = extension_source.value if extension_source else None
+            if extension is not None and (
+                not isinstance(extension, dict) or extension.get("version") != "core-1"
+            ):
+                raise ValueError("扩展文件必须是 version=core-1 的对象")
+        except (ValueError, UnicodeError) as error:
+            report.add(
+                outcome="error", construct="document", source_path="", message=str(error)
+            )
+            return report.finish(empty)
+        source = parse_document(document, report)
         if source is None:
             return report.finish(empty)
         value = source.value
@@ -748,10 +802,21 @@ class OssieAdapter(ImportOnlyAdapter):
                 message="概念名重复，无法确定引用身份",
             )
             return report.finish(empty)
-        return OntologyImporter(Translation(source, report, invalid)).run()
+        translation = Translation(source, report, invalid)
+        translation.extension = extension
+        translation.extension_source = extension_source
+        translation.import_context = ctx
+        return OntologyImporter(translation).run()
 
     def validate_document(self, document):
         report = ReportBuilder(self.id, UUID(int=0), hashlib.sha256(document).hexdigest())
+        try:
+            document, _ = read_ossie(document)
+        except ValueError as error:
+            report.add(
+                outcome="error", construct="document", source_path="", message=str(error)
+            )
+            return report.issues
         source = parse_document(document, report)
         if source is None:
             return report.issues

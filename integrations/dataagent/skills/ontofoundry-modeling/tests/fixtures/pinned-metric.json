@@ -1,0 +1,74 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "46de54729c0ed35dee28f4393a28d9361ad98ac2881cbc71f82b5965205c31a9"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [],
+    "properties": [],
+    "link_types": [],
+    "rules": [],
+    "metrics": [
+      {
+        "id": "79f64954-6adf-5eda-b40c-13d9716f9b62",
+        "name": "sales",
+        "display_name": null,
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "e9dfd141-2b59-5db5-87e9-3a02d74b3488",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "e9dfd141-2b59-5db5-87e9-3a02d74b3488",
+          "column": "sales"
+        },
+        "filters": [],
+        "time_field": null
+      }
+    ],
+    "datasets": [
+      {
+        "id": "e9dfd141-2b59-5db5-87e9-3a02d74b3488",
+        "name": "yunfan_daily",
+        "display_name": "云帆日经营",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": null,
+        "schema_name": null,
+        "table_name": "demo_daily",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "sales",
+            "physical_type": "numeric",
+            "comment": ""
+          },
+          {
+            "name": "refunds",
+            "physical_type": "numeric",
+            "comment": ""
+          }
+        ]
+      }
+    ],
+    "mappings": [],
+    "material_objects": [],
+    "material_links": [],
+    "value_types": []
+  },
+  "element_hashes": {
+    "79f64954-6adf-5eda-b40c-13d9716f9b62": "9ff5af6c555f22c6716b5566ffc264f35ac0fc5f1dfe2d87ccf02ac5d60b8675",
+    "e9dfd141-2b59-5db5-87e9-3a02d74b3488": "c9d64bd4b079725395c4249d53f7e324de197e18827a4bac32b06b713daa79d6"
+  }
+}

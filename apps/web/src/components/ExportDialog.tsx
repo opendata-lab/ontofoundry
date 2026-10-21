@@ -10,7 +10,7 @@ export function ExportDialog({ open, workspaceId, versions, initialVersionId, on
 
 function ExportFlow({ workspaceId, versions, initialVersionId, onClose }: { workspaceId: string; versions: VersionSummary[]; initialVersionId?: string; onClose: () => void }) {
   const [versionId, setVersionId] = useState(initialVersionId ?? versions[0]?.version_id ?? "");
-  const [adapter, setAdapter] = useState("ontofoundry-core-1");
+  const [adapter, setAdapter] = useState("ontofoundry-core-1-package");
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -31,9 +31,9 @@ function ExportFlow({ workspaceId, versions, initialVersionId, onClose }: { work
   return <div className="flex min-w-0 flex-col gap-4">
     <Form layout="vertical" className="grid grid-cols-2 gap-x-4">
       <Form.Item label="已发布版本"><Select showSearch optionFilterProp="label" aria-label="导出版本" value={versionId || undefined} options={versions.map((v) => ({ value: v.version_id, label: `v${v.version}${v.message ? " · " + v.message : ""}` }))} onChange={(id) => { reset(); setVersionId(id); }} /></Form.Item>
-      <Form.Item label="文件格式"><Select aria-label="导出格式" value={adapter} options={[{ value: "ontofoundry-core-1", label: "OntoFoundry core-1 原生单文件" }, { value: "ossie-0.2", label: "Apache Ossie 0.2" }]} onChange={(id) => { reset(); setAdapter(id); }} /></Form.Item>
+      <Form.Item label="文件格式"><Select aria-label="导出格式" value={adapter} options={[{ value: "ontofoundry-core-1-package", label: "OntoFoundry core-1 原生完整包" }, { value: "ontofoundry-core-1", label: "OntoFoundry core-1 原生单文件" }, { value: "ossie-0.2", label: "Apache Ossie 0.2（ZIP + 扩展文件）" }]} onChange={(id) => { reset(); setAdapter(id); }} /></Form.Item>
     </Form>
-    <Typography.Paragraph type="secondary" className="m-0">只导出所选已发布版本。原生单文件不包含材料原文；Ossie 的转换损失和逐指标约定见报告。</Typography.Paragraph>
+    <Typography.Paragraph type="secondary" className="m-0">只导出所选已发布版本。原生单文件不包含材料原文；Ossie ZIP 包含纯 Ossie JSON 与平台扩展文件，转换损失和逐指标约定见报告。</Typography.Paragraph>
     {error && <Alert type="error" showIcon message={error} />}
     {hasErrors && <Alert type="error" showIcon message="当前格式无法完整交付，未生成可下载文件" description="请按报告修正定义，或明确选择原生单文件后重新生成报告。" />}
     {preview && <>

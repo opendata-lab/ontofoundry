@@ -75,28 +75,39 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("object popup", () => {
+  it("keeps the overview graph and field positions when entering edit mode", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((object) => object.name === "customer")!;
+    show(draft, `inspect=object_type:${customer.id}`);
+    const dialog = await screen.findByRole("dialog");
+    const graph = await within(dialog).findByLabelText(`${customer.display_name || customer.name}的关系图`);
+    const layout = dialog.querySelector(".object-overview-columns");
+    fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
+    expect(within(dialog).getByLabelText(`${customer.display_name || customer.name}的关系图`)).toBe(graph);
+    expect(dialog.querySelector(".object-overview-columns")).toBe(layout);
+    expect(within(dialog).getByRole("textbox", { name: "名称" })).toBeEnabled();
+  });
   it("shows the populated tabs, mapping status and column bindings", async () => {
     const draft = example("01-basic-sales");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() =>
       expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual([
         "概览",
-        "属性与映射4",
+        "字段4",
         "关系1",
         "规则0",
-        "实例",
       ]),
     );
     expect(within(dialog).getByText("已映射")).toBeInTheDocument();
     expect(within(dialog).getByText("main.customer_id")).toBeInTheDocument();
-    expect(within(dialog).getByText(/主数据集 customers/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/主数据集 customers/)).not.toBeInTheDocument();
   });
 
   it("edits the object and saves only its aggregate against the current version", async () => {
     const draft = example("01-basic-sales");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=basic`);
     const dialog = await screen.findByRole("dialog");
@@ -112,7 +123,7 @@ describe("object popup", () => {
       session_id: null,
       expected_session_revision: null,
     });
-    expect(payload.draft.object_types.find((o) => o.id === customer.id)?.name).toBe("重要客户");
+    expect((payload.draft.object_types.find((o) => o.id === customer.id)?.display_name || payload.draft.object_types.find((o) => o.id === customer.id)?.name)).toBe("重要客户");
     expect(await screen.findByRole("status")).toHaveTextContent("已保存");
     expect(refresh).toHaveBeenCalled();
   });
@@ -131,7 +142,7 @@ describe("object popup", () => {
 
   it("edits a child's member conditions on the direct parent's properties", async () => {
     const draft = example("06-inheritance");
-    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    const vip = draft.object_types.find((o) => o.name === "vip_party")!;
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
@@ -152,7 +163,7 @@ describe("object popup", () => {
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual([
       "概览",
-      "属性与映射4",
+      "字段4",
       "关系1",
       "规则0",
     ]));
@@ -162,7 +173,7 @@ describe("object popup", () => {
 
   it("shows virtual parent alert instead of main table picker when editing a virtual parent object", async () => {
     const draft = example("06-inheritance");
-    const asset = draft.object_types.find((o) => o.technical_name === "asset")!;
+    const asset = draft.object_types.find((o) => o.name === "asset")!;
     show(draft, `inspect=object_type:${asset.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     expect(
@@ -173,7 +184,7 @@ describe("object popup", () => {
 
   it("clears derived_by and removes orphaned shared_parent mapping when parent object changes", async () => {
     const draft = example("06-inheritance");
-    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    const vip = draft.object_types.find((o) => o.name === "vip_party")!;
     expect(draft.mappings.find((m) => m.type_id === vip.id)?.binding_mode).toBe("shared_parent");
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
@@ -194,7 +205,7 @@ describe("object popup", () => {
 describe("relation, metric and dataset popups", () => {
   it("shows a relation's ends and its own data binding tab, with mapping-table binding off by default", async () => {
     const draft = example("06-inheritance");
-    const link = draft.link_types.find((l) => l.name === "responsible_party")!;
+    const link = draft.link_types.find((l) => (l.display_name || l.name) === "responsible_party")!;
     show(draft, `inspect=link_type:${link.id}&inspectTab=mapping`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(within(dialog).getAllByRole("tab").map((t) => t.textContent)).toEqual(["概览", "映射", "规则0"]));
@@ -231,8 +242,8 @@ describe("relation, metric and dataset popups", () => {
     const metric = payload.draft.metrics.find((m) => m.id === payload.target_id)!;
     expect(metric).toMatchObject({
       kind: "simple",
-      name: "客户数",
-      technical_name: "customer_count",
+      display_name: "客户数",
+      name: "customer_count",
       aggregation: "count",
       measure: null,
       filters: [{ operator: "between", values: ["100", "100"] }],
@@ -245,7 +256,7 @@ describe("relation, metric and dataset popups", () => {
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByRole("textbox", { name: "指标名称" });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
-    expect(await within(dialog).findAllByText("请填写名称")).not.toHaveLength(0);
+    expect(await within(dialog).findAllByText("英文标识只能使用字母、数字和下划线，且不能以数字开头")).not.toHaveLength(0);
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
   });
 
@@ -254,24 +265,76 @@ describe("relation, metric and dataset popups", () => {
     const dataset = draft.datasets.find((d) => d.snapshot_date_column)!;
     show(draft, `inspect=dataset:${dataset.id}`);
     const dialog = await screen.findByRole("dialog");
-    expect(await within(dialog).findByText(`每日快照（${dataset.snapshot_date_column}）`)).toBeInTheDocument();
+    // Overview keeps metadata and references; fields combines source and columns.
+    expect(await within(dialog).findByText(dataset.snapshot_date_column!)).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("tab", { name: "字段" }));
     const columns = within(dialog).getByRole("columnheader", { name: "物理类型" }).closest("table")!;
     expect(within(columns).getAllByRole("row")).toHaveLength((dataset.columns?.length ?? 0) + 1);
   });
 
+  it.each(["source", "columns", "preview"])("opens legacy dataset %s links on the combined fields tab", async (tab) => {
+    const draft = example("12-snapshot-and-trends");
+    const dataset = draft.datasets[0];
+    show(draft, `inspect=dataset:${dataset.id}&inspectTab=${tab}`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("字段"));
+    expect(within(dialog).getAllByRole("tab").map((value) => value.textContent)).toEqual(["概览", "字段"]);
+    expect(within(dialog).getByRole("heading", { name: "来源定义" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "字段结构" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "预览前 20 行" })).toBeInTheDocument();
+  });
+
+  it("keeps dataset references in the overview for legacy reference links", async () => {
+    const draft = example("12-snapshot-and-trends");
+    show(draft, `inspect=dataset:${draft.datasets[0].id}&inspectTab=references`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("概览"));
+    for (const name of ["基本信息", "对象映射", "关系映射", "指标"])
+      expect(within(dialog).getByRole("heading", { name })).toBeInTheDocument();
+  });
+
   it("opens a property's owner object on the properties tab", async () => {
     const draft = example("01-basic-sales");
-    const property = draft.properties.find((p) => p.technical_name === "region")!;
+    const property = draft.properties.find((p) => p.name === "region")!;
     show(draft, `inspect=property:${property.id}`);
     const dialog = await screen.findByRole("dialog");
-    await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("属性与映射"));
+    await waitFor(() => expect(within(dialog).getByRole("tab", { selected: true })).toHaveTextContent("字段"));
   });
 });
 
 describe("element save impact preview", () => {
+  it.each([false, true])("clears a binding inline without changing sibling bindings (expression: %s)", async (expression) => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((object) => object.name === "customer")!;
+    const property = draft.properties.find((value) => value.owner_type_id === customer.id && value.name === "customer_no")!;
+    const mapping = draft.mappings.find((value) => value.type_id === customer.id)!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialog.querySelector(`[data-element-id="${property.id}"]`)).not.toBeNull());
+    const row = dialog.querySelector(`[data-element-id="${property.id}"]`)!.closest("tr")!;
+    if (expression) {
+      fireEvent.mouseDown(within(row).getByRole("combobox", { name: `${property.display_name || property.name}绑定方式` }));
+      fireEvent.click(await screen.findByTitle("计算"));
+      const input = within(row).getByRole("textbox", { name: `${property.display_name || property.name}计算表达式` });
+      fireEvent.change(input, { target: { value: "main.customer_no" } });
+      fireEvent.click(row.querySelector(".ant-input-clear-icon")!);
+      expect(input).toHaveValue("");
+      expect(within(row).getByText("计算", { exact: true })).toBeInTheDocument();
+    } else {
+      fireEvent.mouseDown(row.querySelector(".ant-select-clear")!);
+      expect(within(row).getByRole("combobox", { name: `${property.display_name || property.name}列` })).toHaveValue("");
+    }
+    expect(within(dialog).queryByRole("button", { name: /解除.*绑定/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    const candidate = vi.mocked(modelingApi.saveElement).mock.calls[0][1].draft.mappings.find((value) => value.id === mapping.id)!;
+    expect(candidate.fields).not.toHaveProperty(property.name);
+    expect(candidate.fields.name).toEqual(mapping.fields.name);
+  });
   it.each([false, true])("preserves the shared ancestor source when editing VIP note (column edit: %s)", async (editColumn) => {
     const draft = example("06-inheritance");
-    const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
+    const vip = draft.object_types.find((o) => o.name === "vip_party")!;
     const note = draft.properties.find((p) => p.owner_type_id === vip.id)!;
     const mapping = draft.mappings.find((m) => m.type_id === vip.id)!;
     expect(mapping.sources).toEqual([]);
@@ -281,7 +344,7 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${note.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${note.id}"]`)!;
     fireEvent.click(row);
-    const technical = within(dialog).getByRole("textbox", { name: "属性英文标识" });
+    const technical = within(dialog.querySelector(`[data-element-id="${note.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" });
     fireEvent.change(technical, { target: { value: "note2" } });
     expect(within(dialog).getByRole("combobox", { name: "VIP说明列" })).toHaveValue("vip_note");
     if (editColumn)
@@ -298,8 +361,8 @@ describe("element save impact preview", () => {
 
   it("keeps both UUID bindings when a typed rename passes through another property's name", async () => {
     const draft = example("01-basic-sales");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
-    const customerNo = draft.properties.find((p) => p.owner_type_id === customer.id && p.technical_name === "customer_no")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.owner_type_id === customer.id && p.name === "customer_no")!;
     const mapping = draft.mappings.find((m) => m.type_id === customer.id)!;
     vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
@@ -307,7 +370,7 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
     fireEvent.click(row);
-    const technical = within(dialog).getByRole("textbox", { name: "属性英文标识" });
+    const technical = within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" });
     for (const value of ["n", "na", "nam", "name", "name2"])
       fireEvent.change(technical, { target: { value } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
@@ -322,8 +385,8 @@ describe("element save impact preview", () => {
 
   it("previews once and saves directly without a confirmation modal when affected_items is empty", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
-    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
       current_version_id: "v1",
       session_revision: null,
@@ -336,7 +399,7 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
     fireEvent.click(row);
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
+    fireEvent.change(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
@@ -346,13 +409,13 @@ describe("element save impact preview", () => {
     const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     expect(previewPayload).toEqual(savePayload);
     expect(savePayload).not.toHaveProperty("affected_items");
-    expect(savePayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe("customer_code");
+    expect(savePayload.draft.properties.find((p) => p.id === customerNo.id)?.name).toBe("customer_code");
   });
 
   it("shows affected items and reason in a confirmation modal, cancels without saving, and strips reason when confirmed", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
-    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     const customerFact = draft.material_objects.find((f) => f.type_id === customer.id)!;
     const h = "1".repeat(64);
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
@@ -374,7 +437,7 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
     fireEvent.click(row);
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
+    fireEvent.change(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     const noticeText = await screen.findByText("确认后这些元素会随本次保存一并改写");
@@ -388,7 +451,7 @@ describe("element save impact preview", () => {
     fireEvent.click(within(confirmDialog).getByRole("button", { name: "取消" }));
     await waitFor(() => expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument());
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole("textbox", { name: "属性英文标识" })).toHaveValue("customer_code");
+    expect(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" })).toHaveValue("customer_code");
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     const confirmAgain = (await screen.findByText("确认后这些元素会随本次保存一并改写")).closest<HTMLElement>('[role="dialog"]')!;
@@ -409,7 +472,7 @@ describe("element save impact preview", () => {
 
   it("invalidates the impact confirmation when a late draft change arrives and previews the new draft again", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
       current_version_id: "v1",
       session_revision: null,
@@ -435,14 +498,14 @@ describe("element save impact preview", () => {
     await screen.findByText("确认后这些元素会随本次保存一并改写");
     expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
     const [, payload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
-    expect(payload.draft.object_types.find((o) => o.id === customer.id)?.name).toBe("星河重点客户");
+    expect((payload.draft.object_types.find((o) => o.id === customer.id)?.display_name || payload.draft.object_types.find((o) => o.id === customer.id)?.name)).toBe("星河重点客户");
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
   });
 
   it("displays a 409 error from preview without opening the confirmation modal or saving", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
-    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     vi.mocked(modelingApi.previewElementSave).mockRejectedValue(
       new ApiError("当前版本已变化", 409, "VERSION_CHANGED"),
     );
@@ -452,19 +515,19 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     const row = dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!;
     fireEvent.click(row);
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
+    fireEvent.change(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
     expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
     expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
-    expect(within(dialog).getByRole("textbox", { name: "属性英文标识" })).toHaveValue("customer_code");
+    expect(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" })).toHaveValue("customer_code");
   });
 
   it("disables Ant Design controls while busy and re-runs preview instead of saving stale candidate when Select changes during delayed preview", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
-    const customerNo = draft.properties.find((p) => p.technical_name === "customer_no")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     let resolveFirstPreview!: (value: {
       current_version_id: string | null;
       session_revision: number | null;
@@ -495,9 +558,9 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
     fireEvent.click(dialog.querySelector<HTMLElement>(`[data-element-id="${customerNo.id}"]`)!);
 
-    const techInput = within(dialog).getByRole("textbox", { name: "属性英文标识" });
-    const valueKindSelect = within(dialog).getByRole("combobox", { name: `${customerNo.name}类型` });
-    const requiredCheckbox = within(dialog).getByRole("checkbox", { name: `${customerNo.name}必填` });
+    const techInput = within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" });
+    const valueKindSelect = within(dialog).getByRole("combobox", { name: `${(customerNo.display_name || customerNo.name)}类型` });
+    const requiredCheckbox = within(dialog).getByRole("checkbox", { name: `${(customerNo.display_name || customerNo.name)}必填` });
 
     // Open the Select dropdown before clicking Save so its portal option is mounted, then click Save
     fireEvent.mouseDown(valueKindSelect);
@@ -531,7 +594,7 @@ describe("element save impact preview", () => {
     const [, secondPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
     expect(firstPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("string");
     expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("integer");
-    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.technical_name).toBe(
+    expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.name).toBe(
       "customer_code",
     );
 
@@ -544,7 +607,7 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     const savedProp = savePayload.draft.properties.find((p) => p.id === customerNo.id);
-    expect(savedProp?.technical_name).toBe("customer_code");
+    expect(savedProp?.name).toBe("customer_code");
     expect(savedProp?.value_kind).toBe("integer");
   });
 });

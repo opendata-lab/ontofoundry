@@ -4,7 +4,8 @@
 import type * as Core from "./core.generated";
 
 /** The server always fills defaults, so stored elements carry every field. */
-type Stored<T> = { [K in keyof T]-?: T[K] };
+type Stored<T> = { [K in keyof T as K extends "display_name" ? never : K]-?: T[K] }
+  & Pick<T, Extract<keyof T, "display_name">>;
 
 export type UUID = string;
 export type ISODate = string;
@@ -18,6 +19,7 @@ export type ObjectType = Stored<Core.ObjectType>;
 export type Property = Stored<Core.Property>;
 export type LinkType = Stored<Core.LinkType>;
 export type Rule = Stored<Core.Rule>;
+export type ValueType = Stored<Core.ValueType>;
 export type Dataset = Stored<Core.Dataset>;
 export type DatasetColumn = Core.DatasetColumn;
 export type BindingMode = Core.BindingMode;
@@ -59,7 +61,8 @@ export type TargetKind =
   | "dataset"
   | "mapping"
   | "material_object"
-  | "material_link";
+  | "material_link"
+  | "value_type";
 
 export type ElementByKind = {
   object_type: ObjectType;
@@ -71,6 +74,7 @@ export type ElementByKind = {
   mapping: DataMapping;
   material_object: MaterialObject;
   material_link: MaterialLink;
+  value_type: ValueType;
 };
 export type CoreElement = ElementByKind[TargetKind];
 
@@ -83,7 +87,8 @@ export type CollectionKey =
   | "datasets"
   | "mappings"
   | "material_objects"
-  | "material_links";
+  | "material_links"
+  | "value_types";
 
 export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
   object_type: "object_types",
@@ -95,6 +100,7 @@ export const COLLECTION_BY_KIND: Record<TargetKind, CollectionKey> = {
   mapping: "mappings",
   material_object: "material_objects",
   material_link: "material_links",
+  value_type: "value_types",
 };
 
 /** A core-1 draft as the server returns it: all nine collections present. */
@@ -110,6 +116,7 @@ export type Draft = {
   mappings: DataMapping[];
   material_objects: MaterialObject[];
   material_links: MaterialLink[];
+  value_types: ValueType[];
 };
 
 export type Page<T> = { total: number; items: T[]; next_cursor: string | null };
@@ -233,8 +240,8 @@ export type MetricRead = (
 
 export type ForbiddenMetricRead = {
   id: UUID;
+  display_name?: string | null;
   name: string;
-  technical_name: string;
   description?: string;
   synonyms?: string[];
   binding_status: "forbidden";
@@ -276,7 +283,7 @@ export type ObjectTypeRead = ObjectType & {
   properties: PropertyRead[];
   links: LinkRead[];
   rules: Effective<Rule>[];
-  child_types: Pick<ObjectType, "id" | "name" | "technical_name">[];
+  child_types: Pick<ObjectType, "id" | "display_name" | "name">[];
   binding_status: BindingStatus;
   mapping?: MappingRead | null;
   instance_source_type_ids?: UUID[];
@@ -307,7 +314,7 @@ export type GraphNode = {
   id: UUID;
   kind: "object_type";
   label: string;
-  technical_name: string;
+  name: string;
   description: string;
   tags: string[];
   attribute_count?: number;
@@ -316,7 +323,7 @@ export type GraphEdge = {
   id: string;
   kind: "link_type" | "extends";
   label: string;
-  technical_name: string;
+  name: string;
   source: UUID;
   target: UUID;
   link_type_id?: UUID;
@@ -369,6 +376,8 @@ export type ModelingSession = {
   base_diff: ElementChange[];
   graph: Omit<TypeGraph, "version_id"> & { version_id: UUID | "" };
   material_ids: string[];
+  /** Registered tables linked to the session; the agent proposes datasets on them. */
+  linked_tables?: LinkedTable[];
   task_status: string;
   task_detail: string;
   dataagent_topic_id: string | null;
@@ -419,6 +428,7 @@ export type PublishPreview = {
   labels: Record<UUID, string>;
   impacts: Impact[];
   auto_merged: (ElementChange & { side: "latest" | "both" })[];
+  dataset_checks?: { dataset_id: UUID; name: string; display_name: string | null; valid: boolean; diagnostics: DatasetDiagnostic[] }[];
 };
 export type PublishResult = { version: VersionSummary; session: ModelingSession };
 
@@ -434,7 +444,7 @@ export type AffectedItem = {
   target_id: UUID;
   expected_target_hash: SHA256;
 };
-export type ElementSaveKind = "object_type" | "link_type" | "metric" | "dataset" | "mapping";
+export type ElementSaveKind = "object_type" | "link_type" | "metric" | "dataset" | "mapping" | "value_type";
 export type ElementSave = {
   target_kind: ElementSaveKind;
   target_id: UUID;
@@ -472,6 +482,7 @@ export type DuplicateCandidate = {
   expected_target_hash: SHA256;
 };
 export type ProposalItem = {
+  source_diagnostics?: DatasetDiagnostic[];
   id: UUID;
   batch_id: UUID;
   ordinal: number;
@@ -800,8 +811,8 @@ export type MCPEnvelope = {
 export type OntologyHit = {
   id: UUID;
   kind: OntologyKind;
+  display_name?: string | null;
   name: string;
-  technical_name: string;
   summary: string;
   matched_synonyms: string[];
   owner_kind?: "object_type" | "property" | "link_type";
@@ -826,8 +837,8 @@ export type MCPObject = MCPObjectHit & {
 export type MCPElement = {
   id: UUID;
   kind: OntologyKind;
+  display_name?: string | null;
   name: string;
-  technical_name: string;
   description?: string;
   synonyms?: string[];
   definition?: CoreElement;
@@ -836,7 +847,7 @@ export type MCPElement = {
   properties?: Page<PropertyRead>;
   rules?: Page<Effective<Rule>>;
   links?: Page<LinkRead>;
-  child_types?: Page<Pick<ObjectType, "id" | "name" | "technical_name">>;
+  child_types?: Page<Pick<ObjectType, "id" | "display_name" | "name">>;
   datasets?: Page<DatasetRead>;
   sources?: Page<MappingSource>;
   effective_bindings?: Page<EffectiveBindingRead>;
@@ -930,4 +941,20 @@ export type ExportPreview = {
   filename: string;
   media_type: string;
   download_url: string | null;
+};
+
+
+export type DatasetDiagnostic = { code: string; severity: "error"; path: string; message: string; details?: { connection_id?: string; schema_name?: string; table_name?: string } };
+export type DatasetCheckResult = { valid: boolean; diagnostics: DatasetDiagnostic[]; columns: DatasetColumn[] | null; referenced_tables: { schema_name: string | null; table_name: string }[] };
+export type DatasetPreview = { columns: DatasetColumn[]; items: Record<string, unknown>[]; limit: number };
+export type SyncJob = { id: string; connection_id: string; schema_name: string; scope: "all" | "selected"; state: "queued" | "running" | "succeeded" | "partial_failed" | "failed" | "interrupted"; total: number | null; processed: number; available: number; failed: number; error: string | null; duration_ms: number; batches: { id: string; ordinal: number; state: string; attempt: number; duration_ms: number; error: string | null; tables: string[]; results: { table_name: string; state: string; error?: string }[] }[] };
+
+/** A synced table in data management that a modeling session may use. */
+export type LinkedTable = { connection_id: string; schema_name: string; table_name: string };
+export type RegisteredTable = LinkedTable & {
+  connection_name: string;
+  kind: string;
+  comment: string;
+  column_count: number;
+  datasets: { id: string; name: string; display_name?: string | null }[];
 };

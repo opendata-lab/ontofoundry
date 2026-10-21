@@ -6,7 +6,7 @@ import asyncio
 import json
 
 from ontofoundry_api.db_models import ModelingSessionRecord
-from ontofoundry_api.services.dataagent import DataAgentClient
+from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.model_result import reconcile_run
 
@@ -28,6 +28,9 @@ def install_download(monkeypatch, values) -> list[str]:
 
     async def download(self, topic_id: str, rel_path: str):
         paths.append(rel_path)
+        # Legacy cases have no intermediate artifacts in the agent workspace.
+        if rel_path.startswith("modeling/"):
+            raise DataAgentError("missing workflow file", status_code=404)
         value = queue.pop(0)
         if isinstance(value, BaseException):
             raise value

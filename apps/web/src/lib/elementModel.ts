@@ -86,7 +86,7 @@ export function relationsFor(draft: Draft, type: ObjectType): RelationRow[] {
   }));
 }
 
-const RULE_RANK: Record<Rule["owner_kind"], number> = { object_type: 0, property: 1, link_type: 2 };
+const RULE_RANK: Record<Rule["owner_kind"], number> = { object_type: 0, property: 1, link_type: 2, value_type: 3 };
 
 export function rulesFor(draft: Draft, type: ElementType): Rule[] {
   const rules = isObject(type)
@@ -105,7 +105,7 @@ export function objectTree(draft: Draft, exclude?: UUID): TreeNode[] {
       .filter((o) => (o.extends ?? null) === parent || (parent === null && o.extends && !byId(draft.object_types, o.extends)))
       .map((o) => ({
         value: o.id,
-        title: o.name || o.technical_name || "未命名对象",
+        title: (o.display_name || o.name) || o.name || "未命名对象",
         disabled: !!exclude && isA(draft, o.id, exclude),
         children: build(o.id),
       }));

@@ -19,7 +19,7 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
 | `binding_mode` | 枚举 | 有绑定父对象的子绑定必须为 shared_parent；独立绑定用 independent。 | independent 表示独立来源，shared_parent 表示沿用有绑定父对象的来源。 |
 | `membership_source_id` | 字符串 或 null | 以扩展记录定义成员时必须填写，否则为空。 | 此字段引用本层扩展来源，声明扩展记录存在是成为子对象成员的依据。 |
 | `sources` | 数组 | 绑定中必须提供，可为空数组。 | 此数组按局部来源名引用数据集与有序键，共享父绑定仅列本地新增来源。 |
-| `fields` | 映射 | 绑定中必须提供，可为空映射。 | 此映射按属性技术名保存绑定；列绑定指定来源与列，计算绑定保存同行表达式。 |
+| `fields` | 映射 | 绑定中必须提供，可为空映射。 | 此映射按属性英文标识保存绑定；列绑定指定来源与列，计算绑定保存同行表达式。 |
 | `inherited_link_bindings` | 映射 | 可省略，默认空映射。 | 此映射供虚拟父的具体子对象为继承关系配置本地绑定，关系定义仍沿用原 id。 |
 | 继承的业务标识 | 解析所得 | 这是继承解析结果，不是另一个持久化字段。 | 父对象已有标识时，子对象沿用它，不能新增标识属性扩大元组。 |
 | 继承的实例标题 | 解析所得 | 标题由对象的 title_property_id 选择。 | 子对象可以选择祖先定义的属性作为实例标题，不复制属性定义。 |
@@ -34,8 +34,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
   "object_types": [
     {
       "id": "00000000-0000-4000-8000-000000001001",
-      "name": "客户",
-      "technical_name": "customer",
+      "display_name": "客户",
+      "name": "customer",
       "description": "与公司签约的企业客户",
       "synonyms": [
         "顾客",
@@ -51,8 +51,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     },
     {
       "id": "00000000-0000-4000-8000-000000009103",
-      "name": "VIP客户",
-      "technical_name": "vip_customer",
+      "display_name": "VIP客户",
+      "name": "vip_customer",
       "description": "父客户范围内等级为 VIP 的成员。",
       "synonyms": [],
       "tags": [
@@ -84,8 +84,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     {
       "id": "00000000-0000-4000-8000-000000002001",
       "owner_type_id": "00000000-0000-4000-8000-000000001001",
-      "name": "客户编号",
-      "technical_name": "customer_no",
+      "display_name": "客户编号",
+      "name": "customer_no",
       "description": "",
       "value_kind": "string",
       "required": true,
@@ -97,8 +97,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     {
       "id": "00000000-0000-4000-8000-000000002002",
       "owner_type_id": "00000000-0000-4000-8000-000000001001",
-      "name": "客户名称",
-      "technical_name": "name",
+      "display_name": "客户名称",
+      "name": "name",
       "description": "",
       "value_kind": "string",
       "required": true,
@@ -112,8 +112,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     {
       "id": "00000000-0000-4000-8000-000000002003",
       "owner_type_id": "00000000-0000-4000-8000-000000001001",
-      "name": "所在地区",
-      "technical_name": "region",
+      "display_name": "所在地区",
+      "name": "region",
       "description": "华东 / 华北 / 华南 / 西部",
       "value_kind": "string",
       "required": false,
@@ -125,8 +125,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     {
       "id": "00000000-0000-4000-8000-000000002004",
       "owner_type_id": "00000000-0000-4000-8000-000000001001",
-      "name": "签约日期",
-      "technical_name": "signed_on",
+      "display_name": "签约日期",
+      "name": "signed_on",
       "description": "",
       "value_kind": "date",
       "required": false,
@@ -138,8 +138,8 @@ VIP 客户仍然是客户，所以它沿用客户编号、名称和客户已有�
     {
       "id": "00000000-0000-4000-8000-000000009102",
       "owner_type_id": "00000000-0000-4000-8000-000000001001",
-      "name": "等级",
-      "technical_name": "level",
+      "display_name": "等级",
+      "name": "level",
       "description": "客户当前业务等级。",
       "value_kind": "string",
       "required": false,
@@ -268,7 +268,7 @@ WHERE c.customer_level = 'VIP';
 
 ObjectType.derived_by 默认空数组，派生数组非空时 extends 必须非空。每项是 `{kind: simple, conditions: [...]}` 或 `{kind: expression, expression: "..."}`，conditions 与 expression 互斥；simple 非空条件列表按 AND，条件采用本体成员专用 PathCondition：`{path: {links: [{link_type_id, direction}], property_id}, operator, values}`；links 为空表示上下文属性，方向为 forward 或 reverse，路径须为标量，运算符和值类型按[主设计 §3.2](../design/2026-10-14-core-model-and-format-adapters.md)校验，与指标列条件独立。多条分支取并集，需要同时成立写在同一分支。空数组仅表示本层无条件，不等于成员定义完整。
 
-引用从直接父对象的有效属性和关系解析到 id，可引用祖先定义，保留原 id。表达式支持受限标量、比较、布尔组合、算术、CASE、受限标量函数，另支持 `EXISTS (person.earns)` 的显式关系存在性；每跳保存关系 id 与 forward 或 reverse 方向，文字反向写作 `REVERSE(关系技术名)`。同类不同角色以关系 id 区分，自关联同样保留方向。找不到关联与存在关联但属性为空有区别；不扩展到任意 SQL 子查询、聚合、递归或未定义的变量量化。文本按 AST 和 id 依赖重新生成显示，改技术名不替换字面量，物理列改名不改变条件。
+引用从直接父对象的有效属性和关系解析到 id，可引用祖先定义，保留原 id。表达式支持受限标量、比较、布尔组合、算术、CASE、受限标量函数，另支持 `EXISTS (person.earns)` 的显式关系存在性；每跳保存关系 id 与 forward 或 reverse 方向，文字反向写作 `REVERSE(关系英文标识)`。同类不同角色以关系 id 区分，自关联同样保留方向。找不到关联与存在关联但属性为空有区别；不扩展到任意 SQL 子查询、聚合、递归或未定义的变量量化。文本按 AST 和 id 依赖重新生成显示，改英文标识不替换字面量，物理列改名不改变条件。
 
 文档事实查询按已接受的 UUID 返回，继承展开只对同一 UUID 去重；不同 UUID 不因业务标识相同而合并。业务实体数量另按业务标识统计。Ossie 子类自有首选标识不能改变已有父标识，按 RT-68 报告损失并保留原文，子类单编号仍可作为普通 unique 属性。
 

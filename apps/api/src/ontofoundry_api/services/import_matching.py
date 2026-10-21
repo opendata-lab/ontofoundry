@@ -45,10 +45,8 @@ def match_import(base: CoreDraft, source: CoreDraft, *, native: bool) -> dict[st
             value = str(item[name])
             return remap.get(value, value)
 
-        technical = str(
-            item.get("name", "") if kind == "link_type" else item.get("technical_name", "")
-        ).casefold()
-        if kind in {"object_type", "metric"}:
+        technical = str(item.get("name", "")).casefold()
+        if kind in {"object_type", "metric", "value_type"}:
             return technical
         if kind == "property":
             return owner("owner_type_id"), technical
@@ -64,6 +62,8 @@ def match_import(base: CoreDraft, source: CoreDraft, *, native: bool) -> dict[st
 
     for kind in (
         "object_type",
+        # Before properties and rules, which reference value types.
+        "value_type",
         "property",
         "link_type",
         "rule",
@@ -187,15 +187,7 @@ def build_candidate_graph(
             "dataset",
         }:
             continue
-        fields = (
-            ("technical_name",)
-            if kind == "link_type"
-            else ("name",)
-            if kind == "dataset"
-            else ("technical_name",)
-            if kind == "rule"
-            else ("name", "technical_name")
-        )
+        fields = ("name",)
         for other, (old_kind, previous) in original.items():
             if (
                 other == ident
@@ -203,12 +195,8 @@ def build_candidate_graph(
                 or namespace(kind, item) != namespace(old_kind, previous)
             ):
                 continue
-            names = {"technical_name": item["name"]} if kind == "link_type" else item
-            old_names = (
-                {"technical_name": previous["name"]}
-                if old_kind == "link_type"
-                else previous
-            )
+            names = item
+            old_names = previous
             if any(
                 key in old_names
                 and str(names.get(key, "")).casefold() == str(old_names[key]).casefold()
@@ -231,6 +219,17 @@ def build_candidate_graph(
         ):
             blocked[ident] = "证据 UUID 不能转移归属"
         previous = original.get(ident)
+        if (
+            kind == "dataset"
+            and previous
+            and not item.get("connection_id")
+            and previous[1].get("connection_id")
+        ):
+            # Exchange files never carry connection ids; keep the local binding.
+            item["connection_id"] = previous[1]["connection_id"]
+        if kind == "dataset" and previous and item.get("columns") is None:
+            # A missing column list means "not provided", not "remove the registered columns".
+            item["columns"] = previous[1].get("columns")
         if previous and "evidence" in item:
             by_id = {e["id"]: e for e in item["evidence"]}
             for evidence in previous[1].get("evidence", []):

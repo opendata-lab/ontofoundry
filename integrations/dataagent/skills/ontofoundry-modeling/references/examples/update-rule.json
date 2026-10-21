@@ -1,0 +1,1 @@
+[{"operation":"update","target_kind":"rule","target_id":"0ff4f1f9-6f40-5a87-b49a-c5351fe53b24","after":{"name":"staff_constraint","display_name":"员工姓名必填","description":"已核对业务定义","owner_kind":"object_type","owner_id":"7a79f4c0-f695-5634-b533-ae138643c62f","rule_kind":"constraint","expression":"staff.staff_name IS NOT NULL","evidence":[]}}]

@@ -8,44 +8,42 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001201",
-        "name": "供应商",
-        "technical_name": "supplier",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "supplier",
+        "display_name": "供应商"
       },
       {
         "id": "00000000-0000-4000-8000-000000001202",
-        "name": "零件",
-        "technical_name": "part",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "part",
+        "display_name": "零件"
       },
       {
         "id": "00000000-0000-4000-8000-000000001203",
-        "name": "项目",
-        "technical_name": "project",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "project",
+        "display_name": "项目"
       },
       {
         "id": "00000000-0000-4000-8000-000000001204",
-        "name": "供货记录",
-        "technical_name": "supply",
         "description": "由 Ossie supplier.supplies ManyToOne 重化，角色依次为供应商、零件、项目、数量；前三个角色决定最后的数量。供货日期为另行补充的属性，不参与元组标识。",
         "synonyms": [
           "供货"
@@ -67,152 +65,154 @@
           }
         ],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "supply",
+        "display_name": "供货记录"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002201",
         "owner_type_id": "00000000-0000-4000-8000-000000001201",
-        "name": "供应商编码",
-        "technical_name": "supplier_code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "supplier_code",
+        "display_name": "供应商编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002202",
         "owner_type_id": "00000000-0000-4000-8000-000000001201",
-        "name": "名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002211",
         "owner_type_id": "00000000-0000-4000-8000-000000001202",
-        "name": "零件号",
-        "technical_name": "part_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "part_no",
+        "display_name": "零件号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002212",
         "owner_type_id": "00000000-0000-4000-8000-000000001202",
-        "name": "名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002221",
         "owner_type_id": "00000000-0000-4000-8000-000000001203",
-        "name": "项目编码",
-        "technical_name": "project_code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "project_code",
+        "display_name": "项目编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002222",
         "owner_type_id": "00000000-0000-4000-8000-000000001203",
-        "name": "名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002233",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
-        "name": "供应商编码",
-        "technical_name": "supplier_supplier_code",
         "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "supplier_supplier_code",
+        "display_name": "供应商编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002234",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
-        "name": "零件号",
-        "technical_name": "part_part_no",
         "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "part_part_no",
+        "display_name": "零件号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002235",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
-        "name": "项目编码",
-        "technical_name": "project_project_code",
         "description": "按实体角色的完整业务标识生成；示例映射明确证明对应列保存同一业务编号。",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "project_project_code",
+        "display_name": "项目编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002231",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
-        "name": "数量",
-        "technical_name": "quantity",
         "description": "",
         "value_kind": "integer",
         "required": true,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "quantity",
+        "display_name": "数量"
       },
       {
         "id": "00000000-0000-4000-8000-000000002232",
         "owner_type_id": "00000000-0000-4000-8000-000000001204",
-        "name": "供货日期",
-        "technical_name": "supplied_on",
         "description": "",
         "value_kind": "date",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "supplied_on",
+        "display_name": "供货日期"
       }
     ],
     "link_types": [
@@ -292,32 +292,30 @@
     "rules": [
       {
         "id": "00000000-0000-4000-8000-000000004201",
-        "name": "数量为正",
-        "technical_name": "positive_quantity",
         "description": "来自值类型“正数量”自身约束：数量>0，按变量绑定改写到多元值角色 quantity。",
         "owner_kind": "property",
         "owner_id": "00000000-0000-4000-8000-000000002231",
         "rule_kind": "constraint",
         "expression": "supply.quantity > 0",
-        "evidence": []
+        "evidence": [],
+        "name": "positive_quantity",
+        "display_name": "数量为正"
       },
       {
         "id": "00000000-0000-4000-8000-000000004202",
-        "name": "数量非负",
-        "technical_name": "nonnegative_quantity",
         "description": "来自“正数量”的祖先值类型“数量”的约束：数量>=0，按变量绑定实例化。",
         "owner_kind": "property",
         "owner_id": "00000000-0000-4000-8000-000000002231",
         "rule_kind": "constraint",
         "expression": "supply.quantity >= 0",
-        "evidence": []
+        "evidence": [],
+        "name": "nonnegative_quantity",
+        "display_name": "数量非负"
       }
     ],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006201",
-        "name": "供货量",
-        "technical_name": "supply_quantity",
         "description": "供货表全部记录的数量合计。",
         "synonyms": [],
         "kind": "simple",
@@ -328,12 +326,12 @@
           "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
           "column": "qty"
         },
-        "filters": []
+        "filters": [],
+        "name": "supply_quantity",
+        "display_name": "供货量"
       },
       {
         "id": "00000000-0000-4000-8000-000000006202",
-        "name": "供货供应商数",
-        "technical_name": "active_supplier_count",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -344,7 +342,9 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb"
+        "dataset_id": "ca9867c7-a796-5a45-bc73-4e3a4ac104cb",
+        "name": "active_supplier_count",
+        "display_name": "供货供应商数"
       }
     ],
     "datasets": [

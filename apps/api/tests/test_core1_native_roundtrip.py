@@ -22,8 +22,13 @@ def test_thirteen_native_exports_preserve_every_core_definition_and_uuid(name):
     assert result.document is not None
     assert hashlib.sha256(result.document).hexdigest() == result.report.content_sha256
     document = json.loads(result.document)
-    assert set(document) == {"format", "schema_version", "exported_at", "draft"}
-    assert document["draft"] == model.model_dump(mode="json")
+    # Connection ids stay local; only connection-name hints travel (DS-16).
+    assert set(document) == {"format", "schema_version", "exported_at", "draft", "connection_names"}
+    assert all(d.get("connection_id") is None for d in document["draft"]["datasets"])
+    local = model.model_dump(mode="json")
+    for dataset in local["datasets"]:
+        dataset.pop("connection_id", None)
+    assert document["draft"] == local
     assert result.report.direction == "export"
     restored = NativeAdapter().import_document(
         result.document, ImportContext(model.workspace_id)

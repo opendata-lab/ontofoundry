@@ -12,6 +12,7 @@ from uuid import UUID, uuid5
 from jsonschema import Draft202012Validator
 from pydantic import TypeAdapter
 
+from ontofoundry_api.contracts.proposal_diagnostics import diagnostic, schema_diagnostic
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
 from ontofoundry_api.domain.core import CoreDraft, MaterialEvidence
 from ontofoundry_api.domain.dependencies import (
@@ -307,7 +308,7 @@ def walk_references(kind, value, resolve):
             for condition in branch.get("conditions", []):
                 path(condition["path"])
     elif kind == "property":
-        refs(result, "owner_type_id")
+        refs(result, "owner_type_id", "value_type_id")
     elif kind == "link_type":
         refs(result, "source_type_id", "target_type_id")
         join(result.get("data_join"))
@@ -407,9 +408,7 @@ def group_items(draft, items, *, references_resolved=False):
                 continue
             previous = original.get(changed.target_id, {})
             renamed = changed.after is not None and any(
-                previous.get(k) != changed.after.get(k)
-                for k in ("technical_name", "name")
-                if k in previous
+                previous.get(k) != changed.after.get(k) for k in ("name",) if k in previous
             )
             if changed.operation == "delete" or renamed:
                 dependent = by_target.get(str(owner))
@@ -459,25 +458,9 @@ def group_items(draft, items, *, references_resolved=False):
                 or namespace(item, item.after) != namespace(other, previous)
             ):
                 continue
-            fields = (
-                ("technical_name",)
-                if item.target_kind == "link_type"
-                else ("name",)
-                if item.target_kind == "dataset"
-                else ("technical_name",)
-                if item.target_kind == "rule"
-                else ("name", "technical_name")
-            )
-            names = (
-                {"technical_name": item.after["name"]}
-                if item.target_kind == "link_type"
-                else item.after
-            )
-            old_names = (
-                {"technical_name": previous["name"]}
-                if other.target_kind == "link_type"
-                else previous
-            )
+            fields = ("name",)
+            names = item.after
+            old_names = previous
             if any(
                 k in names
                 and k in old_names
@@ -531,16 +514,35 @@ def group_items(draft, items, *, references_resolved=False):
 def parse_result(
     raw: bytes, context: RunContext, material_lookup: MaterialLookup
 ) -> ParsedBatch:
-    def fail(code, message):
-        raise ProposalContractError(code, message)
+    current_item = None
+    current_pointer = "/"
+
+    def fail(
+        code, message, *, pointer=None, expected="符合固定上下文及当前提案契约", actual=None
+    ):
+        raise ProposalContractError(
+            code,
+            diagnostic(
+                pointer or current_pointer,
+                message,
+                expected,
+                actual if actual is not None else message,
+                current_item,
+            ),
+        )
 
     try:
         data = json.loads(raw)
     except (ValueError, UnicodeError) as exc:
-        raise ProposalContractError("RESULT_JSON_INVALID", "建模结果不是合法 JSON") from exc
+        raise ProposalContractError(
+            "RESULT_JSON_INVALID",
+            diagnostic("/", "建模结果不是合法 JSON", "UTF-8 JSON 对象", type(exc).__name__),
+        ) from exc
     errors = list(Draft202012Validator(result_schema()).iter_errors(data))
     if errors:
-        fail("RESULT_SCHEMA_INVALID", f"建模结果不符合契约：{errors[0].message}")
+        raise ProposalContractError(
+            "RESULT_SCHEMA_INVALID", schema_diagnostic(errors[0], result_schema(), data)
+        )
     for name in (
         "workspace_id",
         "session_id",
@@ -551,15 +553,28 @@ def parse_result(
         "source_draft_sha256",
     ):
         if data[name] != getattr(context, name):
-            fail("RESULT_CONTEXT_MISMATCH", f"建模结果的 {name} 与固定上下文不一致")
-    existing = {e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft[c]}
+            fail(
+                "RESULT_CONTEXT_MISMATCH",
+                f"建模结果的 {name} 与固定上下文不一致",
+                pointer="/" + name,
+                expected=getattr(context, name),
+                actual=data[name],
+            )
+    existing = {e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft.get(c, [])}
     batch_id = batch_id_for(context.session_id, context.run_token)
     refs, targets = {}, {}
     for n, item in enumerate(data["items"]):
+        current_item, current_pointer = item, f"/items/{n}"
         ref = item.get("client_ref")
         if ref:
             if ref in refs:
-                fail("CLIENT_REF_DUPLICATE", f"client_ref {ref} 重复")
+                fail(
+                    "CLIENT_REF_DUPLICATE",
+                    f"client_ref {ref} 重复",
+                    pointer=current_pointer + "/client_ref",
+                    expected="不重复的 client_ref",
+                    actual=ref,
+                )
             refs[ref] = n
         if item["operation"] == "create":
             if (
@@ -568,50 +583,124 @@ def parse_result(
                 or item["before"] is not None
                 or item["after"] is None
             ):
-                fail("OPERATION_SHAPE", "新增必须有 client_ref 和 after，且无目标和 before")
+                fail(
+                    "OPERATION_SHAPE",
+                    "新增必须有 client_ref 和 after，且无目标和 before",
+                    expected={
+                        "client_ref": "非空",
+                        "before": None,
+                        "target_id": None,
+                        "after": "对象",
+                    },
+                    actual={
+                        k: item.get(k)
+                        for k in ("client_ref", "target_id", "before", "after")
+                    },
+                )
             targets[n] = create_target_id(batch_id, ref)
         else:
             target = item.get("target_id")
             if target not in existing:
-                fail("TARGET_NOT_FOUND", "更新或删除的目标不在固定草稿中")
+                fail(
+                    "TARGET_NOT_FOUND",
+                    "更新或删除的目标不在固定草稿中",
+                    pointer=current_pointer + "/target_id",
+                    expected="固定草稿中已有的 UUID",
+                    actual=target,
+                )
             kind, current = existing[target]
             if kind.value != item["target_kind"]:
-                fail("TARGET_KIND_MISMATCH", "目标类型不符")
+                fail(
+                    "TARGET_KIND_MISMATCH",
+                    "目标类型不符",
+                    pointer=current_pointer + "/target_kind",
+                    expected=kind.value,
+                    actual=item["target_kind"],
+                )
             if item["before"] is None or (item["operation"] == "update") != (
                 item["after"] is not None
             ):
-                fail("OPERATION_SHAPE", "更新或删除的 before/after 形态不正确")
+                fail(
+                    "OPERATION_SHAPE",
+                    "更新或删除的 before/after 形态不正确",
+                    expected={
+                        "before": "完整旧对象",
+                        "after": "对象" if item["operation"] == "update" else None,
+                    },
+                    actual={"before": item["before"], "after": item["after"]},
+                )
             if canonical(item["before"]) != canonical(current):
-                fail("BEFORE_MISMATCH", "before 与固定草稿不一致")
+                fail(
+                    "BEFORE_MISMATCH",
+                    "before 与固定草稿不一致",
+                    pointer=current_pointer + "/before",
+                    expected=current,
+                    actual=item["before"],
+                )
             if element_sha256(current, collection=COLLECTIONS[kind]) != item.get(
                 "expected_target_hash"
             ):
-                fail("TARGET_HASH_MISMATCH", "目标哈希不一致")
+                fail(
+                    "TARGET_HASH_MISMATCH",
+                    "目标哈希不一致",
+                    pointer=current_pointer + "/expected_target_hash",
+                    expected=element_sha256(current, collection=COLLECTIONS[kind]),
+                    actual=item.get("expected_target_hash"),
+                )
             targets[n] = target
     if len(set(targets.values())) != len(targets):
-        fail("TARGET_DUPLICATE", "同一批次不能重复作用于同一目标")
+        fail(
+            "TARGET_DUPLICATE",
+            "同一批次不能重复作用于同一目标",
+            pointer="/items",
+            expected="所有目标 UUID 不重复",
+            actual=list(targets.values()),
+        )
     ids = [str(uuid5(UUID(batch_id), f"item:{n}")) for n in targets]
     all_ids = set(existing) | set(targets.values())
     parsed = []
     for n, raw_item in enumerate(data["items"]):
+        current_item, current_pointer = raw_item, f"/items/{n}"
         deps = set()
 
         def resolve(value, n=n, deps=deps):
             if isinstance(value, dict):
                 ref = value["client_ref"]
                 if ref not in refs or data["items"][refs[ref]]["operation"] != "create":
-                    fail("CLIENT_REF_UNKNOWN", f"未知新增引用 {ref}")
+                    fail(
+                        "CLIENT_REF_UNKNOWN",
+                        f"未知新增引用 {ref}",
+                        expected={
+                            "可用新增引用": [
+                                k
+                                for k, v in refs.items()
+                                if data["items"][v]["operation"] == "create"
+                            ]
+                        },
+                        actual=ref,
+                    )
                 target_index = refs[ref]
                 if target_index != n:
                     deps.add(ids[target_index])
                 return targets[target_index]
             if str(value) not in all_ids:
-                fail("REFERENCE_UNKNOWN", f"未知引用 {value}")
+                fail(
+                    "REFERENCE_UNKNOWN",
+                    f"未知引用 {value}",
+                    expected="固定草稿或本批新增的 UUID",
+                    actual=value,
+                )
             return str(value)
 
         for ref in raw_item.get("depends_on", []):
             if ref not in refs:
-                fail("DEPENDENCY_UNKNOWN", f"未知依赖 {ref}")
+                fail(
+                    "DEPENDENCY_UNKNOWN",
+                    f"未知依赖 {ref}",
+                    pointer=current_pointer + "/depends_on",
+                    expected=list(refs),
+                    actual=ref,
+                )
             deps.add(ids[refs[ref]])
         after = raw_item["after"]
         if after is not None:
@@ -638,7 +727,13 @@ def parse_result(
                     )
 
                 if manual(after) != manual(raw_item["before"]):
-                    fail("MANUAL_EVIDENCE_FORBIDDEN", "智能体不能新增、修改或删除人工证据")
+                    fail(
+                        "MANUAL_EVIDENCE_FORBIDDEN",
+                        "智能体不能新增、修改或删除人工证据",
+                        pointer=current_pointer + "/after/evidence",
+                        expected=manual(raw_item["before"]),
+                        actual=manual(after),
+                    )
             evidence = deepcopy(raw_item.get("evidence", []))
             for e in evidence:
                 e.setdefault("id", str(uuid5(UUID(targets[n]), canonical(e))))
@@ -647,7 +742,16 @@ def parse_result(
         except (ValueError, EvidenceError) as exc:
             if isinstance(exc, ProposalContractError):
                 raise
-            raise ProposalContractError("ELEMENT_INVALID", str(exc)) from exc
+            raise ProposalContractError(
+                "ELEMENT_INVALID",
+                diagnostic(
+                    current_pointer + "/after",
+                    str(exc),
+                    "有效元素与真实材料证据",
+                    str(exc),
+                    raw_item,
+                ),
+            ) from exc
         parsed.append(
             ParsedItem(
                 ids[n],
@@ -671,7 +775,10 @@ def parse_result(
     try:
         group_items(context.draft, parsed)
     except ValueError as exc:
-        raise ProposalContractError("ELEMENT_INVALID", str(exc)) from exc
+        raise ProposalContractError(
+            "ELEMENT_INVALID",
+            diagnostic("/items", "候选图校验未通过", "完整合法的候选图", str(exc)),
+        ) from exc
     return ParsedBatch(batch_id, hashlib.sha256(raw).hexdigest(), parsed)
 
 

@@ -1,5 +1,5 @@
 import { Button } from "antd";
-import { PageBody, PageHeader } from "../components/layout";
+import { PageBody, PageHeader, PageToolbar } from "../components/layout";
 import { Plus } from "lucide-react";
 import { useRef } from "react";
 import { DataConnections } from "../components/DataConnections";
@@ -13,14 +13,15 @@ export function ConnectionsPage() {
   usePageTab({ title: "数据连接" });
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas">
-      <PageHeader title="数据连接">
+      <PageHeader title="数据连接" />
+      <PageBody>
         {workspace.role === "admin" && (
+          <PageToolbar>
           <Button type="primary" icon={<Plus size={14} />} onClick={() => openDialog.current?.()}>
             添加连接
           </Button>
+          </PageToolbar>
         )}
-      </PageHeader>
-      <PageBody>
         <DataConnections onReady={(open) => (openDialog.current = open)} />
       </PageBody>
     </div>

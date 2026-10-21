@@ -46,8 +46,17 @@ from ontofoundry_api.services.model_result import (
     exhaust_retriable_result,
     reconcile_run,
 )
+from ontofoundry_api.services.modeling_input import (
+    build_work_pack,
+    encode,
+    execution_input,
+    material_index,
+    scenario_facts,
+    upload_work_pack,
+)
 from ontofoundry_api.services.proposals import proposal_context, proposal_header
 from ontofoundry_api.services.run_credentials import RunGrant
+from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
 from ontofoundry_api.services.run_credentials import issue as issue_run_credential
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
@@ -219,20 +228,6 @@ def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return shown
 
 
-def mcp_access_file(access: dict[str, Any]) -> dict[str, Any]:
-    """What the agent reads to call the pinned MCP; the only place the credential appears."""
-    return {
-        "url": access["url"],
-        "version_id": access["version_id"],
-        "headers": {
-            "Authorization": "Bearer " + access["credential"],
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-            "MCP-Protocol-Version": "2025-11-25",
-        },
-    }
-
-
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
     return _app_client(request.app, workspace_id, session_id)
 
@@ -370,21 +365,27 @@ def _persist_task_projection(
 ) -> str | None:
     status = to_run_status(upstream_status)
     with session_factory() as db:
+        values = {"dataagent_task_id": task_id, "task_status": status, "task_detail": detail}
+        current = db.get(ModelingSessionRecord, session_id)
+        if (
+            current is not None
+            and current.last_result_task_id == task_id
+            and current.result_state
+            and current.result_state != "processing"
+        ):
+            # The settled result owns status and detail (waiting for a reply,
+            # rejected, done); a later poll must not reset them to "finished".
+            values = {"dataagent_task_id": task_id}
         changed = db.execute(
             update(ModelingSessionRecord)
             .where(
                 ModelingSessionRecord.id == session_id,
                 ModelingSessionRecord.dataagent_task_id == task_id,
             )
-            .values(
-                dataagent_task_id=task_id,
-                task_status=status,
-                task_detail=detail,
-                updated_at=utc_now(),
-            )
+            .values(**values, updated_at=utc_now())
         )
         db.commit()
-    return status if changed.rowcount == 1 else None
+    return (current.task_status if len(values) == 1 else status) if changed.rowcount == 1 else None
 
 
 def replacement_task_id(messages: list[dict[str, Any]], task_id: str) -> str | None:
@@ -778,6 +779,14 @@ async def send_message(
         for entry in (item.run_manifest_json or {}).get("materials") or []
         if entry.get("path")
     }
+    # The previous run, read before the claim replaces its manifest: its
+    # confirmed plan and inputs are the baseline for this run's facts.
+    previous_manifest = dict(item.run_manifest_json or {})
+    prior_plan = (
+        previous_manifest.get("prior_plan")
+        if mode == "model" and item.result_state == "awaiting_reply"
+        else None
+    )
     # Everything this run is pinned to. The claim below bumps the revision,
     # so the run's source revision is the one after it.
     manifest = {
@@ -791,6 +800,8 @@ async def send_message(
         "source_session_revision": expected_revision + 1,
         "source_draft_sha256": draft_sha256(draft),
         "materials": [{"id": m.id, "sha256": m.sha256} for m in materials],
+        "repair_used": 0,
+        "repair_budget_required": mode == "model",
         "producer": {
             "agent_id": request.app.state.settings.dataagent_agent_id,
             "skill": "ontofoundry-modeling",
@@ -868,34 +879,46 @@ async def send_message(
 
         material_paths: list[dict[str, Any]] = []
         material_path_by_id: dict[str, str] = dict(known_paths)
-        material_bytes = {material.id: material.byte_size for material in materials}
+        material_indices = []
         for material in materials:
-            if material.id in uploaded_ids and material.id in material_path_by_id:
+            known_path = material_path_by_id.get(material.id)
+            if material.id in uploaded_ids and known_path and not proposals:
+                material_indices.append(
+                    {"id": material.id, "sha256": material.sha256, "path": known_path}
+                )
                 continue
             try:
-                path = material_source_path(
-                    db, request.app.state.settings, material
-                )
+                path = material_source_path(db, request.app.state.settings, material)
             except MaterialSourceMissing:
                 raise DataAgentError(
                     f"建模材料源文件缺失: {material.name}", status_code=422
                 ) from None
-            uploaded = await dataagent.upload(
-                topic_id,
-                f"{material.id}-{material.name}",
-                path.read_bytes(),
-                material_media_type(material.name),
+            source_bytes = path.read_bytes()
+            if material.id in uploaded_ids and known_path:
+                path_in_topic = known_path
+            else:
+                uploaded = await dataagent.upload(
+                    topic_id,
+                    f"{material.id}-{material.name}",
+                    source_bytes,
+                    material_media_type(material.name),
+                )
+                path_in_topic = str(uploaded.get("rel_path") or material.name)
+                material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
+                material_path_by_id[material.id] = path_in_topic
+                newly_uploaded.append(material.id)
+            metadata = {"id": material.id, "sha256": material.sha256}
+            material_indices.append(
+                material_index(metadata, source_bytes, path_in_topic)
+                if proposals
+                else {**metadata, "path": path_in_topic}
             )
-            path_in_topic = str(uploaded.get("rel_path") or material.name)
-            material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
-            material_path_by_id[material.id] = path_in_topic
-            newly_uploaded.append(material.id)
 
         proposal_prompt = None
         if proposals:
-            context_body = json.dumps(
-                proposal_context(manifest, draft), ensure_ascii=False, indent=2
-            ).encode()
+            fixed_context = proposal_context(manifest, draft)
+            fixed_context["execution"] = execution_input(run_token)
+            context_body = encode(fixed_context)
             context = await dataagent.upload(
                 topic_id,
                 f"ontofoundry-context-{run_token}.json",
@@ -924,17 +947,65 @@ async def send_message(
                     "version_id": access["version_id"],
                     "file": str(uploaded_access.get("rel_path") or ""),
                 }
+            table_catalog, tables_file = None, None
+            if item.linked_tables:
+                from ontofoundry_api.services.dataset_sources import linked_table_details
+                from ontofoundry_api.services.errors import ServiceError
+                from ontofoundry_api.services.modeling_input import linked_tables_payload
+
+                try:
+                    details = linked_table_details(db, workspace_id, item.linked_tables)
+                except ServiceError as exc:
+                    raise DataAgentError(exc.message, status_code=422) from exc
+                table_catalog, tables_body = linked_tables_payload(details)
+                uploaded_tables = await dataagent.upload(
+                    topic_id,
+                    f"ontofoundry-tables-{run_token}.json",
+                    tables_body,
+                    "application/json",
+                )
+                tables_file = str(uploaded_tables.get("rel_path") or "")
+            facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
+            prior_plan_file = None
+            if prior_plan:
+                uploaded_plan = await dataagent.upload(
+                    topic_id,
+                    f"ontofoundry-prior-plan-{run_token}.json",
+                    encode(prior_plan),
+                    "application/json",
+                )
+                prior_plan_file = str(uploaded_plan.get("rel_path") or "")
+            pack, pages = build_work_pack(
+                fixed_context,
+                material_indices,
+                context_file=str(context.get("rel_path") or ""),
+                schema_file=str(schema.get("rel_path") or ""),
+                mcp_config_file=mcp["file"] if mcp else None,
+                tables=table_catalog,
+                tables_file=tables_file,
+                scenario_facts=facts,
+                prior_plan_file=prior_plan_file,
+            )
+            work_pack_file = await upload_work_pack(
+                dataagent, topic_id, run_token, pack, pages
+            )
+            manifest["input_files"] = {
+                "context": str(context.get("rel_path") or ""),
+                "schema": str(schema.get("rel_path") or ""),
+                "work_pack": work_pack_file,
+                "materials": material_indices,
+                "mcp": mcp["file"] if mcp else None,
+                "mcp_access": {"url": mcp["url"], "user_id": user.id} if mcp else None,
+                # Fixed for the run: the repair round reuses the same table structure.
+                "tables": table_catalog,
+                "tables_file": tables_file,
+                "scenario_facts": facts,
+            }
             proposal_prompt = proposal_instructions(
+                work_pack_file=manifest["input_files"]["work_pack"],
                 run_token=run_token,
                 header=proposal_header(manifest),
-                materials=[
-                    {
-                        **m,
-                        "path": material_path_by_id.get(m["id"], ""),
-                        "bytes": material_bytes.get(m["id"]),
-                    }
-                    for m in manifest["materials"]
-                ],
+                materials=material_indices,
                 schema_file=str(schema.get("rel_path") or ""),
                 mcp=mcp,
             )
@@ -1016,10 +1087,7 @@ async def send_message(
                     uploaded_material_ids=sorted(uploaded_ids | set(newly_uploaded)),
                     run_manifest_json={
                         **manifest,
-                        "materials": [
-                            {**m, "path": material_path_by_id.get(m["id"], "")}
-                            for m in manifest["materials"]
-                        ],
+                        "materials": [m for m in material_indices],
                     },
                     updated_at=utc_now(),
                 )

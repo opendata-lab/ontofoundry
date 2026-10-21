@@ -99,9 +99,7 @@ def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
         reasons.append("子对象成员绑定待补全")
     if reasons:
         return BindingReadiness("unbound", tuple(reasons))
-    if any(
-        p.technical_name not in binding.fields for p in index.effective_properties(type_id)
-    ):
+    if any(p.name not in binding.fields for p in index.effective_properties(type_id)):
         reasons.append("属性绑定待补全")
     for source in binding.sources.values():
         dataset = index.datasets.get(source.dataset_id)
@@ -125,5 +123,5 @@ def column_binding(
     prop = DraftIndex(draft).properties.get(property_id)
     if prop is None:
         return None
-    binding = resolve_binding(draft, type_id).fields.get(prop.technical_name)
+    binding = resolve_binding(draft, type_id).fields.get(prop.name)
     return binding if isinstance(binding, ColumnBinding) else None

@@ -145,7 +145,7 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
                                 body.snapshot_date,
                             )
                         except ServiceError as exc:
-                            warnings.add(link.name + "：" + exc.message)
+                            warnings.add((link.display_name or link.name) + "：" + exc.message)
                             continue
                         dates += selected
                         truncated |= more

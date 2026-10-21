@@ -4,8 +4,8 @@
 import { VALUE_KINDS } from "./elementModel";
 
 type HintProperty = {
+  display_name?: string | null;
   name: string;
-  technical_name: string;
   value_kind: string;
   required?: boolean;
   identifier?: boolean;
@@ -59,14 +59,14 @@ export function databaseTypeHints(
 ): string[] {
   const hints: string[] = [];
   for (const property of properties) {
-    if (!fields[property.technical_name]) continue;
+    if (!fields[property.name]) continue;
     const wrong = rows
-      .map((row) => row[property.technical_name])
+      .map((row) => row[property.name])
       .filter((value) => value !== null && value !== undefined)
       .filter((value) => !valueMatches(property.value_kind, value));
     if (!wrong.length) continue;
     hints.push(
-      `${property.name}：本体定义为「${kindName(property.value_kind)}」，数据中为` +
+      `${(property.display_name || property.name)}：本体定义为「${kindName(property.value_kind)}」，数据中为` +
         `「${describe(wrong[0])}」（本页 ${wrong.length} 行）。可在「属性」中调整类型。`,
     );
   }
@@ -81,11 +81,11 @@ export function documentGapHints(
     .filter((property) => property.required || property.identifier)
     .map((property) => {
       const missing = objects.filter((object) => {
-        const value = object.values[property.technical_name];
+        const value = object.values[property.name];
         return value === null || value === undefined || (typeof value === "string" && !value.trim());
       }).length;
       return missing
-        ? `${property.name} 待补全：${missing} 个实例的原文未提供该值。`
+        ? `${(property.display_name || property.name)} 待补全：${missing} 个实例的原文未提供该值。`
         : "";
     })
     .filter(Boolean);

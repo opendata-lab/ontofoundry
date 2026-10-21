@@ -6,7 +6,7 @@ import { addSource, chooseIdentifier, setInheritedLinkBinding } from "./objectMa
 import { relationEditReason } from "./relationEditing";
 
 const draft = example("06-inheritance");
-const byName = (name: string) => draft.object_types.find((o) => o.technical_name === name)!;
+const byName = (name: string) => draft.object_types.find((o) => o.name === name)!;
 
 describe("object mapping view", () => {
   it("resolves the four ways an object gets instances and returns unbound when descendants have no mapping", () => {
@@ -28,15 +28,15 @@ describe("object mapping view", () => {
       ["main", true],
     ]);
     expect(person.main?.dataset?.name).toBe("parties");
-    const partyNo = person.properties.find((p) => p.property.technical_name === "party_no")!;
+    const partyNo = person.properties.find((p) => p.property.name === "party_no")!;
     expect(partyNo.inheritedFrom).toBe(byName("party").id);
     expect(partyNo.boundBy).toBe(byName("party").id);
   });
   it("binds an inherited relation locally on a concrete child of a virtual parent and blocks editing on shared_parent", () => {
     const device = byName("device");
-    const link = draft.link_types.find((l) => l.name === "responsible_party")!;
-    const responsible = draft.properties.find((p) => p.technical_name === "responsible_no")!;
-    const partyNo = draft.properties.find((p) => p.technical_name === "party_no")!;
+    const link = draft.link_types.find((l) => (l.display_name || l.name) === "responsible_party")!;
+    const responsible = draft.properties.find((p) => p.name === "responsible_no")!;
+    const partyNo = draft.properties.find((p) => p.name === "party_no")!;
     const next = setInheritedLinkBinding(draft, device.id, link.id, {
       kind: "direct",
       source_property_ids: [responsible.id],
@@ -55,8 +55,8 @@ describe("object mapping view", () => {
     const party = byName("party");
     const { draft: next, sourceId } = addSource(draft, party.id, draft.datasets[1].id);
     expect(sourceId).toBe("side1");
-    const name = draft.properties.find((p) => p.owner_type_id === party.id && p.technical_name === "name")!;
+    const name = draft.properties.find((p) => p.owner_type_id === party.id && p.name === "name")!;
     const chosen = chooseIdentifier(next, party.id, name.id).properties.filter((p) => p.owner_type_id === party.id && p.identifier);
-    expect(chosen.map((p) => p.technical_name)).toEqual(["name"]);
+    expect(chosen.map((p) => p.name)).toEqual(["name"]);
   });
 });

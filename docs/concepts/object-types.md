@@ -4,6 +4,12 @@
 
 本文说明 core-1 的目标模型与行为，状态为设计定稿、待实施。JSON 示例中的业务和数据来源均为虚构；片段不是完整导入包，完整包形式见[格式与转换](formats.md)。字段表逐项说明何时填写、空值与默认行为。
 
+## 2026-10-20 命名与交换约定
+
+对象、属性、关系、规则和指标统一使用必填 `name`（英文标识，`^[A-Za-z_][A-Za-z0-9_]*$`）和可选 `display_name`（中文名称）。名称为空时界面显示 name，名称可重复；英文标识沿用原命名空间与引用规则。Dataset 不变。关系的完整含义及角色名不变。旧数据库内容清理，不转换；旧外部文件由导入适配器转换并报告。
+
+Ossie 导出为 ZIP：纯 Ossie 文件与 `ontofoundry-extension.json`。显示名仅在扩展 `display_names`；同义词在支持的位置用 `ai_context.synonyms`，概念和本体关系使用扩展 synonyms。单个 Ossie 文件导入显示名为空；旧版扩展块仅导入兼容。详见[命名统一设计](../design/2026-10-20-display-name-unification.md)。
+
 ## 1. 概述
 
 一张订单会有订单号、金额和状态，还可能属于某个客户。“订单”是对象类型，“O-1001”是一个订单实例。对象类型让这些实例使用同一份定义，便于关联、解释和查询。
@@ -15,8 +21,8 @@
 | 字段 | 类型 | 填写要求 | 说明 |
 |---|---|---|---|
 | `id` | UUID | 必须提供。 | 此字段保存定义的稳定身份，改名不会改变它。 |
-| `name` | 字符串 | 必须提供。 | 这是向用户显示的业务名称。 |
-| `technical_name` | 字符串 | 必须提供。 | 此字段给出工作空间内的对象技术名，例如 sales_order。 |
+| `display_name` | 字符串 / null | 可选。 | 中文名称；空时显示 name，允许重复。 |
+| `name` | 字符串 | 必须提供。 | 此字段给出工作空间内的对象英文标识，例如 sales_order。 |
 | `description` | 字符串 | 可以省略。 | 此字段解释业务含义、范围和必要上下文。 |
 | `synonyms` | 字符串数组 | 可省略，默认空数组。 | 这些业务别名用于搜索和问答理解。 |
 | `tags` | 字符串数组 | 可省略，默认空数组。 | 这些标签用于管理和整理对象定义。 |
@@ -35,8 +41,8 @@
   "object_types": [
     {
       "id": "00000000-0000-4000-8000-000000001002",
-      "name": "订单",
-      "technical_name": "sales_order",
+      "display_name": "订单",
+      "name": "sales_order",
       "description": "客户的一次下单\n\n采用指标时保留其固定过滤；完成率的已完成条件仅作用于分子。",
       "synonyms": [
         "销售单"
@@ -54,8 +60,8 @@
     {
       "id": "00000000-0000-4000-8000-000000002011",
       "owner_type_id": "00000000-0000-4000-8000-000000001002",
-      "name": "订单号",
-      "technical_name": "order_no",
+      "display_name": "订单号",
+      "name": "order_no",
       "description": "",
       "value_kind": "string",
       "required": true,
@@ -91,11 +97,11 @@
 
 ## 5. 校验与限制
 
-对象技术名工作空间内唯一，忽略大小写；语法为 `^[A-Za-z_][A-Za-z0-9_]*$`；SQL 保留字也可用作技术名，物理引用由 agent 按方言处理。继承单父无环，不能遮蔽继承属性或关系。标题属性必须是本对象或祖先的有效属性。
+对象英文标识工作空间内唯一，忽略大小写；语法为 `^[A-Za-z_][A-Za-z0-9_]*$`；SQL 保留字也可用作英文标识，物理引用由 agent 按方言处理。继承单父无环，不能遮蔽继承属性或关系。标题属性必须是本对象或祖先的有效属性。
 
 无绑定叶对象是待补全对象，不能假装可查数据库。无绑定且有具体后代的虚拟父对象按[继承](inheritance.md)展开来源，不直接接收文档事实。对象可以暂时没有标识，文档事实仍可保存，但须提示补全。
 
-导出 Ossie 时，技术名不能与其内置概念名冲突；例如名为 String 的业务对象必须先改名，否则导出报错。
+导出 Ossie 时，英文标识不能与其内置概念名冲突；例如名为 String 的业务对象必须先改名，否则导出报错。
 
 ## 6. 与 Palantir Foundry、Microsoft Fabric IQ、Apache Ossie 的对照
 
@@ -105,4 +111,4 @@ Palantir 的 [Object type](https://www.palantir.com/docs/foundry/object-link-typ
 
 Fabric 的 [Entity type](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-create-entity-types)支持先定义属性再绑定数据。[元数据文档](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-add-metadata)说明实体描述与同义词可为 agent 提供业务上下文。
 
-Ossie 的 [EntityType](https://github.com/apache/ossie/blob/main/ontology/ontology.md#concepts)对应业务实体概念。它以嵌套 relationships 组织属性及关系；core-1 以扁平集合和 id 组织。显示名、同义词、标签与标题属性使用本平台扩展块，不宣称是其标准同名字段。
+Ossie 的 [EntityType](https://github.com/apache/ossie/blob/main/ontology/ontology.md#concepts)对应业务实体概念。它以嵌套 relationships 组织属性及关系；core-1 以扁平集合和 id 组织。显示名、同义词、标签与标题属性使用本平台扩展文件，不宣称是其标准同名字段。

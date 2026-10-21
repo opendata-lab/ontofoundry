@@ -12,8 +12,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000013101",
-        "name": "提交数",
-        "technical_name": "commit_count",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
@@ -28,12 +26,12 @@
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
         },
-        "dataset_id": "00000000-0000-4000-8000-000000013001"
+        "dataset_id": "00000000-0000-4000-8000-000000013001",
+        "name": "commit_count",
+        "display_name": "提交数"
       },
       {
         "id": "00000000-0000-4000-8000-000000013102",
-        "name": "核心仓库提交数",
-        "technical_name": "core_commit_count",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
@@ -59,23 +57,23 @@
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
         },
-        "dataset_id": "00000000-0000-4000-8000-000000013001"
+        "dataset_id": "00000000-0000-4000-8000-000000013001",
+        "name": "core_commit_count",
+        "display_name": "核心仓库提交数"
       },
       {
         "id": "00000000-0000-4000-8000-000000013103",
-        "name": "核心仓库提交占比",
-        "technical_name": "core_commit_share",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "ratio",
         "evidence": [],
         "numerator_id": "00000000-0000-4000-8000-000000013102",
-        "denominator_id": "00000000-0000-4000-8000-000000013101"
+        "denominator_id": "00000000-0000-4000-8000-000000013101",
+        "name": "core_commit_share",
+        "display_name": "核心仓库提交占比"
       },
       {
         "id": "00000000-0000-4000-8000-000000013104",
-        "name": "有提交仓库数",
-        "technical_name": "active_repos",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
@@ -101,12 +99,12 @@
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
         },
-        "dataset_id": "00000000-0000-4000-8000-000000013001"
+        "dataset_id": "00000000-0000-4000-8000-000000013001",
+        "name": "active_repos",
+        "display_name": "有提交仓库数"
       },
       {
         "id": "00000000-0000-4000-8000-000000013105",
-        "name": "有效提交数表达式",
-        "technical_name": "eligible_commit_count",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "expression",
@@ -117,12 +115,12 @@
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
         },
-        "dataset_id": "00000000-0000-4000-8000-000000013001"
+        "dataset_id": "00000000-0000-4000-8000-000000013001",
+        "name": "eligible_commit_count",
+        "display_name": "有效提交数表达式"
       },
       {
         "id": "00000000-0000-4000-8000-000000013106",
-        "name": "统计行数",
-        "technical_name": "stat_row_count",
         "description": "直接使用数据集列；不反查对象。",
         "synonyms": [],
         "kind": "simple",
@@ -134,7 +132,9 @@
           "dataset_id": "00000000-0000-4000-8000-000000013001",
           "column": "stat_date"
         },
-        "dataset_id": "00000000-0000-4000-8000-000000013001"
+        "dataset_id": "00000000-0000-4000-8000-000000013001",
+        "name": "stat_row_count",
+        "display_name": "统计行数"
       }
     ],
     "datasets": [

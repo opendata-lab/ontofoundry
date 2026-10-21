@@ -26,7 +26,15 @@ def export_document(model, ctx):
             "format": "ontofoundry",
             "schema_version": "core-1",
             "exported_at": ctx.exported_at or datetime.now(UTC).isoformat(),
-            "draft": model.model_dump(mode="json"),
+            "draft": exchange_draft(model),
+            "connection_names": {str(k): v for k, v in (ctx.connection_names or {}).items()},
         },
         file_stem(ctx) + ".ontofoundry.json",
     )
+
+
+def exchange_draft(model):
+    data = model.model_dump(mode="json")
+    for dataset in data["datasets"]:
+        dataset.pop("connection_id", None)
+    return data

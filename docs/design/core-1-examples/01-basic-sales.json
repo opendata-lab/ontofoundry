@@ -8,8 +8,6 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001001",
-        "name": "客户",
-        "technical_name": "customer",
         "description": "与公司签约的企业客户",
         "synonyms": [
           "顾客",
@@ -21,12 +19,12 @@
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "customer",
+        "display_name": "客户"
       },
       {
         "id": "00000000-0000-4000-8000-000000001002",
-        "name": "订单",
-        "technical_name": "sales_order",
         "description": "客户的一次下单\n\n采用指标时保留其固定过滤；完成率的已完成条件仅作用于分子。",
         "synonyms": [
           "销售单"
@@ -37,28 +35,28 @@
         "extends": null,
         "evidence": [],
         "title_property_id": "00000000-0000-4000-8000-000000002011",
-        "derived_by": []
+        "derived_by": [],
+        "name": "sales_order",
+        "display_name": "订单"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002001",
         "owner_type_id": "00000000-0000-4000-8000-000000001001",
-        "name": "客户编号",
-        "technical_name": "customer_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "customer_no",
+        "display_name": "客户编号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002002",
         "owner_type_id": "00000000-0000-4000-8000-000000001001",
-        "name": "客户名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": true,
@@ -67,52 +65,52 @@
         "synonyms": [
           "客户名"
         ],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "客户名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002003",
         "owner_type_id": "00000000-0000-4000-8000-000000001001",
-        "name": "所在地区",
-        "technical_name": "region",
         "description": "华东 / 华北 / 华南 / 西部",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "region",
+        "display_name": "所在地区"
       },
       {
         "id": "00000000-0000-4000-8000-000000002004",
         "owner_type_id": "00000000-0000-4000-8000-000000001001",
-        "name": "签约日期",
-        "technical_name": "signed_on",
         "description": "",
         "value_kind": "date",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "signed_on",
+        "display_name": "签约日期"
       },
       {
         "id": "00000000-0000-4000-8000-000000002011",
         "owner_type_id": "00000000-0000-4000-8000-000000001002",
-        "name": "订单号",
-        "technical_name": "order_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "order_no",
+        "display_name": "订单号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002012",
         "owner_type_id": "00000000-0000-4000-8000-000000001002",
-        "name": "金额",
-        "technical_name": "amount",
         "description": "含税金额，单位元",
         "value_kind": "decimal",
         "required": true,
@@ -122,33 +120,35 @@
           "销售额",
           "订单金额"
         ],
-        "evidence": []
+        "evidence": [],
+        "name": "amount",
+        "display_name": "金额"
       },
       {
         "id": "00000000-0000-4000-8000-000000002013",
         "owner_type_id": "00000000-0000-4000-8000-000000001002",
-        "name": "状态",
-        "technical_name": "status",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "status",
+        "display_name": "状态"
       },
       {
         "id": "00000000-0000-4000-8000-000000002014",
         "owner_type_id": "00000000-0000-4000-8000-000000001002",
-        "name": "下单时间",
-        "technical_name": "ordered_at",
         "description": "",
         "value_kind": "datetime",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "ordered_at",
+        "display_name": "下单时间"
       }
     ],
     "link_types": [
@@ -189,32 +189,30 @@
     "rules": [
       {
         "id": "00000000-0000-4000-8000-000000004001",
-        "name": "金额为正",
-        "technical_name": "positive",
         "description": "",
         "owner_kind": "property",
         "owner_id": "00000000-0000-4000-8000-000000002012",
         "rule_kind": "constraint",
         "expression": "sales_order.amount > 0",
-        "evidence": []
+        "evidence": [],
+        "name": "positive",
+        "display_name": "金额为正"
       },
       {
         "id": "00000000-0000-4000-8000-000000004002",
-        "name": "状态取值",
-        "technical_name": "status_values",
         "description": "订单状态只能是这四种",
         "owner_kind": "property",
         "owner_id": "00000000-0000-4000-8000-000000002013",
         "rule_kind": "constraint",
         "expression": "sales_order.status IN ('待支付', '已支付', '已完成', '已取消')",
-        "evidence": []
+        "evidence": [],
+        "name": "status_values",
+        "display_name": "状态取值"
       }
     ],
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006001",
-        "name": "订单金额",
-        "technical_name": "order_amount",
         "description": "",
         "synonyms": [
           "销售额",
@@ -228,12 +226,12 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "order_amount",
+        "display_name": "订单金额"
       },
       {
         "id": "00000000-0000-4000-8000-000000006002",
-        "name": "订单数",
-        "technical_name": "order_count",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -241,12 +239,12 @@
         "measure": null,
         "filters": [],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "order_count",
+        "display_name": "订单数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006003",
-        "name": "已完成订单数",
-        "technical_name": "completed_order_count",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -265,12 +263,12 @@
           }
         ],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "completed_order_count",
+        "display_name": "已完成订单数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006005",
-        "name": "下单客户数",
-        "technical_name": "buyer_count",
         "description": "订单数据集中 customer_id 精确去重；示例外键有效，一名客户多次下单只计一次。",
         "synonyms": [],
         "kind": "simple",
@@ -281,23 +279,23 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "buyer_count",
+        "display_name": "下单客户数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006006",
-        "name": "客单价",
-        "technical_name": "revenue_per_buyer",
         "description": "订单金额 ÷ 下单客户数",
         "synonyms": [],
         "kind": "ratio",
         "numerator_id": "00000000-0000-4000-8000-000000006001",
         "denominator_id": "00000000-0000-4000-8000-000000006005",
-        "evidence": []
+        "evidence": [],
+        "name": "revenue_per_buyer",
+        "display_name": "客单价"
       },
       {
         "id": "00000000-0000-4000-8000-000000006007",
-        "name": "一季度有效订单金额",
-        "technical_name": "q1_valid_order_amount",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -340,23 +338,23 @@
           }
         ],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "q1_valid_order_amount",
+        "display_name": "一季度有效订单金额"
       },
       {
         "id": "00000000-0000-4000-8000-000000006098",
-        "name": "完成率",
-        "technical_name": "completion_rate",
         "description": "已完成订单数 / 全部订单数；分子过滤不得放公共 WHERE",
         "synonyms": [],
         "kind": "ratio",
         "numerator_id": "00000000-0000-4000-8000-000000006003",
         "denominator_id": "00000000-0000-4000-8000-000000006002",
-        "evidence": []
+        "evidence": [],
+        "name": "completion_rate",
+        "display_name": "完成率"
       },
       {
         "id": "00000000-0000-4000-8000-000000006697",
-        "name": "订单金额中位数",
-        "technical_name": "median_order_amount",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
         "kind": "simple",
@@ -367,31 +365,33 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "median_order_amount",
+        "display_name": "订单金额中位数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006698",
-        "name": "拼接订单状态去重数",
-        "technical_name": "distinct_order_status_pairs",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
         "kind": "expression",
         "expression": "COUNT(DISTINCT orders.order_id || '::' || orders.status)",
         "value_kind": "integer",
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "distinct_order_status_pairs",
+        "display_name": "拼接订单状态去重数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006699",
-        "name": "有效金额表达式",
-        "technical_name": "eligible_amount_expression",
         "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
         "synonyms": [],
         "kind": "expression",
         "expression": "SUM(CASE WHEN orders.status = '已完成' OR orders.status = '已发货' THEN orders.amount ELSE 0 END)",
         "value_kind": "decimal",
         "evidence": [],
-        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75"
+        "dataset_id": "b7cc4307-1928-522c-a58b-921b2b697d75",
+        "name": "eligible_amount_expression",
+        "display_name": "有效金额表达式"
       }
     ],
     "datasets": [

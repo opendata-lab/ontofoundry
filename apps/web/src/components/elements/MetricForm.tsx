@@ -119,15 +119,15 @@ export function MetricForm({
     <Form layout="vertical" component="div" requiredMark className="max-w-settings">
       <SectionTitle title="基本信息" className="mb-4" />
       <div className="grid grid-cols-2 gap-x-4">
-        <Form.Item label="名称" required {...status("name")}>
-          <Input aria-label="指标名称" value={metric.name} placeholder="例如：已完成订单金额" onChange={(e) => onChange({ ...metric, name: e.target.value })} />
+        <Form.Item label="名称">
+          <Input aria-label="指标名称" value={metric.display_name ?? ""} placeholder="例如：已完成订单金额" onChange={(e) => onChange({ ...metric, display_name: e.target.value })} />
         </Form.Item>
-        <Form.Item label="英文标识" required {...status("technical_name")}>
+        <Form.Item label="英文标识" required {...status("name")}>
           <Input
             aria-label="指标英文标识"
             className="font-mono"
-            value={metric.technical_name}
-            onChange={(e) => onChange({ ...metric, technical_name: e.target.value.trim() })}
+            value={metric.name}
+            onChange={(e) => onChange({ ...metric, name: e.target.value.trim() })}
           />
         </Form.Item>
       </div>
@@ -262,7 +262,7 @@ export function MetricForm({
                     optionFilterProp="label"
                     placeholder="选择指标"
                     value={metric[key] || undefined}
-                    options={ratioChoices(draft, metric, side).map((m) => ({ value: m.id, label: m.name }))}
+                    options={ratioChoices(draft, metric, side).map((m) => ({ value: m.id, label: (m.display_name || m.name) }))}
                     notFoundContent="该数据集上还没有可用的聚合指标"
                     onChange={(id: string) => onChange({ ...metric, [key]: id })}
                   />
@@ -275,7 +275,7 @@ export function MetricForm({
               className="mb-4"
               type="info"
               showIcon
-              message={`${metric.name || "比率"} = ${byId(draft.metrics, metric.numerator_id)!.name} ÷ ${byId(draft.metrics, metric.denominator_id)!.name}`}
+              message={`${(metric.display_name || metric.name) || "比率"} = ${(byId(draft.metrics, metric.numerator_id)!.display_name || byId(draft.metrics, metric.numerator_id)!.name)} ÷ ${(byId(draft.metrics, metric.denominator_id)!.display_name || byId(draft.metrics, metric.denominator_id)!.name)}`}
               description="分子、分母各自按自己的条件和时间口径计算；分母为 0 时结果为空。"
             />
           )}

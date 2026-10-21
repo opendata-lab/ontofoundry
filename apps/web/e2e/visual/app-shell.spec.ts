@@ -21,8 +21,8 @@ test("multiple open pages retain one unsaved tab and leave page tabs unchanged",
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
-  await expect(page.getByRole("button", { name: "parties" })).toBeVisible();
-  const innerTab = page.getByRole("tab", { name: /^数据集/ });
+  await expect(page.getByRole("heading", { name: "数据管理", level: 1 })).toBeVisible();
+  const innerTab = page.getByRole("tab", { name: /^数据表/ });
   const innerMetrics = await innerTab.evaluate((tab) => {
     const style = getComputedStyle(tab);
     return { height: style.height, padding: style.padding, fontSize: style.fontSize, background: style.backgroundColor };
@@ -43,7 +43,7 @@ test("multiple open pages retain one unsaved tab and leave page tabs unchanged",
   });
   expect(scrollTop).toBeGreaterThan(0);
   await navigation.getByRole("link", { name: "数据管理", exact: true }).click();
-  await expect(page.getByRole("button", { name: "parties" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "parties", exact: true })).toBeVisible();
   await expect(strip.locator("[role=tab][aria-selected]")).toHaveCount(4);
   await expect(strip.getByLabel("未保存")).toHaveCount(1);
   expect(await innerTab.evaluate((tab) => {

@@ -1,6 +1,6 @@
 import { useErrorMessage } from "../hooks/useErrorMessage";
-import { Button, Empty, Table, Tabs, Typography } from "antd";
-import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle, StatusMark } from "../components/layout";
+import { Button, Empty, Table, Typography } from "antd";
+import { PageBody, PageTabs, Panel, SectionTitle, StatusMark } from "../components/layout";
 import { Check, Copy, Rocket } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -105,19 +105,12 @@ export function DeliveryPage() {
   );
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas">
-      <PageHeader
+      <PageTabs
         title="本体发布"
         note={workspace.current_version && <StatusMark state="mapped" label={`当前 v${workspace.current_version}`} />}
-      >
-        {workspace.role && <Button disabled={!versions.length} onClick={() => openExport(versions[0]?.version_id)}>导出文件</Button>}
-      </PageHeader>
-      <ExportDialog open={exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={exportVersionId} onClose={() => setExportOpen(false)} />
-      <PageBody>
-        <Panel>
-          <Tabs
+        actions={workspace.role && <Button disabled={!versions.length} onClick={() => openExport(versions[0]?.version_id)}>导出文件</Button>}
             activeKey={tab}
             onChange={(key) => setTab(key as PageTab)}
-            renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
             items={[
               ...(workspace.role
                 ? [
@@ -226,10 +219,9 @@ export function DeliveryPage() {
                   </div>
                 ),
               },
-            ]}
+            ].map((item) => ({ ...item, children: <PageBody><Panel>{item.children}</Panel></PageBody> }))}
           />
-        </Panel>
-      </PageBody>
+      <ExportDialog open={exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={exportVersionId} onClose={() => setExportOpen(false)} />
     </div>
   );
 }

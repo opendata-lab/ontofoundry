@@ -29,7 +29,7 @@ from pydantic import (
 
 SCHEMA_VERSION = "core-1"
 
-TECHNICAL_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SOURCE_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -47,16 +47,23 @@ def _display_name(value: str) -> str:
     return normalized
 
 
-def _technical_name(value: str) -> str:
+def _name(value: str) -> str:
     value = value.strip()
-    if not TECHNICAL_NAME_RE.fullmatch(value):
+    if not IDENTIFIER_RE.fullmatch(value):
         raise ValueError("英文标识只能包含 ASCII 字母、数字和下划线，且不能以数字开头")
     return value
 
 
 Name = Annotated[str, Field(min_length=1, max_length=240), AfterValidator(_display_name)]
-TechnicalName = Annotated[
-    str, Field(min_length=1, max_length=240), AfterValidator(_technical_name)
+DisplayName = Annotated[
+    str,
+    Field(max_length=240),
+    AfterValidator(lambda value: unicodedata.normalize("NFKC", value).strip()),
+]
+Identifier = Annotated[
+    str,
+    Field(min_length=1, max_length=240, pattern=IDENTIFIER_RE.pattern),
+    AfterValidator(_name),
 ]
 Description = Annotated[str, Field(default="", max_length=8000)]
 Labels = Annotated[
@@ -218,8 +225,8 @@ DerivedBranch = Annotated[DerivedSimple | DerivedExpression, Field(discriminator
 
 class ObjectType(Strict):
     id: UUID
-    name: Name
-    technical_name: TechnicalName
+    name: Identifier
+    display_name: DisplayName | None = None
     description: Description = ""
     synonyms: Labels
     tags: Labels
@@ -238,13 +245,27 @@ class ObjectType(Strict):
         return self
 
 
+class ValueType(Strict):
+    """A named value domain shared by properties: base kind plus owned constraint rules."""
+
+    id: UUID
+    name: Identifier
+    display_name: DisplayName | None = None
+    description: Description = ""
+    value_kind: ValueKind
+    evidence: EvidenceList
+
+
 class Property(Strict):
     id: UUID
     owner_type_id: UUID
-    name: Name
-    technical_name: TechnicalName
+    name: Identifier
+    display_name: DisplayName | None = None
     description: Description = ""
+    # Always the effective base kind; when value_type_id is set it must equal
+    # the value type's kind (checked on the whole graph).
     value_kind: ValueKind
+    value_type_id: UUID | None = None
     required: bool = False
     identifier: bool = False
     unique: bool = False
@@ -318,8 +339,9 @@ DataJoin = Annotated[DirectJoin | MappingTableJoin, Field(discriminator="kind")]
 
 class LinkType(Strict):
     id: UUID
+    display_name: DisplayName | None = None
     name: Annotated[
-        TechnicalName,
+        Identifier,
         Field(json_schema_extra={"pattern": r"^[A-Za-z_][A-Za-z0-9_]*$"}),
     ]
     description: Description = ""
@@ -345,21 +367,6 @@ class LinkType(Strict):
     data_join: DataJoin | None = None
     evidence: EvidenceList
 
-    @model_validator(mode="before")
-    @classmethod
-    def read_previous_names(cls, value):
-        if isinstance(value, dict) and "technical_name" in value:
-            value = dict(value)
-            identifier = value.pop("technical_name")
-            forward = value.get("name")
-            inverse = value.pop("inverse_name", None)
-            if "verbalizes" not in value:
-                value["verbalizes"] = (
-                    ["{source}" + forward + "{target}"] if forward else []
-                ) + (["{target}" + inverse + "{source}"] if inverse else [])
-            value["name"] = identifier
-        return value
-
     @field_validator("verbalizes")
     @classmethod
     def complete_readings(cls, readings):
@@ -375,11 +382,6 @@ class LinkType(Strict):
                 raise ValueError("关系读法占位符不完整")
         return readings
 
-    @property
-    def technical_name(self) -> str:
-        """Internal path algorithms use the identifier; never a second stored field."""
-        return self.name
-
 
 class RuleKind(StrEnum):
     CONSTRAINT = "constraint"
@@ -390,12 +392,13 @@ class RuleOwnerKind(StrEnum):
     OBJECT_TYPE = "object_type"
     PROPERTY = "property"
     LINK_TYPE = "link_type"
+    VALUE_TYPE = "value_type"
 
 
 class Rule(Strict):
     id: UUID
-    name: Name
-    technical_name: TechnicalName
+    name: Identifier
+    display_name: DisplayName | None = None
     description: Description = ""
     owner_kind: RuleOwnerKind
     owner_id: UUID
@@ -435,8 +438,8 @@ class Aggregation(StrEnum):
 
 class _MetricBase(Strict):
     id: UUID
-    name: Name
-    technical_name: TechnicalName
+    name: Identifier
+    display_name: DisplayName | None = None
     description: Description = ""
     synonyms: Labels
     evidence: EvidenceList
@@ -508,18 +511,30 @@ class DatasetColumn(Strict):
 
 
 class Dataset(Strict):
+    # Table XOR query is enforced by the validator below. A schema-level oneOf
+    # would make generated TypeScript drop every shared field.
     id: UUID
-    name: str = Field(min_length=1, max_length=240)
+    name: Identifier
+    display_name: DisplayName | None = None
+    connection_id: str | None = Field(default=None, min_length=1, max_length=64)
+    source_kind: Literal["table", "query"] = "table"
     dialect: str | None = Field(default=None, max_length=40)
     schema_name: str | None = Field(default=None, max_length=240)
-    table_name: str = Field(min_length=1, max_length=240)
+    table_name: str | None = Field(default=None, min_length=1, max_length=240)
+    query_sql: str | None = Field(default=None, min_length=1, max_length=65536)
     description: Description = ""
     snapshot_date_column: str | None = Field(default=None, min_length=1, max_length=240)
-    # None: no column list was provided, which is not the same as "no columns".
     columns: list[DatasetColumn] | None = None
 
     @model_validator(mode="after")
-    def unique_columns(self) -> Dataset:
+    def source_and_columns(self) -> Dataset:
+        if self.source_kind == "table":
+            if not self.table_name or self.query_sql is not None:
+                raise ValueError("表来源必须指定表名，不能同时填写 SQL")
+        elif not self.query_sql or self.table_name is not None or self.schema_name is not None:
+            raise ValueError("表达式来源必须指定 SQL，不能同时填写表位置")
+        if self.query_sql and len(self.query_sql.encode("utf-8")) > 65536:
+            raise ValueError("SQL 不能超过 64 KiB")
         if self.columns is not None:
             names = [column.name for column in self.columns]
             if len(names) != len(set(names)):
@@ -624,6 +639,7 @@ class CoreDraft(Strict):
     mappings: list[DataMapping] = Field(default_factory=list)
     material_objects: list[MaterialObject] = Field(default_factory=list)
     material_links: list[MaterialLink] = Field(default_factory=list)
+    value_types: list[ValueType] = Field(default_factory=list)
 
 
 COLLECTIONS = (
@@ -636,6 +652,7 @@ COLLECTIONS = (
     "mappings",
     "material_objects",
     "material_links",
+    "value_types",
 )
 
 

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /**
  * Primary white container panel on the canvas background. Keeps toolbars,
- * tables, and optional footer notes inside a single bordered surface so a
+ * tables, and optional footer notes inside a single white surface so a
  * page never exceeds the "canvas -> panel" two-layer container hierarchy.
  */
 export function Panel({
@@ -19,7 +19,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`flex ${fill ? "min-h-0 flex-1" : "flex-none"} flex-col overflow-hidden rounded-md border border-rule bg-surface shadow-panel ${className}`.trim()}
+      className={`flex ${fill ? "min-h-0 flex-1" : "flex-none"} flex-col overflow-hidden rounded-xs bg-surface shadow-panel ${className}`.trim()}
     >
       {children}
       {footer && (

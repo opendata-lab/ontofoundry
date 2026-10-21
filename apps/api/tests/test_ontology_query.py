@@ -28,7 +28,7 @@ def relationship_draft(kind="direct"):
             {
                 "workspace_id": str(uuid4()),
                 "object_types": [
-                    {"id": i, "name": n, "technical_name": t}
+                    {"id": i, "display_name": n, "name": t}
                     for i, n, t in [
                         (a, "星港订单", "starport_order"),
                         (b, "星港客户", "starport_customer"),
@@ -38,8 +38,8 @@ def relationship_draft(kind="direct"):
                     {
                         "id": p,
                         "owner_type_id": o,
-                        "name": "编号",
-                        "technical_name": "number",
+                        "display_name": "编号",
+                        "name": "number",
                         "value_kind": "string",
                         "unique": True,
                     }
@@ -172,7 +172,7 @@ def test_relationship_server_connections(kind, separate, monkeypatch):
 
 def test_inherited_relationship_uses_concrete_local_binding():
     draft = example_draft("06-inheritance").model_copy(deep=True)
-    child = next(o for o in draft.object_types if o.technical_name == "device")
+    child = next(o for o in draft.object_types if o.name == "device")
     mapping = next(m for m in draft.mappings if m.type_id == child.id)
     link_id = next(iter(mapping.inherited_link_bindings))
     assert next(link for link in draft.link_types if link.id == link_id).data_join is None

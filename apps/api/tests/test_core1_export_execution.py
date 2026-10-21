@@ -8,27 +8,29 @@ from uuid import uuid4
 import pytest
 import sqlglot
 from core1_query_fixtures import source_database
+from dataset_binding import _register
 from sqlalchemy import URL, create_engine
 from sqlalchemy.engine import make_url
 from sqlglot import exp
 from test_core1_ossie_roundtrip import metric_container, roundtrip
 
+from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.services.metric_query import execute_metric_preview
 
 
 def compare(db, wid, settings, original, restored):
-    returned = {m.technical_name: m for m in restored.metrics}
+    returned = {m.name: m for m in restored.metrics}
     for metric in original.metrics:
         expected = execute_metric_preview(db, wid, original, metric, settings)["value"]
-        actual = execute_metric_preview(
-            db, wid, restored, returned[metric.technical_name], settings
-        )["value"]
+        actual = execute_metric_preview(db, wid, restored, returned[metric.name], settings)[
+            "value"
+        ]
         assert (
             actual is None
             if expected is None
             else float(actual) == pytest.approx(float(expected))
-        ), metric.technical_name
+        ), metric.name
 
 
 def test_metric_algorithms_recompute_after_export_import_on_sqlite(
@@ -79,10 +81,14 @@ def run_external(client, config, dialect, engine):
         assert all(ds.dialect is None for ds in imported.model.datasets)
         for ds in imported.model.datasets:
             ds.dialect = dialect
+        connection_id = str(uuid4())
+        schema = config["database"] if dialect == "mysql" else "public"
+        for ds in [*model.datasets, *imported.model.datasets]:
+            ds.connection_id = connection_id
         with client.app.state.session_factory() as db:
             db.add(
                 ConnectionRecord(
-                    id=str(uuid4()),
+                    id=connection_id,
                     workspace_id=wid,
                     name="虚构导出复算来源",
                     kind=dialect,
@@ -92,9 +98,13 @@ def run_external(client, config, dialect, engine):
                     secret_encrypted=config["password"],
                 )
             )
+            db.flush()
+            connection = db.get(ConnectionRecord, connection_id)
+            for ds in model.datasets:
+                _register(db, connection, schema, ds.table_name, [c.model_dump() for c in ds.columns or []])
             db.commit()
             compare(db, wid, client.app.state.settings, model, imported.model)
-            semantic = json.loads(artifact.document)["ontology_mappings"][0][
+            semantic = json.loads(read_ossie(artifact.document)[0])["ontology_mappings"][0][
                 "semantic_model"
             ]
             exported_dataset = semantic["datasets"][0]
@@ -108,7 +118,7 @@ def run_external(client, config, dialect, engine):
             }
             with engine.connect() as readonly:
                 for metric in model.metrics:
-                    ast = sqlglot.parse_one(formulas[metric.technical_name])
+                    ast = sqlglot.parse_one(formulas[metric.name])
                     for column in list(ast.find_all(exp.Column)):
                         value = sqlglot.parse_one(physical[column.name])
                         for ref in value.find_all(exp.Column):
@@ -128,7 +138,7 @@ def run_external(client, config, dialect, engine):
                         actual is None
                         if expected is None
                         else float(actual) == pytest.approx(float(expected))
-                    ), metric.technical_name
+                    ), metric.name
     finally:
         with engine.begin() as connection:
             connection.exec_driver_sql(f"DROP TABLE IF EXISTS {table}")

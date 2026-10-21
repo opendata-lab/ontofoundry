@@ -1,150 +1,106 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, catalogApi, modelingApi } from "../api/client";
-import type { Assets, Draft } from "../api/types";
-import { useSnapshot } from "../hooks/useSnapshot";
-import { example } from "../test/drafts";
+import { catalogApi } from "../api/client";
+import type { Assets, SyncJob } from "../api/types";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { MappingsPage } from "./MappingsPage";
 
-const { open, workspace, refresh } = vi.hoisted(() => ({
-  open: vi.fn(),
-  refresh: vi.fn(),
+const { workspace } = vi.hoisted(() => ({
   workspace: { id: "w", role: "admin", current_version: 1, version_id: "v1" },
 }));
-vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh }) }));
-vi.mock("../hooks/useElementDetail", () => ({ useElementDetail: () => ({ open }) }));
-vi.mock("../hooks/useSnapshot", () => ({ useSnapshot: vi.fn() }));
+vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh: vi.fn() }) }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
-vi.mock("react-router-dom", () => ({ Link: ({ children }: { children: unknown }) => children }));
+vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams()] }));
+vi.mock("../components/DocumentMaterials", () => ({ DocumentMaterials: () => <div>文档列表</div> }));
 vi.mock("../api/client", () => ({
-  api: { workspace: vi.fn() },
-  modelingApi: { saveElement: vi.fn(), get: vi.fn() },
-  catalogApi: { connections: vi.fn(), schemas: vi.fn(), tables: vi.fn(), assets: vi.fn(), refreshAssets: vi.fn() },
-  ApiError: class extends Error {},
+  catalogApi: {
+    connections: vi.fn(),
+    schemas: vi.fn(),
+    tables: vi.fn(),
+    assets: vi.fn(),
+    syncJobs: vi.fn(),
+    syncJob: vi.fn(),
+    refreshAssets: vi.fn(),
+    retrySync: vi.fn(),
+  },
 }));
 
-let draft: Draft;
+const assets: Assets = {
+  connection_id: "c",
+  version_id: "v1",
+  metadata_snapshot_id: "m",
+  observed_at: "2026-10-16T00:00:00Z",
+  error: null,
+  changes: [],
+  status: "ready",
+  items: [
+    {
+      name: "contacts",
+      schema: "crm",
+      comment: "联系人",
+      missing: false,
+      datasets: [],
+      columns: [{ name: "id", type: "bigint", primary_key: true, comment: "编号" }],
+    },
+    { name: "archived", schema: "crm", comment: "", missing: true, datasets: [], columns: [] },
+  ],
+};
+
+const job = (patch: Partial<SyncJob>): SyncJob => ({
+  id: "j",
+  connection_id: "c",
+  schema_name: "crm",
+  scope: "all",
+  state: "succeeded",
+  duration_ms: 120,
+  error: null,
+  total: 45,
+  processed: 45,
+  available: 45,
+  failed: 0,
+  batches: [],
+  ...patch,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(catalogApi.tables).mockResolvedValue({ items: [] });
-  draft = example("06-inheritance");
-  vi.mocked(useSnapshot).mockReturnValue({
-    draft,
-    error: "",
-    sessionId: null,
-    suffix: "",
-    load: vi.fn(),
-    setDraft: vi.fn(),
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
+  vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
+  vi.mocked(catalogApi.tables).mockResolvedValue({
+    items: [
+      { name: "contacts", schema: "crm", columns: [] },
+      { name: "orders", schema: "crm", columns: [] },
+    ],
   });
+  vi.mocked(catalogApi.assets).mockResolvedValue(assets);
+  vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
-describe("data mapping page", () => {
-  it("lists registered datasets with their usage and opens one", () => {
+describe("data management page", () => {
+  it("separates tables from documents and lists registered tables with their state", async () => {
     renderWithProviders(<MappingsPage />);
-    const parties = screen.getByRole("button", { name: "parties" }).closest("tr")!;
-    expect(within(parties).getByText("6")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "parties" }));
-    expect(open).toHaveBeenCalledWith({ kind: "dataset", id: draft.datasets[0].id, sessionId: null });
+    expect(screen.getByRole("tab", { name: "数据表" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "文档" })).toBeInTheDocument();
+    expect(await screen.findByText("contacts")).toBeInTheDocument();
+    expect(screen.getByText("已登记")).toBeInTheDocument();
+    expect(screen.getByText("当前不可见或不存在")).toBeInTheDocument();
   });
 
-  it("filters registered datasets by name or physical table", () => {
+  it("runs a full sync when no table is chosen", async () => {
+    vi.mocked(catalogApi.refreshAssets).mockResolvedValue(job({ state: "queued", total: null, processed: 0, available: 0 }));
     renderWithProviders(<MappingsPage />);
-    fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据集" }), { target: { value: "parties" } });
-    expect(screen.getByRole("button", { name: "parties" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "vehicles" })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "全量同步" }));
+    await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "" }, []));
+    expect(await screen.findByText(/正在发现数据表/)).toBeInTheDocument();
   });
 
-  it("registers a catalog table as a dataset through an element save", async () => {
-    const assets: Assets = {
-      connection_id: "c",
-      version_id: "v1",
-      metadata_snapshot_id: "m",
-      observed_at: "2026-10-16T00:00:00Z",
-      error: null,
-      changes: [],
-      status: "ready",
-      items: [
-        {
-          name: "contacts",
-          schema: "crm",
-          comment: "联系人",
-          missing: false,
-          datasets: [],
-          columns: [
-            { name: "id", type: "bigint", primary_key: true, comment: "编号" },
-            { name: "snapshot_on", type: "date", primary_key: false, comment: "快照日" },
-          ],
-        },
-      ],
-    };
-    vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
-    vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
-    vi.mocked(catalogApi.assets).mockResolvedValue(assets);
-    vi.mocked(api.workspace).mockResolvedValue({ version_id: "v1" } as never);
-    vi.mocked(modelingApi.saveElement).mockResolvedValue({ version: {} as never, draft, session: null });
+  it("offers a retry for failed batches and shows progress", async () => {
+    vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [job({ state: "partial_failed", available: 44, failed: 1 })] });
+    vi.mocked(catalogApi.retrySync).mockResolvedValue(job({ state: "queued" }));
     renderWithProviders(<MappingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "从数据目录登记" }));
-    fireEvent.click(await screen.findByRole("button", { name: "登记" }));
-    const form = (await screen.findAllByRole("dialog")).find((d) => d.textContent?.includes("将带入"))!;
-    expect(within(form).getByRole("textbox", { name: "数据集名称" })).toHaveValue("联系人");
-    fireEvent.click(within(form).getByRole("button", { name: "登记" }));
-    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
-    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
-    expect(payload).toMatchObject({ target_kind: "dataset", expected_current_version_id: "v1", session_id: null });
-    expect(payload.draft.datasets.find((d) => d.id === payload.target_id)).toMatchObject({
-      name: "联系人",
-      dialect: "postgresql",
-      schema_name: "crm",
-      table_name: "contacts",
-      columns: [
-        { name: "id", physical_type: "bigint", comment: "编号" },
-        { name: "snapshot_on", physical_type: "date", comment: "快照日" },
-      ],
-    });
-    expect(refresh).toHaveBeenCalled();
-  });
-
-  it("refreshes only the selected table and labels the action accordingly", async () => {
-    const assets: Assets = {
-      connection_id: "c",
-      version_id: null,
-      metadata_snapshot_id: "m",
-      observed_at: "2026-10-16T00:00:00Z",
-      error: null,
-      changes: [],
-      status: "ready",
-      items: [
-        {
-          name: "contacts",
-          schema: "crm",
-          comment: "联系人",
-          missing: false,
-          datasets: [],
-          columns: [{ name: "id", type: "bigint", primary_key: true, comment: "编号" }],
-        },
-      ],
-    };
-    vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
-    vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm"] });
-    vi.mocked(catalogApi.tables).mockResolvedValue({
-      items: [
-        { name: "contacts", schema: "crm", columns: [] },
-        { name: "orders", schema: "crm", columns: [] },
-      ],
-    });
-    vi.mocked(catalogApi.assets).mockResolvedValue(assets);
-    vi.mocked(catalogApi.refreshAssets).mockResolvedValue(assets);
-    renderWithProviders(<MappingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "从数据目录登记" }));
-    const dialog = await screen.findByRole("dialog", { name: "从数据目录登记数据集" });
-    await waitFor(() => expect(catalogApi.tables).toHaveBeenCalled());
-    fireEvent.mouseDown(within(dialog).getByRole("combobox", { name: "选择数据表" }));
-    fireEvent.click(await screen.findByText("orders", { selector: ".ant-select-item-option-content" }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "刷新" }));
-    await waitFor(() =>
-      expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "" }, ["orders"]),
-    );
+    expect(await screen.findByText(/已处理 45\/45，可用 44，失败 1/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试失败批次" }));
+    await waitFor(() => expect(catalogApi.retrySync).toHaveBeenCalledWith("w", "c", "j"));
   });
 });

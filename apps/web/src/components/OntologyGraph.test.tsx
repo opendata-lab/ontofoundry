@@ -73,8 +73,8 @@ function graphOf(draft: Draft): TypeGraph {
     nodes: draft.object_types.map((o) => ({
       id: o.id,
       kind: "object_type",
-      label: o.name,
-      technical_name: o.technical_name,
+      label: (o.display_name || o.name),
+      name: o.name,
       description: o.description,
       tags: o.tags,
     })),
@@ -82,8 +82,8 @@ function graphOf(draft: Draft): TypeGraph {
       ...draft.link_types.map((l) => ({
         id: l.id,
         kind: "link_type" as const,
-        label: l.name,
-        technical_name: l.name,
+        label: (l.display_name || l.name),
+        name: (l.display_name || l.name),
         source: l.source_type_id,
         target: l.target_type_id,
         link_type_id: l.id,
@@ -94,7 +94,7 @@ function graphOf(draft: Draft): TypeGraph {
           id: `extends:${o.id}`,
           kind: "extends" as const,
           label: "继承",
-          technical_name: "extends",
+          name: "extends",
           source: o.id,
           target: o.extends!,
         })),
@@ -103,9 +103,9 @@ function graphOf(draft: Draft): TypeGraph {
 }
 
 const nodeOf = (graph: TypeGraph, name: string) =>
-  graph.nodes.find((n) => n.technical_name === name)!;
+  graph.nodes.find((n) => n.name === name)!;
 const linkOf = (draft: Draft, name: string) =>
-  draft.link_types.find((l) => l.name === name)!;
+  draft.link_types.find((l) => (l.display_name || l.name) === name)!;
 // The node card is the element wrapping the label.
 const card = (label: string) =>
   screen.getByText(label, { selector: "strong" }).closest("div");
@@ -127,7 +127,7 @@ describe("ontology canvas", () => {
     const draft = example("06-inheritance");
     const graph = graphOf(draft);
     render(<OntologyGraph graph={graph} query="" onSelect={() => undefined} />);
-    const person = draft.object_types.find((o) => o.technical_name === "person")!;
+    const person = draft.object_types.find((o) => o.name === "person")!;
     expect(screen.getByTestId(`edge:extends:${person.id}`)).toHaveTextContent(
       `${person.id} → ${person.extends}`,
     );

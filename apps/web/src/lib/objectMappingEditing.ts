@@ -84,8 +84,8 @@ export function setKeyColumns(draft: Draft, typeId: UUID, sourceId: string, keyC
 export function setFieldBinding(draft: Draft, typeId: UUID, property: Property, binding: FieldBinding | null): Draft {
   const mapping = ensureMapping(draft, typeId);
   const fields = { ...mapping.fields };
-  if (binding) fields[property.technical_name] = binding;
-  else delete fields[property.technical_name];
+  if (binding) fields[property.name] = binding;
+  else delete fields[property.name];
   return save(draft, { ...mapping, fields });
 }
 

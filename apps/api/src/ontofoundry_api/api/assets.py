@@ -1,18 +1,24 @@
 """Observed source schemas and their links to a published ontology."""
 
-from time import monotonic
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.connections import connect_readonly, get_connection
+from ontofoundry_api.contracts.metadata_sync import SyncRequest
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import MetadataSnapshotRecord, utc_now
+from ontofoundry_api.db_models import MetadataSnapshotRecord
 from ontofoundry_api.services.access import require_mappings
 from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.metadata_sync import (
+    create_job,
+    get_job,
+    job_response,
+    latest_jobs,
+    retry_job,
+    run_job,
+)
 from ontofoundry_api.services.ontology_query import current_version, snapshot_of
 from ontofoundry_api.services.workspaces import get_workspace
 
@@ -20,133 +26,6 @@ router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/connections/{connection_id}", tags=["assets"]
 )
 
-
-def schema_diff(before, after):
-    changes = []
-    old = {table["name"]: table for table in before.get("tables", [])}
-    new = {table["name"]: table for table in after.get("tables", [])}
-    for name in sorted(old.keys() | new.keys()):
-        if name not in old or name not in new:
-            changes.append(
-                {
-                    "table": name,
-                    "column": None,
-                    "kind": "added" if name in new else "removed",
-                    "before": old.get(name),
-                    "after": new.get(name),
-                }
-            )
-            continue
-        left, right = (
-            {c["name"]: c for c in tables[name]["columns"]} for tables in (old, new)
-        )
-        for column in sorted(left.keys() | right.keys()):
-            if left.get(column) != right.get(column):
-                changes.append(
-                    {
-                        "table": name,
-                        "column": column,
-                        "kind": "added"
-                        if column not in left
-                        else "removed"
-                        if column not in right
-                        else "changed",
-                        "before": left.get(column),
-                        "after": right.get(column),
-                    }
-                )
-    return changes
-
-
-def retain_schema_changes(previous, latest):
-    """Keep unresolved drift across refreshes, reverting only an exact restoration.
-
-    A second refresh proves freshness, not mapping compatibility. Retain the
-    earliest observed definition of each changed field until it is restored.
-    """
-    pending = {(c["table"], c["column"]): c for c in previous}
-    for change in latest:
-        key = (change["table"], change["column"])
-        earlier = pending.get(key)
-        combined = (
-            {**change, "before": earlier["before"]}
-            if earlier and "before" in earlier
-            else change
-        )
-        if "before" in combined and combined["before"] == combined.get("after"):
-            pending.pop(key, None)
-        else:
-            pending[key] = combined
-    return list(pending.values())
-
-
-def read_structure(connection, schema_name, tables=None):
-    inspector = inspect(connection)
-    available = set(
-        inspector.get_table_names(schema=schema_name)
-        + inspector.get_view_names(schema=schema_name)
-    )
-    if tables is None:
-        names = sorted(available)
-        if len(names) > 200:
-            raise HTTPException(
-                422, "当前 schema 超过 200 张表，请先选择要刷新的表"
-            )
-    else:
-        # An explicitly selected table that no longer exists is omitted, which
-        # the diff reports as removed.
-        names = sorted(set(tables) & available)
-    structures, started = [], monotonic()
-    for name in names:
-        if monotonic() - started > 15:
-            raise HTTPException(422, "结构读取超过时间预算，上次快照已保留")
-        primary = inspector.get_pk_constraint(name, schema=schema_name).get(
-            "constrained_columns", []
-        )
-        try:
-            comment = inspector.get_table_comment(name, schema=schema_name).get("text")
-        except NotImplementedError:
-            comment = None
-        structures.append(
-            {
-                "name": name,
-                "schema": schema_name,
-                "comment": comment,
-                "columns": [
-                    {
-                        "name": col["name"],
-                        "type": str(col["type"]),
-                        "primary_key": col["name"] in primary,
-                        "nullable": col.get("nullable"),
-                        "comment": col.get("comment"),
-                    }
-                    for col in inspector.get_columns(name, schema=schema_name)
-                ],
-            }
-        )
-    return {"tables": structures}
-
-
-def merge_structure(previous, observed, tables):
-    """Replace only the selected tables, keeping the rest of the snapshot."""
-    if tables is None:
-        return observed
-    selected = set(tables)
-    kept = [
-        table for table in previous.get("tables", []) if table["name"] not in selected
-    ]
-    return {"tables": sorted(kept + observed["tables"], key=lambda t: t["name"])}
-
-
-def previous_selection(previous, tables):
-    if tables is None:
-        return previous
-    selected = set(tables)
-    return {
-        "tables": [
-            table for table in previous.get("tables", []) if table["name"] in selected
-        ]
-    }
 
 
 @router.get("/schemas")
@@ -170,7 +49,6 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
         authorized_dataset_projection,
         resolve_dataset,
     )
-    from ontofoundry_api.services.errors import ServiceError
 
     space = get_workspace(db, wid)
     version = (
@@ -184,10 +62,11 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
     for raw in snapshot.get("datasets", []):
         dataset = Dataset.model_validate(raw)
         try:
-            source = resolve_dataset(db, wid, dataset)
+            # A removed table still lists the datasets that depend on it.
+            source = resolve_dataset(db, wid, dataset, registered=False)
         except ServiceError:
             continue
-        if source.connection.id == connection.id and (source.schema or "") == (
+        if dataset.source_kind == "table" and source.connection.id == connection.id and (source.schema or "") == (
             schema or source.schema or ""
         ):
             datasets.append(authorized_dataset_projection(db, wid, dataset))
@@ -197,7 +76,10 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
     items = [
         {
             **tables.get(name, {"name": name, "schema": schema or None, "columns": []}),
-            "missing": name not in tables and bool(record and record.observed_at),
+            # Keep a recorded missing observation; only dataset-only placeholders are derived.
+            "missing": bool(tables[name].get("missing"))
+            if name in tables
+            else bool(record and record.observed_at),
             "datasets": [d for d in datasets if d["table_name"] == name],
         }
         for name in sorted(set(tables) | {d["table_name"] for d in datasets})
@@ -229,53 +111,44 @@ def assets(
 ):
     require_mappings(db, workspace_id, user)
     connection = get_connection(db, workspace_id, connection_id)
+    from ontofoundry_api.services.metadata_sync import normalize_schema
+    schema_name = normalize_schema(connection, schema_name)
     record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)
 
 
-class RefreshRequest(BaseModel):
-    tables: list[str] | None = Field(default=None, max_length=200)
-
-
-@router.post("/assets/refresh")
-def refresh(
-    workspace_id: str,
-    connection_id: str,
-    request: Request,
-    body: RefreshRequest | None = None,
-    schema_name: str = Query(default="", max_length=240),
-    version_id: str | None = None,
-    db: Session = Depends(get_db),
-    user: Principal = Depends(current_principal),
-):
+@router.post("/assets/sync-jobs", status_code=202)
+def sync_job(workspace_id: str, connection_id: str, body: SyncRequest, request: Request, background: BackgroundTasks, schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
     require_mappings(db, workspace_id, user)
     connection = get_connection(db, workspace_id, connection_id)
-    record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
-    if not record:
-        record = MetadataSnapshotRecord(
-            connection_id=connection_id,
-            schema_name=schema_name,
-            snapshot_json={},
-            changes_json=[],
-        )
-        db.add(record)
-    selected = body.tables if body and body.tables else None
-    try:
-        with connect_readonly(connection, request.app.state.settings) as conn:
-            observed = read_structure(conn, schema_name or None, selected)
-        record.changes_json = (
-            retain_schema_changes(
-                record.changes_json,
-                schema_diff(previous_selection(record.snapshot_json, selected), observed),
-            )
-            if record.observed_at
-            else []
-        )
-        record.snapshot_json = merge_structure(
-            record.snapshot_json, observed, selected
-        )
-        record.observed_at, record.error = utc_now(), None
-    except (HTTPException, ServiceError) as exc:
-        record.error = str(exc)
-    db.commit()
-    return asset_response(db, workspace_id, connection, record, version_id, schema_name)
+    job = create_job(db, workspace_id, connection, schema_name, body, user.id)
+    background.add_task(run_job, request.app.state.session_factory, job.id, request.app.state.settings)
+    return job_response(db, job)
+
+
+@router.get("/assets/sync-jobs")
+def jobs(workspace_id: str, connection_id: str, schema_name: str = "", db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_mappings(db, workspace_id, user)
+    get_connection(db, workspace_id, connection_id)
+    return {"items": [job_response(db, job) for job in latest_jobs(db, connection_id, schema_name)]}
+
+
+@router.get("/assets/sync-jobs/{job_id}")
+def read_job(workspace_id: str, connection_id: str, job_id: str, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_mappings(db, workspace_id, user)
+    get_connection(db, workspace_id, connection_id)
+    return job_response(db, get_job(db, workspace_id, connection_id, job_id))
+
+
+@router.post("/assets/sync-jobs/{job_id}/retry", status_code=202)
+def retry(workspace_id: str, connection_id: str, job_id: str, request: Request, background: BackgroundTasks, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_mappings(db, workspace_id, user)
+    get_connection(db, workspace_id, connection_id)
+    job = retry_job(db, get_job(db, workspace_id, connection_id, job_id))
+    background.add_task(run_job, request.app.state.session_factory, job.id, request.app.state.settings)
+    return job_response(db, job)
+
+
+@router.post("/assets/refresh", status_code=202)
+def refresh(workspace_id: str, connection_id: str, request: Request, background: BackgroundTasks, body: SyncRequest, schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    return sync_job(workspace_id, connection_id, body, request, background, schema_name, db, user)

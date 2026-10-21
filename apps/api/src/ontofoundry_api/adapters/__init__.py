@@ -3,8 +3,11 @@
 
 def get_adapter(adapter_id: str):
     from ontofoundry_api.adapters.native.importer import NativeAdapter
+    from ontofoundry_api.adapters.native.package import NativePackageAdapter
     from ontofoundry_api.adapters.ossie.importer import OssieAdapter
 
+    if adapter_id == NativePackageAdapter.id:
+        return NativePackageAdapter()
     if adapter_id == NativeAdapter.id:
         return NativeAdapter()
     if adapter_id in (OssieAdapter.id, "ossie"):

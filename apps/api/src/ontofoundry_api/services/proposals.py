@@ -254,7 +254,7 @@ def effective_statuses(
             legacy_unchanged = (
                 item.target_kind == "link_type"
                 and isinstance(previous, dict)
-                and "technical_name" in previous
+                and "name" in previous
                 and domain_sha256(previous) == item.expected_target_hash
                 and element_sha256(previous, collection=collection) == current_hash
             )

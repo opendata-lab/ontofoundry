@@ -1,0 +1,38 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "1c01154d9a98f8cfac8b2c5ec2dacd0db269b09cb055f7fc914aa5feeb4777a1"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [],
+    "properties": [],
+    "link_types": [],
+    "rules": [],
+    "metrics": [],
+    "datasets": [],
+    "mappings": [],
+    "material_objects": [],
+    "material_links": [],
+    "value_types": [
+      {
+        "id": "9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d",
+        "name": "yunfan_member_level",
+        "display_name": "云帆会员等级",
+        "description": "会员等级取值",
+        "value_kind": "string",
+        "evidence": []
+      }
+    ]
+  },
+  "element_hashes": {
+    "9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d": "c7e7e1fa002ebb726fad2b95294356c686d6d07d6ef4c97713502fd0a2a3b422"
+  }
+}

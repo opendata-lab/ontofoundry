@@ -7,7 +7,7 @@ export function DirectoryFrame({ header, children }: { header: ReactNode; childr
       <header className="flex h-app-header flex-none items-center justify-between border-b border-rule-soft bg-surface px-6">
         {header}
       </header>
-      <main className="mx-auto flex w-full max-w-directory flex-1 flex-col">{children}</main>
+      <main className="directory-content flex w-full flex-1 flex-col">{children}</main>
     </div>
   );
 }

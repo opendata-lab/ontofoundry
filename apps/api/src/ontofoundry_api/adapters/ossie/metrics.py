@@ -16,7 +16,7 @@ from ontofoundry_api.domain.core import (
     SimpleMetric,
 )
 
-from .ids import display_name, technical_name
+from .ids import identifier_name
 
 
 def unwrap(ast):
@@ -245,8 +245,8 @@ def shape_key(shape):
 
 def import_metrics(importer, scope):
     t = importer.t
-    used = {m.technical_name.casefold() for m in t.model.metrics}
-    labels = {m.name.casefold() for m in t.model.metrics}
+    used = {m.name.casefold() for m in t.model.metrics}
+
     pending = []
     names = Counter(
         raw.get("name")
@@ -299,17 +299,13 @@ def import_metrics(importer, scope):
                 continue
             sources = normalize(ast, scope)
             if len(sources) > 1:
-                t.issue(
-                    path,
-                    "error",
-                    "Metric",
-                    "RT-69",
-                    "指标引用多个数据集："
-                    + "、".join(sorted(sources))
-                    + "；需要业务改写，未形成核心指标",
-                    completion=True,
-                )
-                continue
+                try:
+                    from .cross_dataset import lift_metric
+                    ast, _, sources = lift_metric(importer, scope, ast, sources, path, raw["name"])
+                    t.issue(path, "converted", "Metric", "RT-69", "依据已登记完整主键、非空外键及唯一连接路径转换为表达式数据集和单数据集指标", completion=False)
+                except ValueError as error:
+                    t.issue(path, "error", "Metric", "RT-69", "跨数据集指标待补全：" + str(error), completion=True)
+                    continue
             if not sources:
                 t.issue(
                     path,
@@ -322,14 +318,21 @@ def import_metrics(importer, scope):
                 )
                 continue
             dataset = scope.datasets[next(iter(sources))].model
+            from .extension import metadata_key
+            metric_meta = importer.extension.data.get("metric_metadata", {}).get(metadata_key(scope.raw["name"], raw["name"]), {})
+            time = metric_meta.get("time_field", {}).get("column")
+            time_column = scope.datasets[next(iter(sources))].direct(time) if time else None
             common = {
                 "id": t.id("metric:" + scope.key + "." + raw["name"]),
-                "name": display_name(
-                    importer.extension.name("metric:" + raw["name"], raw["name"]), labels
-                ),
-                "technical_name": technical_name(raw["name"], used),
+                "display_name": importer.extension.name("metric:" + raw["name"]),
+                "name": identifier_name(raw["name"], used),
                 "description": raw.get("description", ""),
-                "synonyms": importer.extension.labels("synonyms", "metric:" + raw["name"]),
+                "synonyms": (
+                    raw.get("ai_context", {}).get("synonyms", [])
+                    if isinstance(raw.get("ai_context"), dict)
+                    else []
+                )
+                or importer.extension.labels("synonyms", "metric:" + raw["name"]),
             }
             if dialect:
                 common["description"] = "\n\n".join(
@@ -347,7 +350,7 @@ def import_metrics(importer, scope):
             try:
                 shape = simple_shape(ast, dataset)
                 metric = SimpleMetric(
-                    **common, kind="simple", dataset_id=dataset.id, **shape
+                    **common, kind="simple", dataset_id=dataset.id, time_field={"dataset_id": dataset.id, "column": time_column} if time_column else None, **shape
                 )
                 rule = (
                     "RT-50"
@@ -365,6 +368,7 @@ def import_metrics(importer, scope):
                     **common,
                     kind="expression",
                     dataset_id=dataset.id,
+                    time_field={"dataset_id": dataset.id, "column": time_column} if time_column else None,
                     expression=ast.sql(),
                     value_kind={
                         "Integer": "integer",

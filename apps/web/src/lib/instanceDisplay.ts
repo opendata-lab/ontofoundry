@@ -8,10 +8,10 @@ const hasValue = (value: Scalar | undefined) => value !== null && value !== unde
 
 export function documentDisplayText(draft: Draft, fact: MaterialObject): string {
   const title = titleProperty(draft, fact.type_id);
-  if (title && hasValue(fact.values[title.technical_name])) return String(fact.values[title.technical_name]);
+  if (title && hasValue(fact.values[title.name])) return String(fact.values[title.name]);
   const keys = identifier(draft, fact.type_id);
-  if (keys.length && keys.every((p) => hasValue(fact.values[p.technical_name]))) {
-    return keys.map((p) => String(fact.values[p.technical_name])).join(" · ");
+  if (keys.length && keys.every((p) => hasValue(fact.values[p.name]))) {
+    return keys.map((p) => String(fact.values[p.name])).join(" · ");
   }
   const quote = [...fact.evidence]
     .sort((a, b) => compareUuidBytes(a.id, b.id))

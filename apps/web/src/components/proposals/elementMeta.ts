@@ -10,6 +10,7 @@ export const KIND: Record<TargetKind, { label: string; color: string }> = {
   mapping: { label: "映射", color: "orange" },
   material_object: { label: "文档事实", color: "gold" },
   material_link: { label: "事实关系", color: "gold" },
+  value_type: { label: "值类型", color: "lime" },
 };
 
 export const OPERATION: Record<ProposalItem["operation"], string> = {
@@ -59,8 +60,8 @@ export function acceptableIds(items: ProposalItem[]) {
 }
 
 export const FIELD_LABELS: Record<string, string> = {
-  name: "名称",
-  technical_name: "英文标识",
+  display_name: "名称",
+  name: "英文标识",
   description: "描述",
   synonyms: "同义词",
   tags: "标签",
@@ -107,3 +108,7 @@ export const FIELD_LABELS: Record<string, string> = {
   membership_source_id: "成员扩展表",
   inherited_link_bindings: "继承关系绑定",
 };
+
+export function fieldLabel(path: string, kind?: TargetKind): string {
+  return kind === "dataset" && path === "name" ? "名称" : FIELD_LABELS[path] ?? path;
+}

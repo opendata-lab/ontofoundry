@@ -25,7 +25,7 @@ def test_dataset_impact_contains_direct_and_ratio_but_no_ontology():
 def test_object_edits_do_not_affect_metrics():
     before = example_draft("06-inheritance")
     candidate = before.model_copy(deep=True)
-    candidate.object_types[0].technical_name = "renamed"
+    candidate.object_types[0].name = "renamed"
     candidate.object_types[0].derived_by = []
     candidate.link_types.clear()
     assert affected_metrics(before, candidate) == set()
@@ -61,8 +61,8 @@ def test_atomic_dataset_name_swap_preserves_uuid_and_literals():
 def test_property_rename_rewrites_rules_binding_keys_and_fact_values():
     before = example_draft("06-inheritance")
     candidate = before.model_copy(deep=True)
-    prop = next(p for p in candidate.properties if p.technical_name == "phone")
-    prop.technical_name = "telephone"
+    prop = next(p for p in candidate.properties if p.name == "phone")
+    prop.name = "telephone"
     result = validate_candidate_graph(before, candidate)
     assert "party.telephone" in result.rules[0].expression
     assert any("telephone" in m.fields for m in result.mappings)
@@ -79,7 +79,7 @@ def test_atomic_property_name_swap_does_not_merge_values():
         next(
             p
             for p in candidate.properties
-            if p.technical_name == name and p.owner_type_id == fact.type_id
+            if p.name == name and p.owner_type_id == fact.type_id
         )
         for name in names
     ]
@@ -91,8 +91,8 @@ def test_atomic_property_name_swap_does_not_merge_values():
     ]
     assert len(same_kind) >= 2
     p1, p2 = same_kind[:2]
-    a, b = p1.technical_name, p2.technical_name
-    p1.technical_name, p2.technical_name = b, a
+    a, b = p1.name, p2.name
+    p1.name, p2.name = b, a
     result = validate_candidate_graph(before, candidate)
     for original in before.material_objects:
         current = next(f for f in result.material_objects if f.id == original.id)
@@ -105,7 +105,7 @@ def test_atomic_property_name_swap_does_not_merge_values():
 def test_deleted_reference_must_be_revised_together():
     before = example_draft("08-rules")
     candidate = before.model_copy(deep=True)
-    candidate.properties = [p for p in candidate.properties if p.technical_name != "amount"]
+    candidate.properties = [p for p in candidate.properties if p.name != "amount"]
     with pytest.raises(ValueError, match="删除|无效"):
         validate_candidate_graph(before, candidate)
 
@@ -117,9 +117,9 @@ def test_explicit_expression_revision_resolves_in_final_namespace():
     target = next(
         p
         for p in candidate.properties
-        if p.owner_type_id == rule_context(candidate, rule) and p.technical_name == "amount"
+        if p.owner_type_id == rule_context(candidate, rule) and p.name == "amount"
     )
-    target.technical_name = "total_amount"
+    target.name = "total_amount"
     rule.expression = "sales_order.total_amount >= 100"
     result = validate_candidate_graph(before, candidate)
     assert result.rules[0].expression == rule.expression
@@ -163,12 +163,12 @@ def test_exact_final_property_swap_rewrite_is_not_interpreted_again():
 
     before = example_draft("07-instances-and-evidence")
     candidate = before.model_copy(deep=True)
-    first, second = [
-        p for p in candidate.properties if p.technical_name in {"customer_no", "name"}
-    ][:2]
-    first.technical_name, second.technical_name = (
-        second.technical_name,
-        first.technical_name,
+    first, second = [p for p in candidate.properties if p.name in {"customer_no", "name"}][
+        :2
+    ]
+    first.name, second.name = (
+        second.name,
+        first.name,
     )
     final = validate_candidate_graph(before, candidate)
     saved = final.model_copy(deep=True)
@@ -178,16 +178,10 @@ def test_exact_final_property_swap_rewrite_is_not_interpreted_again():
     for previous in before.material_objects:
         current = next(f for f in final.material_objects if f.id == previous.id)
         for prop in before.properties:
-            if (
-                prop.owner_type_id != previous.type_id
-                or prop.technical_name not in previous.values
-            ):
+            if prop.owner_type_id != previous.type_id or prop.name not in previous.values:
                 continue
             renamed = next(p for p in final.properties if p.id == prop.id)
-            assert (
-                current.values[renamed.technical_name]
-                == previous.values[prop.technical_name]
-            )
+            assert current.values[renamed.name] == previous.values[prop.name]
 
 
 @pytest.mark.parametrize(
@@ -207,27 +201,26 @@ def test_final_fact_swap_requires_identical_scalar_types(
 
     before = example_draft("07-instances-and-evidence")
     first, second = [
-        next(p for p in before.properties if p.technical_name == name)
-        for name in ("name", "is_vip")
+        next(p for p in before.properties if p.name == name) for name in ("name", "is_vip")
     ]
     first.value_kind, second.value_kind = ValueKind(left_kind), ValueKind(right_kind)
     for fact in before.material_objects:
         if fact.type_id == first.owner_type_id:
-            fact.values[first.technical_name] = left
-            fact.values[second.technical_name] = right
+            fact.values[first.name] = left
+            fact.values[second.name] = right
     validate_core_graph(before)
     candidate = before.model_copy(deep=True)
     a, b = [
         next(p for p in candidate.properties if p.id == old.id) for old in (first, second)
     ]
-    a.technical_name, b.technical_name = b.technical_name, a.technical_name
+    a.name, b.name = b.name, a.name
     final = validate_candidate_graph(before, candidate)
     for fact in final.material_objects:
         if fact.type_id == first.owner_type_id:
-            assert type(fact.values[b.technical_name]) is type(right)
-            assert type(fact.values[a.technical_name]) is type(left)
-            assert fact.values[a.technical_name] == left
-            assert fact.values[b.technical_name] == right
+            assert type(fact.values[b.name]) is type(right)
+            assert type(fact.values[a.name]) is type(left)
+            assert fact.values[a.name] == left
+            assert fact.values[b.name] == right
     assert rewrite_references(before, final).model_dump_json() == final.model_dump_json()
     assert candidate.model_dump_json() != final.model_dump_json()
 
@@ -238,9 +231,9 @@ def test_ambiguous_binding_swap_is_accepted_as_exact_final_form_first():
     first, second = [
         p for p in candidate.properties if p.owner_type_id == candidate.object_types[0].id
     ][:2]
-    first.technical_name, second.technical_name = (
-        second.technical_name,
-        first.technical_name,
+    first.name, second.name = (
+        second.name,
+        first.name,
     )
     final = validate_candidate_graph(before, candidate)
     # These same submitted fields could mean a manual binding swap in the old
@@ -250,8 +243,8 @@ def test_ambiguous_binding_swap_is_accepted_as_exact_final_form_first():
     assert result.mappings == final.mappings
     # A binding revision after the rename is an unambiguous second save.
     mapping = next(m for m in submitted.mappings if m.type_id == first.owner_type_id)
-    mapping.fields[first.technical_name], mapping.fields[second.technical_name] = (
-        mapping.fields[second.technical_name],
-        mapping.fields[first.technical_name],
+    mapping.fields[first.name], mapping.fields[second.name] = (
+        mapping.fields[second.name],
+        mapping.fields[first.name],
     )
     assert validate_candidate_graph(final, submitted).mappings == submitted.mappings

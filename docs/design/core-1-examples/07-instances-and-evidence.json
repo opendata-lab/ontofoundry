@@ -8,61 +8,59 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001601",
-        "name": "客户",
-        "technical_name": "customer",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "customer",
+        "display_name": "客户"
       },
       {
         "id": "00000000-0000-4000-8000-000000001602",
-        "name": "退货单",
-        "technical_name": "return_request",
         "description": "客户提交的退货登记",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "return_request",
+        "display_name": "退货单"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002601",
         "owner_type_id": "00000000-0000-4000-8000-000000001601",
-        "name": "客户编号",
-        "technical_name": "customer_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "customer_no",
+        "display_name": "客户编号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002602",
         "owner_type_id": "00000000-0000-4000-8000-000000001601",
-        "name": "名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002603",
         "owner_type_id": "00000000-0000-4000-8000-000000001601",
-        "name": "是否VIP",
-        "technical_name": "is_vip",
         "description": "由 Ossie 一元关系 customer.is_vip 转换",
         "value_kind": "boolean",
         "required": false,
@@ -82,46 +80,48 @@
             },
             "quote": "\"name\": \"is_vip\""
           }
-        ]
+        ],
+        "name": "is_vip",
+        "display_name": "是否VIP"
       },
       {
         "id": "00000000-0000-4000-8000-000000002611",
         "owner_type_id": "00000000-0000-4000-8000-000000001602",
-        "name": "退货单号",
-        "technical_name": "return_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "return_no",
+        "display_name": "退货单号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002612",
         "owner_type_id": "00000000-0000-4000-8000-000000001602",
-        "name": "退款金额",
-        "technical_name": "refund",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "refund",
+        "display_name": "退款金额"
       },
       {
         "id": "00000000-0000-4000-8000-000000002613",
         "owner_type_id": "00000000-0000-4000-8000-000000001602",
-        "name": "登记日期",
-        "technical_name": "registered_on",
         "description": "",
         "value_kind": "date",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "registered_on",
+        "display_name": "登记日期"
       }
     ],
     "link_types": [

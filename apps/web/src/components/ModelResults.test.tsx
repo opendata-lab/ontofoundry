@@ -52,12 +52,12 @@ describe("modeling results", () => {
     show(
       session({
         base_diff: [
-          { element_kind: "object_type", element_id: customer.id, label: customer.name, change: "updated", field_changes: [], before: null, after: null },
-          { element_kind: "object_type", element_id: "gone", label: "旧对象", change: "deleted", field_changes: [], before: { technical_name: "old" } as never, after: null },
+          { element_kind: "object_type", element_id: customer.id, label: (customer.display_name || customer.name), change: "updated", field_changes: [], before: null, after: null },
+          { element_kind: "object_type", element_id: "gone", label: "旧对象", change: "deleted", field_changes: [], before: { name: "old" } as never, after: null },
         ],
       }),
     );
-    expect(within(screen.getByRole("button", { name: customer.name }).closest("tr")!).getByText("已修改")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: (customer.display_name || customer.name) }).closest("tr")!).getByText("已修改")).toBeInTheDocument();
     expect(within(screen.getByText("旧对象").closest("tr")!).getByText("待删除")).toBeInTheDocument();
   });
 

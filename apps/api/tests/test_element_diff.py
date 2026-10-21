@@ -17,8 +17,8 @@ def fact_draft():
             "object_types": [
                 {
                     "id": obj,
-                    "name": "星港员工",
-                    "technical_name": "starport_staff",
+                    "display_name": "星港员工",
+                    "name": "starport_staff",
                     "title_property_id": title,
                 }
             ],
@@ -26,15 +26,15 @@ def fact_draft():
                 {
                     "id": title,
                     "owner_type_id": obj,
-                    "name": "姓名",
-                    "technical_name": "staff_name",
+                    "display_name": "姓名",
+                    "name": "staff_name",
                     "value_kind": "string",
                 },
                 {
                     "id": identifier,
                     "owner_type_id": obj,
-                    "name": "编号",
-                    "technical_name": "staff_no",
+                    "display_name": "编号",
+                    "name": "staff_no",
                     "value_kind": "string",
                     "identifier": True,
                     "required": True,
@@ -113,8 +113,6 @@ def test_deleted_fact_keeps_title_when_the_title_property_is_deleted_too():
     after = deepcopy(before)
     fact = after["material_objects"].pop(0)
     after["object_types"][0]["title_property_id"] = None
-    after["properties"] = [
-        p for p in after["properties"] if p["technical_name"] != "staff_name"
-    ]
+    after["properties"] = [p for p in after["properties"] if p["name"] != "staff_name"]
     changes = element_changes(before, after)
     assert next(c["label"] for c in changes if c["element_id"] == fact["id"]) == "小岚"

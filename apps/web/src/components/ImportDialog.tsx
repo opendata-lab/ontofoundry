@@ -55,16 +55,16 @@ function ImportFlow({ workspaceId, maxFileMb, onClose, onConfirmed }: { workspac
       {error && <Alert type="error" showIcon message={error} />}
       {step === 0 && <Form layout="vertical">
         <Form.Item label="文件格式">
-          <Select aria-label="文件格式" value={adapter} disabled={busy} onChange={(value) => { reset(); setAdapter(value); setFile(null); }} options={[{ value: "ossie-0.2", label: "Apache Ossie 0.2" }, { value: "ontofoundry-core-1", label: "OntoFoundry core-1 原生单文件" }]} />
+          <Select aria-label="文件格式" value={adapter} disabled={busy} onChange={(value) => { reset(); setAdapter(value); setFile(null); }} options={[{ value: "ossie-0.2", label: "Apache Ossie 0.2（JSON / ZIP）" }, { value: "ontofoundry-core-1", label: "OntoFoundry core-1（单文件 / 完整包）" }]} />
         </Form.Item>
-        <Form.Item label="本体文件" extra={`支持 UTF-8 JSON，最大 ${maxFileMb} MB。`}>
-          <Upload accept=".json" maxCount={1} disabled={busy} fileList={file ? [{ uid: "import-file", name: file.name, status: "done" }] : []} beforeUpload={(next) => {
+        <Form.Item label="本体文件" extra={`支持 UTF-8 JSON 或 ZIP，最大 ${maxFileMb} MB。`}>
+          <Upload accept=".json,.zip" maxCount={1} disabled={busy} fileList={file ? [{ uid: "import-file", name: file.name, status: "done" }] : []} beforeUpload={(next) => {
             reset();
             if (next.size > maxFileMb * 1024 * 1024) { setFile(null); setError("文件超过上传限制"); }
             else setFile(next);
             return false;
           }} onRemove={() => { reset(); setFile(null); }}>
-            <Button icon={<FileUp size={15} />}>选择 JSON 文件</Button>
+            <Button icon={<FileUp size={15} />}>选择本体文件</Button>
           </Upload>
         </Form.Item>
         <Typography.Paragraph type="secondary">先查看转换结果，再生成待审提案。接受提案后仍需正常发布。</Typography.Paragraph>

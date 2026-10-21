@@ -37,7 +37,7 @@ def typed_fact_swap(left_kind, left, right_kind, right):
                 if "evidence" in element:
                     element["evidence"] = []
     first, second = [
-        next(p for p in before["properties"] if p["technical_name"] == name)
+        next(p for p in before["properties"] if p["name"] == name)
         for name in ("name", "is_vip")
     ]
     first["value_kind"], second["value_kind"] = left_kind, right_kind
@@ -48,7 +48,7 @@ def typed_fact_swap(left_kind, left, right_kind, right):
     candidate = deepcopy(before)
     for prop in candidate["properties"]:
         if prop["id"] == first["id"]:
-            prop["technical_name"] = "is_vip"
+            prop["name"] = "is_vip"
         elif prop["id"] == second["id"]:
-            prop["technical_name"] = "name"
+            prop["name"] = "name"
     return before, candidate, first["owner_type_id"]

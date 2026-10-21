@@ -42,17 +42,7 @@ ORDERED = frozenset(
 
 def _normalize(value: Any, field: str | None = None) -> Any:
     if isinstance(value, dict):
-        # Absent optional role names preserve hashes of pre-role-name snapshots.
-        is_link = {"source_type_id", "target_type_id", "multiplicity"} <= value.keys()
-        return {
-            key: _normalize(item, key)
-            for key, item in value.items()
-            if not (
-                is_link
-                and key in {"source_role_name", "target_role_name"}
-                and item is None
-            )
-        }
+        return {key: _normalize(item, key) for key, item in value.items()}
     if not isinstance(value, list):
         return value
     items = [_normalize(item) for item in value]

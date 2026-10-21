@@ -44,6 +44,8 @@ class TranslationReport(BaseModel):
 @dataclass(frozen=True)
 class ImportContext:
     workspace_id: UUID
+    connections: tuple[dict, ...] = ()
+    registered_tables: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,7 @@ class ImportResult:
     model: CoreDraft
     report: TranslationReport
     pending_material_evidence: tuple[PendingMaterialEvidence, ...] = ()
+    bundled_materials: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -68,6 +71,8 @@ class ExportContext:
     workspace_description: str
     exported_at: str | None = None
     dataset_scopes: dict[UUID, str] | None = None
+    connection_names: dict[UUID, str] | None = None
+    materials: tuple[dict, ...] | None = None
 
 
 @dataclass(frozen=True)

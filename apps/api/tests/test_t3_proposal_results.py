@@ -39,6 +39,7 @@ def proposals_run(client) -> tuple[dict, dict]:
         "producer": {"agent_id": "agent", "skill": "ontofoundry-modeling", "mode": "model"},
         "result_contract": "proposals",
         "pinned_draft": draft,
+        "input_files": {"schema": "inputs/schema.json", "materials": []},
     }
     with client.app.state.session_factory() as db:
         db.execute(
@@ -89,7 +90,7 @@ def some_items(draft: dict) -> list[dict]:
             "target_id": None,
             "expected_target_hash": None,
             "before": None,
-            "after": {"name": "采购订单", "technical_name": "purchase_order"},
+            "after": {"display_name": "采购订单", "name": "purchase_order"},
         },
         {
             "client_ref": "po-no",
@@ -101,8 +102,8 @@ def some_items(draft: dict) -> list[dict]:
             "after": {
                 "owner_type_id": {"client_ref": "po"},
                 "value_kind": "string",
-                "name": "订单号",
-                "technical_name": "order_no",
+                "display_name": "订单号",
+                "name": "order_no",
             },
         },
         {
@@ -223,6 +224,11 @@ def test_a_new_batch_supersedes_older_pending_items_on_the_same_target(client, m
 
 
 def test_a_rejected_result_is_handed_back_for_repair(client, monkeypatch):
+    async def upload(self, topic_id, name, data, media_type):
+        return {"rel_path": "inputs/" + name}
+
+    monkeypatch.setattr(DataAgentClient, "upload", upload)
+
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["items"][2]["expected_target_hash"] = "0" * 64
@@ -240,11 +246,18 @@ def test_a_rejected_result_is_handed_back_for_repair(client, monkeypatch):
     assert after.dataagent_task_id == "task-repair"
     assert after.run_manifest_json["run_token"] == after.dataagent_run_token != RUN_TOKEN
     assert "TARGET_HASH_MISMATCH" in sent[0]
-    assert after.dataagent_run_token in sent[0]  # the new header to copy
+    assert (
+        after.dataagent_run_token in sent[0]
+    )  # The new dynamic entry points carry the token.
     assert stored(client, session["id"])[0] == []
 
 
 def test_a_rejected_result_without_repair_is_kept_as_a_failed_batch(client, monkeypatch):
+    async def upload(self, topic_id, name, content, media_type):
+        return {"rel_path": "inputs/" + name}
+
+    monkeypatch.setattr(DataAgentClient, "upload", upload)
+
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["run_token"] = "wrong"
@@ -304,25 +317,29 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert context["element_hashes"][first["id"]] == element_sha256(
         first, collection="object_types"
     )
+    pack = json.loads(
+        next(v for k, v in uploads.items() if k.startswith("ontofoundry-work-pack-"))
+    )
+    assert pack["context_file"].startswith("inputs/ontofoundry-context-")
+    assert pack["run"] == context["run"]
+    assert pack["execution"]["repair_used"] == 0
+    assert pack["elements"] and len(json.dumps(pack, ensure_ascii=False).encode()) < 8192
+    assert manifest["repair_budget_required"] is True
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
-    assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] in prompt
+    assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] not in prompt
     token = manifest["run_token"]
-    assert f"output/ontofoundry-needs-input-{token}.json" in prompt
-    assert f'{{"run_token": "{token}", "questions": ["待确认问题"]}}' in prompt
-    assert (
-        "questions 必须是非空的中文问题列表，与回答中询问用户的问题一致，此时不要写结果文件"
-        in prompt
-    )
-    assert "否则必须写入结果文件" in prompt
-    assert session["base_version_id"] in prompt
-    # The prompt is shown as the user's chat message: the credential lives in a file.
+    assert pack["result_file"] == f"output/ontofoundry-result-{token}.json"
+    assert pack["needs_input_file"] == f"output/ontofoundry-needs-input-{token}.json"
+    assert pack["needs_input_file"] in prompt and pack["result_file"] in prompt
+    assert "questions" not in prompt and "结果头" not in prompt
+    assert session["base_version_id"] == pack["run"]["base_version_id"]
     assert "ofrun." not in prompt
     access_name = f"ontofoundry-mcp-{manifest['run_token']}.json"
-    assert "inputs/" + access_name in prompt
+    assert pack["mcp_config_file"] == "inputs/" + access_name
+    assert "inputs/" + access_name not in prompt
     access = json.loads(uploads[access_name])
     assert access["headers"]["Authorization"].startswith("Bearer ofrun.")
-    # The file is enough to call the pinned MCP as written.
     path = urlsplit(access["url"]).path
     called = client.post(
         path,
@@ -342,6 +359,7 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
 
     uploads: list[str] = []
     prompts: list[str] = []
+    packs = []
 
     class FakeAgent:
         async def create_topic(self, *_):
@@ -349,6 +367,8 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
 
         async def upload(self, topic_id, name, data, content_type):
             uploads.append(name)
+            if name.startswith("ontofoundry-work-pack-"):
+                packs.append(json.loads(data))
             return {"rel_path": "inputs/" + name}
 
         async def deliver(self, **kwargs):
@@ -386,7 +406,9 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
     assert (
         sum(1 for name in uploads if name.startswith(material["id"])) == 1
     )  # uploaded once
-    assert f"inputs/{material['id']}-a.md" in prompts[1]  # still named in the second run
+    assert f"inputs/{material['id']}-a.md" not in prompts[1]
+    assert packs[-1]["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
+    assert packs[-1]["materials"][0]["original_range"] == [1, 2]
     manifest = row(client, session["id"]).run_manifest_json
     assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
 
@@ -414,6 +436,9 @@ def test_proposals_run_with_needs_input_marker_asks_for_a_reply(client, monkeypa
     assert paths == [
         f"output/ontofoundry-result-{RUN_TOKEN}.json",
         f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
+        "modeling/plan.md",
+        "modeling/entities.json",
+        "modeling/issues.json",
     ]
 
 
@@ -427,6 +452,7 @@ def test_proposals_run_with_needs_input_marker_asks_for_a_reply(client, monkeypa
             id="wrong-token",
         ),
         pytest.param({"run_token": RUN_TOKEN, "questions": []}, id="empty-questions"),
+        pytest.param({"run_token": RUN_TOKEN, "questions": ["   "]}, id="blank-question"),
         pytest.param({"run_token": RUN_TOKEN, "questions": [1]}, id="non-string-question"),
     ],
 )
@@ -454,7 +480,15 @@ def test_proposals_run_without_valid_marker_fails_permanently(client, monkeypatc
     assert detail["task_detail"] == current.task_detail
 
     assert reconcile(client, session["id"]) == "failed_permanent"
-    assert len(paths) == 2
+    assert paths[2:] == [
+        "modeling/plan.md",
+        "modeling/notes.md",
+        "modeling/parts/01-types.json",
+        "modeling/parts/02-links.json",
+        "modeling/parts/03-datasets.json",
+        "modeling/parts/04-metrics-rules.json",
+        "modeling/parts/05-facts.json",
+    ]
 
 
 @pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
@@ -491,6 +525,11 @@ def test_proposals_marker_download_error_is_retriable(client, monkeypatch, statu
 
 @pytest.mark.parametrize("repair", [True, False])
 def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch, repair):
+    async def upload(self, topic_id, name, data, media_type):
+        return {"rel_path": "inputs/" + name}
+
+    monkeypatch.setattr(DataAgentClient, "upload", upload)
+
     from ontofoundry_api.services import model_result
 
     session, manifest = proposals_run(client)
@@ -519,3 +558,141 @@ def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch, r
         assert row(client, session["id"]).dataagent_task_id == "task-repair"
     else:
         assert batches[0].error_json["code"] == "RESULT_VALIDATION_FAILED"
+
+
+@pytest.mark.parametrize("local_used", [0, 1, 2])
+def test_local_and_platform_repairs_share_two_rounds(client, monkeypatch, local_used):
+    import hashlib
+
+    session, manifest = proposals_run(client)
+    manifest.update(
+        repair_used=0,
+        repair_budget_required=True,
+        input_files={"schema": "inputs/schema.json", "materials": []},
+    )
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
+        db.commit()
+    sent, contexts = [], []
+    current_used = local_used
+
+    async def download(self, topic_id, rel_path):
+        current = row(client, session["id"]).run_manifest_json
+        batch = result(current, some_items(session["draft"]))
+        batch["items"][2]["expected_target_hash"] = "0" * 64
+        content = json.dumps(batch, ensure_ascii=False).encode()
+        if "needs-input" in rel_path:
+            raise DataAgentError("missing", status_code=404)
+        if "budget" in rel_path:
+            return json.dumps(
+                {
+                    "run_token": current["run_token"],
+                    "used": current_used,
+                    "result_sha256": hashlib.sha256(content).hexdigest(),
+                }
+            ).encode(), "application/json"
+        return content, "application/json"
+
+    async def upload(self, topic_id, name, content, media_type):
+        contexts.append(json.loads(content))
+        return {"rel_path": "inputs/" + name}
+
+    async def deliver(self, **kwargs):
+        sent.append(kwargs["content"])
+        return {"task_id": f"repair-{len(sent)}"}
+
+    monkeypatch.setattr(DataAgentClient, "download", download)
+    monkeypatch.setattr(DataAgentClient, "upload", upload)
+    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
+    task_id = TASK_ID
+    for used in range(local_used, 3):
+        current_used = used
+        state = reconcile(client, session["id"], task_id)
+        assert state == ("" if used < 2 else "failed_permanent")
+        if used < 2:
+            after = row(client, session["id"])
+            assert after.run_manifest_json["repair_used"] == used + 1
+            assert contexts[-1]["execution"]["repair_used"] == used + 1
+            assert contexts[-1]["run"]["run_token"] == after.dataagent_run_token
+            assert contexts[-2]["draft"] == session["draft"]
+            assert contexts[-1]["context_file"].endswith(
+                f"{after.dataagent_run_token}.json"
+            )
+            assert contexts[-1]["schema_file"] == "inputs/schema.json"
+            assert contexts[-1]["result_file"].endswith(f"{after.dataagent_run_token}.json")
+            assert contexts[-1]["needs_input_file"] in sent[-1]
+            assert contexts[-1]["run"]["source_draft_sha256"] not in sent[-1]
+            task_id = after.dataagent_task_id
+            with client.app.state.session_factory() as db:
+                db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
+                db.commit()
+    assert len(sent) == 2 - local_used
+    assert row(client, session["id"]).draft_json == session["draft"]
+    assert stored(client, session["id"])[0][-1].status == "failed"
+
+
+@pytest.mark.parametrize(
+    "ledger",
+    [
+        None,
+        {"used": 0, "run_token": "old", "result_sha256": "a" * 64},
+        {"used": 3, "run_token": RUN_TOKEN, "result_sha256": "a" * 64},
+    ],
+)
+def test_missing_stale_or_exhausted_budget_cannot_trigger_deliver(
+    client, monkeypatch, ledger
+):
+    session, manifest = proposals_run(client)
+    manifest.update(repair_used=0, repair_budget_required=True)
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
+        db.commit()
+    install_download(
+        monkeypatch,
+        [result(manifest, []), DataAgentError("missing", status_code=404), ledger],
+    )
+
+    async def forbidden(self, **kwargs):
+        pytest.fail("计数失效不得自动调用模型")
+
+    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
+    assert reconcile(client, session["id"]) == "failed_permanent"
+    assert (
+        stored(client, session["id"])[0][-1].error_json["code"] == "REPAIR_BUDGET_INVALID"
+    )
+
+
+@pytest.mark.parametrize("transient", [False, True])
+def test_valid_budget_acceptance_and_transient_ledger_download(
+    client, monkeypatch, transient
+):
+    import hashlib
+
+    session, manifest = proposals_run(client)
+    manifest.update(repair_used=0, repair_budget_required=True)
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
+        db.commit()
+    content = json.dumps(
+        result(manifest, some_items(session["draft"])), ensure_ascii=False
+    ).encode()
+    ledger = {
+        "run_token": RUN_TOKEN,
+        "used": 2,
+        "result_sha256": hashlib.sha256(content).hexdigest(),
+    }
+    missing = DataAgentError("missing", status_code=404)
+    values = [content, missing, ledger]
+    if transient:
+        values = [content, missing, DataAgentError("暂态故障", status_code=503), *values]
+    paths = install_download(monkeypatch, values)
+
+    async def forbidden(self, **kwargs):
+        pytest.fail("有效结果或暂态下载不应请求模型")
+
+    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
+    if transient:
+        assert reconcile(client, session["id"]) == "failed_retriable"
+    assert reconcile(client, session["id"]) == "done"
+    assert len(paths) == (6 if transient else 3)
+    assert len(stored(client, session["id"])[1]) == 3

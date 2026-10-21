@@ -1,0 +1,81 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "e9e8f7d53cb72d52c8e863e7610e231320ab75058991aa580518727876acc1e7"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [
+      {
+        "id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
+        "name": "staff",
+        "display_name": "云帆员工",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "ad90d83c-75fe-5039-a87b-4aff9c675b37",
+        "owner_type_id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
+        "name": "staff_name",
+        "display_name": null,
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [],
+    "rules": [],
+    "metrics": [],
+    "datasets": [],
+    "mappings": [],
+    "material_objects": [
+      {
+        "id": "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34",
+        "type_id": "5976dd92-f3af-5662-bf15-fa58ce5b18c7",
+        "values": {
+          "staff_name": "小岚"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "7239caac-0a20-5af3-9fde-bf4d89ff39eb",
+            "material_id": "11111111-1111-4111-8111-111111111111",
+            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "locator": {
+              "heading": null,
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "云帆商贸的小岚向小舟汇报。"
+          }
+        ]
+      }
+    ],
+    "material_links": [],
+    "value_types": []
+  },
+  "element_hashes": {
+    "5976dd92-f3af-5662-bf15-fa58ce5b18c7": "df73606f27cdffefebcd6f3a7422ec133a99b2bc02a471b08bd75c67022ab30e",
+    "ad90d83c-75fe-5039-a87b-4aff9c675b37": "73c1b81f3609c6460431f5e762978269d5d258ba3ba6d9e5269351a507d81419",
+    "b62aa9e4-12f0-51ab-bb98-f343a7cc0c34": "78ec1387bbf43bfd775a46ea89e2d5dadbd5cfb806326918264b07ca2a5e6c86"
+  }
+}

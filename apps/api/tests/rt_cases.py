@@ -77,7 +77,11 @@ SYNTHETIC_ROUNDTRIPS = (
         },
         {
             "/ontology_mappings/0/semantic_model/datasets/3/fields/4/name": "RT-40",
+            "/ontology_mappings/0/semantic_model/datasets/3/fields/4/ai_context": "RT-46",
             "/ontology_mappings/0/semantic_model/datasets/3/fields/5/name": "RT-40",
+            # Export now derives datatype from the property type (DS-09).
+            "/ontology_mappings/0/semantic_model/datasets/3/fields/4/datatype": "DS-09",
+            "/ontology_mappings/0/semantic_model/datasets/3/fields/5/datatype": "DS-09",
             "/ontology_mappings/0/semantic_model/metrics/0/expression/dialects/0/expression": "RT-47",
             "/ontology_mappings/0/semantic_model/metrics/1/expression/dialects/0/expression": "RT-47",
         },

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from uuid import uuid4
 
+from dataset_binding import bind_datasets
 from test_modeling import ROOT, create_session, save
 
 from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, RunContext, parse_result
@@ -92,16 +93,14 @@ def chain(session: dict) -> list[dict]:
     """Object type → property → link type: a three-level dependency group."""
     supplier = session["draft"]["object_types"][0]["id"]
     return [
-        create(
-            "po", "object_type", {"name": "采购订单", "technical_name": "purchase_order"}
-        ),
+        create("po", "object_type", {"display_name": "采购订单", "name": "purchase_order"}),
         create(
             "po-no",
             "property",
             {
                 "owner_type_id": {"client_ref": "po"},
-                "name": "订单号",
-                "technical_name": "order_no",
+                "display_name": "订单号",
+                "name": "order_no",
             },
         ),
         create(
@@ -196,8 +195,8 @@ def test_dependencies_must_be_accepted_together(client):
     )
     assert together.status_code == 200, together.text
     draft = together.json()["session"]["draft"]
-    assert {t["technical_name"] for t in draft["object_types"]} >= {"purchase_order"}
-    assert any(p["technical_name"] == "order_no" for p in draft["properties"])
+    assert {t["name"] for t in draft["object_types"]} >= {"purchase_order"}
+    assert any(p["name"] == "order_no" for p in draft["properties"])
     assert any(link["name"] == "supplied_by" for link in draft["link_types"])
 
 
@@ -251,10 +250,10 @@ def test_a_stale_item_cannot_be_accepted_until_its_target_is_back(client):
 def test_an_accept_that_breaks_the_draft_changes_nothing(client):
     session = create_session(client)
     proposal = create(
-        "dup", "object_type", {"name": "新增对象", "technical_name": "new_object"}
+        "dup", "object_type", {"display_name": "新增对象", "name": "new_object"}
     )
     (item,) = seed_batch(client, session, [proposal])["items"]
-    session["draft"]["object_types"][0]["technical_name"] = "new_object"
+    session["draft"]["object_types"][0]["name"] = "new_object"
     session = save(client, session, session["draft"]).json()
     response = decide(client, session, [(item["id"], "accept")])
     assert response.status_code == 422
@@ -267,7 +266,7 @@ def test_an_id_registered_as_another_kind_cannot_be_created(client):
     (item,) = seed_batch(
         client,
         session,
-        [create("t", "object_type", {"name": "新类型", "technical_name": "fresh"})],
+        [create("t", "object_type", {"display_name": "新类型", "name": "fresh"})],
     )["items"]
     with client.app.state.session_factory() as db:
         db.add(
@@ -356,6 +355,8 @@ def test_mapping_with_reference_named_properties_can_be_accepted(client):
 
     session = create_session(client)
     items = mapping_name_collision_items()
+    # Accepting a dataset needs a bound, registered source (DS-07).
+    bind_datasets(client, {"datasets": [i["after"] for i in items if i["target_kind"] == "dataset"]})
     batch = seed_batch(client, session, items)
     response = decide(client, session, [(item["id"], "accept") for item in batch["items"]])
     assert response.status_code == 200, response.text
@@ -377,8 +378,8 @@ def test_document_proposal_labels_use_candidate_titles_and_endpoints(client):
                 "staff",
                 "object_type",
                 {
-                    "name": "星港员工",
-                    "technical_name": "starport_staff",
+                    "display_name": "星港员工",
+                    "name": "starport_staff",
                     "title_property_id": {"client_ref": "title"},
                 },
             ),
@@ -387,8 +388,8 @@ def test_document_proposal_labels_use_candidate_titles_and_endpoints(client):
                 "property",
                 {
                     "owner_type_id": {"client_ref": "staff"},
-                    "name": "姓名",
-                    "technical_name": "staff_name",
+                    "display_name": "姓名",
+                    "name": "staff_name",
                 },
             ),
             create(

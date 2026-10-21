@@ -123,10 +123,12 @@ def export_metrics(writer):
                     "dropped",
                     "MetricTime",
                     "RT-60",
-                    "时间字段写入指标说明，不能从说明机械恢复结构",
+                    "时间字段写入指标说明和扩展文件；导入扩展包时恢复，单独的 Ossie 文件中不保留结构",
                     element=metric,
                 )
-            value = {"name": metric.technical_name, "expression": writer.expression(text)}
+            value = {"name": metric.name, "expression": writer.expression(text)}
+            if metric.synonyms:
+                value["ai_context"] = {"synonyms": metric.synonyms}
             if description:
                 value["description"] = description
             if isinstance(metric, ExpressionMetric) and metric.value_kind:

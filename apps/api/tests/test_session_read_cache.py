@@ -49,7 +49,7 @@ def test_a_new_revision_recomputes_every_derived_part(client, monkeypatch):
 
     draft = before["draft"]
     target = draft["object_types"][0]
-    target["name"] = "改名后的实体"
+    target["display_name"] = "改名后的实体"
     saved = save(client, before, draft)
     assert saved.status_code == 200, saved.text
     after = _read(client, session["id"])

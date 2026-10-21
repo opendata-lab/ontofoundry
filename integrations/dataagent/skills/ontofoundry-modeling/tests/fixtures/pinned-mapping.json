@@ -1,0 +1,156 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "744704381a1d6c2882437d1bb46c7a306fd34eccd651dc58a6c4b63b37db6748"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [
+      {
+        "id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
+        "name": "order",
+        "display_name": "云帆订单",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "3ef162e2-91a2-531e-a3de-6f8acc86f2aa",
+        "owner_type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
+        "name": "region",
+        "display_name": null,
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "4da2c71f-77b6-508e-b0d9-90e0879bbfb6",
+        "owner_type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
+        "name": "order_no",
+        "display_name": null,
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      },
+      {
+        "id": "551bde02-6af3-5d1c-b582-41cddfb77ca8",
+        "owner_type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
+        "name": "member_no",
+        "display_name": null,
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [],
+    "rules": [],
+    "metrics": [],
+    "datasets": [
+      {
+        "id": "8836c879-377f-5cd1-9040-711707a5896d",
+        "name": "yunfan_order_lines",
+        "display_name": "云帆订单明细",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": null,
+        "table_name": "demo_orders",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "region",
+            "physical_type": "text",
+            "comment": ""
+          },
+          {
+            "name": "order_no",
+            "physical_type": "text",
+            "comment": ""
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": ""
+          }
+        ]
+      }
+    ],
+    "mappings": [
+      {
+        "id": "f1b248ca-e610-53f3-b7c4-db9ba272eeb3",
+        "type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "8836c879-377f-5cd1-9040-711707a5896d",
+            "key_columns": [
+              "region",
+              "order_no"
+            ]
+          }
+        ],
+        "fields": {
+          "region": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "region"
+          },
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "member_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_no"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    ],
+    "material_objects": [],
+    "material_links": [],
+    "value_types": []
+  },
+  "element_hashes": {
+    "74e49f86-cc5f-51fe-b6c2-2438068967f6": "4a669a7ad314244ca7273330103d0f925a3cd8ea29e42eef4f603fd76b6b7f33",
+    "3ef162e2-91a2-531e-a3de-6f8acc86f2aa": "3b7066c31d015271c42f2aa33bace8aee64cca977cd000a5062f6084370903c9",
+    "4da2c71f-77b6-508e-b0d9-90e0879bbfb6": "29867c7a4ca33ab3a7440c7f70fc6d83ba0f525f87e9726ff8d5e56ecec0c843",
+    "551bde02-6af3-5d1c-b582-41cddfb77ca8": "c75b8a593dab009084c222c215cf4ea173f708638cd12011eb1d79796ac29608",
+    "8836c879-377f-5cd1-9040-711707a5896d": "7f4134ee4aab8235d37968b2b1bf60d343d31eeaac678257d18fc2e4362b3ab6",
+    "f1b248ca-e610-53f3-b7c4-db9ba272eeb3": "090360e3ccb11481da196703ef2cb047a4702283f9b0a6020a160d82b16d17ab"
+  }
+}

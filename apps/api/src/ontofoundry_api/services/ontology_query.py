@@ -149,7 +149,7 @@ def relationship_binding_status(
             def property_columns(binding, property_ids):
                 for identity in property_ids:
                     prop = index.properties.get(identity)
-                    field = binding.fields.get(prop.technical_name) if prop else None
+                    field = binding.fields.get(prop.name) if prop else None
                     if not field_column(binding, field):
                         return False
                 return True
@@ -236,8 +236,8 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
                 else None,
                 "binding_status": status,
             }
-            if mappings and prop.technical_name in binding.fields:
-                b = binding.fields[prop.technical_name]
+            if mappings and prop.name in binding.fields:
+                b = binding.fields[prop.name]
                 p["binding"] = b.model_dump(mode="json")
                 if b.kind == "column":
                     ds = index.datasets[binding.sources[b.source_id].dataset_id]
@@ -292,7 +292,7 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
                 for r in index.effective_rules(obj.id)
             ],
             "child_types": [
-                {"id": str(o.id), "name": o.name, "technical_name": o.technical_name}
+                {"id": str(o.id), "display_name": o.display_name, "name": o.name}
                 for o in index.children(obj.id)
             ],
             "binding_status": status,
@@ -329,7 +329,7 @@ def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspac
             definition = {
                 k: v
                 for k, v in dump(metric).items()
-                if k in {"id", "name", "technical_name", "description", "synonyms"}
+                if k in {"id", "display_name", "name", "description", "synonyms"}
             }
             definition["binding_status"] = "forbidden"
         items.append({"kind": "metric", "definition": definition})
@@ -374,8 +374,8 @@ def search_types(
             or any(
                 query in str(item["definition"].get(k, "")).casefold()
                 for k in (
+                    "display_name",
                     "name",
-                    "technical_name",
                     "description",
                     "synonyms",
                     "source_role_name",
@@ -408,9 +408,7 @@ def get_type(
         found = [
             i
             for i in items
-            if i["definition"]
-            .get("technical_name", i["definition"].get("name", ""))
-            .casefold()
+            if i["definition"].get("name", "").casefold()
             == type_id.casefold()
         ]
     if not found:
@@ -428,8 +426,8 @@ def _all_graph(snapshot):
         {
             "id": o["id"],
             "kind": "object_type",
-            "label": o["name"],
-            "technical_name": o["technical_name"],
+            "label": o.get("display_name") or o["name"],
+            "name": o["name"],
             "description": o["description"],
             "tags": o["tags"],
         }
@@ -440,8 +438,8 @@ def _all_graph(snapshot):
             "id": link_view["id"],
             "kind": "link_type",
             "link_type_id": link_view["id"],
-            "label": link_view["name"],
-            "technical_name": link_view["name"],
+            "label": link_view.get("display_name") or link_view["name"],
+            "name": link_view["name"],
             "source": link_view["source_type_id"],
             "target": link_view["target_type_id"],
             "multiplicity": link_view["multiplicity"],
@@ -455,7 +453,7 @@ def _all_graph(snapshot):
             "id": "extends:" + o["id"],
             "kind": "extends",
             "label": "继承",
-            "technical_name": "extends",
+            "name": "extends",
             "source": o["id"],
             "target": o["extends"],
         }

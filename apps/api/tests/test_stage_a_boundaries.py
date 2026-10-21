@@ -1,16 +1,15 @@
 """Metadata drift retention and typed source keys are independent of compatibility models."""
 
 import pytest
-from fastapi import HTTPException
 
-from ontofoundry_api.api import assets
-from ontofoundry_api.api.assets import (
+from ontofoundry_api.services import metadata_sync
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.instance_plan import key_values
+from ontofoundry_api.services.metadata_sync import (
     merge_structure,
     previous_selection,
     retain_schema_changes,
 )
-from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.instance_plan import key_values
 
 
 def test_repeated_refresh_retains_unresolved_drift():
@@ -38,7 +37,7 @@ def test_selected_refresh_replaces_only_named_tables():
     assert previous_selection(previous, None) is previous
 
 
-def test_selected_refresh_bypasses_the_table_cap(monkeypatch):
+def test_structure_reads_have_no_table_cap_and_selected_reads_only_selected(monkeypatch):
     class Inspector:
         def get_table_names(self, schema=None):
             return [f"fictional_{i}" for i in range(250)]
@@ -46,19 +45,25 @@ def test_selected_refresh_bypasses_the_table_cap(monkeypatch):
         def get_view_names(self, schema=None):
             return []
 
+        def has_table(self, name, schema=None):
+            return True
+
         def get_pk_constraint(self, name, schema=None):
             return {"constrained_columns": []}
 
         def get_table_comment(self, name, schema=None):
             return {"text": None}
 
+        def get_foreign_keys(self, name, schema=None):
+            return []
+
         def get_columns(self, name, schema=None):
             return [{"name": "id", "type": "int", "nullable": False, "comment": None}]
 
-    monkeypatch.setattr(assets, "inspect", lambda connection: Inspector())
-    with pytest.raises(HTTPException):
-        assets.read_structure(object(), None)
-    observed = assets.read_structure(object(), None, ["fictional_7"])
+    monkeypatch.setattr(metadata_sync, "inspect", lambda connection: Inspector())
+    # Full syncs run as batched background jobs, so a large schema is no longer refused.
+    assert len(metadata_sync.read_structure(object(), None)["tables"]) == 250
+    observed = metadata_sync.read_structure(object(), None, ["fictional_7"])
     assert [table["name"] for table in observed["tables"]] == ["fictional_7"]
 
 

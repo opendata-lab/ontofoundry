@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from core1_fixtures import EXAMPLES_DIR, example_names
+from dataset_binding import bind_datasets
 from sqlalchemy import select
 from test_core1_ossie_import import dataset, document, entity, expression, ontology_map
 
@@ -67,7 +68,34 @@ def batch(client, wid, result):
     return response.json()
 
 
+def _changes(client, import_id):
+    with client.app.state.session_factory() as db:
+        record = db.get(ImportRecord, import_id)
+        return [
+            (c["target_kind"], c.get("field_changes") or c.get("after"))
+            for c in record.preview_json["changes"]
+        ]
+
+
+def bind_imported_datasets(client, wid, result):
+    """Pick a registered connection for unbound dataset proposals, as a reviewer would."""
+    for item in batch(client, wid, result)["items"]:
+        after = item.get("after")
+        if item["status"] != "pending" or item["target_kind"] != "dataset" or not after:
+            continue
+        if after.get("connection_id") or after.get("source_kind", "table") != "table":
+            continue
+        dataset = bind_datasets(client, {"datasets": [dict(after)]}, wid)["datasets"][0]
+        current = session(client, wid, result["session_id"])
+        response = client.put(
+            f"/api/v1/workspaces/{wid}/sessions/{result['session_id']}/proposals/{item['id']}/dataset",
+            json={"dataset": dataset, "expected_session_revision": current["revision"]},
+        )
+        assert response.status_code == 200, response.text
+
+
 def accept(client, wid, result):
+    bind_imported_datasets(client, wid, result)
     current = session(client, wid, result["session_id"])
     items = batch(client, wid, result)["items"]
     if not items:
@@ -184,7 +212,7 @@ def test_thirteen_native_files_preview_confirm_review_publish(client, space, nam
     again = preview(client, space, raw)
     assert (
         not again["proposal_summary"]["create"] and not again["proposal_summary"]["update"]
-    )
+    ), _changes(client, again["import_id"])
     reopened = client.get(import_root(space) + "/" + p["import_id"]).json()
     assert reopened["report"] == p["report"]
 
@@ -427,23 +455,24 @@ def test_correcting_conflicting_parent_unblocks_reverse_dependents_in_new_batch(
     from test_core1_import_matching import graph, object_type
 
     existing = object_type("alpha")
+    gamma = object_type("gamma")
     base_doc = {
         "format": "ontofoundry",
         "schema_version": "core-1",
         "exported_at": "2026-10-18T00:00:00Z",
-        "draft": graph(existing).model_dump(mode="json"),
+        "draft": graph(existing, gamma).model_dump(mode="json"),
     }
     initial = preview(client, space, json.dumps(base_doc).encode())
     first = confirm(client, space, initial).json()
     publish(client, space, accept(client, space, first))
-    new = {**object_type("gamma"), "name": "alpha"}
+    new = {**gamma, "name": "alpha"}
     source = graph(new).model_dump(mode="json")
     source["properties"] = [
         {
             "id": str(uuid4()),
             "owner_type_id": new["id"],
-            "name": "编号",
-            "technical_name": "code",
+            "display_name": "编号",
+            "name": "code",
             "value_kind": "string",
         }
     ]
@@ -453,7 +482,8 @@ def test_correcting_conflicting_parent_unblocks_reverse_dependents_in_new_batch(
     current = session(client, space, result["session_id"])
     issue = next(c for c in p["completion"] if c["source_path"] == "/draft/object_types/0")
     definition = json.loads(issue["original"])
-    definition["name"] = "伽马"
+    definition["name"] = "gamma"
+    definition["display_name"] = "伽马"
     response = client.post(
         import_root(space) + f"/{p['import_id']}/completions",
         json={

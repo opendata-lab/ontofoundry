@@ -31,21 +31,21 @@ export function instanceCanvas(
   objects: InstanceNode[],
   links: InstanceEdge[],
   types: { id: string; name: string }[],
-  relations: Pick<LinkType, "id" | "name">[],
+  relations: Pick<LinkType, "id" | "name" | "display_name">[],
 ): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = objects.map((o) => ({
     id: o.id,
     kind: "object_type",
     label: o.display_text,
-    technical_name: types.find((t) => t.id === o.type_id)?.name ?? "",
+    name: types.find((t) => t.id === o.type_id)?.name ?? "",
     description: "实例",
     tags: [],
   }));
   const edges: GraphEdge[] = links.map((link) => ({
     id: link.id,
     kind: "link_type",
-    label: relations.find((r) => r.id === link.type_id)?.name ?? "关系",
-    technical_name: "instance",
+    label: relations.find((r) => r.id === link.type_id)?.display_name || relations.find((r) => r.id === link.type_id)?.name || "关系",
+    name: "instance",
     source: link.source_id,
     target: link.target_id,
     link_type_id: link.type_id,

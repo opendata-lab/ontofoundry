@@ -31,7 +31,7 @@ def delete(kind, element):
 def test_undo_restores_element_and_records_a_replayable_decision(client, operation):
     session = create_session(client)
     proposal = create(
-        "undo", "object_type", {"name": "可撤销实体", "technical_name": "undo_type"}
+        "undo", "object_type", {"display_name": "可撤销实体", "name": "undo_type"}
     )
     if operation != "create":
         session, first = accepted(client, session, [proposal])
@@ -184,8 +184,8 @@ def test_undo_validates_the_whole_draft_before_writing(client):
                 "later",
                 "property",
                 {
-                    "name": "后续属性",
-                    "technical_name": "later_property",
+                    "display_name": "后续属性",
+                    "name": "later_property",
                     "owner_type_id": root["target_id"],
                 },
             )
@@ -227,8 +227,8 @@ def test_rule_undo_preserves_stable_id_without_legacy_owner_history(client):
                 "rule",
                 "rule",
                 {
-                    "name": "规则",
-                    "technical_name": "rule",
+                    "display_name": "规则",
+                    "name": "rule",
                     "expression": "true",
                     "owner_kind": "object_type",
                     "owner_id": owner_id,

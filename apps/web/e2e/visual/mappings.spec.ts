@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { mockMappingsApi, WORKSPACE_ID } from "./fixtures";
 
 test.describe("MappingsPage visual consistency", () => {
-  test("datasets tab matches visual baseline", async ({ page }) => {
+  test("data tables tab lists registered tables and their state", async ({ page }) => {
     const antdDeprecations: string[] = [];
     const pageErrors: string[] = [];
     page.on("pageerror", (err) => pageErrors.push(err.message));
@@ -17,13 +17,13 @@ test.describe("MappingsPage visual consistency", () => {
     await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
 
     await expect(page.getByRole("heading", { name: "数据管理" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "parties" })).toBeVisible();
-    await expect(page.getByText("每日 · stat_date")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "parties", exact: true })).toBeVisible();
+    await expect(page.getByText("当前不可见或不存在")).toBeVisible();
     await page.evaluate(() => document.fonts.ready);
 
     expect(pageErrors).toEqual([]);
     expect(antdDeprecations).toEqual([]);
-    await expect(page).toHaveScreenshot("mappings-datasets.png", { fullPage: true });
+    await expect(page).toHaveScreenshot("mappings-tables.png", { fullPage: true });
   });
 
   test("object mapping details preserve virtual, partial and unbound states", async ({ page }) => {

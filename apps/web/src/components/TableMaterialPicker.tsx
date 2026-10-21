@@ -1,190 +1,98 @@
-import { Alert, Button, Checkbox, Empty, Input, Modal, Select, Spin, Typography } from "antd";
-import { Database, Table2 } from "lucide-react";
+import { Alert, Button, Checkbox, Empty, Input, Modal, Typography } from "antd";
+import { Database } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { catalogApi } from "../api/client";
-import type { DataConnection, DataTable, Material } from "../api/types";
-import { PanelToolbar, SectionTitle } from "./layout";
-import { HintIcon } from "./HintIcon";
+import { datasetApi } from "../api/client";
+import type { LinkedTable, RegisteredTable } from "../api/types";
+import { tableKey, tableLabel } from "../lib/linkedTables";
 
-const { Text } = Typography;
 
-const HINT =
-  "读取所选表的字段、主键、样例值和关联字段，生成一份结构说明加入材料；开始建模后由智能体提出业务对象、数据映射和关系。";
-
-/**
- * Bottom-up modeling input. The chosen tables are described server-side
- * (columns, keys, samples, join hints) as a Markdown material, which the run
- * reads like any document and answers with objects, mappings and joins.
- * Tables are picked in a dialog: a real database has far more tables than the
- * side panel can list.
- */
-export function TableMaterialPicker({
-  workspaceId,
-  disabled,
-  onMaterial,
-}: {
+/** Links registered tables to a modeling session; only synced tables can be used. */
+export function TableMaterialPicker({ workspaceId, sessionId, linked, disabled, onLink }: {
   workspaceId: string;
+  sessionId?: string;
+  linked: LinkedTable[];
   disabled: boolean;
-  onMaterial: (material: Material) => Promise<void>;
+  onLink: (tables: LinkedTable[]) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const [connections, setConnections] = useState<DataConnection[] | null>(null);
-  const [connectionId, setConnectionId] = useState("");
-  const [tables, setTables] = useState<DataTable[] | null>(null);
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [tables, setTables] = useState<RegisteredTable[]>();
+  const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // A string key keeps a fresh `linked` array from resetting the user's choice.
+  const linkedKeys = linked.map(tableKey).join("\n");
   useEffect(() => {
-    catalogApi
-      .connections(workspaceId)
-      .then((r) => {
-        setConnections(r.items);
-        if (r.items.length === 1) setConnectionId(r.items[0].id);
-      })
-      .catch((e: Error) => setError(e.message));
-  }, [workspaceId]);
-  useEffect(() => {
-    setTables(null);
-    setChosen([]);
-    if (!connectionId) return;
-    let active = true;
-    catalogApi
-      .tables(workspaceId, connectionId)
-      .then((r) => active && setTables(r.items))
-      .catch((e: Error) => active && setError(e.message));
-    return () => {
-      active = false;
-    };
-  }, [workspaceId, connectionId]);
-  if (connections && !connections.length)
-    return (
-      <div className="flex flex-col items-start gap-2">
-        <SectionTitle title="还没有数据连接" />
-        <Link to="../connections">
-          <Button size="small" icon={<Database size={14} />}>
-            新增数据连接
-          </Button>
-        </Link>
-      </div>
-    );
-  const needle = query.trim().toLowerCase();
-  const visible = (tables ?? []).filter((t) => !needle || `${t.schema ?? ""}.${t.name}`.toLowerCase().includes(needle));
-  const toggle = (name: string) => setChosen((c) => (c.includes(name) ? c.filter((n) => n !== name) : [...c, name]));
-  const close = () => {
-    setOpen(false);
-    setQuery("");
-  };
-  const generate = async () => {
+    if (!open) return;
+    let live = true;
+    setTables(undefined);
+    setError("");
+    setSelected(linkedKeys ? linkedKeys.split("\n") : []);
+    datasetApi.registeredTables(workspaceId, sessionId)
+      .then((result) => { if (live) setTables(result.items); })
+      .catch((e: Error) => { if (live) { setTables([]); setError(e.message); } });
+    return () => { live = false; };
+  }, [open, workspaceId, sessionId, linkedKeys]);
+  const words = query.trim().toLowerCase();
+  const visible = (tables ?? []).filter((t) => `${t.connection_name} ${tableLabel(t)} ${t.comment}`.toLowerCase().includes(words));
+  const save = async () => {
     setBusy(true);
     setError("");
     try {
-      const material = await catalogApi.tableMaterial(workspaceId, connectionId, chosen);
-      await onMaterial(material);
-      setChosen([]);
-      close();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "读取数据表失败");
+      const byKey = new Map((tables ?? []).map((t) => [tableKey(t), t]));
+      await onLink(selected.flatMap((key) => {
+        const t = byKey.get(key);
+        return t ? [{ connection_id: t.connection_id, schema_name: t.schema_name, table_name: t.table_name }] : [];
+      }));
+      setOpen(false);
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : "关联数据表失败");
     } finally {
       setBusy(false);
     }
   };
   return (
-    <div className="flex items-center gap-2">
-      <Button icon={<Database size={15} />} disabled={disabled || !connections} onClick={() => setOpen(true)}>
-        选择数据表…
-      </Button>
-      <HintIcon text={HINT} />
+    <>
+      <Button icon={<Database size={15} />} disabled={disabled} onClick={() => setOpen(true)}>选择数据表…</Button>
       <Modal
         open={open}
-        title="选择业务数据表"
-        width="var(--review-dialog-width)"
-        onCancel={() => !busy && close()}
-        closable={{ "aria-label": "关闭选择数据表" }}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button onClick={close} disabled={busy}>
-              取消
-            </Button>
-            <Button type="primary" disabled={!chosen.length} loading={busy} onClick={() => void generate()}>
-              {busy ? "正在读取表结构…" : `加入建模材料${chosen.length ? `（${chosen.length} 张表）` : ""}`}
-            </Button>
-          </div>
-        }
+        title="关联数据表"
+        onCancel={() => !busy && setOpen(false)}
+        okText="关联到会话"
+        cancelText="取消"
+        okButtonProps={{ loading: busy, disabled: tables === undefined }}
+        onOk={() => void save()}
       >
         <div className="flex flex-col gap-3">
-          <PanelToolbar className="px-0">
-            <Select
-              size="small"
-              aria-label="数据连接"
-              className="w-52 flex-none"
-              placeholder="选择数据连接"
-              value={connectionId || undefined}
-              disabled={busy}
-              options={(connections ?? []).map((c) => ({ value: c.id, label: c.name }))}
-              onChange={setConnectionId}
-            />
-            <Input.Search
-              size="small"
-              allowClear
-              aria-label="搜索数据表"
-              placeholder="搜索表名"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </PanelToolbar>
-          {connectionId && (
-            <div className="flex items-center gap-2">
-              <Text type="secondary" className="text-xs">
-                已选 {chosen.length} / 共 {tables?.length ?? 0} 张表
-              </Text>
-              <Button
-                size="small"
-                type="link"
-                disabled={!visible.length || busy}
-                onClick={() => setChosen((c) => [...new Set([...c, ...visible.map((t) => t.name)])])}
-              >
-                全选筛选结果
-              </Button>
-              <Button size="small" type="link" disabled={!chosen.length || busy} onClick={() => setChosen([])}>
-                清空
-              </Button>
-            </div>
+          <Typography.Text type="secondary">只能使用已在数据管理中同步的表和视图；建模助手会在这些表上提议数据集。</Typography.Text>
+          <Input.Search aria-label="搜索数据表" placeholder="连接、表名或注释" value={query} onChange={(e) => setQuery(e.target.value)} />
+          {tables !== undefined && !tables.length && !error && (
+            <Empty description={<span>还没有已同步的数据表，请先到 <Link to={`/workspaces/${workspaceId}/mappings`}>数据管理</Link> 同步</span>} />
           )}
-          <div className="flex max-h-review-code flex-col gap-1 overflow-auto" role="group" aria-label="选择数据表">
-            {!connectionId && <Text type="secondary">先选择数据连接</Text>}
-            {connectionId && !tables && <Spin />}
-            {tables && !visible.length && <Empty description="没有匹配的数据表" />}
-            {visible.map((t) => {
-              const keys = t.columns.filter((c) => c.primary_key).map((c) => c.name);
-              return (
-                <Checkbox
-                  key={`${t.schema ?? ""}.${t.name}`}
-                  aria-label={t.name}
-                  checked={chosen.includes(t.name)}
-                  disabled={busy}
-                  onChange={() => toggle(t.name)}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <Table2 size={14} aria-hidden="true" />
-                    <span>{t.name}</span>
-                    {/* The list endpoint may omit columns; never show a misleading "0 列". */}
-                    {(t.schema || t.columns.length > 0) && (
-                      <Text type="secondary" className="text-xs">
-                        {[t.schema, t.columns.length ? `${t.columns.length} 列` : "", keys.length ? `主键 ${keys.join(", ")}` : ""]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </Text>
-                    )}
+          {!!tables?.length && !visible.length && <Empty description="没有匹配的数据表" />}
+          {!!visible.length && (
+            <Checkbox.Group
+              className="flex max-h-review-code flex-col gap-2 overflow-auto"
+              value={selected}
+              onChange={(keys) => setSelected(keys as string[])}
+              options={visible.map((t) => ({
+                value: tableKey(t),
+                label: (
+                  <span className="inline-flex min-w-0 items-center gap-2 text-sm">
+                    <span className="truncate" title={tableLabel(t)}>{tableLabel(t)}</span>
+                    <Typography.Text type="secondary" className="text-xs">
+                      {t.connection_name} · {t.column_count} 列{t.kind === "view" ? " · 视图" : ""}
+                      {t.datasets.length ? ` · 已有数据集 ${t.datasets.map((d) => d.display_name || d.name).join("、")}` : ""}
+                    </Typography.Text>
                   </span>
-                </Checkbox>
-              );
-            })}
-          </div>
+                ),
+              }))}
+            />
+          )}
           {error && <Alert type="error" showIcon message={error} />}
         </div>
       </Modal>
-    </div>
+    </>
   );
 }

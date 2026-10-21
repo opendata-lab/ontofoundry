@@ -24,7 +24,7 @@ function item(overrides: Partial<ProposalItem> = {}): ProposalItem {
     display_name: "对象",
     owner_label: null,
     before: null,
-    after: element({ name: "对象", technical_name: id }),
+    after: element({ display_name: "对象", name: id }),
     field_changes: [],
     evidence: [],
     reason: "",
@@ -51,13 +51,13 @@ const evidence = {
   quote: "供应商名称以材料为准",
 };
 const items = [
-  item({ id: "po", display_name: "采购订单", after: element({ name: "采购订单", technical_name: "purchase_order" }) }),
+  item({ id: "po", display_name: "采购订单", after: element({ display_name: "采购订单", name: "purchase_order" }) }),
   item({
     id: "no",
     target_kind: "property",
     display_name: "订单号",
     owner_label: "采购订单",
-    after: element({ name: "订单号", technical_name: "order_no", owner_type_id: "target-po" }),
+    after: element({ display_name: "订单号", name: "order_no", owner_type_id: "target-po" }),
     depends_on: ["po"],
     dependency_group: ["no", "po"],
   }),
@@ -65,12 +65,12 @@ const items = [
     id: "upd",
     operation: "update",
     display_name: "供应商",
-    before: element({ name: "旧供应商名称", technical_name: "supplier" }),
-    after: element({ name: "供应商", technical_name: "supplier" }),
+    before: element({ display_name: "旧供应商名称", name: "supplier" }),
+    after: element({ display_name: "供应商", name: "supplier" }),
     field_changes: [{ path: "name", before: "旧供应商名称", after: "供应商" }],
     evidence: [evidence],
   }),
-  item({ id: "metric", target_kind: "metric", display_name: "订单数", after: element({ name: "订单数", technical_name: "order_count", kind: "simple" }) }),
+  item({ id: "metric", target_kind: "metric", display_name: "订单数", after: element({ display_name: "订单数", name: "order_count", kind: "simple" }) }),
   item({ id: "old", operation: "update", display_name: "物料", status: "stale", status_reason: "目标在提案生成后已被修改" }),
   item({ id: "gone", display_name: "旧提案", status: "rejected", stored_status: "rejected" }),
 ];
@@ -91,6 +91,7 @@ function state(extra: Partial<ProposalsState> = {}): ProposalsState {
     batches: [batch()],
     selected: "b",
     select: vi.fn(),
+    reviseDataset: vi.fn(),
     detail: batch(),
     error: "",
     itemErrors: {},
@@ -166,7 +167,7 @@ describe("proposal review", () => {
 
   it("opens the detail with names instead of ids (including document facts), evidence and linked dependency count", () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     const fact0 = draft.material_objects[0];
     const fact1 = draft.material_objects[1];
     const link = draft.link_types[0];
@@ -182,7 +183,7 @@ describe("proposal review", () => {
     expect(within(row("文档关系")).getByText("联动 1 项")).toBeInTheDocument();
     fireEvent.click(row("文档关系"));
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(link.name)).toBeInTheDocument();
+    expect(within(dialog).getByText((link.display_name || link.name))).toBeInTheDocument();
     expect(within(dialog).getByText("C001")).toBeInTheDocument();
     expect(within(dialog).getByText("1 项")).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "采购订单" })).toBeInTheDocument();

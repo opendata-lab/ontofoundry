@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import pytest
 from core1_fixtures import example_draft
+from dataset_binding import _register
 from sqlalchemy.engine import make_url
 
 from ontofoundry_api.db_models import ConnectionRecord
@@ -21,7 +22,9 @@ def test_unsaved_ratio_aggregates_and_readonly_timeout_path(pg_client, percent_n
     app = pg_client.app
     url = make_url(app.state.settings.database_url)
     draft = example_draft("13-dataset-metrics")
+    connection_id = str(uuid4())
     for ds in draft.datasets:
+        ds.connection_id = connection_id
         ds.dialect = "postgresql"
         ds.schema_name = "public"
         if percent_names:
@@ -49,7 +52,7 @@ def test_unsaved_ratio_aggregates_and_readonly_timeout_path(pg_client, percent_n
     with app.state.session_factory() as db:
         db.add(
             ConnectionRecord(
-                id=str(uuid4()),
+                id=connection_id,
                 workspace_id=wid,
                 name="虚构测试连接",
                 kind="postgresql",
@@ -62,6 +65,10 @@ def test_unsaved_ratio_aggregates_and_readonly_timeout_path(pg_client, percent_n
                 secret_encrypted=url.password or "",
             )
         )
+        db.flush()
+        connection = db.get(ConnectionRecord, connection_id)
+        for dataset in draft.datasets:
+            _register(db, connection, dataset.schema_name, dataset.table_name, [column.model_dump() for column in dataset.columns or []])
         db.commit()
         metric = next(m for m in draft.metrics if m.kind == "ratio")
         result = execute_metric_preview(

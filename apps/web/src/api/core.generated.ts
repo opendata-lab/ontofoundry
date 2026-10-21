@@ -4,13 +4,17 @@ export type Columns = DatasetColumn[] | null
 export type Comment = string
 export type Name = string
 export type PhysicalType = string | null
+export type ConnectionId = string | null
 export type Description = string
 export type Dialect = string | null
+export type DisplayName = string | null
 export type Id = string
 export type Name1 = string
+export type QuerySql = string | null
 export type SchemaName = string | null
 export type SnapshotDateColumn = string | null
-export type TableName = string
+export type SourceKind = 'table' | 'query'
+export type TableName = string | null
 export type Datasets = Dataset[]
 export type DataJoin = (DirectJoin | MappingTableJoin) | null
 export type Kind = 'direct'
@@ -46,6 +50,7 @@ export type PropertyIds = [string, ...string[]]
 export type TargetColumns = [string, ...string[]]
 export type TargetKey = MappingKey | PropertiesKey
 export type Description1 = string
+export type DisplayName1 = string | null
 export type Id1 = string
 export type Kind4 = 'material'
 export type Heading = string | null
@@ -125,6 +130,7 @@ export type MaterialObjects = MaterialObject[]
 export type Aggregation = 'sum' | 'avg' | 'median' | 'min' | 'max' | 'count' | 'count_distinct'
 export type DatasetId2 = string
 export type Description2 = string
+export type DisplayName2 = string | null
 /**
  * @maxItems 50
  */
@@ -147,9 +153,9 @@ export type Name3 = string
  * @maxItems 50
  */
 export type Synonyms1 = string[]
-export type TechnicalName = string
 export type DenominatorId = string
 export type Description3 = string
+export type DisplayName3 = string | null
 /**
  * @maxItems 50
  */
@@ -162,9 +168,9 @@ export type NumeratorId = string
  * @maxItems 50
  */
 export type Synonyms2 = string[]
-export type TechnicalName1 = string
 export type DatasetId4 = string
 export type Description4 = string
+export type DisplayName4 = string | null
 /**
  * @maxItems 50
  */
@@ -177,7 +183,6 @@ export type Name5 = string
  * @maxItems 50
  */
 export type Synonyms3 = string[]
-export type TechnicalName2 = string
 /**
  * Ossie's seven built-in value types; core-1 adds no others.
  */
@@ -207,6 +212,7 @@ export type Kind12 = 'expression'
  */
 export type DerivedBy = (DerivedSimple | DerivedExpression)[]
 export type Description5 = string
+export type DisplayName5 = string | null
 /**
  * @maxItems 50
  */
@@ -222,10 +228,10 @@ export type Synonyms4 = string[]
  * @maxItems 50
  */
 export type Tags1 = string[]
-export type TechnicalName3 = string
 export type TitlePropertyId = string | null
 export type ObjectTypes = ObjectType[]
 export type Description6 = string
+export type DisplayName6 = string | null
 /**
  * @maxItems 50
  */
@@ -239,10 +245,11 @@ export type Required = boolean
  * @maxItems 50
  */
 export type Synonyms5 = string[]
-export type TechnicalName4 = string
 export type Unique = boolean
+export type ValueTypeId = string | null
 export type Properties = Property[]
 export type Description7 = string
+export type DisplayName7 = string | null
 /**
  * @maxItems 50
  */
@@ -251,11 +258,19 @@ export type Expression3 = string
 export type Id13 = string
 export type Name8 = string
 export type OwnerId = string
-export type RuleOwnerKind = 'object_type' | 'property' | 'link_type'
+export type RuleOwnerKind = 'object_type' | 'property' | 'link_type' | 'value_type'
 export type RuleKind = 'constraint' | 'derivation'
-export type TechnicalName5 = string
 export type Rules = Rule[]
 export type SchemaVersion = 'core-1'
+export type Description8 = string
+export type DisplayName8 = string | null
+/**
+ * @maxItems 50
+ */
+export type Evidence9 = (MaterialEvidence | ManualEvidence)[]
+export type Id14 = string
+export type Name9 = string
+export type ValueTypes = ValueType[]
 export type WorkspaceId = string
 
 export interface CoreDraft {
@@ -269,17 +284,22 @@ export interface CoreDraft {
   properties?: Properties
   rules?: Rules
   schema_version?: SchemaVersion
+  value_types?: ValueTypes
   workspace_id: WorkspaceId
 }
 export interface Dataset {
   columns?: Columns
+  connection_id?: ConnectionId
   description?: Description
   dialect?: Dialect
+  display_name?: DisplayName
   id: Id
   name: Name1
+  query_sql?: QuerySql
   schema_name?: SchemaName
   snapshot_date_column?: SnapshotDateColumn
-  table_name: TableName
+  source_kind?: SourceKind
+  table_name?: TableName
 }
 export interface DatasetColumn {
   comment?: Comment
@@ -289,6 +309,7 @@ export interface DatasetColumn {
 export interface LinkType {
   data_join?: DataJoin
   description?: Description1
+  display_name?: DisplayName1
   evidence?: Evidence
   id: Id3
   multiplicity: Multiplicity
@@ -411,6 +432,7 @@ export interface SimpleMetric {
   aggregation: Aggregation
   dataset_id: DatasetId2
   description?: Description2
+  display_name?: DisplayName2
   evidence?: Evidence3
   filters?: Filters
   id: Id8
@@ -418,7 +440,6 @@ export interface SimpleMetric {
   measure?: ColumnReference | null
   name: Name3
   synonyms?: Synonyms1
-  technical_name: TechnicalName
   time_field?: ColumnReference | null
 }
 export interface Condition {
@@ -436,37 +457,37 @@ export interface ColumnReference {
 export interface RatioMetric {
   denominator_id: DenominatorId
   description?: Description3
+  display_name?: DisplayName3
   evidence?: Evidence4
   id: Id9
   kind: Kind9
   name: Name4
   numerator_id: NumeratorId
   synonyms?: Synonyms2
-  technical_name: TechnicalName1
 }
 export interface ExpressionMetric {
   dataset_id: DatasetId4
   description?: Description4
+  display_name?: DisplayName4
   evidence?: Evidence5
   expression: Expression1
   id: Id10
   kind: Kind10
   name: Name5
   synonyms?: Synonyms3
-  technical_name: TechnicalName2
   time_field?: ColumnReference | null
   value_kind?: ValueKind | null
 }
 export interface ObjectType {
   derived_by?: DerivedBy
   description?: Description5
+  display_name?: DisplayName5
   evidence?: Evidence6
   extends?: Extends
   id: Id11
   name: Name6
   synonyms?: Synonyms4
   tags?: Tags1
-  technical_name: TechnicalName3
   title_property_id?: TitlePropertyId
 }
 /**
@@ -499,6 +520,7 @@ export interface DerivedExpression {
 }
 export interface Property {
   description?: Description6
+  display_name?: DisplayName6
   evidence?: Evidence7
   id: Id12
   identifier?: Identifier
@@ -506,12 +528,13 @@ export interface Property {
   owner_type_id: OwnerTypeId
   required?: Required
   synonyms?: Synonyms5
-  technical_name: TechnicalName4
   unique?: Unique
   value_kind: ValueKind
+  value_type_id?: ValueTypeId
 }
 export interface Rule {
   description?: Description7
+  display_name?: DisplayName7
   evidence?: Evidence8
   expression: Expression3
   id: Id13
@@ -519,5 +542,15 @@ export interface Rule {
   owner_id: OwnerId
   owner_kind: RuleOwnerKind
   rule_kind: RuleKind
-  technical_name: TechnicalName5
+}
+/**
+ * A named value domain shared by properties: base kind plus owned constraint rules.
+ */
+export interface ValueType {
+  description?: Description8
+  display_name?: DisplayName8
+  evidence?: Evidence9
+  id: Id14
+  name: Name9
+  value_kind: ValueKind
 }

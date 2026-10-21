@@ -10,6 +10,7 @@ from rt_cases import SYNTHETIC_ROUNDTRIPS
 from sqlglot import exp
 from test_core1_ossie_roundtrip import property_projection, roundtrip
 
+from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.adapters.base import ImportContext
 from ontofoundry_api.adapters.ossie.importer import OssieAdapter
 
@@ -44,7 +45,10 @@ def test_ab_roundtrip_checks_each_semantic_loss_and_exact_remaining_difference(c
     )
     exported, restored = roundtrip(source.model)
     repeated, _ = roundtrip(restored.model)
-    left, right = json.loads(exported.document), json.loads(repeated.document)
+    left, right = (
+        json.loads(read_ossie(exported.document)[0]),
+        json.loads(read_ossie(repeated.document)[0]),
+    )
     for document in (left, right):
         for scope in document.get("ontology_mappings", []):
             for dataset in scope["semantic_model"]["datasets"]:
@@ -54,15 +58,15 @@ def test_ab_roundtrip_checks_each_semantic_loss_and_exact_remaining_difference(c
                 )
     assert differences(left, right) == set(case.allowed_reexport_differences)
     assert property_projection(source.model) == property_projection(restored.model)
-    owners = {o.id: o.technical_name for o in source.model.object_types}
+    owners = {o.id: o.name for o in source.model.object_types}
     lost = {owners[m.type_id] for m in source.model.mappings} - {
-        o.technical_name
+        o.name
         for o in restored.model.object_types
         if any(m.type_id == o.id for m in restored.model.mappings)
     }
     assert lost == case.dropped_mapping_owners
     for name in lost:
-        obj = next(o for o in source.model.object_types if o.technical_name == name)
+        obj = next(o for o in source.model.object_types if o.name == name)
         assert not any(
             p.identifier for p in source.model.properties if p.owner_type_id == obj.id
         )
@@ -99,4 +103,20 @@ def test_ab_roundtrip_checks_each_semantic_loss_and_exact_remaining_difference(c
             for metric in scope["semantic_model"]["metrics"]:
                 variant = metric["expression"]["dialects"][0]
                 variant["expression"] = sqlglot.parse_one(variant["expression"]).sql()
+    # Expression sorting moves source field 0 to field 4 in this reviewed fixture.
+    # Field context has no core owner after its object mapping was rejected.
+    for path, rule in case.allowed_reexport_differences.items():
+        if rule == "RT-46":
+            assert any(
+                i.source_path == path.replace("/fields/4/", "/fields/0/")
+                and i.rule_id == rule
+                and i.outcome == "dropped"
+                for i in restored.report.issues
+            )
+        if rule in {"RT-46", "DS-09"}:
+            parts = path.split("/")[1:]
+            node = left
+            for part in parts[:-1]:
+                node = node[int(part)] if isinstance(node, list) else node[part]
+            node.pop(parts[-1])
     assert left == right

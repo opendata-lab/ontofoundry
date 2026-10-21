@@ -13,6 +13,7 @@ from ontofoundry_api.api import (
     assets,
     auth,
     connections,
+    datasets,
     exports,
     imports,
     instances,
@@ -27,10 +28,19 @@ from ontofoundry_api.api import (
 from ontofoundry_api.api import settings as settings_api
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
-from ontofoundry_api.db_models import WorkspaceRecord
+from ontofoundry_api.db_models import (
+    ConnectionRecord,
+    MetadataSnapshotRecord,
+    WorkspaceRecord,
+)
 from ontofoundry_api.domain.models import WorkspaceCreate
 from ontofoundry_api.services.dataagent import DataAgentError
-from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID, build_demo_draft
+from ontofoundry_api.services.demo import (
+    DEMO_CONNECTION_ID,
+    DEMO_TABLE,
+    DEMO_WORKSPACE_ID,
+    build_demo_draft,
+)
 from ontofoundry_api.services.errors import PublishValidationError, ServiceError
 from ontofoundry_api.services.workspaces import (
     DEV_USER_ID,
@@ -66,6 +76,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             workspace_id=DEMO_WORKSPACE_ID,
                         )
+                    if session.get(ConnectionRecord, DEMO_CONNECTION_ID) is None:
+                        # A fictional connection with one registered table keeps the
+                        # demo dataset a valid, bound source.
+                        session.add(
+                            ConnectionRecord(
+                                id=DEMO_CONNECTION_ID,
+                                workspace_id=workspace.id,
+                                name="星港销售演示库",
+                                kind="postgresql",
+                                config_json={"host": "demo.invalid", "database": "starlane"},
+                                secret_encrypted="",
+                            )
+                        )
+                        session.flush()
+                        session.add(
+                            MetadataSnapshotRecord(
+                                connection_id=DEMO_CONNECTION_ID,
+                                schema_name="public",
+                                snapshot_json={"tables": [DEMO_TABLE]},
+                                changes_json=[],
+                            )
+                        )
+                        session.flush()
                     if workspace.current_version_id is None:
                         publish_draft(
                             session,
@@ -74,6 +107,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                             user_id=DEV_USER_ID,
                             message="初始化可查询的发布基线",
                         )
+        from ontofoundry_api.services.metadata_sync import interrupt_jobs
+
+        with session_factory() as sync_db:
+            interrupt_jobs(sync_db)
         try:
             yield
         finally:
@@ -89,6 +126,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.include_router(assets.router)
+    app.include_router(datasets.router)
+    app.include_router(datasets.tables_router)
 
     @app.middleware("http")
     async def check_origin(request: Request, call_next):

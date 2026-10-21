@@ -1,3 +1,4 @@
+import { displayName } from "../lib/coreModel";
 import {
   Box,
   Database,
@@ -209,8 +210,8 @@ export function AppShell() {
         <div className="mt-3 flex max-h-app-search flex-col overflow-auto">
           {results
             .filter((r) => {
-              const d = r.definition as { name: string; technical_name?: string; description?: string; synonyms?: string[] };
-              return [d.name, d.technical_name ?? "", d.description ?? "", ...(d.synonyms ?? [])]
+              const d = r.definition as { name: string; display_name?: string | null; description?: string; synonyms?: string[] };
+              return [(d.display_name || d.name), d.name ?? "", d.description ?? "", ...(d.synonyms ?? [])]
                 .join(" ")
                 .toLowerCase()
                 .includes(query.toLowerCase());
@@ -228,9 +229,9 @@ export function AppShell() {
                   }}
                 >
                   <Icon className="size-icon" />
-                  <span>{r.definition.name}</span>
+                  <span>{displayName(r.definition)}</span>
                   <code className="text-xs text-muted">
-                    {"technical_name" in r.definition ? r.definition.technical_name : ""}
+                    {"name" in r.definition ? r.definition.name : ""}
                   </code>
                 </Button>
               );

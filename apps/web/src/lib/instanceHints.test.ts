@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { databaseTypeHints, documentGapHints, valueMatches } from "./instanceHints";
 
 const customerNo = {
-  name: "客户编号", technical_name: "customer_no", value_kind: "string", identifier: true,
+  display_name: "客户编号", name: "customer_no", value_kind: "string", identifier: true,
 };
 
 it("names a property whose live rows have another type", () => {

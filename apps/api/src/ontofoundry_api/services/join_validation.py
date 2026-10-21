@@ -56,7 +56,42 @@ def validate_source_columns(draft):
         join(link.get("data_join"))
 
 
+def datasets_to_check(before, after):
+    """Datasets new or changed since `before`."""
+    old = {d["id"]: d for d in before.get("datasets", [])}
+    return [
+        (index, dataset)
+        for index, dataset in enumerate(CoreDraft.model_validate(after).datasets)
+        if old.get(str(dataset.id)) != dataset.model_dump(mode="json")
+    ]
+
+
+def dataset_checks(db, workspace_id, before, after, settings):
+    """Read-only source checks shown before publishing; nothing is raised."""
+    from ontofoundry_api.services.dataset_validation import check_dataset
+
+    result = []
+    for _, dataset in datasets_to_check(before, after):
+        checked = check_dataset(db, workspace_id, dataset, settings)
+        result.append(
+            {
+                "dataset_id": str(dataset.id),
+                "name": dataset.name,
+                "display_name": dataset.display_name,
+                "valid": checked["valid"],
+                "diagnostics": checked["diagnostics"],
+            }
+        )
+    return result
+
+
 def validate_join_columns(db, workspace_id, before, after, settings):
+    from ontofoundry_api.services.dataset_validation import enforce_dataset
+
+    for index, dataset in datasets_to_check(before, after):
+        checked = enforce_dataset(db, workspace_id, dataset, settings)
+        after["datasets"][index] = checked.model_dump(mode="json")
+
     validate_source_columns(after)
     try:
         validate_core_graph(CoreDraft.model_validate(after))

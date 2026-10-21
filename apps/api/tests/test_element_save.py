@@ -1,12 +1,14 @@
 from copy import deepcopy
 
 import pytest
+from dataset_binding import bind_datasets
 from test_modeling import ONTOLOGY, ROOT, create_session, save
 
 
 def submit(
     client, draft, *, kind="object_type", target_id=None, session=None, version=None
 ):
+    bind_datasets(client, draft)
     return client.post(
         ROOT + "/element-saves",
         json={
@@ -73,7 +75,7 @@ def test_stale_session_and_validation_failure_are_atomic(client):
     newer = save(client, session, session["draft"]).json()
     assert submit(client, old["draft"], session=old).status_code == 409
     invalid = deepcopy(newer["draft"])
-    invalid["object_types"][0]["technical_name"] = "bad name"
+    invalid["object_types"][0]["name"] = "bad name"
     assert submit(client, invalid, session=newer).status_code == 422
     assert client.get(ONTOLOGY + "/version").json()["version"] == 1
     assert (
@@ -134,12 +136,12 @@ def test_saved_session_displays_latest_merged_values_of_selected_element(client)
     session["draft"]["object_types"][0]["description"] = "会话中的描述"
     session = save(client, session, session["draft"]).json()
     current = client.get(ROOT + "/published-snapshot").json()
-    current["object_types"][0]["name"] = "新的供应商名称"
+    current["object_types"][0]["display_name"] = "新的供应商名称"
     assert submit(client, current).status_code == 200
     response = submit(client, session["draft"], session=session)
     assert response.status_code == 200, response.text
     published = response.json()["draft"]["object_types"][0]
-    assert published["name"] == "新的供应商名称"
+    assert published["display_name"] == "新的供应商名称"
     assert published["description"] == "会话中的描述"
     assert response.json()["session"]["draft"]["object_types"][0] == published
 
@@ -156,8 +158,8 @@ def test_example07_rename_preflight_hashes_and_synchronizes_session(client):
     session["draft"]["object_types"][1]["description"] = "不相关的会话修改"
     session = save(client, session, session["draft"]).json()
     edited = deepcopy(session["draft"])
-    prop = next(p for p in edited["properties"] if p["technical_name"] == "customer_no")
-    prop["technical_name"] = "customer_code"
+    prop = next(p for p in edited["properties"] if p["name"] == "customer_no")
+    prop["name"] = "customer_code"
     body = {
         "target_kind": "object_type",
         "target_id": prop["owner_type_id"],
@@ -354,9 +356,7 @@ def test_object_description_cannot_smuggle_dependent_relation_edit(client):
 
     session = example_session(client, "07-instances-and-evidence", published=True)
     candidate = deepcopy(session["draft"])
-    customer = next(
-        o for o in candidate["object_types"] if o["technical_name"] == "customer"
-    )
+    customer = next(o for o in candidate["object_types"] if o["name"] == "customer")
     customer["description"] = "客户说明修正"
     relation = next(
         r
@@ -378,8 +378,8 @@ def test_object_description_cannot_smuggle_dependent_relation_edit(client):
 
 def rename_customer(client, session):
     candidate = deepcopy(session["draft"])
-    prop = next(p for p in candidate["properties"] if p["technical_name"] == "customer_no")
-    prop["technical_name"] = "customer_code"
+    prop = next(p for p in candidate["properties"] if p["name"] == "customer_no")
+    prop["name"] = "customer_code"
     body = save_body(client, session, candidate, target_id=prop["owner_type_id"])
     confirmations = preflight_confirmations(client, body)
     assert len(confirmations) == 1
@@ -467,8 +467,8 @@ def test_necessary_fact_rename_does_not_authorize_other_fact_values(client):
 
     session = example_session(client, "07-instances-and-evidence", published=True)
     candidate = deepcopy(session["draft"])
-    prop = next(p for p in candidate["properties"] if p["technical_name"] == "customer_no")
-    prop["technical_name"] = "customer_code"
+    prop = next(p for p in candidate["properties"] if p["name"] == "customer_no")
+    prop["name"] = "customer_code"
     fact = next(f for f in candidate["material_objects"] if "customer_no" in f["values"])
     fact["values"]["customer_code"] = fact["values"].pop("customer_no")
     body = save_body(client, session, candidate, target_id=prop["owner_type_id"])
@@ -505,9 +505,7 @@ def test_dataset_confirms_metrics_added_since_old_session_baseline(client):
     session = example_session(client, "13-dataset-metrics", published=True)
     current = deepcopy(session["draft"])
     metric = deepcopy(next(m for m in current["metrics"] if m["kind"] == "simple"))
-    metric.update(
-        id=str(uuid4()), name="新增提交数", technical_name="additional_submissions"
-    )
+    metric.update(id=str(uuid4()), display_name="新增提交数", name="additional_submissions")
     current["metrics"].append(metric)
     response = submit(client, current, kind="metric", target_id=metric["id"])
     assert response.status_code == 200, response.text
@@ -557,8 +555,8 @@ def test_rename_rewrites_newly_published_facts_against_latest(client):
     response = publish(client, response.json())
     assert response.status_code == 200, response.text
     candidate = deepcopy(session["draft"])
-    prop = next(p for p in candidate["properties"] if p["technical_name"] == "customer_no")
-    prop["technical_name"] = "customer_code"
+    prop = next(p for p in candidate["properties"] if p["name"] == "customer_no")
+    prop["name"] = "customer_code"
     body = save_body(client, session, candidate, target_id=prop["owner_type_id"])
     confirmations = preflight_confirmations(client, body)
     assert {c["target_id"] for c in confirmations} == {customer_fact["id"], extra["id"]}
@@ -587,7 +585,7 @@ def test_existing_members_cannot_cross_aggregate_boundaries(
     candidate = deepcopy(session["draft"])
     customer, order = candidate["object_types"]
     if member_kind == "property":
-        member = next(p for p in candidate["properties"] if p["technical_name"] == "region")
+        member = next(p for p in candidate["properties"] if p["name"] == "region")
         source, destination = customer, order
         member["owner_type_id"] = destination["id"]
         candidate["mappings"][0]["fields"].pop("region")
@@ -626,7 +624,7 @@ def test_customer_property_can_be_deleted_without_moving_it(client):
 
     session = example_session(client, "01-basic-sales", published=True)
     candidate = deepcopy(session["draft"])
-    prop = next(p for p in candidate["properties"] if p["technical_name"] == "region")
+    prop = next(p for p in candidate["properties"] if p["name"] == "region")
     candidate["properties"].remove(prop)
     candidate["mappings"][0]["fields"].pop("region")
     body = save_body(client, session, candidate, target_id=prop["owner_type_id"])
@@ -654,9 +652,9 @@ def test_property_swap_keeps_bindings_by_uuid_for_both_candidate_forms(
     customer_id = candidate["object_types"][0]["id"]
     props = [p for p in candidate["properties"] if p["owner_type_id"] == customer_id]
     first, second = props[:2]
-    first["technical_name"], second["technical_name"] = (
-        second["technical_name"],
-        first["technical_name"],
+    first["name"], second["name"] = (
+        second["name"],
+        first["name"],
     )
     final = rewrite_references(
         CoreDraft.model_validate(original), CoreDraft.model_validate(candidate)
@@ -678,14 +676,14 @@ def test_property_swap_keeps_bindings_by_uuid_for_both_candidate_forms(
     assert response.status_code == 200, response.text
     original_fields = original["mappings"][0]["fields"]
     bindings_by_uuid = {
-        p["id"]: original_fields[p["technical_name"]]
+        p["id"]: original_fields[p["name"]]
         for p in original["properties"]
         if p["owner_type_id"] == customer_id
     }
     for raw in (response.json()["draft"], response.json()["session"]["draft"]):
         mapping = next(m for m in raw["mappings"] if m["type_id"] == customer_id)
         assert {
-            p["id"]: mapping["fields"][p["technical_name"]]
+            p["id"]: mapping["fields"][p["name"]]
             for p in raw["properties"]
             if p["owner_type_id"] == customer_id
         } == bindings_by_uuid
@@ -709,9 +707,7 @@ def test_old_ratio_session_imports_missing_upstream_closure(client, new_dataset)
     component = deepcopy(
         next(m for m in latest["metrics"] if m["id"] == ratio["numerator_id"])
     )
-    component.update(
-        id=str(uuid4()), technical_name="new_core_commits", name="新核心提交数"
-    )
+    component.update(id=str(uuid4()), name="new_core_commits", display_name="新核心提交数")
     latest["metrics"].append(component)
     ratio["numerator_id"] = component["id"]
     imported = [component]
@@ -723,7 +719,7 @@ def test_old_ratio_session_imports_missing_upstream_closure(client, new_dataset)
             next(m for m in latest["metrics"] if m["id"] == ratio["denominator_id"])
         )
         denominator.update(
-            id=str(uuid4()), technical_name="new_all_commits", name="新全部提交数"
+            id=str(uuid4()), name="new_all_commits", display_name="新全部提交数"
         )
         latest["metrics"].append(denominator)
         ratio["denominator_id"] = denominator["id"]
@@ -916,21 +912,21 @@ def test_example06_old_session_imports_effective_inheritance_and_bindings(
     if target_name == "vip_party" and not existing_parent:
         from uuid import uuid4
 
-        root = next(o for o in latest["object_types"] if o["technical_name"] == "party")
+        root = next(o for o in latest["object_types"] if o["name"] == "party")
         middle = {
             **deepcopy(root),
             "id": str(uuid4()),
-            "name": "登记参与方",
-            "technical_name": "registered_party",
+            "display_name": "登记参与方",
+            "name": "registered_party",
             "extends": root["id"],
             "title_property_id": None,
         }
         latest["object_types"].append(middle)
-        next(o for o in latest["object_types"] if o["technical_name"] == target_name)[
-            "extends"
-        ] = middle["id"]
-    target = next(o for o in latest["object_types"] if o["technical_name"] == target_name)
-    unrelated = next(o for o in latest["object_types"] if o["technical_name"] == "supplier")
+        next(o for o in latest["object_types"] if o["name"] == target_name)["extends"] = (
+            middle["id"]
+        )
+    target = next(o for o in latest["object_types"] if o["name"] == target_name)
+    unrelated = next(o for o in latest["object_types"] if o["name"] == "supplier")
     base = {**latest, **{c: [] for c in COLLECTIONS.values()}}
     base["object_types"] = [
         {**o, "extends": None, "derived_by": [], "title_property_id": None}
@@ -1022,7 +1018,7 @@ def test_example06_old_session_imports_effective_inheritance_and_bindings(
         assert resolve_binding(graph, target_id) == resolve_binding(expected, target_id)
     assert not synced.metrics and not synced.material_objects and not synced.material_links
     assert not {"organization", "vehicle", "channel_partner"} & {
-        o.technical_name for o in synced.object_types
+        o.name for o in synced.object_types
     }
     assert (
         next(o for o in synced.object_types if str(o.id) == unrelated["id"]).description
@@ -1048,10 +1044,10 @@ def test_example06_shared_parent_note_rename_keeps_column_binding(client, column
 
     session = example_session(client, "06-inheritance", published=True)
     candidate = deepcopy(session["draft"])
-    vip = next(o for o in candidate["object_types"] if o["technical_name"] == "vip_party")
-    next(p for p in candidate["properties"] if p["owner_type_id"] == vip["id"])[
-        "technical_name"
-    ] = "note2"
+    vip = next(o for o in candidate["object_types"] if o["name"] == "vip_party")
+    next(p for p in candidate["properties"] if p["owner_type_id"] == vip["id"])["name"] = (
+        "note2"
+    )
     mapping = next(m for m in candidate["mappings"] if m["type_id"] == vip["id"])
     assert mapping["sources"] == []
     mapping["fields"] = {"note2": {"kind": "column", "source_id": "main", "column": column}}

@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.core import LinkType
 from ontofoundry_api.domain.models import COLLECTIONS
 from ontofoundry_api.domain.snapshot import empty_snapshot, read_snapshot_json
 
@@ -65,7 +64,6 @@ def three_way(
 
         raise ServiceError("草稿格式或空间无效", code="VALIDATION_FAILED", status_code=422)
     draft = deepcopy(draft)
-    draft["link_types"] = [LinkType.read_previous_names(link) for link in draft.get("link_types", [])]
     for collection in COLLECTIONS.values():
         draft.setdefault(collection, [])
     merged, raw = merge_snapshots(base, latest, draft, resolutions)

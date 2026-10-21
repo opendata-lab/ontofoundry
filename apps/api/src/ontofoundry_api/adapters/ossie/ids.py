@@ -8,7 +8,7 @@ def source_id(workspace_id: UUID, key: str) -> UUID:
     return uuid5(workspace_id, "ossie:" + key)
 
 
-def technical_name(name: str, used: set[str]) -> str:
+def identifier_name(name: str, used: set[str]) -> str:
     base = re.sub(r"[^A-Za-z0-9_]", "_", name)[:220] or "element"
     if base[0].isdigit():
         base = "_" + base

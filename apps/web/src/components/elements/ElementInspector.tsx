@@ -1,3 +1,4 @@
+import { displayName } from "../../lib/coreModel";
 import { Alert, Button, ConfigProvider, List, Modal, Spin, Tabs, Tag, Tooltip, Typography } from "antd";
 import { Box, Database, GitBranch, Maximize2, Minimize2, Sigma } from "lucide-react";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -29,7 +30,7 @@ import { documentDisplayText } from "../../lib/instanceDisplay";
 import { metricErrors, newMetric, storedMetric } from "../../lib/metricEditing";
 import { objectMapping, shortObjectName } from "../../lib/objectMapping";
 import { newDataset } from "../../lib/datasetEditing";
-import { PageBody, PageHeader, Panel, PanelToolbar, StatusMark } from "../layout";
+import { ContentBlock, ContentBlockScope, PageBody, PageHeader, PageTabs, Panel, PanelToolbar, SectionTitle, StatusMark } from "../layout";
 import { KIND } from "../proposals/elementMeta";
 import { DatasetPanel } from "./DatasetPanel";
 import { ElementInstances } from "./ElementInstances";
@@ -113,13 +114,13 @@ function resolve(draft: Draft, kind: string, id: string): Resolved {
 }
 
 function blank(draft: Draft, kind: InspectKind, id: string, owner: string | null): Element {
-  const base = { id, name: "", technical_name: "", description: "", synonyms: [], evidence: [] };
+  const base = { id, display_name: "", name: "", description: "", synonyms: [], evidence: [] };
   if (kind === "object_type")
     return { ...base, tags: [], extends: null, derived_by: [], title_property_id: null };
   if (kind === "link_type") {
     const source = byId(draft.object_types, owner)?.id ?? draft.object_types[0]?.id ?? "";
     return {
-      id, name: "", description: "", synonyms: [], evidence: [],
+      id, display_name: "", name: "", description: "", synonyms: [], evidence: [],
       verbalizes: [], tags: [],
       source_type_id: source,
       target_type_id: draft.object_types.find((o) => o.id !== source)?.id ?? source,
@@ -139,13 +140,15 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
     const dataset = element as Dataset;
     if (!dataset.name.trim()) return "请填写数据集名称";
     if (dataset.snapshot_date_column === "") return "请选择快照日期字段";
-    return dataset.table_name ? null : "请填写表或视图";
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(dataset.name)) return "英文标识只能使用 ASCII 字母、数字和下划线";
+    if (!dataset.connection_id) return "请选择数据连接";
+    return dataset.source_kind === "query" ? dataset.query_sql && dataset.columns ? null : "请在字段页填写 SQL 并校验探测列" : dataset.table_name ? null : "请填写表或视图";
   }
   if (kind === "metric") return Object.values(metricErrors(draft, element as Metric))[0] ?? null;
   const named = element as ObjectType | LinkType;
-  if (!named.name.trim() || ("technical_name" in named && !named.technical_name)) return kind === "link_type" ? "请填写关系标识" : `请填写${NOUN[kind]}的名称和英文标识`;
-  if (rulesFor(draft, named).some((r) => !r.name.trim() || !r.technical_name || !r.expression.trim()))
-    return "有规则还没有填写名称、英文标识和表达式";
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(named.name)) return `请填写${NOUN[kind]}的有效英文标识`;
+  if (rulesFor(draft, named).some((r) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(r.name) || !r.expression.trim()))
+    return "有规则还没有填写有效英文标识和表达式";
   if (kind === "link_type") {
     const relation = element as LinkType;
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(relation.name)) return "关系标识只能使用字母、数字和下划线，且不能以数字开头";
@@ -156,8 +159,8 @@ function saveProblem(draft: Draft, kind: InspectKind, element: Element): string 
     return joinProblem(relation.data_join);
   }
   const object = element as ObjectType;
-  const unnamed = draft.properties.find((p) => p.owner_type_id === object.id && (!p.name.trim() || !p.technical_name));
-  if (unnamed) return "有属性还没有填写名称和英文标识";
+  const unnamed = draft.properties.find((p) => p.owner_type_id === object.id && !(/^[A-Za-z_][A-Za-z0-9_]*$/.test(p.name)));
+  if (unnamed) return "有属性还没有填写有效英文标识";
   const derived = branchProblem(draft, object.derived_by);
   if (derived) return derived;
   for (const join of Object.values(mappingFor(draft, object.id)?.inherited_link_bindings ?? {})) {
@@ -179,19 +182,20 @@ function affectedElementName(
     case "link_type":
     case "rule":
     case "metric":
-    case "dataset": {
+    case "dataset":
+    case "value_type": {
       const collection = COLLECTION_BY_KIND[kind];
       const found =
-        byId(draft[collection] as { id: string; name?: string }[], id) ??
-        byId(base[collection] as { id: string; name?: string }[], id);
-      return found?.name?.trim() || id;
+        byId(draft[collection] as { id: string; name?: string; display_name?: string | null }[], id) ??
+        byId(base[collection] as { id: string; name?: string; display_name?: string | null }[], id);
+      return (found?.display_name || found?.name)?.trim() || id;
     }
     case "mapping": {
       const mapping = byId(draft.mappings, id) ?? byId(base.mappings, id);
       const owner = mapping
         ? (byId(draft.object_types, mapping.type_id) ?? byId(base.object_types, mapping.type_id))
         : undefined;
-      return owner?.name?.trim() || id;
+      return (owner?.display_name || owner?.name)?.trim() || id;
     }
     case "material_object": {
       const baseFact = byId(base.material_objects, id);
@@ -387,10 +391,9 @@ export function ElementView({
   const tabs: { key: ElementTab; label: string; count?: number }[] = object
     ? [
         { key: "basic", label: "概览" },
-        { key: "properties", label: "属性与映射", count: properties.length },
+        { key: "properties", label: "字段", count: properties.length },
         { key: "relations", label: "关系", count: relations.length },
         { key: "rules", label: "规则", count: rules.length },
-        ...(member && !creating ? [{ key: "instances" as const, label: "实例" }] : []),
       ]
     : link
       ? [
@@ -398,10 +401,18 @@ export function ElementView({
           ...(member ? [{ key: "mapping" as const, label: "映射" }] : []),
           { key: "rules", label: "规则", count: rules.length },
         ]
-      : [];
+      : kind === "dataset" ? [
+          { key: "basic", label: "概览" }, { key: "fields", label: "字段" },
+        ] : [];
   const requestedTab = requestedTabKey ?? resolved?.tab ?? "basic";
   const compatible =
-    link && ["definition", "instances"].includes(requestedTab)
+    object && requestedTab === "instances"
+      ? "properties"
+      : kind === "dataset" && ["source", "columns", "preview"].includes(requestedTab)
+      ? "fields"
+      : kind === "dataset" && requestedTab === "references"
+      ? "basic"
+      : link && ["definition", "instances"].includes(requestedTab)
       ? "basic"
       : link && requestedTab === "data"
       ? "mapping"
@@ -414,10 +425,18 @@ export function ElementView({
   const selectTab = onTab;
   useEffect(() => {
     if (!loaded || !body.current) return;
+    if (kind === "object_type" && requestedTab === "instances") {
+      body.current.querySelector<HTMLElement>("[data-element-instances]")?.scrollIntoView?.({ block: "start" });
+      return;
+    }
+    if (kind === "dataset" && ["source", "columns", "preview", "references"].includes(requestedTab)) {
+      body.current.querySelector<HTMLElement>(`[data-dataset-section="${requestedTab}"]`)?.scrollIntoView?.({ block: "start" });
+      return;
+    }
     Array.from(body.current.querySelectorAll<HTMLElement>("[data-element-id]"))
       .find((el) => el.dataset.elementId === id)
       ?.scrollIntoView?.({ block: "nearest" });
-  }, [loaded, selectedTab, id]);
+  }, [loaded, selectedTab, id, kind, requestedTab]);
 
   const discard = () => {
     propertyBindings.current.clear();
@@ -617,14 +636,15 @@ export function ElementView({
       : null;
   const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
   const record = draft && object ? objectMapping(draft, object) : null;
-  const title = element?.name
+  const title = displayName(element)
     ? kind === "object_type" || kind === "link_type"
-      ? shortObjectName(element)
-      : element.name
+      ? shortObjectName(element!)
+      : displayName(element)
     : creating
       ? `新建${NOUN[kind]}`
       : NOUN[kind];
-  const technical = element && "technical_name" in element ? element.technical_name : "";
+  // Without a display name the title already is the identifier; show it once.
+  const technical = element && "display_name" in element && element.display_name ? element.name : "";
   const content = (() => {
     if (!draft || !element) return null;
     if (kind === "metric")
@@ -645,18 +665,19 @@ export function ElementView({
         />
       );
     if (kind === "dataset")
-      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} />;
+      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={selectedTab} canPreview={member} revision={loaded?.session?.revision} />;
     if (!panel) return null;
     if (object) {
       const props = panel as PanelProps<ObjectType>;
-      if (selectedTab === "properties")
-        return <PropertiesPanel key={`${object.id}:${requestedKind === "property" ? id : "all"}`} {...props} initialPropertyId={requestedKind === "property" ? id : undefined} />;
+      if (selectedTab === "properties") return <div className="flex min-w-0 flex-col gap-4">
+        <PropertiesPanel key={`${object.id}:${requestedKind === "property" ? id : "all"}`} {...props} initialPropertyId={requestedKind === "property" ? id : undefined} />
+        {member && !creating && <ContentBlock aria-label="实体实例" data-element-instances="">
+          <SectionTitle title="实例" />
+          <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
+        </ContentBlock>}
+      </div>;
       if (selectedTab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
       if (selectedTab === "rules") return <RulesPanel key={`${object.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
-      if (selectedTab === "instances")
-        return (
-          <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
-        );
       return <ObjectBasicPanel {...props} />;
     }
     if (selectedTab === "rules") return <RulesPanel key={`${link?.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
@@ -669,18 +690,18 @@ export function ElementView({
     />;
   })();
   useLayoutEffect(() => {
-    reportElement?.(modal ? { dirty, busy } : { title: element?.name || title, dirty, busy });
+    reportElement?.(modal ? { dirty, busy } : { title: displayName(element) || title, dirty, busy });
     return () => reportElement?.({ dirty: false, busy: false });
-  }, [modal, title, element?.name, dirty, busy, reportElement]);
+  }, [modal, title, element, dirty, busy, reportElement]);
   const status = record && record.mode !== "virtual" && record.mode !== "unbound" && (
     <span className="flex items-center gap-2 text-xs font-normal">
       <MappingStatusIcon state={record.state} label={record.label} />
-      {record.main?.dataset && <Text type="secondary" className="text-xs">· 主数据集 {record.main.dataset.name}</Text>}
     </span>
   );
   const control = modal ? "small" : "middle";
   const actions = (
     <>
+      {!modal && status}
       {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
       {!editing && member && !previewHash && element && (
         <Button size={control} onClick={beginEdit} disabled={!loaded || busy}>
@@ -714,27 +735,32 @@ export function ElementView({
       )}
     </>
   );
+  const tabItems = tabs.map((tab) => ({
+    key: tab.key,
+    disabled: busy,
+    label: (
+      <span>
+        {tab.label}
+        {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
+      </span>
+    ),
+  }));
+  const separateBlocks = !modal && (
+    kind === "object_type" || kind === "link_type" ||
+    kind === "metric" || kind === "dataset"
+  );
   const main = (
     <div ref={body} aria-busy={busy} className="element-detail-body flex min-h-0 flex-1 flex-col">
-      {tabs.length > 0 && (
+      {modal && tabs.length > 0 && (
         <PanelToolbar className="shrink-0">
           <Tabs
             activeKey={selectedTab}
             onChange={(key) => !busy && selectTab(key as ElementTab)}
-            items={tabs.map((tab) => ({
-              key: tab.key,
-              disabled: busy,
-              label: (
-                <span>
-                  {tab.label}
-                  {tab.count !== undefined && <span className="ml-1 text-xs text-muted">{tab.count}</span>}
-                </span>
-              ),
-            }))}
+            items={tabItems}
           />
         </PanelToolbar>
       )}
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
+      <div className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto ${separateBlocks ? "" : "p-4"}`}>
         {error && (
           <Alert
             type="error"
@@ -758,7 +784,7 @@ export function ElementView({
         {content && (
           <ConfigProvider componentDisabled={busy}>
             <fieldset disabled={busy} className="m-0 min-w-0 border-0 p-0">
-              {content}
+              <ContentBlockScope separate={separateBlocks}>{content}</ContentBlockScope>
             </fieldset>
           </ConfigProvider>
         )}
@@ -802,36 +828,43 @@ export function ElementView({
     </Modal>
   );
   const heading = (
-    <span className="flex flex-wrap items-baseline gap-2" aria-label={element?.name || title}>
+    <span className="flex flex-wrap items-baseline gap-2" aria-label={displayName(element) || title}>
       <span className={modal ? "text-lg" : undefined}>{title}</span>
       {technical && <code className="text-xs font-normal text-muted">{technical}</code>}
     </span>
   );
-  if (!modal)
+  if (!modal) {
+    const pageTitle = (
+      <span className="flex items-center gap-2">
+        <Icon size={16} className="flex-none text-accent" />
+        {heading}
+      </span>
+    );
+    const pageNote = (
+      <span className="flex items-center gap-3">
+        {previewHash ? "待发布预览" : sessionId ? "建模会话草稿" : null}
+      </span>
+    );
+    const pageContent = <PageBody>{separateBlocks ? main : <Panel fill>{main}</Panel>}</PageBody>;
     return (
       <div className="flex h-full min-h-0 flex-col bg-canvas">
-        <PageHeader
-          title={
-            <span className="flex items-center gap-2">
-              <Icon size={16} className="flex-none text-accent" />
-              {heading}
-            </span>
-          }
-          note={
-            <span className="flex items-center gap-3">
-              {status}
-              {previewHash ? "待发布预览" : sessionId ? "建模会话草稿" : null}
-            </span>
-          }
-        >
-          {actions}
-        </PageHeader>
-        <PageBody>
-          <Panel fill>{main}</Panel>
-        </PageBody>
+        {tabs.length > 0 ? (
+          <PageTabs
+            title={pageTitle}
+            note={pageNote}
+            actions={actions}
+            activeKey={selectedTab}
+            onChange={(key) => !busy && selectTab(key as ElementTab)}
+            items={tabItems.map((tab) => ({ ...tab, children: tab.key === selectedTab ? pageContent : null }))}
+          />
+        ) : <>
+          <PageHeader title={pageTitle} note={pageNote}>{actions}</PageHeader>
+          {pageContent}
+        </>}
         {impact}
       </div>
     );
+  }
   return (
     <Modal
       open={active}

@@ -8,7 +8,7 @@ def test_overview_ignores_unpublished_changes(client):
     assert before["version"]["counts"]["metrics"] == 1
     assert before["details"]["object_count"] == 1
     session = create_session(client)
-    session["draft"]["object_types"][0]["name"] = "草稿客户"
+    session["draft"]["object_types"][0]["display_name"] = "草稿客户"
     assert save(client, session, session["draft"]).status_code == 200
     assert client.get(ROOT + "/overview").json() == before
 

@@ -111,7 +111,7 @@ function pathText(draft: Draft, root: string, condition: PathCondition) {
     const name = quoteName(byId(draft.link_types, step.link_type_id)?.name ?? "?");
     return step.direction === "reverse" ? `REVERSE(${name})` : name;
   });
-  const property = byId(draft.properties, condition.path.property_id)?.technical_name ?? "?";
+  const property = byId(draft.properties, condition.path.property_id)?.name ?? "?";
   return [quoteName(root), ...hops, quoteName(property)].join(".");
 }
 
@@ -141,7 +141,7 @@ function rowText(draft: Draft, root: string, row: DerivedRow) {
 
 /** Readable text of stored branches, OR between branches. */
 export function branchesText(draft: Draft, parentId: UUID | null, branches: DerivedBranch[]): string {
-  const root = byId(draft.object_types, parentId)?.technical_name ?? "parent";
+  const root = byId(draft.object_types, parentId)?.name ?? "parent";
   const texts = branches.map((branch) =>
     branch.kind === "expression"
       ? branch.expression
@@ -157,8 +157,8 @@ export function branchSummary(draft: Draft, branch: DerivedBranch): string {
   if (branch.kind === "expression") return branch.expression;
   return branch.conditions
     .map((c) => {
-      const hops = (c.path.links ?? []).map((s) => byId(draft.link_types, s.link_type_id)?.name ?? "?");
-      const property = byId(draft.properties, c.path.property_id)?.name ?? "?";
+      const hops = (c.path.links ?? []).map((s) => (byId(draft.link_types, s.link_type_id)?.display_name || byId(draft.link_types, s.link_type_id)?.name) ?? "?");
+      const property = (byId(draft.properties, c.path.property_id)?.display_name || byId(draft.properties, c.path.property_id)?.name) ?? "?";
       const values = c.values ?? [];
       const shown =
         c.operator === "between" ? `${values[0]} 至 ${values[1]}` : values.map((v) => String(v)).join("、");
@@ -238,7 +238,7 @@ function parseTerm(term: string, root: string, context: ReturnType<typeof derive
   }
   const head = new RegExp(String.raw`^(${NAME})\s*\.\s*(${NAME})\s+(.*)$`, "is").exec(term);
   if (!head || unquote(head[1]).toLowerCase() !== root.toLowerCase()) return null;
-  const property = context.properties.find((p) => p.technical_name.toLowerCase() === unquote(head[2]).toLowerCase());
+  const property = context.properties.find((p) => p.name.toLowerCase() === unquote(head[2]).toLowerCase());
   if (!property) return null;
   const rest = head[3].trim();
   const row = (operator: Operator, values: Scalar[]): PropertyRow => ({
@@ -289,7 +289,7 @@ export function formFromBranches(draft: Draft, parentId: UUID | null, branches: 
     }
     if (branch.kind === "expression" && context.parent) {
       const terms = splitAnd(branch.expression);
-      const rows = terms?.map((t) => parseTerm(t, context.parent!.technical_name, context));
+      const rows = terms?.map((t) => parseTerm(t, context.parent!.name, context));
       if (rows && rows.length && rows.every(Boolean) && rows.some((r) => r!.kind === "link")) {
         return { mode: "simple", rows: rows as DerivedRow[] };
       }
@@ -338,7 +338,7 @@ export function branchesFromForm(draft: Draft, parentId: UUID | null, form: Deri
     }) as [PathCondition, ...PathCondition[]];
     return [{ kind: "simple", conditions }];
   }
-  const root = byId(draft.object_types, parentId)?.technical_name ?? "parent";
+  const root = byId(draft.object_types, parentId)?.name ?? "parent";
   return [{ kind: "expression", expression: form.rows.map((r) => rowText(draft, root, r)).join(" AND ") }];
 }
 

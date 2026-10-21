@@ -199,6 +199,7 @@ class MetricCompiler:
         self, draft, metric, *, db=None, workspace_id=None, source=None, time_range=None
     ):
         self.draft, self.metric = draft, metric
+        self.db, self.workspace_id = db, workspace_id
         self.dataset = dataset_for(draft, metric)
         self.source = source or resolve_dataset(db, workspace_id, self.dataset)
         self.dialect = (
@@ -229,6 +230,10 @@ class MetricCompiler:
         return f"%({name})s" if self.dialect in {"mysql", "postgres"} else ":" + name
 
     def table(self):
+        if self.dataset.source_kind == "query":
+            from ontofoundry_api.services.dataset_sources import relation_sql
+            tree = parse_expression(relation_sql(self.db, self.workspace_id, self.dataset, source=self.source), self.dialect)
+            return "(" + serialize(tree, self.dialect) + ")"
         schema = self.source.schema
         if self.dialect == "sqlite":
             schema = None
@@ -319,11 +324,11 @@ class MetricCompiler:
             if trend and metric.time_field.column == self.snapshot_column:
                 global_month = self.month(global_column)
                 where.append(
-                    f"{snap} IN (SELECT MAX({global_column}) FROM {table}{selection_sql} GROUP BY {global_month})"
+                    f"{snap} IN (SELECT MAX({global_column}) FROM {table} AS snapshot_source{selection_sql} GROUP BY {global_month})"
                 )
             else:
                 where.append(
-                    f"{snap} = (SELECT MAX({global_column}) FROM {table}{selection_sql})"
+                    f"{snap} = (SELECT MAX({global_column}) FROM {table} AS snapshot_source{selection_sql})"
                 )
         elif time:
             where += self.range_predicate(time)

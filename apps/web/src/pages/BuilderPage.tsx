@@ -1,4 +1,4 @@
-import { ArrowUp, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
+import { ArrowUp, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
 import { Alert, Button, Checkbox, Dropdown, Input, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
@@ -9,6 +9,7 @@ import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../comp
 import { ModelResults } from "../components/ModelResults";
 import { BuilderConversationEmpty } from "../components/BuilderConversationEmpty";
 import { TableMaterialPicker } from "../components/TableMaterialPicker";
+import { tableKey, tableLabel } from "../lib/linkedTables";
 import { SessionPicker } from "../components/SessionPicker";
 import { TagList } from "../components/TagList";
 import { useModeling } from "../hooks/useModeling";
@@ -93,11 +94,11 @@ export function BuilderPage() {
   };
   const blocked = !capabilities?.agent_configured || running || busy || uploading;
   const canSend = !blocked && (composerMode === "model"
-    ? !!session?.material_ids.length || !!scenario.trim() || !!composerDraft.trim()
+    ? !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length || !!scenario.trim() || !!composerDraft.trim()
     : !!composerDraft.trim());
-  const sendState = useRef({ mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length });
+  const sendState = useRef({ mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length });
   useLayoutEffect(() => {
-    sendState.current = { mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length };
+    sendState.current = { mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length };
   });
   const attach = async (material: Material) => {
     const current = await model.ensure();
@@ -330,10 +331,41 @@ export function BuilderPage() {
                 </section>
                 <section className="flex shrink-0 flex-col gap-3">
                   <SectionTitle title="业务数据" />
+                  {!!session?.linked_tables?.length && (
+                    <div className="flex flex-col gap-1">
+                      {session.linked_tables.map((t) => (
+                        <Checkbox
+                          key={tableKey(t)}
+                          checked
+                          disabled={busy || running}
+                          onChange={() =>
+                            act(async () => {
+                              const s = await model.ensure();
+                              setSession(
+                                await modelingApi.save(s, s.draft, {
+                                  linked_tables: (s.linked_tables ?? []).filter((x) => tableKey(x) !== tableKey(t)),
+                                }),
+                              );
+                            })
+                          }
+                        >
+                          <span className="inline-flex min-w-0 items-center gap-2 text-sm">
+                            <Database size={14} className="flex-none" />
+                            <span className="truncate" title={tableLabel(t)}>{tableLabel(t)}</span>
+                          </span>
+                        </Checkbox>
+                      ))}
+                    </div>
+                  )}
                   <TableMaterialPicker
                     workspaceId={workspace.id}
+                    sessionId={session?.id}
+                    linked={session?.linked_tables ?? []}
                     disabled={busy || running}
-                    onMaterial={(material) => act(() => attach(material))}
+                    onLink={(tables) => act(async () => {
+                      const current = await model.ensure();
+                      setSession(await modelingApi.save(current, current.draft, { linked_tables: tables }));
+                    })}
                   />
                 </section>
                 <section className="flex shrink-0 flex-col gap-3">

@@ -26,6 +26,7 @@ export function storedDraft(source: CoreDraft): Draft {
       identifier: false,
       unique: false,
       required: false,
+      value_type_id: null,
       ...p,
     })),
     link_types: (source.link_types ?? []).map((l) => ({
@@ -47,6 +48,11 @@ export function storedDraft(source: CoreDraft): Draft {
       return { ...common, ...m } as Metric;
     }),
     datasets: (source.datasets ?? []).map((d) => ({
+      source_kind: "table" as const,
+      connection_id: null,
+      display_name: null,
+      query_sql: null,
+      table_name: null,
       description: "",
       dialect: null,
       schema_name: null,
@@ -63,6 +69,7 @@ export function storedDraft(source: CoreDraft): Draft {
     })),
     material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o })),
     material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l })),
+    value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
   };
 }
 

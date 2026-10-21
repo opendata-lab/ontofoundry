@@ -18,6 +18,20 @@
           "default": null,
           "title": "Columns"
         },
+        "connection_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Connection Id"
+        },
         "description": {
           "default": "",
           "maxLength": 8000,
@@ -37,6 +51,19 @@
           "default": null,
           "title": "Dialect"
         },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
         "id": {
           "format": "uuid",
           "title": "Id",
@@ -45,8 +72,23 @@
         "name": {
           "maxLength": 240,
           "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
           "title": "Name",
           "type": "string"
+        },
+        "query_sql": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query Sql"
         },
         "schema_name": {
           "anyOf": [
@@ -75,17 +117,33 @@
           "default": null,
           "title": "Snapshot Date Column"
         },
-        "table_name": {
-          "maxLength": 240,
-          "minLength": 1,
-          "title": "Table Name",
+        "source_kind": {
+          "default": "table",
+          "enum": [
+            "table",
+            "query"
+          ],
+          "title": "Source Kind",
           "type": "string"
+        },
+        "table_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Name"
         }
       },
       "required": [
         "id",
-        "name",
-        "table_name"
+        "name"
       ],
       "title": "Dataset",
       "type": "object"

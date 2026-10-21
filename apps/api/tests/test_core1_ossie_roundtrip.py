@@ -9,6 +9,7 @@ from core1_fixtures import example_draft
 from rt_cases import OSSIE_IMPORT_CASES
 from test_core1_ossie_export import export
 
+from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.adapters.base import ImportContext
 from ontofoundry_api.adapters.ossie.importer import OssieAdapter
 from ontofoundry_api.domain.core import ExpressionMetric, SimpleMetric
@@ -27,9 +28,9 @@ def roundtrip(model):
 
 
 def property_projection(model):
-    objects = {o.id: o.technical_name for o in model.object_types}
+    objects = {o.id: o.name for o in model.object_types}
     return {
-        (objects[p.owner_type_id], p.technical_name): (
+        (objects[p.owner_type_id], p.name): (
             p.name,
             str(p.value_kind),
             p.identifier,
@@ -57,10 +58,10 @@ def test_business_definitions_survive_supported_ontology_exchange(name):
     model = example_draft(name)
     _, restored = roundtrip(model)
     assert property_projection(restored.model) == property_projection(model)
-    old = {o.id: o.technical_name for o in model.object_types}
-    new = {o.id: o.technical_name for o in restored.model.object_types}
-    assert {(o.technical_name, old.get(o.extends)) for o in model.object_types} == {
-        (o.technical_name, new.get(o.extends)) for o in restored.model.object_types
+    old = {o.id: o.name for o in model.object_types}
+    new = {o.id: o.name for o in restored.model.object_types}
+    assert {(o.name, old.get(o.extends)) for o in model.object_types} == {
+        (o.name, new.get(o.extends)) for o in restored.model.object_types
     }
     assert {
         (
@@ -102,8 +103,8 @@ def metric_container():
 def test_dataset_metrics_one_to_one_and_count_case_roundtrip():
     model = metric_container()
     exported, restored = roundtrip(model)
-    original = {m.technical_name: m for m in model.metrics}
-    returned = {m.technical_name: m for m in restored.model.metrics}
+    original = {m.name: m for m in model.metrics}
+    returned = {m.name: m for m in restored.model.metrics}
     assert original.keys() == returned.keys()
     datasets = {d.id: d.name for d in model.datasets}
     back_datasets = {d.id: d.name for d in restored.model.datasets}
@@ -119,7 +120,7 @@ def test_dataset_metrics_one_to_one_and_count_case_roundtrip():
             assert [(f.column.column, f.operator, f.values) for f in metric.filters] == [
                 (f.column.column, f.operator, f.values) for f in actual.filters
             ]
-    file = json.loads(exported.document)
+    file = json.loads(read_ossie(exported.document)[0])
     expressions = {
         m["name"]: m["expression"]["dialects"][0]["expression"]
         for scope in file["ontology_mappings"]
@@ -138,8 +139,8 @@ def test_count_star_expression_keeps_other_algorithm_literal_and_declared_source
         ExpressionMetric(
             id=uuid4(),
             kind="expression",
-            name="虚构表达式",
-            technical_name="fiction_expression",
+            display_name="虚构表达式",
+            name="fiction_expression",
             dataset_id=dataset.id,
             expression="COUNT(*) + LENGTH('COUNT(*)::literal')",
             value_kind="integer",
@@ -162,8 +163,8 @@ def test_nullable_column_count_is_never_changed_into_row_count():
         ExpressionMetric(
             id=uuid4(),
             kind="expression",
-            name="可空列计数",
-            technical_name="nullable_count",
+            display_name="可空列计数",
+            name="nullable_count",
             dataset_id=dataset.id,
             expression=f'COUNT("{dataset.name}"."{column}")',
             value_kind="integer",
@@ -182,8 +183,8 @@ def test_ratio_without_declared_components_remains_one_expression():
     model.metrics = [
         ExpressionMetric(
             id=uuid4(),
-            name="虚构比率",
-            technical_name="fraction",
+            display_name="虚构比率",
+            name="fraction",
             kind="expression",
             dataset_id=dataset.id,
             expression=f'SUM("{dataset.name}"."{dataset.columns[-1].name}") / NULLIF(COUNT(*), 0)',
@@ -212,9 +213,7 @@ def test_mapping_columns_main_identity_and_flat_auxiliary_sources_survive(name):
     exported, restored = roundtrip(model)
     for obj in model.object_types:
         original = resolve_binding(model, obj.id)
-        returned_obj = next(
-            o for o in restored.model.object_types if o.technical_name == obj.technical_name
-        )
+        returned_obj = next(o for o in restored.model.object_types if o.name == obj.name)
         returned = resolve_binding(restored.model, returned_obj.id)
         assert (original.main is None) == (returned.main is None)
         if original.main is None:
@@ -234,7 +233,7 @@ def test_mapping_columns_main_identity_and_flat_auxiliary_sources_survive(name):
             original_ds[original.main.dataset_id] == returned_ds[returned.main.dataset_id]
         )
     if name == "11-multi-source-and-unique-link":
-        value = json.loads(exported.document)
+        value = json.loads(read_ossie(exported.document)[0])
         scope = value["ontology_mappings"][0]
         customer = next(
             d for d in scope["semantic_model"]["datasets"] if d["name"] == "customers"
@@ -253,15 +252,21 @@ def test_mapping_columns_main_identity_and_flat_auxiliary_sources_survive(name):
 def test_snapshot_history_keys_and_time_loss_do_not_forge_same_day_joins():
     model = example_draft("12-snapshot-and-trends")
     exported, restored = roundtrip(model)
-    scope = json.loads(exported.document)["ontology_mappings"][0]["semantic_model"]
+    scope = json.loads(read_ossie(exported.document)[0])["ontology_mappings"][0][
+        "semantic_model"
+    ]
     assert len(scope["datasets"]) == 3
     assert all(d["primary_key"][-1] == "snapshot_date" for d in scope["datasets"])
     assert not scope["relationships"]
-    assert all(
-        d.snapshot_date_column is None and d.dialect is None
-        for d in restored.model.datasets
-    )
-    assert all(m.time_field is None for m in restored.model.metrics)
+    # The extension file restores snapshot dates and time fields; the pure Ossie
+    # file still loses the structure, so RT-60 stays reported on export.
+    assert [d.snapshot_date_column for d in restored.model.datasets] == [
+        d.snapshot_date_column for d in model.datasets
+    ]
+    assert all(d.dialect is None for d in restored.model.datasets)
+    assert [m.time_field.column for m in restored.model.metrics] == [
+        m.time_field.column for m in model.metrics
+    ]
     assert all("快照日期列" in d.description for d in restored.model.datasets)
     assert sum(i.rule_id == "RT-60" for i in exported.report.issues) == 6
 
@@ -269,8 +274,8 @@ def test_snapshot_history_keys_and_time_loss_do_not_forge_same_day_joins():
 def test_member_branches_and_expression_preserve_union_and_paths():
     model = example_draft("06-inheritance")
     exported, restored = roundtrip(model)
-    first = {o.technical_name: o for o in model.object_types}
-    second = {o.technical_name: o for o in restored.model.object_types}
+    first = {o.name: o for o in model.object_types}
+    second = {o.name: o for o in restored.model.object_types}
     from ontofoundry_api.adapters.ossie.exporter import membership
     from ontofoundry_api.domain.graph import DraftIndex
 
@@ -315,11 +320,11 @@ def test_or_branches_reverse_exists_and_each_inheritance_level_survive():
         )
     ).model
     _, restored = roundtrip(source)
-    returned = {o.technical_name: o for o in restored.model.object_types}
+    returned = {o.name: o for o in restored.model.object_types}
     for obj in source.object_types:
         if obj.derived_by:
             assert membership(source, obj, DraftIndex(source)) == membership(
-                restored.model, returned[obj.technical_name], DraftIndex(restored.model)
+                restored.model, returned[obj.name], DraftIndex(restored.model)
             )
     assert len(returned["vip"].derived_by) == 2
     assert len(returned["special"].derived_by) == 1
@@ -332,8 +337,8 @@ def test_row_count_remembers_explicit_dataset_among_multiple_candidates(selected
     model.metrics = [
         SimpleMetric(
             id=uuid4(),
-            name="虚构行数",
-            technical_name="fiction_rows",
+            display_name="虚构行数",
+            name="fiction_rows",
             kind="simple",
             dataset_id=ds.id,
             aggregation="count",
@@ -356,8 +361,8 @@ def test_constant_expression_source_cannot_be_silently_discarded():
     model.metrics = [
         ExpressionMetric(
             id=uuid4(),
-            name="虚构常量",
-            technical_name="constant",
+            display_name="虚构常量",
+            name="constant",
             kind="expression",
             dataset_id=model.datasets[0].id,
             expression="1 + 1",
@@ -383,7 +388,7 @@ def test_field_alias_collision_keeps_physical_columns_and_metric_scope():
     exported, restored = roundtrip(model)
     raw = next(
         d
-        for scope in json.loads(exported.document)["ontology_mappings"]
+        for scope in json.loads(read_ossie(exported.document)[0])["ontology_mappings"]
         for d in scope["semantic_model"]["datasets"]
         if d["name"] == dataset.name
     )
@@ -395,9 +400,7 @@ def test_field_alias_collision_keeps_physical_columns_and_metric_scope():
     assert any(i.rule_id == "RT-40" for i in exported.report.issues)
     returned_dataset = next(d for d in restored.model.datasets if d.name == dataset.name)
     returned_metric = next(
-        m
-        for m in restored.model.metrics
-        if m.technical_name == model.metrics[0].technical_name
+        m for m in restored.model.metrics if m.name == model.metrics[0].name
     )
     assert returned_metric.dataset_id == returned_dataset.id
     assert returned_metric.measure.column == model.metrics[0].measure.column
@@ -411,12 +414,10 @@ def test_original_ossie_cases_roundtrip_supported_core_subset(case):
     )
     _, second = roundtrip(first.model)
     assert property_projection(first.model) == property_projection(second.model)
-    assert {o.technical_name for o in first.model.object_types} == {
-        o.technical_name for o in second.model.object_types
+    assert {o.name for o in first.model.object_types} == {
+        o.name for o in second.model.object_types
     }
-    assert {m.technical_name for m in first.model.metrics} == {
-        m.technical_name for m in second.model.metrics
-    }
+    assert {m.name for m in first.model.metrics} == {m.name for m in second.model.metrics}
     assert len(first.model.datasets) == len(second.model.datasets)
     validate_core_graph(second.model)
 
@@ -446,8 +447,8 @@ def test_each_fixed_filter_survives_row_count_case(operator, values):
     model.metrics = [
         SimpleMetric(
             id=uuid4(),
-            name="虚构条件行数",
-            technical_name="filtered_rows",
+            display_name="虚构条件行数",
+            name="filtered_rows",
             kind="simple",
             dataset_id=dataset.id,
             aggregation="count",
@@ -471,7 +472,7 @@ def test_computed_property_keeps_algorithm_and_resolved_physical_columns():
     _, restored = roundtrip(model)
 
     def formulas(draft):
-        objects = {o.id: o.technical_name for o in draft.object_types}
+        objects = {o.id: o.name for o in draft.object_types}
         datasets = {d.id: d.table_name for d in draft.datasets}
         result = {}
         for mapping in draft.mappings:

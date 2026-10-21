@@ -19,7 +19,7 @@ WS = UUID("22222222-2222-4222-8222-222222222222")
 
 
 def object_type(name, ident=None):
-    return {"id": str(ident or uuid4()), "name": name, "technical_name": name}
+    return {"id": str(ident or uuid4()), "display_name": name, "name": name}
 
 
 def graph(*objects):
@@ -29,7 +29,7 @@ def graph(*objects):
 def test_uuid_locks_all_targets_before_natural_names_are_considered():
     alpha, beta = object_type("alpha"), object_type("beta")
     base = graph(alpha, beta)
-    renamed_beta = {**beta, "technical_name": "gamma", "name": "gamma"}
+    renamed_beta = {**beta, "name": "gamma", "display_name": "gamma"}
     new_beta = object_type("beta")
     source = graph(new_beta, renamed_beta)
     ids = match_import(base, source, native=True)
@@ -47,8 +47,8 @@ def test_natural_child_mapping_uses_remapped_owner_and_preserves_unmatched_uuid(
         {
             "id": old_prop,
             "owner_type_id": old["id"],
-            "name": "编号",
-            "technical_name": "code",
+            "display_name": "编号",
+            "name": "code",
             "value_kind": "string",
         }
     ]
@@ -71,8 +71,8 @@ def test_native_name_swap_is_atomic_and_rewrites_external_rule_literal_safely():
     base["properties"] = [
         {
             "id": property_id,
-            "name": "标签",
-            "technical_name": "label",
+            "display_name": "标签",
+            "name": "label",
             "owner_type_id": alpha["id"],
             "value_kind": "string",
         }
@@ -80,8 +80,8 @@ def test_native_name_swap_is_atomic_and_rewrites_external_rule_literal_safely():
     base["rules"] = [
         {
             "id": str(uuid4()),
-            "name": "标签规则",
-            "technical_name": "label_rule",
+            "display_name": "标签规则",
+            "name": "label_rule",
             "owner_kind": "object_type",
             "owner_id": alpha["id"],
             "rule_kind": "constraint",
@@ -89,8 +89,8 @@ def test_native_name_swap_is_atomic_and_rewrites_external_rule_literal_safely():
         }
     ]
     source = graph(
-        {**alpha, "name": "beta", "technical_name": "beta"},
-        {**beta, "name": "alpha", "technical_name": "alpha"},
+        {**alpha, "display_name": "beta", "name": "beta"},
+        {**beta, "display_name": "alpha", "name": "alpha"},
     )
     result = build_candidate_graph(CoreDraft.model_validate(base), source, native=True)
     assert not result.blocked
@@ -110,8 +110,8 @@ def test_kind_conflict_blocks_reverse_closure_but_keeps_independent_import():
     source["properties"] = [
         {
             "id": str(uuid4()),
-            "name": "编号",
-            "technical_name": "code",
+            "display_name": "编号",
+            "name": "code",
             "owner_type_id": old["id"],
             "value_kind": "string",
         }
@@ -126,13 +126,12 @@ def test_kind_conflict_blocks_reverse_closure_but_keeps_independent_import():
     assert len(result.blocked) == 2
 
 
-def test_conflicting_display_names_block_only_invalid_branch():
+def test_duplicate_display_names_do_not_block_distinct_identifiers():
     old = object_type("orders")
-    source = graph({**object_type("other"), "name": "orders"}, object_type("independent"))
+    source = graph({**object_type("other"), "display_name": "orders"}, object_type("independent"))
     result = build_candidate_graph(graph(old), source, native=True)
-    assert len(result.blocked) == 1
-    assert len(result.changes) == 1
-    assert result.changes[0]["after"]["technical_name"] == "independent"
+    assert not result.blocked
+    assert {c["after"]["name"] for c in result.changes} == {"other", "independent"}
     assert old["id"] in {str(o.id) for o in result.model.object_types}
 
 
@@ -205,15 +204,15 @@ def test_imported_expression_is_resolved_in_its_own_namespace_even_if_text_uncha
     base["properties"] = [
         {
             "id": pa,
-            "name": "甲编号",
-            "technical_name": "code",
+            "display_name": "甲编号",
+            "name": "code",
             "owner_type_id": alpha["id"],
             "value_kind": "string",
         },
         {
             "id": pb,
-            "name": "乙编号",
-            "technical_name": "code",
+            "display_name": "乙编号",
+            "name": "code",
             "owner_type_id": beta["id"],
             "value_kind": "string",
         },
@@ -221,8 +220,8 @@ def test_imported_expression_is_resolved_in_its_own_namespace_even_if_text_uncha
     base["rules"] = [
         {
             "id": str(uuid4()),
-            "name": "编号规则",
-            "technical_name": "code_rule",
+            "display_name": "编号规则",
+            "name": "code_rule",
             "owner_kind": "object_type",
             "owner_id": alpha["id"],
             "rule_kind": "constraint",
@@ -231,8 +230,8 @@ def test_imported_expression_is_resolved_in_its_own_namespace_even_if_text_uncha
     ]
     source = deepcopy(base)
     source["object_types"] = [
-        {**alpha, "name": "beta", "technical_name": "beta"},
-        {**beta, "name": "alpha", "technical_name": "alpha"},
+        {**alpha, "display_name": "beta", "name": "beta"},
+        {**beta, "display_name": "alpha", "name": "alpha"},
     ]
     source["rules"][0]["owner_id"] = beta["id"]
     validate_core_graph(CoreDraft.model_validate(source))
@@ -250,24 +249,25 @@ def test_imported_expression_is_resolved_in_its_own_namespace_even_if_text_uncha
     )
 
 
-def test_unrelated_conflicts_cannot_split_a_valid_name_exchange():
+def test_duplicate_display_names_do_not_split_a_valid_identifier_exchange():
     alpha = object_type("alpha", UUID("00000000-0000-4000-8000-0000000000f1"))
     beta = object_type("beta", UUID("00000000-0000-4000-8000-0000000000f2"))
     retained1, retained2 = object_type("retained_one"), object_type("retained_two")
     source = graph(
-        {**alpha, "name": "beta", "technical_name": "beta"},
-        {**beta, "name": "alpha", "technical_name": "alpha"},
+        {**alpha, "display_name": "beta", "name": "beta"},
+        {**beta, "display_name": "alpha", "name": "alpha"},
         {
             **object_type("new_one", UUID("00000000-0000-4000-8000-000000000001")),
-            "name": "retained_one",
+            "display_name": "retained_one",
         },
         {
             **object_type("new_two", UUID("00000000-0000-4000-8000-000000000002")),
-            "name": "retained_two",
+            "display_name": "retained_two",
         },
     )
     result = build_candidate_graph(
         graph(alpha, beta, retained1, retained2), source, native=True
     )
-    assert len(result.blocked) == 2
-    assert {c["target_id"] for c in result.changes} == {alpha["id"], beta["id"]}
+    assert not result.blocked
+    assert len(result.changes) == 4
+    assert {alpha["id"], beta["id"]} <= {c["target_id"] for c in result.changes}

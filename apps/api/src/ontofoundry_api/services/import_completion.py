@@ -12,7 +12,7 @@ from sqlglot import exp
 
 from ontofoundry_api.adapters.base import ImportContext
 from ontofoundry_api.adapters.documents import SourceDocument
-from ontofoundry_api.adapters.ossie.ids import display_name, source_id, technical_name
+from ontofoundry_api.adapters.ossie.ids import identifier_name, source_id
 from ontofoundry_api.adapters.ossie.metrics import variant
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
@@ -326,7 +326,11 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         )
     candidate = pending_candidate(db, session)
     raw = (settings.data_dir / record.raw_artifact).read_bytes()
-    document = SourceDocument.parse(raw)
+    from ontofoundry_api.adapters.archive import read_ossie
+
+    document = SourceDocument.parse(
+        read_ossie(raw)[0] if record.adapter == "ossie-0.2" else raw
+    )
     correction_report = None
     target_ids = set()
     evidence = {}
@@ -405,14 +409,10 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         metric = SimpleMetric(
             id=ident,
             kind="simple",
+            display_name=existing.display_name if existing else None,
             name=existing.name
             if existing
-            else display_name(definition["name"], {m.name.casefold() for m in others}),
-            technical_name=existing.technical_name
-            if existing
-            else technical_name(
-                definition["name"], {m.technical_name.casefold() for m in others}
-            ),
+            else identifier_name(definition["name"], {m.name.casefold() for m in others}),
             description=definition.get("description", ""),
             dataset_id=body.dataset_id,
             aggregation="count",
@@ -477,7 +477,7 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         matched = build_candidate_graph(
             candidate,
             translated.model,
-            native=record.adapter == "ontofoundry-core-1",
+            native=record.adapter in {"ontofoundry-core-1", "ontofoundry-core-1-package"},
             registered=identities(db, workspace_id),
         )
         source_targets = {

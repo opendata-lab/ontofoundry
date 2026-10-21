@@ -8,7 +8,7 @@
   --color-surface-soft: #f3f6fa;
   --color-rule-soft: #edf1f6;
   --color-rule: #e3e9f1;
-  --shadow-panel: 0 1px 2px rgb(25 45 75 / 3%), 0 6px 20px rgb(25 45 75 / 3%);
+  --shadow-panel: 0 1px 3px rgb(25 45 75 / 6%);
   --color-rule-strong: #b9c3d1;
   --color-ink: #20252d;
   --color-ink-2: #303842;
@@ -96,6 +96,8 @@
   /* U1 application chrome and the unchanged decorative brand geometry. */
   --app-min-width: 1100px;
   --app-header-height: 52px;
+  --page-header-height: 48px;
+  --panel-toolbar-height: 48px;
   --app-sidebar-collapsed: 56px;
   --app-search-max-height: 420px;
   --workspace-tab-title-width: 180px;
@@ -132,6 +134,15 @@
   --inspector-search-width: 240px;
   --inspector-filter-width: 128px;
   --inspector-cardinality-width: 80px;
+  --source-fields-columns: minmax(15rem, 1fr) minmax(0, 3fr);
+  --inspector-basic-label-width: 5rem;
+  --property-table-min-width: 66rem;
+  --property-name-column: 10%;
+  --property-technical-column: 12%;
+  --property-kind-column: 9%;
+  --property-constraints-column: 20%;
+  --property-binding-column: 24%;
+  --property-actions-column: 5%;
   --inspector-source-label-width: 96px;
   --icon-size: 16px;
   --icon-size-sm: 14px;
@@ -149,6 +160,12 @@
   --spacing-review-filter: var(--review-filter-width);
   --spacing-builder-results: var(--builder-results-width);
   --spacing-review-graph: var(--review-graph-height);
+  --spacing-property-name: 8rem;
+  --spacing-property-kind: 7rem;
+  --spacing-property-binding: 18rem;
+  --spacing-property-constraints: 11rem;
+  --spacing-binding-mode: 4rem;
+  --spacing-binding-source: 5rem;
   --spacing-inspector-search: var(--inspector-search-width);
   --spacing-inspector-filter: var(--inspector-filter-width);
   --spacing-inspector-cardinality: var(--inspector-cardinality-width);
@@ -159,6 +176,8 @@
   --container-tab-title: var(--workspace-tab-title-width);
   --container-tab-confirm: min(var(--workspace-tab-confirm-width), calc(100vw - var(--space-xl) - var(--space-xs)));
   --spacing-app-header: var(--app-header-height);
+  --spacing-page-header: var(--page-header-height);
+  --spacing-panel-toolbar: var(--panel-toolbar-height);
   --container-directory: var(--directory-max-width);
   --container-settings: var(--settings-max-width);
   --spacing-app-search: var(--app-search-max-height);
@@ -247,6 +266,26 @@
 }
 .brand-tile-muted { opacity: var(--brand-muted-opacity); }
 
+/* The directory shares the full-width title band while its body stays bounded. */
+.directory-content > div {
+  width: 100%;
+  max-width: var(--directory-max-width);
+  margin-inline: auto;
+}
+.directory-content > header > div {
+  width: 100%;
+  max-width: var(--directory-max-width);
+  margin-inline: auto;
+}
+
+/* Only page-level categories join the title band; nested Tabs keep their layout. */
+.page-tabs {
+  & > .ant-tabs-content-holder { min-height: 0; flex: 1; overflow: hidden; }
+  & > .ant-tabs-content-holder > .ant-tabs-content,
+  & > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane { height: 100%; }
+  & > .ant-tabs-content-holder > .ant-tabs-content > .ant-tabs-tabpane-active { display: flex; flex-direction: column; }
+}
+
 /* Retained result tabs fill the workbench without reaching nested Tabs. */
 .review-tabs {
   & > .ant-tabs-content-holder { min-height: 0; flex: 1; }
@@ -294,8 +333,8 @@
 .object-overview-columns {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: var(--space-xl);
+  align-items: stretch;
+  gap: var(--space-md);
 }
 @container (min-width: 48rem) {
   .object-overview-columns {
@@ -304,7 +343,7 @@
 }
 .object-overview-info {
   overflow-wrap: anywhere;
-  & .ant-descriptions-item-label { white-space: nowrap; }
+  & .ant-descriptions-item-label { white-space: nowrap; min-width: var(--inspector-basic-label-width); }
   & .ant-descriptions-item-content { min-width: 0; overflow-wrap: anywhere; }
 }
 .object-overview-graph {
@@ -402,4 +441,28 @@
     )
   );
   gap: var(--space-xs);
+}
+
+/* Source configuration keeps its own responsive width beside the field table. */
+.source-fields-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-md);
+}
+.source-fields-source { container-type: inline-size; overflow-wrap: anywhere; }
+.inspector-source-field-label { display: none; }
+@container (min-width: 64rem) {
+  .source-fields-layout { grid-template-columns: var(--source-fields-columns); }
+}
+@container (max-width: 32rem) {
+  .inspector-source-labels { display: none; }
+  .inspector-source-field-label { display: block; }
+  .inspector-source-row:not(.inspector-source-labels) {
+    grid-template-columns: minmax(0, 1fr) var(--control-height);
+    & > :first-child { grid-column: 1; grid-row: 1; }
+    & > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+    & > :nth-child(3) { grid-column: 1 / -1; grid-row: 3; }
+    & > :last-child { grid-column: 2; grid-row: 1; justify-self: end; }
+  }
 }

@@ -50,7 +50,7 @@ def test_metrics_execute_actual_aggregate_sql(tmp_path, monkeypatch, example, ex
     draft, engine = source_database(tmp_path, monkeypatch, example)
     try:
         for name, value in expected.items():
-            metric = next(m for m in draft.metrics if m.technical_name == name)
+            metric = next(m for m in draft.metrics if m.name == name)
             result = execute_metric_preview(
                 None, str(draft.workspace_id), draft, metric, None
             )
@@ -123,7 +123,7 @@ def test_engine_unsupported_and_zero_denominator_have_no_fake_value(tmp_path, mo
         with pytest.raises(ServiceError) as exc:
             execute_metric_preview(None, str(draft.workspace_id), draft, median, None)
         assert exc.value.code == "dialect_unsupported"
-        ratio = next(m for m in draft.metrics if m.technical_name == "completion_rate")
+        ratio = next(m for m in draft.metrics if m.name == "completion_rate")
         for metric in draft.metrics:
             if metric.id in {ratio.numerator_id, ratio.denominator_id}:
                 metric.filters = [
@@ -160,8 +160,8 @@ def test_snapshot_selected_before_grouping_by_launch_month(tmp_path, monkeypatch
             metric = ExpressionMetric.model_validate(
                 {
                     "id": str(metric.id),
+                    "display_name": metric.name,
                     "name": metric.name,
-                    "technical_name": metric.technical_name,
                     "kind": "expression",
                     "dataset_id": str(dataset.id),
                     "expression": "COUNT(*)",

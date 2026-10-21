@@ -250,7 +250,7 @@ def test_type_and_fact_change_survives_another_sessions_publication(
     initial = example_session(client, "07-instances-and-evidence")
 
     def set_kind_and_values(raw, kind, value):
-        prop = next(p for p in raw["properties"] if p["technical_name"] == "is_vip")
+        prop = next(p for p in raw["properties"] if p["name"] == "is_vip")
         prop["value_kind"] = kind
         for fact in raw["material_objects"]:
             if fact["type_id"] == prop["owner_type_id"]:
@@ -294,7 +294,7 @@ def test_type_and_fact_change_survives_another_sessions_publication(
         graph = validate_core_graph(CoreDraft.model_validate(raw))
         target = next(o for o in graph.object_types if str(o.id) == target_id)
         assert target.description == obj["description"]
-        prop = next(p for p in graph.properties if p.technical_name == "is_vip")
+        prop = next(p for p in graph.properties if p.name == "is_vip")
         assert prop.value_kind == new_kind
         facts = [f for f in graph.material_objects if str(f.type_id) == target_id]
         assert facts

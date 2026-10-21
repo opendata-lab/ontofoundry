@@ -33,7 +33,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.canonical import element_sha256
-from ontofoundry_api.domain.core import LinkType, MaterialObject, Strict
+from ontofoundry_api.domain.core import MaterialObject, Strict
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind, OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
@@ -102,11 +102,6 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
 
 def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict[str, Any]:
     before, after = item.before_json, item.after_json
-    legacy = item.target_kind == "link_type" and any(
-        isinstance(value, dict) and "technical_name" in value for value in (before, after)
-    )
-    if legacy:
-        before, after = (LinkType.read_previous_names(value) for value in (before, after))
     element = after or before or {}
     status, reason = statuses[item.id]
     group = set(dependency_group(item.id, dependencies))
@@ -120,7 +115,9 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         ).all()
         for peer in peers:
             group.update(dependency_group(peer, dependencies))
+    from ontofoundry_api.services.dataset_proposals import proposal_diagnostics
     return {
+        "source_diagnostics": proposal_diagnostics(db, workspace_id, item),
         "id": item.id,
         "batch_id": item.batch_id,
         "ordinal": item.ordinal,
@@ -133,7 +130,7 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements) -> dict
         "before": before,
         "after": after,
         # Agents may omit field_changes (display data); derive them then.
-        "field_changes": (None if legacy else item.field_changes_json)
+        "field_changes": item.field_changes_json
         or (field_changes(before, after) if before and after else []),
         "evidence": _evidence_view(
             db,
@@ -535,11 +532,12 @@ def decide(
             ) from exc
         from ontofoundry_api.services.join_validation import validate_join_columns
 
+        checked_draft = model.model_dump(mode="json")
         validate_join_columns(
             db,
             workspace_id,
             before_mapping_write,
-            model.model_dump(mode="json"),
+            checked_draft,
             request.app.state.settings,
         )
         check_identities(
@@ -551,7 +549,7 @@ def decide(
                 if item.operation == "create"
             },
         )
-        draft = model.model_dump(mode="json")
+        draft = checked_draft
         check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
@@ -772,3 +770,15 @@ def revise_fact_proposal(
         db, workspace_id, session_id, proposal_id, body, user, request.app.state.settings
     )
     return read_batch(workspace_id, session_id, batch_id, db, user)
+
+
+class DatasetProposalRevision(BaseModel):
+    dataset: __import__("ontofoundry_api.domain.core", fromlist=["Dataset"]).Dataset
+    expected_session_revision: int
+
+
+@router.put("/proposals/{proposal_id}/dataset")
+def revise_dataset_source(workspace_id: str, session_id: str, proposal_id: str, body: DatasetProposalRevision, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    require_member(db, workspace_id, user.id)
+    from ontofoundry_api.services.dataset_proposals import revise_dataset
+    return revise_dataset(db, workspace_id, session_id, proposal_id, body.dataset, body.expected_session_revision)

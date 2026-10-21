@@ -3,9 +3,6 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import (
-    MetaData,
-    Table,
-    func,
     inspect,
     select,
     text,
@@ -18,7 +15,6 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
 from ontofoundry_api.services.readonly import connect_readonly
-from ontofoundry_api.services.table_material import SAMPLE_ROWS, tables_markdown
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["data"])
 
@@ -173,74 +169,10 @@ def table_material(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    """Bottom-up modeling: turn selected tables into a material a modeling run reads."""
-    # Imported here: materials imports modeling, which this module's callers load first.
-    from ontofoundry_api.api.materials import describe, store_text_material
-
     require_member(db, workspace_id, user.id)
-    item = get_connection(db, workspace_id, connection_id)
-    schema = body.schema_name
-    described = []
-    with connect_readonly(item, request.app.state.settings) as conn:
-        inspector = inspect(conn)
-        names = set(
-            inspector.get_table_names(schema=schema)
-            + inspector.get_view_names(schema=schema)
-        )
-        missing = [t for t in body.tables if t not in names]
-        if missing:
-            raise HTTPException(404, "数据表不存在：" + "、".join(missing))
-        for name in dict.fromkeys(body.tables):
-            pks = inspector.get_pk_constraint(name, schema=schema).get(
-                "constrained_columns", []
-            )
-            columns = inspector.get_columns(name, schema=schema)
-            table = Table(name, MetaData(), schema=schema, autoload_with=conn)
-            samples = [
-                dict(row._mapping) for row in conn.execute(select(table).limit(SAMPLE_ROWS))
-            ]
-            count = conn.execute(select(func.count()).select_from(table)).scalar()
-            described.append(
-                {
-                    "name": name,
-                    "comment": (inspector.get_table_comment(name, schema=schema) or {}).get(
-                        "text"
-                    ),
-                    "row_count": count,
-                    "columns": [
-                        {
-                            "name": c["name"],
-                            "type": str(c["type"]),
-                            "nullable": c.get("nullable"),
-                            "primary_key": c["name"] in pks,
-                            "comment": c.get("comment"),
-                        }
-                        for c in columns
-                    ],
-                    "foreign_keys": [
-                        {
-                            "column": fk["constrained_columns"][0],
-                            "table": fk["referred_table"],
-                        }
-                        for fk in inspector.get_foreign_keys(name, schema=schema)
-                        if len(fk.get("constrained_columns") or []) == 1
-                    ],
-                    "samples": samples,
-                }
-            )
-    config = item.config_json
-    text_value = tables_markdown(
-        source=item.name,
-        kind=item.kind,
-        database=config["database"],
-        schema=schema,
-        tables=described,
-    )
-    file_name = f"数据表结构-{item.name}-{'-'.join(body.tables)}"[:200] + ".md"
-    material = store_text_material(
-        db, request.app.state.settings, workspace_id, file_name, text_value
-    )
-    return describe(material)
+    get_connection(db, workspace_id, connection_id)
+    from ontofoundry_api.services.errors import DatasetSourceError
+    raise DatasetSourceError("请在本体目录创建数据集，并在构建页直接关联到会话；不再生成重复表结构材料", code="DATASET_ASSOCIATION_REQUIRED")
 
 
 class PreviewRequest(BaseModel):

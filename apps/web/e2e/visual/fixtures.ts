@@ -49,6 +49,7 @@ function toStoredDraft(source: CoreDraft): Draft {
       identifier: false,
       unique: false,
       required: false,
+      value_type_id: null,
       ...p,
     })),
     link_types: (source.link_types ?? []).map((l) => ({
@@ -70,6 +71,11 @@ function toStoredDraft(source: CoreDraft): Draft {
       return { ...common, ...m } as Metric;
     }),
     datasets: (source.datasets ?? []).map((d) => ({
+      source_kind: "table" as const,
+      connection_id: null,
+      display_name: null,
+      query_sql: null,
+      table_name: null,
       description: "",
       dialect: null,
       schema_name: null,
@@ -86,6 +92,7 @@ function toStoredDraft(source: CoreDraft): Draft {
     })),
     material_objects: (source.material_objects ?? []).map((o) => ({ values: {}, evidence: [], ...o })),
     material_links: (source.material_links ?? []).map((l) => ({ evidence: [], ...l })),
+    value_types: (source.value_types ?? []).map((v) => ({ description: "", evidence: [], display_name: null, ...v })),
   };
 }
 
@@ -114,7 +121,7 @@ function buildMappingsDraft(): Draft {
   }
 
   // Append the unmapped `city` object and its identifier property from 10-partial.
-  const cityObject = partial.object_types?.find((o) => o.technical_name === "city");
+  const cityObject = partial.object_types?.find((o) => o.name === "city");
   const cityProps = (partial.properties ?? []).filter((p) => p.owner_type_id === cityObject?.id);
   if (cityObject) {
     inheritance.object_types = [...(inheritance.object_types ?? []), cityObject];
@@ -247,6 +254,20 @@ export async function mockMappingsApi(page: Page) {
     [`${base}/members`]: { items: FIXTURE_MEMBERS },
     [`${base}/settings/dataagent-health`]: FIXTURE_HEALTH,
     [`${base}/versions`]: { items: FIXTURE_VERSIONS },
+    [`${base}/connections/conn-visual-retail/assets`]: {
+      connection_id: "conn-visual-retail",
+      version_id: null,
+      metadata_snapshot_id: "snapshot-visual-retail",
+      observed_at: "2026-10-17T02:00:00Z",
+      error: null,
+      changes: [],
+      status: "ready",
+      items: [
+        { name: "parties", schema: "public", comment: "当事人主数据", missing: false, datasets: [], columns: [{ name: "party_id", type: "varchar(32)", primary_key: true, nullable: false }, { name: "party_name", type: "varchar(120)", primary_key: false, nullable: false }, { name: "level", type: "varchar(16)", primary_key: false, nullable: true }] },
+        { name: "daily_sales", schema: "public", comment: "门店日销售汇总", missing: false, datasets: [], columns: [{ name: "stat_date", type: "date", primary_key: true, nullable: false }, { name: "store_id", type: "varchar(16)", primary_key: true, nullable: false }, { name: "amount", type: "numeric(12,2)", primary_key: false, nullable: true }] },
+        { name: "legacy_refunds", schema: "public", comment: "已下线的退款表", missing: true, datasets: [], columns: [{ name: "refund_id", type: "varchar(32)", primary_key: true, nullable: false }] },
+      ],
+    },
   };
   // Match the backend prefix only: a "**/api/**" glob also catches Vite's
   // /src/api/*.ts modules and stops the app from loading.
@@ -261,7 +282,7 @@ export async function mockMappingsApi(page: Page) {
 
 export const REVIEW_SESSION_ID = "session-visual-review";
 
-const SUPPLIER = FIXTURE_DRAFT.object_types.find((item) => item.technical_name === "supplier")!;
+const SUPPLIER = FIXTURE_DRAFT.object_types.find((item) => item.name === "supplier")!;
 const REVIEW_EVIDENCE: EvidenceView[] = [
   {
     kind: "material",
@@ -333,8 +354,8 @@ const REVIEW_BATCH: ProposalBatchDetail = {
       after: {
         id: "property-visual-service-scope",
         owner_type_id: SUPPLIER.id,
-        name: "供应范围",
-        technical_name: "service_scope",
+        display_name: "供应范围",
+        name: "service_scope",
         value_kind: "string",
         description: "供应商提供的商品或服务范围",
         identifier: false,
@@ -494,10 +515,10 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
 
 export const ELEMENT_DRAFT = structuredClone(FIXTURE_DRAFT);
 export const ELEMENTS = {
-  object: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "person")!,
-  derived: ELEMENT_DRAFT.object_types.find((item) => item.technical_name === "vip_party")!,
+  object: ELEMENT_DRAFT.object_types.find((item) => item.name === "person")!,
+  derived: ELEMENT_DRAFT.object_types.find((item) => item.name === "vip_party")!,
   relation: ELEMENT_DRAFT.link_types.find((item) => item.name === "signer")!,
-  metric: ELEMENT_DRAFT.metrics.find((item) => item.technical_name === "vip_party_count")!,
+  metric: ELEMENT_DRAFT.metrics.find((item) => item.name === "vip_party_count")!,
   dataset: ELEMENT_DRAFT.datasets.find((item) => item.name === "contracts")!,
 };
 ELEMENTS.dataset.columns!.push({ name: "stat_date", physical_type: "date", comment: "每日快照日期" });
@@ -563,17 +584,17 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
     graph: {
       ...FIXTURE_VERSIONS[0],
       nodes: ELEMENT_DRAFT.object_types.map((type) => ({
-        id: type.id, kind: "object_type", label: type.name, technical_name: type.technical_name,
+        id: type.id, kind: "object_type", label: type.display_name || type.name, name: type.name,
         description: type.description, tags: type.tags, attribute_count: effectiveProperties(ELEMENT_DRAFT, type.id).length,
       })),
       edges: [
         ...ELEMENT_DRAFT.link_types.map((link) => ({
-          id: link.id, kind: "link_type" as const, label: link.name, technical_name: link.name,
+          id: link.id, kind: "link_type" as const, label: link.display_name || link.name, name: link.name,
           source: link.source_type_id, target: link.target_type_id, link_type_id: link.id,
           description: link.description, multiplicity: link.multiplicity,
         })),
         ...ELEMENT_DRAFT.object_types.filter((type) => type.extends).map((type) => ({
-          id: `extends:${type.id}`, kind: "extends" as const, label: "继承", technical_name: "extends",
+          id: `extends:${type.id}`, kind: "extends" as const, label: "继承", name: "extends",
           source: type.id, target: type.extends!,
         })),
       ],

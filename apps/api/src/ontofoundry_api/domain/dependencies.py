@@ -98,6 +98,7 @@ def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
                         add(obj.id, step.link_type_id, path)
     for prop in draft.properties:
         add(prop.id, prop.owner_type_id, "owner_type_id")
+        add(prop.id, prop.value_type_id, "value_type_id")
     for link in draft.link_types:
         add(link.id, link.source_type_id, "source_type_id")
         add(link.id, link.target_type_id, "target_type_id")
@@ -252,10 +253,10 @@ def rewrite_references(
             binding = original_binding.model_copy(deep=True)
             prop = old.property_by_name(previous.type_id, name)
             if prop and prop.id in new.properties and name in previous.fields:
-                name = new.properties[prop.id].technical_name
+                name = new.properties[prop.id].name
                 if (
                     isinstance(binding, ExpressionBinding)
-                    and binding == previous.fields[prop.technical_name]
+                    and binding == previous.fields[prop.name]
                 ):
                     binding.expression = render_references(
                         resolve_field_expression(before, previous, binding.expression),
@@ -288,7 +289,7 @@ def rewrite_references(
         for name, value in values.items():
             prop = old.property_by_name(previous.type_id, name)
             if prop and prop.id in new.properties and name in previous.values:
-                name = new.properties[prop.id].technical_name
+                name = new.properties[prop.id].name
             if name in rewritten:
                 raise ValueError("属性改名后的事实值键冲突")
             rewritten[name] = value

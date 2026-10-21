@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 from core1_fixtures import example_draft
+from dataset_binding import _register
 from sqlalchemy import URL, create_engine
 
 from ontofoundry_api.db_models import ConnectionRecord
@@ -48,7 +49,9 @@ def test_mysql_metric_preview_uses_actual_aggregate(client, percent_names):
                 {},
             )
         draft = example_draft("13-dataset-metrics")
+        connection_id = str(uuid4())
         for ds in draft.datasets:
+            ds.connection_id = connection_id
             ds.table_name = name
             ds.dialect = "mysql"
             ds.schema_name = config["database"]
@@ -65,7 +68,7 @@ def test_mysql_metric_preview_uses_actual_aggregate(client, percent_names):
         with client.app.state.session_factory() as db:
             db.add(
                 ConnectionRecord(
-                    id=str(uuid4()),
+                    id=connection_id,
                     workspace_id=wid,
                     name="虚构一次性来源",
                     kind="mysql",
@@ -75,6 +78,10 @@ def test_mysql_metric_preview_uses_actual_aggregate(client, percent_names):
                     secret_encrypted=config["password"],
                 )
             )
+            db.flush()
+            connection = db.get(ConnectionRecord, connection_id)
+            for dataset in draft.datasets:
+                _register(db, connection, dataset.schema_name, dataset.table_name, [column.model_dump() for column in dataset.columns or []])
             db.commit()
             ratio = next(m for m in draft.metrics if m.kind == "ratio")
             assert float(

@@ -8,196 +8,196 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001301",
-        "name": "订单",
-        "technical_name": "sales_order",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "sales_order",
+        "display_name": "订单"
       },
       {
         "id": "00000000-0000-4000-8000-000000001302",
-        "name": "订单明细",
-        "technical_name": "order_line",
         "description": "订单中的一行，由订单 + 行号标识",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "order_line",
+        "display_name": "订单明细"
       },
       {
         "id": "00000000-0000-4000-8000-000000001303",
-        "name": "商品",
-        "technical_name": "product",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "product",
+        "display_name": "商品"
       },
       {
         "id": "00000000-0000-4000-8000-000000001304",
-        "name": "发货单",
-        "technical_name": "shipment",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "shipment",
+        "display_name": "发货单"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002301",
         "owner_type_id": "00000000-0000-4000-8000-000000001301",
-        "name": "订单号",
-        "technical_name": "order_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "order_no",
+        "display_name": "订单号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002302",
         "owner_type_id": "00000000-0000-4000-8000-000000001301",
-        "name": "状态",
-        "technical_name": "status",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "status",
+        "display_name": "状态"
       },
       {
         "id": "00000000-0000-4000-8000-000000002314",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "订单号",
-        "technical_name": "order_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "order_no",
+        "display_name": "订单号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002311",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "行号",
-        "technical_name": "line_no",
         "description": "",
         "value_kind": "integer",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "line_no",
+        "display_name": "行号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002312",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "数量",
-        "technical_name": "quantity",
         "description": "",
         "value_kind": "integer",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "quantity",
+        "display_name": "数量"
       },
       {
         "id": "00000000-0000-4000-8000-000000002313",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "单价",
-        "technical_name": "unit_price",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "unit_price",
+        "display_name": "单价"
       },
       {
         "id": "00000000-0000-4000-8000-000000002321",
         "owner_type_id": "00000000-0000-4000-8000-000000001303",
-        "name": "SKU",
-        "technical_name": "sku",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "sku",
+        "display_name": "SKU"
       },
       {
         "id": "00000000-0000-4000-8000-000000002322",
         "owner_type_id": "00000000-0000-4000-8000-000000001303",
-        "name": "品类",
-        "technical_name": "category",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "category",
+        "display_name": "品类"
       },
       {
         "id": "00000000-0000-4000-8000-000000002331",
         "owner_type_id": "00000000-0000-4000-8000-000000001304",
-        "name": "发货单号",
-        "technical_name": "shipment_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "shipment_no",
+        "display_name": "发货单号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002332",
         "owner_type_id": "00000000-0000-4000-8000-000000001304",
-        "name": "发货时间",
-        "technical_name": "shipped_at",
         "description": "",
         "value_kind": "datetime",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "shipped_at",
+        "display_name": "发货时间"
       },
       {
         "id": "00000000-0000-4000-8000-000000002330",
         "owner_type_id": "00000000-0000-4000-8000-000000001302",
-        "name": "明细金额",
-        "technical_name": "line_amount",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "line_amount",
+        "display_name": "明细金额"
       }
     ],
     "link_types": [
@@ -302,8 +302,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006301",
-        "name": "销量",
-        "technical_name": "units_sold",
         "description": "全部订单明细的数量合计，不限定订单状态。",
         "synonyms": [],
         "kind": "simple",
@@ -314,12 +312,12 @@
           "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
           "column": "qty"
         },
-        "filters": []
+        "filters": [],
+        "name": "units_sold",
+        "display_name": "销量"
       },
       {
         "id": "00000000-0000-4000-8000-000000006303",
-        "name": "发货单数",
-        "technical_name": "shipment_count",
         "description": "发货表全部记录的行数，不限定订单状态或明细匹配情况。",
         "synonyms": [],
         "kind": "simple",
@@ -327,19 +325,21 @@
         "dataset_id": "1cf49f63-2949-534c-8821-3514c9314ac6",
         "aggregation": "count",
         "measure": null,
-        "filters": []
+        "filters": [],
+        "name": "shipment_count",
+        "display_name": "发货单数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006330",
-        "name": "明细销售额",
-        "technical_name": "line_sales_amount",
         "description": "",
         "synonyms": [],
         "kind": "expression",
         "evidence": [],
         "dataset_id": "c352e603-3cd3-5a5b-93a7-9382ddae5580",
         "expression": "SUM(order_lines.qty * order_lines.unit_price)",
-        "value_kind": "decimal"
+        "value_kind": "decimal",
+        "name": "line_sales_amount",
+        "display_name": "明细销售额"
       }
     ],
     "datasets": [

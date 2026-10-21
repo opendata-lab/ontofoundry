@@ -82,7 +82,7 @@ def test_neighborhood_uses_declared_join_columns(
 ):
     draft, engine = source_database(tmp_path, monkeypatch, example)
     try:
-        obj = next(o for o in draft.object_types if o.technical_name == center_type)
+        obj = next(o for o in draft.object_types if o.name == center_type)
         rows = query_instances(None, str(draft.workspace_id), draft, obj.id, None)["items"]
         assert rows, (
             "The fictional center must exist; empty query results cannot pass adjacency tests"
@@ -98,8 +98,8 @@ def test_neighborhood_uses_declared_join_columns(
         )
         assert not result["warnings"], result["warnings"]
         assert not result["truncated"]
-        names = {str(o.id): o.technical_name for o in draft.object_types}
-        links = {str(relation.id): relation.technical_name for relation in draft.link_types}
+        names = {str(o.id): o.name for o in draft.object_types}
+        links = {str(relation.id): relation.name for relation in draft.link_types}
         nodes = {
             o["id"]: (names[o["type_id"]], tuple(str(p["value"]) for p in o["key"]))
             for o in result["objects"]

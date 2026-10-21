@@ -49,3 +49,17 @@ def verify(secret: str, credential: str) -> RunGrant | None:
     except (BadSignature, SignatureExpired):
         return None
     return RunGrant(data["w"], data["s"], data["r"], data.get("v"), data["u"])
+
+
+def access_file(access: dict) -> dict:
+    """The credential appears only in this uploaded file, never the turn text."""
+    return {
+        "url": access["url"],
+        "version_id": access["version_id"],
+        "headers": {
+            "Authorization": "Bearer " + access["credential"],
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2025-11-25",
+        },
+    }

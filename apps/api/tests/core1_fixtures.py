@@ -26,7 +26,13 @@ def example_document(name: str) -> dict:
 
 
 def example_draft_json(name: str) -> dict:
-    return json.loads(json.dumps(example_document(name)["draft"]))
+    draft = json.loads(json.dumps(example_document(name)["draft"]))
+    # Examples predate later collections such as value_types; add them empty.
+    from ontofoundry_api.domain.core import COLLECTIONS
+
+    for collection in COLLECTIONS:
+        draft.setdefault(collection, [])
+    return draft
 
 
 def example_draft(name: str) -> CoreDraft:

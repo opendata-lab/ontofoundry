@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Form, Popconfirm, Select, Tag, Tooltip, Typography } from "antd";
+import { Alert, Button, Descriptions, Popconfirm, Select, Tag, Tooltip, Typography } from "antd";
 import { Plus, Trash2 } from "lucide-react";
 import type { Dataset, Draft, ObjectType } from "../../api/types";
 import { byId, remove, type ResolvedSource } from "../../lib/coreModel";
@@ -30,6 +30,8 @@ function KeyColumns({
   const columns = sourceColumns(dataset);
   return (
     <Select
+      size="small"
+      maxTagCount="responsive"
       mode={columns.length ? "multiple" : "tags"}
       aria-label={label}
       disabled={!onChange || undefined}
@@ -88,7 +90,7 @@ export function MappingSources({
                 {s.key_columns.length > 0 && <Tooltip title="按业务时点唯一识别记录的逻辑键，不要求数据库已声明主键约束"><Text type="secondary">唯一键：{s.key_columns.join(", ")}</Text></Tooltip>}
                 {s.dataset?.snapshot_date_column && <Tag className="m-0">每日快照</Tag>}
                 {s.ownerTypeId !== type.id && (
-                  <Text type="secondary">来自{byId(draft.object_types, s.ownerTypeId)?.name}</Text>
+                  <Text type="secondary">来自{(byId(draft.object_types, s.ownerTypeId)?.display_name || byId(draft.object_types, s.ownerTypeId)?.name)}</Text>
                 )}
               </span>
             ),
@@ -105,8 +107,9 @@ export function MappingSources({
   const sides = own.filter((s) => s.id !== MAIN_SOURCE);
   const sourceRow = (s: ResolvedSource, title: string, removable: boolean) => (
     <div key={s.id} className="inspector-source-row">
-      <Text type="secondary" className="w-24 flex-none">{title}</Text>
-      <Form.Item layout="vertical" label="数据集" className="mb-0 min-w-0 flex-1"><Select
+      <Text type="secondary" className="flex-none">{title}</Text>
+      <div className="flex min-w-0 flex-col gap-1"><Text type="secondary" className="inspector-source-field-label text-xs">数据集</Text><Select
+        size="small"
         aria-label={`${title}数据集`}
         className="min-w-0 flex-1"
         showSearch
@@ -127,19 +130,20 @@ export function MappingSources({
                 },
           )
         }
-      /></Form.Item>
-      <Form.Item layout="vertical" label={<Tooltip title="用于在同一业务时点唯一识别记录，不要求数据库已声明物理主键约束">唯一键</Tooltip>} className="mb-0 min-w-0 flex-1"><KeyColumns
+      /></div>
+      <div className="flex min-w-0 flex-col gap-1"><Text type="secondary" className="inspector-source-field-label text-xs">唯一键</Text><KeyColumns
         dataset={s.dataset}
         label={`${title}唯一键`}
         value={s.key_columns}
         onChange={(columns) => change(setKeyColumns(draft, type.id, s.id, columns))}
-      /></Form.Item>
+      /></div>
       {removable ? (
         <Popconfirm title={s.id === MAIN_SOURCE ? "解除本对象的数据绑定？" : `移除${title}？`}
           description={s.id === MAIN_SOURCE ? "同时移除本对象的附表及属性映射，保存后生效。" : "同时移除使用此表的属性绑定，保存后生效。"}
           onConfirm={() => change(s.id === MAIN_SOURCE && mapping ? remove(draft, "mappings", mapping.id) : removeSource(draft, type.id, s.id))}>
         <Tooltip title={s.id === MAIN_SOURCE ? "移除主表并解除本对象的数据绑定" : `移除${title}`}><Button
           type="text"
+          size="small"
           danger
           aria-label={`移除${title}`}
           icon={<Trash2 size={15} />}
@@ -151,30 +155,36 @@ export function MappingSources({
     </div>
   );
   return (
-    <div className="flex flex-col gap-3">
-      <Text type="secondary" className="text-xs">选择可唯一识别记录的列；组合键按顺序选择，附表键与主表逐列对应。快照表按同一快照时点识别。</Text>
+    <div className="flex flex-col gap-2">
       {shared && (
         <Alert
           type="info"
           showIcon
-          message={`共用${byId(draft.object_types, inherited[0]?.ownerTypeId)?.name ?? "父对象"}的数据。用成员条件或成员扩展表限定哪些实例属于本对象。`}
+          message={`共用${(byId(draft.object_types, inherited[0]?.ownerTypeId)?.display_name || byId(draft.object_types, inherited[0]?.ownerTypeId)?.name) ?? "父对象"}的数据。用成员条件或成员扩展表限定哪些实例属于本对象。`}
         />
       )}
       {inherited.map((s) => (
         <div key={`${s.ownerTypeId}:${s.id}`} className="flex items-center gap-2">
-          <Text type="secondary" className="w-24 flex-none">{sourceLabel(s)}</Text>
+          <Text type="secondary" className="flex-none">{sourceLabel(s)}</Text>
           <Text>
-            {datasetLabel(s.dataset)} <Text type="secondary">· 来自{byId(draft.object_types, s.ownerTypeId)?.name}</Text>
+            {datasetLabel(s.dataset)} <Text type="secondary">· 来自{(byId(draft.object_types, s.ownerTypeId)?.display_name || byId(draft.object_types, s.ownerTypeId)?.name)}</Text>
           </Text>
         </div>
       ))}
+      {(main || sides.length > 0) && <div className="inspector-source-row inspector-source-labels text-xs text-muted" aria-hidden="true">
+        <span />
+        <span>数据集</span>
+        <Tooltip title="用于在同一业务时点唯一识别记录，不要求数据库已声明物理主键约束"><span>唯一键</span></Tooltip>
+        <span />
+      </div>}
       {!shared &&
         (main ? (
           sourceRow(main, "主表", true)
         ) : (
           <div className="flex items-center gap-2">
-            <Text type="secondary" className="w-24 flex-none">主表</Text>
+            <Text type="secondary" className="flex-none">主表</Text>
             <Select
+              size="small"
               className="min-w-0 flex-1"
               aria-label="主表数据集"
               showSearch
@@ -189,6 +199,7 @@ export function MappingSources({
       <div className="flex flex-wrap items-center gap-3">
         {(shared || main) && (
           <Select
+            size="small"
             aria-label={shared ? "添加扩展表" : "添加附表"}
             showSearch
             optionFilterProp="label"
@@ -200,18 +211,19 @@ export function MappingSources({
             }
             value={null}
             options={datasets}
-            className="min-w-60"
+            className="w-inspector-filter"
             onChange={(datasetId: string) => change(addSource(draft, type.id, datasetId).draft)}
           />
         )}
         {shared && sides.length > 0 && (
-          <span className="inline-flex items-center gap-2">
-            <Text type="secondary">成员扩展表</Text>
+          <span className="inline-flex w-full min-w-0 items-center gap-2">
+            <Text type="secondary" className="shrink-0 whitespace-nowrap text-xs">成员扩展表</Text>
             <Select
+              size="small"
               aria-label="成员扩展表"
               allowClear
               placeholder="不限定"
-              className="min-w-48"
+              className="min-w-0 flex-1"
               value={membership ?? undefined}
               options={sides.map((s) => ({ value: s.id, label: datasetLabel(s.dataset) }))}
               onChange={(sourceId?: string) => change(setMembershipSource(draft, type.id, sourceId ?? null))}

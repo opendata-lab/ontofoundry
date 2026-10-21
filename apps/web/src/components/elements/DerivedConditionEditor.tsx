@@ -57,20 +57,20 @@ export function DerivedConditionEditor({
     onChange(branchesFromForm(draft, object.extends, next));
   };
   const errors = formErrors(draft, form);
-  const parentName = context.parent?.name ?? "父对象";
+  const parentName = (context.parent?.display_name || context.parent?.name) ?? "父对象";
   const fieldValue = (row: DerivedRow) =>
     row.kind === "property" ? `p:${row.propertyId}` : `l:${row.linkId}:${row.direction}`;
   const fieldOptions = [
     {
       label: "属性",
-      options: context.properties.map((p) => ({ value: `p:${p.id}`, label: p.name })),
+      options: context.properties.map((p) => ({ value: `p:${p.id}`, label: (p.display_name || p.name) })),
     },
     {
       label: "关联",
       options: context.links.map((l) => {
         const other = byId(draft.object_types, l.direction === "forward" ? l.link.target_type_id : l.link.source_type_id);
         const name = linkDisplayName(l.link, l.direction === "forward");
-        return { value: `l:${l.link.id}:${l.direction}`, label: `${name}（${other?.name ?? "?"}）` };
+        return { value: `l:${l.link.id}:${l.direction}`, label: `${name}（${(other?.display_name || other?.name) ?? "?"}）` };
       }),
     },
   ];
@@ -87,7 +87,7 @@ export function DerivedConditionEditor({
   if (!object.extends) return null;
   return (
     <div className="flex flex-col gap-3">
-      <SectionTitle title={`哪些${parentName}属于${object.name || "这个对象"}`}>
+      <SectionTitle title={`哪些${parentName}属于${(object.display_name || object.name) || "这个对象"}`}>
         <Segmented
           size="small"
           value={form.mode}
@@ -123,12 +123,12 @@ export function DerivedConditionEditor({
                 validateStatus={error ? "error" : undefined}
                 help={error}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Text type="secondary" className="w-10 flex-none text-right">
                     {i === 0 ? "当" : "并且"}
                   </Text>
                   <Select
-                    className="min-w-0 flex-1"
+                    className="min-w-inspector-filter flex-1"
                     showSearch
                     optionFilterProp="label"
                     aria-label={`条件 ${i + 1} 的字段`}
@@ -159,7 +159,7 @@ export function DerivedConditionEditor({
                       />
                     )}
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-inspector-filter flex-1">
                     {row.kind === "link" ? (
                       <Text type="secondary">关联的实例</Text>
                     ) : (
@@ -205,9 +205,9 @@ export function DerivedConditionEditor({
             onChange={(e) => update({ mode: "expression", expression: e.target.value })}
           />
           <Text type="secondary" className="text-xs">
-            从 {context.parent?.technical_name ?? "父对象"} 出发引用属性和关联，例如{" "}
-            <code>{context.parent?.technical_name ?? "parent"}.属性英文标识 = '值'</code>；有关联写{" "}
-            <code>EXISTS ({context.parent?.technical_name ?? "parent"}.关系英文标识)</code>，反向关系写{" "}
+            从 {context.parent?.name ?? "父对象"} 出发引用属性和关联，例如{" "}
+            <code>{context.parent?.name ?? "parent"}.属性英文标识 = '值'</code>；有关联写{" "}
+            <code>EXISTS ({context.parent?.name ?? "parent"}.关系英文标识)</code>，反向关系写{" "}
             <code>REVERSE(关系英文标识)</code>。保存时由服务器校验。
           </Text>
         </>

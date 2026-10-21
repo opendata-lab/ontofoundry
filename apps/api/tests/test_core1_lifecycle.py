@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from core1_fixtures import example_draft_json, example_names
+from dataset_binding import bind_datasets
 from test_modeling import create_session
 from test_t4_proposal_decisions import decide, seed_batch, update
 
@@ -31,6 +32,7 @@ def test_all_examples_save_publish_read(client, name):
     ):
         for e in draft[collection]:
             e["evidence"] = []
+    bind_datasets(client, draft, session["workspace_id"])
     saved = client.put(
         root + f"/sessions/{session['id']}",
         json={"revision": session["revision"], "draft": draft},
@@ -66,8 +68,8 @@ def test_atomic_name_swap_expands_and_undo_restores(client):
         client,
         s,
         [
-            update("object_type", a, name=b["name"], technical_name=b["technical_name"]),
-            update("object_type", b, name=a["name"], technical_name=a["technical_name"]),
+            update("object_type", a, display_name=b["name"], name=b["name"]),
+            update("object_type", b, display_name=a["name"], name=a["name"]),
         ],
     )
     first, second = batch["items"]

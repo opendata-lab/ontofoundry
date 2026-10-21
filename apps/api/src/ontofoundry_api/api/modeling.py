@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer
 
 from ontofoundry_api.api.auth import Principal, current_principal
+from ontofoundry_api.contracts.dataset_sources import LinkedTable
 from ontofoundry_api.contracts.read_models import AffectedItem, ElementSaveImpact
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
@@ -19,7 +20,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.canonical import snapshot_sha256
-from ontofoundry_api.domain.core import CoreDraft, LinkType
+from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.domain.models import OntologyDraft, Strict
 from ontofoundry_api.domain.snapshot import (
@@ -59,7 +60,7 @@ router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"]
 
 
 class ElementSave(Strict):
-    target_kind: Literal["object_type", "link_type", "metric", "dataset", "mapping"]
+    target_kind: Literal["object_type", "link_type", "metric", "dataset", "mapping", "value_type"]
     target_id: str
     expected_current_version_id: str | None
     session_id: str | None = None
@@ -147,13 +148,15 @@ def save_element(
         model = OntologyDraft.model_validate(calculation.merged)
         from ontofoundry_api.services.join_validation import validate_join_columns
 
+        checked_draft = model.model_dump(mode="json")
         validate_join_columns(
             db,
             workspace_id,
             original,
-            model.model_dump(mode="json"),
+            checked_draft,
             request.app.state.settings,
         )
+        model = OntologyDraft.model_validate(checked_draft)
         version = publish_draft(
             db,
             workspace_id=workspace_id,
@@ -163,7 +166,14 @@ def save_element(
             commit=False,
         )
         if item:
-            updated_draft = calculation.session_draft
+            updated_draft = deepcopy(calculation.session_draft)
+            # Server-probed dataset columns go to the session too, so it matches
+            # exactly what was published.
+            probed = {d["id"]: d for d in checked_draft["datasets"]}
+            updated_draft["datasets"] = [
+                {**d, "columns": probed[d["id"]]["columns"]} if d["id"] in probed else d
+                for d in updated_draft["datasets"]
+            ]
             # CAS also protects SQLite and a proposal decision racing this request.
             changed = db.execute(
                 update(ModelingSessionRecord)
@@ -228,11 +238,10 @@ def get_modeling_session(db: Session, workspace_id: str, session_id: str):
 
 
 def session_draft(item) -> dict:
-    """Normalize relationship fields on reads without rewriting session history."""
+    """Read the current draft without rewriting session history."""
     if item.draft_json.get("schema_version") != "core-1":
         raise HTTPException(404, "旧建模会话已停用，请新建会话")
     draft = deepcopy(item.draft_json)
-    draft["link_types"] = [LinkType.read_previous_names(link) for link in draft.get("link_types", [])]
     return draft
 
 
@@ -324,6 +333,7 @@ def session_data(item):
         "draft_sha256": item.draft_sha256 or draft_sha256(draft),
         "draft": draft,
         "material_ids": item.material_ids,
+        "linked_tables": item.linked_tables or [],
         "task_status": item.task_status,
         "task_detail": item.task_detail,
         "dataagent_topic_id": item.dataagent_topic_id,
@@ -413,6 +423,7 @@ class DraftSave(Strict):
     draft: dict
     title: str | None = Field(default=None, min_length=1, max_length=240)
     material_ids: list[str] | None = None
+    linked_tables: list[LinkedTable] | None = Field(default=None, max_length=200)
 
 
 class SessionPublish(Strict):
@@ -716,6 +727,12 @@ def save_session(
                 raise HTTPException(422, "材料不属于当前空间")
         values["material_ids"] = body.material_ids
         values.update(revised_material_bookkeeping(item, body.material_ids))
+    if body.linked_tables is not None:
+        from ontofoundry_api.services.dataset_sources import linked_table_details
+
+        linked = [t.model_dump() for t in body.linked_tables]
+        linked_table_details(db, workspace_id, linked)
+        values["linked_tables"] = linked
     result = revise(db, item, body.revision, **values)
     result["validation"] = validate_draft(draft, get_workspace(db, workspace_id))
     return result
@@ -738,6 +755,7 @@ def publish_session(
     workspace_id: str,
     session_id: str,
     body: SessionPublish,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -825,6 +843,17 @@ def publish_session(
             status_code=409,
             details={"current_version_id": space.current_version_id},
         )
+    # Session drafts can be edited directly, so publishing re-checks every new or
+    # changed dataset: registered source and safe read-only SQL.
+    from ontofoundry_api.services.join_validation import validate_join_columns
+
+    validate_join_columns(
+        db,
+        workspace_id,
+        version_snapshot(db, workspace_id, space.current_version_id),
+        merged,
+        request.app.state.settings,
+    )
     try:
         model = OntologyDraft.model_validate(merged)
     except ValidationError as exc:
@@ -945,11 +974,14 @@ def preview_definition(
     workspace_id: str,
     session_id: str,
     body: SessionPublish,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
     """Exactly what publishing now would produce: the B/L/D merge of base,
     latest and draft, validated and compiled, with the values publish checks."""
+    from ontofoundry_api.services.join_validation import dataset_checks
+
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
     if item.revision != body.session_revision:
@@ -1005,6 +1037,9 @@ def preview_definition(
         "labels": element_labels(merge.latest, merge.merged),
         "impacts": impacts(changes, merge.merged),
         "auto_merged": auto_merged(merge),
+        "dataset_checks": dataset_checks(
+            db, workspace_id, merge.latest, merge.merged, request.app.state.settings
+        ),
     }
 
 

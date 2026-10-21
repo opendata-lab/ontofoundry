@@ -26,6 +26,7 @@ from ontofoundry_api.domain.core import (
     Multiplicity,
     Operator,
     RatioMetric,
+    RuleOwnerKind,
     SimpleMetric,
     ValueKind,
 )
@@ -153,13 +154,17 @@ def metric_value_kind(
     return _column(index, metric.dataset_id, metric.measure.column)
 
 
-def _names(items, label, *, display=True, technical=True):
-    if display:
-        names = [unicodedata.normalize("NFKC", item.name).strip() for item in items]
-        _require(len(names) == len(set(names)), f"{label}名称重复")
-    if technical:
-        names = [item.technical_name.casefold() for item in items]
-        _require(len(names) == len(set(names)), f"{label}英文标识重复（含继承）")
+def _names(items, label, *, technical=True):
+    names = [
+        item.name.casefold()
+        if technical
+        else unicodedata.normalize("NFKC", item.name).strip()
+        for item in items
+    ]
+    _require(
+        len(names) == len(set(names)),
+        f"{label}英文标识重复（含继承）" if technical else f"{label}名称重复",
+    )
 
 
 def _unique_key(index: DraftIndex, type_id: UUID, ids: list[UUID]) -> bool:
@@ -188,7 +193,7 @@ def _join(draft, index, link, join: DataJoin, *, source_type_id=None):
             for pid in ids:
                 _require(
                     not isinstance(
-                        fields.get(index.properties[pid].technical_name), ExpressionBinding
+                        fields.get(index.properties[pid].name), ExpressionBinding
                     ),
                     "计算表达式不能作为关联键",
                 )
@@ -226,7 +231,7 @@ def _join(draft, index, link, join: DataJoin, *, source_type_id=None):
                 _require(
                     all(
                         not isinstance(
-                            fields.get(index.properties[pid].technical_name),
+                            fields.get(index.properties[pid].name),
                             ExpressionBinding,
                         )
                         for pid in key.property_ids
@@ -275,7 +280,7 @@ def _mappings(draft: CoreDraft, index: DraftIndex):
                     len(main.key_columns) == len(source.key_columns),
                     "附来源逻辑键宽必须与主来源一致",
                 )
-        props = {p.technical_name: p for p in index.effective_properties(obj.id)}
+        props = {p.name: p for p in index.effective_properties(obj.id)}
         for name, binding in mapping.fields.items():
             _require(name in props, f"映射引用了无效属性 {name}")
             if bound_ancestors:
@@ -299,6 +304,30 @@ def _mappings(draft: CoreDraft, index: DraftIndex):
                 "只能绑定从虚拟祖先继承的关系",
             )
             _join(draft, index, link, join, source_type_id=obj.id)
+
+
+def _value_types(draft: CoreDraft, index: DraftIndex) -> None:
+    from ontofoundry_api.domain.value_types import RESERVED_NAMES
+
+    _names(draft.value_types, "值类型")
+    _names([*draft.object_types, *draft.value_types], "实体类型与值类型共享英文标识")
+    for value_type in draft.value_types:
+        _require(
+            value_type.name.casefold() not in RESERVED_NAMES,
+            f"值类型英文标识不能使用内置类型名：{value_type.name}",
+        )
+    for prop in draft.properties:
+        if prop.value_type_id is None:
+            continue
+        value_type = index.value_types.get(prop.value_type_id)
+        _require(value_type is not None, f"属性 {prop.name} 引用的值类型不存在，请先改绑或一并保留值类型")
+        _require(
+            prop.value_kind == value_type.value_kind,
+            f"属性 {prop.name} 的基础类型须与值类型 {value_type.name} 一致（{value_type.value_kind}）",
+        )
+    for rule in draft.rules:
+        if rule.owner_kind == RuleOwnerKind.VALUE_TYPE:
+            _require(rule.owner_id in index.value_types, "规则归属的值类型不存在")
 
 
 def validate_core_graph(draft: CoreDraft) -> CoreDraft:
@@ -329,6 +358,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
             _require(current.extends not in seen, "继承关系不能成环")
             seen.add(current.extends)
             current = index.objects[current.extends]
+    _value_types(draft, index)
     for prop in draft.properties:
         _require(prop.owner_type_id in index.objects, "属性归属对象不存在")
     for link in draft.link_types:
@@ -370,7 +400,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
                     )
     rule_keys = set()
     for rule in draft.rules:
-        key = (rule.owner_kind, rule.owner_id, rule.technical_name.casefold())
+        key = (rule.owner_kind, rule.owner_id, rule.name.casefold())
         _require(key not in rule_keys, "同一归属下规则英文标识重复")
         rule_keys.add(key)
         resolve_rule_expression(draft, rule)
@@ -439,7 +469,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
             not (fact.type_id not in mappings and index.children(fact.type_id)),
             "虚拟父对象不能保存直接事实",
         )
-        props = {p.technical_name: p for p in index.effective_properties(fact.type_id)}
+        props = {p.name: p for p in index.effective_properties(fact.type_id)}
         for name, value in fact.values.items():
             _require(name in props, "事实引用了无效属性")
             _require(check_scalar(value, props[name].value_kind), "事实属性值类型不符")

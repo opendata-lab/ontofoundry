@@ -38,7 +38,7 @@ def payload():
                 "target_kind": "object_type",
                 "client_ref": "staff",
                 "before": None,
-                "after": {"name": "星港员工", "technical_name": "starport_staff"},
+                "after": {"display_name": "星港员工", "name": "starport_staff"},
             }
         ],
     }
@@ -88,8 +88,8 @@ def test_closed_batch_and_literal_values():
             "after",
             {
                 "id": str(uuid4()),
-                "name": "星港员工",
-                "technical_name": "starport_staff",
+                "display_name": "星港员工",
+                "name": "starport_staff",
             },
         ),
     ],
@@ -103,7 +103,7 @@ def test_invalid_create_shape(field, value):
 def update_payload(operation="update"):
     result = payload()
     target = str(uuid4())
-    before = {"id": target, "name": "星港员工", "technical_name": "starport_staff"}
+    before = {"id": target, "display_name": "星港员工", "name": "starport_staff"}
     after = (
         {k: v for k, v in before.items() if k != "id"}
         if operation == "update"
@@ -147,7 +147,7 @@ def test_update_delete_after_shape(operation):
     result["items"][0]["after"] = (
         None
         if operation == "update"
-        else {"name": "星港员工", "technical_name": "starport_staff"}
+        else {"display_name": "星港员工", "name": "starport_staff"}
     )
     assert checker.check_result(result, SCHEMA)
 
@@ -236,7 +236,21 @@ def test_relationship_schema_accepts_complete_readings(readings):
 
 
 def test_document_fact_reference_example_is_checkable():
-    text = (Path(__file__).parents[1] / "references/modeling-patterns.md").read_text()
     result = payload()
-    result["items"] = json.loads(text.split("```json\n")[1].split("```")[0])
+    result["items"] = json.loads(
+        (Path(__file__).parents[1] / "references/examples/facts.json").read_bytes()
+    )
+    for item in result["items"]:
+        item.setdefault("before", None)
     assert checker.check_result(result, SCHEMA) == []
+
+
+def test_optional_display_name_and_legacy_field_rejection():
+    result = payload()
+    del result["items"][0]["after"]["display_name"]
+    assert checker.check_result(result, SCHEMA) == []
+    result["items"][0]["after"]["technical_name"] = "starport_staff"
+    assert checker.check_result(result, SCHEMA)
+    del result["items"][0]["after"]["technical_name"]
+    result["items"][0]["after"]["name"] = "星港员工"
+    assert checker.check_result(result, SCHEMA)

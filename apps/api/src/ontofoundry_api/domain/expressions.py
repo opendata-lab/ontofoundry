@@ -159,9 +159,7 @@ def _link(index: DraftIndex, type_id: UUID, name: str, direction: str):
         if direction == "forward"
         else index.incoming_links(type_id)
     )
-    found = [
-        link for link in candidates if link.technical_name.casefold() == name.casefold()
-    ]
+    found = [link for link in candidates if link.name.casefold() == name.casefold()]
     if len(found) != 1:
         raise ExpressionError(f"关系路径不存在或有歧义：{name}")
     return found[0]
@@ -200,8 +198,8 @@ def resolve_path(
 
 def _ontology_reference(index, context, parts, first, last, *, existence=False):
     root = index.objects[context]
-    if parts[0][0].casefold() != root.technical_name.casefold():
-        raise ExpressionError(f"路径必须从上下文对象 {root.technical_name} 出发")
+    if parts[0][0].casefold() != root.name.casefold():
+        raise ExpressionError(f"路径必须从上下文对象 {root.name} 出发")
     current = context
     hops: list[tuple[UUID, str]] = []
     navigation = parts[1:] if existence else parts[1:-1]
@@ -396,6 +394,10 @@ def rule_context(draft: CoreDraft, rule: Rule) -> UUID:
 
 
 def resolve_rule_expression(draft: CoreDraft, rule: Rule) -> ResolvedExpression:
+    if rule.owner_kind == RuleOwnerKind.VALUE_TYPE:
+        from ontofoundry_api.domain.value_types import resolve_value_type_rule
+
+        return resolve_value_type_rule(draft, rule)
     return _resolve(rule.expression, draft, context=rule_context(draft, rule))
 
 
@@ -429,13 +431,15 @@ def render_references(resolved: ResolvedExpression, draft: CoreDraft) -> str:
     text = resolved.text
     for ref in reversed(resolved.references):
         try:
-            if ref.context == "ontology":
-                parts = [index.objects[ref.root_id].technical_name]
+            if ref.context == "value_type":
+                parts = [index.value_types[ref.root_id].name]
+            elif ref.context == "ontology":
+                parts = [index.objects[ref.root_id].name]
                 for link_id, direction in ref.links:
-                    name = index.links[link_id].technical_name
+                    name = index.links[link_id].name
                     parts.append(f"REVERSE({name})" if direction == "reverse" else name)
                 if ref.property_id is not None:
-                    parts.append(index.properties[ref.property_id].technical_name)
+                    parts.append(index.properties[ref.property_id].name)
             else:
                 parts = [
                     ref.source_id

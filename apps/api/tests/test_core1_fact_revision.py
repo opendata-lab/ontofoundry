@@ -159,12 +159,12 @@ def test_revision_converts_evidence_errors_without_database_or_mutation(
 def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(client):
     session = create_session(client)
     draft = session["draft"]
-    prop = next(p for p in draft["properties"] if p["technical_name"] == "label")
+    prop = next(p for p in draft["properties"] if p["name"] == "label")
     prop.update(identifier=True, unique=True)
     customer = next(
         o for o in draft["material_objects"] if o["type_id"] == prop["owner_type_id"]
     )
-    order_type = next(o for o in draft["object_types"] if o["technical_name"] == "order")
+    order_type = next(o for o in draft["object_types"] if o["name"] == "order")
     order_fact = {
         "id": str(uuid4()),
         "type_id": order_type["id"],
@@ -191,11 +191,7 @@ def test_revision_uses_current_target_hash_and_preserves_pending_adjacency(clien
         "locator": {"line_start": 1, "line_end": 1},
         "quote": "星港商店",
     }
-    link = next(
-        relation
-        for relation in draft["link_types"]
-        if relation["name"] == "buyer"
-    )
+    link = next(relation for relation in draft["link_types"] if relation["name"] == "buyer")
     batch = seed_batch(
         client,
         session,
@@ -270,9 +266,7 @@ def test_fact_revision_migrates_pending_upstream_and_preserves_both_endpoints(cl
         o for o in session["draft"]["material_objects"] if "customer_no" in o["values"]
     )
     returns = next(
-        o
-        for o in session["draft"]["object_types"]
-        if o["technical_name"] == "return_request"
+        o for o in session["draft"]["object_types"] if o["name"] == "return_request"
     )
     link = session["draft"]["link_types"][0]
     batch = seed_batch(

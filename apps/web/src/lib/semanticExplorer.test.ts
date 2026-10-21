@@ -21,7 +21,7 @@ describe("semantic resources", () => {
   it("draws inheritance as extends edges from the child", () => {
     const draft = example("06-inheritance");
     const graph = draftGraph(draft);
-    const person = draft.object_types.find((o) => o.technical_name === "person")!;
+    const person = draft.object_types.find((o) => o.name === "person")!;
     expect(graph.edges.find((e) => e.kind === "extends" && e.source === person.id)?.target).toBe(person.extends);
   });
 });

@@ -14,7 +14,7 @@ from ontofoundry_api.domain.core import (
 from ontofoundry_api.domain.expressions import resolve_field_expression
 from ontofoundry_api.domain.graph import DraftIndex
 
-from .ids import technical_name
+from .ids import identifier_name
 
 
 class MappingExporter:
@@ -30,7 +30,7 @@ class MappingExporter:
         self.join_names = set()
         used = set()
         for d in sorted(model.datasets, key=lambda d: (d.name, str(d.id))):
-            self.names[d.id] = technical_name(d.name, used)
+            self.names[d.id] = identifier_name(d.name, used)
             if self.names[d.id] != d.name:
                 report.issue(
                     f"/datasets/{self.position(d)}",
@@ -54,7 +54,7 @@ class MappingExporter:
                     "concept_mappings": [],
                 }
             parts = [*(d.schema_name.split(".") if d.schema_name else []), d.table_name]
-            source = ".".join(exp.to_identifier(part, quoted=True).sql() for part in parts)
+            source = d.query_sql if d.source_kind == "query" else ".".join(exp.to_identifier(part, quoted=True).sql() for part in parts)
             self.datasets[d.id] = {"name": self.names[d.id], "source": source, "fields": []}
             self.maps[scope]["semantic_model"]["datasets"].append(self.datasets[d.id])
             description = d.description
@@ -68,7 +68,7 @@ class MappingExporter:
                     "dropped",
                     "DatasetSnapshot",
                     "RT-60",
-                    "快照日期及独立选日约定写入本数据集说明，无法从说明自动恢复",
+                    "快照日期写入数据集说明和扩展文件；导入扩展包时恢复，单独的 Ossie 文件中不保留结构",
                     element=d,
                 )
             if d.dialect or any(c.physical_type or c.comment for c in d.columns or []):
@@ -100,7 +100,20 @@ class MappingExporter:
             if description:
                 self.datasets[d.id]["description"] = description
         self.populate_fields()
+        for (_, prop_id), (dataset_id, field_name, _) in self.property_fields.items():
+            prop = self.index.properties[prop_id]
+            if prop.synonyms:
+                field = next(
+                    f
+                    for f in self.datasets[dataset_id]["fields"]
+                    if f["name"] == field_name
+                )
+                context = field.setdefault("ai_context", {})
+                context["synonyms"] = list(
+                    dict.fromkeys(context.get("synonyms", []) + prop.synonyms)
+                )
         self.populate_keys()
+        self.populate_field_metadata()
 
     def position(self, dataset):
         return self.model.datasets.index(dataset)
@@ -111,9 +124,12 @@ class MappingExporter:
             dataset_id, "unresolved:" + str(dataset_id)
         )
 
-    @staticmethod
-    def expression(text):
-        return {"dialects": [{"dialect": "ANSI_SQL", "expression": text}]}
+    def expression(self, text, dataset_id=None):
+        dataset = self.index.datasets.get(dataset_id)
+        # Ossie only enumerates a few engine dialects; MySQL, Doris and
+        # PostgreSQL have none, so their expressions travel as ANSI_SQL.
+        dialect = {"snowflake": "SNOWFLAKE", "databricks": "DATABRICKS", "bigquery": "BIGQUERY"}.get(dataset.dialect if dataset else None, "ANSI_SQL")
+        return {"dialects": [{"dialect": dialect, "expression": text}]}
 
     def add_field(self, dataset_id, wanted, text, *, column=None):
         fields = self.fields[dataset_id]
@@ -126,7 +142,7 @@ class MappingExporter:
         if name not in fields:
             fields[name] = text
             self.datasets[dataset_id]["fields"].append(
-                {"name": name, "expression": self.expression(text)}
+                {"name": name, "expression": self.expression(text, dataset_id)}
             )
         if column is not None:
             self.physical[dataset_id].setdefault(column, name)
@@ -156,17 +172,15 @@ class MappingExporter:
         ).sql()
 
     def populate_fields(self):
-        for obj in sorted(
-            self.model.object_types, key=lambda o: (o.technical_name, str(o.id))
-        ):
+        for obj in sorted(self.model.object_types, key=lambda o: (o.name, str(o.id))):
             binding = resolve_binding(self.model, obj.id)
             for prop in self.index.effective_properties(obj.id):
-                field = binding.fields.get(prop.technical_name)
+                field = binding.fields.get(prop.name)
                 if isinstance(field, ColumnBinding):
                     source = binding.sources[field.source_id]
                     name = self.add_field(
                         source.dataset_id,
-                        prop.technical_name,
+                        prop.name,
                         exp.to_identifier(field.column, quoted=True).sql(),
                         column=field.column,
                     )
@@ -178,9 +192,7 @@ class MappingExporter:
                 elif isinstance(field, ExpressionBinding):
                     try:
                         mapping = next(
-                            m
-                            for m in reversed(binding.mappings)
-                            if prop.technical_name in m.fields
+                            m for m in reversed(binding.mappings) if prop.name in m.fields
                         )
                         resolved = resolve_field_expression(
                             self.model, mapping, field.expression
@@ -199,7 +211,7 @@ class MappingExporter:
                                 else self.ref(ref.dataset_id, ref.column)
                             )
                             text = text[: ref.start] + replacement + text[ref.end :]
-                        name = self.add_field(dataset_id, prop.technical_name, text)
+                        name = self.add_field(dataset_id, prop.name, text)
                         self.property_fields[obj.id, prop.id] = dataset_id, name, None
                         if len(scopes) > 1:
                             self.report.issue(
@@ -300,7 +312,7 @@ class MappingExporter:
         relationships = self.maps[self.scope(source)]["semantic_model"]["relationships"]
         if any(all(r[k] == v for k, v in raw.items()) for r in relationships):
             return True
-        raw["name"] = technical_name(
+        raw["name"] = identifier_name(
             self.names[source] + "_to_" + self.names[target], self.join_names
         )
         relationships.append(raw)
@@ -327,7 +339,7 @@ class MappingExporter:
             return {"expression": pairs[0][1]}
         return {
             "referent_mappings": [
-                {"relationship": p.technical_name, "expression": text} for p, text in pairs
+                {"relationship": p.name, "expression": text} for p, text in pairs
             ]
         }
 
@@ -384,7 +396,7 @@ class MappingExporter:
                         ds, field, _ = value
                         children.append(
                             {
-                                "relationship": prop.technical_name,
+                                "relationship": prop.name,
                                 "object_mapping": {
                                     "expression": exp.column(
                                         field, table=self.names[ds], quoted=True
@@ -393,7 +405,7 @@ class MappingExporter:
                             }
                         )
                 concept = {
-                    "concept": obj.technical_name,
+                    "concept": obj.name,
                     "object_mappings": [identity],
                     "link_mappings": [{"object_mapping": identity, "children": children}],
                 }
@@ -513,8 +525,7 @@ class MappingExporter:
                     (
                         c
                         for c in self.maps[scope]["concept_mappings"]
-                        if c["concept"]
-                        == self.index.objects[link.source_type_id].technical_name
+                        if c["concept"] == self.index.objects[link.source_type_id].name
                     ),
                     None,
                 )
@@ -523,9 +534,7 @@ class MappingExporter:
                 concept["link_mappings"].append(
                     {
                         "object_mapping": root,
-                        "children": [
-                            {"relationship": link.technical_name, "object_mapping": child}
-                        ],
+                        "children": [{"relationship": link.name, "object_mapping": child}],
                     }
                 )
                 self.report.issue(
@@ -562,3 +571,30 @@ class MappingExporter:
                 element=d,
             )
         return list(self.maps.values())
+
+
+    def populate_field_metadata(self):
+        from ontofoundry_api.domain.validation import physical_value_kind
+        kinds = {"string": "String", "integer": "Integer", "decimal": "Decimal", "float": "Float", "boolean": "Boolean", "date": "Date", "datetime": "DateTime"}
+        for dataset in self.model.datasets:
+            time_columns = {dataset.snapshot_date_column} - {None}
+            time_columns.update(m.time_field.column for m in self.model.metrics if getattr(m, "dataset_id", None) == dataset.id and getattr(m, "time_field", None))
+            physical = {c.name: c.physical_type for c in dataset.columns or []}
+            for field in self.datasets[dataset.id]["fields"]:
+                name = field["name"]
+                column = next((c for c, f in self.physical[dataset.id].items() if f == name), None)
+                prop_kinds = {self.index.properties[pid].value_kind for (_, pid), (did, fname, _) in self.property_fields.items() if did == dataset.id and fname == name}
+                physical_kind = physical_value_kind(physical.get(column)) if physical.get(column) else None
+                if len(prop_kinds) > 1 or (prop_kinds and physical_kind and physical_kind not in prop_kinds):
+                    self.report.issue("/datasets", "dropped", "FieldMetadata", "RT-46", "属性与物理列类型冲突，未猜测 datatype", element=dataset)
+                    continue
+                kind = next(iter(prop_kinds), physical_kind)
+                datatype = kinds.get(kind)
+                sql_type = (physical.get(column) or "").lower()
+                if "time zone" in sql_type or "timestamptz" in sql_type:
+                    datatype = "DateTimeTz"
+                elif sql_type == "time" or sql_type.startswith("time("):
+                    datatype = "Time"
+                if datatype:
+                    field["datatype"] = datatype
+                field["dimension"] = {"is_time": column in time_columns}

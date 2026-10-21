@@ -63,7 +63,7 @@ def parse(payload, ctx, lookup=lambda _: None):
     return parse_result(json.dumps(payload).encode(), ctx, lookup)
 
 
-def test_schema_has_exact_nine_targets():
+def test_schema_has_exact_ten_targets():
     assert set(result_schema()["$defs"]["item"]["properties"]["target_kind"]["enum"]) == {
         "object_type",
         "property",
@@ -74,6 +74,7 @@ def test_schema_has_exact_nine_targets():
         "mapping",
         "material_object",
         "material_link",
+        "value_type",
     }
 
 
@@ -94,8 +95,8 @@ def test_nested_column_and_ratio_client_refs():
             "metric",
             {
                 "kind": "simple",
-                "name": "数量",
-                "technical_name": "quantity",
+                "display_name": "数量",
+                "name": "quantity",
                 "dataset_id": {"client_ref": "ds"},
                 "aggregation": "sum",
                 "measure": {"dataset_id": {"client_ref": "ds"}, "column": "n"},
@@ -106,8 +107,8 @@ def test_nested_column_and_ratio_client_refs():
             "metric",
             {
                 "kind": "ratio",
-                "name": "占比",
-                "technical_name": "share",
+                "display_name": "占比",
+                "name": "share",
                 "numerator_id": {"client_ref": "n"},
                 "denominator_id": {"client_ref": "n"},
             },
@@ -126,7 +127,7 @@ def test_nested_column_and_ratio_client_refs():
 def test_whole_result_rejected(mutation):
     ctx = context()
     payload = result(
-        ctx, [create("new", "object_type", {"name": "新增", "technical_name": "fresh"})]
+        ctx, [create("new", "object_type", {"display_name": "新增", "name": "fresh"})]
     )
     if mutation == "duplicate":
         payload["items"] *= 2
@@ -137,7 +138,7 @@ def test_whole_result_rejected(mutation):
     if mutation == "context":
         payload["run_token"] = "other"
     if mutation == "invalid_graph":
-        payload["items"][0]["after"]["technical_name"] = "customer"
+        payload["items"][0]["after"]["name"] = "customer"
     with pytest.raises(ProposalContractError):
         parse(payload, ctx)
 
@@ -156,7 +157,7 @@ def test_material_quote_checked_and_manual_cannot_be_authored():
     item = create(
         "new",
         "object_type",
-        {"name": "新增", "technical_name": "fresh", "evidence": [evidence]},
+        {"display_name": "新增", "name": "fresh", "evidence": [evidence]},
     )
     assert parse(result(ctx, [item]), ctx, lambda _: ("a" * 64, ["客户订单"])).items
     evidence["quote"] = "不存在"
@@ -211,7 +212,7 @@ def test_typed_fact_swap_batch_must_include_rewritten_facts_at_ingestion(
         for previous, after in zip(
             before["properties"], candidate["properties"], strict=True
         )
-        if previous["technical_name"] != after["technical_name"]
+        if previous["name"] != after["name"]
     ]
     assert len(items) == 2
     with pytest.raises(ProposalContractError, match="引用改写涉及批次外元素") as error:
@@ -264,7 +265,7 @@ def mapping_name_collision_items():
         create(
             "collision-type",
             "object_type",
-            {"name": "星港客户", "technical_name": "starport_customer"},
+            {"display_name": "星港客户", "name": "starport_customer"},
         ),
         *[
             create(
@@ -272,8 +273,8 @@ def mapping_name_collision_items():
                 "property",
                 {
                     "owner_type_id": {"client_ref": "collision-type"},
-                    "name": "属性" + name,
-                    "technical_name": name,
+                    "display_name": "属性" + name,
+                    "name": name,
                     "value_kind": "string",
                 },
             )
@@ -310,7 +311,7 @@ def mapping_name_collision_items():
     ]
 
 
-def test_mapping_technical_names_are_not_reference_paths():
+def test_mapping_names_are_not_reference_paths():
     from ontofoundry_api.contracts.proposals import apply_items
     from ontofoundry_api.domain.core import CoreDraft
     from ontofoundry_api.domain.validation import validate_core_graph
@@ -376,15 +377,20 @@ def test_committed_proposal_schema_matches_runtime():
 
 
 def test_skill_fact_example_is_valid_as_a_complete_graph():
+    import hashlib
     from pathlib import Path
 
-    text = (
-        Path(__file__).parents[3]
-        / "integrations/dataagent/skills/ontofoundry-modeling/references/modeling-patterns.md"
-    ).read_text()
-    items = json.loads(text.split("```json\n")[1].split("```")[0])
+    skill = Path(__file__).parents[3] / "integrations/dataagent/skills/ontofoundry-modeling"
+    items = json.loads(
+        (skill / "references/examples/create-material_link.json").read_bytes()
+    )
+    material = (skill / "tests/fixtures/material.md").read_bytes()
     ctx = context(empty_snapshot(uuid4()))
-    parsed = parse(result(ctx, items), ctx)
+    parsed = parse(
+        result(ctx, items),
+        ctx,
+        lambda _: (hashlib.sha256(material).hexdigest(), material.decode().splitlines()),
+    )
     assert parsed.items[-1].after["source_id"] == parsed.items[-3].target_id
 
 

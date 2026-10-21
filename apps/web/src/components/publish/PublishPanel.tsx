@@ -6,7 +6,7 @@ import type { ElementChange, MergeConflict, ModelingSession, PublishPreview, Tar
 import type { ElementRequest } from "../../lib/elementInspector";
 import { documentDisplayText } from "../../lib/instanceDisplay";
 import { lineDiff } from "../../lib/lineDiff";
-import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
+import { fieldLabel, KIND } from "../proposals/elementMeta";
 import { FieldDiff } from "../proposals/FieldDiff";
 import { PanelToolbar, SectionTitle, StatusMark, type StatusState } from "../layout";
 import { ElementModal } from "../elements/ElementInspector";
@@ -101,7 +101,7 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
 }
 
 /** The fields of a created or deleted element, minus identity and empty values. */
-function FieldList({ value, names }: { value: Record<string, unknown>; names: Map<string, string> }) {
+function FieldList({ value, names, kind }: { value: Record<string, unknown>; names: Map<string, string>; kind: ElementChange["element_kind"] }) {
   const named = (key: string, v: unknown) =>
     !REFERENCE_FIELDS.has(key) ? v : Array.isArray(v) ? v.map((id) => names.get(String(id)) ?? id) : (names.get(String(v)) ?? v);
   const rows = Object.entries(value).filter(
@@ -114,7 +114,7 @@ function FieldList({ value, names }: { value: Record<string, unknown>; names: Ma
       column={1}
       items={rows.map(([key, v]) => ({
         key,
-        label: FIELD_LABELS[key] ?? key,
+        label: fieldLabel(key, kind),
         children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v))}</span>,
       }))}
     />
@@ -145,12 +145,12 @@ function ChangeBody({ change, names }: { change: ElementChange; names: Map<strin
         )
       ) : change.change === "updated" ? (
         change.field_changes.length ? (
-          <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
+          <FieldDiff kind={change.element_kind} changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
         ) : (
           <Text type="secondary">无字段级变化</Text>
         )
       ) : (
-        <FieldList value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
+        <FieldList kind={change.element_kind} value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
       )}
     </div>
   );
@@ -222,7 +222,7 @@ function sortChanges<T extends ElementChange>(changes: T[]) {
 function elementNames(preview: PublishPreview | null, draft: ModelingSession["draft"]): Map<string, string> {
   const names = new Map<string, string>();
   for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
-    for (const item of draft[key] as { id: string; name?: string }[]) if (item.name) names.set(item.id, item.name);
+    for (const item of draft[key] as { id: string; name?: string; display_name?: string | null }[]) if (item.name) names.set(item.id, item.display_name || item.name);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   if (preview?.merged_model) {
     for (const fact of preview.merged_model.material_objects)
@@ -335,7 +335,12 @@ export function PublishPanel({
   const changes = preview ? sortChanges(preview.changes) : [];
   const count = (kind: ElementChange["change"]) => changes.filter((c) => c.change === kind).length;
   const total = changes.length;
-  const errors = preview?.validation.errors ?? [];
+  // Changed datasets whose source is not ready block publishing like validation errors.
+  const sourceErrors = (preview?.dataset_checks ?? []).flatMap((c) =>
+    c.diagnostics.map((d) => ({ message: `数据集 ${c.display_name || c.name}：${d.message}` })),
+  );
+  const errors = [...(preview?.validation.errors ?? []), ...sourceErrors];
+  const publishable = !!preview?.validation.publishable && !sourceErrors.length;
   const warnings = preview?.validation.warnings ?? [];
   const current = preview ? versionLabel(preview.current_version_number) : "…";
   // The session is behind when versions were published after it started.
@@ -354,7 +359,7 @@ export function PublishPanel({
       ? error
         ? "预览失败"
         : "正在计算合并结果…"
-      : !preview.validation.publishable
+      : !publishable
         ? errors.length
           ? `校验未通过 · ${errors.length} 个错误`
           : "校验未通过"
@@ -366,7 +371,7 @@ export function PublishPanel({
     ? { state: "partial", text: "有冲突" }
     : !preview
       ? { state: "unmapped", text: error ? "预览失败" : "计算中" }
-      : !preview.validation.publishable
+      : !publishable
         ? { state: "error", text: "校验未通过" }
         : !total
           ? { state: "unmapped", text: "无变更" }
@@ -533,8 +538,8 @@ export function PublishPanel({
                 检查
                 {preview ? (
                   <StatusMark
-                    state={preview.validation.publishable ? "mapped" : "error"}
-                    label={preview.validation.publishable ? "通过" : "未通过"}
+                    state={publishable ? "mapped" : "error"}
+                    label={publishable ? "通过" : "未通过"}
                   />
                 ) : conflicts ? <StatusMark state="partial" label="待处理" /> : null}
               </span>
@@ -552,7 +557,7 @@ export function PublishPanel({
                     },
                     {
                       key: "validation",
-                      state: (!preview ? "idle" : preview.validation.publishable ? "pass" : "fail") as "pass" | "fail" | "warn" | "idle",
+                      state: (!preview ? "idle" : publishable ? "pass" : "fail") as "pass" | "fail" | "warn" | "idle",
                       title: "本体校验",
                       detail: preview ? `${errors.length} 个错误 · ${warnings.length} 个警告` : "等待合并结果",
                       extra:

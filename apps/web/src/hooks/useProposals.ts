@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, proposalsApi } from "../api/client";
+import { ApiError, modelingApi, proposalsApi } from "../api/client";
 import type {
+  Dataset,
   FactProposalRevision,
   ModelingSession,
   ProposalBatch,
@@ -44,6 +45,12 @@ export function useProposals(
   const revision = session?.revision;
 
   const reload = useCallback(() => setRefresh((n) => n + 1), []);
+  useEffect(() => {
+    const synced = () => reload();
+    window.addEventListener("ontofoundry:metadata-synced", synced);
+    window.addEventListener("ontofoundry:proposal-source-changed", synced);
+    return () => { window.removeEventListener("ontofoundry:metadata-synced", synced); window.removeEventListener("ontofoundry:proposal-source-changed", synced); };
+  }, [reload]);
 
   useEffect(() => {
     if (!sessionId || !workspaceId) {
@@ -169,6 +176,28 @@ export function useProposals(
     }
   };
 
+  /** Change a pending dataset proposal's connection or table, then re-check dependents. */
+  const reviseDataset = async (proposalId: string, dataset: Dataset) => {
+    const current = sessionRef.current;
+    if (!current) return false;
+    setBusy(true);
+    setError("");
+    try {
+      await proposalsApi.reviseDataset(current.workspace_id, current.id, proposalId, dataset, current.revision);
+      const fresh = await modelingApi.get(current.workspace_id, current.id);
+      sessionRef.current = fresh;
+      onSession(fresh);
+      reload();
+      return true;
+    } catch (e) {
+      setItemErrors({ [proposalId]: e instanceof Error ? e.message : "修改数据集来源失败" });
+      if (e instanceof ApiError && e.status === 409) onStale();
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return {
     batches,
     selected,
@@ -180,6 +209,7 @@ export function useProposals(
     reload,
     decide,
     revise,
+    reviseDataset,
   };
 }
 

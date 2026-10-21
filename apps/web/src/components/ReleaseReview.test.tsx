@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 const versions = [versionSummary(2), versionSummary(1)];
-const customer = example("01-basic-sales").object_types.find((o) => o.technical_name === "customer")!;
+const customer = example("01-basic-sales").object_types.find((o) => o.name === "customer")!;
 
 function comparison(extra: Partial<Comparison> = {}): Comparison {
   return {
@@ -30,7 +30,7 @@ function comparison(extra: Partial<Comparison> = {}): Comparison {
         after: customer.description,
       },
     ],
-    impacts: [{ kind: "object_type", id: customer.id, label: customer.name }],
+    impacts: [{ kind: "object_type", id: customer.id, label: (customer.display_name || customer.name) }],
     ...extra,
   };
 }
@@ -45,7 +45,7 @@ it("compares the latest version with an empty baseline when opened", async () =>
   open();
   await waitFor(() => expect(api.comparison).toHaveBeenCalledWith("w1", "v2", undefined));
   expect(await screen.findByText("1 项变化 · 1 个模型内依赖")).toBeInTheDocument();
-  expect(screen.getByText(`影响：${customer.name}`)).toBeInTheDocument();
+  expect(screen.getByText(`影响：${(customer.display_name || customer.name)}`)).toBeInTheDocument();
   const row = screen.getByText(`object_types/${customer.id}/description`).closest("tr")!;
   expect(within(row).getByText("修改")).toBeInTheDocument();
   expect(within(row).getByText(`"企业客户"`)).toBeInTheDocument();

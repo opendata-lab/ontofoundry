@@ -71,8 +71,8 @@ def test_object_without_properties_is_a_warning(client):
     bare = {
         **kind,
         "id": str(uuid4()),
-        "name": "退货单",
-        "technical_name": "return_order",
+        "display_name": "退货单",
+        "name": "return_order",
         "title_property_id": None,
     }
     draft["object_types"].append(bare)
@@ -101,16 +101,16 @@ def test_abstract_parents_are_not_flagged(client):
     parent = {
         **kind,
         "id": str(uuid4()),
-        "name": "故事页柜",
-        "technical_name": "storybook_cabinet",
+        "display_name": "故事页柜",
+        "name": "storybook_cabinet",
         "extends": None,
         "title_property_id": None,
     }
     child = {
         **kind,
         "id": str(uuid4()),
-        "name": "虚构阅览柜",
-        "technical_name": "storybook_reading_cabinet",
+        "display_name": "虚构阅览柜",
+        "name": "storybook_reading_cabinet",
         "extends": parent["id"],
         "title_property_id": None,
     }

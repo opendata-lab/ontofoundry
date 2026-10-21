@@ -60,5 +60,5 @@ def compare_snapshots(left, right):
             or bool(affected.intersection([link["source_type_id"], link["target_type_id"]]))
             for item in changes
         ):
-            impacts.append({"kind": "link_type", "id": link["id"], "label": link["name"]})
+            impacts.append({"kind": "link_type", "id": link["id"], "label": link.get("display_name") or link["name"]})
     return {"changes": changes, "impacts": impacts}

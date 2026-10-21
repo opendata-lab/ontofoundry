@@ -8,8 +8,8 @@ test("export selected history version, report hash and unavailable Ossie", async
     const url = new URL(route.request().url());
     const unavailable = url.pathname.endsWith("ossie-0.2");
     await route.fulfill({ json: {
-      version_id: url.searchParams.get("version_id"), adapter: unavailable ? "ossie-0.2" : "ontofoundry-core-1",
-      filename: "fictional-v3.ontofoundry.json", media_type: "application/json",
+      version_id: url.searchParams.get("version_id"), adapter: unavailable ? "ossie-0.2" : "ontofoundry-core-1-package",
+      filename: "fictional-v3.ontofoundry.zip", media_type: "application/zip",
       content_sha256: unavailable ? null : "a".repeat(64), download_url: unavailable ? null : "/fictional-artifact/" + "a".repeat(64),
       report: { ...importPreview.report, direction: "export", issues: [importPreview.report.issues[unavailable ? 1 : 0]] },
     } });
@@ -22,7 +22,7 @@ test("export selected history version, report hash and unavailable Ossie", async
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("export-native.png", { fullPage: true });
   await dialog.locator(".ant-select", { has: page.getByRole("combobox", { name: "导出格式" }) }).click();
-  await page.locator('.ant-select-item-option[title="Apache Ossie 0.2"]').click();
+  await page.locator('.ant-select-item-option[title="Apache Ossie 0.2（ZIP + 扩展文件）"]').click();
   await expect(dialog.getByRole("link", { name: "下载文件" })).toHaveCount(0);
   await dialog.getByRole("button", { name: /生成导出报告/ }).click();
   await expect(dialog.getByText("当前格式无法完整交付，未生成可下载文件")).toBeVisible();

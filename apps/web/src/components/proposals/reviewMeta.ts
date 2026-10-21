@@ -36,12 +36,12 @@ export function ownerName(item: ProposalItem, items: ProposalItem[], draft: Draf
   const ownerId = field(element, "owner_type_id") as string | undefined;
   const proposal = items.find((c) => c.target_kind === "object_type" && c.target_id === ownerId);
   const owner = proposal?.after ?? proposal?.before;
-  if (owner) return String(field(owner, "technical_name") ?? item.owner_label ?? "");
-  return byId(draft.object_types, ownerId)?.technical_name ?? item.owner_label ?? "";
+  if (owner) return String(field(owner, "name") ?? item.owner_label ?? "");
+  return byId(draft.object_types, ownerId)?.name ?? item.owner_label ?? "";
 }
 
 export function technicalName(item: ProposalItem, items: ProposalItem[], draft: Draft): string {
-  const value = field(item.after, "technical_name") ?? field(item.before, "technical_name") ?? item.display_name;
+  const value = field(item.after, "name") ?? field(item.before, "name") ?? item.display_name;
   const name = typeof value === "string" && value ? value : item.display_name;
   const owner = item.target_kind === "property" ? ownerName(item, items, draft) : "";
   return owner ? `${owner}.${name}` : name;
@@ -51,6 +51,8 @@ export function technicalName(item: ProposalItem, items: ProposalItem[], draft: 
 export function searchText(item: ProposalItem, items: ProposalItem[], draft: Draft) {
   return [
     item.display_name,
+    field(item.before, "display_name"),
+    field(item.after, "display_name"),
     field(item.before, "name"),
     field(item.after, "name"),
     technicalName(item, items, draft),
@@ -71,6 +73,8 @@ export function acceptanceBlock(item: ProposalItem, byIdMap: Map<string, Proposa
   if (item.status !== "pending") return item.status_reason || `提案${STATUS[item.status]}`;
   if (visited.has(item.id)) return "";
   visited.add(item.id);
+  const source = item.source_diagnostics?.find((d) => d.severity === "error");
+  if (source) return `数据来源未就绪：${source.message}`;
   for (const id of requiredIds(item)) {
     const dependency = byIdMap.get(id);
     if (!dependency) return "依赖提案缺失";
@@ -137,7 +141,7 @@ export function mergedFact(existing: MaterialObject, proposed: MaterialObject): 
 export function elementNames(draft: Draft, items: ProposalItem[]) {
   const names = new Map<string, string>();
   for (const key of ["object_types", "properties", "link_types", "rules", "metrics", "datasets"] as const)
-    for (const element of draft[key] as { id: string; name: string }[]) names.set(element.id, element.name);
+    for (const element of draft[key] as { id: string; name: string; display_name?: string | null }[]) names.set(element.id, element.display_name || element.name);
   for (const fact of draft.material_objects) names.set(fact.id, documentDisplayText(draft, fact));
   for (const item of items) names.set(item.target_id, item.display_name);
   return names;

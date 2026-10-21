@@ -5,7 +5,7 @@ import { modelingApi } from "../api/client";
 import type { ManagedMaterial, Workspace } from "../api/types";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { usePageActive } from "../hooks/usePageTab";
-import { PanelToolbar, StatusMark } from "./layout";
+import { PageToolbar, Panel, StatusMark } from "./layout";
 
 const sizeText = (size: number) => size < 1024 ? `${size} B` : size < 1024 * 1024
   ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
@@ -35,8 +35,9 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
     }
   }, [workspace.id]);
   useEffect(() => {
+    const requestRevision = revision;
     if (active) void load();
-    return () => { revision.current++; };
+    return () => { requestRevision.current++; };
   }, [load, active]);
   const upload = async (files: File[]) => {
     setBusy(true);
@@ -84,18 +85,21 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
         : filter === "unused" ? material.usage.can_delete
           : !material.usage.can_delete)));
   return <>
-    <PanelToolbar extra={<>
-      <Select size="small" aria-label="文档使用情况" value={filter} onChange={setFilter} options={[
+    <PageToolbar extra={<>
+      <Select aria-label="文档使用情况" value={filter} onChange={setFilter} options={[
         { value: "all", label: "全部文档" }, { value: "used", label: "已使用" }, { value: "unused", label: "未使用" },
         { value: "archived", label: "已归档" },
       ]} />
-      <Input size="small" type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索文档" placeholder="搜索文档名称" value={query} onChange={(e) => setQuery(e.target.value)} />
-      <Tooltip title="刷新文档"><Button size="small" type="text" aria-label="刷新文档" disabled={busy} icon={<RefreshCw size={14} />} onClick={() => void load()} /></Tooltip>
+      <Input type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索文档" placeholder="搜索文档名称" value={query} onChange={(e) => setQuery(e.target.value)} />
+      <Tooltip title="刷新文档"><Button aria-label="刷新文档" disabled={busy} icon={<RefreshCw size={14} />} onClick={() => void load()} /></Tooltip>
+    </>}>
       <Upload accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv" multiple showUploadList={false} disabled={busy}
         beforeUpload={(file, files) => { if (file === files[0]) void upload(files); return false; }}>
-        <Button size="small" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
+        <Button type="primary" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
       </Upload>
-    </>}><Typography.Text type="secondary" className="text-xs">{materials.length} 个文档</Typography.Text></PanelToolbar>
+      <Typography.Text type="secondary" className="text-xs">{materials.length} 个文档</Typography.Text>
+    </PageToolbar>
+    <Panel>
     <Table<ManagedMaterial> size="middle" rowKey="id" loading={loading} dataSource={rows} pagination={rows.length > 20 ? { pageSize: 20 } : false}
       locale={{ emptyText: <Empty description={error ? "文档未加载，请刷新重试" : query || filter !== "all" ? "没有匹配的文档" : "尚未上传文档"} /> }}
       expandable={{ expandedRowRender: (material) => <div className="flex flex-wrap items-center gap-4 text-xs text-ink-2">
@@ -130,5 +134,6 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
           </div>;
         } },
       ]} />
+    </Panel>
   </>;
 }

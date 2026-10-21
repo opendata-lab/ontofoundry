@@ -2,8 +2,9 @@
 
 import re
 
-from ontofoundry_api.adapters.exporting import ExportBuilder, file_stem
-from ontofoundry_api.domain.core import DerivedExpression, LinkType
+from ontofoundry_api.adapters.archive import write_archive
+from ontofoundry_api.adapters.exporting import ExportBuilder, file_stem, json_bytes
+from ontofoundry_api.domain.core import DerivedExpression
 from ontofoundry_api.domain.expressions import (
     render_references,
     resolve_derived_expression,
@@ -39,13 +40,13 @@ def membership(model, obj, index):
             continue
         conditions = []
         for condition in branch.conditions:
-            parts = [index.objects[obj.extends].technical_name]
+            parts = [index.objects[obj.extends].name]
             for step in condition.path.links:
-                name = index.links[step.link_type_id].technical_name
+                name = index.links[step.link_type_id].name
                 parts.append(
                     "REVERSE(" + name + ")" if str(step.direction) == "reverse" else name
                 )
-            parts.append(index.properties[condition.path.property_id].technical_name)
+            parts.append(index.properties[condition.path.property_id].name)
             conditions.append("(" + condition_sql(".".join(parts), condition) + ")")
         branches.append(" AND ".join(conditions))
     return branches
@@ -53,7 +54,7 @@ def membership(model, obj, index):
 
 def export_document(model, ctx):
     report = ExportBuilder("ossie-0.2", model)
-    filename = file_stem(ctx) + ".ossie.json"
+    filename = file_stem(ctx) + ".ossie.zip"
     try:
         validate_core_graph(model)
     except ValueError as error:
@@ -76,12 +77,9 @@ def export_document(model, ctx):
         )
         return report.finish(None, filename)
     index = DraftIndex(model)
-    used = {name.casefold() for name in BUILTIN_CONCEPTS} | {
-        o.technical_name.casefold() for o in model.object_types
-    }
     builtins = {name.casefold() for name in BUILTIN_CONCEPTS}
     for pos, obj in enumerate(model.object_types):
-        if obj.technical_name.casefold() in builtins:
+        if obj.name.casefold() in builtins:
             report.issue(
                 f"/object_types/{pos}",
                 "error",
@@ -93,21 +91,16 @@ def export_document(model, ctx):
     if any(i.outcome == "error" for i in report.report.issues):
         return report.finish(None, filename)
     value_names, values = {}, []
-    for prop in sorted(
-        (p for p in model.properties if p.identifier),
-        key=lambda p: (index.objects[p.owner_type_id].technical_name, p.technical_name),
-    ):
-        owner = index.objects[prop.owner_type_id]
-        base = owner.technical_name + "_" + prop.technical_name + "_value"
-        name, suffix = base, 2
-        while name.casefold() in used:
-            name = base + "_" + str(suffix)
-            suffix += 1
-        used.add(name.casefold())
-        value_names[prop.id] = name
-        values.append(
-            {"concept": name, "type": "ValueType", "extends": [BASES[str(prop.value_kind)]]}
-        )
+    shared = {}
+    for value_type in sorted(model.value_types, key=lambda v: v.name):
+        concept = {"concept": value_type.name, "type": "ValueType", "extends": [BASES[str(value_type.value_kind)]]}
+        if value_type.description:
+            concept["description"] = value_type.description
+        shared[value_type.id] = concept
+        values.append(concept)
+    for prop in model.properties:
+        if prop.value_type_id in shared:
+            value_names[prop.id] = shared[prop.value_type_id]["concept"]
     extension = {
         "version": "core-1",
         "display_names": {},
@@ -117,26 +110,31 @@ def export_document(model, ctx):
         "tags": {},
         "title_properties": {},
         "required": [],
+        "rules": {},
     }
     components, owners = [], {}
 
     def labels(element, key):
-        if not isinstance(element, LinkType):
-            extension["display_names"][key] = element.name
-        if getattr(element, "synonyms", []):
+        if element.display_name:
+            extension["display_names"][key] = element.display_name
+        if getattr(element, "synonyms", []) and not key.startswith("metric:"):
             extension["synonyms"][key] = element.synonyms
         if getattr(element, "tags", []):
             extension["tags"][key] = element.tags
 
+    for value_type in model.value_types:
+        owners[value_type.id] = shared[value_type.id]
+        labels(value_type, value_type.name)
+
     for pos, obj in enumerate(model.object_types):
-        value = {"concept": obj.technical_name, "type": "EntityType", "relationships": []}
+        value = {"concept": obj.name, "type": "EntityType", "relationships": []}
         if obj.description:
             value["description"] = obj.description
         if obj.extends:
-            value["extends"] = [index.objects[obj.extends].technical_name]
+            value["extends"] = [index.objects[obj.extends].name]
         identifiers = index.identifier(obj.id)
         if identifiers:
-            value["identify_by"] = [p.technical_name for p in identifiers]
+            value["identify_by"] = [p.name for p in identifiers]
         if obj.derived_by:
             try:
                 value["derived_by"] = membership(model, obj, index)
@@ -160,11 +158,11 @@ def export_document(model, ctx):
                 )
         owners[obj.id] = value
         components.append(value)
-        labels(obj, obj.technical_name)
+        labels(obj, obj.name)
         if obj.title_property_id:
-            extension["title_properties"][obj.technical_name] = index.properties[
+            extension["title_properties"][obj.name] = index.properties[
                 obj.title_property_id
-            ].technical_name
+            ].name
         report.issue(
             f"/object_types/{pos}",
             "converted",
@@ -175,19 +173,19 @@ def export_document(model, ctx):
             target_path=f"/ontology/{pos}",
         )
     for pos, prop in enumerate(model.properties):
-        owner = index.objects[prop.owner_type_id].technical_name
+        owner = index.objects[prop.owner_type_id].name
         concept = value_names.get(prop.id, BASES[str(prop.value_kind)])
         raw = {
-            "name": prop.technical_name,
+            "name": prop.name,
             "roles": [{"concept": concept}],
             "multiplicity": "OneToOne" if prop.unique else "ManyToOne",
-            "verbalizes": [f"{{{owner}}}的{prop.technical_name}是{{{concept}}}"],
+            "verbalizes": [f"{{{owner}}}的{prop.name}是{{{concept}}}"],
         }
         if prop.description:
             raw["description"] = prop.description
         owners[prop.owner_type_id]["relationships"].append(raw)
         owners[prop.id] = raw
-        path = owner + "." + prop.technical_name
+        path = owner + "." + prop.name
         labels(prop, path)
         if prop.required:
             extension["required"].append(path)
@@ -200,25 +198,27 @@ def export_document(model, ctx):
             element=prop,
         )
     for pos, link in enumerate(model.link_types):
-        source = index.objects[link.source_type_id].technical_name
-        target = index.objects[link.target_type_id].technical_name
+        source = index.objects[link.source_type_id].name
+        target = index.objects[link.target_type_id].name
         role_name = link.target_role_name
         if (
             role_name == source
-            or source == target and role_name is None
-            or role_name and any(char in role_name for char in "{}")
+            or source == target
+            and role_name is None
+            or role_name
+            and any(char in role_name for char in "{}")
         ):
             role_name = "related" if source != "related" else "related_2"
         role = target + (":" + role_name if role_name else "")
         raw = {
-            "name": link.technical_name,
-            "roles": [
-                {"concept": target, **({"name": role_name} if role_name else {})}
-            ],
+            "name": link.name,
+            "roles": [{"concept": target, **({"name": role_name} if role_name else {})}],
             "verbalizes": [
                 re.sub(
                     r"\{(source|target)\}",
-                    lambda match: "{" + (source if match[1] == "source" else role) + "}",
+                    lambda match, source=source, role=role: (
+                        "{" + (source if match[1] == "source" else role) + "}"
+                    ),
                     reading,
                 )
                 for reading in (link.verbalizes or ["{source}关联{target}"])
@@ -258,9 +258,24 @@ def export_document(model, ctx):
             ):
                 raise ValueError("子对象的说明性派生规则不能混写为成员定义")
             text = render_references(resolve_rule_expression(model, rule), model)
-            owners[rule.owner_id].setdefault(
+            expressions = owners[rule.owner_id].setdefault(
                 "requires" if str(rule.rule_kind) == "constraint" else "derived_by", []
-            ).append(text)
+            )
+            owner = {**index.objects, **index.properties, **index.links, **index.value_types}[rule.owner_id]
+            owner_path = owner.name
+            if str(rule.owner_kind) == "property":
+                owner_path = index.objects[owner.owner_type_id].name + "." + owner.name
+            elif str(rule.owner_kind) == "link_type":
+                owner_path = index.objects[owner.source_type_id].name + "." + owner.name
+            key = owner_path + "." + rule.name
+            extension["rules"][key] = {
+                "owner": owner_path,
+                "kind": str(rule.rule_kind),
+                "position": len(expressions),
+                "description": rule.description,
+            }
+            labels(rule, "rule:" + key)
+            expressions.append(text)
             report.issue(
                 f"/rules/{pos}",
                 "converted",
@@ -280,7 +295,7 @@ def export_document(model, ctx):
                 completion=True,
             )
     for metric in model.metrics:
-        labels(metric, "metric:" + metric.technical_name)
+        labels(metric, "metric:" + metric.name)
     extension["required"].sort()
     extension["generated_link_readings"].sort()
     value = {
@@ -288,12 +303,23 @@ def export_document(model, ctx):
         "name": ctx.workspace_name,
         "ontology": sorted(values, key=lambda c: c["concept"])
         + sorted(components, key=lambda c: c["concept"]),
-        "ai_context": {"ontofoundry": extension},
     }
     if ctx.workspace_description:
         value["description"] = ctx.workspace_description
     writer = MappingExporter(model, ctx, report)
     mappings = writer.finish()
+    from .extension import metadata_key
+    extension["dataset_metadata"], extension["metric_metadata"] = {}, {}
+    for dataset in model.datasets:
+        map_name = writer.maps[writer.scope(dataset.id)]["name"]
+        key = metadata_key(map_name, writer.names[dataset.id])
+        extension["dataset_metadata"][key] = {"snapshot_date_column": dataset.snapshot_date_column, "connection_name": (ctx.connection_names or {}).get(dataset.id)}
+        if dataset.display_name:
+            extension["display_names"]["dataset:" + key] = dataset.display_name
+    for metric in model.metrics:
+        if getattr(metric, "time_field", None):
+            map_name = writer.maps[writer.scope(metric.dataset_id)]["name"]
+            extension["metric_metadata"][metadata_key(map_name, metric.name)] = {"time_field": {"column": writer.column_field(metric.dataset_id, metric.time_field.column)}}
     if mappings:
         for mapping in mappings:
             for dataset in mapping["semantic_model"]["datasets"]:
@@ -308,7 +334,7 @@ def export_document(model, ctx):
         if issue.construct == "object_types" and issue.target_path is not None:
             obj = index.objects[issue.target_element_ids[0]]
             report.report.issues[pos] = issue.model_copy(
-                update={"target_path": f"/ontology/{positions[obj.technical_name]}"}
+                update={"target_path": f"/ontology/{positions[obj.name]}"}
             )
     for collection in ("material_objects", "material_links"):
         for pos, fact in enumerate(getattr(model, collection)):
@@ -323,9 +349,9 @@ def export_document(model, ctx):
     report.issue(
         "",
         "dropped",
-        "EvidenceAndRuleMetadata",
+        "EvidenceMetadata",
         None,
-        "Ossie 不包含证据和材料，也不保存规则名、英文标识与描述；这些内容未放入平台扩展块",
+        "Ossie 不包含证据和材料；规则英文标识、名称与描述保存在平台扩展文件",
     )
     validation = validate_schema(value)
     if not validation:
@@ -339,4 +365,19 @@ def export_document(model, ctx):
             "Ossie 官方交付校验：" + issue["message"],
             severity=issue["severity"],
         )
-    return report.finish(value, filename)
+    extension["unsupported"] = [
+        {
+            "source_path": issue.source_path,
+            "construct": issue.construct,
+            "message": issue.message,
+        }
+        for issue in report.report.issues
+        if issue.outcome == "dropped"
+    ]
+    document = write_archive(
+        {
+            file_stem(ctx) + ".ossie.json": json_bytes(value),
+            "ontofoundry-extension.json": json_bytes(extension),
+        }
+    )
+    return report.finish(document, filename, "application/zip")

@@ -1,0 +1,305 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "ffb9eca49698a12de21eaa185d63997eff098c9bb5837ec9ae0e637cf2d7a4da",
+    "source_session_revision": 1,
+    "source_draft_sha256": "b7f86d08fcaa303e99251426cbf3b642a34b3b3ac6aa191211bb03bd5b40d7ee"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [],
+    "properties": [],
+    "link_types": [],
+    "rules": [],
+    "metrics": [],
+    "datasets": [
+      {
+        "id": "66666666-6666-4666-8666-000000000000",
+        "name": "yunfan_table_1",
+        "display_name": "云帆业务表1",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_orders",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      },
+      {
+        "id": "66666666-6666-4666-8666-000000000001",
+        "name": "yunfan_table_2",
+        "display_name": "云帆业务表2",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_refunds",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      },
+      {
+        "id": "66666666-6666-4666-8666-000000000002",
+        "name": "yunfan_table_3",
+        "display_name": "云帆业务表3",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_members",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      },
+      {
+        "id": "66666666-6666-4666-8666-000000000003",
+        "name": "yunfan_table_4",
+        "display_name": "云帆业务表4",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_stores",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      },
+      {
+        "id": "66666666-6666-4666-8666-000000000004",
+        "name": "yunfan_table_5",
+        "display_name": "云帆业务表5",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_products",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      },
+      {
+        "id": "66666666-6666-4666-8666-000000000005",
+        "name": "yunfan_table_6",
+        "display_name": "云帆业务表6",
+        "connection_id": null,
+        "source_kind": "table",
+        "dialect": "postgres",
+        "schema_name": "demo",
+        "table_name": "demo_order_lines",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "row_no",
+            "physical_type": "text",
+            "comment": "记录编号"
+          },
+          {
+            "name": "region_no",
+            "physical_type": "text",
+            "comment": "区域编号"
+          },
+          {
+            "name": "business_no",
+            "physical_type": "text",
+            "comment": "业务编号"
+          },
+          {
+            "name": "amount",
+            "physical_type": "numeric",
+            "comment": "金额"
+          },
+          {
+            "name": "occurred_at",
+            "physical_type": "timestamp",
+            "comment": "业务时间"
+          },
+          {
+            "name": "member_no",
+            "physical_type": "text",
+            "comment": "可空会员编号"
+          }
+        ]
+      }
+    ],
+    "mappings": [],
+    "material_objects": [],
+    "material_links": [],
+    "value_types": []
+  },
+  "element_hashes": {
+    "66666666-6666-4666-8666-000000000000": "6bafa9de8419ad2811afcd4ba2be002a0a70a68093a52265f3ac41575004c75d",
+    "66666666-6666-4666-8666-000000000001": "8b672151df1c38ab2f92c0aa719c3de0941addeb6fced8dd315e0bc1a706ba9f",
+    "66666666-6666-4666-8666-000000000002": "b744899a179c0623ac7462d4dcf8efa4d09c8ed1138379bad1f291d1817a1830",
+    "66666666-6666-4666-8666-000000000003": "42069467609a3c34efc887242a8a796c9a62957239997245fabf1d2478e7b946",
+    "66666666-6666-4666-8666-000000000004": "653ccb018592b9466e1e986bbe9e6d786242bacde40a58e4a45d2f41e691a366",
+    "66666666-6666-4666-8666-000000000005": "15203cdb4e813890619a4aff987ca9ec6e4687d016e21d7ad51764e019af7d8b"
+  }
+}

@@ -1,5 +1,5 @@
 import { Descriptions, Typography } from "antd";
-import { SectionTitle } from "../layout";
+import { ContentBlock, SectionTitle } from "../layout";
 import type { Draft, Metric } from "../../api/types";
 import {
   AGGREGATIONS,
@@ -25,10 +25,10 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
   const kind = metricValueKind(draft, metric);
   const metricLink = (id: string) => {
     const m = byId(draft.metrics, id);
-    return m ? <ElementLink onClick={() => open({ kind: "metric", id })}>{m.name}</ElementLink> : "?";
+    return m ? <ElementLink onClick={() => open({ kind: "metric", id })}>{(m.display_name || m.name)}</ElementLink> : "?";
   };
   const items = [
-    { key: "technical", label: "英文标识", children: <code>{metric.technical_name}</code> },
+    { key: "technical", label: "英文标识", children: <code>{metric.name}</code> },
     { key: "kind", label: "计算方式", children: METRIC_KINDS[metric.kind] },
     {
       key: "dataset",
@@ -77,7 +77,6 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
         <Text type="secondary">暂无说明</Text>
       )}
       <Descriptions size="small" column={2} items={items} />
-      <EvidenceSection workspaceId={draft.workspace_id} evidence={metric.evidence} />
     </div>
   );
 }
@@ -103,7 +102,8 @@ export function MetricPanel({
   open: (request: ElementRequest) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-col">
+    <div className="flex min-w-0 flex-col gap-4">
+      <ContentBlock>
       {editing ? (
         <MetricForm
           draft={draft}
@@ -114,11 +114,13 @@ export function MetricPanel({
       ) : (
         <MetricSummary draft={draft} metric={metric} open={open} />
       )}
+      </ContentBlock>
+      {!editing && <EvidenceSection workspaceId={draft.workspace_id} evidence={metric.evidence} />}
       {canPreview && (
-        <section className="mt-4 flex flex-col gap-3 border-t border-rule pt-4">
+        <ContentBlock>
           <SectionTitle title="数值预览" />
           <MetricPreview draft={draft} metric={metric} context={context} />
-        </section>
+        </ContentBlock>
       )}
     </div>
   );

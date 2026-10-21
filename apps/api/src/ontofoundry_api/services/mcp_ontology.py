@@ -1,6 +1,8 @@
+
 """Four read-only ontology tools with authorization-bound segmented pagination."""
 
 import json
+from contextlib import suppress
 from copy import deepcopy
 from typing import Literal
 from uuid import UUID
@@ -27,7 +29,7 @@ from ontofoundry_api.services.ontology_query import (
 )
 from ontofoundry_api.services.workspaces import get_workspace
 
-Kind = Literal["object_type", "property", "link_type", "rule", "metric"]
+Kind = Literal["object_type", "property", "link_type", "rule", "metric", "dataset", "value_type"]
 
 
 class Paging(Strict):
@@ -170,8 +172,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
 
     resources = resource_items(
         snapshot,
-        mappings=mappings
-        and (name != "get_ontology" or "physical" in getattr(args, "include", [])),
+        mappings=mappings,
         instances=instances,
         db=db if mappings else None,
         workspace_id=workspace_id,
@@ -192,12 +193,20 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 definition["sources"] = [
                     s.model_dump(mode="json") for s in binding.sources.values()
                 ]
-    lookup = {r["definition"]["id"]: r for r in resources if r["kind"] != "dataset"}
-    for kind, collection in (("property", "properties"), ("rule", "rules")):
-        for e in snapshot[collection]:
+    lookup = {r["definition"]["id"]: r for r in resources if mappings or r["kind"] != "dataset"}
+    for kind, collection in (("property", "properties"), ("rule", "rules"), ("value_type", "value_types")):
+        for e in snapshot.get(collection, []):
             definition = deepcopy(e)
             if not instances:
                 definition.pop("evidence", None)
+            if kind == "value_type":
+                # Constraints and usage are derived on read, never stored on the type.
+                definition["constraints"] = [
+                    r["expression"] for r in snapshot["rules"] if r["owner_kind"] == "value_type" and r["owner_id"] == e["id"]
+                ]
+                definition["used_by_property_ids"] = [
+                    p["id"] for p in snapshot["properties"] if p.get("value_type_id") == e["id"]
+                ]
             lookup[e["id"]] = {"kind": kind, "definition": definition}
     if name == "search_ontology":
         hits = []
@@ -206,15 +215,29 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             if args.kinds and r["kind"] not in args.kinds:
                 continue
             q = args.query.casefold()
+            leaf_names = []
+            if r["kind"] == "dataset" and d.get("query_sql"):
+                from ontofoundry_api.services.dataset_sql import (
+                    parse_query,
+                    physical_tables,
+                )
+                with suppress(ServiceError, ValueError):
+                    leaf_names = [ref.name for ref in physical_tables(parse_query(d["query_sql"], d.get("dialect")))]
             matched = [s for s in d.get("synonyms", []) if q in s.casefold()]
             if (
                 q
                 and not matched
+                and not any(q in name.casefold() for name in leaf_names)
                 and not any(
                     q in str(d.get(k, "")).casefold()
                     for k in (
-                        "name", "technical_name", "description",
-                        "source_role_name", "target_role_name", "verbalizes",
+                        "display_name",
+                        "name",
+                        "description",
+                        "table_name",
+                        "source_role_name",
+                        "target_role_name",
+                        "verbalizes",
                     )
                 )
             ):
@@ -222,8 +245,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             hit = {
                 "id": identity,
                 "kind": r["kind"],
+                "display_name": d.get("display_name"),
                 "name": d["name"],
-                "technical_name": d.get("technical_name", d["name"]),
                 "summary": d.get("description", ""),
                 "matched_synonyms": matched,
             }
@@ -252,8 +275,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             element = {
                 "id": identity,
                 "kind": r["kind"],
+                "display_name": d.get("display_name"),
                 "name": d["name"],
-                "technical_name": d.get("technical_name", d["name"]),
             }
             if wanted is not None:
                 for field in ("description", "synonyms", "binding_status"):
@@ -270,6 +293,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                                     "property": "properties",
                                     "rule": "rules",
                                     "metric": "metrics",
+                                    "dataset": "datasets",
+                                    "value_type": "value_types",
                                 }[r["kind"]]
                             ]
                             if e["id"] == identity
@@ -281,9 +306,24 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                     definition.pop("evidence", None)
                 if not mappings or "physical" not in args.include:
                     definition.pop("data_join", None)
-                    if r["kind"] == "metric":
+                    if r["kind"] in {"metric", "dataset"}:
                         definition = None
+                if definition is not None and r["kind"] == "value_type":
+                    definition["constraints"] = d["constraints"]
+                    definition["used_by_property_ids"] = d["used_by_property_ids"]
                 if definition is not None:
+                    definition.pop("connection_id", None)
+                    if r["kind"] == "dataset":
+                        columns = definition.pop("columns", None) or []
+                        d["columns"] = columns
+                        element["columns"] = page(columns, [len(values), "columns"])
+                        if "adjacency" in args.include:
+                            from ontofoundry_api.services.dataset_sources import (
+                                dataset_references,
+                            )
+                            refs = dataset_references(draft, identity)
+                            d["referenced_by"] = [{"category": category, **ref} for category, values in refs.items() for ref in values]
+                            element["referenced_by"] = page(d["referenced_by"], [len(values), "referenced_by"])
                     element["definition"] = definition
                 for key in ("properties", "child_types"):
                     if key in d:
@@ -408,9 +448,9 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     }
     sections = {
         "properties": [
-            {"property_id": str(p.id), "value": fact.values[p.technical_name]}
+            {"property_id": str(p.id), "value": fact.values[p.name]}
             for p in index.effective_properties(fact.type_id)
-            if p.technical_name in fact.values
+            if p.name in fact.values
         ],
         "evidence": [e.model_dump(mode="json") for e in fact.evidence],
         "adjacency": [],

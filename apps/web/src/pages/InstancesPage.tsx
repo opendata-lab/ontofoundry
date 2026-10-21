@@ -186,7 +186,7 @@ export function InstancesPage() {
       })()
     : facts.find((o) => o.id === objectId);
   usePageTab({
-    title: object ? `实例 · ${object.display_text}` : type ? `${type.name} · ${objectId ? "实例详情" : "实例列表"}` : undefined,
+    title: object ? `实例 · ${object.display_text}` : type ? `${(type.display_name || type.name)} · ${objectId ? "实例详情" : "实例列表"}` : undefined,
   });
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (!draft) return <LoadingSurface label="正在读取实例…" />;
@@ -274,9 +274,9 @@ export function InstancesPage() {
       render: (_: unknown, o: Shown) => <Link to={linkTo(o)}>{o.display_text}</Link>,
     },
     ...(showTypeColumn
-      ? [{ title: "类型", key: "type", render: (_: unknown, o: Shown) => byId(draft.object_types, o.type_id)?.name }]
+      ? [{ title: "类型", key: "type", render: (_: unknown, o: Shown) => (byId(draft.object_types, o.type_id)?.display_name || byId(draft.object_types, o.type_id)?.name) }]
       : []),
-    ...columnsShown.map((p) => ({ title: p.name, key: p.id, render: (_: unknown, o: Shown) => cell(o.values[p.technical_name]) })),
+    ...columnsShown.map((p) => ({ title: (p.display_name || p.name), key: p.id, render: (_: unknown, o: Shown) => cell(o.values[p.name]) })),
   ];
   const hasNext = sessionId ? Boolean(preview?.has_more) : Boolean(list?.next_cursor);
   const setDate = (date: string | null) =>
@@ -291,19 +291,19 @@ export function InstancesPage() {
     );
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas">
-      <div className="px-6 pt-4">
-        <Breadcrumb
-          items={[
-            { title: <Link to={"../objects" + suffix}>本体对象</Link> },
-            { title: <Link to={detail.href({ kind: "object_type", id: type.id })}>{type.name}</Link> },
-            { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
-            ...(object ? [{ title: object.display_text }] : []),
-          ]}
-        />
-      </div>
       <PageHeader
-        title={object?.display_text ?? type.name}
-        note={`${byId(draft.object_types, object?.type_id ?? typeId)?.name} / ${type.technical_name}`}
+        title={object?.display_text ?? (type.display_name || type.name)}
+        note={`${(byId(draft.object_types, object?.type_id ?? typeId)?.display_name || byId(draft.object_types, object?.type_id ?? typeId)?.name)} / ${type.name}`}
+        breadcrumb={
+          <Breadcrumb
+            items={[
+              { title: <Link to={"../objects" + suffix}>本体对象</Link> },
+              { title: <Link to={detail.href({ kind: "object_type", id: type.id })}>{(type.display_name || type.name)}</Link> },
+              { title: <Link to={`../objects/${type.id}/instances${suffix}`}>实例列表</Link> },
+              ...(object ? [{ title: object.display_text }] : []),
+            ]}
+          />
+        }
       >
         {object && (
           <Button type="primary" className="ml-auto" icon={<Network size={14} />} onClick={() => setGraphOpen(!graphOpen)}>
@@ -459,8 +459,8 @@ export function InstancesPage() {
                 column={2}
                 items={effectiveProperties(draft, object.type_id).map((p) => ({
                   key: p.definition.id,
-                  label: p.definition.name,
-                  children: cell(object.values[p.definition.technical_name]),
+                  label: (p.definition.display_name || p.definition.name),
+                  children: cell(object.values[p.definition.name]),
                 }))}
               />
               <div className="grid grid-cols-1 gap-4 border-t border-rule pt-4 lg:grid-cols-2">
@@ -472,7 +472,7 @@ export function InstancesPage() {
                         <Network size={15} />
                         <Text type="secondary">{r.label}</Text>
                         {r.other!.display_text}
-                        <Tag className="m-0">{byId(draft.object_types, r.other!.type_id)?.name}</Tag>
+                        <Tag className="m-0">{(byId(draft.object_types, r.other!.type_id)?.display_name || byId(draft.object_types, r.other!.type_id)?.name)}</Tag>
                       </Link>
                     ))
                   ) : (

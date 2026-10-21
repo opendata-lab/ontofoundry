@@ -21,7 +21,7 @@ export function PanelToolbar({
 }) {
   return (
     <div
-      className={`flex min-h-10 flex-wrap items-center justify-between gap-3 border-b border-rule ${inset ? "px-4" : ""} ${className}`.trim()}
+      className={`flex min-h-panel-toolbar flex-wrap items-center justify-between gap-3 border-b border-rule ${inset ? "px-4" : ""} ${className}`.trim()}
     >
       {tabBar ?? (children && <div className="flex min-w-0 items-center gap-3">{children}</div>)}
       {extra && <div className="ml-auto flex flex-wrap items-center gap-2 py-1">{extra}</div>}

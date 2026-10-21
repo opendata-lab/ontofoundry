@@ -23,9 +23,9 @@ describe("文档实例邻域", () => {
     expect(result.links).toHaveLength(99);
   });
   it("draws instances by display text and links source to target", () => {
-    const graph = instanceCanvas(objects.slice(0, 2), [links[0]], [{ id: "t", name: "客户" }], [{ id: "r", name: "属于" }]);
+    const graph = instanceCanvas(objects.slice(0, 2), [links[0]], [{ id: "t", name: "customer" }], [{ id: "r", name: "belongs_to", display_name: "属于" }]);
     expect(graph.nodes.map((n) => n.label)).toEqual(["A", "B"]);
-    expect(graph.nodes[0].technical_name).toBe("客户");
+    expect(graph.nodes[0].name).toBe("customer");
     expect(graph.edges[0]).toMatchObject({ source: "a", target: "b", label: "属于", kind: "link_type" });
   });
 });

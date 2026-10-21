@@ -39,7 +39,7 @@ export const MULTIPLICITY: Record<LinkType["multiplicity"], string> = {
 /** A traversal is named for the role played by the object it returns. */
 export function linkDisplayName(link: LinkType, forward: boolean): string {
   return (forward ? link.target_role_name : link.source_role_name)
-    || (forward ? link.name : `${link.name}（反向）`);
+    || (forward ? (link.display_name || link.name) : `${(link.display_name || link.name)}（反向）`);
 }
 
 export const AGGREGATIONS: Record<Aggregation, string> = {
@@ -68,6 +68,7 @@ export function emptyDraft(workspaceId: UUID): Draft {
     mappings: [],
     material_objects: [],
     material_links: [],
+    value_types: [],
   };
 }
 
@@ -119,7 +120,7 @@ export function effectiveProperties(draft: Draft, typeId: UUID): Inherited<Prope
 export function propertyByName(draft: Draft, typeId: UUID, technicalName: string) {
   const wanted = technicalName.toLowerCase();
   return effectiveProperties(draft, typeId).find(
-    (p) => p.definition.technical_name.toLowerCase() === wanted,
+    (p) => p.definition.name.toLowerCase() === wanted,
   )?.definition;
 }
 
@@ -162,7 +163,11 @@ export function effectiveLinks(draft: Draft, typeId: UUID, bothSelfDirections = 
 export function effectiveRules(draft: Draft, typeId: UUID): Inherited<Rule>[] {
   const owners = new Map<UUID, UUID | null>();
   for (const id of lineage(draft, typeId)) owners.set(id, id === typeId ? null : id);
-  for (const p of effectiveProperties(draft, typeId)) owners.set(p.definition.id, p.inheritedFrom);
+  for (const p of effectiveProperties(draft, typeId)) {
+    owners.set(p.definition.id, p.inheritedFrom);
+    // A property's value type contributes its constraints, read-only here (VT-10).
+    if (p.definition.value_type_id) owners.set(p.definition.value_type_id, null);
+  }
   for (const l of effectiveLinks(draft, typeId)) {
     if (l.direction === "forward") owners.set(l.definition.id, l.inheritedFrom);
   }
@@ -254,7 +259,7 @@ export function datasetColumns(dataset: Dataset | undefined) {
 export function joinSummary(draft: Draft, join: DataJoin | null): string {
   if (!join) return "未绑定";
   if (join.kind === "direct") {
-    const names = (ids: UUID[]) => ids.map((id) => byId(draft.properties, id)?.name ?? "?").join(" + ");
+    const names = (ids: UUID[]) => ids.map((id) => (byId(draft.properties, id)?.display_name || byId(draft.properties, id)?.name) ?? "?").join(" + ");
     return `${names(join.source_property_ids)} = ${names(join.target_property_ids)}`;
   }
   return `映射表 ${byId(draft.datasets, join.dataset_id)?.name ?? "?"}`;
@@ -337,4 +342,10 @@ export function upsert<K extends keyof Draft & string>(
 export function remove<K extends keyof Draft & string>(draft: Draft, collection: K, id: UUID): Draft {
   const items = draft[collection] as unknown as { id: UUID }[];
   return { ...draft, [collection]: items.filter((item) => item.id !== id) };
+}
+
+/** Presentation fallback also accepts datasets, which keep their original name. */
+export function displayName(element: { name: string } | null | undefined): string {
+  return element && "display_name" in element && typeof element.display_name === "string" && element.display_name
+    ? element.display_name : element?.name ?? "";
 }

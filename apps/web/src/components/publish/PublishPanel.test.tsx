@@ -57,7 +57,7 @@ function preview(extra: Partial<PublishPreview> = {}): PublishPreview {
         change: "created",
         field_changes: [],
         before: null,
-        after: { name: "订单数", technical_name: "order_count" } as never,
+        after: { display_name: "订单数", name: "order_count" } as never,
       },
     ],
     labels: {},
@@ -269,8 +269,8 @@ describe("publish panel", () => {
       object_types: [
         {
           id: "ot-c",
-          name: "客户",
-          technical_name: "customer",
+          display_name: "客户",
+          name: "customer",
           description: "",
           extends: null,
           derived_by: [],
@@ -284,10 +284,11 @@ describe("publish panel", () => {
         {
           id: "p-name",
           owner_type_id: "ot-c",
-          name: "名称",
-          technical_name: "name",
+          display_name: "名称",
+          name: "name",
           description: "",
           value_kind: "string" as const,
+          value_type_id: null,
           identifier: true,
           unique: true,
           required: true,

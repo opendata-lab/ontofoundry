@@ -20,13 +20,13 @@ export const METRIC_KINDS: Record<Metric["kind"], string> = {
   expression: "表达式",
 };
 
-type Common = Pick<Metric, "id" | "name" | "technical_name" | "description" | "synonyms" | "evidence">;
+type Common = Pick<Metric, "id" | "display_name" | "name" | "description" | "synonyms" | "evidence">;
 
 function common(metric: Common): Common {
   return {
     id: metric.id,
+    display_name: metric.display_name,
     name: metric.name,
-    technical_name: metric.technical_name,
     description: metric.description,
     synonyms: metric.synonyms,
     evidence: metric.evidence,
@@ -37,8 +37,8 @@ export function newMetric(id: UUID, datasetId: UUID | null): SimpleMetric {
   return {
     id,
     kind: "simple",
+    display_name: "",
     name: "",
-    technical_name: "",
     description: "",
     synonyms: [],
     evidence: [],
@@ -103,7 +103,7 @@ export function newFilter(datasetId: UUID): Condition {
   return { column: { dataset_id: datasetId, column: "" }, operator: "eq", values: [] };
 }
 
-export type MetricErrors = Partial<Record<"name" | "technical_name" | "dataset" | "measure" | "numerator" | "denominator" | "expression" | `filter.${number}`, string>>;
+export type MetricErrors = Partial<Record<"display_name" | "name" | "dataset" | "measure" | "numerator" | "denominator" | "expression" | `filter.${number}`, string>>;
 
 function conditionValueMatches(value: Scalar, kind: ValueKind): boolean {
   if (kind === "string") return typeof value === "string";
@@ -121,10 +121,9 @@ function conditionValueMatches(value: Scalar, kind: ValueKind): boolean {
 
 export function metricErrors(draft: Draft, metric: Metric): MetricErrors {
   const errors: MetricErrors = {};
-  if (!metric.name.trim()) errors.name = "请填写名称";
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(metric.technical_name)) errors.technical_name = "英文标识只能使用字母、数字和下划线，且不能以数字开头";
-  else if (draft.metrics.some((m) => m.id !== metric.id && m.technical_name.toLowerCase() === metric.technical_name.toLowerCase()))
-    errors.technical_name = "英文标识已被其他指标使用";
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(metric.name)) errors.name = "英文标识只能使用字母、数字和下划线，且不能以数字开头";
+  else if (draft.metrics.some((m) => m.id !== metric.id && m.name.toLowerCase() === metric.name.toLowerCase()))
+    errors.name = "英文标识已被其他指标使用";
   if (isRatio(metric)) {
     const numerator = byId(draft.metrics, metric.numerator_id);
     const denominator = byId(draft.metrics, metric.denominator_id);

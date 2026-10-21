@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime
 from uuid import UUID
 
@@ -45,13 +46,27 @@ class NativeAdapter(ImportOnlyAdapter):
 
     def import_document(self, raw: bytes, ctx: ImportContext) -> ImportResult:
         report = ReportBuilder(self.id, ctx.workspace_id, hashlib.sha256(raw).hexdigest())
+        bundled = ()
+        if raw.startswith(b"PK"):
+            from .package import unpack
+
+            try:
+                raw, bundled = unpack(raw)
+            except (ValueError, UnicodeError, KeyError, TypeError) as error:
+                report.add(
+                    outcome="error",
+                    construct="document",
+                    source_path="",
+                    message="原生完整包校验失败：" + str(error),
+                )
+                return report.finish(empty_draft(ctx.workspace_id))
         source = parse_document(raw, report)
         empty = empty_draft(ctx.workspace_id)
         if source is None:
             return report.finish(empty)
         value = source.value
         try:
-            if not isinstance(value, dict) or set(value) != {
+            if not isinstance(value, dict) or set(value) - {"connection_names"} != {
                 "format",
                 "schema_version",
                 "exported_at",
@@ -61,10 +76,20 @@ class NativeAdapter(ImportOnlyAdapter):
                     "原生单文件必须恰好包含 format、schema_version、exported_at、draft"
                 )
             if value["format"] != "ontofoundry" or value["schema_version"] != "core-1":
-                raise ValueError("仅支持 ontofoundry core-1 单文件，不支持 ZIP 或旧版本")
+                raise ValueError("仅支持 ontofoundry core-1 单文件，不支持其他模型版本")
             datetime.fromisoformat(value["exported_at"].replace("Z", "+00:00"))
             data = deepcopy(value["draft"])
-            model = validate_core_graph(CoreDraft.model_validate(data))
+            for dataset in data.get("datasets", []):
+                hint = value.get("connection_names", {}).get(dataset["id"])
+                matches = [c for c in ctx.connections if c["name"] == hint]
+                dataset["connection_id"] = matches[0]["id"] if len(matches) == 1 else None
+                if len(matches) == 1:
+                    dataset["dialect"] = matches[0]["kind"]
+            from .legacy import convert_names
+
+            model = validate_core_graph(
+                CoreDraft.model_validate(convert_names(data, report))
+            )
             model.workspace_id = ctx.workspace_id
         except (ValueError, TypeError, AttributeError, ValidationError) as error:
             report.add(
@@ -108,7 +133,9 @@ class NativeAdapter(ImportOnlyAdapter):
                     targets=[element.id],
                     message="保留原生定义及 UUID，使用目标工作空间",
                 )
-        return report.finish(validate_core_graph(model), pending)
+        return replace(
+            report.finish(validate_core_graph(model), pending), bundled_materials=bundled
+        )
 
     def validate_document(self, document: bytes):
         return [

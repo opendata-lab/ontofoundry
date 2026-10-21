@@ -4,17 +4,21 @@ from __future__ import annotations
 
 
 def build_proposal_repair_request(
-    problems: list[str], header: dict, result_path: str
+    problems: list[str], *, run_token: str, work_pack_file: str, repair_used: int
 ) -> str:
-    """Repair turn for an ontofoundry.proposals/v1 result that was rejected."""
-    import json
+    """Attach actual server diagnostics to the fresh dynamic entry points."""
+    from ontofoundry_api.services.dataagent import proposal_instructions
 
-    numbered = "\n".join(f"{index}. {text}" for index, text in enumerate(problems, 1))
+    entry = proposal_instructions(
+        run_token=run_token,
+        work_pack_file=work_pack_file,
+        header={},
+        materials=[],
+        schema_file="",
+        mcp=None,
+    )
     return (
-        "[OntoFoundry 提案结果校验未通过]\n"
-        "上一轮的提案结果整份被拒收，原因如下。请修正后重新输出**全部**提案：\n\n"
-        f"{numbered}\n\n"
-        "结果头部必须逐字使用以下值（run_token 已更换）：\n"
-        + json.dumps(header, ensure_ascii=False, indent=2)
-        + f"\n并写到 {result_path}。不要修改或覆盖其他轮次的结果文件。"
+        f"模式：建模修复\n{entry}\n累计修正：{repair_used}/2\n"
+        "在 modeling/parts/ 已有片段上修改，只改报错指向的片段，再重新合并。\n\n"
+        "[服务端实际错误]\n" + "\n".join(problems)
     )

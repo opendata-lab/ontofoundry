@@ -24,7 +24,7 @@ export function RelationshipConnection(props: PanelProps<LinkType>) {
   };
   const source = byId(draft.object_types, type.source_type_id);
   const target = byId(draft.object_types, type.target_type_id);
-  const options = draft.object_types.map((object) => ({ value: object.id, label: object.name || object.technical_name }));
+  const options = draft.object_types.map((object) => ({ value: object.id, label: (object.display_name || object.name) || object.name }));
   const forwardMany = type.multiplicity === "many_to_many";
   const reverseMany = type.multiplicity !== "one_to_one";
   const endpoint = (reverse: boolean) => {
@@ -32,7 +32,7 @@ export function RelationshipConnection(props: PanelProps<LinkType>) {
     return <Form.Item className="mb-0" label={reverse ? "目标对象" : "来源对象"} required={editing}>
       {editing ? <Select className="w-full" aria-label={reverse ? "目标对象" : "来源对象"} showSearch optionFilterProp="label" options={options} value={object?.id}
         onChange={(id: string) => update(reverse ? { target_type_id: id, data_join: null } : { source_type_id: id, data_join: null })} />
-        : object ? <ElementLink onClick={() => open({ kind: "object_type", id: object.id })}>{object.name}</ElementLink> : <Text type="secondary">未指定对象</Text>}
+        : object ? <ElementLink onClick={() => open({ kind: "object_type", id: object.id })}>{(object.display_name || object.name)}</ElementLink> : <Text type="secondary">未指定对象</Text>}
     </Form.Item>;
   };
   const direction = (reverse: boolean) => {
@@ -43,9 +43,9 @@ export function RelationshipConnection(props: PanelProps<LinkType>) {
     const readings = (type.verbalizes ?? []).filter((reading) => isForwardReading(reading) !== reverse);
     const meaningLabel = reverse ? "反向关系含义" : "正向关系含义";
     return <section className="flex min-w-0 flex-col gap-3" aria-label={reverse ? "反向关系" : "正向关系"}>
-      <SectionTitle title={role || (reverse ? "反向关系" : "正向关系")} note={<span className="inline-flex flex-wrap items-center gap-2">{from?.name || "未指定对象"}<ArrowRight className="size-icon-sm text-muted" />{to?.name || "未指定对象"}</span>} />
+      <SectionTitle title={role || (reverse ? "反向关系" : "正向关系")} note={<span className="inline-flex flex-wrap items-center gap-2">{(from?.display_name || from?.name) || "未指定对象"}<ArrowRight className="size-icon-sm text-muted" />{(to?.display_name || to?.name) || "未指定对象"}</span>} />
       <div className="flex min-h-control-sm flex-wrap items-center gap-2">
-        <Text>每个 {from?.name || "对象"} {role ? "有" : "对应"}</Text>
+        <Text>每个 {(from?.display_name || from?.name) || "对象"} {role ? "有" : "对应"}</Text>
         {editing ? <Select className="w-inspector-cardinality" aria-label={reverse ? "每个目标对应的来源数量" : "每个来源对应的目标数量"} value={many ? "many" : "one"}
           options={[
             { value: "one", label: "一个", disabled: reverse && forwardMany },
@@ -56,7 +56,7 @@ export function RelationshipConnection(props: PanelProps<LinkType>) {
             const nextReverse = reverse ? count === "many" : reverseMany;
             update({ multiplicity: nextForward ? "many_to_many" : nextReverse ? "many_to_one" : "one_to_one" });
           }} /> : <Text strong>{many ? "多个" : "一个"}</Text>}
-        <Text>{role || to?.name || "对象"}</Text>
+        <Text>{role || (to?.display_name || to?.name) || "对象"}</Text>
       </div>
       <Form.Item className="mb-0" label={meaningLabel}>
         {editing ? <Input.TextArea aria-label={meaningLabel} autoSize={{ minRows: 2, maxRows: 6 }}

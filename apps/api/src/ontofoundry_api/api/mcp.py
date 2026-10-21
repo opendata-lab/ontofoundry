@@ -23,12 +23,12 @@ LEGACY_PROTOCOL_VERSIONS = (
 META = "io.modelcontextprotocol/"
 INSTRUCTIONS = (
     "只读核心本体和已接受的文档事实；数据库聚合由 DataAgent 自有查询工具执行。"
-    "关系公共外壳的 technical_name 是读取兼容字段（等于 name），不属于核心定义；"
+    "元素 name 是必填英文标识，display_name 是可选中文名称，空时显示 name；"
     "写提案以 definition 和本轮 proposal Schema 为准。"
 )
 TOOLS = {
-    "search_ontology": "按名称和同义词搜索核心语义",
-    "get_ontology": "读取核心定义、继承及授权物理投影",
+    "search_ontology": "按名称、英文标识和同义词搜索核心语义；kinds 可选 object_type、property、link_type、rule、metric、dataset、value_type",
+    "get_ontology": "读取核心定义、继承及授权物理投影；数据集含来源方式、表位置或 SQL、列和被引用元素，值类型含基础类型、约束和使用属性",
     "search_objects": "按事实 UUID 分页搜索已接受的文档事实",
     "get_object": "读取文档事实、证据与直接邻接",
 }

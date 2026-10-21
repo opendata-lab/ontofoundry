@@ -4,11 +4,11 @@ import { example } from "../test/drafts";
 import { branchProblem, branchesFromForm, formErrors, formFromBranches, newPropertyRow, type LinkRow } from "./derivedEditing";
 
 const draft = example("06-inheritance");
-const party = draft.object_types.find((o) => o.technical_name === "party")!;
-const vip = draft.object_types.find((o) => o.technical_name === "vip_party")!;
-const level = draft.properties.find((p) => p.technical_name === "level" && p.owner_type_id === party.id)!;
-const signer = draft.link_types.find((l) => l.name === "signer")!;
-const contact = draft.link_types.find((l) => l.name === "contact")!;
+const party = draft.object_types.find((o) => o.name === "party")!;
+const vip = draft.object_types.find((o) => o.name === "vip_party")!;
+const level = draft.properties.find((p) => p.name === "level" && p.owner_type_id === party.id)!;
+const signer = draft.link_types.find((l) => (l.display_name || l.name) === "signer")!;
+const contact = draft.link_types.find((l) => (l.display_name || l.name) === "contact")!;
 
 describe("member condition form", () => {
   it("reads a single simple branch as rows and writes the same branch back", () => {
@@ -65,15 +65,15 @@ describe("member condition form", () => {
     expect(formErrors(draft, { mode: "simple", rows: [notInNull] })[notInNull.key]).toBe("“不属于”的值不能包含空值");
 
     const sales = example("01-basic-sales");
-    const order = sales.object_types.find((o) => o.technical_name === "sales_order")!;
-    const amount = sales.properties.find((p) => p.owner_type_id === order.id && p.technical_name === "amount")!;
+    const order = sales.object_types.find((o) => o.name === "sales_order")!;
+    const amount = sales.properties.find((p) => p.owner_type_id === order.id && p.name === "amount")!;
     const badNum = { ...newPropertyRow(amount), operator: "gt" as const, values: ["abc"] };
     expect(formErrors(sales, { mode: "simple", rows: [badNum] })[badNum.key]).toBe("数值属性的条件值必须是数字");
   });
   it("stores boolean in and not_in values as booleans", () => {
     const inst = example("07-instances-and-evidence");
-    const customer = inst.object_types.find((o) => o.technical_name === "customer")!;
-    const isVip = inst.properties.find((p) => p.owner_type_id === customer.id && p.technical_name === "is_vip")!;
+    const customer = inst.object_types.find((o) => o.name === "customer")!;
+    const isVip = inst.properties.find((p) => p.owner_type_id === customer.id && p.name === "is_vip")!;
     const row = { ...newPropertyRow(isVip), operator: "in" as const, values: ["true", "false"] };
     const branches = branchesFromForm(inst, customer.id, { mode: "simple", rows: [row] });
     expect(branches).toEqual([

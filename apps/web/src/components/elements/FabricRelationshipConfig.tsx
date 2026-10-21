@@ -5,7 +5,7 @@ import { byId } from "../../lib/coreModel";
 import { changeType, type PanelProps } from "../../lib/elementModel";
 import { objectMapping, sourceColumns } from "../../lib/objectMapping";
 import { joinProblem } from "../../lib/objectMappingEditing";
-import { FormRow, SectionTitle } from "../layout";
+import { ContentBlock, FormRow, SectionTitle } from "../layout";
 import { KeyEditor } from "./LinkMappingPanel";
 
 const { Text } = Typography;
@@ -38,7 +38,7 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
     const keyKey = side === "source" ? "source_key" : "target_key";
     const object = side === "source" ? source : target;
     const key = join[keyKey];
-    const keyName = key.kind === "mapping_key" ? "对象数据的键列" : key.property_ids.map((id) => byId(draft.properties, id)?.name ?? "未指定属性").join(" + ");
+    const keyName = key.kind === "mapping_key" ? "对象数据的键列" : key.property_ids.map((id) => (byId(draft.properties, id)?.display_name || byId(draft.properties, id)?.name) ?? "未指定属性").join(" + ");
     return (
       <div className="grid min-w-0 grid-cols-2 items-start gap-3">
         <Select
@@ -54,7 +54,7 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
         <div className="flex min-w-0 items-start gap-2">
           <Link2 size={14} className="mt-2 shrink-0 text-muted" />
           {editing && object ? <div className="min-w-0 flex-1"><KeyEditor
-            draft={draft} typeId={object.id} value={key} label={object.name}
+            draft={draft} typeId={object.id} value={key} label={(object.display_name || object.name)}
             onChange={(value: MappingTableJoin["source_key"]) => setJoin({ ...join, [keyKey]: value })}
           /></div> : <span className="inline-flex min-h-control-sm min-w-0 items-center gap-2"><KeyRound size={14} className="shrink-0 text-muted" /><Text className="break-words">{keyName || "未指定键"}</Text></span>}
         </div>
@@ -65,7 +65,7 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
     return (
       <section className="flex min-w-0 flex-col gap-3">
         <Form.Item className="mb-0" label={`${side === "source" ? "来源" : "目标"}对象类型`} required>
-          <Input aria-label={`${side === "source" ? "来源" : "目标"}对象`} readOnly value={(side === "source" ? source : target)?.name || "未指定对象"} />
+          <Input aria-label={`${side === "source" ? "来源" : "目标"}对象`} readOnly value={((side === "source" ? source : target)?.display_name || (side === "source" ? source : target)?.name) || "未指定对象"} />
         </Form.Item>
         <div className="grid grid-cols-2 gap-3 text-xs"><Text>映射表列</Text><Text>对象键属性</Text></div>
         {mappingRow(side)}
@@ -74,7 +74,8 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
   };
   const problem = joinProblem(join);
   return (
-    <Form layout="vertical" component="div" size="small" className="fabric-relationship-form flex w-full min-w-0 flex-col gap-3">
+    <Form layout="vertical" component="div" size="small" className="fabric-relationship-form flex w-full min-w-0 flex-col gap-4">
+      <ContentBlock>
       <SectionTitle title="数据映射" />
       {showBinding && <FormRow>
         <Form.Item className="mb-0" label="使用映射表">
@@ -84,7 +85,8 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
           </div>
         </Form.Item>
       </FormRow>}
-      {showBinding && join?.kind === "mapping_table" && <section className="flex min-w-0 flex-col gap-3 border-t border-rule pt-4">
+      </ContentBlock>
+      {showBinding && join?.kind === "mapping_table" && <ContentBlock>
         <SectionTitle title="映射表" />
         <FormRow>
           <Form.Item className="mb-0" label="数据集">
@@ -103,12 +105,12 @@ export function FabricRelationshipConfig(props: PanelProps<LinkType> & {
             </Text>
           </Form.Item>
         </FormRow>
-      </section>}
+      </ContentBlock>}
       {showBinding && join?.kind === "mapping_table" && <>
-        <section className="flex min-w-0 flex-col gap-3 border-t border-rule pt-4">
+        <ContentBlock>
           <SectionTitle title="字段对应" />
           <FormRow>{endpoint("source")}{endpoint("target")}</FormRow>
-        </section>
+        </ContentBlock>
         {editing && problem && <Alert type="warning" showIcon message={problem} />}
         {(sourceRecord?.mode === "virtual" || targetRecord?.mode === "virtual") && <Alert type="info" showIcon message="虚拟父对象的关系绑定在具体子对象上配置。" />}
       </>}

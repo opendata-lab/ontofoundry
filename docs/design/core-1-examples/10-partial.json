@@ -8,68 +8,68 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001901",
-        "name": "门店",
-        "technical_name": "store",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "store",
+        "display_name": "门店"
       },
       {
         "id": "00000000-0000-4000-8000-000000001902",
-        "name": "城市",
-        "technical_name": "city",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "city",
+        "display_name": "城市"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002901",
         "owner_type_id": "00000000-0000-4000-8000-000000001901",
-        "name": "门店编码",
-        "technical_name": "store_code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "store_code",
+        "display_name": "门店编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002902",
         "owner_type_id": "00000000-0000-4000-8000-000000001901",
-        "name": "营业面积",
-        "technical_name": "area",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "area",
+        "display_name": "营业面积"
       },
       {
         "id": "00000000-0000-4000-8000-000000002911",
         "owner_type_id": "00000000-0000-4000-8000-000000001902",
-        "name": "城市名",
-        "technical_name": "city_name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "city_name",
+        "display_name": "城市名"
       }
     ],
     "link_types": [
@@ -94,8 +94,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006901",
-        "name": "门店总面积",
-        "technical_name": "total_store_area",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -106,7 +104,9 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8"
+        "dataset_id": "f7bd13d9-73bc-5348-84f9-99b86ead98d8",
+        "name": "total_store_area",
+        "display_name": "门店总面积"
       }
     ],
     "datasets": [

@@ -3,7 +3,7 @@ import { Database, PlugZap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { catalogApi, workspaceRequest } from "../api/client";
 import type { DataConnection } from "../api/types";
-import { Panel, PanelToolbar, SectionTitle, StatusMark } from "./layout";
+import { Panel, StatusMark } from "./layout";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 
 const PORTS: Record<DataConnection["kind"], number> = { postgresql: 5432, mysql: 3306, doris: 9030 };
@@ -59,9 +59,6 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
         </div>
       )}
       <Panel footer="使用仅需查询权限的数据库账号。实例按需查询，不全量同步源数据。">
-        <PanelToolbar>
-          <SectionTitle title="连接列表" note={`${connections.length} 个连接`} />
-        </PanelToolbar>
         <Table
           size="middle"
           onHeaderRow={() => ({ className: "text-xs" })}

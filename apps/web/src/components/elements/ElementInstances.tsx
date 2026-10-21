@@ -58,10 +58,10 @@ function InstanceDetail({ draft, row, related, busy, error, snapshotDate, onClos
       <SectionTitle title={row.display_text || "未命名实例"}>
         <Button size="small" type="text" onClick={onClose}>收起</Button>
       </SectionTitle>
-      {type && <Tag className="m-0 self-start">{type.name}</Tag>}
+      {type && <Tag className="m-0 self-start">{(type.display_name || type.name)}</Tag>}
       <section className="flex flex-col gap-3">
         <SectionTitle title="基本属性" />
-        <Descriptions size="small" column={1} items={properties.map((p) => ({ key: p.id, label: p.name, children: shown(row.values[p.technical_name]) }))} />
+        <Descriptions size="small" column={1} items={properties.map((p) => ({ key: p.id, label: (p.display_name || p.name), children: shown(row.values[p.name]) }))} />
       </section>
       <section className="flex flex-col gap-3 border-t border-rule pt-4">
         <SectionTitle title="关联实例" />
@@ -232,21 +232,21 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
     ? draft.material_links.filter((l) => l.source_id === selected.id || l.target_id === selected.id).map((l) => {
         const outgoing = l.source_id === selected.id;
         const other = byId(draft.material_objects, outgoing ? l.target_id : l.source_id);
-        return { id: l.id, label: linkLabel(byId(draft.link_types, l.type_id), outgoing), other: other ? documentDisplayText(draft, other) : "?", typeName: byId(draft.object_types, other?.type_id)?.name ?? "" };
+        return { id: l.id, label: linkLabel(byId(draft.link_types, l.type_id), outgoing), other: other ? documentDisplayText(draft, other) : "?", typeName: (byId(draft.object_types, other?.type_id)?.display_name || byId(draft.object_types, other?.type_id)?.name) ?? "" };
       })
     : selected && neighborhood
       ? neighborhood.links.filter((l) => l.source_id === neighborhood.center_id || l.target_id === neighborhood.center_id).map((l) => {
           const outgoing = l.source_id === neighborhood.center_id;
           const other = neighborhood.objects.find((o) => o.id === (outgoing ? l.target_id : l.source_id));
-          return { id: l.id, label: linkLabel(byId(draft.link_types, l.type_id), outgoing), other: other?.display_text ?? "?", typeName: byId(draft.object_types, other?.type_id)?.name ?? "" };
+          return { id: l.id, label: linkLabel(byId(draft.link_types, l.type_id), outgoing), other: other?.display_text ?? "?", typeName: (byId(draft.object_types, other?.type_id)?.display_name || byId(draft.object_types, other?.type_id)?.name) ?? "" };
         }) : null;
   const showTypeColumn = facts.some((f) => f.type_id !== type.id) || rows.some((r) => r.type_id !== type.id) || mode === "virtual";
   const columns = [
     { title: "实例", key: "display", ellipsis: true, render: (_: unknown, row: Row) => (
       <Button type="link" size="small" className="h-auto p-0" onClick={(e) => { e.stopPropagation(); void select(row); }}>{row.display_text}</Button>
     ) },
-    ...(showTypeColumn ? [{ title: "类型", key: "type", ellipsis: true, render: (_: unknown, row: Row) => byId(draft.object_types, row.type_id)?.name }] : []),
-    ...properties.map((p) => ({ title: p.name, key: p.id, ellipsis: true, render: (_: unknown, row: Row) => shown(row.values[p.technical_name]) })),
+    ...(showTypeColumn ? [{ title: "类型", key: "type", ellipsis: true, render: (_: unknown, row: Row) => (byId(draft.object_types, row.type_id)?.display_name || byId(draft.object_types, row.type_id)?.name) }] : []),
+    ...properties.map((p) => ({ title: (p.display_name || p.name), key: p.id, ellipsis: true, render: (_: unknown, row: Row) => shown(row.values[p.name]) })),
   ];
   const dates = [...new Set(snapshotDates.map((s) => s.date).filter(Boolean))];
   return (
@@ -254,7 +254,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
       <PanelToolbar inset={false} className="inspector-toolbar" extra={
         <Popover trigger="click" title="显示业务属性" content={
           <Checkbox.Group value={visiblePropertyIds} onChange={(ids) => setVisiblePropertyIds(ids as string[])}>
-            <div className="flex flex-col gap-2">{allProperties.map((p) => <Checkbox key={p.id} value={p.id}>{p.name}</Checkbox>)}</div>
+            <div className="flex flex-col gap-2">{allProperties.map((p) => <Checkbox key={p.id} value={p.id}>{(p.display_name || p.name)}</Checkbox>)}</div>
           </Checkbox.Group>
         }>
           <Button size="small" icon={<Settings2 size={14} />} disabled={!allProperties.length}>列设置</Button>
@@ -331,7 +331,7 @@ function LinkInstances({ draft, type, open }: PanelProps<LinkType>) {
         />
       } detail={selected ? (
         <>
-          <SectionTitle title={type.name}><Button size="small" type="text" onClick={() => setSelectedId(null)}>收起</Button></SectionTitle>
+          <SectionTitle title={(type.display_name || type.name)}><Button size="small" type="text" onClick={() => setSelectedId(null)}>收起</Button></SectionTitle>
           <SectionTitle title="关联实例" />
           <Descriptions size="small" column={1} items={[
             { key: "source", label: type.source_role_name || "来源实例", children: name(selected.source_id) },

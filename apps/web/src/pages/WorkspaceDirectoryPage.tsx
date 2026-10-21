@@ -11,8 +11,7 @@ import {
   PageBody,
   PageHeader,
   Panel,
-  PanelToolbar,
-  SectionTitle,
+  PageToolbar,
   StatusMark,
 } from "../components/layout";
 
@@ -68,16 +67,14 @@ export function WorkspaceDirectoryPage() {
         </>
       }
     >
-      <PageHeader title="工作空间" note="每个工作空间维护一张独立本体图和一个当前发布版本。">
+      <PageHeader title="工作空间" note="每个工作空间维护一张独立本体图和一个当前发布版本。" />
+      <PageBody>
+        <PageToolbar extra={<Text type="secondary" className="text-xs">{workspaces.length} 个工作空间</Text>}>
         <Button type="primary" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setOpen(true)}>
           创建工作空间
         </Button>
-      </PageHeader>
-      <PageBody>
+        </PageToolbar>
         <Panel>
-          <PanelToolbar>
-            <SectionTitle title="工作空间列表" note={`${workspaces.length} 个工作空间`} />
-          </PanelToolbar>
           <Table
             size="middle"
             onHeaderRow={() => ({ className: "text-xs" })}

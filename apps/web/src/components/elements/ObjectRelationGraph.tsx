@@ -38,7 +38,7 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
   const cy = height / 2;
   const crowded = neighbours.length > 8;
   const connection = (id: string, group: Group, path: string, x: number, y: number) => (
-    <g key={`edge:${id}`} tabIndex={0} aria-label={group.names.join("、")} className="group outline-none">
+    <g key={`edge:${id}`} role="group" tabIndex={0} aria-label={group.names.join("、")} className="group outline-none">
       <title>{group.names.join("\n")}</title>
       <path d={path} className="fill-none stroke-transparent" strokeWidth={14} />
       <path
@@ -48,15 +48,11 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
         markerStart={group.incoming ? `url(#${marker}-start)` : undefined}
         markerEnd={group.outgoing ? `url(#${marker}-end)` : undefined}
       />
-      {group.names.length === 1 && !crowded && (
+      {(!crowded || group.names.length > 1) && (
         <text x={x} y={y - 16} textAnchor="middle" className="fill-muted text-xs">
-          {group.names[0]}
+          {group.names.length === 1 ? group.names[0] : `${group.names.length} 条关系`}
         </text>
       )}
-      <circle cx={x} cy={y} r={11} className="fill-surface stroke-rule-strong" />
-      <text x={x} y={y + 4} textAnchor="middle" className="fill-ink-2 text-xs">
-        {group.names.length}
-      </text>
     </g>
   );
   return (
@@ -127,14 +123,18 @@ export function ObjectRelationGraph({ draft, type, open }: PanelProps<ObjectType
                 </g>
               );
             })}
-            {groups.has(type.id) &&
-              connection(
-                type.id,
-                groups.get(type.id)!,
-                `M${cx - 35},${cy - 25} C${cx - 110},${cy - 105} ${cx + 110},${cy - 105} ${cx + 35},${cy - 25}`,
-                cx,
-                cy - 85,
-              )}
+            {groups.has(type.id) && (() => {
+              // Put the loop between radial edges, away from their labels.
+              const angle = neighbours.length === 0 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / neighbours.length;
+              const point = (direction: number, radius: number) => ({ x: cx + Math.cos(direction) * radius, y: cy + Math.sin(direction) * radius });
+              const boundary = (direction: number) => point(direction, Math.min(59 / Math.max(Math.abs(Math.cos(direction)), 0.01), 25 / Math.max(Math.abs(Math.sin(direction)), 0.01)));
+              const start = boundary(angle - 0.4);
+              const end = boundary(angle + 0.4);
+              const first = point(angle - 0.6, 150);
+              const second = point(angle + 0.6, 150);
+              const label = point(angle, 120);
+              return connection(type.id, groups.get(type.id)!, `M${start.x},${start.y} C${first.x},${first.y} ${second.x},${second.y} ${end.x},${end.y}`, label.x, label.y);
+            })()}
             <g>
               <rect x={cx - 59} y={cy - 25} width={118} height={50} rx={7} className="fill-object-soft stroke-object" />
               <text x={cx} y={cy + 4} textAnchor="middle" className="fill-object text-sm font-semibold">

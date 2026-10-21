@@ -41,9 +41,12 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
     workspace = db.get(WorkspaceRecord, workspace_id)
     model = CoreDraft.model_validate(snapshot_of(version))
     scopes = {}
+    connection_names = {}
     for dataset in model.datasets:
         try:
-            scopes[dataset.id] = resolve_dataset(db, workspace_id, dataset).connection.id
+            source = resolve_dataset(db, workspace_id, dataset, registered=False)
+            scopes[dataset.id] = source.connection.id
+            connection_names[dataset.id] = source.connection.name
         except ServiceError:
             continue
     identity = payload_sha256(
@@ -53,7 +56,8 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
             "workspace": [workspace.name, workspace.slug, workspace.description],
             "adapter": adapter.id,
             "scopes": {str(k): v for k, v in scopes.items()},
-            "compiler": "core-1-export-v1",
+            "connection_names": {str(k): v for k, v in connection_names.items()},
+            "compiler": "core-1-export-v3-dataset-sources",
         }
     )
     root = export_root(settings, workspace_id, version.id, adapter.id)
@@ -68,12 +72,19 @@ def export_snapshot(db, settings, workspace_id, adapter_id, version_id):
             return preview
         except (ValueError, OSError, ServiceError):
             pass
+    materials = (
+        packaged_materials(db, settings, workspace_id, model)
+        if adapter.id == "ontofoundry-core-1-package"
+        else None
+    )
     ctx = ExportContext(
         workspace_name=workspace.name,
         workspace_slug=workspace.slug,
         workspace_description=workspace.description,
         exported_at=datetime.now(UTC).isoformat(),
         dataset_scopes=scopes,
+        connection_names=connection_names,
+        materials=materials,
     )
     result = adapter.export_document(model, ctx)
     digest = (
@@ -140,3 +151,46 @@ def download_export(db, settings, workspace_id, adapter_id, version_id, digest):
     adapter = adapter_for(adapter_id)
     version = current_version(db, workspace_id, version_id)
     return artifact_bytes(settings, workspace_id, adapter.id, version.id, digest)
+
+
+def packaged_materials(db, settings, workspace_id, model):
+    from sqlalchemy import select
+
+    from ontofoundry_api.db_models import MaterialRecord
+    from ontofoundry_api.domain.core import COLLECTIONS
+    from ontofoundry_api.services.material_source import (
+        MaterialSourceMissing,
+        material_source_path,
+    )
+
+    references = {
+        e.material_sha256
+        for collection in COLLECTIONS
+        for element in getattr(model, collection)
+        for e in getattr(element, "evidence", [])
+        if e.kind == "material"
+    }
+    result = []
+    for material in db.scalars(
+        select(MaterialRecord).where(
+            MaterialRecord.workspace_id == workspace_id,
+            MaterialRecord.sha256.in_(references),
+        )
+    ):
+        try:
+            data = material_source_path(db, settings, material).read_bytes()
+        except (OSError, MaterialSourceMissing):
+            continue
+        if hashlib.sha256(data).hexdigest() != material.sha256:
+            continue
+        result.append(
+            {
+                "material_id": material.id,
+                "name": material.name,
+                "sha256": material.sha256,
+                "byte_size": len(data),
+                "path": "materials/" + material.sha256 + ".md",
+                "data": data,
+            }
+        )
+    return tuple(result)

@@ -1,12 +1,13 @@
 import { Alert, Button, Descriptions, Modal, Table, Typography } from "antd";
 import { useState } from "react";
-import type { DuplicateCandidate, Draft, MaterialObject, ProposalItem } from "../../api/types";
+import type { Dataset, DuplicateCandidate, Draft, MaterialObject, ProposalItem } from "../../api/types";
 import { byId, effectiveProperties } from "../../lib/coreModel";
 import { SectionTitle } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
 import { OPERATION, STATUS } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
+import { ProposalSourceIssues } from "./ProposalSourceIssues";
 import { acceptanceBlock, elementNames, mergedFact, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
@@ -55,14 +56,14 @@ function ReviseDialog({
             pagination={false}
             dataSource={properties}
             columns={[
-              { title: "属性", key: "name", render: (_, p) => p.name },
-              { title: "已有值", key: "before", render: (_, p) => valueText(existing!.values[p.technical_name]) },
+              { title: "属性", key: "name", render: (_, p) => (p.display_name || p.name) },
+              { title: "已有值", key: "before", render: (_, p) => valueText(existing!.values[p.name]) },
               {
                 title: "更新后",
                 key: "after",
                 render: (_, p) => {
-                  const changed = existing!.values[p.technical_name] !== after.values[p.technical_name];
-                  return <span className={changed ? "font-semibold text-success" : ""}>{valueText(after.values[p.technical_name])}</span>;
+                  const changed = existing!.values[p.name] !== after.values[p.name];
+                  return <span className={changed ? "font-semibold text-success" : ""}>{valueText(after.values[p.name])}</span>;
                 },
               },
             ]}
@@ -85,6 +86,8 @@ export function ProposalDetail({
   error,
   actions,
   onRevise,
+  onReviseDataset,
+  workspaceId,
   onClose,
 }: {
   item: ProposalItem;
@@ -95,6 +98,8 @@ export function ProposalDetail({
   error?: string;
   actions: CardActions;
   onRevise: (candidate: DuplicateCandidate, after: MaterialObject) => Promise<boolean>;
+  onReviseDataset: (dataset: Dataset) => Promise<boolean>;
+  workspaceId: string;
   onClose: () => void;
 }) {
   const [revising, setRevising] = useState<DuplicateCandidate | null>(null);
@@ -137,6 +142,7 @@ export function ProposalDetail({
         {["conflict", "stale"].includes(item.status) && (
           <Alert type="warning" showIcon message={`${STATUS[item.status]}：${item.status_reason || "当前目标已发生变化，请重新评估"}`} />
         )}
+        <ProposalSourceIssues item={item} workspaceId={workspaceId} busy={busy} onReviseDataset={onReviseDataset} />
         {canRevise && (
           <section className="flex flex-col gap-2 border-b border-rule pb-4">
             <SectionTitle title="可能重复的已有事实" />
@@ -150,7 +156,7 @@ export function ProposalDetail({
               dataSource={item.duplicate_candidates}
               columns={[
                 { title: "已有事实", key: "display", render: (_, c) => c.display_text },
-                { title: "类型", key: "type", render: (_, c) => byId(draft.object_types, c.type_id)?.name },
+                { title: "类型", key: "type", render: (_, c) => (byId(draft.object_types, c.type_id)?.display_name || byId(draft.object_types, c.type_id)?.name) },
                 {
                   title: "",
                   key: "action",
@@ -167,7 +173,7 @@ export function ProposalDetail({
         )}
         <section className="flex flex-col gap-2 border-b border-rule pb-4">
           <SectionTitle title="字段差异" note={`${changes.length} 处改动`} />
-          <FieldDiff changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
+          <FieldDiff kind={item.target_kind} changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
         </section>
         {reason && (
           <section className="flex flex-col gap-1 border-b border-rule pb-4">

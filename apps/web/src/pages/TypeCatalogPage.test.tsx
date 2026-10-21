@@ -15,7 +15,7 @@ vi.mock("../hooks/useSnapshot", () => ({
     load: vi.fn(),
   }),
 }));
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it("preserves inherited counts, session detail links and search in the object table", () => {
   renderWithProviders(
@@ -47,8 +47,21 @@ it("shows a relation's identifier, meaning, multiplicity and the basic detail ta
   );
   const link = screen.getByRole("link", { name: "signer" });
   const row = within(link.closest("tr")!);
-  expect(row.getAllByRole("cell")[1]).toHaveTextContent(/合同.*当事人/);
+  expect(row.getAllByRole("cell")[1]).toHaveTextContent("signer");
+  expect(row.getAllByRole("cell")[2]).toHaveTextContent(/合同.*当事人/);
   expect(row.getByText("多对一")).toBeInTheDocument();
   expect(link.getAttribute("href")).toContain("/elements/link_type/");
   expect(link.getAttribute("href")).toContain("tab=basic");
+});
+
+
+it("searches the optional Chinese relation name and keeps its English identifier", async () => {
+  const snapshotModule = await import("../hooks/useSnapshot");
+  const draft = example("06-inheritance");
+  draft.link_types.find((link) => link.name === "signer")!.display_name = "签约方";
+  vi.spyOn(snapshotModule, "useSnapshot").mockReturnValue({ ...snapshotModule.useSnapshot(workspace()), draft });
+  renderWithProviders(<MemoryRouter><TypeCatalogPage kind="link_type" /></MemoryRouter>);
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索目录" }), { target: { value: "签约方" } });
+  const link = screen.getByRole("link", { name: "签约方" });
+  expect(within(link.closest("tr")!).getByText("signer")).toBeInTheDocument();
 });

@@ -4,6 +4,12 @@
 
 本文说明 core-1 的目标模型与行为，状态为设计定稿、待实施。JSON 示例中的业务和数据来源均为虚构；片段不是完整导入包，完整包形式见[格式与转换](formats.md)。字段表逐项说明何时填写、空值与默认行为。
 
+## 2026-10-20 命名与交换约定
+
+对象、属性、关系、规则和指标统一使用必填 `name`（英文标识，`^[A-Za-z_][A-Za-z0-9_]*$`）和可选 `display_name`（中文名称）。名称为空时界面显示 name，名称可重复；英文标识沿用原命名空间与引用规则。Dataset 不变。关系的完整含义及角色名不变。旧数据库内容清理，不转换；旧外部文件由导入适配器转换并报告。
+
+Ossie 导出为 ZIP：纯 Ossie 文件与 `ontofoundry-extension.json`。显示名仅在扩展 `display_names`；同义词在支持的位置用 `ai_context.synonyms`，概念和本体关系使用扩展 synonyms。单个 Ossie 文件导入显示名为空；旧版扩展块仅导入兼容。详见[命名统一设计](../design/2026-10-20-display-name-unification.md)。
+
 ## 1. 概述
 
 订单 O-1 的第 1 行与订单 O-2 的第 1 行是两条不同明细。因此识别明细要同时使用订单号和行号，不能只看行号。业务标识就是回答“是不是同一个实例”的一组属性，由本对象及继承属性中全部 identifier=true 的项组成。
@@ -31,8 +37,8 @@
     {
       "id": "00000000-0000-4000-8000-000000002314",
       "owner_type_id": "00000000-0000-4000-8000-000000001302",
-      "name": "订单号",
-      "technical_name": "order_no",
+      "display_name": "订单号",
+      "name": "order_no",
       "description": "",
       "value_kind": "string",
       "required": true,
@@ -44,8 +50,8 @@
     {
       "id": "00000000-0000-4000-8000-000000002311",
       "owner_type_id": "00000000-0000-4000-8000-000000001302",
-      "name": "行号",
-      "technical_name": "line_no",
+      "display_name": "行号",
+      "name": "line_no",
       "description": "",
       "value_kind": "integer",
       "required": true,

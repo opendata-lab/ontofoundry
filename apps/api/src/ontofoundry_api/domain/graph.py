@@ -10,7 +10,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from ontofoundry_api.domain.core import CoreDraft, Dataset, LinkType, ObjectType, Property
+from ontofoundry_api.domain.core import (
+    CoreDraft,
+    Dataset,
+    LinkType,
+    ObjectType,
+    Property,
+    ValueType,
+)
 
 
 @dataclass
@@ -22,12 +29,14 @@ class DraftIndex:
     properties: dict[UUID, Property] = field(init=False)
     links: dict[UUID, LinkType] = field(init=False)
     datasets: dict[UUID, Dataset] = field(init=False)
+    value_types: dict[UUID, ValueType] = field(init=False)
 
     def __post_init__(self) -> None:
         self.objects = {o.id: o for o in self.draft.object_types}
         self.properties = {p.id: p for p in self.draft.properties}
         self.links = {link.id: link for link in self.draft.link_types}
         self.datasets = {d.id: d for d in self.draft.datasets}
+        self.value_types = {v.id: v for v in self.draft.value_types}
 
     def ancestors(self, type_id: UUID) -> list[UUID]:
         """Parent first, root last. Stops at a cycle or a missing parent."""
@@ -54,10 +63,10 @@ class DraftIndex:
         found = [p for p in self.draft.properties if p.owner_type_id in rank]
         return sorted(found, key=lambda p: rank[p.owner_type_id])
 
-    def property_by_name(self, type_id: UUID, technical_name: str) -> Property | None:
-        wanted = technical_name.lower()
+    def property_by_name(self, type_id: UUID, name: str) -> Property | None:
+        wanted = name.lower()
         for prop in self.effective_properties(type_id):
-            if prop.technical_name.lower() == wanted:
+            if prop.name.lower() == wanted:
                 return prop
         return None
 

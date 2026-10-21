@@ -27,10 +27,11 @@ from ontofoundry_api.domain.core import (
 from ontofoundry_api.domain.expressions import resolve_field_expression
 from ontofoundry_api.domain.graph import DraftIndex
 
-from .ids import display_name
+from .extension import metadata_key
+from .ids import identifier_name
 
 
-def parse_expression(value):
+def parse_expression(value, dialect=None):
     if isinstance(value, str):
         statements = sqlglot.parse(value)
         if len(statements) != 1 or statements[0] is None:
@@ -39,10 +40,12 @@ def parse_expression(value):
     if not isinstance(value, dict):
         raise ValueError("缺少可解析的表达式或引用")
     variants = value.get("dialects", [])
-    chosen = next((d for d in variants if d["dialect"] == "ANSI_SQL"), None)
+    from ontofoundry_api.services.dataset_sql import dialect_for
+    chosen = next((d for d in variants if dialect and dialect_for(d["dialect"].lower()) == dialect_for(dialect)), None)
+    chosen = chosen or next((d for d in variants if d["dialect"] == "ANSI_SQL"), None)
     if not chosen:
         raise ValueError("缺少可解析的 ANSI_SQL 表达式")
-    statements = sqlglot.parse(chosen["expression"])
+    statements = sqlglot.parse(chosen["expression"], read=dialect_for(dialect))
     if len(statements) != 1 or statements[0] is None:
         raise ValueError("只接受单个表达式")
     return statements[0]
@@ -125,7 +128,24 @@ def import_datasets(importer, scope, used):
             )
             continue
         try:
-            schema, table = source_table(raw["source"])
+            metadata = importer.extension.data.get("dataset_metadata", {}).get(metadata_key(scope.raw["name"], raw["name"]), {})
+            context = getattr(t, "import_context", None)
+            matches = [c for c in (context.connections if context else ()) if c["name"] == metadata.get("connection_name")]
+            connection = matches[0] if len(matches) == 1 else None
+            engine = connection["kind"] if connection else None
+            source_kind, query_sql = "table", None
+            try:
+                schema, table = source_table(raw["source"])
+            except (ValueError, SqlglotError):
+                from ontofoundry_api.services.dataset_sql import parse_query
+                from ontofoundry_api.services.errors import ServiceError
+
+                try:
+                    parse_query(raw["source"], engine)
+                except ServiceError as error:
+                    # Rejected SQL (e.g. a hidden second statement) is reported as RT-63.
+                    raise ValueError(error.message) from error
+                schema, table, source_kind, query_sql = None, None, "query", raw["source"]
             fields = {}
             columns = {}
             for j, f in enumerate(raw.get("fields", [])):
@@ -135,7 +155,7 @@ def import_datasets(importer, scope, used):
                 if f["name"] in fields:
                     raise ValueError("逻辑字段名重复")
                 try:
-                    ast = parse_expression(f["expression"])
+                    ast = parse_expression(f["expression"], engine)
                     if any(
                         isinstance(
                             n,
@@ -159,19 +179,27 @@ def import_datasets(importer, scope, used):
                         c.set("table", None)
                     fields[f["name"]] = ast
                     for loss in (
-                        "dimension",
                         "label",
-                        "datatype",
                         "ai_context",
                         "custom_extensions",
+                        "datatype",
+                        "dimension",
                     ):
+                        if loss == "ai_context" and isinstance(f.get(loss), dict):
+                            remaining = set(f[loss]) - {"synonyms"}
+                            if not remaining:
+                                continue
                         if loss in f:
+                            # Declared types are not compared with registered columns;
+                            # the reviewer reads the location and decides.
                             t.issue(
                                 fp + "/" + loss,
                                 "dropped",
                                 "FieldMetadata",
                                 "RT-46",
-                                "逻辑字段元数据不作为物理元数据保存",
+                                "字段类型和时间用途声明不保存，以登记列类型和指标时间字段为准"
+                                if loss in ("datatype", "dimension")
+                                else "逻辑字段元数据不作为物理元数据保存",
                             )
                 except (ValueError, SqlglotError) as error:
                     t.issue(
@@ -182,10 +210,16 @@ def import_datasets(importer, scope, used):
                         f"字段不能机械解析：{error}",
                         completion=True,
                     )
-            label = display_name(raw["name"], used)
+            label = identifier_name(raw["name"], used)
             model = Dataset(
                 id=t.id("dataset:" + scope.key + ":" + raw["name"]),
                 name=label,
+                display_name=importer.extension.name("dataset:" + metadata_key(scope.raw["name"], raw["name"])),
+                source_kind=source_kind,
+                query_sql=query_sql,
+                connection_id=connection["id"] if connection else None,
+                dialect=engine,
+                snapshot_date_column=metadata.get("snapshot_date_column"),
                 schema_name=schema,
                 table_name=table,
                 description=raw.get("description", ""),
@@ -244,7 +278,7 @@ def import_datasets(importer, scope, used):
                 "error",
                 "Dataset",
                 "RT-63",
-                f"数据集来源不能表示为表位置：{error}",
+                f"数据集来源不支持：{error}",
                 completion=True,
             )
     for i, raw in enumerate(scope.raw["semantic_model"].get("relationships", [])):
@@ -305,24 +339,24 @@ def identity(importer, scope, owner, raw):
             if info and info is not dataset:
                 raise ValueError("一个对象身份跨多个数据集")
             info = dataset
-            fields[prop.technical_name] = ColumnBinding(
+            fields[prop.name] = ColumnBinding(
                 kind="column", source_id="main", column=ast.name
             )
-        if {p.technical_name for p in identifiers} != set(fields):
+        if {p.name for p in identifiers} != set(fields):
             raise ValueError("referent_mappings 必须对应完整有效标识")
     elif raw.get("expression"):
         info, ast = scope.reference(raw["expression"])
         if not isinstance(ast, exp.Column):
             raise ValueError("身份字段不能是计算表达式")
         if len(identifiers) == 1:
-            fields[identifiers[0].technical_name] = ColumnBinding(
+            fields[identifiers[0].name] = ColumnBinding(
                 kind="column", source_id="main", column=ast.name
             )
     else:
         raise ValueError("对象映射没有可确定的主身份")
     primary = info.columns(info.raw.get("primary_key", []))
-    if not primary and identifiers and all(p.technical_name in fields for p in identifiers):
-        candidate = [fields[p.technical_name].column for p in identifiers]
+    if not primary and identifiers and all(p.name in fields for p in identifiers):
+        candidate = [fields[p.name].column for p in identifiers]
         # Ontology identity is a semantic uniqueness declaration, not evidence
         # that another arbitrary field is a database key.
         if len(candidate) == len(set(candidate)):
@@ -456,13 +490,43 @@ def import_object_mapping(importer, scope, owner, raw, path):
                             mapping.model_copy(update={"sources": next_sources}),
                             binding.expression,
                         )
-                    if (
-                        prop.technical_name in mapping.fields
-                        and mapping.fields[prop.technical_name] != binding
-                    ):
+                    if prop.name in mapping.fields and mapping.fields[prop.name] != binding:
                         raise ValueError("同一属性有不等价的重复绑定")
                     mapping.sources = next_sources
-                    mapping.fields[prop.technical_name] = binding
+                    mapping.fields[prop.name] = binding
+                    logical = child["object_mapping"]["expression"]
+                    try:
+                        logical_column = parse_expression(logical)
+                    except (ValueError, SqlglotError):
+                        logical_column = None
+                    if isinstance(logical_column, exp.Column):
+                        raw_field = next(
+                            (
+                                f
+                                for f in dataset.raw.get("fields", [])
+                                if f["name"] == logical_column.name
+                            ),
+                            {},
+                        )
+                        context = raw_field.get("ai_context")
+                        if isinstance(context, dict) and context.get("synonyms"):
+                            t.used_field_synonyms.add(
+                                (dataset.model.id, logical_column.name)
+                            )
+                            t.replace(
+                                "properties",
+                                prop.model_copy(
+                                    update={
+                                        "synonyms": list(
+                                            dict.fromkeys(
+                                                prop.synonyms + context["synonyms"]
+                                            )
+                                        )
+                                    }
+                                ),
+                                cp,
+                                message="逻辑字段同义词并入已映射属性",
+                            )
                     source_names[dataset.model.id] = source_name
                     t.issue(
                         cp,
@@ -536,9 +600,9 @@ def bound_properties(t, type_id, columns):
         matches = [
             p
             for p in index.effective_properties(type_id)
-            if isinstance(binding.fields.get(p.technical_name), ColumnBinding)
-            and binding.fields[p.technical_name].source_id == "main"
-            and binding.fields[p.technical_name].column == column
+            if isinstance(binding.fields.get(p.name), ColumnBinding)
+            and binding.fields[p.name].source_id == "main"
+            and binding.fields[p.name].column == column
         ]
         if len(matches) != 1:
             return None
@@ -561,7 +625,7 @@ def restore_declared_uniqueness(importer, scopes):
     for obj in t.model.object_types:
         binding = resolve_binding(t.model, obj.id)
         for prop in DraftIndex(t.model).effective_properties(obj.id):
-            field = binding.fields.get(prop.technical_name)
+            field = binding.fields.get(prop.name)
             if prop.unique or not isinstance(field, ColumnBinding):
                 continue
             source = binding.sources.get(field.source_id)
@@ -839,4 +903,24 @@ def import_mappings(importer):
             rule="RT-53",
             message="全部声明汇总后唯一匹配物理完整列组，已按目标键次序对齐",
         )
+    for scope in scopes:
+        for dataset in scope.datasets.values():
+            for i, raw_field in enumerate(dataset.raw.get("fields", [])):
+                if not t.valid(dataset.path + f"/fields/{i}") or not isinstance(
+                    raw_field, dict
+                ):
+                    continue
+                context = raw_field.get("ai_context", {})
+                if (
+                    isinstance(context, dict)
+                    and context.get("synonyms")
+                    and (dataset.model.id, raw_field["name"]) not in t.used_field_synonyms
+                ):
+                    t.issue(
+                        dataset.path + f"/fields/{i}/ai_context",
+                        "dropped",
+                        "FieldMetadata",
+                        "RT-46",
+                        "逻辑字段同义词没有已映射属性承接，保留源文件与报告",
+                    )
     return scopes

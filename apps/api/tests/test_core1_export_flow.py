@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from sqlalchemy import func, select
 
+from ontofoundry_api.adapters.archive import read_ossie
 from ontofoundry_api.api.auth import Principal, ontology_principal
 from ontofoundry_api.db_models import OntologyVersionRecord, WorkspaceRecord
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
@@ -33,7 +34,13 @@ def test_report_download_and_repeated_get_share_bytes_without_model_writes(clien
         == result["content_sha256"]
         == result["report"]["content_sha256"]
     )
-    assert json.loads(download.content)["draft"] == before
+    # The exported file drops local connection ids (DS-16).
+    exported = json.loads(download.content)
+    local = json.loads(json.dumps(before))
+    for dataset in local["datasets"]:
+        dataset.pop("connection_id", None)
+    assert exported["draft"] == local
+    assert exported["connection_names"] == {d["id"]: "星港销售演示库" for d in before["datasets"]}
     assert result["filename"] in download.headers["content-disposition"]
     assert download.headers["x-content-sha256"] == result["content_sha256"]
     assert client.get(ROOT + f"/ontofoundry-core-1?version_id={vid}").json() == result
@@ -139,64 +146,50 @@ def test_wrong_version_workspace_adapter_and_tampering_do_not_deliver(client):
     assert client.get(regenerated.json()["download_url"]).status_code == 200
 
 
-def test_export_scopes_follow_server_connections_and_ambiguous_sources_split(client):
+def test_export_scopes_follow_each_dataset_connection(client):
     from core1_fixtures import example_draft
 
     from ontofoundry_api.db_models import ConnectionRecord
     from ontofoundry_api.services.workspaces import publish_draft
 
-    model = example_draft("01-basic-sales")
-    model.workspace_id = DEMO_WORKSPACE_ID
-    with client.app.state.session_factory() as db:
-        published = publish_draft(
-            db,
-            workspace_id=str(DEMO_WORKSPACE_ID),
-            draft=model,
-            user_id=DEV_USER_ID,
-            message="虚构来源验收",
-        )
-        vid = published.id
-        first = ConnectionRecord(
+    def connection(db, name):
+        record = ConnectionRecord(
             id=str(uuid4()),
             workspace_id=str(DEMO_WORKSPACE_ID),
-            name="虚构来源一",
+            name=name,
             kind="mysql",
-            config_json={
-                "database": "dw",
-                "host": "fiction.invalid",
-                "port": 3306,
-                "username": "fiction",
-            },
+            config_json={"database": "dw", "host": "fiction.invalid", "port": 3306, "username": "fiction"},
             secret_encrypted="",
         )
-        db.add(first)
-        db.commit()
-    endpoint = ROOT + f"/ossie-0.2?version_id={vid}"
-    preview = client.get(endpoint).json()
-    assert preview["download_url"], preview
-    one = client.get(preview["download_url"]).json()
-    assert len(one["ontology_mappings"]) == 1
-    assert any(
-        r["from"] != r["to"]
-        for r in one["ontology_mappings"][0]["semantic_model"]["relationships"]
-    )
+        db.add(record)
+        db.flush()
+        return record.id
+
+    def scopes(bindings):
+        model = example_draft("01-basic-sales")
+        model.workspace_id = DEMO_WORKSPACE_ID
+        model.datasets = [d.model_copy(update={"connection_id": c}) for d, c in zip(model.datasets, bindings, strict=True)]
+        with client.app.state.session_factory() as db:
+            vid = publish_draft(
+                db, workspace_id=str(DEMO_WORKSPACE_ID), draft=model, user_id=DEV_USER_ID, message="虚构来源验收"
+            ).id
+        preview = client.get(ROOT + f"/ossie-0.2?version_id={vid}").json()
+        assert preview["download_url"], preview
+        return model, json.loads(read_ossie(client.get(preview["download_url"]).content)[0])
+
     with client.app.state.session_factory() as db:
-        db.add(
-            ConnectionRecord(
-                id=str(uuid4()),
-                workspace_id=str(DEMO_WORKSPACE_ID),
-                name="虚构来源二",
-                kind="mysql",
-                config_json=first.config_json,
-                secret_encrypted="",
-            )
-        )
+        first, second = connection(db, "虚构来源一"), connection(db, "虚构来源二")
         db.commit()
-    preview = client.get(endpoint).json()
-    split = client.get(preview["download_url"]).json()
+    model, together = scopes([first] * 2)
+    assert len(together["ontology_mappings"]) == 1
+    assert any(r["from"] != r["to"] for r in together["ontology_mappings"][0]["semantic_model"]["relationships"])
+    _, split = scopes([first, second])
     assert len(split["ontology_mappings"]) == len(model.datasets)
     assert all(
         r["from"] == r["to"]
         for scope in split["ontology_mappings"]
         for r in scope["semantic_model"]["relationships"]
     )
+    # Unbound datasets never share a scope.
+    _, unbound = scopes([None, None])
+    assert len(unbound["ontology_mappings"]) == len(model.datasets)

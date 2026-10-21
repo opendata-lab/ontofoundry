@@ -115,6 +115,8 @@ class ModelingSessionRecord(Base):
     run_manifest_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     candidates_json: Mapped[list] = mapped_column(JSON, default=list)
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
+    # Registered tables linked in the builder; the agent proposes datasets on them.
+    linked_tables: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
     task_status: Mapped[str] = mapped_column(String(24), default="idle")
     task_detail: Mapped[str] = mapped_column(Text, default="")
     dataagent_topic_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -448,3 +450,38 @@ class ImportRecord(Base):
     confirmation_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     completions_json: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class MetadataSyncJobRecord(Base):
+    __tablename__ = "metadata_sync_jobs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str] = mapped_column(ForeignKey("data_connections.id"), index=True)
+    schema_name: Mapped[str] = mapped_column(String(240), default="")
+    scope: Mapped[str] = mapped_column(String(16))
+    selected_json: Mapped[list] = mapped_column(JSON, default=list)
+    inventory_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    state: Mapped[str] = mapped_column(String(24), default="queued", index=True)
+    created_by: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class MetadataSyncBatchRecord(Base):
+    __tablename__ = "metadata_sync_batches"
+    __table_args__ = (UniqueConstraint("job_id", "ordinal", name="uq_metadata_sync_batch_ordinal"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey("metadata_sync_jobs.id"), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    table_names_json: Mapped[list] = mapped_column(JSON)
+    state: Mapped[str] = mapped_column(String(24), default="queued")
+    attempt: Mapped[int] = mapped_column(Integer, default=0)
+    results_json: Mapped[list] = mapped_column(JSON, default=list)
+    history_json: Mapped[list] = mapped_column(JSON, default=list)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)

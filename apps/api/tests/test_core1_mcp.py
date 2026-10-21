@@ -110,8 +110,8 @@ def test_large_fact_value_is_segmented_and_reassembled(client):
     extra = {
         "id": str(uuid4()),
         "owner_type_id": fact["type_id"],
-        "name": "详情",
-        "technical_name": "detail",
+        "display_name": "详情",
+        "name": "detail",
         "value_kind": "string",
     }
     s["draft"]["properties"].append(extra)
@@ -140,7 +140,7 @@ def test_example06_physical_projection_carries_membership_and_local_inherited_li
 
     session = example_session(client, "06-inheritance", published=True)
     draft = session["draft"]
-    objects = {o["technical_name"]: o for o in draft["object_types"]}
+    objects = {o["name"]: o for o in draft["object_types"]}
     responsible = next(
         relation
         for relation in draft["link_types"]
@@ -155,7 +155,7 @@ def test_example06_physical_projection_carries_membership_and_local_inherited_li
             "limit": 100,
         },
     )["structuredContent"]
-    elements = {e["technical_name"]: e for e in detail["elements"]}
+    elements = {e["name"]: e for e in detail["elements"]}
     person = elements["person"]
     binding = person["effective_bindings"]["items"][0]
     assert binding["type_id"] == objects["person"]["id"]
@@ -251,7 +251,7 @@ def test_physical_projection_keeps_each_source_snapshot_declaration(client):
 
     session = example_session(client, "12-snapshot-and-trends", published=True)
     component = next(
-        o for o in session["draft"]["object_types"] if o["technical_name"] == "component"
+        o for o in session["draft"]["object_types"] if o["name"] == "component"
     )
     element = call(
         client, "get_ontology", {"ids": [component["id"]], "include": ["physical"]}
@@ -291,8 +291,10 @@ def test_relationship_status_and_self_adjacency_use_shared_projection(client):
     )["structuredContent"]
     relationship = next(e for e in detail["elements"] if e["kind"] == "link_type")
     assert relationship["binding_status"] == "unbound"
-    assert relationship["technical_name"] == relationship["definition"]["name"]
-    assert "technical_name" not in relationship["definition"]
+    assert relationship["name"] == relationship["definition"]["name"]
+    assert relationship["definition"]["name"] == link["name"]
+    assert "technical_name" not in relationship
+    assert "display_name" in relationship
     obj = next(e for e in detail["elements"] if e["kind"] == "object_type")
     views = [v for v in obj["links"]["items"] if v["id"] == link["id"]]
     assert [v["direction"] for v in views] == ["forward", "reverse"]

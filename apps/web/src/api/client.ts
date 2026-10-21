@@ -1,4 +1,5 @@
 import type {
+  Dataset, DatasetCheckResult, DatasetPreview, SyncJob,
   ExportPreview,
   ImportPreview,
   ImportSource,
@@ -23,6 +24,7 @@ import type {
   InstanceList,
   InstanceNeighborhood,
   Items,
+  LinkedTable,
   MappingPreview,
   MappingPreviewRequest,
   Material,
@@ -31,6 +33,7 @@ import type {
   MetricPreview,
   MetricPreviewRequest,
   ModelingSession,
+  RegisteredTable,
   ModelingSessionSummary,
   NeighborhoodRequest,
   ProposalBatch,
@@ -214,7 +217,7 @@ export const modelingApi = {
     workspaceRequest<ModelingSession>(id, "/sessions", { title }),
   get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid),
   /** Saves the whole session draft; it does not publish. */
-  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[] } = {}) =>
+  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[] } = {}) =>
     request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft, ...extra })),
   validate: (s: ModelingSession) => request<ValidationReport>(sessionPath(s) + "/validate", json("POST", {})),
   snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot"),
@@ -253,14 +256,11 @@ export const catalogApi = {
     workspaceRequest<Items<string>>(id, `/connections/${connectionId}/schemas`),
   assets: (id: string, connectionId: string, params?: { schema_name?: string; version_id?: string }) =>
     workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
-  /** Without tables, reads the whole schema (capped at 200); with tables, refreshes only them. */
   refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }, tables?: string[]) =>
-    workspaceRequest<Assets>(
-      id,
-      `/connections/${connectionId}/assets/refresh` + query({ ...params }),
-      tables?.length ? { tables } : {},
-      "POST",
-    ),
+    workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ ...params }), tables?.length ? { scope: "selected", tables } : { scope: "all" }),
+  syncJobs: (id: string, connectionId: string, schema_name?: string) => workspaceRequest<Items<SyncJob>>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ schema_name })),
+  syncJob: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}`),
+  retrySync: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}/retry`, {}),
   mappingPreview: (id: string, payload: MappingPreviewRequest) =>
     workspaceRequest<MappingPreview>(id, "/mapping-preview", payload),
 };
@@ -294,6 +294,7 @@ export const instancesApi = {
 };
 
 export const proposalsApi = {
+  reviseDataset: (workspaceId: string, sessionId: string, proposalId: string, dataset: Dataset, revision: number) => workspaceRequest<{ proposal_id: string; session_revision: number }>(workspaceId, `/sessions/${sessionId}/proposals/${proposalId}/dataset`, { dataset, expected_session_revision: revision }, "PUT"),
   batches: (s: Pick<ModelingSession, "id" | "workspace_id">, params?: { limit?: number; cursor?: string }) =>
     request<Items<ProposalBatch> & { next_cursor: string | null }>(
       sessionPath(s) + "/proposal-batches" + query({ ...params }),
@@ -362,4 +363,12 @@ export const importApi = {
 export const exportApi = {
   preview: (workspaceId: string, adapter: string, versionId: string) =>
     request<ExportPreview>(`/api/v1/modeling/workspaces/${encodeURIComponent(workspaceId)}/exports/${encodeURIComponent(adapter)}?version_id=${encodeURIComponent(versionId)}`),
+};
+
+
+export const datasetApi = {
+  registeredTables: (id: string, sessionId?: string) =>
+    workspaceRequest<Items<RegisteredTable>>(id, "/registered-tables" + query({ session_id: sessionId })),
+  validate: (id: string, dataset: Dataset, revision?: number | null) => workspaceRequest<DatasetCheckResult>(id, "/datasets/validate", { dataset, expected_session_revision: revision ?? null }),
+  preview: (id: string, dataset: Dataset) => workspaceRequest<DatasetPreview>(id, "/datasets/preview", { dataset }),
 };

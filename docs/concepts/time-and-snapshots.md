@@ -98,8 +98,8 @@ ratio 使用分子、分母各自的 time_field。例如退款率 = 退款金额
 ```json
 {
   "id": "00000000-0000-4000-8000-000000061101",
-  "name": "组件期末数量",
-  "technical_name": "component_closing_quantity",
+  "display_name": "组件期末数量",
+  "name": "component_closing_quantity",
   "description": "时间字段是快照日期；数据集声明了快照，按周期取最后一个有数据的日期。",
   "synonyms": [],
   "kind": "simple",

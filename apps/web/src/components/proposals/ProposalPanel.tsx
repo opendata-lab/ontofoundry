@@ -343,6 +343,8 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
               after,
             })
           }
+          workspaceId={session.workspace_id}
+          onReviseDataset={(dataset) => proposals.reviseDataset(openItem.id, dataset)}
           onClose={() => setOpenId(null)}
         />
       )}

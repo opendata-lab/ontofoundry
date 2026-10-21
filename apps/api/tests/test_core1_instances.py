@@ -9,7 +9,7 @@ from ontofoundry_api.services.instance_query import db_ref, parse_ref
 
 
 def query(draft, name):
-    return next(o.id for o in draft.object_types if o.technical_name == name)
+    return next(o.id for o in draft.object_types if o.name == name)
 
 
 @pytest.mark.parametrize(
@@ -196,7 +196,7 @@ def test_exists_membership_correlates_to_current_party(
             conn.exec_driver_sql(
                 "INSERT INTO contracts (contract_id, amount, signer_id) VALUES ('K1', 100, 'P2')"
             )
-        vip = next(o for o in draft.object_types if o.technical_name == "vip_party")
+        vip = next(o for o in draft.object_types if o.name == "vip_party")
         # A/P1 satisfies the local condition but has no contract. Only B/P2 has one.
         expression = "EXISTS (party.REVERSE(signer))"
         if local_condition:
@@ -219,11 +219,11 @@ def test_reverse_virtual_parent_expands_concrete_local_bindings(tmp_path, monkey
         # Both assets have the same local key, but distinct concrete identities.
         with engine.begin() as conn:
             conn.exec_driver_sql("UPDATE vehicles SET responsible_id = 'P1'")
-        party = next(o for o in draft.object_types if o.technical_name == "party")
+        party = next(o for o in draft.object_types if o.name == "party")
         responsible = next(
             relation
             for relation in draft.link_types
-            if relation.technical_name == "responsible_party"
+            if relation.name == "responsible_party"
         )
         result = database_neighborhood(
             None,
@@ -240,9 +240,7 @@ def test_reverse_virtual_parent_expands_concrete_local_bindings(tmp_path, monkey
         assert not result["warnings"], result["warnings"]
         assets = [o for o in result["objects"] if o["type_id"] != str(party.id)]
         assert {o["type_id"] for o in assets} == {
-            str(o.id)
-            for o in draft.object_types
-            if o.technical_name in {"device", "vehicle"}
+            str(o.id) for o in draft.object_types if o.name in {"device", "vehicle"}
         }
         assert len(assets) == 2 and len({o["id"] for o in assets}) == 2
         assert all(o["key"] == [{"type": "string", "value": "1"}] for o in assets)

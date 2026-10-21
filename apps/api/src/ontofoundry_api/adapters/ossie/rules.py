@@ -17,6 +17,7 @@ from ontofoundry_api.domain.core import (
     PathCondition,
     Property,
     Rule,
+    ValueType,
 )
 from ontofoundry_api.domain.expressions import resolve_derived_expression
 from ontofoundry_api.domain.graph import DraftIndex
@@ -73,7 +74,7 @@ def rewrite_expression(importer, text):
         ):
             i += 1
             continue
-        edits.append((token.start(), token.end(), t.objects[owner].technical_name))
+        edits.append((token.start(), token.end(), t.objects[owner].name))
         j = i + 2
         while j < len(tokens):
             reverse = name(tokens[j]).upper() == "REVERSE"
@@ -87,7 +88,7 @@ def rewrite_expression(importer, text):
             item = member(owner, name(tokens[at]), reverse)
             if item is None:
                 break
-            edits.append((tokens[at].start(), tokens[at].end(), item.technical_name))
+            edits.append((tokens[at].start(), tokens[at].end(), item.name))
             after = at + 2 if reverse else at + 1
             if isinstance(item, LinkType):
                 target = item.source_type_id if reverse else item.target_type_id
@@ -112,7 +113,7 @@ def reified_expression(importer, element, text):
     for column in list(ast.find_all(exp.Column)):
         property_name = bindings.get((column.table, column.name))
         if property_name:
-            column.replace(exp.column(property_name, table=element.technical_name))
+            column.replace(exp.column(property_name, table=element.name))
     return ast.sql()
 
 
@@ -123,18 +124,45 @@ def add_rule(importer, element, text, path, key, kind, *, description=""):
         if isinstance(element, ObjectType)
         else "property"
         if isinstance(element, Property)
+        else "value_type"
+        if isinstance(element, ValueType)
         else "link_type"
     )
     position = (
         sum(r.owner_id == element.id and r.rule_kind == kind for r in t.model.rules) + 1
     )
     try:
+        owner_path = element.name
+        if isinstance(element, (Property, LinkType)):
+            owner_id = (
+                element.owner_type_id
+                if isinstance(element, Property)
+                else element.source_type_id
+            )
+            owner_path = (
+                next(obj.name for obj in t.model.object_types if obj.id == owner_id)
+                + "."
+                + element.name
+            )
+        metadata = next(
+            (
+                (key, value)
+                for key, value in importer.extension.data.get("rules", {}).items()
+                if value["owner"] == owner_path
+                and value["kind"] == kind
+                and value["position"] == int(path.rsplit("/", 1)[-1])
+            ),
+            None,
+        )
+        rule_key = metadata[0] if metadata else None
+        if metadata:
+            description = metadata[1].get("description", "")
         rule = Rule(
             id=t.id(key),
-            name=f"{element.name}·"
-            + ("约束" if kind == "constraint" else "派生")
-            + str(position),
-            technical_name=f"{kind}_{position}",
+            display_name=importer.extension.name("rule:" + rule_key, None)
+            if rule_key
+            else None,
+            name=rule_key.rsplit(".", 1)[-1] if rule_key else f"{kind}_{position}",
             description=description,
             owner_kind=owner_kind,
             owner_id=element.id,
@@ -276,7 +304,7 @@ def import_rules(importer):
                 (
                     p
                     for p in DraftIndex(t.model).effective_properties(obj.id)
-                    if p.technical_name == title or t.members.get((name, title)) is p
+                    if p.name == title or t.members.get((name, title)) is p
                 ),
                 None,
             )
@@ -284,12 +312,16 @@ def import_rules(importer):
                 t.replace(
                     "object_types",
                     t.objects[name].model_copy(update={"title_property_id": prop.id}),
-                    "/ai_context/ontofoundry/title_properties/" + escape_pointer(name),
+                    importer.extension.source_path
+                    + "/title_properties/"
+                    + escape_pointer(name),
                     message="标题引用有效属性",
                 )
             else:
                 t.issue(
-                    "/ai_context/ontofoundry/title_properties/" + escape_pointer(name),
+                    importer.extension.source_path
+                    + "/title_properties/"
+                    + escape_pointer(name),
                     "dropped",
                     "TitleProperty",
                     "RT-03",
@@ -327,27 +359,9 @@ def import_rules(importer):
         c = importer.concepts[name]
         return [*sum((ancestors(p, seen) for p in c.get("extends", [])), []), (name, c)]
 
-    for prop in t.model.properties:
-        origin = t.property_sources.get(prop.id)
-        if not origin:
-            continue
-        owner, relationship, path = origin
-        if owner in t.objects:
-            raw = next(
-                (
-                    r
-                    for r in importer.concepts[owner].get("relationships", [])
-                    if r.get("name") == relationship
-                ),
-                {},
-            )
-            roles = raw.get("roles", [])
-            if len(roles) != 1:
-                continue
-            type_name = roles[0]["concept"]
-        else:
-            type_name = owner
-        for source, c in ancestors(type_name, set()):
+    # Constraints stay on the shared value type; ancestors fold into it (VT-08).
+    for name, value_type in importer.value_types.items():
+        for source, c in ancestors(name, set()):
             for i, text in enumerate(c.get("requires", [])):
                 pointer = importer.paths[source] + f"/requires/{i}"
                 try:
@@ -355,14 +369,7 @@ def import_rules(importer):
                     matched = False
                     for column in list(ast.find_all(exp.Column)):
                         if not column.table and column.name == source:
-                            obj = next(
-                                o
-                                for o in t.model.object_types
-                                if o.id == prop.owner_type_id
-                            )
-                            column.replace(
-                                exp.column(prop.technical_name, table=obj.technical_name)
-                            )
+                            column.replace(exp.column(value_type.name))
                             matched = True
                     if not matched:
                         raise ValueError("约束没有可绑定的值变量")
@@ -373,16 +380,16 @@ def import_rules(importer):
                         "error",
                         "ValueConstraint",
                         "RT-24",
-                        f"不能完整绑定值类型约束到属性：{error}",
+                        f"不能把约束绑定到值类型：{error}",
                         completion=True,
                     )
                     continue
                 add_rule(
                     importer,
-                    prop,
+                    value_type,
                     expression,
                     pointer,
-                    f"value-rule:{prop.id}:{importer.paths[source]}:{i}",
+                    f"value-type-rule:{value_type.id}:{importer.paths[source]}:{i}",
                     "constraint",
-                    description=f"来自值类型 {source} 的约束",
+                    description="" if source == name else f"来自祖先值类型 {source} 的约束",
                 )

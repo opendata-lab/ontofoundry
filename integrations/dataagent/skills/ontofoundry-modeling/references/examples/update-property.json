@@ -1,0 +1,1 @@
+[{"operation":"update","target_kind":"property","target_id":"1c6c45d9-5ba3-55fb-bc80-3ef014cd1a37","after":{"owner_type_id":"8400cead-d71d-54a1-adc9-7a249d570a36","name":"staff_name","display_name":"员工姓名","description":"已核对业务定义","value_kind":"string","required":false,"identifier":false,"unique":false,"synonyms":[],"evidence":[]}}]

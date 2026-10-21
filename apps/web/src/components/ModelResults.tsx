@@ -42,32 +42,32 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
   const row = (id: string, name: string, technical: string, description: string): Row => ({ id, kind, name, technical, description });
   switch (kind) {
     case "object_type":
-      return draft.object_types.map((o) => row(o.id, o.name, o.technical_name, o.description));
+      return draft.object_types.map((o) => row(o.id, (o.display_name || o.name), o.name, o.description));
     case "link_type":
       return draft.link_types.map((l) =>
-        row(l.id, l.name, "", `${byId(draft.object_types, l.source_type_id)?.name ?? "?"} → ${byId(draft.object_types, l.target_type_id)?.name ?? "?"}`),
+        row(l.id, (l.display_name || l.name), "", `${(byId(draft.object_types, l.source_type_id)?.display_name || byId(draft.object_types, l.source_type_id)?.name) ?? "?"} → ${(byId(draft.object_types, l.target_type_id)?.display_name || byId(draft.object_types, l.target_type_id)?.name) ?? "?"}`),
       );
     case "property":
       return draft.properties.map((p) =>
-        row(p.id, p.name, p.technical_name, `${byId(draft.object_types, p.owner_type_id)?.name ?? "?"} · ${VALUE_KINDS[p.value_kind]}`),
+        row(p.id, (p.display_name || p.name), p.name, `${(byId(draft.object_types, p.owner_type_id)?.display_name || byId(draft.object_types, p.owner_type_id)?.name) ?? "?"} · ${VALUE_KINDS[p.value_kind]}`),
       );
     case "rule":
-      return draft.rules.map((r) => row(r.id, r.name, r.technical_name, r.expression));
+      return draft.rules.map((r) => row(r.id, (r.display_name || r.name), r.name, r.expression));
     case "metric":
-      return draft.metrics.map((m) => row(m.id, m.name, m.technical_name, `${METRIC_KINDS[m.kind]}${m.description ? " · " + m.description : ""}`));
+      return draft.metrics.map((m) => row(m.id, (m.display_name || m.name), m.name, `${METRIC_KINDS[m.kind]}${m.description ? " · " + m.description : ""}`));
     case "dataset":
       return draft.datasets.map((d) => row(d.id, d.name, [d.schema_name, d.table_name].filter(Boolean).join("."), d.description));
     case "mapping":
       return draft.mappings.map((m) =>
         row(
           m.id,
-          byId(draft.object_types, m.type_id)?.name ?? "?",
+          (byId(draft.object_types, m.type_id)?.display_name || byId(draft.object_types, m.type_id)?.name) ?? "?",
           BINDING_MODES[m.binding_mode] ?? m.binding_mode,
           m.sources.map((s) => byId(draft.datasets, s.dataset_id)?.name ?? "?").join("、"),
         ),
       );
     case "material_object":
-      return draft.material_objects.map((o) => row(o.id, documentDisplayText(draft, o), "", byId(draft.object_types, o.type_id)?.name ?? ""));
+      return draft.material_objects.map((o) => row(o.id, documentDisplayText(draft, o), "", (byId(draft.object_types, o.type_id)?.display_name || byId(draft.object_types, o.type_id)?.name) ?? ""));
     case "material_link":
       return draft.material_links.map((l) => {
         const source = byId(draft.material_objects, l.source_id);
@@ -76,7 +76,7 @@ function rowsOf(draft: Draft, kind: TargetKind): Row[] {
           l.id,
           `${source ? documentDisplayText(draft, source) : "?"} → ${target ? documentDisplayText(draft, target) : "?"}`,
           "",
-          byId(draft.link_types, l.type_id)?.name ?? "",
+          (byId(draft.link_types, l.type_id)?.display_name || byId(draft.link_types, l.type_id)?.name) ?? "",
         );
       });
     default:
@@ -145,7 +145,7 @@ export function ModelResults({
         id: c.element_id,
         kind,
         name: c.label,
-        technical: String((c.before as { technical_name?: string } | null)?.technical_name ?? ""),
+        technical: String((c.before as { name?: string } | null)?.name ?? ""),
         description: "",
         deleted: true,
       }));

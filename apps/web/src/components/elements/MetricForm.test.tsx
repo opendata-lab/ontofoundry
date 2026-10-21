@@ -21,7 +21,7 @@ function show(column: string, values: Scalar[] = [], operator: "eq" | "in" | "be
   let latest: SimpleMetric;
   function Harness() {
     const [metric, setMetric] = useState<SimpleMetric>({
-      ...newMetric("typed_metric", dataset.id), name: "条件指标", technical_name: "typed_metric",
+      ...newMetric("typed_metric", dataset.id), display_name: "条件指标", name: "typed_metric",
       filters: [{ column: { dataset_id: dataset.id, column }, operator, values }],
     });
     latest = metric;

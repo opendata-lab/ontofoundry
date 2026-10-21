@@ -9,15 +9,15 @@ def present(value):
 
 def business_identity(draft, type_id, values):
     props = DraftIndex(draft).identifier(type_id)
-    if not props or any(not present(values.get(p.technical_name)) for p in props):
+    if not props or any(not present(values.get(p.name)) for p in props):
         return None
-    return tuple((p.value_kind.value, values[p.technical_name]) for p in props)
+    return tuple((p.value_kind.value, values[p.name]) for p in props)
 
 
 def _label(draft, type_id, values):
     prop = DraftIndex(draft).title_property(type_id)
-    if prop and present(values.get(prop.technical_name)):
-        return str(values[prop.technical_name])
+    if prop and present(values.get(prop.name)):
+        return str(values[prop.name])
     identity = business_identity(draft, type_id, values)
     if identity is not None:
         return " · ".join(str(v) for _, v in identity)

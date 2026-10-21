@@ -1,10 +1,11 @@
+import { fieldLabel } from "./elementMeta";
 import { Button, Checkbox, Popover, Tag, Tooltip, Typography } from "antd";
 import { FileText } from "lucide-react";
 import type { ProposalItem, ProposalStatus } from "../../api/types";
 import { OPERATION, STATUS } from "./elementMeta";
 import { StatusMark, type StatusState } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
-import { REVIEW_FIELD_LABELS, requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
+import { requiredIds, reviewChanges, reviewKindName, valueText } from "./reviewMeta";
 
 const { Text } = Typography;
 
@@ -165,7 +166,7 @@ export function ProposalCard({
         </div>
         <div
           className="flex min-w-0 items-center gap-1 text-xs"
-          title={`${REVIEW_FIELD_LABELS[change?.path ?? "name"] ?? change?.path ?? "名称"}：${before} → ${after}`}
+          title={`${fieldLabel(change?.path ?? "display_name", item.target_kind)}：${before} → ${after}`}
         >
           <Text type="secondary" className="max-w-2/5 truncate line-through">
             {before}
@@ -177,6 +178,11 @@ export function ProposalCard({
         {isBlocked && (
           <Text type="danger" className="text-xs" title={item.status_reason}>
             {item.status_reason || "当前目标已发生变化，请重新评估"}
+          </Text>
+        )}
+        {!isBlocked && item.status === "pending" && blocked.startsWith("数据来源未就绪") && (
+          <Text type="danger" className="text-xs" title={blocked}>
+            {blocked}
           </Text>
         )}
         {error && (

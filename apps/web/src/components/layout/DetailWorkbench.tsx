@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useContext, type ReactNode } from "react";
+import { ContentBlock } from "./ContentBlock";
+import { SeparateBlocks } from "./contentBlockContext";
 
 /** A compact master list and a stable configuration pane within an inspector. */
 export function DetailWorkbench({
@@ -12,10 +14,11 @@ export function DetailWorkbench({
   detailLabel: string;
   variant?: "configuration" | "preview";
 }) {
+  const separate = useContext(SeparateBlocks);
   return (
     <div className={`inspector-property-workbench${variant === "preview" ? " inspector-preview-workbench" : ""}${!detail ? " inspector-workbench-full" : ""}`}>
-      <section className="flex min-w-0 flex-col gap-3">{primary}</section>
-      {detail && <section className="inspector-property-detail flex min-w-0 flex-col gap-4" aria-label={detailLabel}>
+      <ContentBlock>{primary}</ContentBlock>
+      {detail && <section className={`${separate ? "" : "inspector-property-detail"} flex min-w-0 flex-col gap-4`} aria-label={detailLabel}>
         {detail}
       </section>}
     </div>

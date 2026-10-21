@@ -23,11 +23,19 @@ from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.model_review import (
     build_proposal_repair_request,
 )
+from ontofoundry_api.services.modeling_input import (
+    build_work_pack,
+    encode,
+    execution_input,
+    upload_work_pack,
+)
 from ontofoundry_api.services.proposals import (
-    proposal_header,
+    proposal_context,
     store_batch,
     store_failed_batch,
 )
+from ontofoundry_api.services.run_credentials import RunGrant, access_file
+from ontofoundry_api.services.run_credentials import issue as issue_run_credential
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +101,100 @@ def _finish_failure(
     return _current_result_state(app, session_id)
 
 
+# Stepwise modeling keeps intermediate files in the agent workspace under
+# modeling/ (harness design §11 items 14/15).
+WORKFLOW_DIR = "modeling/"
+PLAN_FILES = ("plan.md", "entities.json", "issues.json")
+PART_FILES = tuple(
+    "parts/" + name
+    for name in (
+        "01-types.json",
+        "02-links.json",
+        "03-datasets.json",
+        "04-metrics-rules.json",
+        "05-facts.json",
+    )
+)
+PLAN_LIMIT = 16 * 1024
+EXCERPT_LIMIT = 4 * 1024
+
+
+async def _optional_download(client: DataAgentClient, topic_id: str, path: str) -> bytes | None:
+    """A workflow file, or None when it is absent or cannot be read now."""
+    try:
+        content, _ = await client.download(topic_id, path)
+    except DataAgentError as exc:
+        if exc.status_code != 404:
+            logger.info("Workflow file %s unavailable: %s", path, exc)
+        return None
+    return content
+
+
+def _text(content: bytes, limit: int) -> str:
+    return content[:limit].decode("utf-8", "ignore")
+
+
+async def saved_plan(client: DataAgentClient, topic_id: str) -> dict[str, Any] | None:
+    """The plan the user is asked to confirm, kept for the next run."""
+    plan: dict[str, Any] = {}
+    for name in PLAN_FILES:
+        content = await _optional_download(client, topic_id, WORKFLOW_DIR + name)
+        if content is None:
+            continue
+        if name == "plan.md":
+            plan["plan_md"] = _text(content, PLAN_LIMIT)
+            continue
+        with suppress(UnicodeDecodeError, json.JSONDecodeError):
+            plan[name.removesuffix(".json")] = json.loads(content)
+    if not plan:
+        return None
+    for name in ("issues", "entities"):
+        if len(encode(plan)) > PLAN_LIMIT and name in plan:
+            plan.pop(name)
+            plan["truncated"] = True
+    return plan
+
+
+async def workflow_diagnostics(client: DataAgentClient, topic_id: str) -> list[dict[str, Any]]:
+    """Which workflow files exist; plan and notes keep a short excerpt."""
+    found = []
+    for name in ("plan.md", "notes.md", *PART_FILES):
+        content = await _optional_download(client, topic_id, WORKFLOW_DIR + name)
+        if content is None:
+            continue
+        entry: dict[str, Any] = {"path": WORKFLOW_DIR + name, "bytes": len(content)}
+        if name.endswith(".md"):
+            entry["excerpt"] = _text(content, EXCERPT_LIMIT)
+        found.append(entry)
+    return found
+
+
+async def _fail_with_workflow(
+    app: Any,
+    workspace_id: str,
+    session_id: str,
+    task_id: str,
+    claimed_at,
+    *,
+    topic_id: str,
+    manifest: dict[str, Any],
+    detail: str,
+) -> str:
+    """A permanent failure that also keeps the workflow files as diagnostics."""
+    found = await workflow_diagnostics(_client(app, workspace_id, session_id), topic_id)
+    values: dict[str, Any] = {
+        "result_state": "failed_permanent",
+        "task_status": "failed",
+        "task_detail": detail
+        + ("；已取回中间文件：" + "、".join(f["path"] for f in found) if found else ""),
+    }
+    if found:
+        values["run_manifest_json"] = {**manifest, "workflow_diagnostics": found}
+    if _guarded_result_values(app, session_id, task_id, claimed_at, **values):
+        return "failed_permanent"
+    return _current_result_state(app, session_id)
+
+
 async def _request_repair(
     app: Any,
     workspace_id: str,
@@ -114,19 +216,86 @@ async def _request_repair(
     The claim is released only after DataAgent accepts the follow-up, so a
     refusal leaves the lease exactly as it was.
     """
-    if not topic_id or not problems:
+    if not topic_id or not problems or (manifest or {}).get("repair_used", 0) >= 2:
         return None
 
     next_token = secrets.token_hex(16)
-    result_path = f"output/ontofoundry-result-{next_token}.json"
-    next_manifest = {**manifest, "run_token": next_token} if manifest else None
+    next_manifest = (
+        {
+            **manifest,
+            "run_token": next_token,
+            "repair_used": manifest.get("repair_used", 0) + 1,
+        }
+        if manifest
+        else None
+    )
     if next_manifest is None:
         return None
-    content = build_proposal_repair_request(
-        problems, proposal_header(next_manifest), result_path
-    )
     try:
-        submitted = await _client(app, workspace_id, session_id).deliver(
+        client = _client(app, workspace_id, session_id)
+        files = next_manifest.get("input_files", {})
+        if not files.get("schema") or "materials" not in files:
+            return None
+        if files.get("mcp"):
+            metadata = files.get("mcp_access")
+            if not metadata:
+                return None
+            credential = issue_run_credential(
+                app.state.settings.session_secret,
+                RunGrant(
+                    workspace_id=workspace_id,
+                    session_id=session_id,
+                    run_token=next_token,
+                    version_id=next_manifest.get("base_version_id"),
+                    user_id=metadata["user_id"],
+                ),
+            )
+            uploaded_mcp = await client.upload(
+                topic_id,
+                f"ontofoundry-mcp-{next_token}.json",
+                encode(
+                    access_file(
+                        {
+                            "url": metadata["url"],
+                            "version_id": next_manifest.get("base_version_id"),
+                            "credential": credential,
+                        }
+                    )
+                ),
+                "application/json",
+            )
+            files = {**files, "mcp": uploaded_mcp["rel_path"]}
+        context = proposal_context(next_manifest, next_manifest["pinned_draft"])
+        context["execution"] = execution_input(next_token, next_manifest["repair_used"])
+        uploaded = await client.upload(
+            topic_id,
+            f"ontofoundry-context-{next_token}.json",
+            encode(context),
+            "application/json",
+        )
+        pack, pages = build_work_pack(
+            context,
+            files["materials"],
+            context_file=uploaded["rel_path"],
+            schema_file=files["schema"],
+            mcp_config_file=files.get("mcp"),
+            tables=files.get("tables"),
+            tables_file=files.get("tables_file"),
+            scenario_facts=files.get("scenario_facts"),
+        )
+        work_pack_file = await upload_work_pack(client, topic_id, next_token, pack, pages)
+        next_manifest["input_files"] = {
+            **files,
+            "context": uploaded["rel_path"],
+            "work_pack": work_pack_file,
+        }
+        content = build_proposal_repair_request(
+            problems,
+            run_token=next_token,
+            work_pack_file=work_pack_file,
+            repair_used=next_manifest["repair_used"],
+        )
+        submitted = await client.deliver(
             topic_id=topic_id,
             content=content,
             agent_id=app.state.settings.dataagent_agent_id,
@@ -269,16 +438,23 @@ async def reconcile_run(
                 and marker.get("run_token") == run_token
                 and isinstance(marker.get("questions"), list)
                 and marker["questions"]
-                and all(isinstance(question, str) for question in marker["questions"])
+                and all(
+                    isinstance(question, str) and question.strip()
+                    for question in marker["questions"]
+                )
             ):
-                return _finish_failure(
+                return await _fail_with_workflow(
                     app,
+                    workspace_id,
                     session_id,
                     task_id,
                     claimed_at,
-                    state="failed_permanent",
+                    topic_id=topic_id,
+                    manifest=manifest,
                     detail=f"建模没有产出{what}：智能体结束时没有写入结果文件，请重试或换个说法描述需求",
                 )
+            # The entity list or issue list the user confirms is reused next run.
+            plan = await saved_plan(_client(app, workspace_id, session_id), topic_id)
             if _guarded_result_values(
                 app,
                 session_id,
@@ -286,6 +462,7 @@ async def reconcile_run(
                 claimed_at,
                 result_state="awaiting_reply",
                 task_detail=f"智能体需要你确认后才能生成{what}，请在对话中回复",
+                **({"run_manifest_json": {**manifest, "prior_plan": plan}} if plan else {}),
             ):
                 return "awaiting_reply"
             return _current_result_state(app, session_id)
@@ -342,9 +519,72 @@ async def _consume_proposals(
         source_draft_sha256=manifest["source_draft_sha256"],
         draft=manifest["pinned_draft"],
     )
+    if manifest.get("repair_budget_required"):
+        try:
+            await _client(app, workspace_id, session_id).download(
+                topic_id, f"output/ontofoundry-needs-input-{manifest['run_token']}.json"
+            )
+        except DataAgentError as exc:
+            if exc.status_code != 404:
+                return _finish_failure(
+                    app,
+                    session_id,
+                    task_id,
+                    claimed_at,
+                    state="failed_retriable"
+                    if _is_retriable_download(exc.status_code)
+                    else "failed_permanent",
+                    detail="待确认文件检查暂时失败，等待重试"
+                    if _is_retriable_download(exc.status_code)
+                    else _permanent_detail(exc),
+                )
+        else:
+            return _finish_failure(
+                app,
+                session_id,
+                task_id,
+                claimed_at,
+                state="failed_permanent",
+                detail="同轮结果与待确认文件互斥，请只保留一种产物",
+            )
+    budget_failure = None
+    if manifest.get("repair_budget_required"):
+        try:
+            ledger_bytes, _ = await _client(app, workspace_id, session_id).download(
+                topic_id, execution_input(manifest["run_token"])["budget_file"]
+            )
+            ledger = json.loads(ledger_bytes)
+            used = ledger["used"]
+            if (
+                ledger["run_token"] != manifest["run_token"]
+                or type(used) is not int
+                or not manifest.get("repair_used", 0) <= used <= 2
+                or ledger["result_sha256"] != hashlib.sha256(content).hexdigest()
+            ):
+                raise ValueError("invalid correction ledger")
+            manifest = {**manifest, "repair_used": used}
+        except DataAgentError as exc:
+            if _is_retriable_download(exc.status_code):
+                return _finish_failure(
+                    app,
+                    session_id,
+                    task_id,
+                    claimed_at,
+                    state="failed_retriable",
+                    detail="修正计数下载暂时失败，等待重试",
+                )
+            budget_failure = ProposalContractError(
+                "REPAIR_BUDGET_INVALID", "修正计数缺失，无法继续本轮"
+            )
+        except (ValueError, KeyError, TypeError, AttributeError):
+            budget_failure = ProposalContractError(
+                "REPAIR_BUDGET_INVALID", "修正计数缺失、过期或耗尽，请结束本轮"
+            )
     with app.state.session_factory() as db:
         lookup = material_lookup(db, app.state.settings, workspace_id)
         try:
+            if budget_failure:
+                raise budget_failure
             parsed = parse_result(content, context, material_lookup=lookup)
         except ProposalContractError as exc:
             parsed, failure = None, exc
@@ -365,7 +605,7 @@ async def _consume_proposals(
             claimed_at,
             topic_id=topic_id,
             problems=[f"{failure.code}：{failure}"],
-            manifest=manifest,
+            manifest={**manifest, "repair_used": 2} if budget_failure else manifest,
         )
         if repaired is not None:
             return repaired
@@ -392,12 +632,14 @@ async def _consume_proposals(
                 message=str(failure),
             )
             db.commit()
-        return _finish_failure(
+        return await _fail_with_workflow(
             app,
+            workspace_id,
             session_id,
             task_id,
             claimed_at,
-            state="failed_permanent",
+            topic_id=topic_id,
+            manifest=manifest,
             detail=f"提案结果被拒收：{failure}",
         )
 

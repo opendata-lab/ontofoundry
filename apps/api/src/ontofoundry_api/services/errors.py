@@ -43,3 +43,13 @@ class PublishValidationError(ServiceError):
         super().__init__(message)
         self.report = report
         self.details = {"errors": report.get("errors", [])}
+
+
+class DatasetSourceError(ServiceError):
+    status_code = 422
+    code = "DATASET_SOURCE_INVALID"
+
+
+class MetadataSyncError(ServiceError):
+    status_code = 422
+    code = "METADATA_SYNC_FAILED"

@@ -8,158 +8,158 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001101",
-        "name": "学生",
-        "technical_name": "student",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "student",
+        "display_name": "学生"
       },
       {
         "id": "00000000-0000-4000-8000-000000001102",
-        "name": "课程",
-        "technical_name": "course",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "course",
+        "display_name": "课程"
       },
       {
         "id": "00000000-0000-4000-8000-000000001103",
-        "name": "选课记录",
-        "technical_name": "enrollment",
         "description": "学生选修课程的一条记录，带成绩",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "enrollment",
+        "display_name": "选课记录"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002101",
         "owner_type_id": "00000000-0000-4000-8000-000000001101",
-        "name": "学号",
-        "technical_name": "student_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "student_no",
+        "display_name": "学号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002102",
         "owner_type_id": "00000000-0000-4000-8000-000000001101",
-        "name": "姓名",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "姓名"
       },
       {
         "id": "00000000-0000-4000-8000-000000002111",
         "owner_type_id": "00000000-0000-4000-8000-000000001102",
-        "name": "课程编号",
-        "technical_name": "course_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "course_no",
+        "display_name": "课程编号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002112",
         "owner_type_id": "00000000-0000-4000-8000-000000001102",
-        "name": "课程名称",
-        "technical_name": "title",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "title",
+        "display_name": "课程名称"
       },
       {
         "id": "00000000-0000-4000-8000-000000002113",
         "owner_type_id": "00000000-0000-4000-8000-000000001102",
-        "name": "学分",
-        "technical_name": "credit",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "credit",
+        "display_name": "学分"
       },
       {
         "id": "00000000-0000-4000-8000-000000002123",
         "owner_type_id": "00000000-0000-4000-8000-000000001103",
-        "name": "学号",
-        "technical_name": "student_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "student_no",
+        "display_name": "学号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002124",
         "owner_type_id": "00000000-0000-4000-8000-000000001103",
-        "name": "课程编号",
-        "technical_name": "course_no",
         "description": "",
         "value_kind": "string",
         "required": true,
         "identifier": true,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "course_no",
+        "display_name": "课程编号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002121",
         "owner_type_id": "00000000-0000-4000-8000-000000001103",
-        "name": "成绩",
-        "technical_name": "score",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "score",
+        "display_name": "成绩"
       },
       {
         "id": "00000000-0000-4000-8000-000000002122",
         "owner_type_id": "00000000-0000-4000-8000-000000001103",
-        "name": "选课日期",
-        "technical_name": "enrolled_on",
         "description": "",
         "value_kind": "date",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "enrolled_on",
+        "display_name": "选课日期"
       }
     ],
     "link_types": [
@@ -263,8 +263,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006101",
-        "name": "平均成绩",
-        "technical_name": "avg_score",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -275,12 +273,12 @@
         },
         "filters": [],
         "evidence": [],
-        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
+        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f",
+        "name": "avg_score",
+        "display_name": "平均成绩"
       },
       {
         "id": "00000000-0000-4000-8000-000000006102",
-        "name": "选课人次",
-        "technical_name": "enrollment_count",
         "description": "",
         "synonyms": [],
         "kind": "simple",
@@ -288,7 +286,9 @@
         "measure": null,
         "filters": [],
         "evidence": [],
-        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f"
+        "dataset_id": "58d9eae4-7d13-5946-bf56-53576e3ae72f",
+        "name": "enrollment_count",
+        "display_name": "选课人次"
       }
     ],
     "datasets": [

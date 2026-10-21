@@ -14,13 +14,17 @@ export const DIALECTS = [
 export function datasetLabel(dataset: Dataset | undefined) {
   if (!dataset) return "数据集已删除";
   const location = [dataset.schema_name, dataset.table_name].filter(Boolean).join(".");
-  return dataset.name === location || dataset.name === dataset.table_name ? location : `${dataset.name}（${location}）`;
+  return `${dataset.display_name || dataset.name}（${dataset.source_kind === "query" ? "表达式" : location}）`;
 }
 
 export function newDataset(id: string): Dataset {
   return {
     id,
     name: "",
+    display_name: null,
+    connection_id: null,
+    source_kind: "table",
+    query_sql: null,
     description: "",
     dialect: null,
     schema_name: null,
@@ -44,7 +48,11 @@ export function sameLocation(draft: Draft, dataset: Pick<Dataset, "id" | "schema
 export function datasetFromTable(connection: DataConnection, table: AssetTable, name: string): Dataset {
   return {
     id: newId(),
-    name,
+    name: /^[A-Za-z_][A-Za-z0-9_]*$/.test(table.name) ? table.name : "dataset",
+    display_name: name,
+    connection_id: connection.id,
+    source_kind: "table",
+    query_sql: null,
     description: table.comment ?? "",
     dialect: connection.kind,
     schema_name: table.schema,

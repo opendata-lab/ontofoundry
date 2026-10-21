@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from dataset_binding import bind_datasets
+
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 
 ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
@@ -15,6 +17,7 @@ def create_session(client):
 
 
 def save(client, session, draft):
+    bind_datasets(client, draft)
     return client.put(
         ROOT + f"/sessions/{session['id']}",
         json={"revision": session["revision"], "draft": draft},
@@ -103,9 +106,7 @@ def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
         client, session, [update("metric", metric, description="待接受的口径说明")]
     )
     incomplete = deepcopy(session["draft"])
-    incomplete["object_types"][1]["technical_name"] = incomplete["object_types"][0][
-        "technical_name"
-    ]
+    incomplete["object_types"][1]["name"] = incomplete["object_types"][0]["name"]
     response = save(client, session, incomplete)
     assert response.status_code == 200, response.text
     stashed = response.json()

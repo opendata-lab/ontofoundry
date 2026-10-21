@@ -1,0 +1,146 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "7bcf796ad4543a979a0834852a1db5e700f61821225e43f466b13f704b341fc2"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [
+      {
+        "id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "name": "staff",
+        "display_name": "云帆员工",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "378f6072-db7d-5b15-8632-a2d5bb28156c",
+        "derived_by": [],
+        "evidence": []
+      }
+    ],
+    "properties": [
+      {
+        "id": "378f6072-db7d-5b15-8632-a2d5bb28156c",
+        "owner_type_id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "name": "staff_name",
+        "display_name": null,
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    ],
+    "link_types": [
+      {
+        "id": "3efe5468-7552-504e-a665-6ba1a643bc7b",
+        "display_name": null,
+        "name": "reports_to",
+        "description": "",
+        "verbalizes": [
+          "{source}汇报给{target}",
+          "{target}管理{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "target_type_id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "source_role_name": "下属",
+        "target_role_name": "主管",
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": null,
+        "evidence": []
+      }
+    ],
+    "rules": [],
+    "metrics": [],
+    "datasets": [],
+    "mappings": [],
+    "material_objects": [
+      {
+        "id": "5db4d5a7-bda2-56f4-8212-7e91acfe6007",
+        "type_id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "values": {
+          "staff_name": "小岚"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "977f969d-4c62-50e7-8896-f1b4f6deea92",
+            "material_id": "11111111-1111-4111-8111-111111111111",
+            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "locator": {
+              "heading": null,
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "云帆商贸的小岚向小舟汇报。"
+          }
+        ]
+      },
+      {
+        "id": "232dbb9d-7c60-5db7-b365-59ab63617991",
+        "type_id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
+        "values": {
+          "staff_name": "小舟"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "8deb89c9-f7d1-5270-a3e2-f4e7776e28d0",
+            "material_id": "11111111-1111-4111-8111-111111111111",
+            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "locator": {
+              "heading": null,
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "云帆商贸的小岚向小舟汇报。"
+          }
+        ]
+      }
+    ],
+    "material_links": [
+      {
+        "id": "cb11fa58-c814-5a79-a174-c7f726a20bf5",
+        "type_id": "3efe5468-7552-504e-a665-6ba1a643bc7b",
+        "source_id": "5db4d5a7-bda2-56f4-8212-7e91acfe6007",
+        "target_id": "232dbb9d-7c60-5db7-b365-59ab63617991",
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "d362f6a7-089e-59f2-b9ec-afeb0cbe80fb",
+            "material_id": "11111111-1111-4111-8111-111111111111",
+            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "locator": {
+              "heading": null,
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "云帆商贸的小岚向小舟汇报。"
+          }
+        ]
+      }
+    ],
+    "value_types": []
+  },
+  "element_hashes": {
+    "74a20a3d-d2dc-5f32-88e9-84f79200cdbe": "3c2685f0864f31920bd32147e2bdf88a34e37493ae66a832e37f6f9fd95a3585",
+    "378f6072-db7d-5b15-8632-a2d5bb28156c": "2366310363f86d5bc94b4d65d1cba2534460b3aeac4185e84f203fed6f95f362",
+    "3efe5468-7552-504e-a665-6ba1a643bc7b": "1c4efdb3d11510e70c73b1e503b8cde7d6cd54f83578b5b13eff7f9471b79b79",
+    "5db4d5a7-bda2-56f4-8212-7e91acfe6007": "a4babb1add9c2105c474d871fa18e81b6286d115a528935b23f2b446ba444f91",
+    "232dbb9d-7c60-5db7-b365-59ab63617991": "d2bd5dd839ed33f0a6702f8d2c35f08ad62d89ca16d455231eb70de5c39f3225",
+    "cb11fa58-c814-5a79-a174-c7f726a20bf5": "81ce4a0915cbf2597fe531c3be0017d97992d0d47a8018c5b82b1f29d9a082a7"
+  }
+}

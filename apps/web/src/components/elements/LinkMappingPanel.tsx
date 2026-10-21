@@ -25,7 +25,7 @@ export function KeyEditor({
   label: string;
   onChange: (key: Key) => void;
 }) {
-  const properties = effectiveProperties(draft, typeId).map((p) => ({ value: p.definition.id, label: p.definition.name }));
+  const properties = effectiveProperties(draft, typeId).map((p) => ({ value: p.definition.id, label: (p.definition.display_name || p.definition.name) }));
   return (
     <div className="flex flex-col gap-2">
       <Select
@@ -73,7 +73,7 @@ export function LinkJoinEditor({
   const source = byId(draft.object_types, sourceTypeId);
   const target = byId(draft.object_types, targetTypeId);
   const options = (typeId: UUID) =>
-    effectiveProperties(draft, typeId).map((p) => ({ value: p.definition.id, label: p.definition.name }));
+    effectiveProperties(draft, typeId).map((p) => ({ value: p.definition.id, label: (p.definition.display_name || p.definition.name) }));
   const mode = value?.kind ?? "none";
   const setMode = (next: string) => {
     if (next === mode) return;
@@ -105,7 +105,7 @@ export function LinkJoinEditor({
         />
       </Form.Item>
       {value?.kind === "direct" && (
-        <Form.Item label={`${source?.name ?? "来源"} 的属性 = ${target?.name ?? "目标"} 的属性`}>
+        <Form.Item label={`${(source?.display_name || source?.name) ?? "来源"} 的属性 = ${(target?.display_name || target?.name) ?? "目标"} 的属性`}>
           <div className="flex flex-col gap-2">
             {value.source_property_ids.map((sourceId, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -175,8 +175,8 @@ export function LinkJoinEditor({
           value={value}
           onChange={onChange}
           ends={[
-            { typeId: sourceTypeId, label: source?.name ?? "来源对象", side: "source" },
-            { typeId: targetTypeId, label: target?.name ?? "目标对象", side: "target" },
+            { typeId: sourceTypeId, label: (source?.display_name || source?.name) ?? "来源对象", side: "source" },
+            { typeId: targetTypeId, label: (target?.display_name || target?.name) ?? "目标对象", side: "target" },
           ]}
         />
       )}
@@ -244,9 +244,9 @@ function MappingTableFields({
 /** The relation's own data binding (its data_join). */
 export function LinkMappingPanel(props: PanelProps<LinkType>) {
   const { draft, type, editing, change } = props;
-  const sourceName = byId(draft.object_types, type.source_type_id)?.name ?? "来源对象";
-  const targetName = byId(draft.object_types, type.target_type_id)?.name ?? "目标对象";
-  const propertyName = (id: string | undefined) => byId(draft.properties, id)?.name || "未指定属性";
+  const sourceName = (byId(draft.object_types, type.source_type_id)?.display_name || byId(draft.object_types, type.source_type_id)?.name) ?? "来源对象";
+  const targetName = (byId(draft.object_types, type.target_type_id)?.display_name || byId(draft.object_types, type.target_type_id)?.name) ?? "目标对象";
+  const propertyName = (id: string | undefined) => (byId(draft.properties, id)?.display_name || byId(draft.properties, id)?.name) || "未指定属性";
   const correspondence = (rows: { id: string; source: string; target: string }[], sourceLabel: string, targetLabel: string) => (
     <Table
       size="small"

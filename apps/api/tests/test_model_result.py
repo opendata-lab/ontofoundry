@@ -72,5 +72,6 @@ def test_model_prompt_requires_proposal_contract():
         proposal_prompt="ontofoundry.proposals/v1",
         run_token="round",
     )
-    assert "ontofoundry.proposals/v1" in prompt and "超过" in prompt
+    # Modeling runs read the work pack; the generic size hint is for chat only.
+    assert "ontofoundry.proposals/v1" in prompt and "超过" not in prompt
     assert "model-result" not in prompt

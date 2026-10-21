@@ -10,7 +10,7 @@ import { MetricPreview } from "./MetricPreview";
 vi.mock("../../api/client", () => ({ metricsApi: { preview: vi.fn() } }));
 
 const draft = example("01-basic-sales");
-const metric = draft.metrics.find((m) => m.technical_name === "order_amount")!;
+const metric = draft.metrics.find((m) => m.name === "order_amount")!;
 const result = (value: number, extra: Partial<Preview> = {}): Preview => ({
   definition_hash: "h",
   context_version: "v1",
@@ -28,7 +28,7 @@ function Harness() {
   const [value, setValue] = useState<Metric>(metric);
   return (
     <>
-      <button onClick={() => setValue({ ...value, name: value.name + "!" } as Metric)}>改名</button>
+      <button onClick={() => setValue({ ...value, display_name: (value.display_name || value.name) + "!" } as Metric)}>改名</button>
       <button onClick={() => setValue({ ...value, aggregation: "max" } as Metric)}>改口径</button>
       <MetricPreview draft={draft} metric={value} context={{ expected_current_version_id: "v1" }} />
     </>

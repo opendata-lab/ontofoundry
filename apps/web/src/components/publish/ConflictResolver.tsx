@@ -3,7 +3,7 @@ import { useState } from "react";
 import { ApiError, publishApi } from "../../api/client";
 import type { Json, MergeConflict, ModelingSession, Resolution } from "../../api/types";
 import { SectionTitle, StatusMark } from "../layout";
-import { FIELD_LABELS, KIND } from "../proposals/elementMeta";
+import { fieldLabel, KIND } from "../proposals/elementMeta";
 
 const { Text } = Typography;
 
@@ -14,7 +14,7 @@ function show(value: unknown) {
 
 const title = (c: MergeConflict) =>
   `${c.element_kind ? `${KIND[c.element_kind].label} · ` : ""}${c.element_label} / ${
-    c.kind === "delete_modify" ? "删除与修改" : (FIELD_LABELS[c.path] ?? c.path)
+    c.kind === "delete_modify" ? "删除与修改" : (fieldLabel(c.path, c.element_kind ?? undefined))
   }`;
 
 const LABELS: Record<Resolution["choice"], [string, string]> = {
@@ -26,7 +26,7 @@ const LABELS: Record<Resolution["choice"], [string, string]> = {
 
 const STRING_PATHS = new Set([
   "name",
-  "technical_name",
+  "display_name",
   "description",
   "source_role_name",
   "target_role_name",

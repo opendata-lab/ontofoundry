@@ -8,157 +8,157 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001401",
-        "name": "员工",
-        "technical_name": "employee",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "employee",
+        "display_name": "员工"
       },
       {
         "id": "00000000-0000-4000-8000-000000001402",
-        "name": "工位",
-        "technical_name": "desk",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "desk",
+        "display_name": "工位"
       },
       {
         "id": "00000000-0000-4000-8000-000000001403",
-        "name": "公司",
-        "technical_name": "company",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "company",
+        "display_name": "公司"
       },
       {
         "id": "00000000-0000-4000-8000-000000001404",
-        "name": "交易",
-        "technical_name": "trade",
         "description": "",
         "synonyms": [],
         "tags": [],
         "extends": null,
         "evidence": [],
         "title_property_id": null,
-        "derived_by": []
+        "derived_by": [],
+        "name": "trade",
+        "display_name": "交易"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002401",
         "owner_type_id": "00000000-0000-4000-8000-000000001401",
-        "name": "工号",
-        "technical_name": "employee_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "employee_no",
+        "display_name": "工号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002402",
         "owner_type_id": "00000000-0000-4000-8000-000000001401",
-        "name": "姓名",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "姓名"
       },
       {
         "id": "00000000-0000-4000-8000-000000002411",
         "owner_type_id": "00000000-0000-4000-8000-000000001402",
-        "name": "工位号",
-        "technical_name": "desk_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "desk_no",
+        "display_name": "工位号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002412",
         "owner_type_id": "00000000-0000-4000-8000-000000001402",
-        "name": "楼层",
-        "technical_name": "floor",
         "description": "",
         "value_kind": "integer",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "floor",
+        "display_name": "楼层"
       },
       {
         "id": "00000000-0000-4000-8000-000000002421",
         "owner_type_id": "00000000-0000-4000-8000-000000001403",
-        "name": "统一社会信用代码",
-        "technical_name": "credit_code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "credit_code",
+        "display_name": "统一社会信用代码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002422",
         "owner_type_id": "00000000-0000-4000-8000-000000001403",
-        "name": "所在地区",
-        "technical_name": "region",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "region",
+        "display_name": "所在地区"
       },
       {
         "id": "00000000-0000-4000-8000-000000002431",
         "owner_type_id": "00000000-0000-4000-8000-000000001404",
-        "name": "交易号",
-        "technical_name": "trade_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "trade_no",
+        "display_name": "交易号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002432",
         "owner_type_id": "00000000-0000-4000-8000-000000001404",
-        "name": "成交额",
-        "technical_name": "amount",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "amount",
+        "display_name": "成交额"
       }
     ],
     "link_types": [
@@ -293,8 +293,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006401",
-        "name": "成交额",
-        "technical_name": "trade_amount",
         "description": "交易表全部记录的金额合计。",
         "synonyms": [],
         "kind": "simple",
@@ -305,12 +303,12 @@
           "dataset_id": "9d1e3753-885a-5f86-b85a-229d13055cbd",
           "column": "amount"
         },
-        "filters": []
+        "filters": [],
+        "name": "trade_amount",
+        "display_name": "成交额"
       },
       {
         "id": "00000000-0000-4000-8000-000000006403",
-        "name": "员工数",
-        "technical_name": "employee_count",
         "description": "员工表的行数。",
         "synonyms": [],
         "kind": "simple",
@@ -318,12 +316,12 @@
         "dataset_id": "ea651ca1-1168-5a16-b739-7fdcb55416a4",
         "aggregation": "count",
         "measure": null,
-        "filters": []
+        "filters": [],
+        "name": "employee_count",
+        "display_name": "员工数"
       },
       {
         "id": "00000000-0000-4000-8000-000000006490",
-        "name": "工位数",
-        "technical_name": "desk_count",
         "description": "工位表的行数，不限定分配状态。",
         "synonyms": [],
         "kind": "simple",
@@ -331,7 +329,9 @@
         "dataset_id": "d5ea21d1-29fd-5928-986f-bf4334306a43",
         "aggregation": "count",
         "measure": null,
-        "filters": []
+        "filters": [],
+        "name": "desk_count",
+        "display_name": "工位数"
       }
     ],
     "datasets": [

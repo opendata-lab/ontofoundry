@@ -8,107 +8,107 @@
     "object_types": [
       {
         "id": "00000000-0000-4000-8000-000000001901",
-        "name": "账户",
-        "technical_name": "account",
         "description": "主表决定账户集合；来源键由建模者声明，无数据库主键也是有效语义绑定。",
         "synonyms": [],
         "title_property_id": null,
         "tags": [],
         "extends": null,
         "evidence": [],
-        "derived_by": []
+        "derived_by": [],
+        "name": "account",
+        "display_name": "账户"
       },
       {
         "id": "00000000-0000-4000-8000-000000001902",
-        "name": "客户",
-        "technical_name": "customer",
         "description": "",
         "synonyms": [],
         "title_property_id": "00000000-0000-4000-8000-000000002913",
         "tags": [],
         "extends": null,
         "evidence": [],
-        "derived_by": []
+        "derived_by": [],
+        "name": "customer",
+        "display_name": "客户"
       }
     ],
     "properties": [
       {
         "id": "00000000-0000-4000-8000-000000002901",
         "owner_type_id": "00000000-0000-4000-8000-000000001901",
-        "name": "账户号",
-        "technical_name": "account_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "account_no",
+        "display_name": "账户号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002902",
         "owner_type_id": "00000000-0000-4000-8000-000000001901",
-        "name": "客户编码",
-        "technical_name": "customer_code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "customer_code",
+        "display_name": "客户编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002903",
         "owner_type_id": "00000000-0000-4000-8000-000000001901",
-        "name": "可用金额",
-        "technical_name": "available_amount",
         "description": "",
         "value_kind": "decimal",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "available_amount",
+        "display_name": "可用金额"
       },
       {
         "id": "00000000-0000-4000-8000-000000002911",
         "owner_type_id": "00000000-0000-4000-8000-000000001902",
-        "name": "客户编号",
-        "technical_name": "customer_no",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": true,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "customer_no",
+        "display_name": "客户编号"
       },
       {
         "id": "00000000-0000-4000-8000-000000002912",
         "owner_type_id": "00000000-0000-4000-8000-000000001902",
-        "name": "编码",
-        "technical_name": "code",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": true,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "code",
+        "display_name": "编码"
       },
       {
         "id": "00000000-0000-4000-8000-000000002913",
         "owner_type_id": "00000000-0000-4000-8000-000000001902",
-        "name": "名称",
-        "technical_name": "name",
         "description": "",
         "value_kind": "string",
         "required": false,
         "identifier": false,
         "unique": false,
         "synonyms": [],
-        "evidence": []
+        "evidence": [],
+        "name": "name",
+        "display_name": "名称"
       }
     ],
     "link_types": [
@@ -141,8 +141,6 @@
     "metrics": [
       {
         "id": "00000000-0000-4000-8000-000000006901",
-        "name": "账户可用金额",
-        "technical_name": "account_available_amount",
         "description": "对 account_amounts 的 available_amount 求和，包括不属于 accounts 的孤儿行；如需排除，由 agent 关联主表或清理数据。",
         "synonyms": [],
         "kind": "simple",
@@ -153,7 +151,9 @@
           "dataset_id": "76c85ca4-635a-5ce7-8cf4-13eb0fd574f5",
           "column": "available_amount"
         },
-        "filters": []
+        "filters": [],
+        "name": "account_available_amount",
+        "display_name": "账户可用金额"
       }
     ],
     "datasets": [

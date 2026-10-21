@@ -9,7 +9,7 @@ import { ExportDialog } from "./ExportDialog";
 vi.mock("../api/client", async (load) => ({ ...(await load<typeof import("../api/client")>()), exportApi: { preview: vi.fn() } }));
 afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
-const preview: ExportPreview = { version_id: "fiction-version", adapter: "ontofoundry-core-1", report: { ...importPreview.report, direction: "export", issues: [importPreview.report.issues[0]], content_sha256: "a".repeat(64) }, content_sha256: "a".repeat(64), filename: "fiction.ontofoundry.json", media_type: "application/json", download_url: "/fiction-artifact/" + "a".repeat(64) };
+const preview: ExportPreview = { version_id: "fiction-version", adapter: "ontofoundry-core-1-package", report: { ...importPreview.report, direction: "export", issues: [importPreview.report.issues[0]], content_sha256: "a".repeat(64) }, content_sha256: "a".repeat(64), filename: "fiction.ontofoundry.zip", media_type: "application/zip", download_url: "/fiction-artifact/" + "a".repeat(64) };
 function renderDialog() {
   const props = { open: true, workspaceId: "fiction-workspace", versions: [versionSummary(2, { version_id: "fiction-version" })], onClose: vi.fn() };
   return { ...renderWithProviders(<ExportDialog {...props} />), props };
@@ -21,7 +21,7 @@ it("requires a report and downloads exactly the shown artifact", async () => {
   fireEvent.click(screen.getByRole("button", { name: "生成导出报告" }));
   expect(await screen.findByRole("link", { name: "下载文件" })).toHaveAttribute("href", preview.download_url);
   expect(screen.getByText(preview.content_sha256!)).toBeInTheDocument();
-  expect(exportApi.preview).toHaveBeenCalledWith("fiction-workspace", "ontofoundry-core-1", "fiction-version");
+  expect(exportApi.preview).toHaveBeenCalledWith("fiction-workspace", "ontofoundry-core-1-package", "fiction-version");
 });
 it("does not offer a file for export errors or permission failures", async () => {
   vi.mocked(exportApi.preview).mockResolvedValue({ ...preview, download_url: null, content_sha256: null, report: { ...preview.report, issues: [importPreview.report.issues[1]] } });
@@ -39,7 +39,7 @@ it("clears the old download when format changes and on reopening", async () => {
   fireEvent.click(screen.getByRole("button", { name: "生成导出报告" }));
   await screen.findByRole("link", { name: "下载文件" });
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "导出格式" }));
-  fireEvent.click(await screen.findByText("Apache Ossie 0.2", { selector: ".ant-select-item-option-content" }));
+  fireEvent.click(await screen.findByText("Apache Ossie 0.2（ZIP + 扩展文件）", { selector: ".ant-select-item-option-content" }));
   expect(screen.queryByRole("link", { name: "下载文件" })).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: "生成导出报告" })).toBeEnabled();
   rerender(<ExportDialog {...props} open={false} />);
@@ -60,7 +60,7 @@ it("ignores an earlier report after changing the selected version", async () => 
   vi.mocked(exportApi.preview).mockResolvedValue({ ...preview, version_id: "older-fiction-version" });
   fireEvent.click(screen.getByRole("button", { name: "生成导出报告" }));
   await screen.findByRole("link", { name: "下载文件" });
-  expect(exportApi.preview).toHaveBeenLastCalledWith("fiction-workspace", "ontofoundry-core-1", "older-fiction-version");
+  expect(exportApi.preview).toHaveBeenLastCalledWith("fiction-workspace", "ontofoundry-core-1-package", "older-fiction-version");
 });
 
 it("removes an earlier download when authorization fails on regeneration", async () => {

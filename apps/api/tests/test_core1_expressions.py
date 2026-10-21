@@ -19,8 +19,8 @@ from ontofoundry_api.domain.expressions import (
 def _rule(draft, text, owner=None):
     return Rule(
         id=uuid4(),
-        name="校验",
-        technical_name="check_value",
+        display_name="校验",
+        name="check_value",
         owner_kind="object_type",
         owner_id=owner or draft.object_types[0].id,
         rule_kind="constraint",
@@ -30,7 +30,7 @@ def _rule(draft, text, owner=None):
 
 def _sales_rule(text):
     draft = example_draft("01-basic-sales")
-    order = next(o for o in draft.object_types if o.technical_name == "sales_order")
+    order = next(o for o in draft.object_types if o.name == "sales_order")
     return draft, _rule(draft, text, order.id)
 
 
@@ -40,13 +40,13 @@ def test_rule_reserved_word_and_literal_parameter_are_preserved():
     )
     resolved = resolve_rule_expression(draft, rule)
     changed = draft.model_copy(deep=True)
-    next(o for o in changed.object_types if o.id == rule.owner_id).technical_name = "order"
+    next(o for o in changed.object_types if o.id == rule.owner_id).name = "order"
     amount = next(
         p
         for p in changed.properties
-        if p.owner_type_id == rule.owner_id and p.technical_name == "amount"
+        if p.owner_type_id == rule.owner_id and p.name == "amount"
     )
-    amount.technical_name = "total"
+    amount.name = "total"
     text = render_references(resolved, changed)
     assert text == "order.total > :amount AND 'sales_order.amount' <> 'x'"
     rule.expression = text
@@ -92,14 +92,14 @@ def test_rule_property_and_link_owners_use_definition_context():
 
 def test_exists_reverse_collection_self_and_parallel_links():
     draft = example_draft("05-self-and-parallel-links")
-    employee = next(o for o in draft.object_types if o.technical_name == "employee")
+    employee = next(o for o in draft.object_types if o.name == "employee")
     manager = next(
         link
         for link in draft.link_types
         if link.source_type_id == employee.id and link.target_type_id == employee.id
     )
-    forward = f"EXISTS (employee.{manager.technical_name})"
-    reverse = f"EXISTS (employee.REVERSE({manager.technical_name}))"
+    forward = f"EXISTS (employee.{manager.name})"
+    reverse = f"EXISTS (employee.REVERSE({manager.name}))"
     first = resolve_derived_expression(draft, employee.id, forward).references[0]
     second = resolve_derived_expression(draft, employee.id, reverse).references[0]
     assert first.links == ((manager.id, "forward"),)
@@ -109,18 +109,18 @@ def test_exists_reverse_collection_self_and_parallel_links():
         resolve_derived_expression(
             draft,
             employee.id,
-            f"employee.REVERSE({manager.technical_name}).{prop.technical_name} IS NULL",
+            f"employee.REVERSE({manager.name}).{prop.name} IS NULL",
         )
     assert resolve_derived_expression(
         draft,
         employee.id,
-        f"employee.{manager.technical_name}.{prop.technical_name} IS NULL",
+        f"employee.{manager.name}.{prop.name} IS NULL",
     )
-    trade = next(o for o in draft.object_types if o.technical_name == "trade")
+    trade = next(o for o in draft.object_types if o.name == "trade")
     parallel = [link for link in draft.link_types if link.source_type_id == trade.id]
     refs = [
         resolve_derived_expression(
-            draft, trade.id, f"EXISTS (trade.{link.technical_name})"
+            draft, trade.id, f"EXISTS (trade.{link.name})"
         ).references[0]
         for link in parallel
     ]
@@ -129,16 +129,18 @@ def test_exists_reverse_collection_self_and_parallel_links():
 
 def test_multihop_exists_rewrite_leaves_wrapper_and_string_unchanged():
     draft = example_draft("05-self-and-parallel-links")
-    employee = next(o for o in draft.object_types if o.technical_name == "employee")
+    employee = next(o for o in draft.object_types if o.name == "employee")
     manager = next(
         link
         for link in draft.link_types
         if link.source_type_id == employee.id and link.target_type_id == employee.id
     )
-    text = f"EXISTS ( employee.{manager.technical_name}.REVERSE({manager.technical_name}) ) AND 'employee' <> ''"
+    text = (
+        f"EXISTS ( employee.{manager.name}.REVERSE({manager.name}) ) AND 'employee' <> ''"
+    )
     resolved = resolve_derived_expression(draft, employee.id, text)
     candidate = draft.model_copy(deep=True)
-    next(o for o in candidate.object_types if o.id == employee.id).technical_name = "person"
+    next(o for o in candidate.object_types if o.id == employee.id).name = "person"
     next(link for link in candidate.link_types if link.id == manager.id).name = "boss"
     assert (
         render_references(resolved, candidate)
@@ -192,8 +194,8 @@ def _metric(text):
     ds = next(d for d in draft.datasets if d.name == "orders")
     metric = ExpressionMetric(
         id=uuid4(),
-        name="复杂指标",
-        technical_name="complex_metric",
+        display_name="复杂指标",
+        name="complex_metric",
         kind="expression",
         dataset_id=ds.id,
         expression=text,

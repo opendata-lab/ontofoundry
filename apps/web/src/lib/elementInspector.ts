@@ -11,7 +11,10 @@ export type ElementTab =
   | "instances"
   | "definition"
   | "preview"
-  | "columns";
+  | "fields"
+  | "columns"
+  | "source"
+  | "references";
 export type ElementRequest = {
   kind: TargetKind;
   id: string;

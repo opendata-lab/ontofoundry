@@ -4,6 +4,12 @@
 
 本文说明 core-1 的目标模型与行为，状态为设计定稿、待实施。JSON 中业务和数据来源均为虚构；完整包形式见[格式与转换](formats.md)。
 
+## 2026-10-20 命名与交换约定
+
+对象、属性、关系、规则和指标统一使用必填 `name`（英文标识，`^[A-Za-z_][A-Za-z0-9_]*$`）和可选 `display_name`（中文名称）。名称为空时界面显示 name，名称可重复；英文标识沿用原命名空间与引用规则。Dataset 不变。关系的完整含义及角色名不变。旧数据库内容清理，不转换；旧外部文件由导入适配器转换并报告。
+
+Ossie 导出为 ZIP：纯 Ossie 文件与 `ontofoundry-extension.json`。显示名仅在扩展 `display_names`；同义词在支持的位置用 `ai_context.synonyms`，概念和本体关系使用扩展 synonyms。单个 Ossie 文件导入显示名为空；旧版扩展块仅导入兼容。详见[命名统一设计](../design/2026-10-20-display-name-unification.md)。
+
 ## 1. 概述
 
 指标保存固定业务口径，例如订单金额求和、订单完成率或每日提交数。**指标只挂数据集，与本体对象、属性、关系不建立关联。** 常见聚合用 simple，比率用 ratio，复杂算法用 expression。单行覆盖率等值仍可作为对象属性；聚合直接使用数据集列。
@@ -12,13 +18,16 @@
 
 simple、expression 保存 dataset_id；ratio 的两个 simple 分量必须同一数据集，读取时从分量解析 dataset_id，输入不重复保存。所有指标只引用单个数据集：simple 的 measure、filters.column、time_field，以及 expression 的全部列和 time_field 均限本数据集。expression 只允许本数据集聚合和标量条件，不接受 SELECT、FROM、JOIN 或额外查询作用域，不使用本体路径。
 
+分子分母来自不同表的指标（例如退款率 = 退款金额 ÷ 销售额，退款在 refunds、销售在 orders）先建[基于表达式的数据集](datasets-and-binding.md)：用 UNION ALL 让销售和退款各成一行、各带业务日期，再在这个数据集上建两个 simple 和一个 ratio。不能把退款明细 JOIN 到订单后求和：一单 100 元、两笔退款 10 和 20 元时，销售额会被算成 200 元，退款率从 30% 变成 15%。
+
 跨数据集条件在查询时处理。例如只在 orders 上定义“订单金额” `SUM(orders.amount)`；用户问“华东区订单金额”时，agent 在查询时沿订单到客户的本体关系筛选客户地区，再按指标口径聚合。这是 agent 回答问题时的行为，不是指标定义的一部分；模型没有数据集之间的关系，指标与本体及本体关系完全无关。
 
 ## 2. 字段
 
 | 字段 | 类型 | 填写要求与说明 |
 |---|---|---|
-| id、name、technical_name | UUID、字符串 | 必填，id 稳定，technical_name 独立寻址 |
+| id、name | UUID、字符串 | 必填，id 稳定，name 为 ASCII 英文标识、工作空间内唯一 |
+| display_name | 字符串 / null | 可选中文名称，空时显示 name，不参与唯一性 |
 | description、synonyms、evidence | 字符串、数组 | 可省略，默认空字符串或空数组 |
 | kind | simple / ratio / expression | 必填 |
 | dataset_id | UUID | simple、expression 必填；ratio 输入不收，从两个同数据集分量解析 |
@@ -87,8 +96,8 @@ simple、expression 保存 dataset_id；ratio 的两个 simple 分量必须同�
   "metrics": [
     {
       "id": "00000000-0000-4000-8000-000000006002",
-      "name": "订单数",
-      "technical_name": "order_count",
+      "display_name": "订单数",
+      "name": "order_count",
       "description": "",
       "synonyms": [],
       "kind": "simple",
@@ -100,8 +109,8 @@ simple、expression 保存 dataset_id；ratio 的两个 simple 分量必须同�
     },
     {
       "id": "00000000-0000-4000-8000-000000006003",
-      "name": "已完成订单数",
-      "technical_name": "completed_order_count",
+      "display_name": "已完成订单数",
+      "name": "completed_order_count",
       "description": "",
       "synonyms": [],
       "kind": "simple",
@@ -124,8 +133,8 @@ simple、expression 保存 dataset_id；ratio 的两个 simple 分量必须同�
     },
     {
       "id": "00000000-0000-4000-8000-000000006098",
-      "name": "完成率",
-      "technical_name": "completion_rate",
+      "display_name": "完成率",
+      "name": "completion_rate",
       "description": "已完成订单数 / 全部订单数；分子过滤不得放公共 WHERE",
       "synonyms": [],
       "kind": "ratio",
@@ -135,8 +144,8 @@ simple、expression 保存 dataset_id；ratio 的两个 simple 分量必须同�
     },
     {
       "id": "00000000-0000-4000-8000-000000006699",
-      "name": "有效金额表达式",
-      "technical_name": "eligible_amount_expression",
+      "display_name": "有效金额表达式",
+      "name": "eligible_amount_expression",
       "description": "保留已定义的算法，由 agent 根据查询引擎调整 SQL。",
       "synonyms": [],
       "kind": "expression",
@@ -196,8 +205,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
   "metrics": [
     {
       "id": "00000000-0000-4000-8000-000000013101",
-      "name": "提交数",
-      "technical_name": "commit_count",
+      "display_name": "提交数",
+      "name": "commit_count",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "simple",
@@ -216,8 +225,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
     },
     {
       "id": "00000000-0000-4000-8000-000000013102",
-      "name": "核心仓库提交数",
-      "technical_name": "core_commit_count",
+      "display_name": "核心仓库提交数",
+      "name": "core_commit_count",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "simple",
@@ -247,8 +256,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
     },
     {
       "id": "00000000-0000-4000-8000-000000013103",
-      "name": "核心仓库提交占比",
-      "technical_name": "core_commit_share",
+      "display_name": "核心仓库提交占比",
+      "name": "core_commit_share",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "ratio",
@@ -258,8 +267,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
     },
     {
       "id": "00000000-0000-4000-8000-000000013104",
-      "name": "有提交仓库数",
-      "technical_name": "active_repos",
+      "display_name": "有提交仓库数",
+      "name": "active_repos",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "simple",
@@ -289,8 +298,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
     },
     {
       "id": "00000000-0000-4000-8000-000000013105",
-      "name": "有效提交数表达式",
-      "technical_name": "eligible_commit_count",
+      "display_name": "有效提交数表达式",
+      "name": "eligible_commit_count",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "expression",
@@ -305,8 +314,8 @@ ratio 按小数相除，零分母为空；精度和物理类型由 agent 按引�
     },
     {
       "id": "00000000-0000-4000-8000-000000013106",
-      "name": "统计行数",
-      "technical_name": "stat_row_count",
+      "display_name": "统计行数",
+      "name": "stat_row_count",
       "description": "直接使用数据集列；不反查对象。",
       "synonyms": [],
       "kind": "simple",

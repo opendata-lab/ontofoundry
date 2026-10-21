@@ -93,7 +93,7 @@ function OntologyNodeView({ data, selected }: NodeProps<OntologyFlowNode>) {
       </span>
       <span className="grid min-w-0">
         <strong className="truncate text-sm text-ink">{item.label}</strong>
-        <small className="truncate font-mono text-xs text-muted">{item.technical_name}</small>
+        <small className="truncate font-mono text-xs text-muted">{item.name}</small>
       </span>
       {!!item.attribute_count && (
         <Tag className="m-0 ml-auto flex-none">{item.attribute_count}</Tag>
@@ -233,7 +233,7 @@ function buildElements(graph: TypeGraph) {
 
 function matches(item: ApiGraphNode, query: string) {
   if (!query) return true;
-  return [item.label, item.technical_name, item.description, ...item.tags]
+  return [item.label, item.name, item.description, ...item.tags]
     .join(" ")
     .toLocaleLowerCase()
     .includes(query);

@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 @dataclass
 class Extension:
     data: dict = field(default_factory=dict)
+    source_path: str = "/ai_context/ontofoundry"
 
-    def name(self, path, fallback):
+    def name(self, path, fallback=None):
         return self.data.get("display_names", {}).get(path, fallback)
 
     def labels(self, kind, path):
@@ -18,23 +19,25 @@ class Extension:
 
 
 def read_extension(translation):
-    context = translation.source.value.get("ai_context")
-    if not isinstance(context, dict):
-        if context:
-            translation.issue(
-                "/ai_context",
-                "dropped",
-                "AIContext",
-                "RT-02",
-                "文档上下文没有可确定的对象归属，保留原文",
-            )
-        return Extension()
-    data = context.get("ontofoundry")
+    data = getattr(translation, "extension", None)
+    source_path = (
+        "/ontofoundry-extension.json" if data is not None else "/ai_context/ontofoundry"
+    )
     if data is None:
-        return Extension()
+        context = translation.source.value.get("ai_context")
+        data = context.get("ontofoundry") if isinstance(context, dict) else None
+        if data is None:
+            return Extension()
+        translation.issue(
+            source_path,
+            "converted",
+            "Extension",
+            "RT-03",
+            "读取旧版扩展块；再次导出时改用 ontofoundry-extension.json",
+        )
     if not isinstance(data, dict) or data.get("version") != "core-1":
         translation.issue(
-            "/ai_context/ontofoundry",
+            source_path,
             "dropped",
             "Extension",
             "RT-03",
@@ -43,6 +46,8 @@ def read_extension(translation):
         return Extension()
     allowed = {
         "version",
+        "dataset_metadata",
+        "metric_metadata",
         "display_names",
         "inverse_names",
         "link_role_names",
@@ -52,16 +57,19 @@ def read_extension(translation):
         "title_properties",
         "required",
         "unsupported",
+        "rules",
     }
     for key in data.keys() - allowed:
         translation.issue(
-            "/ai_context/ontofoundry/" + key.replace("~", "~0").replace("/", "~1"),
+            source_path + "/" + key.replace("~", "~0").replace("/", "~1"),
             "dropped",
             "Extension",
             "RT-03",
             "本期未承载的扩展字段",
         )
     clean = {}
+    for key in ("dataset_metadata", "metric_metadata"):
+        clean[key] = {k: v for k, v in data.get(key, {}).items() if isinstance(k, str) and isinstance(v, dict)} if isinstance(data.get(key), dict) else {}
     for key in ("display_names", "inverse_names", "title_properties"):
         clean[key] = (
             {
@@ -72,6 +80,24 @@ def read_extension(translation):
             if isinstance(data.get(key, {}), dict)
             else {}
         )
+    rules = data.get("rules", {})
+    clean["rules"] = (
+        {
+            key: value
+            for key, value in rules.items()
+            if isinstance(key, str)
+            and "." in key
+            and isinstance(value, dict)
+            and isinstance(value.get("owner"), str)
+            and key.startswith(value["owner"] + ".")
+            and value.get("kind") in {"constraint", "derivation"}
+            and type(value.get("position")) is int
+            and value["position"] >= 0
+            and isinstance(value.get("description", ""), str)
+        }
+        if isinstance(rules, dict)
+        else {}
+    )
     clean["link_role_names"] = {}
     roles = data.get("link_role_names", {})
     if isinstance(roles, dict):
@@ -84,7 +110,8 @@ def read_extension(translation):
                 if key in {"source_role_name", "target_role_name"}
                 and (
                     value is None
-                    or isinstance(value, str) and 0 < len(value.strip()) <= 240
+                    or isinstance(value, str)
+                    and 0 < len(value.strip()) <= 240
                 )
             }
     for key in ("synonyms", "tags"):
@@ -99,10 +126,17 @@ def read_extension(translation):
             if isinstance(data.get(key, {}), dict)
             else {}
         )
-    clean["generated_link_readings"] = [
-        path for path in data.get("generated_link_readings", []) if isinstance(path, str)
-    ] if isinstance(data.get("generated_link_readings", []), list) else []
+    clean["generated_link_readings"] = (
+        [path for path in data.get("generated_link_readings", []) if isinstance(path, str)]
+        if isinstance(data.get("generated_link_readings", []), list)
+        else []
+    )
     clean["required"] = (
         data.get("required", []) if isinstance(data.get("required", []), list) else []
     )
-    return Extension(clean)
+    return Extension(clean, source_path)
+
+
+def metadata_key(scope, name):
+    import json
+    return json.dumps([scope, name], ensure_ascii=False, separators=(",", ":"))

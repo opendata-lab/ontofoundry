@@ -30,7 +30,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 def rel(name, target=None, *, source="customer", **kwargs):
     return {
         "name": name,
-        "verbalizes": ["{" + source + "} " + name + (" {" + target + "}" if target else "")],
+        "verbalizes": [
+            "{" + source + "} " + name + (" {" + target + "}" if target else "")
+        ],
         **({"roles": [{"concept": target}]} if target else {}),
         **kwargs,
     }
@@ -177,21 +179,21 @@ def test_incompatible_value_ancestors_are_not_guessed_as_string():
             ),
         )
     )
-    assert [p.technical_name for p in result.model.properties] == ["label"]
+    assert [p.name for p in result.model.properties] == ["label"]
     assert not result.model.properties[0].identifier
     assert issues(result, "RT-35") and issues(result, "RT-30")
 
 
 def test_entity_inheriting_value_is_invalid_and_does_not_block_other_entities():
     result = run(document(entity("invalid", extends=["String"]), entity("valid")))
-    assert [o.technical_name for o in result.model.object_types] == ["valid"]
+    assert [o.name for o in result.model.object_types] == ["valid"]
     assert any(
         i.outcome == "error" and i.source_path == "/ontology/0"
         for i in result.report.issues
     )
 
 
-def test_value_constraints_instantiate_all_ancestors_without_replacing_literals():
+def test_value_types_import_as_shared_types_and_fold_ancestor_constraints():
     data = document(
         {
             "concept": "Money",
@@ -210,14 +212,22 @@ def test_value_constraints_instantiate_all_ancestors_without_replacing_literals(
         ),
     )
     result = run(data)
-    assert len(result.model.rules) == 3
-    expressions = {r.expression for r in result.model.rules}
-    assert expressions == {
-        "customer.amount >= 0",
-        "customer.refund >= 0",
-        "customer.refund > 0",
+    types = {v.name: v for v in result.model.value_types}
+    assert set(types) == {"Money", "Positive"}
+    assert {str(v.value_kind) for v in types.values()} == {"decimal"}
+    props = {p.name: p for p in result.model.properties}
+    assert props["amount"].value_type_id == types["Money"].id
+    assert props["refund"].value_type_id == types["Positive"].id
+    # Constraints live on the types, not copied to every property; the
+    # ancestor's constraint folds into the descendant (no value type inheritance).
+    owned = {(r.owner_id, r.expression) for r in result.model.rules}
+    assert owned == {
+        (types["Money"].id, "Money >= 0"),
+        (types["Positive"].id, "Positive >= 0"),
+        (types["Positive"].id, "Positive > 0"),
     }
-    assert len({r.id for r in result.model.rules}) == 3
+    assert all(str(r.owner_kind) == "value_type" for r in result.model.rules)
+    assert issues(result, "RT-24")
 
 
 def test_nary_many_to_one_uses_all_determining_roles_and_direct_business_identifiers():
@@ -242,14 +252,12 @@ def test_nary_many_to_one_uses_all_determining_roles_and_direct_business_identif
         )
     )
     result = run(data)
-    intermediate = next(
-        o for o in result.model.object_types if o.technical_name == "warehouse_route"
-    )
+    intermediate = next(o for o in result.model.object_types if o.name == "warehouse_route")
     props = [p for p in result.model.properties if p.owner_type_id == intermediate.id]
     assert len(props) == 3
     assert len([p for p in props if p.identifier]) == 2
     assert all(p.required for p in props)
-    assert not next(p for p in props if p.technical_name == "days").identifier
+    assert not next(p for p in props if p.name == "days").identifier
     links = [
         link for link in result.model.link_types if link.source_type_id == intermediate.id
     ]
@@ -286,12 +294,12 @@ def test_last_role_without_identity_does_not_destroy_determining_tuple_key():
         entity("department"),
     )
     result = run(data)
-    obj = next(o for o in result.model.object_types if o.technical_name == "doctor_shift")
+    obj = next(o for o in result.model.object_types if o.name == "doctor_shift")
     assert len(DraftIndex(result.model).identifier(obj.id)) == 2
     assert issues(result, "RT-28", "error")
     data["ontology"][0].pop("identify_by")
     result = run(data)
-    obj = next(o for o in result.model.object_types if o.technical_name == "doctor_shift")
+    obj = next(o for o in result.model.object_types if o.name == "doctor_shift")
     assert not DraftIndex(result.model).identifier(obj.id)
 
 
@@ -340,7 +348,7 @@ def test_legacy_extension_is_not_read_and_core_extension_restores_presentation_o
         "title_properties": {"customer": "code"},
     }
     result = run(data)
-    assert result.model.object_types[0].name == "客户"
+    assert result.model.object_types[0].display_name == "客户"
     assert result.model.properties[0].required
     assert result.model.object_types[0].title_property_id == result.model.properties[0].id
 
@@ -359,7 +367,7 @@ def test_local_schema_error_does_not_drop_unrelated_valid_definition():
         )
     )
     assert len(result.model.object_types) == 2
-    assert [p.technical_name for p in result.model.properties] == ["code"]
+    assert [p.name for p in result.model.properties] == ["code"]
     assert result.report.counts["error"] >= 1
 
 
@@ -387,7 +395,10 @@ def test_dataset_names_are_scoped_not_merged_and_query_sources_are_not_table_nam
     assert len({d.name for d in result.model.datasets}) == 2
     second["semantic_model"]["datasets"][0]["source"] = "SELECT * FROM fiction_sales"
     result = run(document(entity("customer"), ontology_mappings=[raw, second]))
-    assert len(result.model.datasets) == 1 and issues(result, "RT-63", "error")
+    # A query source becomes an expression dataset instead of a fake table name (DS-02).
+    query = [d for d in result.model.datasets if d.source_kind == "query"]
+    assert len(result.model.datasets) == 2 and len(query) == 1
+    assert query[0].table_name is None and query[0].query_sql == "SELECT * FROM fiction_sales"
 
 
 def mapped_concept(name, source, children=()):
@@ -597,7 +608,7 @@ def test_cross_dataset_and_query_scope_metrics_do_not_enter_core(formula):
             [("unsupported", formula), ("valid", "SUM(sales.amount)")], second=True
         )
     )
-    assert [m.technical_name for m in result.model.metrics] == ["valid"]
+    assert [m.name for m in result.model.metrics] == ["valid"]
     issue = issues(result, "RT-69", "error")[0]
     assert issue.completion_status == "available" and not issue.target_element_ids
     assert formula in issue.original
@@ -704,7 +715,7 @@ def test_composite_direct_join_reorders_source_columns_to_target_key():
     result = run(document(order, customer, ontology_mappings=[mapping]))
     link = result.model.link_types[0]
     assert link.data_join is not None and link.data_join.kind == "direct"
-    index = {p.id: p.technical_name for p in result.model.properties}
+    index = {p.id: p.name for p in result.model.properties}
     assert [index[i] for i in link.data_join.source_property_ids] == [
         "tenant_ref",
         "customer_ref",
@@ -839,8 +850,8 @@ def test_deterministic_names_and_ids_use_original_source_scope():
     first = run(data)
     second = run(data)
     assert first.model == second.model and first.report == second.report
-    assert first.model.object_types[0].technical_name == "sales_order"
-    assert first.model.properties[0].technical_name == "order_code"
+    assert first.model.object_types[0].name == "sales_order"
+    assert first.model.properties[0].name == "order_code"
     assert issues(first, "RT-12", "converted")
     changed = copy.deepcopy(data)
     changed["description"] = "另一个输入身份"
@@ -886,9 +897,7 @@ def test_nary_rule_binds_each_role_to_generated_properties_without_touching_lite
         entity("part", identify_by=["code"], relationships=[rel("code", "String")]),
     )
     result = run(data)
-    obj = next(
-        o for o in result.model.object_types if o.technical_name == "supplier_supply"
-    )
+    obj = next(o for o in result.model.object_types if o.name == "supplier_supply")
     rule = next(r for r in result.model.rules if r.owner_id == obj.id)
     assert "supplier_supply.quantity > 0" in rule.expression
     assert "'supplier.code'" in rule.expression
@@ -968,8 +977,8 @@ def test_oversized_definition_is_local_error_with_valid_dependencies_retained():
         ),
     )
     result = run(data)
-    assert [o.technical_name for o in result.model.object_types] == ["valid"]
-    assert [p.technical_name for p in result.model.properties] == ["code"]
+    assert [o.name for o in result.model.object_types] == ["valid"]
+    assert [p.name for p in result.model.properties] == ["code"]
     assert result.report.counts["error"] == 2
 
 
@@ -1033,14 +1042,14 @@ def test_unique_non_primary_property_can_be_a_direct_join_target():
         }
     ]
     result = run(document(customer, order, ontology_mappings=[mapping]))
-    email = next(p for p in result.model.properties if p.technical_name == "email")
+    email = next(p for p in result.model.properties if p.name == "email")
     assert email.unique and not email.identifier
     join = result.model.link_types[0].data_join
     assert join is not None and join.kind == "direct"
     assert join.target_property_ids == [email.id]
     customers["unique_keys"] = [["code", "email"]]
     result = run(document(customer, order, ontology_mappings=[mapping]))
-    email = next(p for p in result.model.properties if p.technical_name == "email")
+    email = next(p for p in result.model.properties if p.name == "email")
     assert not email.unique
     assert result.model.link_types[0].data_join is None
 
@@ -1138,7 +1147,7 @@ def test_duplicate_metric_names_drop_both_definitions_and_keep_independent_metri
             ]
         )
     )
-    assert [m.technical_name for m in result.model.metrics] == ["valid"]
+    assert [m.name for m in result.model.metrics] == ["valid"]
     assert (
         len(
             [

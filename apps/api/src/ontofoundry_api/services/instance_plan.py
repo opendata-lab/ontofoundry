@@ -7,9 +7,7 @@ from decimal import Decimal, InvalidOperation
 from uuid import UUID
 
 from sqlalchemy import (
-    MetaData,
     String,
-    Table,
     and_,
     cast,
     exists,
@@ -238,22 +236,20 @@ class InstancePlan:
                 self.from_clause = self.from_clause.outerjoin(table, match)
         self.fields = {}
         for prop in self.index.effective_properties(self.type_id):
-            binding = self.binding.fields.get(prop.technical_name)
+            binding = self.binding.fields.get(prop.name)
             if isinstance(binding, ColumnBinding):
                 table = self.tables.get(binding.source_id)
                 if table is None or binding.column not in table.c:
                     fail("属性绑定列不存在", "JOIN_COLUMN_NOT_FOUND")
-                self.fields[prop.technical_name] = self.source_value(
+                self.fields[prop.name] = self.source_value(
                     binding.source_id, binding.column
                 )
             elif binding:
                 mapping = next(
-                    m
-                    for m in reversed(self.binding.mappings)
-                    if prop.technical_name in m.fields
+                    m for m in reversed(self.binding.mappings) if prop.name in m.fields
                 )
                 resolved = resolve_field_expression(draft, mapping, binding.expression)
-                self.fields[prop.technical_name] = self.compile_expression(resolved)
+                self.fields[prop.name] = self.compile_expression(resolved)
         for ancestor in reversed(self.index.lineage(self.type_id)):
             obj = self.index.objects[ancestor]
             mapping = next(
@@ -293,11 +289,10 @@ class InstancePlan:
         source = resolve_dataset(self.db, self.workspace_id, dataset)
         if source.connection.id != self.connection_id:
             fail("对象来源跨连接，不能执行 JOIN")
-        schema = source.schema
-        if self.connection.dialect.name in {"mysql", "sqlite"}:
-            schema = None if self.connection.dialect.name == "sqlite" else schema
-        table = Table(
-            dataset.table_name, MetaData(), schema=schema, autoload_with=self.connection
+        from ontofoundry_api.services.dataset_sources import dataset_relation
+
+        table = dataset_relation(
+            self.db, self.workspace_id, dataset, self.connection, alias, source=source
         )
         if dataset.snapshot_date_column:
             if dataset.snapshot_date_column not in table.c:
@@ -314,8 +309,6 @@ class InstancePlan:
                 }
             )
             table = select(table).where(column == chosen).subquery(alias)
-        else:
-            table = table.alias(alias)
         return table
 
     def source_value(self, source_id, column):
@@ -336,9 +329,9 @@ class InstancePlan:
             if property_id is None:
                 return True
             prop = self.index.properties[property_id]
-            if prop.technical_name not in self.fields:
+            if prop.name not in self.fields:
                 fail("成员属性未绑定")
-            return self.fields[prop.technical_name]
+            return self.fields[prop.name]
         link_id, direction = links[0]
         link = self.index.links[link_id]
         forward = direction == "forward"
@@ -394,9 +387,9 @@ class InstancePlan:
     def path_condition(self, path, operator, values):
         if not path.links:
             prop = self.index.properties[path.property_id]
-            if prop.technical_name not in self.fields:
+            if prop.name not in self.fields:
                 fail("成员条件属性尚未绑定")
-            return condition(self.fields[prop.technical_name], operator, values)
+            return condition(self.fields[prop.name], operator, values)
         step = path.links[0]
         link = self.index.links[step.link_type_id]
         forward = step.direction == "forward"
@@ -433,9 +426,9 @@ def relation_match(source, target, join, forward=True):
         result = []
         for pid in ids:
             prop = plan.index.properties[pid]
-            if prop.technical_name not in plan.fields:
+            if prop.name not in plan.fields:
                 fail("关系属性尚未绑定")
-            result.append(plan.fields[prop.technical_name])
+            result.append(plan.fields[prop.name])
         return result
 
     if isinstance(join, DirectJoin):

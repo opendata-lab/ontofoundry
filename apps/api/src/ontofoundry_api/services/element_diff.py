@@ -53,8 +53,8 @@ def element_label(kind, element, snapshot_elements):
         return " → ".join(labels)
     if kind == "mapping":
         owner = snapshot_elements.get(str(element.get("type_id")), ("", {}))[1]
-        return str(owner.get("name") or element.get("id"))
-    return str(element.get("name") or element.get("technical_name") or element.get("id"))
+        return str(owner.get("display_name") or owner.get("name") or element.get("id"))
+    return str(element.get("display_name") or element.get("name") or element.get("id"))
 
 
 def owner_label(
@@ -70,7 +70,7 @@ def owner_label(
     if owner is None:
         return None
     found = elements.get(str(owner))
-    return str(found[1].get("name") or found[1].get("technical_name")) if found else None
+    return str(found[1].get("display_name") or found[1].get("name")) if found else None
 
 
 def field_changes(before: dict, after: dict) -> list[dict[str, Any]]:

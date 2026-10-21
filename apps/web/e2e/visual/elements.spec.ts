@@ -23,7 +23,10 @@ test.beforeEach(async ({ page }) => {
 test("object overview aligns key values and the relation graph", async ({ page }) => {
   const detail = await openElement(page, "object_type", ELEMENTS.object.id);
   await expect(detail.getByText("标题属性", { exact: true })).toBeVisible();
-  await expect(detail.locator('[role=tab][aria-selected]')).toHaveCount(5);
+  await expect(detail.locator('[role=tab][aria-selected]')).toHaveCount(4);
+  await expect(detail.getByRole("tab", { name: "实例", exact: true })).toHaveCount(0);
+  await expect(detail.getByRole("heading", { name: "数据来源", exact: true })).toHaveCount(0);
+  await expect(detail.getByRole("region", { name: "实体实例", exact: true })).toHaveCount(0);
   await expect(page).toHaveScreenshot("element-object-overview.png", { fullPage: true });
 });
 
@@ -36,9 +39,20 @@ test("object properties show inherited definitions and shared mapping sources", 
 
 test("object property editing keeps compact inputs and header save actions", async ({ page }) => {
   const detail = await openElement(page, "object_type", ELEMENTS.object.id, "properties", true);
-  await detail.getByRole("row").filter({ has: page.getByText("身份证号", { exact: true }) }).click();
-  await expect(detail.getByRole("textbox", { name: "属性名称", exact: true })).toBeEnabled();
+  const editableNames = detail.getByRole("textbox", { name: "属性名称", exact: true });
+  await expect(editableNames.first()).toBeEnabled();
+  await expect(detail.getByRole("columnheader", { name: "数据绑定", exact: true })).toBeVisible();
+  await expect(detail.getByRole("region", { name: "选中属性配置", exact: true })).toHaveCount(0);
   await expect(detail.getByRole("button", { name: "保存", exact: true })).toBeDisabled();
+  const source = await detail.locator(".source-fields-source").boundingBox();
+  const fields = await detail.locator(".source-fields-layout > section").last().boundingBox();
+  const instances = await detail.getByRole("region", { name: "实体实例", exact: true }).boundingBox();
+  expect(source!.x + source!.width).toBeLessThan(fields!.x);
+  expect(instances!.y).toBeGreaterThanOrEqual(Math.max(source!.y + source!.height, fields!.y + fields!.height));
+  for (const selector of await detail.locator(".source-fields-source .ant-select").all()) {
+    const box = await selector.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(source!.x + source!.width);
+  }
   await expect(page).toHaveScreenshot("element-object-properties-edit.png", { fullPage: true });
 });
 
@@ -59,7 +73,7 @@ test("relation binding editor aligns each pair of endpoint properties", async ({
 
 test("metric form displays aggregation and condition rows", async ({ page }) => {
   const detail = await openElement(page, "metric", ELEMENTS.metric.id, "basic", true);
-  await expect(detail.getByRole("textbox", { name: "指标名称", exact: true })).toHaveValue(ELEMENTS.metric.name);
+  await expect(detail.getByRole("textbox", { name: "指标名称", exact: true })).toHaveValue(ELEMENTS.metric.display_name ?? "");
   await expect(detail.getByRole("textbox", { name: "条件 1 的值", exact: true })).toHaveValue("VIP");
   await expect(page).toHaveScreenshot("element-metric-form.png", { fullPage: true });
 });
@@ -72,11 +86,20 @@ test("metric preview displays its value and parameterized query", async ({ page 
   await expect(page).toHaveScreenshot("element-metric-preview.png", { fullPage: true });
 });
 
-test("dataset overview shows registered columns and the snapshot date", async ({ page }) => {
+test("dataset overview shows source, connection and snapshot date", async ({ page }) => {
   const detail = await openElement(page, "dataset", ELEMENTS.dataset.id);
-  await expect(detail.getByText("每日快照（stat_date）", { exact: true })).toBeVisible();
-  await expect(detail.getByRole("columnheader", { name: "物理类型", exact: true })).toBeVisible();
+  await expect(detail.getByText("快照日期列", { exact: true })).toBeVisible();
+  await expect(detail.getByText("stat_date", { exact: true })).toBeVisible();
   await expect(page).toHaveScreenshot("element-dataset.png", { fullPage: true });
+});
+
+test("dataset fields place source and columns above the data preview", async ({ page }) => {
+  const detail = await openElement(page, "dataset", ELEMENTS.dataset.id, "fields");
+  await expect(detail.getByRole("tab", { name: "字段", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(detail.getByRole("heading", { name: "来源定义", exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "字段结构", exact: true })).toBeVisible();
+  await expect(detail.getByRole("heading", { name: "数据预览", exact: true })).toBeVisible();
+  await expect(page).toHaveScreenshot("element-dataset-fields.png", { fullPage: true });
 });
 
 test("derived member conditions align field, operator and value", async ({ page }) => {
@@ -86,8 +109,10 @@ test("derived member conditions align field, operator and value", async ({ page 
   await expect(page).toHaveScreenshot("element-derived-conditions.png", { fullPage: true });
 });
 
-test("instances tab displays document facts and an expanded detail section", async ({ page }) => {
+test("legacy instances links open the fields page facts and an expanded detail section", async ({ page }) => {
   const detail = await openElement(page, "object_type", ELEMENTS.object.id, "instances");
+  await expect(detail.getByRole("tab", { name: /字段/ })).toHaveAttribute("aria-selected", "true");
+  await expect(detail.getByRole("region", { name: "实体实例", exact: true })).toBeInViewport();
   await detail.getByRole("button", { name: "张三", exact: true }).click();
   await expect(detail.getByRole("heading", { name: "来源证据", exact: true })).toBeVisible();
   await expect(detail.getByRole("button", { name: "收起", exact: true })).toBeVisible();

@@ -25,7 +25,7 @@ from ontofoundry_api.domain.validation import validate_core_graph
 
 
 def obj(draft, name):
-    return next(o for o in draft.object_types if o.technical_name == name)
+    return next(o for o in draft.object_types if o.name == name)
 
 
 def dataset(draft, name):
@@ -38,9 +38,10 @@ def test_design_examples_are_valid_core_graphs(name):
     assert validate_core_graph(draft) is draft
 
 
-def test_empty_draft_has_nine_collections():
+def test_empty_draft_has_ten_collections():
     draft = empty_draft(uuid4())
-    assert len(draft.model_dump()) == 11
+    # schema_version, workspace_id and ten element collections (value_types last).
+    assert len(draft.model_dump()) == 12
     assert validate_core_graph(draft)
 
 
@@ -85,8 +86,8 @@ def test_count_is_rows_not_nullable_column_count():
         (
             lambda d: setattr(
                 d.object_types[1],
-                "technical_name",
-                d.object_types[0].technical_name.upper(),
+                "name",
+                d.object_types[0].name.upper(),
             ),
             "英文标识",
         ),
@@ -127,7 +128,7 @@ def test_properties_and_outgoing_links_share_namespace():
     draft = example_draft("01-basic-sales")
     link = draft.link_types[0]
     prop = next(p for p in draft.properties if p.owner_type_id == link.source_type_id)
-    link.name = prop.technical_name
+    link.name = prop.name
     with pytest.raises(ValueError, match="共享命名空间"):
         validate_core_graph(draft)
 
@@ -279,8 +280,8 @@ def test_sum_text_and_ratio_cross_dataset_are_invalid():
     )
     other_count = SimpleMetric(
         id=uuid4(),
-        name="客户数",
-        technical_name="customer_count",
+        display_name="客户数",
+        name="customer_count",
         kind="simple",
         dataset_id=other_dataset.id,
         aggregation="count",
@@ -317,18 +318,18 @@ def test_twenty_sources_and_main_not_first():
 
 def test_multilevel_membership_and_typed_scalar_path():
     draft = empty_draft(uuid4())
-    parent = ObjectType(id=uuid4(), name="客户", technical_name="customer")
+    parent = ObjectType(id=uuid4(), display_name="客户", name="customer")
     prop = Property(
         id=uuid4(),
         owner_type_id=parent.id,
-        name="年龄",
-        technical_name="age",
+        display_name="年龄",
+        name="age",
         value_kind="integer",
     )
     adult = ObjectType(
         id=uuid4(),
-        name="成年客户",
-        technical_name="adult",
+        display_name="成年客户",
+        name="adult",
         extends=parent.id,
         derived_by=[
             DerivedSimple(
@@ -343,8 +344,8 @@ def test_multilevel_membership_and_typed_scalar_path():
     )
     local = ObjectType(
         id=uuid4(),
-        name="本地成年客户",
-        technical_name="local_adult",
+        display_name="本地成年客户",
+        name="local_adult",
         extends=adult.id,
         derived_by=[{"kind": "expression", "expression": "adult.age < 65"}],
     )
@@ -359,8 +360,8 @@ def test_virtual_sources_stop_at_first_bound_descendant():
     device = obj(draft, "device")
     subtype = ObjectType(
         id=uuid4(),
-        name="在用设备",
-        technical_name="active_device",
+        display_name="在用设备",
+        name="active_device",
         extends=device.id,
         derived_by=[{"kind": "expression", "expression": "device.device_no IS NOT NULL"}],
     )

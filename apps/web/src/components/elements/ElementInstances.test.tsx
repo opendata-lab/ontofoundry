@@ -52,7 +52,7 @@ const props = { editing: false, canEdit: true, sessionId: null, change: vi.fn(),
 describe("instances tab", () => {
   it("lists document facts by display text and shows evidence and related facts", async () => {
     const draft = example("07-instances-and-evidence");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     renderWithProviders(<ElementInstances {...props} draft={draft} type={customer} />);
     fireEvent.click(screen.getByRole("button", { name: "C001" }));
     const detail = screen.getByRole("region", { name: "C001的实例详情" });
@@ -62,7 +62,7 @@ describe("instances tab", () => {
 
   it("browses database rows through a temporary mapping preview with typed keys when sessionId is present", async () => {
     const draft = example("01-basic-sales");
-    const customer = draft.object_types.find((o) => o.technical_name === "customer")!;
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
     const preview: MappingPreview = {
       items: [
         {
@@ -109,9 +109,9 @@ describe("instances tab", () => {
 
   it("browses published database instances and virtual parent union via instancesApi.list and neighborhood when sessionId is empty", async () => {
     const draft = example("06-inheritance");
-    const asset = draft.object_types.find((o) => o.technical_name === "asset")!;
-    const device = draft.object_types.find((o) => o.technical_name === "device")!;
-    const vehicle = draft.object_types.find((o) => o.technical_name === "vehicle")!;
+    const asset = draft.object_types.find((o) => o.name === "asset")!;
+    const device = draft.object_types.find((o) => o.name === "device")!;
+    const vehicle = draft.object_types.find((o) => o.name === "vehicle")!;
     const page1: InstanceList = envelope({
       items: [
         {
@@ -187,8 +187,8 @@ describe("instances tab", () => {
   it("allows non-member readers to browse published database instances and detail on InstancesPage", async () => {
     const fullDraft = example("06-inheritance");
     const presentationDraft = { ...fullDraft, datasets: [], mappings: [] };
-    const asset = fullDraft.object_types.find((o) => o.technical_name === "asset")!;
-    const device = fullDraft.object_types.find((o) => o.technical_name === "device")!;
+    const asset = fullDraft.object_types.find((o) => o.name === "asset")!;
+    const device = fullDraft.object_types.find((o) => o.name === "device")!;
     const workspace = { id: "w", name: "测试空间", role: null, version_id: "v1", current_version: 1 } as Workspace;
     vi.mocked(api.presentation).mockResolvedValue({ model: presentationDraft, version: { id: "v1" } as never });
     vi.mocked(instancesApi.list).mockResolvedValue(envelope({

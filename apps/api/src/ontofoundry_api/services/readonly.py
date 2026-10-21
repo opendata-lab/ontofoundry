@@ -29,11 +29,12 @@ def connect_readonly(item, settings, *, timeout_ms=None):
         engine = create_engine(
             URL.create(
                 driver,
-                username=config["username"],
+                # Incomplete settings fail as a connection error, not a server crash.
+                username=config.get("username"),
                 password=password,
-                host=config["host"],
-                port=config["port"],
-                database=config["database"],
+                host=config.get("host"),
+                port=config.get("port"),
+                database=config.get("database"),
             ),
             connect_args=args,
             pool_pre_ping=False,

@@ -13,6 +13,7 @@ from .ids import source_id
 class Translation:
     def __init__(self, source, report, invalid_paths=()):
         self.invalid_paths = set(invalid_paths)
+        self.extension_source = None
         self.source = source
         self.report = report
         self.model = CoreDraft(workspace_id=report.workspace_id)
@@ -20,6 +21,7 @@ class Translation:
         self.members = {}
         self.object_paths = {}
         self.property_sources = {}
+        self.used_field_synonyms = set()
         self.names = {}
         self.relationship_candidates = {}
         self.ambiguous_links = set()
@@ -42,13 +44,26 @@ class Translation:
         completion=False,
         severity=None,
     ):
+        source = self.source
+        pointer = path
+        if path.startswith("/ontofoundry-extension.json"):
+            source = self.extension_source
+            pointer = path.removeprefix("/ontofoundry-extension.json")
+            # Sidecar locations must never become evidence in the Ossie material.
+            locator = {
+                "file": "ontofoundry-extension.json",
+                "sha256": source.sha256,
+                "json_pointer": pointer,
+            }
+        else:
+            locator = source.locator(pointer)
         return self.report.add(
             outcome=outcome,
             construct=construct,
             source_path=path,
             rule_id=rule,
-            locator=self.source.locator(path),
-            original=self.source.original(path),
+            locator=locator,
+            original=source.original(pointer),
             message=message,
             targets=targets,
             completion=completion,

@@ -86,8 +86,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
   "object_types": [
     {
       "id": "00000000-0000-4000-8000-000000001002",
-      "name": "订单",
-      "technical_name": "sales_order",
+      "display_name": "订单",
+      "name": "sales_order",
       "description": "客户的一次下单\n\n采用指标时保留其固定过滤；完成率的已完成条件仅作用于分子。",
       "synonyms": [
         "销售单"
@@ -105,8 +105,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
     {
       "id": "00000000-0000-4000-8000-000000002011",
       "owner_type_id": "00000000-0000-4000-8000-000000001002",
-      "name": "订单号",
-      "technical_name": "order_no",
+      "display_name": "订单号",
+      "name": "order_no",
       "description": "",
       "value_kind": "string",
       "required": true,
@@ -118,8 +118,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
     {
       "id": "00000000-0000-4000-8000-000000002012",
       "owner_type_id": "00000000-0000-4000-8000-000000001002",
-      "name": "金额",
-      "technical_name": "amount",
+      "display_name": "金额",
+      "name": "amount",
       "description": "含税金额，单位元",
       "value_kind": "decimal",
       "required": true,
@@ -134,8 +134,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
     {
       "id": "00000000-0000-4000-8000-000000002013",
       "owner_type_id": "00000000-0000-4000-8000-000000001002",
-      "name": "状态",
-      "technical_name": "status",
+      "display_name": "状态",
+      "name": "status",
       "description": "",
       "value_kind": "string",
       "required": false,
@@ -147,8 +147,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
     {
       "id": "00000000-0000-4000-8000-000000002014",
       "owner_type_id": "00000000-0000-4000-8000-000000001002",
-      "name": "下单时间",
-      "technical_name": "ordered_at",
+      "display_name": "下单时间",
+      "name": "ordered_at",
       "description": "",
       "value_kind": "datetime",
       "required": false,
@@ -163,8 +163,8 @@ Ossie 是语义基准，尽量无损保留；首版未承载能力集中见[主�
   "metrics": [
     {
       "id": "00000000-0000-4000-8000-000000006001",
-      "name": "订单金额",
-      "technical_name": "order_amount",
+      "display_name": "订单金额",
+      "name": "order_amount",
       "description": "",
       "synonyms": [
         "销售额",
@@ -299,7 +299,7 @@ FROM dw.orders AS o;
 
 主设计文档是字段与行为的规范来源。这组概念页不新增持久化字段、查询执行器或外部产品兼容承诺。JSON 展示字段结构与合法引用方式；静态例子不代表 core-1 schema、适配器或 UI 已实现。
 
-技术名采用字母或下划线开头的 ASCII 标识符，允许 SQL 保留字，由 agent 在物理 SQL 中正确引用；对象技术名在工作空间内忽略大小写唯一。属性和关系共享所属对象的命名空间。改技术名按 id 依赖更新路径，不能全局替换字符串。
+英文标识采用字母或下划线开头的 ASCII 标识符，允许 SQL 保留字，由 agent 在物理 SQL 中正确引用；对象英文标识在工作空间内忽略大小写唯一。属性和关系共享所属对象的命名空间。改英文标识按 id 依赖更新路径，不能全局替换字符串。
 
 平台校验声明、依赖与结构，不扫描数据库证明实例覆盖、唯一性或关联基数。权限同时作用于定义投影、物理来源、数量、证据与缓存；数据集登记不能绕过映射读取权限。
 
@@ -314,3 +314,5 @@ FROM dw.orders AS o;
 | 继承 | [Interface](https://www.palantir.com/docs/foundry/interfaces/interface-overview) 是抽象接口，不等于具体对象单父继承。 | [单父继承](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-inheritance)不继承普通关系与绑定。 | extends 支持更宽表达；本平台只保留单父。 |
 | 指标 | [对象集合聚合](https://www.palantir.com/docs/foundry/api/ontology-resources/objects/aggregate)；本体没有同构可复用指标定义。 | [定义协议](https://learn.microsoft.com/en-us/rest/api/fabric/articles/item-management/definitions/ontology-definition)为顶层 model.metrics[]，[操作页](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics)按 measure 所在表对应实体展示。 | [开放语义交换规范 OSI（Open Semantic Interchange）中的指标 Metric，用于交换计算定义](https://github.com/apache/ossie/blob/main/core-spec/spec.yaml)保存表达式。 |
 | 规则 | [Submission criteria](https://www.palantir.com/docs/foundry/action-types/submission-criteria)有执行语义；与本平台只保存的规则不同。 | [业务规则](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-rules)为自然语言上下文。 | requires / derived_by 挂在概念或关系；不支持的语义按例外表报告。 |
+
+- [值类型](value-types.md)：属性共用的值域（基础类型 + 约束）。

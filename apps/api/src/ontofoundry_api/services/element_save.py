@@ -30,7 +30,12 @@ def element_scope(draft, kind, element_id):
         scope["mappings"] = {
             m["id"] for m in draft["mappings"] if m["type_id"] == element_id
         }
-    owners = {kind: {element_id}, "property": scope["properties"]}
+    if kind == "value_type":
+        # A base-kind change revises every referencing property (VT-09/VT-14).
+        scope["properties"] = {
+            p["id"] for p in draft["properties"] if p.get("value_type_id") == element_id
+        }
+    owners = {kind: {element_id}, "property": scope["properties"] if kind != "value_type" else set()}
     scope["rules"] = {
         r["id"]
         for r in draft["rules"]
@@ -49,6 +54,19 @@ def _scope_error():
 
 def _check_member_boundaries(before, after, kind, element_id):
     start, end = [element_scope(s, kind, element_id) for s in (before, after)]
+    if kind == "value_type":
+        # Only the inherited base kind of referencing properties may change.
+        def without_kind(prop):
+            return {k: v for k, v in prop.items() if k != "value_kind"}
+
+        old = {p["id"]: p for p in before["properties"]}
+        for prop in after["properties"]:
+            if (
+                prop["id"] in end["properties"]
+                and prop["id"] in old
+                and without_kind(prop) != without_kind(old[prop["id"]])
+            ):
+                _scope_error()
     # Existing members may be deleted, but cannot cross aggregate boundaries.
     for collection in COLLECTIONS.values():
         existing = {e["id"] for e in before[collection]} & {

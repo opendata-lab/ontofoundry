@@ -1,0 +1,42 @@
+{
+  "run": {
+    "schema_version": "ontofoundry.proposals/v1",
+    "run_token": "example",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "session_id": "44444444-4444-4444-8444-444444444444",
+    "base_version_id": null,
+    "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
+    "source_session_revision": 1,
+    "source_draft_sha256": "d9d034c591786dac12d507c443bce8256f1ca868b863e9ca9bbf2c0a7296498d"
+  },
+  "draft": {
+    "schema_version": "core-1",
+    "workspace_id": "22222222-2222-4222-8222-222222222222",
+    "object_types": [
+      {
+        "id": "d62f46a9-708c-5b8b-9499-8334a06bacea",
+        "name": "staff",
+        "display_name": "云帆员工",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": []
+      }
+    ],
+    "properties": [],
+    "link_types": [],
+    "rules": [],
+    "metrics": [],
+    "datasets": [],
+    "mappings": [],
+    "material_objects": [],
+    "material_links": [],
+    "value_types": []
+  },
+  "element_hashes": {
+    "d62f46a9-708c-5b8b-9499-8334a06bacea": "63b7b4ff4a6e119a67dd4dc1a07016be046ae65e78c073ad6c08f4539c8755a3"
+  }
+}

@@ -55,7 +55,7 @@ export type ObjectMapping = {
   label: string;
 };
 
-export const shortObjectName = (object: { name: string }) => object.name.split(/[；。]/)[0];
+export const shortObjectName = (object: { name: string; display_name?: string | null }) => (object.display_name || object.name).split(/[；。]/)[0];
 
 /** Registered column names of a dataset; [] when no column list was provided. */
 export function sourceColumns(dataset: Dataset | undefined): string[] {
@@ -78,7 +78,7 @@ export function objectMapping(draft: Draft, object: ObjectType): ObjectMapping {
   const properties = effectiveProperties(draft, object.id).map(({ definition, inheritedFrom }) => ({
     property: definition,
     inheritedFrom,
-    ...bindingFor(draft, object.id, definition.technical_name),
+    ...bindingFor(draft, object.id, definition.name),
   }));
   const relations = effectiveLinks(draft, object.id, true).map(({ definition, direction, inheritedFrom }) => {
     const local = inheritedFrom ? mapping?.inherited_link_bindings[definition.id] : undefined;

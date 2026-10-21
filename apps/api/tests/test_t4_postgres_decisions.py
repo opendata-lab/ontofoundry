@@ -104,14 +104,14 @@ def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
     draft = after["draft"]
     assert (
         sum(
-            t["id"] == po["target_id"] and t["technical_name"] == "purchase_order"
+            t["id"] == po["target_id"] and t["name"] == "purchase_order"
             for t in draft["object_types"]
         )
         == 1
     )
     assert (
         sum(
-            p["owner_type_id"] == po["target_id"] and p["technical_name"] == "order_no"
+            p["owner_type_id"] == po["target_id"] and p["name"] == "order_no"
             for p in draft["properties"]
         )
         == 1
@@ -120,7 +120,7 @@ def test_a_three_level_group_is_accepted_atomically_under_a_race(pg_client):
         sum(
             item["id"] == prop["target_id"]
             and item["owner_type_id"] == po["target_id"]
-            and item["technical_name"] == "order_no"
+            and item["name"] == "order_no"
             for item in draft["properties"]
         )
         == 1

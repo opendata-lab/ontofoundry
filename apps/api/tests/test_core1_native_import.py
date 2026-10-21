@@ -30,9 +30,9 @@ def test_all_thirteen_examples_preserve_every_definition_and_identity(path):
     for collection in COLLECTIONS:
         actual = getattr(result.model, collection)
         assert [str(e.id) for e in actual] == [
-            e["id"] for e in original["draft"][collection]
+            e["id"] for e in original["draft"].get(collection, [])
         ]
-        for element, source in zip(actual, original["draft"][collection], strict=True):
+        for element, source in zip(actual, original["draft"].get(collection, []), strict=True):
             got = element.model_dump(mode="json")
             expected = dict(source)
             if "evidence" in expected:

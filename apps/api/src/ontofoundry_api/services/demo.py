@@ -5,6 +5,9 @@ from uuid import UUID, uuid5
 from ontofoundry_api.domain.models import OntologyDraft
 
 DEMO_WORKSPACE_ID = UUID("10000000-0000-4000-8000-000000000001")
+# The demo dataset is bound to a registered fictional table so it is a valid source.
+DEMO_CONNECTION_ID = "10000000-0000-4000-8000-0000000000c1"
+DEMO_TABLE = {"name": "fictional_sales", "schema": "public", "kind": "table", "columns": [{"name": "amount", "type": "numeric", "comment": "金额"}]}
 
 
 def build_demo_draft():
@@ -18,11 +21,11 @@ def build_demo_draft():
             "object_types": [
                 {
                     "id": identity("customer"),
-                    "name": "客户",
-                    "technical_name": "customer",
+                    "display_name": "客户",
+                    "name": "customer",
                     "title_property_id": identity("customer_label"),
                 },
-                {"id": identity("order"), "name": "订单", "technical_name": "order"},
+                {"id": identity("order"), "display_name": "订单", "name": "order"},
             ],
             "link_types": [
                 {
@@ -39,15 +42,15 @@ def build_demo_draft():
                 {
                     "id": identity("customer_label"),
                     "owner_type_id": identity("customer"),
-                    "name": "名称",
-                    "technical_name": "label",
+                    "display_name": "名称",
+                    "name": "label",
                     "value_kind": "string",
                 },
                 {
                     "id": identity("order_label"),
                     "owner_type_id": identity("order"),
-                    "name": "订单号",
-                    "technical_name": "order_no",
+                    "display_name": "订单号",
+                    "name": "order_no",
                     "value_kind": "string",
                 },
             ],
@@ -55,6 +58,8 @@ def build_demo_draft():
                 {
                     "id": identity("sales"),
                     "name": "sales",
+                    "display_name": "销售",
+                    "connection_id": DEMO_CONNECTION_ID,
                     "table_name": "fictional_sales",
                     "dialect": "postgresql",
                     "columns": [{"name": "amount", "physical_type": "numeric"}],
@@ -64,8 +69,8 @@ def build_demo_draft():
                 {
                     "id": identity("revenue"),
                     "kind": "simple",
-                    "name": "销售额",
-                    "technical_name": "revenue",
+                    "display_name": "销售额",
+                    "name": "revenue",
                     "dataset_id": identity("sales"),
                     "aggregation": "sum",
                     "measure": {"dataset_id": identity("sales"), "column": "amount"},

@@ -1,0 +1,1 @@
+[{"operation":"create","target_kind":"dataset","client_ref":"orders_ds","before":null,"after":{"name":"yunfan_order_lines","display_name":"云帆订单明细","table_name":"demo_orders","dialect":"postgres","columns":[{"name":"region","physical_type":"text"},{"name":"order_no","physical_type":"text"},{"name":"member_no","physical_type":"text"}]}}]

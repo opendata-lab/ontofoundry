@@ -55,11 +55,13 @@ class ExportBuilder:
         if target_path is not None:
             self.report.issues[-1] = item.model_copy(update={"target_path": target_path})
 
-    def finish(self, value, filename):
+    def finish(self, value, filename, media_type="application/json"):
         report = self.report.finish(self.model).report
         document = (
             None
             if value is None or any(i.outcome == "error" for i in report.issues)
+            else value
+            if isinstance(value, bytes)
             else json_bytes(value)
         )
         digest = (
@@ -79,7 +81,7 @@ class ExportBuilder:
         )
         return ExportResult(
             document=document,
-            media_type="application/json",
+            media_type=media_type,
             filename=filename,
             report=report,
         )
