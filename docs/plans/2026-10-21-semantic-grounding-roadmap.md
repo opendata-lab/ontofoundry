@@ -22,3 +22,24 @@
 - 不接入 opendataworks Portal MCP 与其血缘（SG-09）。
 - 步骤 2、5 改动 Skill 后，在新会话中做真实验收；DeepSeek 运行前先征得用户同意。
 - 向量召回（pgvector + 内网 embedding 服务）在路线图之后单独排期，以步骤 1 的关键词召回率为基线评估收益。
+
+## 实施状态（2026-10-22）
+
+| 步骤 | 状态 | 提交 |
+|---|---|---|
+| 1 本体检索 | 完成：关键词召回 + 一层扩展 + 规则重排，MCP 与 REST；30 题验收集基线（前 10 召回率 83%，除“叫法不同”外 100%） | eaea849、734bd10 |
+| 2 P0 补缺并拆 Skill | 完成：表结构收据、表分类方法、三个 Skill 与插件包 | 47631a3、c8e898b |
+| 3 实例库分离 | 完成：四张表、实例基线、待发布与放弃会话、两条发布通路检查、固定运行权限、前端实例视图 | 9430210 |
+| 4 P1 对齐审阅 | 完成：可能已有的定义、必填与可空列差异 | af4f5c3 |
+| 5 P2 | 完成：Entity Resolver（MCP 与 REST）、表结构变化影响预览与发起局部建模 | b2e462e、a0aa2c3 |
+
+未执行：真实 DeepSeek 建模与问数验收（用户要求暂缓）；向量召回（单独排期）。
+
+## 上线清单
+
+1. 停止平台服务与在途建模运行，备份平台数据库与材料目录。
+2. 部署新镜像，执行 Alembic 迁移（`20261021_000001` 材料来源、`20261021_000002` 实例库；后者丢弃旧事实并失效旧运行），重启服务。
+3. DataAgent：`make -C integrations/dataagent zip`，用插件包中的 `install.sh` 安装三个技能，重启 DataAgent。
+4. 管理后台：OntoFoundry MCP 服务刷新工具列表（新增 `resolve_entity`）；建模 Agent 挂载 ontology-discovery 与 entity-extraction，问数 Agent 挂载 semantic-grounding，并同步 `agents/*.md` 的系统正文后发布。
+5. 在新会话中做一次建模与一次问数的真实验收（需用户同意 DeepSeek 预算）。
+
