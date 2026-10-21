@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>参考：Fabric IQ 与 Palantir 界面</title>
+<style>
+body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f7fb;color:#20252d;margin:0;padding:32px 48px;max-width:1280px}
+h1{font-size:22px}h2{font-size:18px;margin-top:40px;border-top:1px solid #e3e9f1;padding-top:24px}
+figure{margin:16px 0 28px;background:#fff;border:1px solid #e3e9f1;border-radius:8px;padding:16px}
+img{max-width:100%;display:block;margin:0 auto}figcaption{margin-top:10px;color:#67717e;font-size:14px;line-height:1.6}
+a{color:#0061ef}
+</style></head><body>
+<h1>参考：Microsoft Fabric IQ 本体 与 Palantir Foundry 的界面</h1>
+<p>截图均来自两家官方文档，核查日期 2026-10-16。</p>
+
+<h2>Microsoft Fabric IQ（本体）</h2>
+<figure><img src="/ref/configure.png"><figcaption><b>实体类型配置页</b>：左边是属性表（名称、类型、数据来源），右上是继承关系图（Relationship / Lineage 切换），右下是继承信息（直接父类、祖先数、子类数），左下是描述和同义词。继承只表达"是谁的子类"，<b>没有派生条件</b>，子类型自己绑定数据。<br>来源：<a href="https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-inheritance">Entity Type Inheritance</a></figcaption></figure>
+<figure><img src="/ref/add-entity-type-configuration.png"><figcaption><b>新建实体类型</b>：在"更多配置"里选择要继承的父类型。</figcaption></figure>
+<figure><img src="/ref/canvas-lineage.png"><figcaption><b>画布的继承视图</b>：用连线表示父子类型。</figcaption></figure>
+<figure><img src="/ref/metric-details.png"><figcaption><b>指标详情</b>：来源（语义模型）、表达式（DAX，可展开查看）、适用的实体（Applies to）、描述。<br>来源：<a href="https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-use-metrics">Define Metrics in Ontology</a></figcaption></figure>
+<figure><img src="/ref/metrics-grid.png"><figcaption><b>实体详情里的指标列表</b>：按"指标定义所在的表"推导出来显示。</figcaption></figure>
+
+<h2>Palantir Foundry</h2>
+<figure><img src="/ref/pl-create-object-type-configure-keys-manual.png"><figcaption><b>Ontology Manager 对象类型编辑</b>：左边属性列表（带类型图标、主键星标、标题键书签），右边是选中属性的设置：主键、标题键、基础类型等。<br>来源：<a href="https://www.palantir.com/docs/foundry/object-link-types/create-object-type/">Create an object type</a></figcaption></figure>
+<figure><img src="/ref/pl-create-object-type-add-new-property.png"><figcaption><b>添加属性</b>：从数据源的列映射为属性。</figcaption></figure>
+<figure><img src="/ref/pl-filter_list_configured_pills.png"><figcaption><b>Workshop 筛选列表（胶囊布局）</b>：一排胶囊，每个是一个属性筛选，点开是弹层（直方图 + 起止日期）；"Filter on Flight: Has Flight" 是<b>按关联对象筛选</b>，同样以胶囊出现。多个筛选同时生效（并且）。<br>来源：<a href="https://www.palantir.com/docs/foundry/workshop/widgets-filter-list/">Filter List widget</a></figcaption></figure>
+<figure><img src="/ref/pl-filter_list_configured.png"><figcaption><b>Workshop 筛选列表（纵向布局）</b>：属性筛选从上到下排列，每个属性一个控件（多选、直方图、日期等）。</figcaption></figure>
+<figure><img src="/ref/OE_search_results_general_annotated.png"><figcaption><b>Object Explorer 搜索结果</b>：左侧按对象类型筛选，右侧按对象、对象类型、产物分组。<br>来源：<a href="https://www.palantir.com/docs/foundry/object-explorer/search-objects/">Search for objects</a></figcaption></figure>
+</body></html>

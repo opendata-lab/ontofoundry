@@ -1,0 +1,8 @@
+/* Tailwind without preflight so it does not fight Ant Design's own base styles.
+   Ant Design is put into its own cascade layer through StyleProvider. */
+@layer theme, base, antd, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "../shared/tokens.css";
+
+body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-body); }

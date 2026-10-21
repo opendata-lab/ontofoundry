@@ -1,6 +1,6 @@
 # 语义锚定：原子化 Skill 与场景 Workflow
 
-日期：2026-10-21。状态：待评审。来源：用户 2026-10-21 与 ChatGPT 的讨论（Semantic Grounding Service、semantic-extraction 目录结构）及当日决定。
+日期：2026-10-21。状态：已确认，待实施。来源：用户 2026-10-21 与 ChatGPT 的讨论（Semantic Grounding Service、semantic-extraction 目录结构）及当日决定。
 
 ## 1. 定位
 
@@ -18,10 +18,10 @@
 | SG-01 | 拆为三个独立 Skill：`schema-extraction`、`instance-extraction`、`query-understanding`；每个 Skill 自带输出 Schema，单独打包、单独安装。 | 已确认 |
 | SG-02 | 场景由 Workflow 组合 Skill，不在 Skill 内判断场景；Workflow 落在 DataAgent 已有 Agent 的配置（系统提示词 + 引用的 Skill 列表）与平台的运行类型上，不新建流程引擎。 | 已确认 |
 | SG-03 | 共享匹配能力做成平台 MCP 工具：`search_ontology`、`get_ontology`、`search_objects`、`resolve_entity`。 | 已确认 |
-| SG-04 | 不新增 `submit_proposal` 工具：提案仍由运行结束时的结果文件整批提交，平台整批校验入库（绑定运行标识，避免半途提交与重复提交）。 | 建议，待确认 |
-| SG-05 | `validate_extraction` 不做成 MCP 工具：沿用 Skill 自带的 `check_part.py`、`prepare_result.py` 做本地校验，平台入库再校验一次。 | 建议，待确认 |
+| SG-04 | 不新增 `submit_proposal` 工具：提案仍由运行结束时的结果文件整批提交，平台整批校验入库（绑定运行标识，避免半途提交与重复提交）。 | 已确认（2026-10-21） |
+| SG-05 | `validate_extraction` 不做成 MCP 工具：沿用 Skill 自带的 `check_part.py`、`prepare_result.py` 做本地校验，平台入库再校验一次。 | 已确认（2026-10-21） |
 | SG-06 | 共享参考文档（核心模型、原则、取值表）与共享脚本只保留一份源码，打包时复制进各 Skill 包，不手工维护多份副本。 | 已确认 |
-| SG-07 | 三个 Skill、MCP 服务登记信息和各 Workflow 的 Agent 配置作为一个插件包统一发布（`plugin.json` 记录版本、内容和要求的平台最低版本）。DataAgent 目前不支持整包加载：安装脚本只复制 Skill 到 `SKILLS_ROOT_DIR`，MCP 登记与 Agent 配置由管理员按包内说明在后台完成；DataAgent 原生插件加载属于 opendataworks 改动，另行排期。 | 建议，待确认 |
+| SG-07 | 三个 Skill、MCP 服务登记信息和各 Workflow 的 Agent 配置作为一个插件包统一发布（`plugin.json` 记录版本、内容和要求的平台最低版本）。DataAgent 目前不支持整包加载：安装脚本只复制 Skill 到 `SKILLS_ROOT_DIR`，MCP 登记与 Agent 配置由管理员按包内说明在后台完成；DataAgent 原生插件加载属于 opendataworks 改动，另行排期。 | 已确认（2026-10-21） |
 
 ## 3. 目录
 
