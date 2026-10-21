@@ -22,12 +22,12 @@
 2. 部署新代码，执行 `alembic upgrade head`（含 20261020_000001）。此迁移只删除旧本体内容，不转换任何 JSON。
 3. 清理：workspaces.current_version_id 置空；ontology_imports（及历史 imports）、proposal_decision_items、proposal_item_dependencies、proposal_items、proposal_batches、proposal_decision_requests、modeling_session_migrations（存在时）、modeling_sessions、ontology_element_identities、ontology_versions 全部清空。保留 users、workspaces、workspace_members、materials、material_chunks、磁盘材料、data_connections、service_tokens、service_token_scopes、metadata_snapshots。
 4. 重启全部应用进程，清除进程内缓存。downgrade 无法恢复已清理内容，恢复必须使用备份。
-5. 将 agents/agent_ontofoundry.md 和 agents/agent_ontofoundry_qa.md 同步到已有 DataAgent 的管理后台并发布，不创建 Agent。将本目录 skills/ontofoundry-modeling（含 references、scripts/check_result.py）按上文复制到 SKILLS_ROOT_DIR，重启 DataAgent。旧输出中的 technical_name 将被严格契约拒绝。
+5. 将 agents/agent_ontofoundry.md 和 agents/agent_ontofoundry_qa.md 同步到已有 DataAgent 的管理后台并发布，不创建 Agent。将 `make -C integrations/dataagent zip` 生成的技能包解压到 SKILLS_ROOT_DIR（包内不含 tests 与 offline_budget），重启 DataAgent。旧输出中的 technical_name 将被严格契约拒绝。
 6. 在局域网 HTTP 地址确认新建元素、提案、导入导出可用。Ossie 下载为 .ossie.zip，包内为纯 Ossie JSON 与 ontofoundry-extension.json；原生导入旧文件会报告字段转换。视觉基准由人工重新生成。
 
 ## 2026-10-20 建模 token 效率优化（离线实现）
 
-此改动不涉及核心模型、契约或迁移，不重复执行上文清空数据步骤。部署时将整个 `skills/ontofoundry-modeling/`（包括 references/examples、速查及全部 scripts）复制到 `SKILLS_ROOT_DIR/ontofoundry-modeling`，替换旧技能后由运维重启 DataAgent；将更新后的 `agents/agent_ontofoundry.md` 系统正文同步到已有 Agent 并发布。max_turns=12 已设置发布，其他 DataAgent 参数仍只建议，不修改共享模型配置。
+此改动不涉及核心模型、契约或迁移，不重复执行上文清空数据步骤。部署时用 `make -C integrations/dataagent zip` 生成的技能包替换 `SKILLS_ROOT_DIR/ontofoundry-modeling` 整个目录（包内不含 tests 与 offline_budget：测试夹具含验收答案，不能让 Agent 读到），由运维重启 DataAgent；将更新后的 `agents/agent_ontofoundry.md` 系统正文同步到已有 Agent 并发布。建模 Agent 的 max_turns 设为 40（2026-10-21 真实验收：抽取约 29 轮、补齐约 25 轮）。问数需要 DataAgent 配置 `ODW_BACKEND_BASE_URL`（OpenDataWorks 后端 AI 接口根地址）与 `ODW_AGENT_SERVICE_TOKEN`（等于后端 `AGENT_API_SERVICE_TOKEN`）。
 
 平台与技能须同时部署：平台新增临时工作包、材料原行号索引及修正计数侧文件；完整固定上下文、Schema、原材料仍上传并强校验，历史材料上传去重不变。每轮结果须同时保留 `output/ontofoundry-budget-<run_token>.json`，平台校对结果 SHA256，缺失／过期／耗尽走既有失败路径，不新增业务状态。prepare_result.py 每次整批校验，通过才原子写最终文件；首次检查不占修正，后续内容变化自动计数，--repair 显式计数，平台拒收修复继续同一预算。
 
@@ -44,8 +44,8 @@ PYTHONDONTWRITEBYTECODE=1 apps/api/.venv/bin/python integrations/dataagent/skill
 
 本轮仅离线实现。后续部署整批更新平台、整个技能目录与已有建模 Agent 系统正文；不执行上文历史清库步骤，不新增迁移。
 
-1. 替换 `SKILLS_ROOT_DIR/ontofoundry-modeling` 全目录，包含 SKILL、quick-reference、principles、methodology、四份 extract 方法、catalog／所有正例及全部 scripts（含 show_example、prepare_result、check_result、read_input）。源码不创建反例目录；tests 中的错误构造不作为 Agent 阅读材料。
-2. 在管理后台只复制 [建模配置](agents/agent_ontofoundry.md) 的“系统提示词：”之后的五行正文（四行候选加简体中文要求）。技能绑定和 max_turns=12 属配置，不粘到正文；核对现有 Agent 已绑定技能与轮数，再发布。此次问数 Agent 查询语义保持原有配置，不因建模优化删减。
+1. 用打包产物替换 `SKILLS_ROOT_DIR/ontofoundry-modeling` 全目录（SKILL、references、正例与运行脚本；不含 tests 与 offline_budget）。源码不创建反例目录；tests 中的错误构造与验收夹具不作为 Agent 阅读材料。
+2. 在管理后台只复制 [建模配置](agents/agent_ontofoundry.md) 的“系统提示词：”之后的五行正文（四行候选加简体中文要求）。技能绑定和 max_turns=40 属配置，不粘到正文；核对现有 Agent 已绑定技能与轮数，再发布。此次问数 Agent 查询语义保持原有配置，不因建模优化删减。
 3. 运维重启 DataAgent，确认技能被识别；在技能目录执行 `python scripts/show_example.py metric --variant ratio`，应返回 ≤8 KiB 正例，检查未知类型能列出选项。报错中的绝对路径由运行时技能脚本计算，服务端相对命令在技能目录执行。
 4. 同版部署平台，核对首轮提示仅有模式、工作包、token、输出路径和用户消息；材料、结果头、Schema、MCP 在工作包。平台拒收须上传新 context 和新工作包，并保留原材料／Schema 索引、pinned draft 和累计次数；MCP 配置重新签发同一固定版本与发起用户的新 token 凭据，不能继续使用旧包或重置两轮预算。旧运行缺少完整索引时明确失败，不用旧包续跑。
 5. 本地统一离线检查通过后再安排一次获授权的真实验收。核对思考与回答为简体中文、MCP固定版本和授权、业务口径、完整提案与证据、实际轮数及U/C/O、工具折叠与压缩缓存。未同步表只在方法／交付说明提示需先同步，本次未实现“表未同步”校验或审阅UI。
