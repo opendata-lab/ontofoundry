@@ -1,6 +1,6 @@
 # Entity Resolver：实例链接与消歧
 
-日期：2026-10-21。状态：已确认，待实施。来源：用户 2026-10-21 与 ChatGPT 讨论中的“Entity Resolver：统一实体链接与消歧”及当日决定。
+日期：2026-10-21。状态：已实施（2026-10-22）。来源：用户 2026-10-21 与 ChatGPT 讨论中的“Entity Resolver：统一实体链接与消歧”及当日决定。
 
 ## 1. 目标
 
@@ -70,3 +70,13 @@
 
 - 不对实例做向量化，不做跨来源实体合并，不输出置信度。
 - 不新增别名、曾用名等模型概念；数据中已有并映射为属性的列，可在后续版本加入匹配范围。
+
+## 8. 实施结果
+
+- 服务 `services/entity_resolution.py`；MCP 工具 `resolve_entity` 与 REST `POST /api/v1/ontology/workspaces/{workspace_id}/entities/resolve` 共用。
+- 业务库候选复用现有只读实例查询（`instance_plan.query_instances`，含映射、权限与白名单），以“包含”取最多 200 条（同时尝试输入原样与 NFKC 写法），在 Python 中按 ①②③ 判级；精确命中必然也是包含命中，因此候选不遗漏。读取被截断时状态不判为 `MATCHED`，`coverage` 为 `partial`（ER-10、ER-12）。
+- 文档实例取 `instance_store.visible`（按所用版本过滤不兼容实例），类型含子类型。
+- 复合业务标识不参与 ① 级；无标题属性且无单一业务标识的类型返回 422 `NOT_RESOLVABLE`；无实例权限 403。
+- semantic-grounding 与 entity-extraction 技能已写入调用方法；插件清单工具列表加入 `resolve_entity`。
+- 测试：`apps/api/tests/test_entity_resolution.py`（文档实例分级与状态、全角规范化、MCP 与 REST 一致、业务标识精确命中、截断不判唯一、未知类型）。
+

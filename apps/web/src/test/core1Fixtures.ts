@@ -3,8 +3,13 @@
 import type { CoreDraft } from '../api/core.generated'
 import type { Draft } from '../api/types'
 // Document instances left core-1 for the instance store; the backend keeps the
-// examples' instances in one fixture that both test suites read.
-import instanceFixtures from '../../../api/tests/fixtures/document_instances.json'
+// examples' instances in one fixture that both test suites read. A glob, like the
+// examples above, so image builds that copy only apps/web still compile.
+const instanceFiles = import.meta.glob<Record<string, unknown>>(
+  '../../../api/tests/fixtures/document_instances.json',
+  { eager: true, import: 'default' },
+)
+const instanceFixtures = Object.values(instanceFiles)[0] ?? {}
 
 type ExampleInstances = Partial<Pick<Draft, 'material_objects' | 'material_links'>>
 

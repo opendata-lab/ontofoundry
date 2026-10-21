@@ -13,13 +13,14 @@ def call(client, name, args):
     return result
 
 
-def test_exact_four_tools_and_reject_old_arguments(client):
+def test_exact_tools_and_reject_old_arguments(client):
     result = mcp_request(client, "tools/list").json()["result"]
     assert {t["name"] for t in result["tools"]} == {
         "search_ontology",
         "get_ontology",
         "search_objects",
         "get_object",
+        "resolve_entity",
     }
     for t in result["tools"]:
         assert "version_id" not in t["inputSchema"]["properties"]
@@ -28,6 +29,8 @@ def test_exact_four_tools_and_reject_old_arguments(client):
             args["query"] = ""
         if t["name"] == "get_object":
             args["id"] = "00000000-0000-4000-8000-000000000001"
+        if t["name"] == "resolve_entity":
+            args |= {"mention": "虚构", "object_type_id": "00000000-0000-4000-8000-000000000001"}
         assert call(client, t["name"], args)["isError"]
     assert call(client, "get_ontology", {"ids": []})["isError"]
     assert call(client, "search_objects", {"source": "database"})["isError"]

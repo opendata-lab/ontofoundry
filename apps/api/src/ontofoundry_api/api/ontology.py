@@ -18,6 +18,7 @@ from ontofoundry_api.services.instance_query import (
     object_neighborhood,
     search_objects,
 )
+from ontofoundry_api.services.mcp_ontology import ResolveEntity
 from ontofoundry_api.services.ontology_query import (
     current_version,
     get_type,
@@ -67,6 +68,30 @@ def search(
     return search_ontology(
         session, workspace_id, principal, options, request.app.state.settings
     )
+
+
+@router.post("/{workspace_id}/entities/resolve")
+def resolve(
+    workspace_id: str,
+    body: ResolveEntity,
+    request: Request,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    """Same service as the resolve_entity MCP tool, over the current published version."""
+    from ontofoundry_api.domain.core import CoreDraft
+    from ontofoundry_api.services.entity_resolution import resolve_entity
+    from ontofoundry_api.services.ontology_query import snapshot_of
+
+    require_instances(session, workspace_id, principal)
+    version = current_version(session, workspace_id, None)
+    result = resolve_entity(
+        session, workspace_id, CoreDraft.model_validate(snapshot_of(version)),
+        mention=body.mention, object_type_id=body.object_type_id, limit=body.limit,
+        settings=request.app.state.settings,
+        mappings_readable=can_read_mappings(session, workspace_id, principal),
+    )
+    return {"workspace_id": workspace_id, "version_id": version.id, **result}
 
 
 @router.get("/{workspace_id}/objects")

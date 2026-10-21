@@ -190,7 +190,7 @@ def test_plugin_install_only_copies_skills_and_reports_admin_work(packages, tmp_
     manifest = json.loads((root / "plugin.json").read_bytes())
     assert [entry["name"] for entry in manifest["skills"]] == list(SKILLS)
     assert manifest["minimum_platform_version"]
-    assert manifest["mcp_services"][0]["tools"] == ["search_ontology", "get_ontology", "search_objects", "get_object"]
+    assert manifest["mcp_services"][0]["tools"] == ["search_ontology", "get_ontology", "search_objects", "get_object", "resolve_entity"]
     target = tmp_path / "installed with spaces"
     env = {**os.environ, "SKILLS_ROOT_DIR": str(target)}
     command = ["sh", str(root / "install.sh")]

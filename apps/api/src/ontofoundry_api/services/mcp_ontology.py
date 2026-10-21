@@ -62,7 +62,16 @@ class GetObject(Paging):
     )
 
 
+class ResolveEntity(Strict):
+    mention: str = Field(min_length=1, max_length=240)
+    object_type_id: UUID
+    limit: int = Field(default=10, ge=1, le=50)
+    # Shared tool plumbing reads a cursor; resolution returns one page and ignores it.
+    cursor: str | None = None
+
+
 INPUTS = {
+    "resolve_entity": ResolveEntity,
     "search_ontology": SearchOntology,
     "get_ontology": GetOntology,
     "search_objects": SearchObjects,
@@ -376,6 +385,18 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     from ontofoundry_api.services.instance_store import visible
     stored = visible(db, workspace_id, draft)
     envelope.update({k: v for k, v in stored.items() if k not in {"objects", "links"}})
+    if name == "resolve_entity":
+        if not instances:
+            raise ServiceError("需要空间成员身份及实例读取授权", code="INSTANCES_FORBIDDEN", status_code=403)
+        from ontofoundry_api.services.entity_resolution import resolve_entity
+
+        return {
+            **envelope,
+            **resolve_entity(
+                db, workspace_id, draft, mention=args.mention, object_type_id=args.object_type_id,
+                limit=args.limit, settings=settings, mappings_readable=mappings,
+            ),
+        }
     if name == "search_objects":
         objects = [
             o

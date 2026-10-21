@@ -52,3 +52,8 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 实例抽取沿用 material_object／material_link 契约，界面说明称“文档实例”“关系实例”。同运行定义与实例片段共享 modeling/ 和 execution，由 prepare_result.py 合为一个结果文件，最多两轮修正，平台拒收后保留累计计数。平台只引用已有 Agent，不新建、不修改其配置。
 
 当前未调用实体消歧服务；专门实例抽取入口、问数结构化结果自动入运行记录与真实模型验收仍需后续联验。详见 [迁移说明](迁移说明.md) 与仓库 `docs/design/2026-10-21-semantic-grounding-skills.md`。更新 shared、skills 或 agents 后都须重新打包，并由管理员复制至 SKILLS_ROOT_DIR、同步后台并发布。
+
+## 2026-10-22 实体解析
+
+平台新增 MCP 工具 `resolve_entity`。部署平台新版本后，在 DataAgent 管理后台为已登记的 OntoFoundry MCP 服务刷新工具列表；用 `make -C integrations/dataagent zip` 重新生成并安装 semantic-grounding 与 entity-extraction 技能包，重启 DataAgent。
+

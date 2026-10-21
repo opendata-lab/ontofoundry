@@ -13,4 +13,4 @@ description: 按已有本体约束从文档抽取文档实例、属性值和关�
 5. 同一运行组合 ontology-discovery 时，共享 modeling/、execution 和修正计数；定义片段 01–04 与实例片段 05 合并为一个结果文件，不分别提交、不覆盖其他 Skill 片段。发现缺少业务概念时按任务加载 ontology-discovery 提出定义提案与相关实例提案，交人工审阅。单独抽取时只交本次片段。output-schema.json 是本技能的实例子集说明；检查器始终用工作包 schema_file（平台完整提案契约），允许组合输出。
 6. `prepare_result.py --schema <schema_file> --context <context_file> --output <result_file> modeling/parts/`，定义按 draft/element_hashes、实例按 instance_baseline 自动补 before/hash，通过才写入。最多两轮修正，共用 execution；只改报错片段再合并，加 --repair（平台已计次的新上下文首次不加），不删除计数。中文说明实例、证据、歧义与未交付项；技术失败不冒充业务提问或成功。
 
-匹配、授权和确定性判级归平台工具；当前仅使用已上线的读取工具，不假设实例消歧服务已可用。Schema 只给检查器，未覆盖按报错命令定点查正例。业务数据库行不自动写成文档实例，不因名称近似认定同一身份。
+匹配、授权和确定性判级归平台工具。新建实例前对实体提及调用 `resolve_entity`：document 来源命中可按实例基线提出更新已有实例，database 来源只作说明；是否同一实体由人工审阅。Schema 只给检查器，未覆盖按报错命令定点查正例。业务数据库行不自动写成文档实例，不因名称近似认定同一身份。
