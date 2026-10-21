@@ -1,1 +1,1 @@
-[{"operation":"update","target_kind":"object_type","target_id":"d62f46a9-708c-5b8b-9499-8334a06bacea","after":{"name":"staff","display_name":"云帆员工","description":"已核对业务定义","synonyms":[],"tags":[],"extends":null,"title_property_id":null,"derived_by":[],"evidence":[]}}]
+[{"operation":"update","target_kind":"object_type","target_id":"d62f46a9-708c-5b8b-9499-8334a06bacea","after":{"name":"staff","display_name":"澄页员工","description":"已核对业务定义","synonyms":[],"tags":[],"extends":null,"title_property_id":null,"derived_by":[],"evidence":[]}}]

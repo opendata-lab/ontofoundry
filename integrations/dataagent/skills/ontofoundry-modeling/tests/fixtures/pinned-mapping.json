@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "744704381a1d6c2882437d1bb46c7a306fd34eccd651dc58a6c4b63b37db6748"
+    "source_draft_sha256": "f3495f3e2606fb4bca4035deb1f2e4ce9f71e9a9577b23c13d4440cc4896d050"
   },
   "draft": {
     "schema_version": "core-1",
@@ -15,8 +15,8 @@
     "object_types": [
       {
         "id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
-        "name": "order",
-        "display_name": "云帆订单",
+        "name": "loan",
+        "display_name": "澄页借阅单",
         "description": "",
         "synonyms": [],
         "tags": [],
@@ -44,7 +44,7 @@
       {
         "id": "4da2c71f-77b6-508e-b0d9-90e0879bbfb6",
         "owner_type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
-        "name": "order_no",
+        "name": "loan_no",
         "display_name": null,
         "description": "",
         "value_kind": "string",
@@ -58,7 +58,7 @@
       {
         "id": "551bde02-6af3-5d1c-b582-41cddfb77ca8",
         "owner_type_id": "74e49f86-cc5f-51fe-b6c2-2438068967f6",
-        "name": "member_no",
+        "name": "reader_no",
         "display_name": null,
         "description": "",
         "value_kind": "string",
@@ -76,13 +76,13 @@
     "datasets": [
       {
         "id": "8836c879-377f-5cd1-9040-711707a5896d",
-        "name": "yunfan_order_lines",
-        "display_name": "云帆订单明细",
+        "name": "chengye_loan_lines",
+        "display_name": "澄页借阅明细",
         "connection_id": null,
         "source_kind": "table",
         "dialect": "postgres",
         "schema_name": null,
-        "table_name": "demo_orders",
+        "table_name": "demo_loans",
         "query_sql": null,
         "description": "",
         "snapshot_date_column": null,
@@ -93,12 +93,12 @@
             "comment": ""
           },
           {
-            "name": "order_no",
+            "name": "loan_no",
             "physical_type": "text",
             "comment": ""
           },
           {
-            "name": "member_no",
+            "name": "reader_no",
             "physical_type": "text",
             "comment": ""
           }
@@ -116,7 +116,7 @@
             "dataset_id": "8836c879-377f-5cd1-9040-711707a5896d",
             "key_columns": [
               "region",
-              "order_no"
+              "loan_no"
             ]
           }
         ],
@@ -126,15 +126,15 @@
             "source_id": "main",
             "column": "region"
           },
-          "order_no": {
+          "loan_no": {
             "kind": "column",
             "source_id": "main",
-            "column": "order_no"
+            "column": "loan_no"
           },
-          "member_no": {
+          "reader_no": {
             "kind": "column",
             "source_id": "main",
-            "column": "member_no"
+            "column": "reader_no"
           }
         },
         "membership_source_id": null,
@@ -146,11 +146,11 @@
     "value_types": []
   },
   "element_hashes": {
-    "74e49f86-cc5f-51fe-b6c2-2438068967f6": "4a669a7ad314244ca7273330103d0f925a3cd8ea29e42eef4f603fd76b6b7f33",
+    "74e49f86-cc5f-51fe-b6c2-2438068967f6": "ba3ce16425d864faf6987011b9823e2623d9bf00d8dbc2af18c23e76777823cb",
     "3ef162e2-91a2-531e-a3de-6f8acc86f2aa": "3b7066c31d015271c42f2aa33bace8aee64cca977cd000a5062f6084370903c9",
-    "4da2c71f-77b6-508e-b0d9-90e0879bbfb6": "29867c7a4ca33ab3a7440c7f70fc6d83ba0f525f87e9726ff8d5e56ecec0c843",
-    "551bde02-6af3-5d1c-b582-41cddfb77ca8": "c75b8a593dab009084c222c215cf4ea173f708638cd12011eb1d79796ac29608",
-    "8836c879-377f-5cd1-9040-711707a5896d": "7f4134ee4aab8235d37968b2b1bf60d343d31eeaac678257d18fc2e4362b3ab6",
-    "f1b248ca-e610-53f3-b7c4-db9ba272eeb3": "090360e3ccb11481da196703ef2cb047a4702283f9b0a6020a160d82b16d17ab"
+    "4da2c71f-77b6-508e-b0d9-90e0879bbfb6": "242fceae7c5b1fc1072549d074a21fa98178c116d6221e5e31d76205a1864466",
+    "551bde02-6af3-5d1c-b582-41cddfb77ca8": "72d3b1a222e83dbf26b418b279b909b963b14d107baaa51fc08ae3eabee92d9d",
+    "8836c879-377f-5cd1-9040-711707a5896d": "8b107ea7d50b5d2d992aac16cf8386777cdb7db75cb87baaee9de9a87b1dcafc",
+    "f1b248ca-e610-53f3-b7c4-db9ba272eeb3": "0637b49f3ec37713a7b33361548526306b81801337ddb766a5f058f8e38aa908"
   }
 }

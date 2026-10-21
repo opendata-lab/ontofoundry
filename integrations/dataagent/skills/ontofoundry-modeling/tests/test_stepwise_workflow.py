@@ -125,7 +125,7 @@ def test_check_part_cross_fragment_references_are_pending_and_reports_use_reques
     )
     report = json.loads((reports / "03-mapping.json").read_bytes())
     assert report["errors"] == []
-    assert report["pending_refs"] == ["orders", "orders_ds"]
+    assert report["pending_refs"] == ["loans", "loans_ds"]
     assert not (tmp_path / "modeling/checks").exists()
     assert not list(tmp_path.rglob("*budget*"))
 
@@ -179,7 +179,7 @@ def test_check_part_missing_display_name_is_a_hint():
 
 def test_check_part_rejects_dangling_reference_inside_mapping():
     ctx, items = mapping_example()
-    items[-1]["after"]["fields"]["order_no"]["source_id"] = "missing_local_source"
+    items[-1]["after"]["fields"]["loan_no"]["source_id"] = "missing_local_source"
     # A mapping's sources are local, so another fragment cannot supply this ID.
     assert any(
         "LOCAL_SOURCE_UNKNOWN" in e

@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "652575c7a65cbe534558c6307fb8455be34541698666877013df50c776c3e960"
+    "source_draft_sha256": "f9ad3f9cc365b28f775445966fd3b628457b07a49a54f00999f0a71109c3d719"
   },
   "draft": {
     "schema_version": "core-1",
@@ -20,13 +20,13 @@
     "datasets": [
       {
         "id": "8c7e2b46-7e29-5e39-a097-938a0ac5d9cc",
-        "name": "yunfan_order_lines",
-        "display_name": "云帆订单明细",
+        "name": "chengye_loan_lines",
+        "display_name": "澄页借阅明细",
         "connection_id": null,
         "source_kind": "table",
         "dialect": "postgres",
         "schema_name": null,
-        "table_name": "demo_orders",
+        "table_name": "demo_loans",
         "query_sql": null,
         "description": "",
         "snapshot_date_column": null,
@@ -37,12 +37,12 @@
             "comment": ""
           },
           {
-            "name": "order_no",
+            "name": "loan_no",
             "physical_type": "text",
             "comment": ""
           },
           {
-            "name": "member_no",
+            "name": "reader_no",
             "physical_type": "text",
             "comment": ""
           }
@@ -55,6 +55,6 @@
     "value_types": []
   },
   "element_hashes": {
-    "8c7e2b46-7e29-5e39-a097-938a0ac5d9cc": "3add3bed50f05dc12c51bda2c13167615406d2e936a18490653daf79b9c5e81e"
+    "8c7e2b46-7e29-5e39-a097-938a0ac5d9cc": "85888216ec47536e9e2d72725df25ff345abe522ddada601af0680f9409db36e"
   }
 }

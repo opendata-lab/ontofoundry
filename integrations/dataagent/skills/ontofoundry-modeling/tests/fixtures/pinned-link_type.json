@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "8e3a8e07890b318abc7f0aa543a81b9f09f1847b416bd2996399aff04da4a5de"
+    "source_draft_sha256": "972c68d44549c2b59b89d990ef0f503a5793e31e8b32b176f63f70175d4e7880"
   },
   "draft": {
     "schema_version": "core-1",
@@ -16,7 +16,7 @@
       {
         "id": "938f36bf-fc19-5b6a-af04-766784b96b1b",
         "name": "staff",
-        "display_name": "云帆员工",
+        "display_name": "澄页员工",
         "description": "",
         "synonyms": [],
         "tags": [],
@@ -57,7 +57,7 @@
     "value_types": []
   },
   "element_hashes": {
-    "938f36bf-fc19-5b6a-af04-766784b96b1b": "184a15410daf5222b26bc59d62d97f2985e03fd97ddff2e5c1411a2d025df6e6",
+    "938f36bf-fc19-5b6a-af04-766784b96b1b": "4a43a570489485ac40494be70732e3bd6e48e14529532b9a9a2adeae30692e08",
     "688ac2c2-c144-5091-bd59-1e2b38631760": "bc5b108b5ec4a9e0d382d5654b80690b3c50811d40cd64584e3c651405f358aa"
   }
 }

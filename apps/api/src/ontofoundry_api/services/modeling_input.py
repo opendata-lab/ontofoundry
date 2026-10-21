@@ -12,6 +12,7 @@ PACK_LIMIT = 8 * 1024
 READ_LIMIT = 8 * 1024
 EXAMPLES = {
     "固定抽取包": "python <技能目录>/scripts/show_example.py --part 01（依次 01–05）；另读 --guide、--values",
+    "增量": "先 show_element.py --work-pack <工作包> <英文标识或id>；再 show_example.py --incremental-guide、--part update（修改删除加 --part edit）",
     "类型": "references/extract-types.md",
     "映射": "references/extract-mappings.md",
     "指标规则": "references/extract-metrics-rules.md",
@@ -108,7 +109,7 @@ def build_work_pack(
         "materials": sorted(materials, key=lambda m: m["id"]),
         "examples": EXAMPLES,
         "elements": entries,
-        "read_back": "更新删除按 pointer 读取完整目标与 element_hashes；继承、反向引用和依赖读完整 draft，禁止关键词裁剪。完整上下文始终交给检查器。",
+        "read_back": "已有元素用 show_element.py --work-pack <工作包> <英文标识或id> 精确取定义、hash、引用者，按返回参数分页；不读 context 全文、源码或 Schema。完整上下文交给检查器。",
     }
     if mcp_config_file:
         pack["mcp_config_file"] = mcp_config_file

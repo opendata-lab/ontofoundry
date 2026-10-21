@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "1c01154d9a98f8cfac8b2c5ec2dacd0db269b09cb055f7fc914aa5feeb4777a1"
+    "source_draft_sha256": "bbfd2aee1967d7e783b3b937dca5d3738a37bedad9cec328da8ba5275e192479"
   },
   "draft": {
     "schema_version": "core-1",
@@ -24,15 +24,15 @@
     "value_types": [
       {
         "id": "9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d",
-        "name": "yunfan_member_level",
-        "display_name": "云帆会员等级",
-        "description": "会员等级取值",
+        "name": "chengye_reader_level",
+        "display_name": "澄页读者等级",
+        "description": "读者等级取值",
         "value_kind": "string",
         "evidence": []
       }
     ]
   },
   "element_hashes": {
-    "9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d": "c7e7e1fa002ebb726fad2b95294356c686d6d07d6ef4c97713502fd0a2a3b422"
+    "9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d": "119d8df50fbe544c412cc255fb86a43285670fd08a867ccc9a00c05b2742dfd7"
   }
 }

@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "46de54729c0ed35dee28f4393a28d9361ad98ac2881cbc71f82b5965205c31a9"
+    "source_draft_sha256": "8a80bf3dd2a17c296787919607812c028811123a3c055318f26a42d885fa9d29"
   },
   "draft": {
     "schema_version": "core-1",
@@ -19,7 +19,7 @@
     "metrics": [
       {
         "id": "79f64954-6adf-5eda-b40c-13d9716f9b62",
-        "name": "sales",
+        "name": "deposits",
         "display_name": null,
         "description": "",
         "synonyms": [],
@@ -29,7 +29,7 @@
         "aggregation": "sum",
         "measure": {
           "dataset_id": "e9dfd141-2b59-5db5-87e9-3a02d74b3488",
-          "column": "sales"
+          "column": "deposits"
         },
         "filters": [],
         "time_field": null
@@ -38,8 +38,8 @@
     "datasets": [
       {
         "id": "e9dfd141-2b59-5db5-87e9-3a02d74b3488",
-        "name": "yunfan_daily",
-        "display_name": "云帆日经营",
+        "name": "chengye_daily",
+        "display_name": "澄页日经营",
         "connection_id": null,
         "source_kind": "table",
         "dialect": null,
@@ -50,12 +50,12 @@
         "snapshot_date_column": null,
         "columns": [
           {
-            "name": "sales",
+            "name": "deposits",
             "physical_type": "numeric",
             "comment": ""
           },
           {
-            "name": "refunds",
+            "name": "claims",
             "physical_type": "numeric",
             "comment": ""
           }
@@ -68,7 +68,7 @@
     "value_types": []
   },
   "element_hashes": {
-    "79f64954-6adf-5eda-b40c-13d9716f9b62": "9ff5af6c555f22c6716b5566ffc264f35ac0fc5f1dfe2d87ccf02ac5d60b8675",
-    "e9dfd141-2b59-5db5-87e9-3a02d74b3488": "c9d64bd4b079725395c4249d53f7e324de197e18827a4bac32b06b713daa79d6"
+    "79f64954-6adf-5eda-b40c-13d9716f9b62": "fc8d5679fc060fcce2773fa6eac611516ab2915cf56f7c24030be988ae03452d",
+    "e9dfd141-2b59-5db5-87e9-3a02d74b3488": "aedbc793494628169ca88307a75c06ce511ae2f9b2b6ca53bde2fc2505625a2c"
   }
 }

@@ -1,1 +1,1 @@
-[{"operation":"update","target_kind":"value_type","target_id":"9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d","after":{"name":"yunfan_member_level","display_name":"云帆会员等级","description":"会员等级取值，已核对业务定义","value_kind":"string","evidence":[]}}]
+[{"operation":"update","target_kind":"value_type","target_id":"9a0b8c2e-1f3d-5a4b-8c6d-7e8f9a0b1c2d","after":{"name":"chengye_reader_level","display_name":"澄页读者等级","description":"读者等级取值，已核对业务定义","value_kind":"string","evidence":[]}}]

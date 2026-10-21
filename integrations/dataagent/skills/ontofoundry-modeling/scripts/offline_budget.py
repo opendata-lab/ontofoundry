@@ -11,6 +11,11 @@ SELECTED_EXAMPLES_LIMIT = 5600
 # plan-time 14 KB estimate is raised; it stays below the one-shot routes.
 PLAN_ROUTE_LIMIT = 18500
 EXTRACT_ROUTE_LIMIT = 36000
+INCREMENTAL_ROUTE_LIMIT = 50000
+INCREMENTAL_QUERIES = [
+    ["object_type:refund", "dataset:refunds", "dataset:orders"],
+    [f"property:refund.{name}" for name in ("refund_no", "order_no", "refund_date", "refund_amount", "reason")],
+]
 
 SKILL = Path(__file__).resolve().parents[1]
 ROOT = SKILL.parents[3]
@@ -344,12 +349,69 @@ def byte_report():
         "bytes": extract_bytes, "limit": EXTRACT_ROUTE_LIMIT,
         "pass": extract_bytes <= EXTRACT_ROUTE_LIMIT,
         "components": extract_components,
-        "scope": "虚构星河零售：工作包＋全部带行号材料＋前轮计划＋五表结构＋原则＋完整固定包；refunds 无列",
+        "scope": "虚构星河零售：工作包＋全部带行号材料＋前轮计划＋五表结构＋原则＋完整图书馆写法包（与验收业务分离）；refunds 无列",
         "estimated_rounds": {
             "normal": [9, 11], "two_repairs": [13, 15],
             "first_part_by": [3, 4],
             "stages": {"输入与包": [2, 3], "写片段与即检": [4, 5], "合并与说明": [2, 3], "每次修正增加": [2, 2]},
             "basis": "可执行路径估计，没有模型行为或概率分布实测",
+        },
+    }
+    from show_element import ElementIndex, bounded
+
+    incremental_context = json.loads((fixture / "v1-context.json").read_bytes())
+    incremental_tables = json.loads((fixture / "tables-supplemented.json").read_bytes())["tables"]
+    incremental_pack, incremental_pages = build_work_pack(
+        incremental_context, extract_materials,
+        context_file="inputs/context.json", schema_file="inputs/schema.json",
+        tables=incremental_tables, tables_file="inputs/tables.json",
+        scenario_facts={"draft_empty": False},
+    )
+    incremental_pack["index_pages"] = [f"inputs/incremental-index-{i}.json" for i in range(len(incremental_pages))]
+    incremental_prompt = build_turn_prompt(
+        "refunds 表已经同步，请补齐退款：退款的映射、退款金额和退款率指标。", mode="model",
+        workspace_id=incremental_context["run"]["workspace_id"],
+        session_id=incremental_context["run"]["session_id"], context_file="inputs/context.json",
+        context_bytes=len(encode(incremental_context)), material_files=[],
+        run_token=incremental_context["run"]["run_token"],
+        proposal_prompt=proposal_instructions(
+            run_token=incremental_context["run"]["run_token"], header=incremental_context["run"],
+            materials=extract_materials, schema_file="inputs/schema.json", mcp=None,
+            work_pack_file="inputs/work-pack.json",
+        ),
+    )
+    incremental_inputs = {
+        "已知Agent提示": system_body.encode(), "平台提示": incremental_prompt.encode(),
+        "技能入口": (SKILL / "SKILL.md").read_bytes(), "工作包": encode(incremental_pack),
+        "带原行号材料": extract_inputs["带原行号材料"],
+        "表结构": (render_tables(json.dumps({"tables": incremental_tables}), ",".join(t["key"] for t in incremental_tables)) + "\n").encode(),
+        "原则": (SKILL / "references/principles.md").read_bytes(),
+        **{f"写法包/{name}": (kit / name).read_bytes() for name in ("incremental.md", "values.json", "update.json")},
+        **{f"工作包索引/{i}": page for i, page in enumerate(incremental_pages)},
+    }
+    index = ElementIndex(incremental_context)
+    for i, selectors in enumerate(INCREMENTAL_QUERIES):
+        value, status = index.query(selectors)
+        if status:
+            raise ValueError("增量预算查询必须精确命中")
+        output = bounded(value)
+        if "elements" not in json.loads(output):
+            raise ValueError("预算查询须拆为有界的完整元素输出")
+        incremental_inputs[f"已有元素/{i}"] = (output + "\n").encode()
+    incremental_components = {name: measure(data) for name, data in incremental_inputs.items()}
+    incremental_bytes = sum(c["bytes"] for c in incremental_components.values())
+    for name, data in incremental_inputs.items():
+        limits[f"增量单次/{name}"] = (len(data), 8192)
+    routes["增量（退款补齐）"] = {
+        "bytes": incremental_bytes, "limit": INCREMENTAL_ROUTE_LIMIT,
+        "pass": incremental_bytes <= INCREMENTAL_ROUTE_LIMIT,
+        "components": incremental_components,
+        "scope": "离线零售 v1＋独立图书馆写法：完整工作包及全部索引页、全部材料、六表结构、提示、原则、增量指南、取值、update 和两组精确查询；不读 context／源码／Schema，无前轮计划；名称删除另加 edit",
+        "optional_edit_bytes": (kit / "edit.json").stat().st_size,
+        "estimated_rounds": {
+            "normal": [6, 8], "two_repairs": [10, 12], "first_part_by": [3, 4],
+            "stages": {"输入与查询及包": [2, 3], "写片段与即检": [2, 2], "合并与说明": [2, 3]},
+            "basis": "可执行路径估计，没有模型行为实测；分页、歧义重查增加轮数",
         },
     }
     total = sum(v["bytes"] for v in components.values())

@@ -126,7 +126,7 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
         if kind == "rule":
             shapes.add("规则/" + after["owner_kind"])
             if after["owner_kind"] == "link_type":
-                assert "refund.refund_for_order.pay_amount" in after["expression"]
+                assert "claim.claim_for_loan.deposit" in after["expression"]
                 shapes.add("跨关系约束")
         if kind == "link_type":
             assert after["data_join"]["kind"] == "direct"
@@ -136,8 +136,8 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
             assert after["connection_id"]
             if after["source_kind"] == "query":
                 assert "UNION ALL" in after["query_sql"]
-                assert "o.order_date AS biz_date" in after["query_sql"]
-                assert "r.refund_date AS biz_date" in after["query_sql"]
+                assert "o.lent_on AS event_on" in after["query_sql"]
+                assert "r.assessed_on AS event_on" in after["query_sql"]
                 shapes.add("UNION各带日期")
             else:
                 shapes.add("表列" if after["columns"] else "未同步无列")
@@ -290,7 +290,7 @@ def test_init_creates_both_requested_parent_directories_idempotently(tmp_path, m
 
 
 def test_every_fixed_payload_is_registered_and_invalid_combinations_fail():
-    assert {p.name for p in KIT.iterdir()} == {"01.json", "02.json", "03.json", "04.json", "05.json", "values.json", "guide.md", "material.md"}
+    assert {p.name for p in KIT.iterdir()} == {"01.json", "02.json", "03.json", "04.json", "05.json", "values.json", "guide.md", "material.md", "update.json", "edit.json", "incremental.md"}
     for args in (("--part", "06"), ("--part", "01", "metric"), ("--values", "--operation", "update"), ("--part", "01", "--with-deps")):
         result = lookup(*args)
         assert result.returncode != 0

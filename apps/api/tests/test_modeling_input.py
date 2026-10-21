@@ -48,6 +48,9 @@ def test_six_datasets_and_original_material_are_lossless():
     )
     assert pack["materials"][0]["original_range"] == [1, 2]
     assert pack["materials"][0]["sha256"] == hashlib.sha256(content).hexdigest()
+    assert "show_element.py --work-pack" in pack["read_back"]
+    assert "--part update" in pack["examples"]["增量"]
+    assert "读完整 draft" not in pack["read_back"]
     assert build_work_pack(
         ctx, [material], context_file="context.json", schema_file="schema.json"
     ) == (pack, pages)

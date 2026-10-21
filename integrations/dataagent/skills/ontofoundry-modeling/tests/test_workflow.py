@@ -226,7 +226,7 @@ def test_local_source_scope_and_reference_literals():
     other["client_ref"] = "second_mapping"
     batch["items"].append(other)
     assert not checker.check_result(batch, SCHEMA, ctx)  # same local main is legal
-    other["after"]["fields"]["order_no"]["source_id"] = "aux"
+    other["after"]["fields"]["loan_no"]["source_id"] = "aux"
     errors = checker.check_result(batch, SCHEMA, ctx)
     assert any("source_id" in e and "LOCAL_SOURCE_UNKNOWN" in e for e in errors)
 
@@ -405,7 +405,7 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
             "column": "sales",
         }
     elif mutation == "source":
-        batch["items"][-1]["after"]["fields"]["order_no"]["source_id"] = "aux"
+        batch["items"][-1]["after"]["fields"]["loan_no"]["source_id"] = "aux"
     elif mutation == "reference":
         item["after"]["extends"] = {"client_ref": "absent"}
     elif mutation == "token":
@@ -488,7 +488,7 @@ def test_manual_evidence_preservation_and_meaningful_calculation_examples():
     )
     assert (
         example[-1]["after"]["fields"]["line_amount"]["expression"]
-        == "main.quantity * main.unit_price"
+        == "main.copy_count * main.deposit_each"
     )
     assert 2 * 30 == 60
     joins = json.loads((SKILL / "references/examples/link-joins.json").read_bytes())

@@ -7,7 +7,7 @@
     "base_version_id": null,
     "base_version_sha256": "8ddbad01b954571261d618d91e546a2fe97458470ee744fa20c6746d27174818",
     "source_session_revision": 1,
-    "source_draft_sha256": "7bcf796ad4543a979a0834852a1db5e700f61821225e43f466b13f704b341fc2"
+    "source_draft_sha256": "516d78b339b0b6824c908a4dcb164ef4a8a2c2d919e7a9d18cb962ea4af2e460"
   },
   "draft": {
     "schema_version": "core-1",
@@ -16,7 +16,7 @@
       {
         "id": "74a20a3d-d2dc-5f32-88e9-84f79200cdbe",
         "name": "staff",
-        "display_name": "云帆员工",
+        "display_name": "澄页员工",
         "description": "",
         "synonyms": [],
         "tags": [],
@@ -79,13 +79,13 @@
             "kind": "material",
             "id": "977f969d-4c62-50e7-8896-f1b4f6deea92",
             "material_id": "11111111-1111-4111-8111-111111111111",
-            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "material_sha256": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
             "locator": {
               "heading": null,
               "line_start": 1,
               "line_end": 1
             },
-            "quote": "云帆商贸的小岚向小舟汇报。"
+            "quote": "澄页图书馆的小岚向小舟汇报。"
           }
         ]
       },
@@ -100,13 +100,13 @@
             "kind": "material",
             "id": "8deb89c9-f7d1-5270-a3e2-f4e7776e28d0",
             "material_id": "11111111-1111-4111-8111-111111111111",
-            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "material_sha256": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
             "locator": {
               "heading": null,
               "line_start": 1,
               "line_end": 1
             },
-            "quote": "云帆商贸的小岚向小舟汇报。"
+            "quote": "澄页图书馆的小岚向小舟汇报。"
           }
         ]
       }
@@ -122,13 +122,13 @@
             "kind": "material",
             "id": "d362f6a7-089e-59f2-b9ec-afeb0cbe80fb",
             "material_id": "11111111-1111-4111-8111-111111111111",
-            "material_sha256": "b0d01e9ede89de158be0d54b10a5d5abe10c4ed7ceeca2c3e556f272942d6df9",
+            "material_sha256": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
             "locator": {
               "heading": null,
               "line_start": 1,
               "line_end": 1
             },
-            "quote": "云帆商贸的小岚向小舟汇报。"
+            "quote": "澄页图书馆的小岚向小舟汇报。"
           }
         ]
       }
@@ -136,11 +136,11 @@
     "value_types": []
   },
   "element_hashes": {
-    "74a20a3d-d2dc-5f32-88e9-84f79200cdbe": "3c2685f0864f31920bd32147e2bdf88a34e37493ae66a832e37f6f9fd95a3585",
+    "74a20a3d-d2dc-5f32-88e9-84f79200cdbe": "a96f22a2fde6cdeb73c1cfe230d688d3a78cdbd7750a4fd6267ee32a39edbf7f",
     "378f6072-db7d-5b15-8632-a2d5bb28156c": "2366310363f86d5bc94b4d65d1cba2534460b3aeac4185e84f203fed6f95f362",
     "3efe5468-7552-504e-a665-6ba1a643bc7b": "1c4efdb3d11510e70c73b1e503b8cde7d6cd54f83578b5b13eff7f9471b79b79",
-    "5db4d5a7-bda2-56f4-8212-7e91acfe6007": "a4babb1add9c2105c474d871fa18e81b6286d115a528935b23f2b446ba444f91",
-    "232dbb9d-7c60-5db7-b365-59ab63617991": "d2bd5dd839ed33f0a6702f8d2c35f08ad62d89ca16d455231eb70de5c39f3225",
-    "cb11fa58-c814-5a79-a174-c7f726a20bf5": "81ce4a0915cbf2597fe531c3be0017d97992d0d47a8018c5b82b1f29d9a082a7"
+    "5db4d5a7-bda2-56f4-8212-7e91acfe6007": "d58931d398f483f41af458ee0143a1b48455954ec74d75d5f23e667dfa34c144",
+    "232dbb9d-7c60-5db7-b365-59ab63617991": "efbaa74a8c376bc866c9babe900734d5488cdfb2d22947ed08261e72dd699b55",
+    "cb11fa58-c814-5a79-a174-c7f726a20bf5": "a5455cab8df846073583ece966f291219949c6f0b2e338a842ddc743bf6480ce"
   }
 }

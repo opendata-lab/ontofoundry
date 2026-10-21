@@ -68,7 +68,8 @@ def main():
     )
     parser.add_argument("target_kinds", nargs="*", metavar="target_kind")
     fixed = parser.add_mutually_exclusive_group()
-    fixed.add_argument("--part", choices=["01", "02", "03", "04", "05"], help="固定抽取包的裸 items 数组；五份依次合并")
+    fixed.add_argument("--part", choices=["01", "02", "03", "04", "05", "update", "edit"], help="裸 items 数组；01–05 全量，update 增量补齐，edit 修改删除")
+    fixed.add_argument("--incremental-guide", action="store_true", help="增量查询与写法说明")
     fixed.add_argument("--values", action="store_true", help="契约取值速查")
     fixed.add_argument("--guide", action="store_true", help="固定包说明与确定的读取参数")
     parser.add_argument("--operation", default="create")
@@ -76,10 +77,10 @@ def main():
     parser.add_argument("--with-deps", action="store_true", help="附带依赖元素，输出可直接整批检查的完整正例")
     args = parser.parse_args()
     try:
-        if args.part or args.values or args.guide:
+        if args.part or args.values or args.guide or args.incremental_guide:
             if args.target_kinds or args.variant or args.with_deps or args.operation != "create":
                 raise ValueError("固定包入口不能与类型、操作或分支查询混用")
-            filename = f"{args.part}.json" if args.part else "values.json" if args.values else "guide.md"
+            filename = f"{args.part}.json" if args.part else "values.json" if args.values else "incremental.md" if args.incremental_guide else "guide.md"
             content = (KIT / filename).read_text().rstrip("\n")
             if len((content + "\n").encode()) > LIMIT:
                 raise ValueError("固定包输出超过8 KiB，请维护更小的片段")
