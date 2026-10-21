@@ -453,6 +453,8 @@ const REVIEW_PREVIEW: PublishPreview = {
   current_version_sha256: "3".repeat(64),
   merged_snapshot_sha256: "e".repeat(64),
   merged_model: REVIEW_DRAFT,
+  instance_change_sequence: 1,
+  affected_instances: [],
   validation: {
     ...FIXTURE_VERSIONS[0].validation,
     warnings: [{ message: "供应商名称尚未绑定数据来源" }],
