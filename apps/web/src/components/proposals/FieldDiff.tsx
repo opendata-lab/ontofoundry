@@ -1,5 +1,5 @@
 import { Table, Typography } from "antd";
-import type { FieldChange, TargetKind } from "../../api/types";
+import type { FieldChange } from "../../api/types";
 import { fieldLabel } from "./elementMeta";
 import { valueText } from "./reviewMeta";
 
@@ -24,10 +24,8 @@ export function FieldDiff({
   afterLabel = "提案值",
   limit,
   names,
-  kind,
 }: {
   changes: FieldChange[];
-  kind?: TargetKind;
   beforeLabel?: string;
   afterLabel?: string;
   limit?: number;
@@ -44,7 +42,7 @@ export function FieldDiff({
         pagination={false}
         dataSource={rows}
         columns={[
-          { title: "字段", key: "path", width: 140, render: (_, c) => fieldLabel(c.path, kind) },
+          { title: "字段", key: "path", width: 140, render: (_, c) => fieldLabel(c.path) },
           { title: beforeLabel, key: "before", render: (_, c) => cell(c.before, true, names) },
           { title: afterLabel, key: "after", render: (_, c) => cell(c.after, false, names) },
         ]}

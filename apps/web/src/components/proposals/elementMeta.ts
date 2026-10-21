@@ -107,8 +107,11 @@ export const FIELD_LABELS: Record<string, string> = {
   fields: "字段绑定",
   membership_source_id: "成员扩展表",
   inherited_link_bindings: "继承关系绑定",
+  connection_id: "连接",
+  source_kind: "来源方式",
+  query_sql: "SQL",
 };
 
-export function fieldLabel(path: string, kind?: TargetKind): string {
-  return kind === "dataset" && path === "name" ? "名称" : FIELD_LABELS[path] ?? path;
+export function fieldLabel(path: string): string {
+  return FIELD_LABELS[path] ?? path;
 }

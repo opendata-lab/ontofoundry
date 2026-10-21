@@ -166,7 +166,7 @@ export function ProposalCard({
         </div>
         <div
           className="flex min-w-0 items-center gap-1 text-xs"
-          title={`${fieldLabel(change?.path ?? "display_name", item.target_kind)}：${before} → ${after}`}
+          title={`${fieldLabel(change?.path ?? "display_name")}：${before} → ${after}`}
         >
           <Text type="secondary" className="max-w-2/5 truncate line-through">
             {before}

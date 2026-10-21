@@ -173,7 +173,7 @@ export function ProposalDetail({
         )}
         <section className="flex flex-col gap-2 border-b border-rule pb-4">
           <SectionTitle title="字段差异" note={`${changes.length} 处改动`} />
-          <FieldDiff kind={item.target_kind} changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
+          <FieldDiff changes={changes} beforeLabel="修改前" names={elementNames(draft, items)} />
         </section>
         {reason && (
           <section className="flex flex-col gap-1 border-b border-rule pb-4">

@@ -101,7 +101,7 @@ function JsonSplit({ before, after }: { before: unknown; after: unknown }) {
 }
 
 /** The fields of a created or deleted element, minus identity and empty values. */
-function FieldList({ value, names, kind }: { value: Record<string, unknown>; names: Map<string, string>; kind: ElementChange["element_kind"] }) {
+function FieldList({ value, names }: { value: Record<string, unknown>; names: Map<string, string> }) {
   const named = (key: string, v: unknown) =>
     !REFERENCE_FIELDS.has(key) ? v : Array.isArray(v) ? v.map((id) => names.get(String(id)) ?? id) : (names.get(String(v)) ?? v);
   const rows = Object.entries(value).filter(
@@ -114,7 +114,7 @@ function FieldList({ value, names, kind }: { value: Record<string, unknown>; nam
       column={1}
       items={rows.map(([key, v]) => ({
         key,
-        label: fieldLabel(key, kind),
+        label: fieldLabel(key),
         children: <span className="text-xs whitespace-pre-wrap break-all">{readable(key, named(key, v))}</span>,
       }))}
     />
@@ -145,12 +145,12 @@ function ChangeBody({ change, names }: { change: ElementChange; names: Map<strin
         )
       ) : change.change === "updated" ? (
         change.field_changes.length ? (
-          <FieldDiff kind={change.element_kind} changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
+          <FieldDiff changes={change.field_changes} beforeLabel="当前发布版本" afterLabel="发布后" names={names} />
         ) : (
           <Text type="secondary">无字段级变化</Text>
         )
       ) : (
-        <FieldList kind={change.element_kind} value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
+        <FieldList value={((change.change === "created" ? change.after : change.before) ?? {}) as Record<string, unknown>} names={names} />
       )}
     </div>
   );

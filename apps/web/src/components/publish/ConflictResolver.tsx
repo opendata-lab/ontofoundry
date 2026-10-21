@@ -14,7 +14,7 @@ function show(value: unknown) {
 
 const title = (c: MergeConflict) =>
   `${c.element_kind ? `${KIND[c.element_kind].label} · ` : ""}${c.element_label} / ${
-    c.kind === "delete_modify" ? "删除与修改" : (fieldLabel(c.path, c.element_kind ?? undefined))
+    c.kind === "delete_modify" ? "删除与修改" : fieldLabel(c.path)
   }`;
 
 const LABELS: Record<Resolution["choice"], [string, string]> = {
