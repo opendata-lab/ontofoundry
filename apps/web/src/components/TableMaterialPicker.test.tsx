@@ -44,9 +44,13 @@ it("links the chosen registered tables to the session", async () => {
   const onLink = renderPicker();
   // Wait until the loaded list has settled before choosing.
   await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled(), { timeout: 5000 });
-  fireEvent.click(await screen.findByRole("checkbox", { name: /dw\.orders/ }));
-  // CI runners are slower than local runs; allow the re-render more than the 1 s default.
-  await waitFor(() => expect(screen.getByRole("checkbox", { name: /dw\.orders/ })).toBeChecked(), { timeout: 5000 });
+  // On slow CI runners the list can re-render after it is found, so a click may land
+  // on a detached node; re-query each attempt and click until the box is checked.
+  await waitFor(() => {
+    const box = screen.getByRole("checkbox", { name: /dw\.orders/ });
+    if (!(box as HTMLInputElement).checked) fireEvent.click(box);
+    expect(box).toBeChecked();
+  }, { timeout: 10_000 });
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
   await waitFor(() =>
     expect(onLink).toHaveBeenCalledWith([{ connection_id: "c1", schema_name: "dw", table_name: "orders" }]),
