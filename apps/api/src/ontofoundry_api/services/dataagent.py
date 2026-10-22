@@ -318,7 +318,10 @@ def proposal_instructions(
         f"run_token：{run_token}\n"
         f"结果：output/ontofoundry-result-{run_token}.json\n"
         f"待确认：output/ontofoundry-needs-input-{run_token}.json\n"
-        "工作流：modeling/"
+        "工作流：modeling/\n"
+        # Real runs spent their first turns listing directories and reading the
+        # context and schema in full; the skill entry already says where to start.
+        "先加载建模技能并按其入口运行初始化；不必先列目录，也不必读上下文或 Schema 全文。"
     )
 
 
