@@ -102,6 +102,13 @@ test("dataset fields place source and columns above the data preview", async ({ 
   await expect(page).toHaveScreenshot("element-dataset-fields.png", { fullPage: true });
 });
 
+test("dataset source editing waits for a database before listing tables", async ({ page }, testInfo) => {
+  const detail = await openElement(page, "dataset", ELEMENTS.dataset.id, "fields", true);
+  await expect(detail.getByRole("combobox", { name: "库或 schema" })).toBeVisible();
+  await expect(detail.getByRole("combobox", { name: "表或视图" })).toBeDisabled();
+  await page.screenshot({ path: testInfo.outputPath("element-dataset-fields-edit.png"), fullPage: true });
+});
+
 test("derived member conditions align field, operator and value", async ({ page }) => {
   const detail = await openElement(page, "object_type", ELEMENTS.derived.id, "basic", true);
   await expect(detail.getByRole("heading", { name: "哪些当事人属于VIP当事人", exact: true })).toBeVisible();

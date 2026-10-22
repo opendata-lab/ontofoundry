@@ -48,6 +48,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
     setBusy(true);
     setError("");
     try {
+      values = { ...values, database: (editing?.kind ?? values.kind) === "postgresql" ? values.database : "" };
       if (editing) {
         // An empty password keeps the stored one; the engine cannot change.
         const { kind: _kind, password, ...rest } = values;
@@ -109,13 +110,12 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               ),
             },
             { title: "数据库类型", dataIndex: "kind" },
-            { title: "数据库", key: "database", render: (_, c) => c.kind === "postgresql" ? <code className="text-xs">{c.database}</code> : <span className="text-xs text-muted">整个服务</span> },
             {
               title: "地址",
               key: "host",
               render: (_, c) => (
                 <code className="text-xs text-muted">
-                  {c.host}:{c.port}
+                  {c.host}:{c.port}{c.kind === "postgresql" ? `/${c.database}` : ""}
                 </code>
               ),
             },
@@ -199,7 +199,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
           {/* MySQL and Doris connect to the whole server; libraries are chosen in data management.
               A PostgreSQL connection cannot be made without its database. */}
           {(editing?.kind ?? kind) === "postgresql" && (
-            <Form.Item name="database" label="数据库名称" rules={[{ required: true, message: "PostgreSQL 连接需要填写数据库名称" }]}>
+            <Form.Item name="database" label="数据库名称" preserve={false} rules={[{ required: true, whitespace: true, message: "PostgreSQL 连接需要填写数据库名称" }]}>
               <Input aria-label="数据库名称" />
             </Form.Item>
           )}

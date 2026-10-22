@@ -33,6 +33,9 @@ test("connections show compact rows and preserve the add action", async ({ page 
   await expect(page.getByRole("heading", { name: "数据连接", exact: true })).toBeVisible();
   await expect(page.getByRole("cell", { name: "星河零售只读库", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "测试", exact: true })).toHaveCount(2);
+  await expect(page.getByRole("columnheader", { name: "数据库", exact: true })).toHaveCount(0);
+  await expect(page.getByText("整个服务", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: "retail-db.example.invalid:5432/xinghe_demo", exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("connections.png", { fullPage: true });
 

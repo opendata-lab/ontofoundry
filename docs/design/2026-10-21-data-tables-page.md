@@ -119,3 +119,78 @@ PYTHONPATH=src /Users/guoruping/project/bigdata/ontograph/apps/api/.venv/bin/pyt
 ### 上线注意
 
 先停止旧 API/后台任务并备份平台数据库，再执行 `20261022_000001` 迁移：会清空所有连接（包括 PostgreSQL）的 metadata_snapshots、metadata_sync_jobs、metadata_sync_batches，并清空 MySQL/Doris 连接配置中的 database。业务源库、工作空间和本体/数据集定义不变。**所有已同步表都需要重新同步**；现有数据集在此之前显示表未同步。不要重试旧任务，按实际库新建全量任务，核对同名表的字段与主键。该迁移不可恢复已删除快照，回滚需使用备份。现场重新出现异常时，应保留同一请求、任务 schema、源清单和快照的对应证据，再定位运行路径。
+
+## 2026-10-22 调用方修复（v0.2.2）
+
+依据：[服务级连接调用链设计](2026-10-22-connection-schema-callers.md)。不修改版本号、核心模型、接口契约或数据库结构。
+
+### 复现范围与修复
+
+使用空 database 的 MySQL/Doris 连接，Vitest 渲染真实页面/组件，保留真实 api/client.ts，以 mock HTTP 对缺少 schema_name 的单库接口返回 SCHEMA_REQUIRED；pytest 使用 SQLite ATTACH 两个虚构业务库和 Doris information_schema 模拟，禁止连接真实服务。
+
+| 路径 | 触发操作与修复前行为 | 修复 |
+|---|---|---|
+| components/elements/DatasetLocationFields.tsx:37 的 assets effect（修复前 :35） | 新建基于表的数据集选择连接但未选库；或编辑 schema_name=null 的遗留数据集。直接 GET assets，无 schema_name，返回“请选择库”。 | MySQL/Doris 未选库不请求资产，表选择禁用；选库后显式传 schema_name。PostgreSQL 保留默认 schema。清空库时清空表和列。 |
+| 同文件 :53 的 changeConnection（修复前 :49） | 遗留数据集有 table_name 而无 schema_name，切换连接。Promise.all 同时列库、用空库查资产；报错被 catch 吞掉并重置来源。 | 未选库直接重置；已有库先确认目标连接可见该库，再带该库查表。检查期间不提前写入目标连接，防止 effect 向无权限库发请求。 |
+| components/DataConnections.tsx:51、:112、:202 | 列表有数据库列及“整个服务”；表单从 PostgreSQL 切换引擎时隐藏的旧数据库仍被 Form 保留。 | 删除该列；PostgreSQL 地址附 /db；隐藏字段 preserve=false，提交时 MySQL/Doris 的 database 显式清空，PG 必填。 |
+
+当前分支数据表页和同步对话框本来已逐库传参。新增回归须在修复前后均验证它们，不能据此声称复现了用户现场这两个入口的同一错误；现场运行资源版本与请求参数尚未取得。表详情“影响”在本实现体现为基本信息中的引用数据集及数据集引用页，无独立表影响接口。
+
+### 前端全部连接相关调用清单
+
+下表文件路径相对于 apps/web/src。api/client.ts 的 catalogApi 统一经 workspaceRequest 构造连接 URL，测试断言最终 fetch URL，而非仅断言 mock 方法实参。
+
+| 调用方 | 接口/传参及空库行为 |
+|---|---|
+| components/DataConnections.tsx:43、:56、:60、:132 | catalogApi.connections；workspaceRequest POST /connections、PATCH /connections/{id}、POST /test。连接级入口不要求 schema；MySQL/Doris 不带固定数据库，PG 必填。 |
+| hooks/useConnectionNames.ts:11 | catalogApi.connections，只读连接显示名，无单库读取。 |
+| lib/metadataSync.ts:8–9 → TableSyncPanel.tsx:42、TableSyncDialog.tsx:43 | schemas 后遍历每个库请求 assets({schema_name: schema})；“全部库”只是前端合并，不发空库资产请求。无可见库时不请求 assets。 |
+| components/TableSyncPanel.tsx:34、:47 | connections；删除用 deleteTable(table.schema, table.name)；打开详情携带该行库名。 |
+| components/TableSyncDialog.tsx:36、:44、:62、:74、:93、:103 | connections；每库 syncJobs(g.schema)；选中的每库 tables({schema_name:s})、refreshAssets({schema_name:s})；syncJob/retrySync 用 job_id，后台读取持久化的 job.schema_name。 |
+| components/TableDetailDialog.tsx:25 | tableRows({table_name, schema_name:schema})；结构和引用数据集来自已选库资产快照，不再请求源库。其唯一调用方 TableSyncPanel 保证传行库名。 |
+| components/elements/DatasetLocationFields.tsx:22、:28、:37、:50、:53 | connections、schemas；本轮修复两个 assets 调用，MySQL/Doris 均在明确库名后请求，PostgreSQL 允许后端归一化默认 schema；目标连接没有原库时不请求该库资产。用于新建和编辑数据集的共用选表控件。 |
+| pages/InstancesPage.tsx:136、components/elements/ElementInstances.tsx:167 | mappingPreview，映射引用的数据集含其自身 schema_name；经 dataset_sources 解析，不调用 metadata 的 require_schema。 |
+| api/client.ts:251 的 tableMaterial | 无前端使用者；保留旧客户端方法，后端固定拒绝重复材料，错误码 DATASET_ASSOCIATION_REQUIRED，不读取表、不调用 require_schema。 |
+| components/TableMaterialPicker.tsx:32（构建页）、api/client.ts:377–380 的 datasetApi | registeredTables 不要求库，后端汇总登记快照；关联结果逐表保留 connection_id/schema_name/table_name。datasetApi.validate/preview 请求体携带数据集选中的 schema_name。 |
+| 其他 workspaceRequest | settings、modeling、提案等不是连接单库入口；reviseDataset 和 element-saves 保留数据集 schema_name，不另猜默认库。 |
+
+### 后端全部归一化/库名检查入口
+
+路径相对于 apps/api/src/ontofoundry_api。MySQL/Doris 空库在下表检查点均保持拒绝；PostgreSQL 的 normalize_schema 仍回落配置值或 public。
+
+| 调用方 | 上游入口与检查 |
+|---|---|
+| api/connections.py:190 的 tables | GET /connections/{id}/tables（含 table 参数详情）→ normalize_schema → require_schema → list_tables；空库 422，显式库同时传列表和字段读取。 |
+| api/assets.py:113 的 assets | GET /assets → normalize_schema → require_schema → 复合主键快照；空库 422。 |
+| services/metadata_sync.py:147 的 create_job | POST /assets/sync-jobs 与兼容 /assets/refresh → normalize_schema → require_schema；空库不创建任务。 |
+| services/metadata_sync.py:171 的 latest_jobs | GET /assets/sync-jobs → normalize_schema → require_schema；前端逐库读历史。 |
+| services/metadata_sync.py:238 的 run_job | 创建或重试后台任务 → require_schema(job.schema_name)；空库遗留任务失败，禁止打开源库。GET 单任务不要求另传库。 |
+| services/metadata_sync.py:307 的 remove_table | DELETE /assets/tables → normalize_schema → require_schema；删除只作用于目标库快照。 |
+| services/table_preview.py:24 的 preview_table | GET /assets/rows → normalize_schema → require_schema，再从已登记表生成限定库名的只读 SQL。 |
+| services/metadata_catalog.py:53 的 list_tables | require_source_schema；上游为 tables 接口、read_structure、后台全量同步发现表。 |
+| services/metadata_sync.py:114 的 read_table | require_source_schema；上游为 tables 单表详情、read_structure、后台批次。 |
+| services/metadata_catalog.py:65 的 read_doris_table | require_source_schema；上游为 read_table 的 Doris 分支，空库不能落到默认库。 |
+| services/imports.py:111 的 import_context | normalize_schema(c,None) 生成导入候选连接的 default_schema；MySQL/Doris 为 None，不调用 require_schema，不访问源库。 |
+| services/dataset_sources.py:32 的 resolve_dataset | normalize_schema(connection,dataset.schema_name)，供数据集校验/预览、映射/实例和资产引用解析；未指定库的表来源由 registered_tables 返回 SOURCE_NOT_REGISTERED，不是 SCHEMA_REQUIRED。 |
+| services/dataset_sources.py:137 的 registered_table_catalog | normalize_schema 仅用于将数据集引用匹配到确切登记表；汇总所有合法快照，不调用 require_schema，不需要单库参数。 |
+
+### 验证记录
+
+- 修复前证据：用 git archive HEAD 建立 `/private/tmp/ontofoundry-022-before` 隔离副本，只复制新增回归测试，执行 `npx vitest run src/components/ConnectionSchemaFlow.test.tsx src/pages/ConnectionsPage.test.tsx`。最终 **6 failed、9 passed（15 项）**：MySQL/Doris 新建数据集未选库各一项、遗留数据集切换连接一项、连接地址/列一项、隐藏旧库值切换两种引擎各一项。数据表/同步完整流程两种引擎、PG 默认 schema 和构建关联表均通过。日志 `/private/tmp/ontofoundry-022-before-vitest-final.log`。修复后这 15 项均包含在下列全量通过结果中。
+- Vitest 保留真实 client，mock HTTP 拒绝 MySQL/Doris 空库；断言 URL 的 schema_name、数据集 validate/preview 的请求体，以及跨库同名表关联的三元身份。测试中等待 Ant Design Checkbox.Group 注册完毕，消除过早点击造成的测试时序失败。
+- pytest 新增完整 API 流程：POST 不含 database 的 MySQL/Doris 连接 → 连通测试 → 列库/列表 → 选择表同步 → 双库不同字段及样例行 → 数据集校验/预览/新建保存/改库保存 → registered-tables 引用及构建会话 linked_tables；旧表材料入口保持 DATASET_ASSOCIATION_REQUIRED。补测 PG 缺库/空白库拒绝、有效库创建，以及 refresh/delete 空库拒绝。仅使用 SQLite ATTACH 和模拟 Doris 系统表。
+- 后端指定命令最终 **1089 passed、17 skipped、0 failed、0 errors、3 warnings，130.38 秒**。日志 `/private/tmp/ontofoundry-022-pytest.log`。警告为现有 Starlette/TestClient 依赖弃用及 Pydantic 字段名提示。更新后的测试文件 ruff 通过。
+- 前端指定命令最终：build 通过（现有大 chunk 提示）；Vitest **50 个文件、233 passed、0 failed、0 skipped，22.57 秒**；`npx eslint src` 通过。日志分别为 `/private/tmp/ontofoundry-022-build-final.log`、`/private/tmp/ontofoundry-022-vitest-final.log`、`/private/tmp/ontofoundry-022-eslint-final.log`。
+- 环境处理：原 apps/web/node_modules 是指向主目录的只读符号链接，Vite/tsc 写缓存时返回 EPERM；验证期间使用工作目录内的缓存目录及原依赖链接，未安装或改动主目录依赖，结束后恢复原符号链接。
+- **视觉及局域网验收未完成**：已执行 `npm run test:visual`，Vite 监听 127.0.0.1:5199 返回 EPERM，测试未开始；直接启动 Chromium 也被沙箱终止。`npx vite --host 172.20.10.3 --port 5199 --strictPort` 同样返回 EPERM。尝试现有浏览器的离线真实组件页面，工具安全策略拒绝 file://（只允许 HTTP/HTTPS），随后停止该路径并恢复视口。无 1440×900 前后截图可供比较，容器层级、对齐线、字号档位、状态和表格密度尚未经截图验收；旧 connections.png 基准待在可启动浏览器的环境审核更新。日志 `/private/tmp/ontofoundry-022-visual.log`、`/private/tmp/ontofoundry-022-lan.log`。新增数据集编辑视觉用例在可运行环境生成测试截图附件。
+- 真实 MySQL/Doris 未访问；没有修改版本号，没有 commit/push。
+
+```sh
+cd apps/api
+PYTHONPATH=src /Users/guoruping/project/bigdata/ontograph/apps/api/.venv/bin/pytest -q -p no:cacheprovider
+cd ../web
+npm run build
+npx vitest run
+npx eslint src
+npm run test:visual
+```

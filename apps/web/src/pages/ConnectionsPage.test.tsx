@@ -88,3 +88,34 @@ it("edits a connection without resending an unchanged password", async () => {
   await waitFor(() => expect(dialog).not.toBeVisible());
 });
 
+it("removes the database column and appends only PostgreSQL's database to its address", async () => {
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection, { ...connection, id: "mysql", name: "虚构服务", kind: "mysql", port: 3306, database: "" }] });
+  renderWithProviders(<ConnectionsPage />);
+  expect(await screen.findByRole("cell", { name: "db.example.invalid:5432/xinghe_demo" })).toBeInTheDocument();
+  expect(screen.getByRole("cell", { name: "db.example.invalid:3306" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "数据库" })).not.toBeInTheDocument();
+  expect(screen.queryByText("整个服务")).not.toBeInTheDocument();
+});
+
+it.each(["MySQL", "Apache Doris"])("drops a hidden PostgreSQL database when switching to %s", async (engine) => {
+  vi.mocked(workspaceRequest).mockResolvedValue({ ...connection, id: "fiction-new" });
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(screen.getByRole("button", { name: "添加连接" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "数据库名称" }), { target: { value: "fiction_old" } });
+  fireEvent.mouseDown(screen.getByRole("combobox", { name: "数据库类型" }));
+  fireEvent.click(await screen.findByText(engine, { selector: ".ant-select-item-option-content" }));
+  expect(screen.queryByRole("textbox", { name: "数据库名称" })).not.toBeInTheDocument();
+  for (const [name, value] of [["连接名称", "虚构新服务"], ["主机", "fiction.invalid"], ["查询用户名", "reader"]]) {
+    fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } });
+  }
+  fireEvent.click(screen.getByRole("button", { name: "测试并保存" }));
+  await waitFor(() => expect(workspaceRequest).toHaveBeenCalledWith("w1", "/connections", expect.objectContaining({ database: "" })));
+});
+
+it("requires a PostgreSQL database before submitting", async () => {
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(screen.getByRole("button", { name: "添加连接" }));
+  fireEvent.click(screen.getByRole("button", { name: "测试并保存" }));
+  expect(await screen.findByText("PostgreSQL 连接需要填写数据库名称")).toBeInTheDocument();
+  expect(workspaceRequest).not.toHaveBeenCalled();
+});

@@ -20,7 +20,12 @@ from ontofoundry_api.db_models import (
     MetadataSyncBatchRecord,
     MetadataSyncJobRecord,
 )
-from ontofoundry_api.services import metadata_sync, readonly, table_preview
+from ontofoundry_api.services import (
+    dataset_validation,
+    metadata_sync,
+    readonly,
+    table_preview,
+)
 from ontofoundry_api.services.dataset_sources import registered_table_catalog
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.errors import ServiceError
@@ -76,7 +81,7 @@ def server(request, client, tmp_path, monkeypatch):
             conn.info["source_kind"] = item.kind
             yield conn
 
-    for module in (metadata_sync, assets, connections, table_preview):
+    for module in (metadata_sync, assets, connections, table_preview, dataset_validation):
         monkeypatch.setattr(module, "connect_readonly", connect)
     identity = str(uuid4())
     with client.app.state.session_factory() as db:
@@ -170,7 +175,78 @@ def test_omitted_schema_never_falls_back_to_legacy_config(client, server):
         assert response.json()["error"]["code"] == "SCHEMA_REQUIRED"
     response = client.post(base + "/assets/sync-jobs", json={"scope": "all"})
     assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
+    response = client.post(base + "/assets/refresh", json={"scope": "all"})
+    assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
+    response = client.delete(base + "/assets/tables", params={"table_name": "fiction_shared"})
+    assert response.status_code == 422 and response.json()["error"]["code"] == "SCHEMA_REQUIRED"
     assert not server.opened
+
+
+def test_new_server_connection_through_sync_details_dataset_edit_and_builder_links(client, server):
+    from test_modeling import create_session
+
+    created = client.post(ROOT + "/connections", json={
+        "name": "虚构新建服务", "kind": server.kind, "host": "fiction.invalid",
+        "port": 3306, "username": "reader", "password": "",
+    })
+    assert created.status_code == 201, created.text
+    assert created.json()["database"] == ""
+    server.id = created.json()["id"]
+    base = ROOT + f"/connections/{server.id}"
+    assert client.post(base + "/test").status_code == 200
+    assert set(SCHEMAS) <= set(client.get(base + "/schemas").json()["items"])
+    # Each schema has a different shape and value for the same table name.
+    with server.engine.begin() as source:
+        source.exec_driver_sql("INSERT INTO fiction_alpha.fiction_shared VALUES (11, '虚构甲库')")
+        source.exec_driver_sql("INSERT INTO fiction_beta.fiction_shared VALUES (22, 42)")
+    session = create_session(client)
+    dataset_id = str(uuid4())
+    for schema, columns, row in (
+        (SCHEMAS[0], ["id", "alpha_value"], {"id": 11, "alpha_value": "虚构甲库"}),
+        (SCHEMAS[1], ["code", "beta_value"], {"code": 22, "beta_value": 42}),
+    ):
+        inventory = client.get(base + "/tables", params={"schema_name": schema})
+        assert inventory.status_code == 200, inventory.text
+        finished(client, server, schema, "selected", ["fiction_shared"])
+        details = client.get(base + "/assets", params={"schema_name": schema})
+        assert details.status_code == 200, details.text
+        assert [c["name"] for c in details.json()["items"][0]["columns"]] == columns
+        preview = client.get(base + "/assets/rows", params={"schema_name": schema, "table_name": "fiction_shared"})
+        assert preview.status_code == 200, preview.text
+        assert preview.json()["items"] == [row]
+        dataset = {"id": dataset_id, "name": "fiction_dataset", "display_name": "虚构数据集", "source_kind": "table", "connection_id": server.id, "dialect": server.kind, "schema_name": schema, "table_name": "fiction_shared"}
+        checked = client.post(ROOT + "/datasets/validate", json={"dataset": dataset})
+        assert checked.status_code == 200 and checked.json()["valid"], checked.text
+        assert [c["name"] for c in checked.json()["columns"]] == columns
+        data = client.post(ROOT + "/datasets/preview", json={"dataset": dataset})
+        assert data.status_code == 200, data.text
+        assert data.json()["items"] == [row]
+        # Save creation, then edit the same dataset to the other database.
+        draft = {**session["draft"], "datasets": [dataset]}
+        linked = [{"connection_id": server.id, "schema_name": schema, "table_name": "fiction_shared"}]
+        saved = client.put(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "draft": draft, "linked_tables": linked})
+        assert saved.status_code == 200, saved.text
+        session = saved.json()
+        assert session["draft"]["datasets"][0]["schema_name"] == schema
+        assert session["linked_tables"] == linked
+        catalog = client.get(ROOT + "/registered-tables", params={"session_id": session["id"]})
+        assert catalog.status_code == 200, catalog.text
+        used = [t for t in catalog.json()["items"] if t["connection_id"] == server.id and t["datasets"]]
+        assert [(t["schema_name"], t["table_name"]) for t in used] == [(schema, "fiction_shared")]
+    legacy = client.post(base + "/table-material", json={"tables": ["fiction_shared"]})
+    assert legacy.status_code == 422
+    assert legacy.json()["error"]["code"] == "DATASET_ASSOCIATION_REQUIRED"
+
+
+def test_postgresql_connection_requires_database_even_when_mysql_does_not(client, server):
+    body = {"name": "虚构PG服务", "kind": "postgresql", "host": "fiction.invalid", "port": 5432, "username": "reader", "password": ""}
+    for extra in ({}, {"database": ""}, {"database": "  "}):
+        response = client.post(ROOT + "/connections", json={**body, **extra})
+        assert response.status_code == 422, response.text
+    assert not server.opened
+    created = client.post(ROOT + "/connections", json={**body, "database": "fiction_database"})
+    assert created.status_code == 201, created.text
+    assert created.json()["database"] == "fiction_database"
 
 
 @pytest.mark.parametrize("schema,allowed", [("", None), ("fiction_alpha", ["fiction_beta"])])
