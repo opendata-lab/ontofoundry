@@ -1,0 +1,131 @@
+{
+  "scenario": "harbor_city_bus_dispatch",
+  "prompt": "根据材料建立公交调度的本体。",
+  "concepts": [
+    {
+      "key": "bus_route",
+      "accepted": [
+        "公交线路",
+        "线路",
+        "bus_route"
+      ],
+      "instances": [
+        "岚湾环行线",
+        "LW-47"
+      ]
+    },
+    {
+      "key": "bus_stop",
+      "accepted": [
+        "公交站点",
+        "站点",
+        "bus_stop"
+      ],
+      "instances": [
+        "苇灯口站",
+        "砚沙桥站"
+      ]
+    },
+    {
+      "key": "bus_vehicle",
+      "accepted": [
+        "公交车辆",
+        "车辆",
+        "bus_vehicle"
+      ],
+      "instances": [
+        "CX-731"
+      ]
+    },
+    {
+      "key": "bus_depot",
+      "accepted": [
+        "车场",
+        "公交车场",
+        "bus_depot"
+      ],
+      "instances": [
+        "蒲汀车场"
+      ]
+    },
+    {
+      "key": "scheduled_departure",
+      "accepted": [
+        "运营班次",
+        "班次",
+        "scheduled_departure"
+      ],
+      "instances": [
+        "BC-8261"
+      ]
+    },
+    {
+      "key": "employee",
+      "accepted": [
+        "员工",
+        "发起人",
+        "复核人",
+        "employee"
+      ],
+      "instances": [
+        "叶澄禾",
+        "陆闻舟"
+      ]
+    },
+    {
+      "key": "dispatch_order",
+      "accepted": [
+        "调度指令",
+        "派车单",
+        "dispatch_order"
+      ],
+      "instances": [
+        "PD-518",
+        "PD-519"
+      ]
+    }
+  ],
+  "not_concepts": [
+    {
+      "kind": "attribute",
+      "texts": [
+        "线路编号",
+        "线路名称",
+        "核定里程",
+        "站点编号",
+        "站点名称",
+        "经度",
+        "纬度",
+        "车辆编号",
+        "核载人数",
+        "车辆状态",
+        "候场",
+        "执行",
+        "封存",
+        "车场编号",
+        "车场名称",
+        "停车容量",
+        "班次编号",
+        "运营日期",
+        "计划发车时刻",
+        "实际发车时刻",
+        "员工编号",
+        "员工姓名",
+        "联系电话",
+        "指令编号",
+        "创建时刻",
+        "处置档位",
+        "青苗",
+        "银帆",
+        "赤隼"
+      ]
+    },
+    {
+      "kind": "metric",
+      "texts": [
+        "按时发车率",
+        "车辆出勤率"
+      ]
+    }
+  ]
+}

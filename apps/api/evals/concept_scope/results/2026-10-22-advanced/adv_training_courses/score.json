@@ -1,0 +1,55 @@
+{
+ "scenario": "adv_training_courses",
+ "level": "advanced",
+ "predicted": 6,
+ "expected": 6,
+ "correct": 6,
+ "precision": 1.0,
+ "recall": 1.0,
+ "f1": 1.0,
+ "missed": [],
+ "errors": {},
+ "examples_placed": 10,
+ "examples_expected": 10,
+ "details": [
+  {
+   "item": "课程",
+   "result": "正确",
+   "concept": "course"
+  },
+  {
+   "item": "开班",
+   "result": "正确",
+   "concept": "course_class"
+  },
+  {
+   "item": "学员",
+   "result": "正确",
+   "concept": "student"
+  },
+  {
+   "item": "报名记录",
+   "result": "正确",
+   "concept": "enrollment"
+  },
+  {
+   "item": "讲师",
+   "result": "正确",
+   "concept": "teacher"
+  },
+  {
+   "item": "授课安排",
+   "result": "正确",
+   "concept": "teaching_assignment"
+  }
+ ],
+ "workspace_id": "7e297b24-65b9-43dd-b62d-e54993b59d20",
+ "session_id": "f4883242-0f8e-4bea-a519-421fbe9db87a",
+ "result_state": "awaiting_reply",
+ "seconds": 91,
+ "turns": 10,
+ "input": 8029,
+ "cache": 81408,
+ "output": 7412,
+ "tool_errors": 2
+}

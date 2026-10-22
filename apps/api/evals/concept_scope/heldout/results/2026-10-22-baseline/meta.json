@@ -1,0 +1,10 @@
+{
+ "started_at": "2026-10-22T22:42:04",
+ "commit": "a6742c8",
+ "api": "http://192.168.0.100:8000",
+ "set": "heldout",
+ "scenarios": [
+  "harbor_city_bus_dispatch"
+ ],
+ "score_only": false
+}

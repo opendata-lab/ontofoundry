@@ -9,6 +9,10 @@
 | `wind_inspection` | 虚构风电场巡检运维说明 | 无 |
 | `contract_approval` | 虚构合同审批管理办法 | 无 |
 | `clinic_booking` | 虚构社区诊所预约与处方说明 | `tables.sql`（含一张汇总统计表） |
+| `adv_property_repair`（进阶） | 虚构物业报修：同名异称、角色、纯关联表与带属性关联、只在表中出现的概念、背景段 | `tables.sql` |
+| `adv_training_courses`（进阶） | 虚构职业培训：课程与开班两层概念、同名异称、角色词、背景段 | 无 |
+
+gold.json 的 `level` 区分 basic／advanced，运行时可用 `--level` 只跑一类。`heldout/` 下是不公开的留出场景，由另一模型编写，技能作者不阅读，只看汇总分数；用 `--set heldout` 运行。
 
 `gold.json`：`concepts` 为必须识别的概念，`accepted` 是可接受的中英文叫法，`instances` 是材料中的具名实例（列成概念算错，出现在该概念的 examples 中算归位）；`not_concepts` 为属性、指标、汇总统计表，列成概念算错。不设“两可”项。
 

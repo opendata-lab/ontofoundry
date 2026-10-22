@@ -20,13 +20,18 @@ def material_text(folder):
     return "\n".join(p.read_text(encoding="utf-8") for p in (folder / "materials").glob("*.md"))
 
 
-def test_three_scenarios_one_with_tables():
+HELDOUT = sorted(p for p in (EVAL / "heldout").glob("*") if (p / "gold.json").is_file())
+
+
+def test_basic_and_advanced_sets_each_have_one_table_scenario():
     golds = [gold_of(f) for f in SCENARIOS]
-    assert len(golds) == 3
-    assert sum(bool(g.get("schema")) for g in golds) == 1
+    for level, count in (("basic", 3), ("advanced", 2)):
+        chosen = [g for g in golds if g.get("level") == level]
+        assert len(chosen) == count
+        assert sum(bool(g.get("schema")) for g in chosen) == 1
 
 
-@pytest.mark.parametrize("folder", SCENARIOS, ids=lambda p: p.name)
+@pytest.mark.parametrize("folder", SCENARIOS + HELDOUT, ids=lambda p: p.name)
 def test_gold_is_unambiguous_and_grounded_in_the_material(folder):
     gold = gold_of(folder)
     seen = {}
@@ -78,7 +83,7 @@ def test_full_marks_and_empty_plan():
 def test_skills_never_contain_eval_scenario_terms():
     """Tuning skills to the exam would make the baseline meaningless."""
     skill_text = "\n".join(p.read_text(encoding="utf-8") for p in SKILLS.rglob("*") if p.suffix in {".md", ".json"} and "tests" not in p.parts and "dist" not in p.parts)
-    for folder in SCENARIOS:
+    for folder in SCENARIOS + HELDOUT:
         gold = gold_of(folder)
         for concept in gold["concepts"]:
             for instance in concept.get("instances", []):

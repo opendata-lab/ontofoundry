@@ -1,0 +1,63 @@
+{
+ "scenario": "harbor_city_bus_dispatch",
+ "level": "basic",
+ "predicted": 7,
+ "expected": 7,
+ "correct": 6,
+ "precision": 0.857,
+ "recall": 0.857,
+ "f1": 0.857,
+ "missed": [
+  "dispatch_order"
+ ],
+ "errors": {
+  "未登记，待人工判定": 1
+ },
+ "examples_placed": 8,
+ "examples_expected": 11,
+ "details": [
+  {
+   "item": "公交线路",
+   "result": "正确",
+   "concept": "bus_route"
+  },
+  {
+   "item": "公交站点",
+   "result": "正确",
+   "concept": "bus_stop"
+  },
+  {
+   "item": "公交车辆",
+   "result": "正确",
+   "concept": "bus_vehicle"
+  },
+  {
+   "item": "车场",
+   "result": "正确",
+   "concept": "bus_depot"
+  },
+  {
+   "item": "运营班次",
+   "result": "正确",
+   "concept": "scheduled_departure"
+  },
+  {
+   "item": "员工",
+   "result": "正确",
+   "concept": "employee"
+  },
+  {
+   "item": "调度指令（派车单）",
+   "result": "未登记，待人工判定"
+  }
+ ],
+ "workspace_id": "71448c04-5f27-476c-a685-ee08aac2ced7",
+ "session_id": "b970ca83-aac1-4b9e-9a37-55bf2e90af42",
+ "result_state": "awaiting_reply",
+ "seconds": 101,
+ "turns": 10,
+ "input": 8266,
+ "cache": 78720,
+ "output": 8604,
+ "tool_errors": 1
+}

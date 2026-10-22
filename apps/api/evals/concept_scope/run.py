@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from score import score  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent / "scenarios"
+SETS = {"public": ROOT, "heldout": ROOT.parent / "heldout"}
 ACTIVE = {"queued", "running", "waiting_permission"}
 
 
@@ -54,8 +55,8 @@ class Platform:
             raise SystemExit(f"{method} {path} -> {exc.code} {exc.read()[:400].decode(errors='replace')}") from exc
 
 
-def prepare(platform, name, gold, stamp):
-    folder = ROOT / name
+def prepare(platform, name, gold, stamp, root=ROOT):
+    folder = root / name
     space = platform.call("POST", "/workspaces", {
         "name": f"概念评测 {name} {stamp}", "slug": f"eval-{name.replace('_', '-')}-{stamp}",
         "description": "概念范围评测（虚构材料）",
@@ -152,24 +153,29 @@ def main():
     parser = argparse.ArgumentParser(description="跑各场景的计划轮并给概念清单打分，完整保存过程数据")
     parser.add_argument("--api", required=True)
     parser.add_argument("--origin", required=True)
+    parser.add_argument("--set", choices=sorted(SETS), default="public", help="public 为公开场景；heldout 为不公开的留出场景")
+    parser.add_argument("--level", choices=["basic", "advanced"], help="只跑某个难度的公开场景")
     parser.add_argument("--scenario", action="append", help="场景目录名，可重复；默认全部")
     parser.add_argument("--output-dir", required=True, help="结果目录，如 evals/concept_scope/results/2026-10-22-baseline")
     parser.add_argument("--score-only", help="不重跑，只给已有的 workspace_id:session_id 打分并存档（需配合单个 --scenario）")
     args = parser.parse_args()
     platform = Platform(args.api, args.origin)
     out = Path(args.output_dir)
-    names = args.scenario or sorted(p.name for p in ROOT.iterdir() if (p / "gold.json").is_file())
+    root = SETS[args.set]
+    names = args.scenario or sorted(p.name for p in root.iterdir() if (p / "gold.json").is_file())
+    if args.level:
+        names = [n for n in names if json.loads((root / n / "gold.json").read_text(encoding="utf-8")).get("level", "basic") == args.level]
     stamp = datetime.now().strftime("%m%d%H%M")
     write(out / "meta.json", {"started_at": datetime.now().isoformat(timespec="seconds"), "commit": commit(),
-                              "api": args.api, "scenarios": names, "score_only": bool(args.score_only)})
+                              "api": args.api, "set": args.set, "scenarios": names, "score_only": bool(args.score_only)})
     results = []
     for name in names:
-        gold = json.loads((ROOT / name / "gold.json").read_text(encoding="utf-8"))
+        gold = json.loads((root / name / "gold.json").read_text(encoding="utf-8"))
         if args.score_only:
             workspace_id, session_id = args.score_only.split(":")
             state, seconds = platform.call("GET", f"/workspaces/{workspace_id}/sessions/{session_id}"), None
         else:
-            workspace_id, session_id = prepare(platform, name, gold, stamp)
+            workspace_id, session_id = prepare(platform, name, gold, stamp, root)
             state, seconds = run_plan(platform, workspace_id, session_id, gold["prompt"])
         plan = saved_plan(session_id)
         result = score(gold, plan.get("entities"))

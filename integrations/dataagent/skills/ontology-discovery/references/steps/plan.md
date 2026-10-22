@@ -1,12 +1,12 @@
 # 计划：只定范围
 
-范围确认是建模里最省力的一步：用户一句“确认”就锁定要建哪些概念，属性、关系、实例都留到抽取轮按清单展开。所以本轮只回答“要建模哪些概念”。
+用户一句“确认”就锁定要建哪些概念，属性、关系、实例留到抽取轮按清单展开。本轮只回答“要建模哪些概念”。
 
-1. 按初始化打印的命令用 `read_input.py <材料>` 读材料并保留行号；表只看工作包目录，不读列。只读下文链接的两个模板（优化时换成问题与选择模板）。
+1. 按初始化打印的命令用 `read_input.py <材料>` 读材料并保留行号；表只看工作包目录，不读列。只读下文链接的模板。
 2. 区分概念与实例：概念是一类东西；具名的具体事物（某个产品、系统、服务器、人、单据）是它的实例。材料列出《晨读》《古籍考》→ 概念“期刊”，二者记入 examples，不各成类型，也不逐个请用户确认——确认概念后它们在抽取轮作为实例提出。单值归属性、跨行统计归指标，本轮不展开。
-3. 判断场景写 plan.md 首行；全量／增量写 [entities.json](../examples/protocol/entities.json)，优化写 [issues.json](../examples/protocol/issues.json)。概念与依据记入 notes.md。
+3. 判断场景写 plan.md 首行；全量／增量照 [references/examples/protocol/entities.json](../examples/protocol/entities.json)，优化照 [references/examples/protocol/issues.json](../examples/protocol/issues.json)。概念与依据记入 notes.md。
 4. 本轮不定标识、对应表、关系、属性，不读原则、Schema，不运行 show_example.py，不检查。第 3 轮前写完；拿不准的点写成待确认问题，不反复推敲，用户比推理更快给出答案。
-5. 按[确认](../examples/protocol/needs-input-entities.json)或[选择](../examples/protocol/needs-input-issues.json)模板写 needs_input_file 后结束，不写提案。回答表格列概念（名称／英文标识）、说明、依据（材料行号或表）、材料中的例子；优化列问题／改法／影响。
+5. 按 [references/examples/protocol/needs-input-entities.json](../examples/protocol/needs-input-entities.json)或 [references/examples/protocol/needs-input-issues.json](../examples/protocol/needs-input-issues.json)模板写待确认文件 后结束，不写提案。回答表格列概念（名称／英文标识）、说明、依据（材料行号或表）、材料中的例子；优化列问题／改法／影响。
 
 | 场景 | 判断 | 产物 | 确认 |
 | --- | --- | --- | --- |

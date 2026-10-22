@@ -8,7 +8,14 @@ accepted, added to the gold's names.
 
 import unicodedata
 
-KINDS = {"instance": "实例当概念", "attribute": "属性当概念", "metric": "指标当概念", "aggregate": "统计表当概念"}
+KINDS = {
+    "instance": "实例当概念",
+    "attribute": "属性当概念",
+    "metric": "指标当概念",
+    "aggregate": "统计表当概念",
+    "link_table": "关联表当概念",
+    "background": "背景当概念",
+}
 
 
 def normalize(text) -> str:
@@ -64,6 +71,7 @@ def score(gold: dict, entities: dict | None) -> dict:
     counts = {label: sum(d["result"] == label for d in details) for label in [*KINDS.values(), "重复", "未登记，待人工判定"]}
     return {
         "scenario": gold.get("scenario"),
+        "level": gold.get("level", "basic"),
         "predicted": predicted,
         "expected": len(concepts),
         "correct": tp,

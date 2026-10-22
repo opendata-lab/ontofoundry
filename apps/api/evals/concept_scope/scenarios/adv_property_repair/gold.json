@@ -1,0 +1,166 @@
+{
+ "scenario": "adv_property_repair",
+ "level": "advanced",
+ "prompt": "根据材料和关联的表建立青檀物业报修的本体。",
+ "schema": "eval_property",
+ "tables": [
+  "buildings",
+  "houses",
+  "residents",
+  "repair_orders",
+  "workers",
+  "shifts",
+  "worker_buildings",
+  "spare_parts",
+  "order_parts"
+ ],
+ "traps": [
+  "报修单与工单同指一物",
+  "住户兼作评价人",
+  "worker_buildings、order_parts 为纯关联表",
+  "排班为带属性的关联",
+  "备件只出现在表结构",
+  "紧急程度、工种、班次为枚举字段",
+  "公司简介为背景"
+ ],
+ "concepts": [
+  {
+   "key": "building",
+   "accepted": [
+    "楼栋",
+    "building"
+   ],
+   "instances": [
+    "7 栋"
+   ]
+  },
+  {
+   "key": "house",
+   "accepted": [
+    "房屋",
+    "房产",
+    "house",
+    "unit",
+    "property_unit"
+   ],
+   "instances": [
+    "3 栋 1502 室"
+   ]
+  },
+  {
+   "key": "resident",
+   "accepted": [
+    "住户",
+    "业主",
+    "评价人",
+    "报修人",
+    "resident",
+    "owner",
+    "householder"
+   ],
+   "instances": []
+  },
+  {
+   "key": "repair_order",
+   "accepted": [
+    "报修单",
+    "工单",
+    "维修工单",
+    "报修",
+    "repair_order",
+    "work_order",
+    "repair_request"
+   ],
+   "instances": [
+    "BX-0315",
+    "厨房水管漏水"
+   ]
+  },
+  {
+   "key": "worker",
+   "accepted": [
+    "维修工",
+    "维修人员",
+    "维修师傅",
+    "worker",
+    "repair_worker",
+    "technician"
+   ],
+   "instances": [
+    "韩师傅",
+    "W012"
+   ]
+  },
+  {
+   "key": "shift",
+   "accepted": [
+    "排班",
+    "排班记录",
+    "值班",
+    "shift",
+    "duty_schedule",
+    "schedule"
+   ],
+   "instances": []
+  },
+  {
+   "key": "spare_part",
+   "accepted": [
+    "备件",
+    "配件",
+    "spare_part",
+    "part"
+   ],
+   "instances": []
+  }
+ ],
+ "not_concepts": [
+  {
+   "kind": "attribute",
+   "texts": [
+    "紧急程度",
+    "工种",
+    "班次",
+    "报修编号",
+    "报修时间",
+    "问题描述",
+    "住户编号",
+    "联系电话",
+    "房号",
+    "建筑面积",
+    "楼栋编号",
+    "楼层数",
+    "工号",
+    "住户评分",
+    "评分"
+   ]
+  },
+  {
+   "kind": "metric",
+   "texts": [
+    "报修及时完成率",
+    "住户满意度"
+   ]
+  },
+  {
+   "kind": "link_table",
+   "texts": [
+    "worker_buildings",
+    "维修工负责楼栋",
+    "负责楼栋",
+    "order_parts",
+    "报修单使用的备件",
+    "备件使用"
+   ]
+  },
+  {
+   "kind": "background",
+   "texts": [
+    "青檀物业",
+    "物业公司",
+    "公司",
+    "示范单位"
+   ]
+  }
+ ]
+}

@@ -1,5 +1,6 @@
 {
  "scenario": "wind_inspection",
+ "level": "basic",
  "prompt": "根据材料建立东岭风电运维的本体。",
  "concepts": [
   {

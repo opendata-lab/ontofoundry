@@ -1,0 +1,140 @@
+{
+ "scenario": "adv_training_courses",
+ "level": "advanced",
+ "prompt": "根据材料建立启明职业培训课程运营的本体。",
+ "traps": [
+  "课程与开班是两层概念",
+  "学员与学生同指一类人",
+  "主讲、助教是角色",
+  "课程级别、报名状态为枚举字段",
+  "机构历程为背景"
+ ],
+ "concepts": [
+  {
+   "key": "course",
+   "accepted": [
+    "课程",
+    "培训课程",
+    "培训项目",
+    "course",
+    "training_course"
+   ],
+   "instances": [
+    "KC-101",
+    "KC-205",
+    "Python 数据分析",
+    "财务报表实务"
+   ]
+  },
+  {
+   "key": "course_class",
+   "accepted": [
+    "开班",
+    "班级",
+    "开班班级",
+    "班期",
+    "course_class",
+    "class",
+    "course_offering",
+    "class_session",
+    "cohort"
+   ],
+   "instances": [
+    "KB-26S01",
+    "2026 春季 Python 数据分析 1 班"
+   ]
+  },
+  {
+   "key": "student",
+   "accepted": [
+    "学员",
+    "学生",
+    "student",
+    "trainee",
+    "learner"
+   ],
+   "instances": [
+    "陈思远",
+    "S2601"
+   ]
+  },
+  {
+   "key": "enrollment",
+   "accepted": [
+    "报名记录",
+    "报名",
+    "enrollment",
+    "registration",
+    "signup"
+   ],
+   "instances": []
+  },
+  {
+   "key": "teacher",
+   "accepted": [
+    "讲师",
+    "老师",
+    "teacher",
+    "instructor",
+    "lecturer"
+   ],
+   "instances": [
+    "方立",
+    "T07"
+   ]
+  },
+  {
+   "key": "teaching_assignment",
+   "accepted": [
+    "授课安排",
+    "授课",
+    "授课记录",
+    "teaching_assignment",
+    "assignment",
+    "class_teacher"
+   ],
+   "instances": []
+  }
+ ],
+ "not_concepts": [
+  {
+   "kind": "attribute",
+   "texts": [
+    "课程级别",
+    "报名状态",
+    "主讲",
+    "助教",
+    "角色",
+    "课程编号",
+    "课时数",
+    "开班编号",
+    "开课日期",
+    "结课日期",
+    "上课地点",
+    "计划招生人数",
+    "学员编号",
+    "手机号",
+    "报名日期",
+    "缴费金额",
+    "擅长方向"
+   ]
+  },
+  {
+   "kind": "metric",
+   "texts": [
+    "开班满员率",
+    "退费率"
+   ]
+  },
+  {
+   "kind": "background",
+   "texts": [
+    "启明职业培训",
+    "机构",
+    "培训机构",
+    "青岚软件园",
+    "优秀机构"
+   ]
+  }
+ ]
+}

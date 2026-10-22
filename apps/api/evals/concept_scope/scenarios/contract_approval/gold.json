@@ -1,5 +1,6 @@
 {
  "scenario": "contract_approval",
+ "level": "basic",
  "prompt": "根据材料建立青禾科技合同审批的本体。",
  "concepts": [
   {

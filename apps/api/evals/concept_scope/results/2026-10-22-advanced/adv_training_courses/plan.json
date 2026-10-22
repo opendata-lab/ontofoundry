@@ -1,0 +1,97 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-a33329c99a52b13e2fdaa55f153bd9ad.json\n本体为空：是\n新增材料：无\n新增关联表：无\n\n## 范围\n启明职业培训课程运营：课程、开班、学员、报名记录、讲师、授课安排六个概念。机构历程为背景不建模；课程级别、报名状态、主讲/助教为字段取值不单独建模；满员率、退费率为指标留到抽取轮。\n\n## 实体或变化清单（全量／增量）或问题清单（优化）\n见 entities.json。\n\n## 来源表\n无（材料未提供表结构）。\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n- 机构历程（L5）明确为背景，默认不建模。\n- 满员率、退费率（L25）作为指标，抽取轮处理，不建概念。\n- 主讲/助教（L21）为讲师在开班中的角色字段，不另建类型。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "course",
+    "display_name": "课程",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "KC-101《Python 数据分析》",
+     "KC-205《财务报表实务》"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "class_session",
+    "display_name": "开班",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 11
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "KB-26S01 2026 春季 Python 数据分析 1 班"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "student",
+    "display_name": "学员",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 15
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "S2601 陈思远"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "enrollment",
+    "display_name": "报名记录",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 17
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   },
+   {
+    "name": "instructor",
+    "display_name": "讲师",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 21
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "T07 方立"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "teaching_assignment",
+    "display_name": "授课安排",
+    "basis": [
+     {
+      "material_id": "3021c2eb-1cff-4dc7-8e6c-255ad23b8d81",
+      "line": 21
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   }
+  ]
+ }
+}

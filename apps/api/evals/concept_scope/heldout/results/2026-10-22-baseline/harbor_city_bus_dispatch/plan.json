@@ -1,0 +1,127 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-ebf3174b0d517128fe0b29e88c98cc3d.json\n本体为空：是\n新增材料：无（材料为工作包自带 0e957bec-5c3b-430c-ac47-27e36d395332-_.md）\n新增关联表：无\n\n## 范围\n首次为“城市公交调度”建立本体，新增 7 个概念：公交线路、公交站点、公交车辆、车场、运营班次、员工、调度指令（派车单）。\n不建实体：车辆状态（候场/执行/封存）与处置档位（青苗/银帆/赤隼）为枚举值；发起人/复核人为员工的办理角色；按时发车率/车辆出勤率为指标；公司/纸签/展览/纪念册/口号为背景，均不在范围。\n\n## 实体或变化清单（全量）\n见 modeling/entities.json。\n\n## 来源表\n无（材料为纯文本业务说明，无表结构）\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n无\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "bus_route",
+    "display_name": "公交线路",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "岚湾环行线"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "bus_stop",
+    "display_name": "公交站点",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "苇灯口站",
+     "砚沙桥站"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "bus_vehicle",
+    "display_name": "公交车辆",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "CX-731"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "depot",
+    "display_name": "车场",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "蒲汀车场"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "operation_trip",
+    "display_name": "运营班次",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "BC-8261"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "employee",
+    "display_name": "员工",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 11
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "叶澄禾",
+     "陆闻舟"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "dispatch_instruction",
+    "display_name": "调度指令（派车单）",
+    "basis": [
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 11
+     },
+     {
+      "material_id": "0e957bec-5c3b-430c-ac47-27e36d395332",
+      "line": 13
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "PD-518",
+     "PD-519"
+    ],
+    "example_count": 2,
+    "status": "new"
+   }
+  ]
+ }
+}

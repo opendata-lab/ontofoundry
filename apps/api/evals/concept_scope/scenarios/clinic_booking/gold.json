@@ -1,5 +1,6 @@
 {
  "scenario": "clinic_booking",
+ "level": "basic",
  "prompt": "根据材料和关联的表建立青柠社区诊所的本体。",
  "schema": "eval_clinic",
  "tables": [

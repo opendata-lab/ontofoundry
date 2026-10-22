@@ -1,0 +1,11 @@
+{
+ "started_at": "2026-10-22T22:38:21",
+ "commit": "a6742c8",
+ "api": "http://192.168.0.100:8000",
+ "set": "public",
+ "scenarios": [
+  "adv_property_repair",
+  "adv_training_courses"
+ ],
+ "score_only": false
+}
