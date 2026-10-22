@@ -11,7 +11,7 @@ SELECTED_EXAMPLES_LIMIT = 5600
 # plan step now reads only the routing entry and plan.md (about 15.6 KB in total).
 PLAN_ROUTE_LIMIT = 15500
 EXTRACT_ROUTE_LIMIT = 36000
-INCREMENTAL_ROUTE_LIMIT = 50000
+INCREMENTAL_ROUTE_LIMIT = 30000
 INCREMENTAL_QUERIES = [
     ["object_type:refund", "dataset:refunds", "dataset:orders"],
     [f"property:refund.{name}" for name in ("refund_no", "order_no", "refund_date", "refund_amount", "reason")],
@@ -423,7 +423,7 @@ def byte_report():
         "表结构": (render_tables(json.dumps({"tables": incremental_tables}), ",".join(t["key"] for t in incremental_tables)) + "\n").encode(),
         "原则": resource("references/principles.md").read_bytes(),
         **{f"写法包/{name}": (kit / name).read_bytes() for name in ("incremental.md", "values.json", "update.json")},
-        **{f"工作包索引/{i}": page for i, page in enumerate(incremental_pages)},
+        # Targets are looked up by name with show_element, so index pages stay unread.
     }
     index = ElementIndex(incremental_context)
     for i, selectors in enumerate(INCREMENTAL_QUERIES):
@@ -442,7 +442,7 @@ def byte_report():
         "bytes": incremental_bytes, "limit": INCREMENTAL_ROUTE_LIMIT,
         "pass": incremental_bytes <= INCREMENTAL_ROUTE_LIMIT,
         "components": incremental_components,
-        "scope": "离线零售 v1＋独立图书馆写法：完整工作包及全部索引页、全部材料、六表结构、提示、原则、增量指南、取值、update 和两组精确查询；不读 context／源码／Schema，无前轮计划；名称删除另加 edit",
+        "scope": "离线零售 v1＋独立图书馆写法：完整工作包（索引页不读，按名称精确查询）、全部材料、六表结构、提示、原则、增量指南、取值、update 和两组精确查询；不读 context／源码／Schema，无前轮计划；名称删除另加 edit",
         "optional_edit_bytes": (kit / "edit.json").stat().st_size,
         "estimated_rounds": {
             "normal": [6, 8], "two_repairs": [10, 12], "first_part_by": [3, 4],

@@ -183,7 +183,7 @@ def test_exact_queries_return_full_definitions_hashes_and_only_small_reference_l
     assert any(r.get("name") == "refund_limit" for r in refs)
 
 
-@pytest.mark.parametrize("selector", ["missing_refund", "Refund", "退款", "city", "property:city"])
+@pytest.mark.parametrize("selector", ["missing_refund", "Refund", "退", "city", "property:city"])
 def test_nonexistent_and_ambiguous_queries_fail_with_exact_candidates(tmp_path, selector):
     status, data = cli(tmp_path, context(), selector)
     assert status == 1
@@ -195,6 +195,18 @@ def test_nonexistent_and_ambiguous_queries_fail_with_exact_candidates(tmp_path, 
     assert all(index.find(s)[1] is None for s in candidates)
     if "city" in selector:
         assert candidates == ["property:member.city", "property:store.city"]
+
+
+def test_chinese_names_select_exactly_like_english_ones(tmp_path):
+    ctx = context()
+    index = ElementIndex(ctx)
+    refund = next(e for e in ctx["draft"]["object_types"] if e.get("display_name") == "退款")
+    assert index.find("退款") == (refund["id"], None)
+    assert index.find("object_type:退款") == (refund["id"], None)
+    prop = next(p for p in ctx["draft"]["properties"] if p["owner_type_id"] == refund["id"] and p.get("display_name"))
+    assert index.find(f"退款.{prop['display_name']}")[0] == prop["id"]
+    # Still exact: a fragment of a name selects nothing.
+    assert index.find("退")[0] is None
 
 
 def test_pagination_reconstructs_full_unicode_definition_and_pins_hash(tmp_path):
@@ -284,7 +296,8 @@ def test_incremental_read_budget_counts_public_outputs_and_enforces_limit(monkey
     assert route["estimated_rounds"]["two_repairs"] == [10, 12]
     assert route["optional_edit_bytes"] == len(lookup("--part", "edit").stdout)
     assert {"工作包", "带原行号材料", "表结构", "原则", "技能入口", "写法包/incremental.md", "写法包/values.json", "写法包/update.json", "已有元素/0", "已有元素/1"} <= route["components"].keys()
-    assert any(k.startswith("工作包索引/") for k in route["components"])
+    # Targets are found by name, so the work-pack index pages are not read.
+    assert not any(k.startswith("工作包索引/") for k in route["components"])
     for n, selectors in enumerate(budget.INCREMENTAL_QUERIES):
         value, status = ElementIndex(context()).query(selectors)
         assert status == 0

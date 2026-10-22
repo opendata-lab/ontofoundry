@@ -48,16 +48,22 @@ class ElementIndex:
         return None
 
     def selectors(self, identity):
+        """Exact spellings that select this element: id, English name or Chinese name.
+
+        The Chinese name is matched exactly like the English one, so the agent can
+        look up what the user said without paging through the work-pack index.
+        """
         kind, element = self.elements[identity]
-        name = element.get("name")
-        aliases = {identity}
-        if name:
-            aliases.update((name, f"{kind}:{name}"))
-            owner = element.get("owner_type_id") if kind == "property" else element.get("source_type_id") if kind == "link_type" else None
-            if owner:
-                qualified = self.elements[owner][1]["name"] + "." + name
+        aliases = {identity, f"{kind}:{identity}"}
+        owner = element.get("owner_type_id") if kind == "property" else element.get("source_type_id") if kind == "link_type" else None
+        for key in ("name", "display_name"):
+            label = element.get(key)
+            if not label:
+                continue
+            aliases.update((label, f"{kind}:{label}"))
+            if owner and self.elements[owner][1].get(key):
+                qualified = self.elements[owner][1][key] + "." + label
                 aliases.update((qualified, f"{kind}:{qualified}"))
-        aliases.add(f"{kind}:{identity}")
         return aliases
 
     def exact_selector(self, identity):
@@ -81,7 +87,7 @@ class ElementIndex:
             return matches[0], None
         candidates = matches or [i for i, (k, _) in self.elements.items() if kind not in TARGET_KINDS or kind == k]
         return None, {
-            "查询": selector, **({"code": "TARGET_NOT_FOUND"} if not matches else {}), "错误": "英文标识有歧义" if matches else "元素不存在（仅支持精确英文标识或 id）",
+            "查询": selector, **({"code": "TARGET_NOT_FOUND"} if not matches else {}), "错误": "名称有歧义，按候选精确写法重查" if matches else "元素不存在（支持精确的中文名称、英文标识、实体.属性或 id，不做模糊匹配）",
             "候选精确写法": sorted(self.exact_selector(i) for i in candidates),
         }
 
@@ -232,9 +238,9 @@ def bounded(value, page=None, expected_hash=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="精确读取已有元素、固定 hash 与直接引用者；不支持中文名称或模糊匹配")
+    parser = argparse.ArgumentParser(description="精确读取已有元素、固定 hash 与直接引用者；按中文名称、英文标识、实体.属性或 id 精确匹配，不做模糊匹配")
     parser.add_argument("--work-pack", required=True)
-    parser.add_argument("selectors", nargs="+", help="id、英文标识、kind:标识、实体.属性/关系；无英文标识的元素用 id")
+    parser.add_argument("selectors", nargs="+", help="中文名称、英文标识、kind:名称、实体.属性/关系或 id")
     parser.add_argument("--page", type=int)
     parser.add_argument("--sha256")
     args = parser.parse_args()

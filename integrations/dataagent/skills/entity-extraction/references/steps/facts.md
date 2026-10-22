@@ -2,7 +2,7 @@
 
 概念已由用户确认；本步骤只把材料中的具体事物和具体关系落为这些概念的实例。
 
-1. 取得工作包，运行 `init_workflow.py --work-pack <工作包>`，有前轮计划加 `--prior-plan <prior_plan_file>`。用 `read_input.py <材料>` 保留原行号，按范围完整阅读材料；用 `show_element.py --work-pack <工作包> <英文标识或id>...` 定点取得具体类型、有效属性、关系端点及已有实例。歧义按候选重查，超限分页，不读 context_file 全文或 Schema。
+1. 取得工作包，运行 `init_workflow.py --work-pack <工作包>`，有前轮计划加 `--prior-plan <prior_plan_file>`。用 `read_input.py <材料>` 保留原行号，按范围完整阅读材料；用 `show_element.py --work-pack <工作包> <名称>...` 定点取得具体类型、有效属性、关系端点及已有实例。歧义按候选重查，超限分页，不读 context_file 全文或 Schema。
 2. 读 [实例方法](../extract-facts.md)、[原则](../principles.md)，同回合执行 `show_example.py --values`、`show_example.py --part 05`。区分定义与实例：规则“员工需有主管”不是具体关系，“小岚向小舟汇报”可形成两个文档实例和一个关系实例。示例、假设、否定、计划不自动成为已成立的实例。对外称“文档实例”“关系实例”；脚本与契约仍用 material_object、material_link、values、evidence 等原字段。
 3. 只引用已确认的类型和属性，UUID 引用已有定义，同批新定义用 client_ref。身份不明或同号多记录时保留证据并请用户确认，不擅自合并或更新；只有明确指向 UUID 才更新，保留已有人工证据。原文金额未知不能补值，0 与 false 是真实值。证据使用原材料 id/hash/行号/quote，不从聊天回答编造。
 4. 写 `modeling/parts/05-facts.json` 裸数组，无实例写 []，运行 `check_part.py --work-pack <工作包> modeling/parts/05-facts.json`。只写变化，及时检查，notes≤2 KB，压缩后先读 plan/notes。
