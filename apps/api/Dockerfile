@@ -16,9 +16,20 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Dependencies first, in their own layer: with the source copied before the
+# install, every code change reinstalled them all, which under qemu for arm64
+# took three minutes. A placeholder package lets the build backend resolve the
+# project; the real source is installed on top without touching dependencies.
 COPY apps/api/pyproject.toml apps/api/README.md* /opt/ontofoundry-api/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    mkdir -p /opt/ontofoundry-api/src/ontofoundry_api \
+    && touch /opt/ontofoundry-api/src/ontofoundry_api/__init__.py \
+    && pip install /opt/ontofoundry-api \
+    && pip uninstall -y ontofoundry-api \
+    && rm -rf /opt/ontofoundry-api/src
+
 COPY apps/api/src /opt/ontofoundry-api/src
-RUN pip install --no-cache-dir /opt/ontofoundry-api
+RUN pip install --no-cache-dir --no-deps /opt/ontofoundry-api
 
 # ---- of-backend --------------------------------------------------------
 FROM base AS backend
