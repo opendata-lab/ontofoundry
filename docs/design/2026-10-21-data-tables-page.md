@@ -194,3 +194,34 @@ npx vitest run
 npx eslint src
 npm run test:visual
 ```
+
+
+### 连接删除
+
+用户于 **2026-10-22 选择方案 A**：被引用或同步中的连接拒绝删除，其余连接可删除。详细设计见[连接删除设计](2026-10-22-connection-deletion.md)。
+
+- 权限与创建、编辑一致，仅空间管理员可操作；新增 `DELETE /api/v1/workspaces/{workspace_id}/connections/{connection_id}`，成功返回 204，连接不存在或不属于该空间返回 404。
+- 以下引用阻止删除：当前已发布版本中 connection_id 指向它的数据集；未放弃会话草稿中的数据集；这些会话中 pending 的数据集提案（创建、修改检查 after_json，删除检查 before_json）；未放弃会话的 linked_tables。历史发布版本和非 pending 提案不单独阻止删除。
+- 当前数据库模型没有 abandoned_at，也没有持久化的会话放弃流程，因此所有现存会话均按未放弃检查；本次不新增字段或迁移。
+- 引用冲突由 ServiceError 子类返回 **409 CONNECTION_IN_USE**，message 为“该连接仍被引用，请先改用其他连接或删除这些数据集”。details 中的 references 沿用错误信封展开为 `error.references`，逐项返回类型、显示名或名称、所在（已发布版本 / 会话标题）；界面以列表展示，如“数据集 虚构订单（已发布版本）”。
+- 连接任意库有 queued/running 同步任务时返回 **409 SYNC_RUNNING**，提示等待同步完成后重试。
+- 无引用、无活动同步时，在同一事务中显式删除 metadata_sync_batches、metadata_sync_jobs、metadata_snapshots，再删除连接；不连接、不修改业务数据源，不改变表结构。
+- 连接列表每行在“编辑”旁增加“删除”，与编辑一样仅管理员可见；使用 Ant Design Popconfirm，确认文案为“删除连接 {name}？已同步的表结构会一起删除，不影响源数据库。”。请求统一走 api/client.ts；成功后移除该行；失败保留连接，使用现有 Alert 显示服务端 message，并逐条列出引用。
+- 引用诊断的 Pydantic 模型、JSON Schema 和前端类型同步维护；仅使用虚构名称补充 pytest 和 Vitest 回归，不修改版本号、不 commit。
+
+
+#### 连接删除验证结果（2026-10-22）
+
+- 指定 pytest 全量：**1103 passed、17 skipped、0 failed、0 errors、3 warnings，480.56 秒**；新增删除回归 14 项，包含外键约束下的多库元数据清理、四类引用及同时列出、pending 创建/修改/删除提案、queued/running、非管理员、空间隔离、历史版本和已决提案。日志 `/private/tmp/connection-delete-pytest.log`。
+- 指定 `ruff check src tests` 全量通过，日志 `/private/tmp/connection-delete-ruff.log`。
+- `npm run build` 通过，仅有现有大 chunk 提示；`npx eslint src` 通过，日志 `/private/tmp/connection-delete-eslint.log`。前端新增 6 项删除及接口回归。
+- `npx vitest run` 首轮默认并发：227 passed、12 failed（既有用例超时及异步校验断言未及时完成）；新增删除用例通过。未修改超时阈值或测试断言，改用 `npx vitest run --maxWorkers=2` 重跑全量：**51 个文件、239 passed、0 failed、0 skipped，128.66 秒**。日志 `/private/tmp/connection-delete-vitest.log`。
+- UI 检测器无发现，`git diff --check` 通过。验证时为避免向主目录的只读 node_modules 链接写缓存，使用本工作区的临时缓存目录；验证结束已恢复原链接，未改依赖或锁文件。
+- **视觉和局域网验收未完成**：已执行 `npm run test:visual`，Vite 监听 `127.0.0.1:5199` 被沙箱以 `listen EPERM` 拒绝；使用当前局域网 IP `172.20.10.3` 启动 Vite 也被同样拒绝。无法取得本次 1440×900 截图、对比连接页基准或完成 HTTP 非安全上下文验证；未更新截图基准。日志 `/private/tmp/connection-delete-visual.log`、`/private/tmp/connection-delete-lan.log`。
+- 未连接真实业务数据源；无数据库迁移、版本号变更、commit 或 push。
+
+## 已同步表的读取（2026-10-22，用户确认）
+
+- 「数据表」页只展示已同步登记到平台的表，通过 `GET /connections/{id}/assets/synced` 一次读出该连接下所有已同步的库（另含已发布数据集引用的库），按库分组；不连接源库，不需要库名参数。
+- 「同步数据表」弹窗：第一步选连接、第二步选库只读取源库的库名列表（`/schemas`），不读取已登记表；第三步按所选库带库名读取表清单。第二步不再显示各库已登记表数和同步时间，这些信息在「数据表」页列表中查看。
+- 因此 MySQL、Doris 的任何列表请求都带明确库名，不会再出现“请选择库”。

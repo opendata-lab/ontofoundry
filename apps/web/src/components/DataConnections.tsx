@@ -1,12 +1,15 @@
-import { Alert, Button, Empty, Form, Input, InputNumber, Modal, Select, Table } from "antd";
-import { Database, Pencil, PlugZap } from "lucide-react";
+import { Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Popconfirm, Select, Table } from "antd";
+import { Database, Pencil, PlugZap, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { catalogApi, workspaceRequest } from "../api/client";
-import type { DataConnection } from "../api/types";
+import { ApiError, catalogApi, workspaceRequest } from "../api/client";
+import type { ConnectionReference, DataConnection } from "../api/types";
 import { Panel, StatusMark } from "./layout";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 
 const PORTS: Record<DataConnection["kind"], number> = { postgresql: 5432, mysql: 3306, doris: 9030 };
+const REFERENCE_LABELS: Record<ConnectionReference["type"], string> = {
+  dataset: "数据集", dataset_proposal: "待审数据集提案", linked_table: "关联表",
+};
 
 type ConnectionForm = {
   name: string;
@@ -23,6 +26,8 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
   const { workspace } = useWorkspaceContext();
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
+  const [references, setReferences] = useState<ConnectionReference[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -31,11 +36,12 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
   const [form] = Form.useForm<ConnectionForm>();
   const kind = Form.useWatch("kind", form);
   useEffect(() => {
-    onReady?.(() => { setEditing(null); setError(""); setOpen(true); });
+    onReady?.(() => { setEditing(null); setError(""); setReferences([]); setOpen(true); });
   }, [onReady]);
   const edit = (c: DataConnection) => {
     setEditing(c);
     setError("");
+    setReferences([]);
     setOpen(true);
   };
   useEffect(() => {
@@ -44,6 +50,24 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
       .then((r) => setConnections(r.items))
       .catch((e: Error) => setError(e.message));
   }, [workspace.id]);
+  const remove = async (connection: DataConnection) => {
+    setDeleting(connection.id);
+    setError("");
+    setReferences([]);
+    setStatus("");
+    try {
+      await workspaceRequest<void>(workspace.id, `/connections/${connection.id}`, undefined, "DELETE");
+      setConnections((items) => items.filter((item) => item.id !== connection.id));
+      setStatus(connection.name + "：已删除");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "删除连接失败");
+      if (e instanceof ApiError && e.code === "CONNECTION_IN_USE") {
+        setReferences(e.references.filter((item): item is ConnectionReference => typeof item === "object" && "type" in item && "location" in item));
+      }
+    } finally {
+      setDeleting(null);
+    }
+  };
   const submit = async (values: ConnectionForm) => {
     setBusy(true);
     setError("");
@@ -71,7 +95,11 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
   };
   return (
     <section className="flex flex-col gap-4">
-      {error && !open && <Alert type="error" showIcon message={error} />}
+      {error && !open && <Alert type="error" showIcon message={error} description={references.length > 0 ? (
+        <List size="small" split={false} dataSource={references} renderItem={(reference) => (
+          <List.Item>{REFERENCE_LABELS[reference.type]} {reference.name}（{reference.location}）</List.Item>
+        )} />
+      ) : undefined} />}
       {status && (
         <div role="status">
           <StatusMark state="mapped" label={status} />
@@ -124,23 +152,39 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               key: "action",
               render: (_, c) => (
                 <span className="inline-flex gap-2">
-                <Button
-                  size="small"
-                  icon={<PlugZap size={14} />}
-                  onClick={() => {
-                    setStatus("");
-                    workspaceRequest(workspace.id, "/connections/" + c.id + "/test", {})
-                      .then(() => setStatus(c.name + "：连接正常"))
-                      .catch((e: Error) => setError(e.message));
-                  }}
-                >
-                  测试
-                </Button>
-                {workspace.role === "admin" && (
-                  <Button size="small" icon={<Pencil size={14} />} aria-label={`编辑 ${c.name}`} onClick={() => edit(c)}>
-                    编辑
+                  <Button
+                    size="small"
+                    icon={<PlugZap size={14} />}
+                    onClick={() => {
+                      setStatus("");
+                      setError("");
+                      setReferences([]);
+                      workspaceRequest(workspace.id, "/connections/" + c.id + "/test", {})
+                        .then(() => setStatus(c.name + "：连接正常"))
+                        .catch((e: Error) => setError(e.message));
+                    }}
+                  >
+                    测试
                   </Button>
-                )}
+                  {workspace.role === "admin" && (
+                    <>
+                      <Button size="small" icon={<Pencil size={14} />} aria-label={`编辑 ${c.name}`} onClick={() => edit(c)}>
+                        编辑
+                      </Button>
+                      <Popconfirm
+                        title={`删除连接 ${c.name}？已同步的表结构会一起删除，不影响源数据库。`}
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => remove(c)}
+                        disabled={deleting !== null}
+                      >
+                        <Button size="small" danger icon={<Trash2 size={14} />} aria-label={`删除 ${c.name}`} loading={deleting === c.id} disabled={deleting !== null}>
+                          删除
+                        </Button>
+                      </Popconfirm>
+                    </>
+                  )}
                 </span>
               ),
             },

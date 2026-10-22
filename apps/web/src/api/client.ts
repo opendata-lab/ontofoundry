@@ -14,6 +14,7 @@ import type {
   Capabilities,
   Comparison,
   DataConnection,
+  ConnectionReference,
   DataTable,
   Decision,
   DecisionResult,
@@ -65,7 +66,7 @@ type ErrorBody = {
     message?: string;
     items?: { proposal_id: string; reason: string }[];
     conflicts?: MergeConflict[];
-    references?: { name: string; field: string }[] | string[];
+    references?: { name: string; field: string }[] | string[] | ConnectionReference[];
     current_version_id?: string | null;
     errors?: ValidationIssue[];
   };
@@ -80,7 +81,7 @@ export class ApiError extends Error {
   items: { proposal_id: string; reason: string }[];
   conflicts: MergeConflict[];
   currentVersionId: string | null;
-  references: { name: string; field: string }[] | string[];
+  references: { name: string; field: string }[] | string[] | ConnectionReference[];
   /** Core validation errors with element locations (body.error.errors). */
   errors: ValidationIssue[];
 
@@ -298,6 +299,8 @@ export const catalogApi = {
     }),
   schemas: (id: string, connectionId: string) =>
     workspaceRequest<Items<string>>(id, `/connections/${connectionId}/schemas`),
+  syncedAssets: (id: string, connectionId: string) =>
+    workspaceRequest<Items<{ schema: string; assets: Assets }>>(id, `/connections/${connectionId}/assets/synced`),
   assets: (id: string, connectionId: string, params?: { schema_name?: string; version_id?: string }) =>
     workspaceRequest<Assets>(id, `/connections/${connectionId}/assets` + query({ ...params })),
   refreshAssets: (id: string, connectionId: string, params?: { schema_name?: string }, tables?: string[]) =>

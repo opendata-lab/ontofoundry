@@ -1,6 +1,6 @@
 [project]
 name = "ontofoundry-api"
-version = "0.2.2"
+version = "0.2.3"
 description = "OntoFoundry ontology modeling and serving API"
 requires-python = ">=3.11"
 dependencies = [

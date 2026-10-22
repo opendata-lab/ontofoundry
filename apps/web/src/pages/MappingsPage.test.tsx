@@ -23,6 +23,7 @@ vi.mock("../api/client", () => ({
     schemas: vi.fn(),
     tables: vi.fn(),
     assets: vi.fn(),
+    syncedAssets: vi.fn(),
     syncJobs: vi.fn(),
     syncJob: vi.fn(),
     refreshAssets: vi.fn(),
@@ -82,6 +83,12 @@ beforeEach(() => {
     ],
   });
   vi.mocked(catalogApi.assets).mockImplementation(async (_w, _c, params) => params?.schema_name === "sales" ? { ...assets, items: [{ ...assets.items[0], name: "sales_orders", schema: "sales", comment: "虚构订单", columns: [], observed_at: "2026-10-20T00:00:00Z" }] } : { ...assets, items: assets.items.map((t) => ({ ...t, observed_at: "2026-10-16T00:00:00Z" })) });
+  // The page reads every synced schema in one call; build it from the per-schema
+  // fixtures without recording calls on schemas/assets.
+  vi.mocked(catalogApi.syncedAssets).mockImplementation(async (w, c) => {
+    const { items } = await vi.mocked(catalogApi.schemas).getMockImplementation()!(w, c);
+    return { items: await Promise.all(items.map(async (schema) => ({ schema, assets: await vi.mocked(catalogApi.assets).getMockImplementation()!(w, c, { schema_name: schema }) }))) };
+  });
   vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
@@ -94,8 +101,8 @@ async function openTables() {
   fireEvent.click(await screen.findByRole("button", { name: "同步数据表" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
-  fireEvent.click(await screen.findByRole("checkbox", { name: /crm ·/ }));
-  fireEvent.click(screen.getByRole("checkbox", { name: /sales ·/ }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "crm" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "sales" }));
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
   await screen.findByRole("checkbox", { name: "crm.contacts" });
 }
@@ -186,7 +193,8 @@ describe("data management page", () => {
     expect(await screen.findByText("移除 crm.contacts 的登记？")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "移除" }));
     await waitFor(() => expect(catalogApi.deleteTable).toHaveBeenCalledWith("w", "c", "crm", "contacts"));
-    await waitFor(() => expect(catalogApi.assets).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(catalogApi.syncedAssets).toHaveBeenCalledTimes(2));
+    expect(catalogApi.assets).not.toHaveBeenCalled();
   });
 
   it("submits one full and one partial task, allows back navigation and refreshes on close", async () => {
@@ -203,9 +211,9 @@ describe("data management page", () => {
     await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledTimes(2));
     expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "crm" }, []);
     expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "sales" }, ["contacts"]);
-    const count = vi.mocked(catalogApi.assets).mock.calls.length;
+    const count = vi.mocked(catalogApi.syncedAssets).mock.calls.length;
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    await waitFor(() => expect(vi.mocked(catalogApi.assets).mock.calls.length).toBeGreaterThan(count));
+    await waitFor(() => expect(vi.mocked(catalogApi.syncedAssets).mock.calls.length).toBeGreaterThan(count));
   });
 
   it("polls progress, prevents duplicate submission, retries failures and expands table results", async () => {
@@ -249,7 +257,7 @@ describe("data management page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "同步连接" }).closest(".ant-select")).toHaveTextContent("主库");
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
-    expect(screen.getByRole("checkbox", { name: /crm ·/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "crm" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     expect(await screen.findByRole("checkbox", { name: "crm.contacts" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "crm.orders" })).not.toBeChecked();

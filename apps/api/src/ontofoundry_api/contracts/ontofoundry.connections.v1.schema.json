@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "ConnectionInUse": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "CONNECTION_IN_USE",
+          "default": "CONNECTION_IN_USE",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/ConnectionReference"
+          },
+          "title": "References",
+          "type": "array"
+        }
+      },
+      "required": [
+        "message",
+        "references"
+      ],
+      "title": "ConnectionInUse",
+      "type": "object"
+    },
+    "ConnectionReference": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "title": "Location",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "dataset",
+            "dataset_proposal",
+            "linked_table"
+          ],
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "name",
+        "location"
+      ],
+      "title": "ConnectionReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "error": {
+      "$ref": "#/$defs/ConnectionInUse"
+    }
+  },
+  "required": [
+    "error"
+  ],
+  "title": "ConnectionInUseResponse",
+  "type": "object"
+}

@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from ontofoundry_api.contracts.connections import ConnectionInUseResponse
 from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
 from ontofoundry_api.contracts.exports import exports_schema
@@ -26,6 +27,15 @@ def export(*, check=False):
             raise SystemExit("实例 schema 与模型不一致，请重新生成")
     else:
         instance_target.write_text(instance_payload)
+    connection_target = Path(__file__).with_name("ontofoundry.connections.v1.schema.json")
+    connection_payload = json.dumps(
+        ConnectionInUseResponse.model_json_schema(), ensure_ascii=False, indent=2, sort_keys=True
+    ) + "\n"
+    if check:
+        if not connection_target.exists() or connection_target.read_text() != connection_payload:
+            raise SystemExit("连接接口 schema 与模型不一致，请重新生成")
+    else:
+        connection_target.write_text(connection_payload)
     payload = (
         json.dumps(result_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     )

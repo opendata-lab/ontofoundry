@@ -1019,3 +1019,8 @@ export type RegisteredTable = LinkedTable & {
   column_count: number;
   datasets: { id: string; name: string; display_name?: string | null }[];
 };
+export type ConnectionReference = {
+  type: "dataset" | "dataset_proposal" | "linked_table";
+  name: string;
+  location: string;
+};

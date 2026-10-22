@@ -2,7 +2,7 @@ import { Alert, Button, Checkbox, Collapse, Empty, Form, Input, Modal, Select, S
 import { useEffect, useRef, useState } from "react";
 import { catalogApi } from "../api/client";
 import type { DataConnection, SyncJob } from "../api/types";
-import { METADATA_SYNCED, loadSchemaAssets, syncTime, type SchemaAssets } from "../lib/metadataSync";
+import { METADATA_SYNCED } from "../lib/metadataSync";
 import { SectionTitle, StatusMark } from "./layout";
 
 const activeJob = (job: SyncJob) => job.state === "queued" || job.state === "running";
@@ -15,7 +15,7 @@ export function TableSyncDialog({ workspaceId, initialConnection, initialSchema 
   const [step, setStep] = useState(0);
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [connection, setConnection] = useState(initialConnection ?? "");
-  const [groups, setGroups] = useState<SchemaAssets[]>([]);
+  const [groups, setGroups] = useState<string[]>([]);
   const [schemas, setSchemas] = useState<string[]>(initialSchema ? [initialSchema] : []);
   const [inventory, setInventory] = useState<Record<string, string[]>>({});
   const [selected, setSelected] = useState<Record<string, string[]>>(initialSchema && initialTable ? { [initialSchema]: [initialTable] } : {});
@@ -40,11 +40,13 @@ export function TableSyncDialog({ workspaceId, initialConnection, initialSchema 
     if (!connection) return;
     let live = true;
     setLoading(true); setError("");
-    loadSchemaAssets(workspaceId, connection).then(async (value) => {
-      const histories = await Promise.all(value.map(async (g) => ({ schema: g.schema, job: (await catalogApi.syncJobs(workspaceId, connection, g.schema)).items[0] })));
+    // Choosing a connection and its schemas only needs the source's schema names;
+    // tables are read per chosen schema in the next step.
+    catalogApi.schemas(workspaceId, connection).then(async ({ items: value }) => {
+      const histories = await Promise.all(value.map(async (schema) => ({ schema, job: (await catalogApi.syncJobs(workspaceId, connection, schema)).items[0] })));
       if (!live) return;
       setGroups(value);
-      setSchemas((current) => current.filter((s) => value.some((g) => g.schema === s)));
+      setSchemas((current) => current.filter((s) => value.includes(s)));
       const existing = histories.filter((h) => h.job);
       setJobs(Object.fromEntries(existing.map((h) => [h.schema, h.job])));
       if (existing.some((h) => activeJob(h.job))) setStep(3);
@@ -117,7 +119,7 @@ export function TableSyncDialog({ workspaceId, initialConnection, initialSchema 
       {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => { setError(""); setReload((v) => v + 1); }}>重新加载</Button>} />}
       <div className="data-tables-step"><Spin spinning={loading}><div className="flex flex-col gap-4">
         {step === 0 && <Form layout="vertical" component="div"><Form.Item label="数据连接"><Select aria-label="同步连接" className="w-full" placeholder="选择数据连接" value={connection || undefined} options={connections.map((c) => ({ value: c.id, label: c.name }))} onChange={(id) => { setConnection(id); setGroups([]); setSchemas([]); setSelected({}); setFull({}); setInventory({}); setJobs({}); setCreationErrors({}); }} /></Form.Item><Typography.Text type="secondary">选择连接后，可一次同步多个库的数据表结构。</Typography.Text>{Object.keys(jobs).length > 0 && <div className="pt-4"><Button onClick={() => setStep(3)}>查看上次同步结果</Button></div>}</Form>}
-        {step === 1 && <><SectionTitle title="选择库" note="可同时选择多个库" />{!groups.length && !loading && <Empty description="此连接没有可用库" />}{groups.map((g) => <Checkbox key={g.schema} checked={schemas.includes(g.schema)} onChange={(e) => setSchemas((v) => e.target.checked ? [...v, g.schema] : v.filter((s) => s !== g.schema))}>{g.schema} · {g.assets.items.length} 张已登记 · {syncTime(g.assets.observed_at)}</Checkbox>)}</>}
+        {step === 1 && <><SectionTitle title="选择库" note="可同时选择多个库" />{!groups.length && !loading && <Empty description="此连接没有可用库" />}{groups.map((g) => <Checkbox key={g} checked={schemas.includes(g)} onChange={(e) => setSchemas((v) => e.target.checked ? [...v, g] : v.filter((s) => s !== g))}>{g}</Checkbox>)}</>}
         {step === 2 && <>
           <div className="flex items-center gap-3"><Input.Search aria-label="搜索同步表" placeholder="搜索表名" allowClear value={search} onChange={(e) => setSearch(e.target.value)} /><Button onClick={() => schemas.forEach((s) => pickAll(s, true))}>全选全部</Button><Button onClick={() => schemas.forEach((s) => pickAll(s, false))}>清空选择</Button></div>
           <Alert type="info" showIcon message="全选库会同步整个库，并标记已消失的表；部分选择只更新所选表。" />

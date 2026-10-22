@@ -299,6 +299,9 @@ export async function mockMappingsApi(page: Page) {
       const { pathname, searchParams } = new URL(route.request().url());
       if (pathname.endsWith("/assets/sync-jobs") && route.request().method() === "GET") {
         await route.fulfill({ json: { items: [] } });
+      } else if (pathname.endsWith("/assets/synced")) {
+        // Only the synced schema is registered; fiction_archive exists on the server but was never synced.
+        await route.fulfill({ json: { items: [{ schema: "public", assets: responses[pathname.replace(/\/synced$/, "")] }] } });
       } else if (pathname.endsWith("/assets") && searchParams.get("schema_name") === "fiction_archive") {
         await route.fulfill({ json: { ...(responses[pathname] as object), items: [], observed_at: null } });
       } else {
