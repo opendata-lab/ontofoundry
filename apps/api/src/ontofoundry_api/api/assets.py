@@ -17,7 +17,6 @@ from ontofoundry_api.services.metadata_sync import (
     create_job,
     get_job,
     job_response,
-    latest_jobs,
     retry_job,
     run_job,
 )
@@ -181,13 +180,6 @@ def sync_job(workspace_id: str, connection_id: str, body: SyncRequest, request: 
     job = create_job(db, workspace_id, connection, schema_name, body, user.id)
     background.add_task(run_job, request.app.state.session_factory, job.id, request.app.state.settings)
     return job_response(db, job)
-
-
-@router.get("/assets/sync-jobs")
-def jobs(workspace_id: str, connection_id: str, schema_name: str = "", db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
-    require_mappings(db, workspace_id, user)
-    get_connection(db, workspace_id, connection_id)
-    return {"items": [job_response(db, job) for job in latest_jobs(db, connection_id, schema_name)]}
 
 
 @router.get("/assets/sync-jobs/{job_id}")

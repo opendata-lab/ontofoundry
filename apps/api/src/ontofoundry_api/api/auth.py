@@ -18,9 +18,8 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.config import Settings
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
-    ServiceTokenRecord,
-    ServiceTokenScopeRecord,
     UserRecord,
+    WorkspaceMemberRecord,
 )
 from ontofoundry_api.services.workspaces import (
     ensure_dev_user,
@@ -164,6 +163,33 @@ def _run_principal(
     )
 
 
+# Read scopes granted to the deployment's fixed MCP token.
+STATIC_SCOPES = frozenset(["ontology:read", "mappings:read", "instances:read"])
+
+
+def _static_principal(session: Session, workspace_id: str | None) -> Principal:
+    """The fixed MCP token reads one workspace as its earliest admin, read-only."""
+    if workspace_id is None:
+        raise HTTPException(401, "固定 MCP 令牌只能用于指定空间的本体接口")
+    admin = session.scalar(
+        select(WorkspaceMemberRecord.user_id)
+        .where(
+            WorkspaceMemberRecord.workspace_id == workspace_id,
+            WorkspaceMemberRecord.role == "admin",
+        )
+        .order_by(WorkspaceMemberRecord.created_at, WorkspaceMemberRecord.id)
+    )
+    user = session.get(UserRecord, admin) if admin else None
+    if not user:
+        raise HTTPException(401, "该空间没有管理员，固定 MCP 令牌无法访问")
+    return replace(
+        _principal(user),
+        service_token_id="static",
+        service_workspace_id=workspace_id,
+        scopes=STATIC_SCOPES,
+    )
+
+
 def _ontology_principal(
     request: Request,
     session: Session,
@@ -179,31 +205,11 @@ def _ontology_principal(
             if not allow_run or scheme.lower() != "bearer":
                 raise HTTPException(401, "建模运行凭据只能用于本体 MCP")
             return _run_principal(request, session, token, workspace_id)
-        record = session.scalar(
-            select(ServiceTokenRecord).where(
-                ServiceTokenRecord.token_hash == hashlib.sha256(token.encode()).hexdigest()
-            )
-        )
-        if (
-            scheme.lower() != "bearer"
-            or not record
-            or (workspace_id is not None and record.workspace_id != workspace_id)
-        ):
-            raise HTTPException(401, "本体服务令牌无效或不属于当前空间")
-        user = session.get(UserRecord, record.created_by)
-        if not user:
-            raise HTTPException(401, "令牌签发用户不存在")
-        scopes = session.scalars(
-            select(ServiceTokenScopeRecord.scope).where(
-                ServiceTokenScopeRecord.token_id == record.id
-            )
-        ).all()
-        return replace(
-            _principal(user),
-            service_token_id=record.id,
-            service_workspace_id=record.workspace_id,
-            scopes=frozenset(["ontology:read", *scopes]),
-        )
+        static = _settings(request).mcp_token
+        if static and scheme.lower() == "bearer" and hmac.compare_digest(token.encode(), static.encode()):
+            return _static_principal(session, workspace_id)
+        # Only the deployment's fixed token and modeling run credentials are accepted.
+        raise HTTPException(401, "本体令牌无效")
     return current_principal(request, session)
 
 

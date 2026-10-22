@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     # Base URL the DataAgent uses to reach this API's MCP endpoint. Empty means
     # "the URL the browser used", which is right when both share a network.
     public_base_url: str = ""
+    # A fixed read-only bearer token for the ontology MCP, chosen at deployment and
+    # pasted into the DataAgent MCP header. Empty disables it; issued service
+    # tokens keep working either way.
+    mcp_token: str = ""
     metric_query_timeout_seconds: int = Field(default=15, ge=1, le=300)
     max_file_mb: int = 256
 
@@ -57,6 +61,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def reject_insecure_production_settings(self) -> "Settings":
+        if self.mcp_token and len(self.mcp_token) < 24:
+            raise ValueError("ONTOFOUNDRY_MCP_TOKEN must be at least 24 characters")
         if self.environment == "production":
             if self.auth_mode != "oauth":
                 raise ValueError("production requires ONTOFOUNDRY_AUTH_MODE=oauth")

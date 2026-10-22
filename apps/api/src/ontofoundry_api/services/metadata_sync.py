@@ -166,13 +166,6 @@ def batches(db, job):
     return list(db.scalars(select(MetadataSyncBatchRecord).where(MetadataSyncBatchRecord.job_id == job.id).order_by(MetadataSyncBatchRecord.ordinal)))
 
 
-def latest_jobs(db, connection_id, schema_name):
-    connection = db.get(ConnectionRecord, connection_id)
-    schema = normalize_schema(connection, schema_name)
-    require_schema(connection, schema)
-    return db.scalars(select(MetadataSyncJobRecord).where(MetadataSyncJobRecord.connection_id == connection_id, MetadataSyncJobRecord.schema_name == schema).order_by(MetadataSyncJobRecord.created_at.desc()).limit(10)).all()
-
-
 def job_response(db, job):
     items = []
     for batch in batches(db, job):

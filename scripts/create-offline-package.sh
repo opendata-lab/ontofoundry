@@ -77,6 +77,12 @@ ONTOFOUNDRY_DATAAGENT_AGENT_ID=
 # 一般不用改：站点 ID 与接口前缀。
 ONTOFOUNDRY_DATAAGENT_WEBSITE_ID=ontofoundry
 ONTOFOUNDRY_DATAAGENT_API_PREFIX=/api/v1/nl2sql
+# DataAgent 读取本体用的固定 MCP 令牌（至少 24 个字符，可用 openssl rand -hex 24 生成）。
+# 在 DataAgent 的 OntoFoundry MCP 配置里填鉴权头 Authorization: Bearer <同一个值>，
+# MCP 地址为 http://<服务器IP>:8080/api/v1/ontology/workspaces/<工作空间ID>/mcp。
+# 只读：可读定义、数据绑定和实例。留空则不启用。
+ONTOFOUNDRY_MCP_TOKEN=
+
 # DataAgent 回调本平台 MCP 用的地址。留空即用浏览器访问的地址
 # （http://<服务器IP>:8080），DataAgent 能访问到它就不用填。
 # ONTOFOUNDRY_PUBLIC_BASE_URL=http://<服务器IP>:8080

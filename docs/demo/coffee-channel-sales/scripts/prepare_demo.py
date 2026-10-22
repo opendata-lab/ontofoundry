@@ -5,7 +5,7 @@ Every stage is idempotent: it looks up what already exists before creating it.
     python prepare_demo.py model      # workspace, material, real DataAgent modeling run
     python prepare_demo.py publish    # accept all proposals of the prepared session, publish
     python prepare_demo.py data       # read-only connection, table mappings, relation joins
-    python prepare_demo.py token      # service token + DataAgent MCP import file
+    python prepare_demo.py token      # DataAgent MCP import file using ONTOFOUNDRY_MCP_TOKEN
     python prepare_demo.py check      # answer the demo questions through MCP
     python prepare_demo.py standby    # backup session for the live step, proposals pending
     python prepare_demo.py ossie      # two empty spaces for the live Ossie import scenario
@@ -306,7 +306,6 @@ def publish_session(ws: dict, session: dict, message: str) -> None:
     print("已发布 v%s" % result["version"]["version"])
 
 
-TOKEN_NAME = "DataAgent 问数助手"
 MCP_PROTOCOL = "2025-11-25"
 
 
@@ -315,19 +314,18 @@ def mcp_url(ws: dict) -> str:
 
 
 def stage_token() -> None:
+    # The platform serves MCP with the deployment's fixed token (ONTOFOUNDRY_MCP_TOKEN).
+    token = os.environ.get("ONTOFOUNDRY_MCP_TOKEN", "")
+    if not token:
+        sys.exit("请设置 ONTOFOUNDRY_MCP_TOKEN（与平台部署时配置的固定令牌相同）")
     ws = workspace()
-    for item in call("GET", ws_path(ws, "/service-tokens"))["items"]:
-        if item["name"] == TOKEN_NAME:
-            call("DELETE", ws_path(ws, "/service-tokens/" + item["id"]))
-    created = call("POST", ws_path(ws, "/service-tokens"),
-                   {"name": TOKEN_NAME, "scopes": ["ontology:read", "instances:read"]})
     OUT.mkdir(exist_ok=True)
     config = {"mcpServers": {"ontofoundry": {
         "type": "http", "url": mcp_url(ws),
-        "headers": {"Authorization": "Bearer " + created["token"]}}}}
+        "headers": {"Authorization": "Bearer " + token}}}}
     target = OUT / "mcp-config.json"
     target.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
-    print("已签发令牌，MCP 配置写入", target)
+    print("MCP 配置写入", target)
 
 
 def mcp(ws: dict, token: str, name: str, arguments: dict) -> dict:

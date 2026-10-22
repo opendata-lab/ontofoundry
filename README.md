@@ -125,7 +125,7 @@ REST API 的路由、请求和响应可在运行实例的 `/docs` 中查看。�
 POST /api/v1/ontology/workspaces/{workspace_id}/mcp
 ```
 
-使用平台签发的 Bearer 服务令牌访问。令牌默认只读本体；映射和实例读取还需相应权限及有效的空间成员身份。当前实现包含 `server/discover`、`tools/list`、`tools/call`，以及旧版客户端的 `initialize` 兼容协商；尚未提供 MCP OAuth 动态发现。
+使用部署时配置的固定令牌访问：平台环境变量 `ONTOFOUNDRY_MCP_TOKEN`（至少 24 个字符），调用方填 `Authorization: Bearer <同一个值>`。该令牌只读，可读定义、数据绑定和实例，按所访问空间的管理员身份做成员检查；未配置时外部无法访问 MCP。建模运行由平台自动签发临时凭据，不需要配置。当前实现包含 `server/discover`、`tools/list`、`tools/call`，以及旧版客户端的 `initialize` 兼容协商；尚未提供 MCP OAuth 动态发现。
 
 ## 开发与验证
 

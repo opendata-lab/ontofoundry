@@ -159,7 +159,6 @@ def test_cutover_cleans_every_content_table_and_preserves_configuration():
         "user_id": "users",
         "session_id": "modeling_sessions",
         "batch_id": "proposal_batches",
-        "token_id": "service_tokens",
         "connection_id": "data_connections",
         "material_id": "materials",
         "request_id": "proposal_decision_requests",

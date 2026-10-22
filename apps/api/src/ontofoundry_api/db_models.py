@@ -177,22 +177,6 @@ class ConnectionRecord(Base):
     secret_encrypted: Mapped[str] = mapped_column(Text)
 
 
-class ServiceTokenRecord(Base):
-    __tablename__ = "service_tokens"
-    id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
-    created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
-    name: Mapped[str] = mapped_column(String(120))
-    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
-
-
-class ServiceTokenScopeRecord(Base):
-    __tablename__ = "service_token_scopes"
-    token_id: Mapped[str] = mapped_column(ForeignKey("service_tokens.id"), primary_key=True)
-    scope: Mapped[str] = mapped_column(String(40), primary_key=True)
-
-
 class MetadataSnapshotRecord(Base):
     __tablename__ = "metadata_snapshots"
     connection_id: Mapped[str] = mapped_column(

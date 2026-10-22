@@ -23,7 +23,6 @@ vi.mock("../api/client", () => ({
     tables: vi.fn(),
     assets: vi.fn(),
     syncedAssets: vi.fn(),
-    syncJobs: vi.fn(),
     syncJob: vi.fn(),
     refreshAssets: vi.fn(),
     retrySync: vi.fn(),
@@ -86,7 +85,6 @@ beforeEach(() => {
     const { items } = await vi.mocked(catalogApi.schemas).getMockImplementation()!(w, c);
     return { items: await Promise.all(items.map(async (schema) => ({ schema, assets: await vi.mocked(catalogApi.assets).getMockImplementation()!(w, c, { schema_name: schema }) }))) };
   });
-  vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [] });
 });
 afterEach(cleanup);
 
@@ -233,7 +231,7 @@ describe("data management page", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
     expect(screen.getByRole("combobox", { name: "同步连接" }).closest(".ant-select")).toHaveTextContent("主库");
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
-    expect(screen.getByRole("checkbox", { name: "crm" })).toBeChecked();
+    expect(await screen.findByRole("checkbox", { name: "crm" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     expect(await screen.findByRole("checkbox", { name: "crm.contacts" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "crm.orders" })).not.toBeChecked();
@@ -255,16 +253,24 @@ describe("data management page", () => {
     renderWithProviders(<TableSyncDialog workspaceId="w" initialConnection="c" initialSchema="crm" onClose={vi.fn()} />);
     await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(await screen.findByRole("checkbox", { name: "crm" })).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     fireEvent.click(await screen.findByRole("checkbox", { name: "全选当前库 crm" }));
     fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
     await waitFor(() => expect(catalogApi.refreshAssets).toHaveBeenCalledWith("w", "c", { schema_name: "crm" }, []));
   });
 
-  it("restores an active task when reopening the dialog", async () => {
-    vi.mocked(catalogApi.syncJobs).mockResolvedValue({ items: [job({ state: "running" })] });
+  it("reads libraries only after the connection step and tables only after the library step", async () => {
     renderWithProviders(<TableSyncDialog workspaceId="w" initialConnection="c" onClose={vi.fn()} />);
-    expect(await screen.findAllByText("同步中")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "上一步" })).toBeDisabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
+    expect(catalogApi.schemas).not.toHaveBeenCalled();
+    expect(catalogApi.tables).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "crm" }));
+    expect(catalogApi.schemas).toHaveBeenCalledTimes(1);
+    expect(catalogApi.tables).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    await screen.findByRole("checkbox", { name: "crm.contacts" });
+    expect(catalogApi.tables).toHaveBeenCalledWith("w", "c", { schema_name: "crm" });
   });
 });

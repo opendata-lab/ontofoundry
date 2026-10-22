@@ -22,10 +22,10 @@ import { createOntoFoundryConversationTransport } from "../lib/agentConversation
 const CONVERSATION = [
   "block h-full min-h-0 w-full flex-1 overflow-hidden",
   "[--dac-font-family:var(--font-body)] [--dac-font-size:var(--text-sm)] [--dac-text-color:var(--color-ink)] [--dac-text-muted:var(--color-muted)]",
-  "[--dac-content-max-width:var(--review-dialog-width)] [--dac-content-padding-inline:var(--space-md)] [--dac-content-padding-block:var(--space-xl)] [--dac-message-gap:var(--space-lg)]",
+  "[--dac-content-max-width:100%] [--dac-content-padding-inline:var(--space-lg)] [--dac-content-padding-block:var(--space-xl)] [--dac-message-gap:var(--space-lg)]",
   "[--dac-primary:var(--color-accent)] [--dac-primary-dark:var(--color-accent-hover)] [--dac-primary-hover:var(--color-accent-hover)] [--dac-primary-color:var(--color-accent)] [--dac-accent:var(--color-accent)] [--dac-user-bubble-bg:var(--color-accent-soft)]",
   "[--dac-user-bubble-color:var(--color-ink-2)] [--dac-bubble-radius:var(--radius-md)] [--dac-input-radius:var(--radius-sm)] [--dac-button-radius:var(--radius-sm)]",
-  "[&::part(run-detail)]:hidden [&::part(root)]:justify-start [&::part(messages)]:flex-1 [&::part(messages)]:overflow-auto",
+  "[&::part(run-detail)]:hidden [&::part(root)]:justify-start [&::part(messages)]:flex-1 [&::part(messages)]:overflow-auto [&::part(assistant-turn)]:max-w-full",
   "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 

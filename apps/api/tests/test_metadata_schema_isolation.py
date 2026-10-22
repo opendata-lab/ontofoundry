@@ -139,8 +139,6 @@ def test_list_selected_full_sync_and_snapshot_reads_keep_each_database(client, s
         assert read["metadata_snapshot_id"] == f"{server.id}:{schema}"
         assert {t["name"] for t in read["items"]} == INVENTORY[schema]
         assert all(t["schema"] == schema for t in read["items"])
-        history = client.get(base + "/assets/sync-jobs", params={"schema_name": schema}).json()["items"]
-        assert len(history) == 2 and all(j["schema_name"] == schema for j in history)
     catalog = client.get(ROOT + "/registered-tables").json()["items"]
     actual = {(t["schema_name"], t["table_name"]) for t in catalog if t["connection_id"] == server.id}
     assert actual == {(s, t) for s in SCHEMAS for t in INVENTORY[s]}
@@ -169,7 +167,7 @@ def test_full_sync_removal_and_unregister_are_scoped_to_one_database(client, ser
 
 def test_omitted_schema_never_falls_back_to_legacy_config(client, server):
     base = ROOT + f"/connections/{server.id}"
-    for path in ("/tables", "/assets", "/assets/sync-jobs", "/assets/rows?table_name=fiction_shared"):
+    for path in ("/tables", "/assets", "/assets/rows?table_name=fiction_shared"):
         response = client.get(base + path)
         assert response.status_code == 422, response.text
         assert response.json()["error"]["code"] == "SCHEMA_REQUIRED"
@@ -484,3 +482,12 @@ def test_synced_tables_are_listed_per_database_without_a_schema_or_the_source(cl
     for schema in SCHEMAS:
         assert {t["name"] for t in groups[schema]["items"]} == {"fiction_shared", f"{schema}_only"}
         assert all(t["schema"] == schema for t in groups[schema]["items"])
+
+
+def test_empty_library_names_from_the_server_are_not_listed(monkeypatch):
+    from ontofoundry_api.services import metadata_catalog
+
+    names = ["", "  ", "fiction_alpha", "information_schema"]
+    monkeypatch.setattr(metadata_catalog, "inspect", lambda source: SimpleNamespace(get_schema_names=lambda: names))
+    connection = SimpleNamespace(kind="doris", config_json={})
+    assert metadata_catalog.visible_schemas(connection, object()) == ["fiction_alpha"]
