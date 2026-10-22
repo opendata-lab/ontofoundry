@@ -1,5 +1,9 @@
 """Run the plan step of each scenario on a live platform and score the concept list.
 
+With --extract, scenarios that have extraction.json also get the confirming
+reply; the resulting proposal batch is scored for properties, relations,
+instances, mappings and metrics (score_extraction.py).
+
 This calls the platform's HTTP API like the browser does, so it spends model
 tokens: run it off-peak and only with the user's agreement. The agent receives
 materials (and linked tables) only; gold.json never leaves this machine.
@@ -32,6 +36,7 @@ import sqlalchemy as sa
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from score import score  # noqa: E402
+from score_extraction import score_extraction  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent / "scenarios"
 SETS = {"public": ROOT, "heldout": ROOT.parent / "heldout"}
@@ -91,7 +96,7 @@ def prepare(platform, name, gold, stamp, root=ROOT):
     return space["id"], session["id"]
 
 
-def run_plan(platform, workspace_id, session_id, prompt, timeout_s=900):
+def run_turn(platform, workspace_id, session_id, prompt, timeout_s=900):
     base = f"/workspaces/{workspace_id}/sessions/{session_id}"
     started = time.monotonic()
     platform.call("POST", base + "/agent-conversation/messages", {"content": prompt, "metadata": {"mode": "model"}})
@@ -102,7 +107,27 @@ def run_plan(platform, workspace_id, session_id, prompt, timeout_s=900):
         seen_active = seen_active or state["task_status"] in ACTIVE
         if seen_active and state["task_status"] not in ACTIVE:
             return state, round(time.monotonic() - started)
-    raise SystemExit("计划轮超时")
+    raise SystemExit("运行超时")
+
+
+def latest_batch(platform, workspace_id, session_id):
+    base = f"/workspaces/{workspace_id}/sessions/{session_id}/proposal-batches"
+    page = platform.call("GET", base + "?limit=1")["items"]
+    return platform.call("GET", f"{base}/{page[0]['id']}") if page else {"items": []}
+
+
+def extract(platform, workspace_id, session_id, extraction, gold, out):
+    """Confirm the plan, then score and archive the proposal batch."""
+    state, seconds = run_turn(platform, workspace_id, session_id, extraction["confirm_reply"], timeout_s=1800)
+    batch = latest_batch(platform, workspace_id, session_id)
+    datasets = (state.get("draft") or {}).get("datasets") or []
+    result = score_extraction(gold, extraction, batch.get("items") or [], datasets)
+    totals, answer = usage(conversation(platform, workspace_id, session_id))
+    summary = {**result, "result_state": state.get("result_state"), "seconds": seconds, **totals}
+    write(out / "extraction-score.json", summary)
+    write(out / "batch.json", batch)
+    write(out / "extraction-answer.md", answer)
+    return summary
 
 
 def saved_plan(session_id):
@@ -157,17 +182,21 @@ def main():
     parser.add_argument("--level", choices=["basic", "advanced"], help="只跑某个难度的公开场景")
     parser.add_argument("--scenario", action="append", help="场景目录名，可重复；默认全部")
     parser.add_argument("--output-dir", required=True, help="结果目录，如 evals/concept_scope/results/2026-10-22-baseline")
+    parser.add_argument("--extract", action="store_true", help="计划轮后回复确认，继续给抽取轮的提案打分（只跑有 extraction.json 的场景）")
     parser.add_argument("--score-only", help="不重跑，只给已有的 workspace_id:session_id 打分并存档（需配合单个 --scenario）")
     args = parser.parse_args()
     platform = Platform(args.api, args.origin)
     out = Path(args.output_dir)
     root = SETS[args.set]
     names = args.scenario or sorted(p.name for p in root.iterdir() if (p / "gold.json").is_file())
+    if args.extract:
+        names = [n for n in names if (root / n / "extraction.json").is_file()]
     if args.level:
         names = [n for n in names if json.loads((root / n / "gold.json").read_text(encoding="utf-8")).get("level", "basic") == args.level]
     stamp = datetime.now().strftime("%m%d%H%M")
     write(out / "meta.json", {"started_at": datetime.now().isoformat(timespec="seconds"), "commit": commit(),
-                              "api": args.api, "set": args.set, "scenarios": names, "score_only": bool(args.score_only)})
+                              "api": args.api, "set": args.set, "scenarios": names, "score_only": bool(args.score_only),
+                              "extract": args.extract})
     results = []
     for name in names:
         gold = json.loads((root / name / "gold.json").read_text(encoding="utf-8"))
@@ -176,7 +205,7 @@ def main():
             state, seconds = platform.call("GET", f"/workspaces/{workspace_id}/sessions/{session_id}"), None
         else:
             workspace_id, session_id = prepare(platform, name, gold, stamp, root)
-            state, seconds = run_plan(platform, workspace_id, session_id, gold["prompt"])
+            state, seconds = run_turn(platform, workspace_id, session_id, gold["prompt"])
         plan = saved_plan(session_id)
         result = score(gold, plan.get("entities"))
         record = conversation(platform, workspace_id, session_id)
@@ -187,9 +216,16 @@ def main():
         write(out / name / "plan.json", plan)
         write(out / name / "conversation.json", record)
         write(out / name / "answer.md", answer)
-        results.append({k: v for k, v in summary.items() if k != "details"})
         print(f"{name}: 准确率 {result['precision']} 召回率 {result['recall']} "
               f"错误 {result['errors'] or '无'} 漏掉 {result['missed'] or '无'} 轮数 {totals['turns']}")
+        if args.extract and not args.score_only:
+            extraction = json.loads((root / name / "extraction.json").read_text(encoding="utf-8"))
+            done = extract(platform, workspace_id, session_id, extraction, gold, out / name)
+            summary["extraction"] = {k: v for k, v in done.items() if k != "details"}
+            write(out / name / "conversation.json", conversation(platform, workspace_id, session_id))
+            print(f"{name} 抽取: " + " ".join(f"{k} {done[k]['found']}/{done[k]['expected']}"
+                                             for k in ("properties", "relations", "instances", "mappings", "metrics")))
+        results.append({k: v for k, v in summary.items() if k != "details"})
     write(out / "summary.json", results)
 
 

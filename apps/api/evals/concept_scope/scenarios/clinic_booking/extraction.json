@@ -1,0 +1,238 @@
+{
+ "scenario": "clinic_booking",
+ "confirm_reply": "确认",
+ "properties": {
+  "department": [
+   {
+    "accepted": [
+     "科室编号",
+     "dept_id",
+     "科室id"
+    ]
+   },
+   {
+    "accepted": [
+     "科室名称",
+     "dept_name",
+     "名称"
+    ]
+   }
+  ],
+  "doctor": [
+   {
+    "accepted": [
+     "医生编号",
+     "doctor_id",
+     "医生id"
+    ]
+   },
+   {
+    "accepted": [
+     "姓名",
+     "医生姓名",
+     "doctor_name",
+     "name"
+    ]
+   },
+   {
+    "accepted": [
+     "职称",
+     "title"
+    ]
+   }
+  ],
+  "patient": [
+   {
+    "accepted": [
+     "患者编号",
+     "patient_id",
+     "患者id"
+    ]
+   },
+   {
+    "accepted": [
+     "姓名",
+     "患者姓名",
+     "patient_name",
+     "name"
+    ]
+   },
+   {
+    "accepted": [
+     "性别",
+     "gender"
+    ]
+   },
+   {
+    "accepted": [
+     "出生日期",
+     "birth_date"
+    ]
+   }
+  ],
+  "appointment": [
+   {
+    "accepted": [
+     "预约编号",
+     "预约号",
+     "appt_no",
+     "appointment_no"
+    ]
+   },
+   {
+    "accepted": [
+     "预约日期",
+     "appt_date"
+    ]
+   },
+   {
+    "accepted": [
+     "时段",
+     "slot"
+    ]
+   },
+   {
+    "accepted": [
+     "预约状态",
+     "状态",
+     "status"
+    ]
+   }
+  ],
+  "prescription": [
+   {
+    "accepted": [
+     "处方号",
+     "处方编号",
+     "rx_no",
+     "prescription_no"
+    ]
+   },
+   {
+    "accepted": [
+     "开具时间",
+     "开方时间",
+     "issued_at"
+    ]
+   },
+   {
+    "accepted": [
+     "处方金额",
+     "处方总金额",
+     "total_amount"
+    ]
+   }
+  ],
+  "prescription_item": [
+   {
+    "accepted": [
+     "行号",
+     "line_no"
+    ]
+   },
+   {
+    "accepted": [
+     "数量",
+     "quantity"
+    ]
+   }
+  ],
+  "drug": [
+   {
+    "accepted": [
+     "药品编码",
+     "drug_code"
+    ]
+   },
+   {
+    "accepted": [
+     "药品名称",
+     "名称",
+     "drug_name"
+    ]
+   },
+   {
+    "accepted": [
+     "单价",
+     "unit_price"
+    ]
+   },
+   {
+    "accepted": [
+     "类别",
+     "药品类别",
+     "category"
+    ]
+   }
+  ]
+ },
+ "relations": [
+  {
+   "source": "doctor",
+   "target": "department",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "appointment",
+   "target": "patient",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "appointment",
+   "target": "doctor",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "prescription",
+   "target": "appointment",
+   "multiplicity": [
+    "many_to_one",
+    "one_to_one"
+   ]
+  },
+  {
+   "source": "prescription_item",
+   "target": "prescription",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "prescription_item",
+   "target": "drug",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  }
+ ],
+ "mappings": {
+  "department": "departments",
+  "doctor": "doctors",
+  "patient": "patients",
+  "appointment": "appointments",
+  "prescription": "prescriptions",
+  "prescription_item": "prescription_items",
+  "drug": "drugs"
+ },
+ "metrics": [
+  {
+   "accepted": [
+    "爽约率",
+    "no_show_rate"
+   ]
+  },
+  {
+   "accepted": [
+    "人均处方金额",
+    "avg_prescription_amount_per_patient",
+    "prescription_amount_per_patient"
+   ]
+  }
+ ]
+}

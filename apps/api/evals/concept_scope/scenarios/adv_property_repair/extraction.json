@@ -1,0 +1,242 @@
+{
+ "scenario": "adv_property_repair",
+ "confirm_reply": "确认",
+ "properties": {
+  "building": [
+   {
+    "accepted": [
+     "楼栋编号",
+     "building_no"
+    ]
+   },
+   {
+    "accepted": [
+     "楼层数",
+     "floors"
+    ]
+   }
+  ],
+  "house": [
+   {
+    "accepted": [
+     "房号",
+     "house_no"
+    ]
+   },
+   {
+    "accepted": [
+     "建筑面积",
+     "area"
+    ]
+   }
+  ],
+  "resident": [
+   {
+    "accepted": [
+     "住户编号",
+     "resident_no"
+    ]
+   },
+   {
+    "accepted": [
+     "姓名",
+     "住户姓名",
+     "resident_name",
+     "name"
+    ]
+   },
+   {
+    "accepted": [
+     "联系电话",
+     "phone"
+    ]
+   }
+  ],
+  "repair_order": [
+   {
+    "accepted": [
+     "报修编号",
+     "order_no",
+     "报修单号"
+    ]
+   },
+   {
+    "accepted": [
+     "报修时间",
+     "reported_at"
+    ]
+   },
+   {
+    "accepted": [
+     "问题描述",
+     "description"
+    ]
+   },
+   {
+    "accepted": [
+     "紧急程度",
+     "urgency"
+    ]
+   },
+   {
+    "accepted": [
+     "住户评分",
+     "评分",
+     "score"
+    ]
+   },
+   {
+    "accepted": [
+     "完成时间",
+     "finished_at"
+    ]
+   }
+  ],
+  "worker": [
+   {
+    "accepted": [
+     "工号",
+     "worker_no"
+    ]
+   },
+   {
+    "accepted": [
+     "姓名",
+     "维修工姓名",
+     "worker_name",
+     "name"
+    ]
+   },
+   {
+    "accepted": [
+     "工种",
+     "trade"
+    ]
+   }
+  ],
+  "shift": [
+   {
+    "accepted": [
+     "排班日期",
+     "日期",
+     "shift_date"
+    ]
+   },
+   {
+    "accepted": [
+     "班次",
+     "shift_type"
+    ]
+   }
+  ],
+  "spare_part": [
+   {
+    "accepted": [
+     "备件编号",
+     "part_no"
+    ]
+   },
+   {
+    "accepted": [
+     "备件名称",
+     "名称",
+     "part_name"
+    ]
+   },
+   {
+    "accepted": [
+     "单价",
+     "unit_price"
+    ]
+   },
+   {
+    "accepted": [
+     "库存",
+     "stock"
+    ]
+   }
+  ]
+ },
+ "relations": [
+  {
+   "source": "house",
+   "target": "building",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "resident",
+   "target": "house",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "repair_order",
+   "target": "resident",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "repair_order",
+   "target": "worker",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "shift",
+   "target": "worker",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "shift",
+   "target": "building",
+   "multiplicity": [
+    "many_to_one"
+   ]
+  },
+  {
+   "source": "worker",
+   "target": "building",
+   "multiplicity": [
+    "many_to_many"
+   ]
+  },
+  {
+   "source": "repair_order",
+   "target": "spare_part",
+   "multiplicity": [
+    "many_to_many"
+   ]
+  }
+ ],
+ "mappings": {
+  "building": "buildings",
+  "house": "houses",
+  "resident": "residents",
+  "repair_order": "repair_orders",
+  "worker": "workers",
+  "shift": "shifts",
+  "spare_part": "spare_parts"
+ },
+ "metrics": [
+  {
+   "accepted": [
+    "报修及时完成率",
+    "on_time_completion_rate"
+   ]
+  },
+  {
+   "accepted": [
+    "住户满意度",
+    "resident_satisfaction",
+    "satisfaction"
+   ]
+  }
+ ]
+}

@@ -88,3 +88,47 @@ def test_skills_never_contain_eval_scenario_terms():
         for concept in gold["concepts"]:
             for instance in concept.get("instances", []):
                 assert instance not in skill_text, f"技能中出现评测实例 {instance}"
+
+
+EXTRACTIONS = sorted(p for p in (EVAL / "scenarios").iterdir() if (p / "extraction.json").is_file())
+
+
+@pytest.mark.parametrize("folder", EXTRACTIONS, ids=lambda p: p.name)
+def test_extraction_gold_refers_to_gold_concepts_and_tables(folder):
+    gold = gold_of(folder)
+    extraction = json.loads((folder / "extraction.json").read_text(encoding="utf-8"))
+    keys = {c["key"] for c in gold["concepts"]}
+    assert set(extraction["properties"]) <= keys
+    assert {r["source"] for r in extraction["relations"]} | {r["target"] for r in extraction["relations"]} <= keys
+    assert set(extraction["mappings"]) <= keys
+    assert set(extraction["mappings"].values()) <= set(gold.get("tables") or [])
+
+
+def _item(kind, **after):
+    return {"operation": "create", "target_kind": kind, "after": after}
+
+
+def test_extraction_scoring_traces_elements_to_gold_concepts():
+    from evals.concept_scope.score_extraction import score_extraction
+
+    gold = {"concepts": [{"key": "member", "accepted": ["会员"], "instances": ["张三"]},
+                         {"key": "store", "accepted": ["门店"], "instances": []}]}
+    extraction = {"properties": {"member": [{"accepted": ["手机号", "电话"]}, {"accepted": ["生日"]}]},
+                  "relations": [{"source": "member", "target": "store", "multiplicity": ["many_to_one"]}],
+                  "mappings": {"member": "members"}, "metrics": [{"accepted": ["复购率"]}]}
+    items = [
+        _item("object_type", id="t1", name="member", display_name="会员"),
+        _item("object_type", id="t2", name="shop", display_name="门店"),
+        _item("property", id="p1", owner_type_id="t1", name="phone", display_name="电话"),
+        _item("property", id="p2", owner_type_id="t2", name="birthday", display_name="生日"),
+        _item("link_type", id="l1", source_type_id="t2", target_type_id="t1", multiplicity="many_to_one"),
+        _item("mapping", id="m1", type_id="t1", sources=[{"dataset_id": "d1"}]),
+        _item("material_object", id="o1", type_id="t1", values={"p1": "张三"}),
+        _item("metric", id="k1", name="repurchase_rate", display_name="复购率"),
+    ]
+    result = score_extraction(gold, extraction, items, datasets=[{"id": "d1", "table_name": "members"}])
+    # 生日 sits on the wrong concept; the link points the wrong way round.
+    assert result["properties"]["found"] == 1
+    assert result["relations"]["found"] == 1 and result["relations"]["multiplicity_correct"] == 0
+    assert [result[k]["recall"] for k in ("mappings", "instances", "metrics")] == [1.0, 1.0, 1.0]
+    assert score_extraction(gold, extraction, [])["properties"]["found"] == 0
