@@ -139,10 +139,9 @@ jobs:
     # main、版本标签和手动运行照常打包；PR 只验证代码和镜像。
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # 不同分支/标签的安装包串行更新，避免互相删除刚上传的产物。
-    concurrency:
-      group: offline-package
-      cancel-in-progress: false
+    # 不设跨运行的并发组：同一 ref 的旧运行已由 workflow 级 concurrency 取消；
+    # 不同 ref（分支、标签）的打包互不依赖，清理步骤只删比本次更早的包，
+    # 并发时最多留下最新的那份，不会互相删掉刚上传的产物。
     # 默认的 GITHUB_TOKEN 是只读的，创建 release 会 403。只有这个 job 需要写，
     # 所以在 job 级别声明而不是放到 workflow 顶层。
     permissions:
@@ -154,9 +153,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
 
+      # 镜像 job 发布过时，直接拉它刚推送的 amd64 镜像打包：包里装的就是发布出去
+      # 的那一份，也省掉一次无缓存的重新构建。没有发布（手动运行）时照旧本地构建。
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push' && github.repository == 'opendata-lab/ontofoundry'
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Pull the published images
+        id: pulled
+        if: github.event_name == 'push' && github.repository == 'opendata-lab/ontofoundry'
+        env:
+          DOCKER_NAMESPACE: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          # metadata-action 的 type=sha 标签：sha- 加 7 位短哈希。
+          tag="sha-${GITHUB_SHA::7}"
+          for name in of-backend of-frontend; do
+            docker pull --platform linux/amd64 "$DOCKER_NAMESPACE/$name:$tag"
+            docker tag "$DOCKER_NAMESPACE/$name:$tag" "$name:local"
+          done
+
       # 真的执行打包脚本。此前它只是仓库里的一个文件——没有任何地方运行它，
       # 不产出 artifact，也不附到 release，所以"离线包"实际上并不存在。
       - name: Build the package
+        env:
+          SKIP_BUILD: ${{ steps.pulled.outcome == 'success' && '1' || '0' }}
         run: ./scripts/create-offline-package.sh "$RUNNER_TEMP/offline"
 
       - name: Sanity check the contents
@@ -241,6 +263,8 @@ jobs:
             );
             for (const artifact of artifacts) {
               if (artifact.name !== current.name || artifact.id === keepId) continue;
+              // A newer package from a concurrent run (another ref) stays.
+              if (new Date(artifact.created_at) > new Date(current.created_at)) continue;
               try {
                 await github.rest.actions.deleteArtifact({ ...repo, artifact_id: artifact.id });
                 core.info(`Deleted previous package ${artifact.id}`);

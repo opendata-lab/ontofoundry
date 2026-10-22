@@ -1,0 +1,29 @@
+# Both images build from the repository root (npm workspaces need the root
+# lockfile), so everything here would otherwise be sent as build context:
+# node_modules, the API venv, .git and the local design prototypes alone are
+# over 900 MB. The Dockerfiles only copy package manifests, apps/web and
+# apps/api/src.
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+.git
+.github
+.claude
+.codegraph
+.local-runtime
+.playwright-cli
+.playwright-mcp
+docs
+dist
+output
+apps/api/tests
+apps/api/evals
+apps/api/.data
+apps/api/*.db
+apps/web/dist
+apps/web/test-results
+apps/web/playwright-report
+integrations
