@@ -4,9 +4,10 @@ With --prior-plan, the plan confirmed in the previous run (uploaded by the
 platform as one JSON bundle) is restored into modeling/ first.
 """
 
-import argparse
 import json
 from pathlib import Path
+
+from runpaths import HintParser, relative, usage
 
 ROOT = Path("modeling")
 PLAN_TEMPLATE = """场景：全量｜增量｜优化｜小改动（选一个，删去其余）
@@ -37,7 +38,7 @@ def write_new(path, text):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="建立 modeling/ 骨架与计划模板；幂等，不覆盖已有文件")
+    parser = HintParser(description="建立 modeling/ 骨架与计划模板；幂等，不覆盖已有文件")
     parser.add_argument("--work-pack", required=True)
     parser.add_argument("--prior-plan", help="平台上传的上一轮已确认计划包")
     args = parser.parse_args()
@@ -47,7 +48,7 @@ def main():
         for field in ("result_file", "needs_input_file"):
             if pack.get(field):
                 Path(pack[field]).parent.mkdir(parents=True, exist_ok=True)
-        for folder in (ROOT, ROOT / "parts", ROOT / "checks"):
+        for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
             folder.mkdir(parents=True, exist_ok=True)
         created = []
         if args.prior_plan:
@@ -74,7 +75,26 @@ def main():
         print(f"初始化失败：{type(exc).__name__}；检查工作包与计划包路径")
         return 1
     print("modeling/ 已就绪" + ("；新建：" + "、".join(created) if created else "；文件均已存在，未覆盖"))
+    print(run_paths(args.work_pack, pack, args.prior_plan))
     return 0
+
+
+def run_paths(work_pack, pack, prior_plan):
+    """This run's files and commands; copy them rather than composing paths."""
+    lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
+    for material in pack.get("materials") or []:
+        if material.get("path"):
+            lines.append(f"- 材料：{material['path']}")
+    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认", "needs_input_file")):
+        if pack.get(key):
+            lines.append(f"- {label}：{pack[key]}")
+    if prior_plan or pack.get("prior_plan_file"):
+        lines.append(f"- 前轮计划：{prior_plan or pack['prior_plan_file']}")
+    lines.append(f"- 技能参考：{relative(Path(__file__).resolve().parents[1] / 'references')}/")
+    lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；不用 /tmp、绝对路径或 ../，DataAgent 会拦截")
+    lines.append("常用命令：")
+    lines += ["  " + line for line in usage(work_pack)]
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

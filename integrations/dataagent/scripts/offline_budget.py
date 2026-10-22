@@ -8,8 +8,8 @@ from pathlib import Path
 
 SELECTED_EXAMPLES_LIMIT = 5600
 # The plan run reads every material in full (7.4 KB in the fixture), so the
-# plan-time 14 KB estimate is raised; it stays below the one-shot routes.
-PLAN_ROUTE_LIMIT = 18500
+# plan step now reads only the routing entry and plan.md (about 15.6 KB in total).
+PLAN_ROUTE_LIMIT = 16500
 EXTRACT_ROUTE_LIMIT = 36000
 INCREMENTAL_ROUTE_LIMIT = 50000
 INCREMENTAL_QUERIES = [
@@ -33,7 +33,7 @@ def resource(path):
     shared = SKILL / path
     if shared.exists():
         return shared
-    skill = "entity-extraction" if path == "references/extract-facts.md" else "ontology-discovery"
+    skill = "entity-extraction" if path in ("references/extract-facts.md", "references/steps/facts.md") else "ontology-discovery"
     return BASE / "skills" / skill / path
 EXPECTED = {
     "task_dd4fe3ae4f894cc983abeccf": (201573, 1175808, 22794, 44),
@@ -219,7 +219,7 @@ def byte_report():
         "技能入口": "SKILL.md",
         "速查": "references/quick-reference.md",
         "原则": "references/principles.md",
-        "方法入口": "references/methodology.md",
+        "计划步骤": "references/steps/plan.md",
     }
     method_paths = [
         "extract-types",
@@ -257,15 +257,24 @@ def byte_report():
             )
         ),
     }
-    # Methodology is a plan-only reference, not another extraction entry point.
-    common_bytes = sum(components[k]["bytes"] for k in common if k != "方法入口")
+    # The plan step is read only in the plan run, not by extraction or edits.
+    common_bytes = sum(components[k]["bytes"] for k in common if k != "计划步骤")
+    steps = {
+        name: len(resource(f"references/steps/{file}").read_bytes())
+        for name, file in (("抽取步骤", "extract.md"), ("增量步骤", "incremental.md"), ("收尾步骤", "finish.md"), ("实例步骤", "facts.md"))
+    }
     limits = {
         "系统正文": (len(system_body.encode()), 450),
         "每轮提示": (len(prompt.encode()), 600),
-        "技能入口": (components["技能入口"]["bytes"], 4000),
+        # Entries only route; each run reads the one step file it needs.
+        "技能入口": (components["技能入口"]["bytes"], 1100),
         "速查": (components["速查"]["bytes"], 1800),
         "原则": (components["原则"]["bytes"], 2400),
-        "方法入口": (components["方法入口"]["bytes"], 2200),
+        "计划步骤": (components["计划步骤"]["bytes"], 2400),
+        "抽取步骤": (steps["抽取步骤"], 1700),
+        "增量步骤": (steps["增量步骤"], 1400),
+        "收尾步骤": (steps["收尾步骤"], 900),
+        "实例步骤": (steps["实例步骤"], 2800),
         "共同必读": (common_bytes, 9600),
         "工作包": (len(encode(pack)), 6500),
         # Examples carry display_name so the agent learns to fill Chinese names.
@@ -276,7 +285,7 @@ def byte_report():
     for name, limit in zip(method_paths, [3000, 3000, 3200, 2500]):
         limits[name] = (len(resource(f"references/{name}.md").read_bytes()), limit)
     for name in ("entity-extraction", "semantic-grounding"):
-        limits[name + "入口"] = (len((BASE / "skills" / name / "SKILL.md").read_bytes()), 4000)
+        limits[name + "入口"] = (len((BASE / "skills" / name / "SKILL.md").read_bytes()), 1100)
     routes = {}
     for task, method, sample in [
         ("名称修改", None, "operations"),
@@ -295,6 +304,8 @@ def byte_report():
             + components["带原行号材料"]["bytes"]
             + extra
             + example_bytes
+            + steps["增量步骤"]
+            + steps["收尾步骤"]
         )
         routes[task] = {
             "bytes": route_total,
@@ -308,7 +319,7 @@ def byte_report():
         "第一步（计划）": (
             fixed
             + components["技能入口"]["bytes"]
-            + components["方法入口"]["bytes"]
+            + components["计划步骤"]["bytes"]
             + components["带原行号材料"]["bytes"],
             PLAN_ROUTE_LIMIT,
         ),
@@ -353,6 +364,8 @@ def byte_report():
     extract_inputs = {
         "已知Agent提示": system_body.encode(), "平台提示": extract_prompt.encode(),
         "技能入口": resource("SKILL.md").read_bytes(),
+        "抽取步骤": resource("references/steps/extract.md").read_bytes(),
+        "收尾步骤": resource("references/steps/finish.md").read_bytes(),
         "工作包": encode(extract_pack),
         "带原行号材料": (render_lines(extract_material.decode()) + "\n").encode(),
         "前轮计划": (fixture / "prior-plan.json").read_bytes(),
@@ -402,6 +415,8 @@ def byte_report():
     incremental_inputs = {
         "已知Agent提示": system_body.encode(), "平台提示": incremental_prompt.encode(),
         "技能入口": resource("SKILL.md").read_bytes(),
+        "增量步骤": resource("references/steps/incremental.md").read_bytes(),
+        "收尾步骤": resource("references/steps/finish.md").read_bytes(),
         "工作包": encode(incremental_pack),
         "带原行号材料": extract_inputs["带原行号材料"],
         "表结构": (render_tables(json.dumps({"tables": incremental_tables}), ",".join(t["key"] for t in incremental_tables)) + "\n").encode(),
@@ -472,6 +487,9 @@ def byte_report():
         "已知Agent提示": system_body.encode(), "平台提示": combined_prompt.encode(),
         "技能入口": resource("SKILL.md").read_bytes(),
         "实例技能入口": (BASE / "skills/entity-extraction/SKILL.md").read_bytes(),
+        "抽取步骤": resource("references/steps/extract.md").read_bytes(),
+        "实例步骤": resource("references/steps/facts.md").read_bytes(),
+        "收尾步骤": resource("references/steps/finish.md").read_bytes(),
         "工作包": encode(combined_pack), "带原行号材料": render_lines(combined_material.decode()).encode(),
         "前轮计划": resource("tests/fixtures/combined-plan.json").read_bytes(),
         "原则": resource("references/principles.md").read_bytes(),

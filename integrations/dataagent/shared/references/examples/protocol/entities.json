@@ -1,5 +1,5 @@
 {"scenario": "全量", "items": [
  {"name": "member", "display_name": "会员", "basis": [{"material_id": "11111111-1111-4111-8111-000000000001", "line": 12}], "tables": ["t1"], "status": "new"},
  {"name": "order", "display_name": "订单", "basis": [{"table": "t2"}], "tables": ["t2"], "status": "new"},
- {"name": "store", "display_name": "门店", "basis": [{"material_id": "11111111-1111-4111-8111-000000000001", "line": 30}], "tables": [], "status": "new"}
+ {"name": "store", "display_name": "门店", "basis": [{"material_id": "11111111-1111-4111-8111-000000000001", "line": 30}], "tables": [], "examples": ["一号店", "二号店"], "example_count": 2, "status": "new"}
 ]}

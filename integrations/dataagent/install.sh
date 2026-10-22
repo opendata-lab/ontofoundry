@@ -10,7 +10,8 @@ validate_skill() {
         references/core-model.md references/principles.md references/quick-reference.md \
         references/examples/protocol/entities.json references/extract-kit/01.json \
         scripts/init_workflow.py scripts/read_input.py scripts/show_element.py \
-        scripts/show_example.py scripts/check_part.py scripts/check_result.py scripts/prepare_result.py; do
+        scripts/show_example.py scripts/check_part.py scripts/check_result.py scripts/prepare_result.py \
+        scripts/runpaths.py references/steps/finish.md; do
         [ -f "$skill_dir/$file" ] || { echo "缺少文件：$skill_dir/$file" >&2; exit 1; }
     done
     [ ! -e "$skill_dir/tests" ] && [ ! -e "$skill_dir/scripts/offline_budget.py" ] || {
@@ -21,7 +22,10 @@ validate_skill() {
 for skill in ontology-discovery entity-extraction semantic-grounding; do
     validate_skill "$PACKAGE_ROOT/skills/$skill"
 done
-for file in ontology-discovery/references/methodology.md ontology-discovery/references/extract-tables.md entity-extraction/references/extract-facts.md; do
+for file in ontology-discovery/references/steps/plan.md ontology-discovery/references/steps/extract.md \
+    ontology-discovery/references/steps/incremental.md ontology-discovery/references/extract-tables.md \
+    entity-extraction/references/steps/facts.md entity-extraction/references/extract-facts.md \
+    semantic-grounding/references/steps/ground.md semantic-grounding/references/steps/answer.md; do
     [ -f "$PACKAGE_ROOT/skills/$file" ] || { echo "缺少专属方法：$file" >&2; exit 1; }
 done
 mkdir -p "$SKILLS_ROOT_DIR"

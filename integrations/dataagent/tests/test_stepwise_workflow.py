@@ -357,16 +357,16 @@ def test_stepwise_routes_and_updated_limits_pass():
     report = offline_budget.byte_report()
     assert report["all_limits_pass"]
     for name in ("技能入口", "entity-extraction入口", "semantic-grounding入口"):
-        assert report["limits"][name]["limit"] == 4000
+        assert report["limits"][name]["limit"] == 1100
     assert report["limits"]["系统正文"]["limit"] == 450
     combined = report["routes"]["定义与实例组合"]
     assert combined["limit"] == 36000 and combined["pass"]
-    assert {"技能入口", "实例技能入口", "工作包", "带原行号材料", "前轮计划", "实例方法", "实例正例"} <= combined["components"].keys()
+    assert {"技能入口", "实例技能入口", "抽取步骤", "实例步骤", "收尾步骤", "工作包", "带原行号材料", "前轮计划", "实例方法", "实例正例"} <= combined["components"].keys()
     assert combined["bytes"] == sum(c["bytes"] for c in combined["components"].values())
-    for name, limit in (("第一步（计划）", 18500), ("第二步（抽取）", 36000)):
+    for name, limit in (("第一步（计划）", 16500), ("第二步（抽取）", 36000)):
         route = report["routes"][name]
         assert route["limit"] == limit and route["bytes"] <= limit and route["pass"]
-    for name, limit in (("技能入口", 4000), ("方法入口", 2200), ("共同必读", 9600)):
+    for name, limit in (("技能入口", 1100), ("计划步骤", 2400), ("共同必读", 9600)):
         assert report["limits"][name]["limit"] == limit
         assert report["limits"][name]["pass"]
     route = report["routes"]["第二步（抽取）"]

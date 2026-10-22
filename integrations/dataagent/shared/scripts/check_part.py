@@ -7,7 +7,6 @@ prepare_result.py decides them. Pinned before/hash checks use definitions and th
 Repair budgets are never touched.
 """
 
-import argparse
 import json
 from pathlib import Path
 
@@ -19,6 +18,7 @@ from check_result import (
     schema_errors,
 )
 from prepare_result import PrepareInputError, assemble
+from runpaths import PARTS, HintParser, fragment_paths
 
 SUMMARY_LIMIT = 4000
 NAMED_KINDS = {"object_type", "property", "value_type", "link_type", "metric", "dataset", "rule"}
@@ -76,22 +76,10 @@ def check_fragment(items, context, schema):
     }
 
 
-PARTS = Path("modeling/parts")
-
-
-def fragment_paths(raw):
-    """A file path, or a short name: "01" → modeling/parts/01-*.json, "01-types" → its .json."""
-    path = Path(raw)
-    if path.is_file():
-        return [path]
-    if raw.isdigit():
-        return sorted(PARTS.glob(f"{raw}-*.json")) or [path]
-    named = PARTS / f"{raw.removesuffix('.json')}.json"
-    return [named] if named.is_file() else [path]
 
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = HintParser(
         description="片段快速检查；跨片段引用留待合并检查，不计修正次数。片段可写 01、01-types 或路径"
     )
     parser.add_argument("--work-pack", help="工作包；从中取 context_file 与 schema_file")
@@ -120,7 +108,7 @@ def main():
         except (OSError, ValueError) as exc:
             failed = True
             existing = "、".join(p.name for p in sorted(PARTS.glob("*.json"))) or "无"
-            lines.append(f"{raw}：无法读取为 JSON（{type(exc).__name__}）；modeling/parts/ 现有：{existing}")
+            lines.append(f"{raw}：无法读取为 JSON（{type(exc).__name__}）；modeling/parts/ 现有：{existing}；先写片段再检查，片段写在 modeling/parts/")
             continue
         report = check_fragment(items, context, schema)
         reports = Path(args.reports)

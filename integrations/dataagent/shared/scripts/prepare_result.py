@@ -1,11 +1,18 @@
 """Assemble a pinned proposal batch without inferring business content."""
 
-import argparse
 import json
 from copy import deepcopy
 from pathlib import Path
 
-from check_result import atomic_write, diagnostic, encode, pinned_targets, same_json, validate_file
+from check_result import (
+    atomic_write,
+    diagnostic,
+    encode,
+    pinned_targets,
+    same_json,
+    validate_file,
+)
+from runpaths import PARTS, HintParser, existing, fragment_paths
 
 
 class PrepareInputError(ValueError):
@@ -95,16 +102,34 @@ def fragment_files(raw_paths):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--context", required=True)
-    parser.add_argument("--schema", required=True)
-    parser.add_argument("--output", required=True)
+    parser = HintParser(description="合并片段为提案批次；--work-pack 自动取上下文、Schema 与结果路径")
+    parser.add_argument("--work-pack", help="工作包；从中取 context_file、schema_file、result_file")
+    parser.add_argument("--context")
+    parser.add_argument("--schema")
+    parser.add_argument("--output")
     parser.add_argument("--repair", action="store_true")
-    parser.add_argument("fragments", nargs="+", help="items 数组片段文件，或片段目录（按文件名排序合并）")
+    parser.add_argument("fragments", nargs="*", help="片段文件、简称（01、01-types）或目录；省略时合并 modeling/parts/")
     args = parser.parse_args()
+    if "-" in args.fragments:
+        print("片段不能从标准输入读取；先写到 modeling/parts/ 再合并")
+        return 2
+    try:
+        if args.work_pack:
+            pack = json.loads(Path(args.work_pack).read_bytes())
+            args.context = args.context or pack["context_file"]
+            args.schema = args.schema or pack["schema_file"]
+            args.output = args.output or pack["result_file"]
+    except (OSError, ValueError, KeyError) as exc:
+        print(f"读取工作包失败：{type(exc).__name__}；检查 --work-pack 路径")
+        return 1
+    if not (args.context and args.schema and args.output):
+        parser.error("需要 --work-pack <工作包>，或同时给出 --context、--schema、--output")
+    raw_fragments = args.fragments or [str(PARTS) + "/"]
     try:
         output = workspace_path(args.output)
-        fragments = [json.loads(p.read_bytes()) for p in fragment_files(args.fragments)]
+        output.parent.mkdir(parents=True, exist_ok=True)
+        paths = [p for raw in raw_fragments for p in fragment_paths(raw)]
+        fragments = [json.loads(p.read_bytes()) for p in fragment_files([str(p) for p in paths])]
         context = json.loads(Path(args.context).read_bytes())
         candidate = output.with_suffix(".pending.json")
         batch = assemble(context, fragments)
@@ -127,7 +152,7 @@ def main():
             )
         except (OSError, ValueError):
             pass
-        print(message + "；未替换最终文件")
+        print(message + f"；未替换最终文件。modeling/parts/ 现有：{existing(PARTS, '*.json')}")
         return 1
     return validate_file(
         candidate, args.schema, args.context, repair=args.repair, publish=output

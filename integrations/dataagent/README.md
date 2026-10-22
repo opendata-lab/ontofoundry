@@ -4,8 +4,8 @@
 
 ```text
 shared/                       唯一共享源码：references、scripts、依赖与许可
-skills/ontology-discovery/    发现定义的方法、SKILL.md、生成的 output-schema.json
-skills/entity-extraction/     实例方法、SKILL.md、生成的 output-schema.json
+skills/ontology-discovery/    路由入口 SKILL.md、步骤 references/steps/（plan、extract、incremental）、发现定义的方法、生成的 output-schema.json
+skills/entity-extraction/     路由入口 SKILL.md、步骤 references/steps/facts.md、实例方法、生成的 output-schema.json
 skills/semantic-grounding/    问数语义方法与结构化理解 Schema
 agents/                       两个已有 Agent 的后台配置说明与系统正文
 scripts/offline_budget.py     仅离线预算，不进入安装包
@@ -15,7 +15,11 @@ build_packages.py             组装包，复制共享资源
 plugin.json、install.sh、迁移说明.md
 ```
 
-`shared/references/` 包含 core-model、principles、quick-reference、examples（含 protocol）、extract-kit；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、check_part、check_result、prepare_result。源码只存一份，构建时复制到三个包，每个安装目录均可独立运行。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
+`shared/references/` 包含 core-model、principles、quick-reference、examples（含 protocol）、extract-kit、steps/finish.md（合并修正输出，两个建模技能共用）；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、check_part、runpaths、check_result、prepare_result。源码只存一份，构建时复制到三个包，每个安装目录均可独立运行。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
+
+## 入口与步骤（2026-10-22）
+
+每个技能的 SKILL.md 只做路由（≤1100 字节），细节按步骤放在 references/steps/，Agent 每轮只读当前步骤。建模先运行 init_workflow.py，它打印本轮全部路径和可复制命令；prepare_result.py 与 check_part.py 都接受 --work-pack 和片段简称，参数写错时打印本轮正确写法。计划步骤只确认概念：具名的具体事物是实例，只作为“材料中的例子”列出；有新概念必须先确认范围，确认前不写提案。决定见 docs/design/2026-10-22-skill-routing-and-scope.md。
 
 ## 离线校验与打包
 

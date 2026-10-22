@@ -1,8 +1,9 @@
 """Bounded source reads with original line ranges or exact JSON pointers."""
 
-import argparse
 import json
 from pathlib import Path
+
+from runpaths import HintParser, existing
 
 
 def render_lines(text, start=1, end=None):
@@ -52,13 +53,17 @@ def render_tables(text, names):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = HintParser(description="按原行号读材料、按 JSON Pointer 读片段，或用 --tables 读关联表的列")
     parser.add_argument("path")
     parser.add_argument("--pointer")
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--end", type=int)
     parser.add_argument("--tables", help="逗号分隔的关联表 key（如 t1,t3），从工作包 tables_file 一次读取多张表的列")
     args = parser.parse_args()
+    if not Path(args.path).is_file():
+        folder = Path(args.path).parent
+        print(f"文件不存在：{args.path}；{folder}/ 现有：{existing(folder)}。路径取自 init_workflow 输出的本轮路径或工作包")
+        return 1
     try:
         text = Path(args.path).read_text()
         if args.tables:
