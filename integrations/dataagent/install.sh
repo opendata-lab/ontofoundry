@@ -23,7 +23,8 @@ for skill in ontology-discovery entity-extraction semantic-grounding; do
     validate_skill "$PACKAGE_ROOT/skills/$skill"
 done
 for file in ontology-discovery/references/steps/plan.md ontology-discovery/references/steps/extract.md \
-    ontology-discovery/references/steps/incremental.md ontology-discovery/references/extract-tables.md \
+    ontology-discovery/references/steps/incremental.md ontology-discovery/references/steps/optimize.md \
+    ontology-discovery/references/extract-tables.md \
     entity-extraction/references/steps/facts.md entity-extraction/references/extract-facts.md \
     semantic-grounding/references/steps/ground.md semantic-grounding/references/steps/answer.md; do
     [ -f "$PACKAGE_ROOT/skills/$file" ] || { echo "缺少专属方法：$file" >&2; exit 1; }

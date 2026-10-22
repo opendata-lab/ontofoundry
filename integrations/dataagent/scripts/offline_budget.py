@@ -9,7 +9,7 @@ from pathlib import Path
 SELECTED_EXAMPLES_LIMIT = 5600
 # The plan run reads every material in full (7.4 KB in the fixture), so the
 # plan step now reads only the routing entry and plan.md (about 15.6 KB in total).
-PLAN_ROUTE_LIMIT = 16500
+PLAN_ROUTE_LIMIT = 15500
 EXTRACT_ROUTE_LIMIT = 36000
 INCREMENTAL_ROUTE_LIMIT = 50000
 INCREMENTAL_QUERIES = [
@@ -270,7 +270,8 @@ def byte_report():
         "技能入口": (components["技能入口"]["bytes"], 1100),
         "速查": (components["速查"]["bytes"], 1800),
         "原则": (components["原则"]["bytes"], 2400),
-        "计划步骤": (components["计划步骤"]["bytes"], 2400),
+        "计划步骤": (components["计划步骤"]["bytes"], 1500),
+        "优化步骤": (len(resource("references/steps/optimize.md").read_bytes()), 900),
         "抽取步骤": (steps["抽取步骤"], 1700),
         "增量步骤": (steps["增量步骤"], 1400),
         "收尾步骤": (steps["收尾步骤"], 900),

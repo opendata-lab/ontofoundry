@@ -90,7 +90,11 @@ def run_paths(work_pack, pack, prior_plan):
             lines.append(f"- {label}：{pack[key]}")
     if prior_plan or pack.get("prior_plan_file"):
         lines.append(f"- 前轮计划：{prior_plan or pack['prior_plan_file']}")
-    lines.append(f"- 技能参考：{relative(Path(__file__).resolve().parents[1] / 'references')}/")
+    references = relative(Path(__file__).resolve().parents[1] / "references")
+    protocol = f"{references}/examples/protocol"
+    lines.append(f"- 技能参考：{references}/")
+    lines.append(f"- 模板：概念清单 {protocol}/entities.json；待确认 {protocol}/needs-input-entities.json")
+    lines.append(f"- 优化模板：问题清单 {protocol}/issues.json；待选择 {protocol}/needs-input-issues.json")
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；不用 /tmp、绝对路径或 ../，DataAgent 会拦截")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]

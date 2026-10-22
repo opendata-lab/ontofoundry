@@ -73,7 +73,9 @@ def test_init_prints_this_runs_paths_and_commands(tmp_path, monkeypatch, capsys)
     out = capsys.readouterr().out
     for text in ("uploads/fictional.md", "output/result.json", "output/needs.json", "uploads/tables.json",
                  "check_part.py --work-pack uploads/pack.json 01",
-                 "prepare_result.py --work-pack uploads/pack.json modeling/parts/", "modeling/tmp/", "/tmp"):
+                 "prepare_result.py --work-pack uploads/pack.json modeling/parts/", "modeling/tmp/", "/tmp",
+                 "references/examples/protocol/entities.json", "references/examples/protocol/needs-input-entities.json",
+                 "references/examples/protocol/issues.json"):
         assert text in out, text
     assert (tmp_path / "modeling/tmp").is_dir() and (tmp_path / "output").is_dir()
     assert pack.is_file()

@@ -2,16 +2,8 @@
 
 用户一句“确认”就锁定要建哪些概念，属性、关系、实例留到抽取轮按清单展开。本轮只回答“要建模哪些概念”。
 
-1. 按初始化打印的命令用 `read_input.py <材料>` 读材料并保留行号；表只看工作包目录，不读列。只读下文链接的模板。
-2. 区分概念与实例：概念是一类东西；具名的具体事物（某个产品、系统、服务器、人、单据）是它的实例。材料列出《晨读》《古籍考》→ 概念“期刊”，二者记入 examples，不各成类型，也不逐个请用户确认——确认概念后它们在抽取轮作为实例提出。单值归属性、跨行统计归指标，本轮不展开。
-3. 判断场景写 plan.md 首行；全量／增量照 [references/examples/protocol/entities.json](../examples/protocol/entities.json)，优化照 [references/examples/protocol/issues.json](../examples/protocol/issues.json)。概念与依据记入 notes.md。
-4. 本轮不定标识、对应表、关系、属性，不读原则、Schema，不运行 show_example.py，不检查。第 3 轮前写完；拿不准的点写成待确认问题，不反复推敲，用户比推理更快给出答案。
-5. 按 [references/examples/protocol/needs-input-entities.json](../examples/protocol/needs-input-entities.json)或 [references/examples/protocol/needs-input-issues.json](../examples/protocol/needs-input-issues.json)模板写待确认文件 后结束，不写提案。回答表格列概念（名称／英文标识）、说明、依据（材料行号或表）、材料中的例子；优化列问题／改法／影响。
-
-| 场景 | 判断 | 产物 | 确认 |
-| --- | --- | --- | --- |
-| 全量 | 本体为空，首次建模 | entities.json 列全部概念 | 必须 |
-| 增量 | 已有本体，新增材料或表带来新概念 | entities.json 列新概念及需补充的已有概念（status 标 new／existing） | 有新概念必须 |
-| 优化 | 不加材料，改命名、重复、缺中文名或描述、映射不全、口径 | issues.json 列元素、问题、改法、影响 | 用户选编号 |
-
-scenario_facts 是客观事实；场景由你结合用户意图判断，写在 plan.md 首行并在回答中说明，用户可纠正。不新增概念的小改动不走本步骤，改读[增量](incremental.md)。
+1. 用初始化给的命令读材料（保留行号）；表只看工作包目录，不读列。
+2. 区分概念与实例：概念是一类东西；具名的具体事物（产品、系统、服务器、人、单据）是它的实例。材料列出《晨读》《古籍考》→ 概念“期刊”，二者记入 examples，不各成类型，也不逐个请用户确认，抽取轮再作为实例提出。单值归属性，跨行统计归指标。
+3. plan.md 首行写场景：全量（本体为空）或增量（已有本体，新材料或新表带来新概念；status 标 new／existing）。照初始化给的概念清单模板写 entities.json，概念与依据记入 notes.md。
+4. 本轮不定标识、对应表、关系、属性，不读原则、Schema，不运行 show_example.py，不检查。第 3 轮前写完；拿不准的点写成待确认问题，不反复推敲。
+5. 照初始化给的待确认模板写待确认文件后结束，不写提案。回答表格列概念（名称／英文标识）、说明、依据（材料行号或表）、材料中的例子，并说明场景判断，用户可纠正。
