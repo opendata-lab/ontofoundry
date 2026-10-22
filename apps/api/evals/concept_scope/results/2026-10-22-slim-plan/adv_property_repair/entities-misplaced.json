@@ -1,0 +1,123 @@
+{
+ "scenario": "全量",
+ "items": [
+  {
+   "name": "resident",
+   "display_name": "住户",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 11
+    },
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 17
+    }
+   ],
+   "tables": [
+    "t5"
+   ],
+   "status": "new"
+  },
+  {
+   "name": "repair_order",
+   "display_name": "报修单（工单）",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 9
+    }
+   ],
+   "tables": [
+    "t4"
+   ],
+   "examples": [
+    "BX-0315（厨房水管漏水）"
+   ],
+   "example_count": 1,
+   "status": "new"
+  },
+  {
+   "name": "house",
+   "display_name": "房屋",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 11
+    }
+   ],
+   "tables": [
+    "t2"
+   ],
+   "examples": [
+    "3 栋 1502 室"
+   ],
+   "example_count": 1,
+   "status": "new"
+  },
+  {
+   "name": "building",
+   "display_name": "楼栋",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 11
+    }
+   ],
+   "tables": [
+    "t1"
+   ],
+   "examples": [
+    "3 栋",
+    "7 栋"
+   ],
+   "example_count": 2,
+   "status": "new"
+  },
+  {
+   "name": "worker",
+   "display_name": "维修工",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 15
+    }
+   ],
+   "tables": [
+    "t9"
+   ],
+   "examples": [
+    "W012 韩师傅"
+   ],
+   "example_count": 1,
+   "status": "new"
+  },
+  {
+   "name": "spare_part",
+   "display_name": "备件",
+   "basis": [
+    {
+     "table": "t7"
+    }
+   ],
+   "tables": [
+    "t7"
+   ],
+   "status": "new"
+  },
+  {
+   "name": "shift",
+   "display_name": "排班",
+   "basis": [
+    {
+     "material_id": "f1f5ad3e-3988-4c6a-8b0a-78196b687946",
+     "line": 19
+    }
+   ],
+   "tables": [
+    "t6"
+   ],
+   "status": "new"
+  }
+ ]
+}

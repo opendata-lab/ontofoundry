@@ -1,0 +1,151 @@
+{
+ "plan_md": "场景：全量（本体为空）\n工作包：uploads/ontofoundry-work-pack-1970f1095ae1ddf352f91ebef58a2aac.json\n本体为空：是\n新增材料：uploads/d44af2b1-75f1-47e0-8160-add349a03abe-_.md（预约与处方说明）\n新增关联表：uploads/ontofoundry-tables-1970f1095ae1ddf352f91ebef58a2aac.json（t1–t8）\n\n## 范围\n本次仅锁定要建模的概念（object_type），共 7 个：科室、医生、患者、预约、处方、处方明细、药品。\n属性、关系、数据集、映射、指标、规则、实例留待用户确认后按清单展开。\n\n## 实体或变化清单（全量）\n见 entities.json。\n\n## 来源表\nt1 appointments、t2 daily_visit_stats、t3 departments、t4 doctors、t5 drugs、t6 patients、t7 prescription_items、t8 prescriptions\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n- 青柠社区诊所按具体实例处理（不作为 object_type），是否认可？\n- daily_visit_stats 不建模为对象，其 visit_count 作为指标，是否认可？\n- 指标（爽约率、人均处方金额、每日就诊人次）与规则（第11行管理口径）在抽取轮展开，是否认可？\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "department",
+    "display_name": "科室",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 3
+     },
+     {
+      "table": "t3"
+     }
+    ],
+    "tables": [
+     "t3"
+    ],
+    "examples": [
+     "全科",
+     "儿科",
+     "口腔科"
+    ],
+    "example_count": 3,
+    "status": "new"
+   },
+   {
+    "name": "doctor",
+    "display_name": "医生",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 3
+     },
+     {
+      "table": "t4"
+     }
+    ],
+    "tables": [
+     "t4"
+    ],
+    "examples": [
+     "许医生(D01)",
+     "唐医生(D05)"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "patient",
+    "display_name": "患者",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 5
+     },
+     {
+      "table": "t6"
+     }
+    ],
+    "tables": [
+     "t6"
+    ],
+    "examples": [],
+    "example_count": 0,
+    "status": "new"
+   },
+   {
+    "name": "appointment",
+    "display_name": "预约",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 5
+     },
+     {
+      "table": "t1"
+     }
+    ],
+    "tables": [
+     "t1"
+    ],
+    "examples": [],
+    "example_count": 0,
+    "status": "new"
+   },
+   {
+    "name": "prescription",
+    "display_name": "处方",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 7
+     },
+     {
+      "table": "t8"
+     }
+    ],
+    "tables": [
+     "t8"
+    ],
+    "examples": [],
+    "example_count": 0,
+    "status": "new"
+   },
+   {
+    "name": "prescription_item",
+    "display_name": "处方明细",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 7
+     },
+     {
+      "table": "t7"
+     }
+    ],
+    "tables": [
+     "t7"
+    ],
+    "examples": [],
+    "example_count": 0,
+    "status": "new"
+   },
+   {
+    "name": "drug",
+    "display_name": "药品",
+    "basis": [
+     {
+      "material_id": "d44af2b1-75f1-47e0-8160-add349a03abe",
+      "line": 7
+     },
+     {
+      "table": "t5"
+     }
+    ],
+    "tables": [
+     "t5"
+    ],
+    "examples": [
+     "阿莫西林胶囊",
+     "布洛芬混悬液"
+    ],
+    "example_count": 2,
+    "status": "new"
+   }
+  ]
+ }
+}

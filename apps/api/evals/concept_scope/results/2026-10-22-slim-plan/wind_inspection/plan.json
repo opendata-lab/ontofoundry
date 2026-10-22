@@ -1,0 +1,113 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-a8a00eefdf2ce8171f6ba3105ca954f8.json\n本体为空：是\n新增材料：ccf7fab3-9451-4d88-bcbe-67158e4e7e67（东岭风电运维管理说明）\n新增关联表：无\n\n## 范围\n风电运维领域本体（东岭风电运维）：风电场、风机、班组、运维人员、巡检任务、缺陷、维修工单。\n\n## 实体或变化清单（全量／增量）或问题清单（优化）\n见 entities.json。\n\n## 来源表\n无（本轮仅材料，无表结构）。\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n缺陷等级按缺陷属性（枚举）处理；缺陷闭环率、月度巡检完成率按指标处理，留待抽取轮。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "wind_farm",
+    "display_name": "风电场",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 3
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "东岭一号风电场",
+     "西坡风电场"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "wind_turbine",
+    "display_name": "风机",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 3
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "F-07",
+     "F-12",
+     "W-03"
+    ],
+    "example_count": 3,
+    "status": "new"
+   },
+   {
+    "name": "crew",
+    "display_name": "班组",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "东岭巡检一班",
+     "西坡巡检班"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "operator",
+    "display_name": "运维人员",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "赵凯",
+     "林溪"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "inspection_task",
+    "display_name": "巡检任务",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   },
+   {
+    "name": "defect",
+    "display_name": "缺陷",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   },
+   {
+    "name": "maintenance_work_order",
+    "display_name": "维修工单",
+    "basis": [
+     {
+      "material_id": "ccf7fab3-9451-4d88-bcbe-67158e4e7e67",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   }
+  ]
+ }
+}

@@ -19,7 +19,7 @@ PLAN_TEMPLATE = """场景：全量｜增量｜优化｜小改动（选一个，�
 ## 范围
 
 ## 实体或变化清单（全量／增量）或问题清单（优化）
-见 entities.json 或 issues.json。
+见 modeling/entities.json 或 modeling/issues.json。
 
 ## 来源表
 
@@ -95,6 +95,7 @@ def run_paths(work_pack, pack, prior_plan):
     lines.append(f"- 技能参考：{references}/")
     lines.append(f"- 模板：概念清单 {protocol}/entities.json；待确认 {protocol}/needs-input-entities.json")
     lines.append(f"- 优化模板：问题清单 {protocol}/issues.json；待选择 {protocol}/needs-input-issues.json")
+    lines.append("- 概念清单写 modeling/entities.json，问题清单写 modeling/issues.json（与 plan.md 同级，不放 parts/）")
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；不用 /tmp、绝对路径或 ../，DataAgent 会拦截")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]

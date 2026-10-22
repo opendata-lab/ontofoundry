@@ -1,0 +1,32 @@
+{
+ "scenario": "adv_property_repair",
+ "level": "advanced",
+ "predicted": 0,
+ "expected": 7,
+ "correct": 0,
+ "precision": 0.0,
+ "recall": 0.0,
+ "f1": 0.0,
+ "missed": [
+  "building",
+  "house",
+  "resident",
+  "repair_order",
+  "worker",
+  "shift",
+  "spare_part"
+ ],
+ "errors": {},
+ "examples_placed": 0,
+ "examples_expected": 6,
+ "details": [],
+ "workspace_id": "0e58c0b5-e34a-4de5-8be9-8a42938e1256",
+ "session_id": "044cda0b-ba6b-4a19-8313-87fe610e5180",
+ "result_state": "awaiting_reply",
+ "seconds": 131,
+ "turns": 12,
+ "input": 11374,
+ "cache": 159616,
+ "output": 10050,
+ "tool_errors": 1
+}

@@ -1,0 +1,99 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-d4c37e9e2262b018bd19a50065804f4a.json\n本体为空：是\n新增材料：无\n新增关联表：无\n\n## 范围\n青禾科技合同审批：合同、相对方、部门、员工、审批记录、付款计划六个实体；合同平均审批时长（指标）、金额超50万须总经理审批（规则）。\n\n## 实体或变化清单（全量／增量）或问题清单（优化）\n见 entities.json。\n\n## 来源表\n无（材料为管理办法文本，未提供表结构）。\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n- 指标「合同平均审批时长」依赖合同「发起时间」，材料未单列该字段定义，抽取轮需确认。\n- 规则「金额>50万须总经理审批」归为约束规则，抽取轮按规则方式建模。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "contract",
+    "display_name": "合同",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 3
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "HT-2026-018《服务器采购合同》",
+     "HT-2026-031《年度运维服务合同》"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "counterparty",
+    "display_name": "相对方",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "北辰数据有限公司",
+     "南溪设备厂"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "department",
+    "display_name": "部门",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "采购部",
+     "法务部"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "employee",
+    "display_name": "员工",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "工号 Q207 的周宁"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "approval_record",
+    "display_name": "审批记录",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   },
+   {
+    "name": "payment_plan",
+    "display_name": "付款计划",
+    "basis": [
+     {
+      "material_id": "a94ba8ed-6de4-471f-bb76-1e80e6218120",
+      "line": 13
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   }
+  ]
+ }
+}
