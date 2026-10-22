@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { catalogApi, workspaceRequest } from "../api/client";
+import { ApiError, catalogApi, workspaceRequest } from "../api/client";
 import { workspace } from "../test/apiRecords";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { ConnectionsPage } from "./ConnectionsPage";
@@ -8,7 +8,10 @@ import { ConnectionsPage } from "./ConnectionsPage";
 const context = vi.hoisted(() => ({ workspace: { id: "w1", role: "admin" as string | null } }));
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => context }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn() }));
-vi.mock("../api/client", () => ({ catalogApi: { connections: vi.fn() }, workspaceRequest: vi.fn() }));
+vi.mock("../api/client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../api/client")>(),
+  catalogApi: { connections: vi.fn() }, workspaceRequest: vi.fn(),
+}));
 
 const connection = {
   id: "conn-demo",
@@ -73,6 +76,64 @@ it("keeps connections readable for members and hides the admin add action", asyn
   renderWithProviders(<ConnectionsPage />);
   expect(await screen.findByRole("cell", { name: "星河只读库" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "添加连接" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: `编辑 ${connection.name}` })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: `删除 ${connection.name}` })).not.toBeInTheDocument();
+});
+
+it("confirms deletion before removing the selected connection", async () => {
+  const other = { ...connection, id: "fiction-other", name: "虚构备用连接" };
+  vi.mocked(catalogApi.connections).mockResolvedValue({ items: [connection, other] });
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: `删除 ${connection.name}` }));
+  expect(await screen.findByText(`删除连接 ${connection.name}？已同步的表结构会一起删除，不影响源数据库。`)).toBeVisible();
+  expect(workspaceRequest).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "删除" }));
+  await waitFor(() => expect(screen.queryByRole("cell", { name: connection.name })).not.toBeInTheDocument());
+  expect(screen.getByRole("cell", { name: other.name })).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent(`${connection.name}：已删除`);
+  expect(workspaceRequest).toHaveBeenCalledWith("w1", `/connections/${connection.id}`, undefined, "DELETE");
+});
+
+it("cancels deletion without making a request", async () => {
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: `删除 ${connection.name}` }));
+  fireEvent.click(await screen.findByRole("button", { name: "取消" }));
+  expect(workspaceRequest).not.toHaveBeenCalled();
+  expect(screen.getByRole("cell", { name: connection.name })).toBeInTheDocument();
+});
+
+it("preserves the connection and lists all references on a 409 response", async () => {
+  const message = "该连接仍被引用，请先改用其他连接或删除这些数据集";
+  vi.mocked(workspaceRequest).mockRejectedValue(new ApiError(message, 409, "CONNECTION_IN_USE", undefined, {
+    references: [
+      { type: "dataset", name: "虚构订单", location: "已发布版本" },
+      { type: "dataset", name: "fiction_customers", location: "虚构青禾建模" },
+      { type: "dataset_proposal", name: "虚构发货", location: "虚构青禾建模" },
+      { type: "linked_table", name: "fiction_sales.fiction_orders", location: "虚构青禾建模" },
+    ],
+  }));
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: `删除 ${connection.name}` }));
+  fireEvent.click(await screen.findByRole("button", { name: "删除" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert).toHaveTextContent(message);
+  const items = within(alert).getAllByRole("listitem");
+  expect(items.map((item) => item.textContent)).toEqual([
+    "数据集 虚构订单（已发布版本）", "数据集 fiction_customers（虚构青禾建模）",
+    "待审数据集提案 虚构发货（虚构青禾建模）", "关联表 fiction_sales.fiction_orders（虚构青禾建模）",
+  ]);
+  expect(screen.getByRole("cell", { name: connection.name })).toBeInTheDocument();
+});
+
+it("shows the server sync-running message and allows a later retry", async () => {
+  const message = "该连接正在同步，请等同步结束后再删除";
+  vi.mocked(workspaceRequest).mockRejectedValueOnce(new ApiError(message, 409, "SYNC_RUNNING"));
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: `删除 ${connection.name}` }));
+  fireEvent.click(await screen.findByRole("button", { name: "删除" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  await waitFor(() => expect(screen.getByRole("button", { name: `删除 ${connection.name}` })).toBeEnabled());
+  expect(screen.getByRole("cell", { name: connection.name })).toBeInTheDocument();
 });
 
 it("edits a connection without resending an unchanged password", async () => {

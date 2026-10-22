@@ -1,6 +1,7 @@
 """Observed source schemas and their links to a published ontology."""
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -95,6 +96,46 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
         else "ready"
         if record and record.observed_at
         else "unobserved",
+    }
+
+
+@router.get("/assets/synced")
+def synced_assets(
+    workspace_id: str,
+    connection_id: str,
+    version_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    """Registered tables of every synced schema, read from the platform only.
+
+    The data tables page lists what was synced; it never opens the source, so a
+    server-wide connection needs no schema here.
+    """
+    from ontofoundry_api.domain.core import Dataset
+    from ontofoundry_api.services.metadata_sync import normalize_schema
+
+    require_mappings(db, workspace_id, user)
+    connection = get_connection(db, workspace_id, connection_id)
+    records = {
+        r.schema_name: r
+        for r in db.scalars(select(MetadataSnapshotRecord).where(MetadataSnapshotRecord.connection_id == connection_id))
+    }
+    # Schemas known only from published datasets still show those tables as placeholders.
+    space = get_workspace(db, workspace_id)
+    version = current_version(db, workspace_id, version_id) if version_id or space.current_version_id else None
+    schemas = set(records)
+    for raw in (snapshot_of(version) if version else {}).get("datasets", []):
+        dataset = Dataset.model_validate(raw)
+        if dataset.source_kind == "table" and dataset.connection_id == connection_id:
+            schema = normalize_schema(connection, dataset.schema_name)
+            if schema:
+                schemas.add(schema)
+    return {
+        "items": [
+            {"schema": schema, "assets": asset_response(db, workspace_id, connection, records.get(schema), version_id, schema)}
+            for schema in sorted(schemas)
+        ]
     }
 
 

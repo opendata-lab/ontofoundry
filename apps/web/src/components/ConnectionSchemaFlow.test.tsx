@@ -35,6 +35,8 @@ beforeEach(() => {
       return reply({ items: connections });
     }
     if (url.pathname.endsWith("/schemas")) return reply({ items: schemas });
+    // Synced tables come from the platform in one call, with no schema parameter.
+    if (url.pathname.endsWith("/assets/synced")) return reply({ items: schemas.map((s) => ({ schema: s, assets: { connection_id: "c", items: [table(s)], changes: [], status: "ready" } })) });
     if (/\/(assets|tables|assets\/rows|assets\/sync-jobs)$/.test(url.pathname)) {
       const connectionId = url.pathname.split("/connections/")[1]?.split("/")[0];
       if (!schema && connections.find((c) => c.id === connectionId)?.kind === "postgresql") schema = "public";
@@ -73,7 +75,8 @@ it.each(["mysql", "doris"] as const)("creates a %s server connection, browses al
   cleanup();
   renderPage(<MappingsPage />);
   await waitFor(() => expect(screen.getAllByRole("button", { name: "fiction_orders" })).toHaveLength(2));
-  for (const schema of schemas) expect(calls).toContainEqual(expect.objectContaining({ path: "/api/v1/workspaces/fiction/connections/c/assets", schema }));
+  expect(calls).toContainEqual(expect.objectContaining({ path: "/api/v1/workspaces/fiction/connections/c/assets/synced" }));
+  expect(calls.filter((c) => c.path.endsWith("/assets"))).toEqual([]);
   fireEvent.click(screen.getAllByRole("button", { name: "fiction_orders" })[1]);
   const detail = await screen.findByRole("dialog");
   expect(within(detail).getByText("fiction_beta")).toBeInTheDocument();
@@ -87,7 +90,7 @@ it.each(["mysql", "doris"] as const)("creates a %s server connection, browses al
   fireEvent.click(screen.getByRole("button", { name: "同步数据表" }));
   await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
-  for (const schema of schemas) fireEvent.click(await screen.findByRole("checkbox", { name: new RegExp(`${schema} ·`) }));
+  for (const schema of schemas) fireEvent.click(await screen.findByRole("checkbox", { name: schema }));
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
   await screen.findByRole("checkbox", { name: "fiction_alpha.fiction_orders" });
   fireEvent.click(screen.getByRole("button", { name: "全选全部" }));

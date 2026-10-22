@@ -35,6 +35,14 @@ class ConflictError(ServiceError):
     code = "CONFLICT"
 
 
+class ConnectionInUseError(ConflictError):
+    code = "CONNECTION_IN_USE"
+
+
+class SyncRunningError(ConflictError):
+    code = "SYNC_RUNNING"
+
+
 class PublishValidationError(ServiceError):
     status_code = 422
     code = "CORE_VALIDATION_FAILED"

@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import (
     func,
@@ -15,6 +15,7 @@ from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
+from ontofoundry_api.services.connections import delete_connection
 from ontofoundry_api.services.readonly import connect_readonly
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["data"])
@@ -153,6 +154,18 @@ def update_connection(
     item.name, item.config_json, item.secret_encrypted = candidate.name, config, candidate.secret_encrypted
     db.commit()
     return public_connection(item)
+
+
+@router.delete("/connections/{connection_id}", status_code=204)
+def remove_connection(
+    workspace_id: str,
+    connection_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id, admin=True)
+    delete_connection(db, workspace_id, connection_id)
+    return Response(status_code=204)
 
 
 @router.post("/connections/{connection_id}/test")

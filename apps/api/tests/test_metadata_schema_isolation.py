@@ -465,3 +465,22 @@ def test_doris_type_fallback_qualifies_and_escapes_database_and_table():
     table = read_doris_table(source, "fiction`alpha", "fiction`shared", "t")
     assert executed == ["SHOW FULL COLUMNS FROM `fiction``alpha`.`fiction``shared`"]
     assert table["columns"][0]["type"] == "bigint"
+
+
+def test_synced_tables_are_listed_per_database_without_a_schema_or_the_source(client, server, monkeypatch):
+    base = ROOT + f"/connections/{server.id}"
+    for schema in SCHEMAS:
+        finished(client, server, schema, "selected", ["fiction_shared", f"{schema}_only"])
+
+    # The data tables page reads what was synced; it must not open the source.
+    def no_source(*args, **kwargs):
+        raise AssertionError("listing synced tables must not connect to the source")
+
+    monkeypatch.setattr(assets, "connect_readonly", no_source)
+    response = client.get(base + "/assets/synced")
+    assert response.status_code == 200, response.text
+    groups = {g["schema"]: g["assets"] for g in response.json()["items"]}
+    assert set(groups) == set(SCHEMAS)
+    for schema in SCHEMAS:
+        assert {t["name"] for t in groups[schema]["items"]} == {"fiction_shared", f"{schema}_only"}
+        assert all(t["schema"] == schema for t in groups[schema]["items"])

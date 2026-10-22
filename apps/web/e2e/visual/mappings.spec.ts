@@ -61,8 +61,8 @@ test("sync dialog walks through connection, schemas, tables and results", async 
   await expect(dialog.getByRole("button", { name: "下一步" })).toBeEnabled();
   await expect(page).toHaveScreenshot("tables-sync-connection.png");
   await dialog.getByRole("button", { name: "下一步" }).click();
-  await dialog.getByRole("checkbox", { name: /public ·/ }).check();
-  await dialog.getByRole("checkbox", { name: /fiction_archive ·/ }).check();
+  await dialog.getByRole("checkbox", { name: "public", exact: true }).check();
+  await dialog.getByRole("checkbox", { name: "fiction_archive", exact: true }).check();
   await expect(page).toHaveScreenshot("tables-sync-schemas.png");
   await dialog.getByRole("button", { name: "下一步" }).click();
   await dialog.getByRole("button", { name: "全选全部" }).click();
