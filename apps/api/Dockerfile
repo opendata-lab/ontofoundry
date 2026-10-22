@@ -24,12 +24,14 @@ COPY apps/api/pyproject.toml apps/api/README.md* /opt/ontofoundry-api/
 RUN --mount=type=cache,target=/root/.cache/pip \
     mkdir -p /opt/ontofoundry-api/src/ontofoundry_api \
     && touch /opt/ontofoundry-api/src/ontofoundry_api/__init__.py \
-    && pip install /opt/ontofoundry-api \
+    && pip install hatchling /opt/ontofoundry-api \
     && pip uninstall -y ontofoundry-api \
     && rm -rf /opt/ontofoundry-api/src
 
 COPY apps/api/src /opt/ontofoundry-api/src
-RUN pip install --no-cache-dir --no-deps /opt/ontofoundry-api
+# hatchling is already installed above, so skip the isolated build environment
+# that would download it again on every source change.
+RUN pip install --no-cache-dir --no-deps --no-build-isolation /opt/ontofoundry-api
 
 # ---- of-backend --------------------------------------------------------
 FROM base AS backend

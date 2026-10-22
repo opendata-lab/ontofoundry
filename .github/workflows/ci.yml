@@ -67,7 +67,8 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
+      # The audit request alone once took five minutes; CI does not act on it.
+      - run: npm ci --no-audit --no-fund
       - run: npm test -w ontofoundry-web -- --run
       - run: npm run build -w ontofoundry-web
 
