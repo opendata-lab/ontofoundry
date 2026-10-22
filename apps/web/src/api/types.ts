@@ -803,8 +803,6 @@ export type Member = {
   subject: string;
   role: "admin" | "member";
 };
-export type Scope = "ontology:read" | "mappings:read" | "instances:read";
-export type ServiceToken = { id: UUID; name: string; created_at: ISOTime; scopes: Scope[] };
 
 // --- MCP read projection --------------------------------------------------
 

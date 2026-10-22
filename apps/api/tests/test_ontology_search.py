@@ -1,7 +1,5 @@
 """Shared ontology retrieval contracts, relevance, expansion and authorization."""
 
-import hashlib
-import json
 from dataclasses import replace
 
 import pytest
@@ -11,7 +9,6 @@ from test_read_contracts import validator
 
 from ontofoundry_api.api.auth import Principal
 from ontofoundry_api.contracts.read_models import OntologySearchRead, OntologySearchRequest
-from ontofoundry_api.db_models import ServiceTokenRecord, ServiceTokenScopeRecord
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.services.cursors import cursor_signer
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
@@ -427,64 +424,27 @@ def test_request_validation_shared_with_mcp(client, options):
     assert call(client, "search_ontology", options)["isError"]
 
 
-def token(client, scopes, n=91):
-    secret = f"fictional-search-token-{n}"
-    with client.app.state.session_factory() as db:
-        db.add(
-            ServiceTokenRecord(
-                id=uid(n),
-                workspace_id=str(DEMO_WORKSPACE_ID),
-                created_by=DEV_USER_ID,
-                name="虚构检索授权",
-                token_hash=hashlib.sha256(secret.encode()).hexdigest(),
-            )
-        )
-        db.flush()
-        for scope in scopes:
-            db.add(ServiceTokenScopeRecord(token_id=uid(n), scope=scope))
-        db.commit()
-    return {"Authorization": "Bearer " + secret}
+FIXED_TOKEN = "fictional-fixed-search-token-0123456789"
 
 
-def test_permissions_precede_recall_summaries_and_expansion(client, published):
-    headers = token(client, [])
-    low = rest(client, {"query": ""}, headers)
-    assert "dataset" not in {i["kind"] for i in low["items"]}
-    assert "fictional_purchase_records" not in json.dumps(low)
-    for item in low["items"]:
-        assert "dataset" not in item
-        if item["kind"] == "metric":
-            assert not (
-                {"measure", "time_field", "filters", "expression"}
-                & item["definition"].keys()
-            )
-    assert not rest(client, {"query": "货款", "kinds": ["object_type"]}, headers)["items"]
-    assert not rest(client, {"query": "采购明细集"}, headers)["items"]
-    high = rest(client, {"query": "货款", "limit": 1})
-    assert high["next_cursor"]
-    assert (
-        client.post(
-            ONTOLOGY + "/search",
-            json={"query": "货款", "limit": 1, "cursor": high["next_cursor"]},
-            headers=headers,
-        ).status_code
-        == 422
-    )
+def test_fixed_token_searches_like_a_member_within_its_workspace(client, published):
+    # External readers use the deployment's fixed MCP token, which reads definitions,
+    # mappings and instances; field cropping itself is covered by retrieve(mappings=False).
+    client.app.state.settings.mcp_token = FIXED_TOKEN
+    headers = {"Authorization": "Bearer " + FIXED_TOKEN}
+    mapped = rest(client, {"query": "货款"}, headers)
+    assert by_id(mapped)[uid(51)]["dataset"]["id"] == uid(31)
+    assert mapped == rest(client, {"query": "货款"})
     from test_modeling import mcp_request
 
     mcp = mcp_request(
         client,
         "tools/call",
-        {"name": "search_ontology", "arguments": {"query": ""}},
+        {"name": "search_ontology", "arguments": {"query": "货款"}},
         headers=headers,
     )
-    assert mcp.json()["result"]["structuredContent"] == low
-    mapping_headers = token(client, ["mappings:read"], n=92)
-    mapped = rest(client, {"query": "货款"}, mapping_headers)
-    assert by_id(mapped)[uid(51)]["dataset"]["id"] == uid(31)
-    assert "evidence" not in json.dumps(mapped)
-    assert "虚构的私密口径依据" not in json.dumps(mapped, ensure_ascii=False)
-    # Service tokens are still bound to their own workspace by the auth dependency.
+    assert mcp.json()["result"]["structuredContent"] == mapped
+    # A workspace without an admin (here: one that does not exist) is refused.
     assert (
         client.post(
             f"/api/v1/ontology/workspaces/{uid(999)}/search",

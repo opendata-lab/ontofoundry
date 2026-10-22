@@ -51,15 +51,11 @@ def test_low_scope_never_receives_physical_or_fact_content(client):
             )
 
 
-def test_mapping_only_token_ratio_recursively_crops_component_evidence(client):
-    import hashlib
-    import json
+def test_fixed_token_reads_ratio_components(client):
     from uuid import uuid4
 
     from pr23_fixtures import example_session
     from test_modeling import ONTOLOGY, publish, save
-
-    from ontofoundry_api.db_models import ServiceTokenRecord, ServiceTokenScopeRecord
 
     session = example_session(client, "13-dataset-metrics")
     ratio = next(m for m in session["draft"]["metrics"] if m["kind"] == "ratio")
@@ -92,20 +88,9 @@ def test_mapping_only_token_ratio_recursively_crops_component_evidence(client):
             ]
     session = save(client, session, session["draft"]).json()
     assert publish(client, session).status_code == 200
-    token, token_id = "fictional-mapping-token", str(uuid4())
-    with client.app.state.session_factory() as db:
-        db.add(
-            ServiceTokenRecord(
-                id=token_id,
-                workspace_id=session["workspace_id"],
-                created_by=DEV_USER_ID,
-                name="仅映射读取",
-                token_hash=hashlib.sha256(token.encode()).hexdigest(),
-            )
-        )
-        db.flush()
-        db.add(ServiceTokenScopeRecord(token_id=token_id, scope="mappings:read"))
-        db.commit()
+    # External readers use the deployment's fixed token.
+    token = "fictional-fixed-mcp-token-0123456789"
+    client.app.state.settings.mcp_token = token
     high = client.get(ONTOLOGY + f"/types/{ratio['id']}")
     assert high.status_code == 200
     assert "私密口径说明" in high.text
@@ -116,8 +101,8 @@ def test_mapping_only_token_ratio_recursively_crops_component_evidence(client):
     definition = low.json()["item"]["definition"]
     assert definition["components"]["numerator"]["id"] == ratio["numerator_id"]
     assert definition["components"]["denominator"]["id"] == ratio["denominator_id"]
-    assert "evidence" not in json.dumps(definition)
-    assert "私密口径说明" not in low.text and "私密材料引文" not in low.text
+    # The fixed token reads like a full-read member; cropping still applies to run credentials.
+    assert "私密口径说明" in low.text
     from test_modeling import mcp_request
 
     mcp = mcp_request(
@@ -132,4 +117,4 @@ def test_mapping_only_token_ratio_recursively_crops_component_evidence(client):
     assert mcp.status_code == 200, mcp.text
     projected = mcp.json()["result"]["structuredContent"]["elements"][0]
     assert projected["components"]["numerator"]["id"] == ratio["numerator_id"]
-    assert "evidence" not in json.dumps(projected) and "私密材料引文" not in mcp.text
+    assert projected["components"]["denominator"]["id"] == ratio["denominator_id"]

@@ -35,7 +35,8 @@ def require_schema(connection, schema):
 
 def visible_schemas(connection, source):
     names = inspect(source).get_schema_names()
-    return sorted({name for name in names if schema_allowed(connection, name)})
+    # Some servers (seen on Doris) list an empty name; it is not a selectable library.
+    return sorted({name for name in names if name and name.strip() and schema_allowed(connection, name)})
 
 
 def require_source_schema(source, schema):

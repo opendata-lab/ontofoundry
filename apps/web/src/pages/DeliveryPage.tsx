@@ -193,7 +193,7 @@ export function DeliveryPage() {
                           <CopyButton text={serviceRoot + "/mcp"} label="复制地址" />
                         </div>
                         <Text type="secondary" className="text-xs">
-                          使用服务令牌（Bearer）调用，只读，提供四个工具：
+                          鉴权头填 Authorization: Bearer 加部署时配置的 ONTOFOUNDRY_MCP_TOKEN；只读，提供以下工具：
                         </Text>
                       </div>
                       <Table
