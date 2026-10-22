@@ -53,9 +53,13 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+// Full flows render several antd dialogs; vitest's 5 s per-test default is tight on CI.
+vi.setConfig({ testTimeout: 20_000 });
+
 async function choose(label: string, option: string) {
   fireEvent.mouseDown(screen.getByRole("combobox", { name: label }));
-  fireEvent.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }));
+  // Options load asynchronously after the select is enabled; slow CI runners need more than 1 s.
+  fireEvent.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }, { timeout: 5000 }));
 }
 const renderPage = (node: React.ReactNode) => renderWithProviders(<MemoryRouter>{node}</MemoryRouter>);
 
