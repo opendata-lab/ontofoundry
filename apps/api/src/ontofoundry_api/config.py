@@ -48,10 +48,10 @@ class Settings(BaseSettings):
     # Base URL the DataAgent uses to reach this API's MCP endpoint. Empty means
     # "the URL the browser used", which is right when both share a network.
     public_base_url: str = ""
-    # A fixed read-only bearer token for the ontology MCP, chosen at deployment and
-    # pasted into the DataAgent MCP header. Empty disables it; issued service
-    # tokens keep working either way.
-    mcp_token: str = ""
+    # A fixed read-only bearer token for the ontology MCP, pasted into the DataAgent
+    # MCP header. The public default works out of the box; deployments should set
+    # their own value. An explicit empty value disables external MCP access.
+    mcp_token: str = "ontofoundry-mcp-default-token"
     metric_query_timeout_seconds: int = Field(default=15, ge=1, le=300)
     max_file_mb: int = 256
 

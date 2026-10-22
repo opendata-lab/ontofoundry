@@ -115,6 +115,9 @@
   --model-category-max-columns: 4;
   /* The results column stays narrower than the conversation. */
   --builder-results-width: clamp(340px, 30%, 480px);
+  /* Side padding of the builder conversation; messages keep the SDK's own
+     alignment and widths (user right, assistant left). */
+  --builder-conversation-padding: 32px;
   --review-code-height: 360px;
   --review-detail-height: 64vh;
   --review-detail-width: 860px;

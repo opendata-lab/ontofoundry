@@ -12,7 +12,8 @@ DataAgent 通过 OntoFoundry MCP 读取本体，MCP 配置填一个固定的 `Au
 |---|---|---|
 | MT-01 | 部署时在平台环境变量 `ONTOFOUNDRY_MCP_TOKEN` 配置一个固定令牌（至少 24 个字符），DataAgent 的 MCP 鉴权头填同一个值。来源：MCP 服务常见的静态 Bearer 鉴权；属于部署配置，不进入本体模型。 | 已确认 |
 | MT-02 | 固定令牌只读，固定具备 `ontology:read`、`mappings:read`、`instances:read`；只能用于带工作空间的本体接口（MCP、本体查询、导出），以该空间最早加入的管理员身份做成员检查；空间没有管理员时拒绝。不能用于空间目录接口。 | 已确认 |
-| MT-03 | 外部访问只用固定令牌：删除服务令牌的签发、列表、作废接口及 `service_tokens`、`service_token_scopes` 两张表（迁移 `20261022_000003`）。留空则外部无法访问 MCP。建模运行凭据（`ofrun.`，平台每次运行自动签发、自动失效）不受影响。更换令牌：改环境变量并重启后端，同时更新 DataAgent 配置。 | 已确认 |
+| MT-03 | 外部访问只用固定令牌：删除服务令牌的签发、列表、作废接口及 `service_tokens`、`service_token_scopes` 两张表（迁移 `20261022_000003`）。显式设为空则外部无法访问 MCP。建模运行凭据（`ofrun.`，平台每次运行自动签发、自动失效）不受影响。更换令牌：改环境变量并重启后端，同时更新 DataAgent 配置。 | 已确认 |
+| MT-04 | 默认值 `ontofoundry-mcp-default-token`（后端配置、离线包 compose 与 `.env.example` 一致），开箱即用；该值公开，正式环境应改为自定义值；显式设为空则关闭外部 MCP 访问。用户 2026-10-22 要求提供默认值。 | 已确认 |
 
 ## 部署
 

@@ -49,8 +49,18 @@ def test_wrong_token_and_directory_reads_are_refused(static_client):
     assert static_client.get("/api/v1/ontology/workspaces", headers=bearer(TOKEN)).status_code == 401
 
 
-def test_unset_fixed_token_accepts_nothing(client):
+def test_default_fixed_token_works_out_of_the_box(client):
+    default = Settings.model_fields["mcp_token"].default
+    assert default == "ontofoundry-mcp-default-token"
+    assert mcp_request(client, "tools/list", headers=bearer(default)).status_code == 200
     assert mcp_request(client, "tools/list", headers=bearer(TOKEN)).status_code == 401
+
+
+def test_empty_fixed_token_disables_external_access(tmp_path):
+    with TestClient(create_app(settings(tmp_path, mcp_token=""))) as client:
+        assert mcp_request(client, "tools/list", headers=bearer("")).status_code == 401
+        default = Settings.model_fields["mcp_token"].default
+        assert mcp_request(client, "tools/list", headers=bearer(default)).status_code == 401
 
 
 def test_short_fixed_token_is_rejected_at_startup(tmp_path):
