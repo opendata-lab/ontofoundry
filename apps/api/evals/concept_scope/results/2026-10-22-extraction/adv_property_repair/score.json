@@ -1,0 +1,60 @@
+{
+ "scenario": "adv_property_repair",
+ "level": "advanced",
+ "predicted": 7,
+ "expected": 7,
+ "correct": 7,
+ "precision": 1.0,
+ "recall": 1.0,
+ "f1": 1.0,
+ "missed": [],
+ "errors": {},
+ "examples_placed": 5,
+ "examples_expected": 6,
+ "details": [
+  {
+   "item": "报修单",
+   "result": "正确",
+   "concept": "repair_order"
+  },
+  {
+   "item": "住户",
+   "result": "正确",
+   "concept": "resident"
+  },
+  {
+   "item": "房屋",
+   "result": "正确",
+   "concept": "house"
+  },
+  {
+   "item": "楼栋",
+   "result": "正确",
+   "concept": "building"
+  },
+  {
+   "item": "维修工",
+   "result": "正确",
+   "concept": "worker"
+  },
+  {
+   "item": "排班",
+   "result": "正确",
+   "concept": "shift"
+  },
+  {
+   "item": "备件",
+   "result": "正确",
+   "concept": "spare_part"
+  }
+ ],
+ "workspace_id": "ed35edee-7503-4b51-8f02-9dd0629d45e0",
+ "session_id": "6c7a3f26-21cb-4414-aa71-7993a786ed9d",
+ "result_state": "awaiting_reply",
+ "seconds": 131,
+ "turns": 11,
+ "input": 12175,
+ "cache": 139648,
+ "output": 10784,
+ "tool_errors": 1
+}

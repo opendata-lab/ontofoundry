@@ -85,7 +85,7 @@ def run_paths(work_pack, pack, prior_plan):
     for material in pack.get("materials") or []:
         if material.get("path"):
             lines.append(f"- 材料：{material['path']}")
-    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认", "needs_input_file")):
+    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认（只在不交结果的轮次写）", "needs_input_file")):
         if pack.get(key):
             lines.append(f"- {label}：{pack[key]}")
     if prior_plan or pack.get("prior_plan_file"):

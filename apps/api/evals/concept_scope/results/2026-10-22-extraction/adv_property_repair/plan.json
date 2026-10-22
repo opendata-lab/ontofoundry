@@ -1,0 +1,140 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-02dda1599b574e54bc3d04cbc0b23d8b.json\n本体为空：是\n新增材料：有（青檀物业报修管理说明 md；表结构 json）\n新增关联表：有（t3 order_parts、t8 worker_buildings 为关系表，不立概念）\n\n## 范围\n青檀物业报修领域：报修单、住户、房屋、楼栋、维修工、排班、备件。\n\n## 实体或变化清单（全量）\n见 modeling/entities.json。\n\n## 来源表\nt1 buildings、t2 houses、t3 order_parts、t4 repair_orders、t5 residents、\nt6 shifts、t7 spare_parts、t8 worker_buildings、t9 workers。\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n1. 备件是否纳入本次建模（材料正文未提及，仅表结构 spare_parts / order_parts 存在）。\n2. 报修单与工单同义，统一用“报修单”；评价人即住户本人，不另立概念。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "repair_order",
+    "display_name": "报修单",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 9
+     },
+     {
+      "table": "t4"
+     }
+    ],
+    "tables": [
+     "t4"
+    ],
+    "examples": [
+     "BX-0315"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "resident",
+    "display_name": "住户",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 11
+     },
+     {
+      "table": "t5"
+     }
+    ],
+    "tables": [
+     "t5"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "house",
+    "display_name": "房屋",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 11
+     },
+     {
+      "table": "t2"
+     }
+    ],
+    "tables": [
+     "t2"
+    ],
+    "examples": [
+     "3栋1502室"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "building",
+    "display_name": "楼栋",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 11
+     },
+     {
+      "table": "t1"
+     }
+    ],
+    "tables": [
+     "t1"
+    ],
+    "examples": [
+     "3栋",
+     "7栋"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "worker",
+    "display_name": "维修工",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 15
+     },
+     {
+      "table": "t9"
+     }
+    ],
+    "tables": [
+     "t9"
+    ],
+    "examples": [
+     "W012 韩师傅"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "shift",
+    "display_name": "排班",
+    "basis": [
+     {
+      "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+      "line": 19
+     },
+     {
+      "table": "t6"
+     }
+    ],
+    "tables": [
+     "t6"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "spare_part",
+    "display_name": "备件",
+    "basis": [
+     {
+      "table": "t7"
+     }
+    ],
+    "tables": [
+     "t7"
+    ],
+    "status": "new"
+   }
+  ]
+ }
+}

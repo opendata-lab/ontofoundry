@@ -1,0 +1,2175 @@
+{
+  "base_version_id": null,
+  "base_version_sha256": "9261bf9741f4f274e81ba64f293314f01335d95decfca6b0d6d30242effa86b7",
+  "run_token": "462220b6f80ae5582951c3a54db62f07",
+  "schema_version": "ontofoundry.proposals/v1",
+  "session_id": "33a97655-6dff-425c-98f3-71ce64c97fe9",
+  "source_draft_sha256": "9261bf9741f4f274e81ba64f293314f01335d95decfca6b0d6d30242effa86b7",
+  "source_session_revision": 3,
+  "workspace_id": "e0258e04-e46e-4151-8733-e5c7c57c6aaf",
+  "items": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "department",
+      "after": {
+        "name": "department",
+        "display_name": "科室",
+        "title_property_id": {
+          "client_ref": "department_dept_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "诊所设有科室，如全科、儿科、口腔科。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "department_dept_id",
+      "after": {
+        "name": "dept_id",
+        "display_name": "科室编号",
+        "owner_type_id": {
+          "client_ref": "department"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "department_dept_name",
+      "after": {
+        "name": "dept_name",
+        "display_name": "科室名称",
+        "owner_type_id": {
+          "client_ref": "department"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "doctor",
+      "after": {
+        "name": "doctor",
+        "display_name": "医生",
+        "title_property_id": {
+          "client_ref": "doctor_doctor_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "每位医生隶属一个科室，记录医生编号、姓名和职称"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "doctor_doctor_id",
+      "after": {
+        "name": "doctor_id",
+        "display_name": "医生编号",
+        "owner_type_id": {
+          "client_ref": "doctor"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true,
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "记录医生编号"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "doctor_doctor_name",
+      "after": {
+        "name": "doctor_name",
+        "display_name": "医生姓名",
+        "owner_type_id": {
+          "client_ref": "doctor"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "doctor_title_prop",
+      "after": {
+        "name": "title",
+        "display_name": "职称",
+        "owner_type_id": {
+          "client_ref": "doctor"
+        },
+        "value_kind": "string",
+        "value_type_id": {
+          "client_ref": "doctor_title"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "职称是医生上的一个字段"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "doctor_dept_id",
+      "after": {
+        "name": "dept_id",
+        "display_name": "科室编号",
+        "owner_type_id": {
+          "client_ref": "doctor"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "patient",
+      "after": {
+        "name": "patient",
+        "display_name": "患者",
+        "title_property_id": {
+          "client_ref": "patient_patient_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "患者记录患者编号、姓名、性别和出生日期。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "patient_patient_id",
+      "after": {
+        "name": "patient_id",
+        "display_name": "患者编号",
+        "owner_type_id": {
+          "client_ref": "patient"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true,
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "患者记录患者编号"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "patient_patient_name",
+      "after": {
+        "name": "patient_name",
+        "display_name": "患者姓名",
+        "owner_type_id": {
+          "client_ref": "patient"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "patient_gender",
+      "after": {
+        "name": "gender",
+        "display_name": "性别",
+        "owner_type_id": {
+          "client_ref": "patient"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "patient_birth_date",
+      "after": {
+        "name": "birth_date",
+        "display_name": "出生日期",
+        "owner_type_id": {
+          "client_ref": "patient"
+        },
+        "value_kind": "date"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "appointment",
+      "after": {
+        "name": "appointment",
+        "display_name": "预约",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "一次预约对应一位患者和一位医生，记录预约日期、时段和预约状态"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_appt_no",
+      "after": {
+        "name": "appt_no",
+        "display_name": "预约编号",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_appt_date",
+      "after": {
+        "name": "appt_date",
+        "display_name": "预约日期",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "date"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_slot",
+      "after": {
+        "name": "slot",
+        "display_name": "时段",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_status_prop",
+      "after": {
+        "name": "status",
+        "display_name": "预约状态",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "string",
+        "value_type_id": {
+          "client_ref": "appointment_status"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "预约状态是预约上的一个字段"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_patient_id",
+      "after": {
+        "name": "patient_id",
+        "display_name": "患者编号",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "appointment_doctor_id",
+      "after": {
+        "name": "doctor_id",
+        "display_name": "医生编号",
+        "owner_type_id": {
+          "client_ref": "appointment"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "prescription",
+      "after": {
+        "name": "prescription",
+        "display_name": "处方",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "就诊后医生开具处方，一张处方对应一次预约。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_rx_no",
+      "after": {
+        "name": "rx_no",
+        "display_name": "处方号",
+        "owner_type_id": {
+          "client_ref": "prescription"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_issued_at",
+      "after": {
+        "name": "issued_at",
+        "display_name": "开具时间",
+        "owner_type_id": {
+          "client_ref": "prescription"
+        },
+        "value_kind": "datetime"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_total_amount",
+      "after": {
+        "name": "total_amount",
+        "display_name": "总金额",
+        "owner_type_id": {
+          "client_ref": "prescription"
+        },
+        "value_kind": "decimal"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_appt_no",
+      "after": {
+        "name": "appt_no",
+        "display_name": "预约编号",
+        "owner_type_id": {
+          "client_ref": "prescription"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "prescription_item",
+      "after": {
+        "name": "prescription_item",
+        "display_name": "处方明细",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "处方由若干处方明细组成，每条处方明细记录药品和数量，以处方号加行号标识。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_item_rx_no",
+      "after": {
+        "name": "rx_no",
+        "display_name": "处方号",
+        "owner_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": false,
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "以处方号加行号标识"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_item_line_no",
+      "after": {
+        "name": "line_no",
+        "display_name": "行号",
+        "owner_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "value_kind": "integer",
+        "identifier": true,
+        "required": true,
+        "unique": false,
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "以处方号加行号标识"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_item_quantity",
+      "after": {
+        "name": "quantity",
+        "display_name": "数量",
+        "owner_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "value_kind": "integer"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "prescription_item_drug_code",
+      "after": {
+        "name": "drug_code",
+        "display_name": "药品编码",
+        "owner_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "drug",
+      "after": {
+        "name": "drug",
+        "display_name": "药品",
+        "title_property_id": {
+          "client_ref": "drug_drug_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "药品记录药品编码、名称、单价和类别"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "drug_drug_code",
+      "after": {
+        "name": "drug_code",
+        "display_name": "药品编码",
+        "owner_type_id": {
+          "client_ref": "drug"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true,
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "药品记录药品编码"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "drug_drug_name",
+      "after": {
+        "name": "drug_name",
+        "display_name": "药品名称",
+        "owner_type_id": {
+          "client_ref": "drug"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "drug_unit_price",
+      "after": {
+        "name": "unit_price",
+        "display_name": "单价",
+        "owner_type_id": {
+          "client_ref": "drug"
+        },
+        "value_kind": "decimal"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "drug_category",
+      "after": {
+        "name": "category",
+        "display_name": "类别",
+        "owner_type_id": {
+          "client_ref": "drug"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "value_type",
+      "client_ref": "doctor_title",
+      "after": {
+        "name": "doctor_title",
+        "display_name": "职称",
+        "value_kind": "string",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "取值为主治医师、副主任医师"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "doctor_title_values",
+      "after": {
+        "name": "doctor_title_values",
+        "display_name": "职称取值",
+        "owner_kind": "value_type",
+        "owner_id": {
+          "client_ref": "doctor_title"
+        },
+        "rule_kind": "constraint",
+        "expression": "doctor_title IN ('主治医师', '副主任医师')"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "value_type",
+      "client_ref": "appointment_status",
+      "after": {
+        "name": "appointment_status",
+        "display_name": "预约状态",
+        "value_kind": "string",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "取值为已预约、已就诊、已取消、爽约"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "appointment_status_values",
+      "after": {
+        "name": "appointment_status_values",
+        "display_name": "预约状态取值",
+        "owner_kind": "value_type",
+        "owner_id": {
+          "client_ref": "appointment_status"
+        },
+        "rule_kind": "constraint",
+        "expression": "appointment_status IN ('已预约', '已就诊', '已取消', '爽约')"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "doctor_belongs_department",
+      "after": {
+        "name": "doctor_belongs_department",
+        "display_name": "隶属科室",
+        "source_type_id": {
+          "client_ref": "doctor"
+        },
+        "target_type_id": {
+          "client_ref": "department"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}隶属科室{target}",
+          "{target}有{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "doctor_dept_id"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "department_dept_id"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "每位医生隶属一个科室"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "appointment_for_patient",
+      "after": {
+        "name": "appointment_for_patient",
+        "display_name": "对应患者",
+        "source_type_id": {
+          "client_ref": "appointment"
+        },
+        "target_type_id": {
+          "client_ref": "patient"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}对应患者{target}",
+          "{target}有{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "appointment_patient_id"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "patient_patient_id"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "一次预约对应一位患者和一位医生"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "appointment_for_doctor",
+      "after": {
+        "name": "appointment_for_doctor",
+        "display_name": "对应医生",
+        "source_type_id": {
+          "client_ref": "appointment"
+        },
+        "target_type_id": {
+          "client_ref": "doctor"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}对应医生{target}",
+          "{target}有{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "appointment_doctor_id"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "doctor_doctor_id"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "一次预约对应一位患者和一位医生"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "prescription_for_appointment",
+      "after": {
+        "name": "prescription_for_appointment",
+        "display_name": "对应预约",
+        "source_type_id": {
+          "client_ref": "prescription"
+        },
+        "target_type_id": {
+          "client_ref": "appointment"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}对应预约{target}",
+          "{target}开具{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "prescription_appt_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "appointment_appt_no"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "一张处方对应一次预约"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "prescription_item_belongs_prescription",
+      "after": {
+        "name": "prescription_item_belongs_prescription",
+        "display_name": "属于处方",
+        "source_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "target_type_id": {
+          "client_ref": "prescription"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}属于处方{target}",
+          "{target}由{source}组成"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "prescription_item_rx_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "prescription_rx_no"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "处方由若干处方明细组成"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "prescription_item_for_drug",
+      "after": {
+        "name": "prescription_item_for_drug",
+        "display_name": "记录药品",
+        "source_type_id": {
+          "client_ref": "prescription_item"
+        },
+        "target_type_id": {
+          "client_ref": "drug"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}记录药品{target}",
+          "{target}出现在{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "prescription_item_drug_code"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "drug_drug_code"
+            }
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "每条处方明细记录药品和数量"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "appointments_ds",
+      "after": {
+        "name": "appointments",
+        "display_name": "预约",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "appointments",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "appt_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "patient_id",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "doctor_id",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "appt_date",
+            "physical_type": "DATE",
+            "comment": ""
+          },
+          {
+            "name": "slot",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "status",
+            "physical_type": "VARCHAR(8)",
+            "comment": "预约状态"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "appointment_map",
+      "after": {
+        "type_id": {
+          "client_ref": "appointment"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "appointments_ds"
+            },
+            "key_columns": [
+              "appt_no"
+            ]
+          }
+        ],
+        "fields": {
+          "appt_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "appt_no"
+          },
+          "appt_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "appt_date"
+          },
+          "slot": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "slot"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          },
+          "patient_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "patient_id"
+          },
+          "doctor_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "doctor_id"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "daily_visit_stats_ds",
+      "after": {
+        "name": "daily_visit_stats",
+        "display_name": "每日就诊人次统计",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "daily_visit_stats",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "stat_date",
+            "physical_type": "DATE",
+            "comment": ""
+          },
+          {
+            "name": "dept_id",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "visit_count",
+            "physical_type": "INTEGER",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "departments_ds",
+      "after": {
+        "name": "departments",
+        "display_name": "科室",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "departments",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "dept_id",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "dept_name",
+            "physical_type": "VARCHAR(40)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "department_map",
+      "after": {
+        "type_id": {
+          "client_ref": "department"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "departments_ds"
+            },
+            "key_columns": [
+              "dept_id"
+            ]
+          }
+        ],
+        "fields": {
+          "dept_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "dept_id"
+          },
+          "dept_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "dept_name"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "doctors_ds",
+      "after": {
+        "name": "doctors",
+        "display_name": "医生",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "doctors",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "doctor_id",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "doctor_name",
+            "physical_type": "VARCHAR(40)",
+            "comment": ""
+          },
+          {
+            "name": "dept_id",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "title",
+            "physical_type": "VARCHAR(20)",
+            "comment": "职称"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "doctor_map",
+      "after": {
+        "type_id": {
+          "client_ref": "doctor"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "doctors_ds"
+            },
+            "key_columns": [
+              "doctor_id"
+            ]
+          }
+        ],
+        "fields": {
+          "doctor_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "doctor_id"
+          },
+          "doctor_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "doctor_name"
+          },
+          "title": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "title"
+          },
+          "dept_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "dept_id"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "patients_ds",
+      "after": {
+        "name": "patients",
+        "display_name": "患者",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "patients",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "patient_id",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "patient_name",
+            "physical_type": "VARCHAR(40)",
+            "comment": ""
+          },
+          {
+            "name": "gender",
+            "physical_type": "VARCHAR(4)",
+            "comment": ""
+          },
+          {
+            "name": "birth_date",
+            "physical_type": "DATE",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "patient_map",
+      "after": {
+        "type_id": {
+          "client_ref": "patient"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "patients_ds"
+            },
+            "key_columns": [
+              "patient_id"
+            ]
+          }
+        ],
+        "fields": {
+          "patient_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "patient_id"
+          },
+          "patient_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "patient_name"
+          },
+          "gender": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "gender"
+          },
+          "birth_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "birth_date"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "prescriptions_ds",
+      "after": {
+        "name": "prescriptions",
+        "display_name": "处方",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "prescriptions",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "rx_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "appt_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "issued_at",
+            "physical_type": "DATETIME",
+            "comment": ""
+          },
+          {
+            "name": "total_amount",
+            "physical_type": "DECIMAL(10, 2)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "prescription_map",
+      "after": {
+        "type_id": {
+          "client_ref": "prescription"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "prescriptions_ds"
+            },
+            "key_columns": [
+              "rx_no"
+            ]
+          }
+        ],
+        "fields": {
+          "rx_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "rx_no"
+          },
+          "issued_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "issued_at"
+          },
+          "total_amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "total_amount"
+          },
+          "appt_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "appt_no"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "prescription_items_ds",
+      "after": {
+        "name": "prescription_items",
+        "display_name": "处方明细",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "prescription_items",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "rx_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "line_no",
+            "physical_type": "INTEGER",
+            "comment": ""
+          },
+          {
+            "name": "drug_code",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "quantity",
+            "physical_type": "INTEGER",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "prescription_item_map",
+      "after": {
+        "type_id": {
+          "client_ref": "prescription_item"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "prescription_items_ds"
+            },
+            "key_columns": [
+              "rx_no",
+              "line_no"
+            ]
+          }
+        ],
+        "fields": {
+          "rx_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "rx_no"
+          },
+          "line_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "line_no"
+          },
+          "quantity": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "quantity"
+          },
+          "drug_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "drug_code"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "drugs_ds",
+      "after": {
+        "name": "drugs",
+        "display_name": "药品",
+        "source_kind": "table",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "schema_name": "eval_clinic",
+        "table_name": "drugs",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "drug_code",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "drug_name",
+            "physical_type": "VARCHAR(60)",
+            "comment": ""
+          },
+          {
+            "name": "unit_price",
+            "physical_type": "DECIMAL(10, 2)",
+            "comment": ""
+          },
+          {
+            "name": "category",
+            "physical_type": "VARCHAR(20)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "drug_map",
+      "after": {
+        "type_id": {
+          "client_ref": "drug"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "drugs_ds"
+            },
+            "key_columns": [
+              "drug_code"
+            ]
+          }
+        ],
+        "fields": {
+          "drug_code": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "drug_code"
+          },
+          "drug_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "drug_name"
+          },
+          "unit_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "unit_price"
+          },
+          "category": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "category"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "prescription_patient_ds",
+      "after": {
+        "name": "prescription_patient",
+        "display_name": "处方关联患者",
+        "source_kind": "query",
+        "connection_id": "a520eaeb-6ed8-4070-bb31-576303f0ce43",
+        "dialect": "mysql",
+        "query_sql": "SELECT p.rx_no, p.issued_at, p.total_amount, a.patient_id FROM eval_clinic.prescriptions p JOIN eval_clinic.appointments a ON a.appt_no = p.appt_no",
+        "columns": [
+          {
+            "name": "rx_no",
+            "physical_type": "VARCHAR(16)"
+          },
+          {
+            "name": "issued_at",
+            "physical_type": "DATETIME"
+          },
+          {
+            "name": "total_amount",
+            "physical_type": "DECIMAL(10, 2)"
+          },
+          {
+            "name": "patient_id",
+            "physical_type": "VARCHAR(12)"
+          }
+        ],
+        "description": "处方关联预约取得患者，用于人均处方金额（处方总金额 ÷ 开具处方患者数）的分母去重口径"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "visit_count",
+      "after": {
+        "name": "visit_count",
+        "display_name": "就诊人次",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "daily_visit_stats_ds"
+        },
+        "aggregation": "sum",
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "daily_visit_stats_ds"
+          },
+          "column": "stat_date"
+        },
+        "measure": {
+          "dataset_id": {
+            "client_ref": "daily_visit_stats_ds"
+          },
+          "column": "visit_count"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "按科室和日期汇总的每日就诊人次统计表"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "appointments_count",
+      "after": {
+        "name": "appointments_count",
+        "display_name": "预约总数",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "appointments_ds"
+        },
+        "aggregation": "count",
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "appointments_ds"
+          },
+          "column": "appt_date"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "预约总数"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "no_show_appointments",
+      "after": {
+        "name": "no_show_appointments",
+        "display_name": "爽约预约数",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "appointments_ds"
+        },
+        "aggregation": "count",
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "appointments_ds"
+          },
+          "column": "appt_date"
+        },
+        "filters": [
+          {
+            "column": {
+              "dataset_id": {
+                "client_ref": "appointments_ds"
+              },
+              "column": "status"
+            },
+            "operator": "eq",
+            "values": [
+              "爽约"
+            ]
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "预约状态为爽约的预约数"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "no_show_rate",
+      "after": {
+        "name": "no_show_rate",
+        "display_name": "爽约率",
+        "kind": "ratio",
+        "numerator_id": {
+          "client_ref": "no_show_appointments"
+        },
+        "denominator_id": {
+          "client_ref": "appointments_count"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "爽约率 = 预约状态为爽约的预约数 ÷ 预约总数"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "rx_total_amount",
+      "after": {
+        "name": "rx_total_amount",
+        "display_name": "处方总金额",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "prescription_patient_ds"
+        },
+        "aggregation": "sum",
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "prescription_patient_ds"
+          },
+          "column": "issued_at"
+        },
+        "measure": {
+          "dataset_id": {
+            "client_ref": "prescription_patient_ds"
+          },
+          "column": "total_amount"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "处方总金额"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "prescribed_patient_count",
+      "after": {
+        "name": "prescribed_patient_count",
+        "display_name": "开具处方患者数",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "prescription_patient_ds"
+        },
+        "aggregation": "count_distinct",
+        "time_field": {
+          "dataset_id": {
+            "client_ref": "prescription_patient_ds"
+          },
+          "column": "issued_at"
+        },
+        "measure": {
+          "dataset_id": {
+            "client_ref": "prescription_patient_ds"
+          },
+          "column": "patient_id"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "开具过处方的患者数"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "avg_rx_amount_per_patient",
+      "after": {
+        "name": "avg_rx_amount_per_patient",
+        "display_name": "人均处方金额",
+        "kind": "ratio",
+        "numerator_id": {
+          "client_ref": "rx_total_amount"
+        },
+        "denominator_id": {
+          "client_ref": "prescribed_patient_count"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "人均处方金额 = 处方总金额 ÷ 开具过处方的患者数"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "dept_general",
+      "after": {
+        "type_id": {
+          "client_ref": "department"
+        },
+        "values": {
+          "dept_name": "全科"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "如全科、儿科、口腔科"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "dept_pediatrics",
+      "after": {
+        "type_id": {
+          "client_ref": "department"
+        },
+        "values": {
+          "dept_name": "儿科"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "如全科、儿科、口腔科"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "dept_stomatology",
+      "after": {
+        "type_id": {
+          "client_ref": "department"
+        },
+        "values": {
+          "dept_name": "口腔科"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "如全科、儿科、口腔科"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "doctor_xu",
+      "after": {
+        "type_id": {
+          "client_ref": "doctor"
+        },
+        "values": {
+          "doctor_id": "D01",
+          "doctor_name": "许医生"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "全科的许医生（D01）"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "doctor_tang",
+      "after": {
+        "type_id": {
+          "client_ref": "doctor"
+        },
+        "values": {
+          "doctor_id": "D05",
+          "doctor_name": "唐医生"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "儿科的唐医生（D05）"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "drug_amoxicillin",
+      "after": {
+        "type_id": {
+          "client_ref": "drug"
+        },
+        "values": {
+          "drug_name": "阿莫西林胶囊"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "例如阿莫西林胶囊、布洛芬混悬液"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "drug_ibuprofen",
+      "after": {
+        "type_id": {
+          "client_ref": "drug"
+        },
+        "values": {
+          "drug_name": "布洛芬混悬液"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "例如阿莫西林胶囊、布洛芬混悬液"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "xu_in_general",
+      "after": {
+        "type_id": {
+          "client_ref": "doctor_belongs_department"
+        },
+        "source_id": {
+          "client_ref": "doctor_xu"
+        },
+        "target_id": {
+          "client_ref": "dept_general"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "全科的许医生（D01）"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_link",
+      "client_ref": "tang_in_pediatrics",
+      "after": {
+        "type_id": {
+          "client_ref": "doctor_belongs_department"
+        },
+        "source_id": {
+          "client_ref": "doctor_tang"
+        },
+        "target_id": {
+          "client_ref": "dept_pediatrics"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "41e27fee-c1eb-448c-8973-954b369671d3",
+            "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+            "locator": {
+              "line_start": 3,
+              "line_end": 3
+            },
+            "quote": "儿科的唐医生（D05）"
+          }
+        ]
+      },
+      "before": null
+    }
+  ]
+}

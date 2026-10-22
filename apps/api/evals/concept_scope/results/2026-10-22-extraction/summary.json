@@ -1,0 +1,122 @@
+[
+ {
+  "scenario": "adv_property_repair",
+  "level": "advanced",
+  "predicted": 7,
+  "expected": 7,
+  "correct": 7,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "missed": [],
+  "errors": {},
+  "examples_placed": 5,
+  "examples_expected": 6,
+  "workspace_id": "ed35edee-7503-4b51-8f02-9dd0629d45e0",
+  "session_id": "6c7a3f26-21cb-4414-aa71-7993a786ed9d",
+  "result_state": "awaiting_reply",
+  "seconds": 131,
+  "turns": 11,
+  "input": 12175,
+  "cache": 139648,
+  "output": 10784,
+  "tool_errors": 1,
+  "extraction": {
+   "scenario": "adv_property_repair",
+   "proposals": 0,
+   "properties": {
+    "found": 0,
+    "expected": 22,
+    "recall": 0.0
+   },
+   "relations": {
+    "found": 0,
+    "expected": 8,
+    "recall": 0.0,
+    "multiplicity_correct": 0
+   },
+   "mappings": {
+    "found": 0,
+    "expected": 7,
+    "recall": 0.0
+   },
+   "instances": {
+    "found": 0,
+    "expected": 6,
+    "recall": 0.0
+   },
+   "metrics": {
+    "found": 0,
+    "expected": 2,
+    "recall": 0.0
+   },
+   "result_state": "failed_permanent",
+   "seconds": 652,
+   "turns": 40,
+   "input": 262248,
+   "cache": 1541376,
+   "output": 58316,
+   "tool_errors": 4
+  }
+ },
+ {
+  "scenario": "clinic_booking",
+  "level": "basic",
+  "predicted": 7,
+  "expected": 7,
+  "correct": 7,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "missed": [],
+  "errors": {},
+  "examples_placed": 9,
+  "examples_expected": 9,
+  "workspace_id": "e0258e04-e46e-4151-8733-e5c7c57c6aaf",
+  "session_id": "33a97655-6dff-425c-98f3-71ce64c97fe9",
+  "result_state": "awaiting_reply",
+  "seconds": 91,
+  "turns": 8,
+  "input": 6935,
+  "cache": 72832,
+  "output": 7433,
+  "tool_errors": 0,
+  "extraction": {
+   "scenario": "clinic_booking",
+   "proposals": 0,
+   "properties": {
+    "found": 0,
+    "expected": 22,
+    "recall": 0.0
+   },
+   "relations": {
+    "found": 0,
+    "expected": 6,
+    "recall": 0.0,
+    "multiplicity_correct": 0
+   },
+   "mappings": {
+    "found": 0,
+    "expected": 7,
+    "recall": 0.0
+   },
+   "instances": {
+    "found": 0,
+    "expected": 9,
+    "recall": 0.0
+   },
+   "metrics": {
+    "found": 0,
+    "expected": 2,
+    "recall": 0.0
+   },
+   "result_state": "failed_permanent",
+   "seconds": 542,
+   "turns": 38,
+   "input": 218504,
+   "cache": 1085440,
+   "output": 48854,
+   "tool_errors": 5
+  }
+ }
+]

@@ -1,0 +1,60 @@
+{
+ "scenario": "clinic_booking",
+ "level": "basic",
+ "predicted": 7,
+ "expected": 7,
+ "correct": 7,
+ "precision": 1.0,
+ "recall": 1.0,
+ "f1": 1.0,
+ "missed": [],
+ "errors": {},
+ "examples_placed": 9,
+ "examples_expected": 9,
+ "details": [
+  {
+   "item": "科室",
+   "result": "正确",
+   "concept": "department"
+  },
+  {
+   "item": "医生",
+   "result": "正确",
+   "concept": "doctor"
+  },
+  {
+   "item": "患者",
+   "result": "正确",
+   "concept": "patient"
+  },
+  {
+   "item": "预约",
+   "result": "正确",
+   "concept": "appointment"
+  },
+  {
+   "item": "处方",
+   "result": "正确",
+   "concept": "prescription"
+  },
+  {
+   "item": "处方明细",
+   "result": "正确",
+   "concept": "prescription_item"
+  },
+  {
+   "item": "药品",
+   "result": "正确",
+   "concept": "drug"
+  }
+ ],
+ "workspace_id": "e0258e04-e46e-4151-8733-e5c7c57c6aaf",
+ "session_id": "33a97655-6dff-425c-98f3-71ce64c97fe9",
+ "result_state": "awaiting_reply",
+ "seconds": 91,
+ "turns": 8,
+ "input": 6935,
+ "cache": 72832,
+ "output": 7433,
+ "tool_errors": 0
+}

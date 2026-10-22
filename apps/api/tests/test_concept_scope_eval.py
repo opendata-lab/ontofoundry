@@ -132,3 +132,26 @@ def test_extraction_scoring_traces_elements_to_gold_concepts():
     assert result["relations"]["found"] == 1 and result["relations"]["multiplicity_correct"] == 0
     assert [result[k]["recall"] for k in ("mappings", "instances", "metrics")] == [1.0, 1.0, 1.0]
     assert score_extraction(gold, extraction, [])["properties"]["found"] == 0
+
+
+def test_extraction_scoring_reads_client_refs_of_an_unsubmitted_result():
+    from evals.concept_scope.score_extraction import score_extraction
+
+    gold = {"concepts": [{"key": "member", "accepted": ["会员"]}, {"key": "store", "accepted": ["门店"]}]}
+    extraction = {"properties": {"member": [{"accepted": ["电话"]}]},
+                  "relations": [{"source": "member", "target": "store", "multiplicity": ["many_to_one"]}],
+                  "mappings": {"member": "members"}}
+    items = [
+        {"operation": "create", "target_kind": "object_type", "client_ref": "m", "after": {"name": "member", "display_name": "会员"}},
+        {"operation": "create", "target_kind": "object_type", "client_ref": "s", "after": {"name": "store", "display_name": "门店"}},
+        {"operation": "create", "target_kind": "property", "client_ref": "p",
+         "after": {"owner_type_id": {"client_ref": "m"}, "name": "phone", "display_name": "电话"}},
+        {"operation": "create", "target_kind": "link_type", "client_ref": "l",
+         "after": {"source_type_id": {"client_ref": "m"}, "target_type_id": {"client_ref": "s"}, "multiplicity": "many_to_one"}},
+        {"operation": "create", "target_kind": "dataset", "client_ref": "d", "after": {"name": "members", "table_name": "members"}},
+        {"operation": "create", "target_kind": "mapping", "client_ref": "mp",
+         "after": {"type_id": {"client_ref": "m"}, "sources": [{"dataset_id": {"client_ref": "d"}}]}},
+    ]
+    result = score_extraction(gold, extraction, items)
+    assert [result[k]["recall"] for k in ("properties", "relations", "mappings")] == [1.0, 1.0, 1.0]
+    assert result["relations"]["multiplicity_correct"] == 1

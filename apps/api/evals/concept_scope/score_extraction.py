@@ -15,8 +15,15 @@ except ModuleNotFoundError:  # imported as a package by the tests
 REVERSED = {"many_to_one": "one_to_many", "one_to_one": "one_to_one", "many_to_many": "many_to_many"}
 
 
-def _after(item):
-    return item.get("after") or {}
+def _ref(value):
+    """A reference is a UUID once stored, or {"client_ref": ...} in an agent's result file."""
+    return value.get("client_ref") if isinstance(value, dict) else (str(value) if value else None)
+
+
+def _element(item):
+    after = dict(item.get("after") or {})
+    after["id"] = _ref(after.get("id")) or item.get("client_ref")
+    return after
 
 
 def _names(element):
@@ -32,7 +39,7 @@ def score_extraction(gold: dict, extraction: dict, items: list[dict], datasets: 
     by_kind = {}
     for item in items:
         if item.get("operation") == "create":
-            by_kind.setdefault(item["target_kind"], []).append(_after(item))
+            by_kind.setdefault(item["target_kind"], []).append(_element(item))
     concept_of = {}
     for element in by_kind.get("object_type", []):
         names = _names(element)
@@ -44,7 +51,7 @@ def score_extraction(gold: dict, extraction: dict, items: list[dict], datasets: 
     # Properties: each expected property found on its concept's object type.
     props = {}
     for element in by_kind.get("property", []):
-        key = concept_of.get(element.get("owner_type_id"))
+        key = concept_of.get(_ref(element.get("owner_type_id")))
         if key:
             props.setdefault(key, []).append(_names(element))
     property_details, found = [], 0
@@ -59,7 +66,7 @@ def score_extraction(gold: dict, extraction: dict, items: list[dict], datasets: 
     # Relations: the pair in either direction, with the multiplicity read accordingly.
     links = []
     for element in by_kind.get("link_type", []):
-        source, target = concept_of.get(element.get("source_type_id")), concept_of.get(element.get("target_type_id"))
+        source, target = concept_of.get(_ref(element.get("source_type_id"))), concept_of.get(_ref(element.get("target_type_id")))
         if source and target:
             links.append((source, target, element.get("multiplicity")))
     relation_details, pairs, exact = [], 0, 0
@@ -77,15 +84,15 @@ def score_extraction(gold: dict, extraction: dict, items: list[dict], datasets: 
     tables = {str(d["id"]): d.get("table_name") for d in [*(datasets or []), *by_kind.get("dataset", [])]}
     mapped = {}
     for element in by_kind.get("mapping", []):
-        key = concept_of.get(element.get("type_id"))
+        key = concept_of.get(_ref(element.get("type_id")))
         if key:
-            mapped.setdefault(key, set()).update(tables.get(str(s.get("dataset_id"))) for s in element.get("sources") or [])
+            mapped.setdefault(key, set()).update(tables.get(_ref(s.get("dataset_id"))) for s in element.get("sources") or [])
     mapping_details = [{"concept": k, "table": t, "found": t in mapped.get(k, set())} for k, t in extraction["mappings"].items()]
 
     # Instances: the gold's named things proposed as document instances of their concept.
     values = {}
     for element in by_kind.get("material_object", []):
-        key = concept_of.get(element.get("type_id"))
+        key = concept_of.get(_ref(element.get("type_id")))
         if key:
             values.setdefault(key, []).extend(normalize(v) for v in (element.get("values") or {}).values() if isinstance(v, str))
     instance_details = []

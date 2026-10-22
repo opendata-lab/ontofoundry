@@ -1,0 +1,12 @@
+{
+ "started_at": "2026-10-22T23:19:04",
+ "commit": "7d4e822",
+ "api": "http://192.168.0.100:8000",
+ "set": "public",
+ "scenarios": [
+  "adv_property_repair",
+  "clinic_booking"
+ ],
+ "score_only": false,
+ "extract": true
+}

@@ -1,0 +1,1775 @@
+{
+  "base_version_id": null,
+  "base_version_sha256": "3a163d2615e24ea56a2a0c2656a47d9722e846612123896bc584a6ded5c61ef3",
+  "run_token": "df64da54722d00140e1b3328364bdc11",
+  "schema_version": "ontofoundry.proposals/v1",
+  "session_id": "6c7a3f26-21cb-4414-aa71-7993a786ed9d",
+  "source_draft_sha256": "3a163d2615e24ea56a2a0c2656a47d9722e846612123896bc584a6ded5c61ef3",
+  "source_session_revision": 3,
+  "workspace_id": "ed35edee-7503-4b51-8f02-9dd0629d45e0",
+  "items": [
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "repair_order",
+      "after": {
+        "name": "repair_order",
+        "display_name": "报修单",
+        "description": "报修单即工单，两者同义",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "每张报修单记录报修编号、报修时间、问题描述和紧急程度"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_order_no",
+      "after": {
+        "name": "order_no",
+        "display_name": "报修编号",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_resident_no",
+      "after": {
+        "name": "resident_no",
+        "display_name": "住户编号",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "string",
+        "description": "提交报修单的住户编号"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_worker_no",
+      "after": {
+        "name": "worker_no",
+        "display_name": "维修工号",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "string",
+        "description": "接单维修工号"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_reported_at",
+      "after": {
+        "name": "reported_at",
+        "display_name": "报修时间",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "datetime"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_description",
+      "after": {
+        "name": "description",
+        "display_name": "问题描述",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_urgency",
+      "after": {
+        "name": "urgency",
+        "display_name": "紧急程度",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "string",
+        "value_type_id": {
+          "client_ref": "urgency_type"
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_score",
+      "after": {
+        "name": "score",
+        "display_name": "住户评分",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "integer"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "repair_order_finished_at",
+      "after": {
+        "name": "finished_at",
+        "display_name": "完工时间",
+        "owner_type_id": {
+          "client_ref": "repair_order"
+        },
+        "value_kind": "datetime",
+        "description": "维修完成时间"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "resident",
+      "after": {
+        "name": "resident",
+        "display_name": "住户",
+        "title_property_id": {
+          "client_ref": "resident_resident_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "住户记录住户编号、姓名、联系电话和所住房屋"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "resident_resident_no",
+      "after": {
+        "name": "resident_no",
+        "display_name": "住户编号",
+        "owner_type_id": {
+          "client_ref": "resident"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "resident_resident_name",
+      "after": {
+        "name": "resident_name",
+        "display_name": "姓名",
+        "owner_type_id": {
+          "client_ref": "resident"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "resident_phone",
+      "after": {
+        "name": "phone",
+        "display_name": "联系电话",
+        "owner_type_id": {
+          "client_ref": "resident"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "resident_house_no",
+      "after": {
+        "name": "house_no",
+        "display_name": "房号",
+        "owner_type_id": {
+          "client_ref": "resident"
+        },
+        "value_kind": "string",
+        "description": "住户所住房屋房号"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "house",
+      "after": {
+        "name": "house",
+        "display_name": "房屋",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "房屋记录房号和建筑面积，每套房屋属于一栋楼栋"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "house_house_no",
+      "after": {
+        "name": "house_no",
+        "display_name": "房号",
+        "owner_type_id": {
+          "client_ref": "house"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "house_area",
+      "after": {
+        "name": "area",
+        "display_name": "建筑面积",
+        "owner_type_id": {
+          "client_ref": "house"
+        },
+        "value_kind": "decimal"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "house_building_no",
+      "after": {
+        "name": "building_no",
+        "display_name": "楼栋编号",
+        "owner_type_id": {
+          "client_ref": "house"
+        },
+        "value_kind": "string",
+        "description": "房屋所属楼栋编号"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "building",
+      "after": {
+        "name": "building",
+        "display_name": "楼栋",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "楼栋记录楼栋编号和楼层数，例如 3 栋、7 栋。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "building_building_no",
+      "after": {
+        "name": "building_no",
+        "display_name": "楼栋编号",
+        "owner_type_id": {
+          "client_ref": "building"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "building_floors",
+      "after": {
+        "name": "floors",
+        "display_name": "楼层数",
+        "owner_type_id": {
+          "client_ref": "building"
+        },
+        "value_kind": "integer"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "worker",
+      "after": {
+        "name": "worker",
+        "display_name": "维修工",
+        "title_property_id": {
+          "client_ref": "worker_worker_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "维修工记录工号、姓名和工种"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "worker_worker_no",
+      "after": {
+        "name": "worker_no",
+        "display_name": "工号",
+        "owner_type_id": {
+          "client_ref": "worker"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "worker_worker_name",
+      "after": {
+        "name": "worker_name",
+        "display_name": "姓名",
+        "owner_type_id": {
+          "client_ref": "worker"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "worker_trade",
+      "after": {
+        "name": "trade",
+        "display_name": "工种",
+        "owner_type_id": {
+          "client_ref": "worker"
+        },
+        "value_kind": "string",
+        "value_type_id": {
+          "client_ref": "trade_type"
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "shift",
+      "after": {
+        "name": "shift",
+        "display_name": "排班",
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 19,
+              "line_end": 19
+            },
+            "quote": "维修工按排班上岗：每条排班记录一位维修工在某一天的某个班次以及值守的楼栋"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "shift_worker_no",
+      "after": {
+        "name": "worker_no",
+        "display_name": "工号",
+        "owner_type_id": {
+          "client_ref": "shift"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": false
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "shift_shift_date",
+      "after": {
+        "name": "shift_date",
+        "display_name": "日期",
+        "owner_type_id": {
+          "client_ref": "shift"
+        },
+        "value_kind": "date",
+        "identifier": true,
+        "required": true,
+        "unique": false
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "shift_shift_type",
+      "after": {
+        "name": "shift_type",
+        "display_name": "班次",
+        "owner_type_id": {
+          "client_ref": "shift"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": false,
+        "value_type_id": {
+          "client_ref": "shift_type_vt"
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "shift_building_no",
+      "after": {
+        "name": "building_no",
+        "display_name": "值守楼栋编号",
+        "owner_type_id": {
+          "client_ref": "shift"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "object_type",
+      "client_ref": "spare_part",
+      "after": {
+        "name": "spare_part",
+        "display_name": "备件",
+        "title_property_id": {
+          "client_ref": "spare_part_part_name"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "8e14edab-558a-4961-af0a-58963e888f4a",
+            "material_sha256": "dc544a4f6f0a5f4895dcb7efaafd7093197c64e767df08e787b155d9607f9c82",
+            "locator": {
+              "line_start": 255,
+              "line_end": 255
+            },
+            "quote": "\"comment\": \"备件\""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "spare_part_part_no",
+      "after": {
+        "name": "part_no",
+        "display_name": "备件编号",
+        "owner_type_id": {
+          "client_ref": "spare_part"
+        },
+        "value_kind": "string",
+        "identifier": true,
+        "required": true,
+        "unique": true
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "spare_part_part_name",
+      "after": {
+        "name": "part_name",
+        "display_name": "备件名称",
+        "owner_type_id": {
+          "client_ref": "spare_part"
+        },
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "spare_part_unit_price",
+      "after": {
+        "name": "unit_price",
+        "display_name": "单价",
+        "owner_type_id": {
+          "client_ref": "spare_part"
+        },
+        "value_kind": "decimal"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "property",
+      "client_ref": "spare_part_stock",
+      "after": {
+        "name": "stock",
+        "display_name": "库存",
+        "owner_type_id": {
+          "client_ref": "spare_part"
+        },
+        "value_kind": "integer"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "value_type",
+      "client_ref": "urgency_type",
+      "after": {
+        "name": "urgency",
+        "display_name": "紧急程度",
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "urgency_values",
+      "after": {
+        "name": "urgency_values",
+        "display_name": "紧急程度取值",
+        "owner_kind": "value_type",
+        "owner_id": {
+          "client_ref": "urgency_type"
+        },
+        "rule_kind": "constraint",
+        "expression": "urgency IN ('普通', '加急', '特急')"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "value_type",
+      "client_ref": "trade_type",
+      "after": {
+        "name": "trade",
+        "display_name": "工种",
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "trade_values",
+      "after": {
+        "name": "trade_values",
+        "display_name": "工种取值",
+        "owner_kind": "value_type",
+        "owner_id": {
+          "client_ref": "trade_type"
+        },
+        "rule_kind": "constraint",
+        "expression": "trade IN ('水电工', '木工', '空调工')"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "value_type",
+      "client_ref": "shift_type_vt",
+      "after": {
+        "name": "shift_type",
+        "display_name": "班次",
+        "value_kind": "string"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "rule",
+      "client_ref": "shift_type_values",
+      "after": {
+        "name": "shift_type_values",
+        "display_name": "班次取值",
+        "owner_kind": "value_type",
+        "owner_id": {
+          "client_ref": "shift_type_vt"
+        },
+        "rule_kind": "constraint",
+        "expression": "shift_type IN ('早班', '晚班')"
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "order_submitted_by",
+      "after": {
+        "name": "order_submitted_by",
+        "display_name": "报修单由住户提交",
+        "source_type_id": {
+          "client_ref": "repair_order"
+        },
+        "target_type_id": {
+          "client_ref": "resident"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}由{target}提交",
+          "{target}提交{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "repair_order_resident_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "resident_resident_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "order_assigned_to",
+      "after": {
+        "name": "order_assigned_to",
+        "display_name": "报修单派给维修工",
+        "source_type_id": {
+          "client_ref": "repair_order"
+        },
+        "target_type_id": {
+          "client_ref": "worker"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}派给{target}",
+          "{target}处理{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "repair_order_worker_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "worker_worker_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "house_belongs_to",
+      "after": {
+        "name": "house_belongs_to",
+        "display_name": "房屋属于楼栋",
+        "source_type_id": {
+          "client_ref": "house"
+        },
+        "target_type_id": {
+          "client_ref": "building"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}属于{target}",
+          "{target}包含{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "house_building_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "building_building_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "resident_lives_in",
+      "after": {
+        "name": "resident_lives_in",
+        "display_name": "住户居住在房屋",
+        "source_type_id": {
+          "client_ref": "resident"
+        },
+        "target_type_id": {
+          "client_ref": "house"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}居住在{target}",
+          "{target}居住有{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "resident_house_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "house_house_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "shift_of_worker",
+      "after": {
+        "name": "shift_of_worker",
+        "display_name": "排班属于维修工",
+        "source_type_id": {
+          "client_ref": "shift"
+        },
+        "target_type_id": {
+          "client_ref": "worker"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}属于{target}",
+          "{target}有{source}"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "shift_worker_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "worker_worker_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "shift_guards_building",
+      "after": {
+        "name": "shift_guards_building",
+        "display_name": "排班值守楼栋",
+        "source_type_id": {
+          "client_ref": "shift"
+        },
+        "target_type_id": {
+          "client_ref": "building"
+        },
+        "multiplicity": "many_to_one",
+        "verbalizes": [
+          "{source}值守{target}",
+          "{target}被{source}值守"
+        ],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            {
+              "client_ref": "shift_building_no"
+            }
+          ],
+          "target_property_ids": [
+            {
+              "client_ref": "building_building_no"
+            }
+          ]
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "worker_responsible_for_building",
+      "after": {
+        "name": "worker_responsible_for_building",
+        "display_name": "维修工负责楼栋",
+        "source_type_id": {
+          "client_ref": "worker"
+        },
+        "target_type_id": {
+          "client_ref": "building"
+        },
+        "multiplicity": "many_to_many",
+        "verbalizes": [
+          "{source}负责{target}",
+          "{target}由{source}负责"
+        ],
+        "data_join": {
+          "kind": "mapping_table",
+          "dataset_id": {
+            "client_ref": "worker_buildings"
+          },
+          "source_columns": [
+            "worker_no"
+          ],
+          "target_columns": [
+            "building_no"
+          ],
+          "source_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "worker_worker_no"
+              }
+            ]
+          },
+          "target_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "building_building_no"
+              }
+            ]
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "link_type",
+      "client_ref": "order_uses_part",
+      "after": {
+        "name": "order_uses_part",
+        "display_name": "报修单使用备件",
+        "source_type_id": {
+          "client_ref": "repair_order"
+        },
+        "target_type_id": {
+          "client_ref": "spare_part"
+        },
+        "multiplicity": "many_to_many",
+        "verbalizes": [
+          "{source}使用{target}",
+          "{target}用于{source}"
+        ],
+        "data_join": {
+          "kind": "mapping_table",
+          "dataset_id": {
+            "client_ref": "order_parts"
+          },
+          "source_columns": [
+            "order_no"
+          ],
+          "target_columns": [
+            "part_no"
+          ],
+          "source_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "repair_order_order_no"
+              }
+            ]
+          },
+          "target_key": {
+            "kind": "properties",
+            "property_ids": [
+              {
+                "client_ref": "spare_part_part_no"
+              }
+            ]
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "buildings",
+      "after": {
+        "name": "buildings",
+        "display_name": "楼栋",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "buildings",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "building_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "floors",
+            "physical_type": "INTEGER",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "building_map",
+      "after": {
+        "type_id": {
+          "client_ref": "building"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "buildings"
+            },
+            "key_columns": [
+              "building_no"
+            ]
+          }
+        ],
+        "fields": {
+          "building_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "building_no"
+          },
+          "floors": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "floors"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "houses",
+      "after": {
+        "name": "houses",
+        "display_name": "房屋",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "houses",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "house_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "building_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "area",
+            "physical_type": "DECIMAL(8, 2)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "house_map",
+      "after": {
+        "type_id": {
+          "client_ref": "house"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "houses"
+            },
+            "key_columns": [
+              "house_no"
+            ]
+          }
+        ],
+        "fields": {
+          "house_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "house_no"
+          },
+          "area": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "area"
+          },
+          "building_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "building_no"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "residents",
+      "after": {
+        "name": "residents",
+        "display_name": "住户",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "residents",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "resident_no",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "resident_name",
+            "physical_type": "VARCHAR(40)",
+            "comment": ""
+          },
+          {
+            "name": "phone",
+            "physical_type": "VARCHAR(20)",
+            "comment": ""
+          },
+          {
+            "name": "house_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "resident_map",
+      "after": {
+        "type_id": {
+          "client_ref": "resident"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "residents"
+            },
+            "key_columns": [
+              "resident_no"
+            ]
+          }
+        ],
+        "fields": {
+          "resident_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "resident_no"
+          },
+          "resident_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "resident_name"
+          },
+          "phone": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "phone"
+          },
+          "house_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "house_no"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "workers",
+      "after": {
+        "name": "workers",
+        "display_name": "维修工",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "workers",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "worker_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "worker_name",
+            "physical_type": "VARCHAR(40)",
+            "comment": ""
+          },
+          {
+            "name": "trade",
+            "physical_type": "VARCHAR(12)",
+            "comment": "工种"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "worker_map",
+      "after": {
+        "type_id": {
+          "client_ref": "worker"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "workers"
+            },
+            "key_columns": [
+              "worker_no"
+            ]
+          }
+        ],
+        "fields": {
+          "worker_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "worker_no"
+          },
+          "worker_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "worker_name"
+          },
+          "trade": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "trade"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "repair_orders",
+      "after": {
+        "name": "repair_orders",
+        "display_name": "报修单",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "repair_orders",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "resident_no",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "worker_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "reported_at",
+            "physical_type": "DATETIME",
+            "comment": ""
+          },
+          {
+            "name": "description",
+            "physical_type": "VARCHAR(200)",
+            "comment": ""
+          },
+          {
+            "name": "urgency",
+            "physical_type": "VARCHAR(8)",
+            "comment": "紧急程度"
+          },
+          {
+            "name": "score",
+            "physical_type": "TINYINT",
+            "comment": "住户评分"
+          },
+          {
+            "name": "finished_at",
+            "physical_type": "DATETIME",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "repair_order_map",
+      "after": {
+        "type_id": {
+          "client_ref": "repair_order"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "repair_orders"
+            },
+            "key_columns": [
+              "order_no"
+            ]
+          }
+        ],
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "resident_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "resident_no"
+          },
+          "worker_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "worker_no"
+          },
+          "reported_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "reported_at"
+          },
+          "description": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "description"
+          },
+          "urgency": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "urgency"
+          },
+          "score": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "score"
+          },
+          "finished_at": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "finished_at"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "shifts",
+      "after": {
+        "name": "shifts",
+        "display_name": "排班",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "shifts",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "worker_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "shift_date",
+            "physical_type": "DATE",
+            "comment": ""
+          },
+          {
+            "name": "shift_type",
+            "physical_type": "VARCHAR(8)",
+            "comment": "班次"
+          },
+          {
+            "name": "building_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "shift_map",
+      "after": {
+        "type_id": {
+          "client_ref": "shift"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "shifts"
+            },
+            "key_columns": [
+              "worker_no",
+              "shift_date",
+              "shift_type"
+            ]
+          }
+        ],
+        "fields": {
+          "worker_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "worker_no"
+          },
+          "shift_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shift_date"
+          },
+          "shift_type": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "shift_type"
+          },
+          "building_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "building_no"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "spare_parts",
+      "after": {
+        "name": "spare_parts",
+        "display_name": "备件",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "spare_parts",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "part_no",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          },
+          {
+            "name": "part_name",
+            "physical_type": "VARCHAR(60)",
+            "comment": ""
+          },
+          {
+            "name": "unit_price",
+            "physical_type": "DECIMAL(10, 2)",
+            "comment": ""
+          },
+          {
+            "name": "stock",
+            "physical_type": "INTEGER",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "mapping",
+      "client_ref": "spare_part_map",
+      "after": {
+        "type_id": {
+          "client_ref": "spare_part"
+        },
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": {
+              "client_ref": "spare_parts"
+            },
+            "key_columns": [
+              "part_no"
+            ]
+          }
+        ],
+        "fields": {
+          "part_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "part_no"
+          },
+          "part_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "part_name"
+          },
+          "unit_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "unit_price"
+          },
+          "stock": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "stock"
+          }
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "order_parts",
+      "after": {
+        "name": "order_parts",
+        "display_name": "报修单使用的备件",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "order_parts",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(16)",
+            "comment": ""
+          },
+          {
+            "name": "part_no",
+            "physical_type": "VARCHAR(12)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "dataset",
+      "client_ref": "worker_buildings",
+      "after": {
+        "name": "worker_buildings",
+        "display_name": "维修工负责楼栋",
+        "source_kind": "table",
+        "connection_id": "d6205555-65f8-4383-9d49-1dc0fe2c3371",
+        "schema_name": "eval_property",
+        "table_name": "worker_buildings",
+        "dialect": "mysql",
+        "columns": [
+          {
+            "name": "worker_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          },
+          {
+            "name": "building_no",
+            "physical_type": "VARCHAR(8)",
+            "comment": ""
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "metric",
+      "client_ref": "resident_satisfaction",
+      "after": {
+        "name": "resident_satisfaction",
+        "display_name": "住户满意度",
+        "kind": "simple",
+        "dataset_id": {
+          "client_ref": "repair_orders"
+        },
+        "aggregation": "avg",
+        "measure": {
+          "dataset_id": {
+            "client_ref": "repair_orders"
+          },
+          "column": "score"
+        }
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "fact_order_bx0315",
+      "after": {
+        "type_id": {
+          "client_ref": "repair_order"
+        },
+        "values": {
+          "order_no": "BX-0315",
+          "description": "厨房水管漏水"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "例如报修编号 BX-0315 的“厨房水管漏水”。"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "fact_building_3",
+      "after": {
+        "type_id": {
+          "client_ref": "building"
+        },
+        "values": {
+          "building_no": "3栋"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "例如 3 栋、7 栋"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "fact_building_7",
+      "after": {
+        "type_id": {
+          "client_ref": "building"
+        },
+        "values": {
+          "building_no": "7栋"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "例如 3 栋、7 栋"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "fact_house_3_1502",
+      "after": {
+        "type_id": {
+          "client_ref": "house"
+        },
+        "values": {
+          "house_no": "3栋1502室"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 11,
+              "line_end": 11
+            },
+            "quote": "例如 3 栋 1502 室"
+          }
+        ]
+      },
+      "before": null
+    },
+    {
+      "operation": "create",
+      "target_kind": "material_object",
+      "client_ref": "fact_worker_w012",
+      "after": {
+        "type_id": {
+          "client_ref": "worker"
+        },
+        "values": {
+          "worker_no": "W012",
+          "worker_name": "韩师傅"
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "material_id": "13993e0f-aa03-4fcd-af9f-e4255cfd3efb",
+            "material_sha256": "a3cefcab7f845d91328b67c1605fa8b837e00857e257a8bc5456bf09db2c1ec6",
+            "locator": {
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "例如工号 W012 的韩师傅。"
+          }
+        ]
+      },
+      "before": null
+    }
+  ]
+}

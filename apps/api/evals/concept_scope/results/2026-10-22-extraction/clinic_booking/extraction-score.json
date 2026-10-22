@@ -1,0 +1,283 @@
+{
+ "scenario": "clinic_booking",
+ "proposals": 0,
+ "properties": {
+  "found": 0,
+  "expected": 22,
+  "recall": 0.0
+ },
+ "relations": {
+  "found": 0,
+  "expected": 6,
+  "recall": 0.0,
+  "multiplicity_correct": 0
+ },
+ "mappings": {
+  "found": 0,
+  "expected": 7,
+  "recall": 0.0
+ },
+ "instances": {
+  "found": 0,
+  "expected": 9,
+  "recall": 0.0
+ },
+ "metrics": {
+  "found": 0,
+  "expected": 2,
+  "recall": 0.0
+ },
+ "details": {
+  "properties": [
+   {
+    "concept": "department",
+    "property": "科室编号",
+    "found": false
+   },
+   {
+    "concept": "department",
+    "property": "科室名称",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "property": "医生编号",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "property": "姓名",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "property": "职称",
+    "found": false
+   },
+   {
+    "concept": "patient",
+    "property": "患者编号",
+    "found": false
+   },
+   {
+    "concept": "patient",
+    "property": "姓名",
+    "found": false
+   },
+   {
+    "concept": "patient",
+    "property": "性别",
+    "found": false
+   },
+   {
+    "concept": "patient",
+    "property": "出生日期",
+    "found": false
+   },
+   {
+    "concept": "appointment",
+    "property": "预约编号",
+    "found": false
+   },
+   {
+    "concept": "appointment",
+    "property": "预约日期",
+    "found": false
+   },
+   {
+    "concept": "appointment",
+    "property": "时段",
+    "found": false
+   },
+   {
+    "concept": "appointment",
+    "property": "预约状态",
+    "found": false
+   },
+   {
+    "concept": "prescription",
+    "property": "处方号",
+    "found": false
+   },
+   {
+    "concept": "prescription",
+    "property": "开具时间",
+    "found": false
+   },
+   {
+    "concept": "prescription",
+    "property": "处方金额",
+    "found": false
+   },
+   {
+    "concept": "prescription_item",
+    "property": "行号",
+    "found": false
+   },
+   {
+    "concept": "prescription_item",
+    "property": "数量",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "property": "药品编码",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "property": "药品名称",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "property": "单价",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "property": "类别",
+    "found": false
+   }
+  ],
+  "relations": [
+   {
+    "relation": "doctor→department",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   },
+   {
+    "relation": "appointment→patient",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   },
+   {
+    "relation": "appointment→doctor",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   },
+   {
+    "relation": "prescription→appointment",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   },
+   {
+    "relation": "prescription_item→prescription",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   },
+   {
+    "relation": "prescription_item→drug",
+    "found": false,
+    "multiplicity_ok": false,
+    "seen": []
+   }
+  ],
+  "mappings": [
+   {
+    "concept": "department",
+    "table": "departments",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "table": "doctors",
+    "found": false
+   },
+   {
+    "concept": "patient",
+    "table": "patients",
+    "found": false
+   },
+   {
+    "concept": "appointment",
+    "table": "appointments",
+    "found": false
+   },
+   {
+    "concept": "prescription",
+    "table": "prescriptions",
+    "found": false
+   },
+   {
+    "concept": "prescription_item",
+    "table": "prescription_items",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "table": "drugs",
+    "found": false
+   }
+  ],
+  "instances": [
+   {
+    "concept": "department",
+    "instance": "全科",
+    "found": false
+   },
+   {
+    "concept": "department",
+    "instance": "儿科",
+    "found": false
+   },
+   {
+    "concept": "department",
+    "instance": "口腔科",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "instance": "许医生",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "instance": "唐医生",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "instance": "D01",
+    "found": false
+   },
+   {
+    "concept": "doctor",
+    "instance": "D05",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "instance": "阿莫西林胶囊",
+    "found": false
+   },
+   {
+    "concept": "drug",
+    "instance": "布洛芬混悬液",
+    "found": false
+   }
+  ],
+  "metrics": [
+   {
+    "metric": "爽约率",
+    "found": false
+   },
+   {
+    "metric": "人均处方金额",
+    "found": false
+   }
+  ]
+ },
+ "result_state": "failed_permanent",
+ "seconds": 542,
+ "turns": 38,
+ "input": 218504,
+ "cache": 1085440,
+ "output": 48854,
+ "tool_errors": 5
+}

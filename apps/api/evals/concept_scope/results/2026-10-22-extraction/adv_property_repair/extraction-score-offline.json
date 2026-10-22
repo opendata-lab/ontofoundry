@@ -1,0 +1,289 @@
+{
+ "scenario": "adv_property_repair",
+ "proposals": 71,
+ "properties": {
+  "found": 22,
+  "expected": 22,
+  "recall": 1.0
+ },
+ "relations": {
+  "found": 8,
+  "expected": 8,
+  "recall": 1.0,
+  "multiplicity_correct": 8
+ },
+ "mappings": {
+  "found": 7,
+  "expected": 7,
+  "recall": 1.0
+ },
+ "instances": {
+  "found": 6,
+  "expected": 6,
+  "recall": 1.0
+ },
+ "metrics": {
+  "found": 1,
+  "expected": 2,
+  "recall": 0.5
+ },
+ "details": {
+  "properties": [
+   {
+    "concept": "building",
+    "property": "楼栋编号",
+    "found": true
+   },
+   {
+    "concept": "building",
+    "property": "楼层数",
+    "found": true
+   },
+   {
+    "concept": "house",
+    "property": "房号",
+    "found": true
+   },
+   {
+    "concept": "house",
+    "property": "建筑面积",
+    "found": true
+   },
+   {
+    "concept": "resident",
+    "property": "住户编号",
+    "found": true
+   },
+   {
+    "concept": "resident",
+    "property": "姓名",
+    "found": true
+   },
+   {
+    "concept": "resident",
+    "property": "联系电话",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "报修编号",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "报修时间",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "问题描述",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "紧急程度",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "住户评分",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "property": "完成时间",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "property": "工号",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "property": "姓名",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "property": "工种",
+    "found": true
+   },
+   {
+    "concept": "shift",
+    "property": "排班日期",
+    "found": true
+   },
+   {
+    "concept": "shift",
+    "property": "班次",
+    "found": true
+   },
+   {
+    "concept": "spare_part",
+    "property": "备件编号",
+    "found": true
+   },
+   {
+    "concept": "spare_part",
+    "property": "备件名称",
+    "found": true
+   },
+   {
+    "concept": "spare_part",
+    "property": "单价",
+    "found": true
+   },
+   {
+    "concept": "spare_part",
+    "property": "库存",
+    "found": true
+   }
+  ],
+  "relations": [
+   {
+    "relation": "house→building",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "resident→house",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "repair_order→resident",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "repair_order→worker",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "shift→worker",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "shift→building",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_one"
+    ]
+   },
+   {
+    "relation": "worker→building",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_many"
+    ]
+   },
+   {
+    "relation": "repair_order→spare_part",
+    "found": true,
+    "multiplicity_ok": true,
+    "seen": [
+     "many_to_many"
+    ]
+   }
+  ],
+  "mappings": [
+   {
+    "concept": "building",
+    "table": "buildings",
+    "found": true
+   },
+   {
+    "concept": "house",
+    "table": "houses",
+    "found": true
+   },
+   {
+    "concept": "resident",
+    "table": "residents",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "table": "repair_orders",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "table": "workers",
+    "found": true
+   },
+   {
+    "concept": "shift",
+    "table": "shifts",
+    "found": true
+   },
+   {
+    "concept": "spare_part",
+    "table": "spare_parts",
+    "found": true
+   }
+  ],
+  "instances": [
+   {
+    "concept": "building",
+    "instance": "7 栋",
+    "found": true
+   },
+   {
+    "concept": "house",
+    "instance": "3 栋 1502 室",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "instance": "BX-0315",
+    "found": true
+   },
+   {
+    "concept": "repair_order",
+    "instance": "厨房水管漏水",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "instance": "韩师傅",
+    "found": true
+   },
+   {
+    "concept": "worker",
+    "instance": "W012",
+    "found": true
+   }
+  ],
+  "metrics": [
+   {
+    "metric": "报修及时完成率",
+    "found": false
+   },
+   {
+    "metric": "住户满意度",
+    "found": true
+   }
+  ]
+ }
+}
