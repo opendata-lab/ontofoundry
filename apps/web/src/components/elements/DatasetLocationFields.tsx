@@ -16,6 +16,7 @@ export function DatasetLocationFields({ workspaceId, dataset, nameField, onChang
   // Any later choice makes an in-flight connection check obsolete.
   const choice = useRef(0);
   const [checking, setChecking] = useState(false);
+  const needsSchema = connections.find((c) => c.id === dataset.connection_id)?.kind !== "postgresql";
   useEffect(() => {
     let live = true;
     catalogApi.connections(workspaceId).then((r) => { if (live) setConnections(r.items); }).catch((e: Error) => { if (live) setError(e.message); });
@@ -30,27 +31,28 @@ export function DatasetLocationFields({ workspaceId, dataset, nameField, onChang
   useEffect(() => {
     let live = true;
     setTables([]);
-    if (!dataset.connection_id || dataset.source_kind === "query") return;
+    setLoading(false); setError("");
+    if (!dataset.connection_id || (!dataset.schema_name && needsSchema) || dataset.source_kind === "query") return;
     setLoading(true); setError("");
-    catalogApi.assets(workspaceId, dataset.connection_id, { schema_name: dataset.schema_name ?? undefined }).then((r) => { if (live) setTables(r.items.filter((t) => !t.missing)); }).catch((e: Error) => { if (live) setError(e.message); }).finally(() => { if (live) setLoading(false); });
+    catalogApi.assets(workspaceId, dataset.connection_id, { schema_name: dataset.schema_name || undefined }).then((r) => { if (live) setTables(r.items.filter((t) => !t.missing)); }).catch((e: Error) => { if (live) setError(e.message); }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [workspaceId, dataset.connection_id, dataset.schema_name, dataset.source_kind]);
+  }, [workspaceId, dataset.connection_id, dataset.schema_name, dataset.source_kind, needsSchema]);
   // Keep the schema and table when the new connection has synced them too.
   const changeConnection = async (id: string) => {
     const base = { connection_id: id, dialect: connections.find((c) => c.id === id)?.kind ?? null };
     const reset = { schema_name: null, table_name: dataset.source_kind === "query" ? null : "", columns: null, snapshot_date_column: null };
     const ticket = ++choice.current;
-    if (dataset.source_kind === "query" || !dataset.table_name) { onChange({ ...base, ...reset }); return; }
-    onChange(base);
+    setError("");
+    setChecking(false);
+    if (dataset.source_kind === "query" || !dataset.table_name || (!dataset.schema_name && base.dialect !== "postgresql")) { onChange({ ...base, ...reset }); return; }
     setChecking(true);
     try {
-      const [found, assets] = await Promise.all([
-        catalogApi.schemas(workspaceId, id),
-        catalogApi.assets(workspaceId, id, { schema_name: dataset.schema_name ?? undefined }),
-      ]);
+      const found = await catalogApi.schemas(workspaceId, id);
       if (ticket !== choice.current) return;
-      const table = !dataset.schema_name || found.items.includes(dataset.schema_name)
-        ? assets.items.find((t) => !t.missing && t.name === dataset.table_name) : undefined;
+      if (dataset.schema_name && !found.items.includes(dataset.schema_name)) { onChange({ ...base, ...reset }); return; }
+      const assets = await catalogApi.assets(workspaceId, id, { schema_name: dataset.schema_name || undefined });
+      if (ticket !== choice.current) return;
+      const table = assets.items.find((t) => !t.missing && t.name === dataset.table_name);
       onChange(table ? { ...base, columns: table.columns.map((c) => ({ name: c.name, physical_type: c.type, comment: c.comment ?? "" })) } : { ...base, ...reset });
     } catch {
       if (ticket === choice.current) onChange({ ...base, ...reset });
@@ -64,8 +66,8 @@ export function DatasetLocationFields({ workspaceId, dataset, nameField, onChang
         onChange={(id: string) => void changeConnection(id)} />
     </Form.Item></FormRow>
     {dataset.source_kind !== "query" && <FormRow>
-      <Form.Item label="库 / Schema"><Select aria-label="库或 schema" allowClear value={dataset.schema_name ?? undefined} placeholder="默认库 / Schema" disabled={!dataset.connection_id} options={schemas.map((name) => ({ value: name, label: name }))} onChange={(schema?: string) => { choice.current++; setChecking(false); onChange({ schema_name: schema ?? null, table_name: "", columns: null, snapshot_date_column: null }); }} /></Form.Item>
-      <Form.Item label="已登记表或视图" required><Select aria-label="表或视图" showSearch loading={loading || checking} disabled={checking} optionFilterProp="label" value={dataset.table_name || undefined} options={tables.map((t) => ({ value: t.name, label: t.name }))} notFoundContent="请先在数据管理同步数据表" onChange={(name: string) => {
+      <Form.Item label="库 / Schema" required={needsSchema}><Select aria-label="库或 schema" allowClear value={dataset.schema_name ?? undefined} placeholder={needsSchema ? "选择库 / Schema" : "默认 Schema"} disabled={!dataset.connection_id || checking} options={schemas.map((name) => ({ value: name, label: name }))} onChange={(schema?: string) => { choice.current++; setChecking(false); onChange({ schema_name: schema ?? null, table_name: "", columns: null, snapshot_date_column: null }); }} /></Form.Item>
+      <Form.Item label="已登记表或视图" required><Select aria-label="表或视图" showSearch loading={loading || checking} disabled={!dataset.connection_id || (!dataset.schema_name && needsSchema) || checking || loading} optionFilterProp="label" value={dataset.table_name || undefined} options={tables.map((t) => ({ value: t.name, label: t.name }))} notFoundContent="请先在数据管理同步数据表" onChange={(name: string) => {
         const table = tables.find((t) => t.name === name);
         choice.current++;
         if (table) onChange({ table_name: name, columns: table.columns.map((c) => ({ name: c.name, physical_type: c.type, comment: c.comment ?? "" })), snapshot_date_column: null });
