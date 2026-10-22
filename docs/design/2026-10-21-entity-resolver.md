@@ -80,3 +80,8 @@
 - semantic-grounding 与 entity-extraction 技能已写入调用方法；插件清单工具列表加入 `resolve_entity`。
 - 测试：`apps/api/tests/test_entity_resolution.py`（文档实例分级与状态、全角规范化、MCP 与 REST 一致、业务标识精确命中、截断不判唯一、未知类型）。
 
+## 9. 补充已确认决定
+
+| 编号 | 决定 | 状态 |
+|---|---|---|
+| ER-14 | `title_property_id` 参考 Palantir Foundry 的对象标题属性，是可选的业务语义字段。建模 Agent 依据材料或表结构说明设置：明确给出实体名称属性（如“分馆名称”）时引用该属性；没有名称属性（如仅有复合标识的借阅明细）时可不设，按标识显示。平台和脚本不从字段名推断名称；`check_part` 仅对未设标题的新实体给出可忽略提示，不报错、不增加修正轮次。Ossie 无此概念，导出写扩展文件（核心模型设计 §6.2）；Fabric IQ 只有 keyProperty。 | 已确认（2026-10-22，用户选择方案 A） |

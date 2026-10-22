@@ -57,6 +57,17 @@ def check_fragment(items, context, schema):
     ]
     errors = schema_errors(batch, schema)
     for n, item in enumerate(batch["items"]):
+        after = item.get("after")
+        if (
+            item["operation"] == "create"
+            and item["target_kind"] == "object_type"
+            and isinstance(after, dict)
+            and after.get("title_property_id") is None
+        ):
+            hints.append(
+                f"{after.get('display_name') or after.get('name')}（{after.get('name')}）未设标题属性（可不设）："
+                "若材料给出名称属性请设置，否则按标识显示，按名称解析会找不到；无需仅为此提示修正。"
+            )
         errors += [diagnostic(f"/items/{n}" + path, *rest, item) for path, *rest in mapping_local_errors(item)]
     return {
         "errors": errors,

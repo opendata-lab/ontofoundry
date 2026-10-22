@@ -31,6 +31,7 @@ Ossie 导出为 ZIP：纯 Ossie 文件与 `ontofoundry-extension.json`。显示�
 | `derived_by` | DerivedBranch 数组 | 可省略，默认空数组，非空时仅子对象可填。 | 成员派生定义，分支取并集，simple 条件与 expression 互斥，见[继承](inheritance.md)。 |
 | `evidence` | Evidence 数组 | 可省略，默认空数组。 | 这些证据说明该定义的业务依据。 |
 
+标题属性参考 Palantir Foundry，由建模 Agent 在材料或表结构明确给出实体名称属性时设置；保持可选，没有名称属性时不设、按标识显示，平台和脚本不从字段名推断。
 
 ## 3. 例子
 

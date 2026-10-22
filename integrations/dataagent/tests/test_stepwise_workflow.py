@@ -177,7 +177,52 @@ def test_check_part_missing_display_name_is_a_hint():
     del item["after"]["display_name"]
     report = check_part.check_fragment([item], ctx, SCHEMA)
     assert not report["errors"]
-    assert report["hints"] == ["/items/0/after/display_name：建议填写中文名称"]
+    assert "/items/0/after/display_name：建议填写中文名称" in report["hints"]
+
+
+@pytest.mark.parametrize("title", ["absent", None, {"client_ref": "branch_name"}])
+def test_check_part_optional_title_hint_does_not_fail_or_infer_names(
+    tmp_path, monkeypatch, capsys, title
+):
+    monkeypatch.chdir(tmp_path)
+    ctx = pinned(SKILL / "references/examples/create-object_type.json")
+    items = [
+        {"operation": "create", "target_kind": "object_type", "client_ref": "branch",
+         "after": {"name": "branch", "display_name": "分馆"}},
+        {"operation": "create", "target_kind": "property", "client_ref": "branch_name",
+         "after": {"name": "branch_name", "display_name": "分馆名称",
+                   "owner_type_id": {"client_ref": "branch"}, "value_kind": "string"}},
+    ]
+    if title != "absent":
+        items[0]["after"]["title_property_id"] = title
+    original = deepcopy(items)
+    fragment = write_json(tmp_path / "01-types.json", items)
+    context = write_json(tmp_path / "context.json", ctx)
+    assert invoke(monkeypatch, check_part, "--context", context, "--schema", SCHEMA_PATH, fragment) == 0
+    report = json.loads((tmp_path / "modeling/checks/01-types.json").read_bytes())
+    output = capsys.readouterr().out
+    assert report["errors"] == report["pending_refs"] == []
+    if isinstance(title, dict):
+        assert report["hints"] == []
+        assert "未设标题属性" not in output
+    else:
+        hint = "分馆（branch）未设标题属性（可不设）：若材料给出名称属性请设置，否则按标识显示，按名称解析会找不到；无需仅为此提示修正。"
+        assert report["hints"] == [hint]
+        assert hint in output
+    assert items == original
+    assert not list(tmp_path.rglob("*budget*"))
+
+
+@pytest.mark.parametrize("operation", ["update", "delete"])
+def test_check_part_title_hint_ignores_existing_entities(operation):
+    ctx = json.loads((BASE / "tests/fixtures/context.json").read_bytes())
+    entity = ctx["draft"]["object_types"][0]
+    item = {"operation": operation, "target_kind": "object_type", "target_id": entity["id"]}
+    if operation == "update":
+        item["after"] = {"name": entity["name"], "display_name": "分馆"}
+    report = check_part.check_fragment([item], ctx, SCHEMA)
+    assert report["errors"] == []
+    assert report["hints"] == []
 
 
 def test_check_part_rejects_dangling_reference_inside_mapping():

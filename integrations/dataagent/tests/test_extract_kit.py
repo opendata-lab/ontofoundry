@@ -112,6 +112,25 @@ def test_values_are_exactly_derived_from_current_contract():
     assert len(values["value_kind"]) == 7
 
 
+def test_named_entity_title_is_a_closed_reference_and_composite_detail_has_none():
+    items = json.loads(lookup("--part", "01").stdout)
+    by_ref = {item["client_ref"]: item for item in items}
+    report = check_part.check_fragment(items, pinned(SKILL / "references/examples/create-object_type.json"), SCHEMA)
+    assert report["errors"] == report["pending_refs"] == []
+    branch = by_ref["branch"]["after"]
+    assert branch["title_property_id"] == {"client_ref": "branch_name"}
+    title = by_ref[branch["title_property_id"]["client_ref"]]
+    assert title["target_kind"] == "property"
+    assert title["after"]["display_name"] == "分馆名称"
+    assert title["after"]["owner_type_id"] == {"client_ref": "branch"}
+    assert "title_property_id" not in by_ref["loan_line"]["after"]
+    identifiers = [item["after"] for item in items if item["target_kind"] == "property"
+                   and item["after"].get("identifier")
+                   and item["after"]["owner_type_id"] == {"client_ref": "loan_line"}]
+    assert len(identifiers) == 2
+    assert all(p["required"] and not p["unique"] for p in identifiers)
+
+
 def test_kit_explicit_shape_inventory_and_fixture_coverage():
     parts = load_parts(KIT, kit=True)
     items = [i for part in parts for i in part]
