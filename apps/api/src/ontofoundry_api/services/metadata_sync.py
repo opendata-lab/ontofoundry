@@ -20,6 +20,7 @@ from ontofoundry_api.services.metadata_catalog import (
     list_tables,
     read_doris_table,
     require_schema,
+    require_source_schema,
 )
 from ontofoundry_api.services.readonly import connect_readonly
 
@@ -110,6 +111,7 @@ def previous_selection(previous, tables):
 
 
 def read_table(connection, schema_name, name, kind=None):
+    require_source_schema(connection, schema_name)
     if is_doris(connection):
         return read_doris_table(connection, schema_name, name, utc_now().isoformat())
     inspector = inspect(connection)
@@ -135,7 +137,10 @@ def read_structure(connection, schema_name, tables=None):
 
 
 def normalize_schema(connection, schema):
-    return schema or connection.config_json.get("schema_name") or ("public" if connection.kind == "postgresql" else connection.config_json.get("database", ""))
+    # MySQL and Doris have no default library: callers name one (see require_schema).
+    if schema:
+        return schema
+    return (connection.config_json.get("schema_name") or "public") if connection.kind == "postgresql" else ""
 
 
 def create_job(db, workspace_id, connection, schema_name, body, user_id):
@@ -164,6 +169,7 @@ def batches(db, job):
 def latest_jobs(db, connection_id, schema_name):
     connection = db.get(ConnectionRecord, connection_id)
     schema = normalize_schema(connection, schema_name)
+    require_schema(connection, schema)
     return db.scalars(select(MetadataSyncJobRecord).where(MetadataSyncJobRecord.connection_id == connection_id, MetadataSyncJobRecord.schema_name == schema).order_by(MetadataSyncJobRecord.created_at.desc()).limit(10)).all()
 
 
@@ -194,6 +200,8 @@ def interrupt_jobs(db):
 
 
 def save_observation(db, job, table):
+    if table.get("schema") != job.schema_name:
+        raise MetadataSyncError("读取结果的库与同步任务不一致", code="SYNC_SCHEMA_MISMATCH")
     record = db.get(MetadataSnapshotRecord, (job.connection_id, job.schema_name))
     if not record:
         record = MetadataSnapshotRecord(connection_id=job.connection_id, schema_name=job.schema_name, snapshot_json={"tables": []}, changes_json=[])
@@ -226,6 +234,8 @@ def run_job(factory, job_id, settings):
             connection = db.get(ConnectionRecord, job.connection_id)
             if connection is None or connection.workspace_id != job.workspace_id:
                 raise MetadataSyncError("连接已删除", code="CONNECTION_UNBOUND")
+            # Recheck persisted jobs, including retries after configuration changes.
+            require_schema(connection, job.schema_name)
             job.state, job.started_at = "running", utc_now()
             db.commit()
             # Only a first run of a full job lists the schema; a retry just re-reads
@@ -236,7 +246,7 @@ def run_job(factory, job_id, settings):
                     names = job.selected_json
                 else:
                     with connect_readonly(connection, settings, timeout_ms=15000) as conn:
-                        names = list_tables(conn, job.schema_name or None)
+                        names = list_tables(conn, job.schema_name)
                 job.inventory_json = names
                 for ordinal, offset in enumerate(range(0, len(names), 20)):
                     db.add(MetadataSyncBatchRecord(id=str(uuid4()), job_id=job.id, ordinal=ordinal, table_names_json=names[offset:offset + 20], state="queued", results_json=[], history_json=[]))
@@ -257,7 +267,7 @@ def run_job(factory, job_id, settings):
                             # End the platform read transaction before waiting on a source.
                             db.commit()
                             try:
-                                observed = read_table(conn, job.schema_name or None, name)
+                                observed = read_table(conn, job.schema_name, name)
                                 save_observation(db, job, observed)
                                 results[name] = {"table_name": name, "state": "missing" if observed.get("missing") else "succeeded"}
                             except Exception as exc:
@@ -281,7 +291,7 @@ def run_job(factory, job_id, settings):
                 record = db.get(MetadataSnapshotRecord, (job.connection_id, job.schema_name))
                 for table in list(record.snapshot_json.get("tables", [])) if record else []:
                     if table["name"] not in job.inventory_json:
-                        save_observation(db, job, {"name": table["name"], "missing": True, "observed_at": utc_now().isoformat()})
+                        save_observation(db, job, {"name": table["name"], "schema": job.schema_name, "missing": True, "observed_at": utc_now().isoformat()})
             job.state = "partial_failed" if any(b.state == "failed" for b in batches(db, job)) else "succeeded"
         except Exception as exc:
             db.rollback()
@@ -290,3 +300,20 @@ def run_job(factory, job_id, settings):
             job.error = exc.message if isinstance(exc, ServiceError) else "同步失败，请检查连接和权限后重试"
         job.finished_at, job.duration_ms = utc_now(), job.duration_ms + int((monotonic() - started) * 1000)
         db.commit()
+
+
+def remove_table(db, connection, schema_name, table_name):
+    """Unregister one synced table; the source database is untouched."""
+    schema = normalize_schema(connection, schema_name)
+    require_schema(connection, schema)
+    if db.scalar(select(MetadataSyncJobRecord).where(MetadataSyncJobRecord.connection_id == connection.id, MetadataSyncJobRecord.schema_name == schema, MetadataSyncJobRecord.state.in_(ACTIVE))):
+        raise ServiceError("该库正在同步，请等同步结束后再删除", code="SYNC_RUNNING", status_code=409)
+    record = db.get(MetadataSnapshotRecord, (connection.id, schema))
+    tables = record.snapshot_json.get("tables", []) if record else []
+    if not any(t["name"] == table_name for t in tables):
+        raise ServiceError("数据表未登记", code="TABLE_NOT_REGISTERED", status_code=404)
+    # Reassign so SQLAlchemy notices the JSON change.
+    record.snapshot_json = {**record.snapshot_json, "tables": [t for t in tables if t["name"] != table_name]}
+    record.changes_json = [c for c in record.changes_json or [] if c.get("table") != table_name]
+    db.commit()
+    return {"schema_name": schema, "table_name": table_name}

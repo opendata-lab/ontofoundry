@@ -1,5 +1,5 @@
 import { Alert, Button, Empty, Form, Input, InputNumber, Modal, Select, Table } from "antd";
-import { Database, PlugZap } from "lucide-react";
+import { Database, Pencil, PlugZap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { catalogApi, workspaceRequest } from "../api/client";
 import type { DataConnection } from "../api/types";
@@ -13,7 +13,7 @@ type ConnectionForm = {
   kind: DataConnection["kind"];
   host: string;
   port: number;
-  database: string;
+  database?: string;
   username: string;
   password?: string;
 };
@@ -26,10 +26,18 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
+  // The connection being edited; null while adding a new one.
+  const [editing, setEditing] = useState<DataConnection | null>(null);
   const [form] = Form.useForm<ConnectionForm>();
+  const kind = Form.useWatch("kind", form);
   useEffect(() => {
-    onReady?.(() => setOpen(true));
+    onReady?.(() => { setEditing(null); setError(""); setOpen(true); });
   }, [onReady]);
+  const edit = (c: DataConnection) => {
+    setEditing(c);
+    setError("");
+    setOpen(true);
+  };
   useEffect(() => {
     catalogApi
       .connections(workspace.id)
@@ -40,9 +48,19 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
     setBusy(true);
     setError("");
     try {
-      const c = await workspaceRequest<DataConnection>(workspace.id, "/connections", values);
-      setConnections((cs) => [...cs, c]);
+      if (editing) {
+        // An empty password keeps the stored one; the engine cannot change.
+        const { kind: _kind, password, ...rest } = values;
+        void _kind;
+        const c = await workspaceRequest<DataConnection>(workspace.id, "/connections/" + editing.id, { ...rest, ...(password ? { password } : {}) }, "PATCH");
+        setConnections((cs) => cs.map((x) => (x.id === c.id ? c : x)));
+        setStatus(c.name + "：已保存");
+      } else {
+        const c = await workspaceRequest<DataConnection>(workspace.id, "/connections", values);
+        setConnections((cs) => [...cs, c]);
+      }
       setOpen(false);
+      setEditing(null);
       form.resetFields();
     } catch (e) {
       setError(e instanceof Error ? e.message : "连接失败");
@@ -91,7 +109,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               ),
             },
             { title: "数据库类型", dataIndex: "kind" },
-            { title: "数据库", key: "database", render: (_, c) => <code className="text-xs">{c.database}</code> },
+            { title: "数据库", key: "database", render: (_, c) => c.kind === "postgresql" ? <code className="text-xs">{c.database}</code> : <span className="text-xs text-muted">整个服务</span> },
             {
               title: "地址",
               key: "host",
@@ -105,6 +123,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               title: "操作",
               key: "action",
               render: (_, c) => (
+                <span className="inline-flex gap-2">
                 <Button
                   size="small"
                   icon={<PlugZap size={14} />}
@@ -117,6 +136,12 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
                 >
                   测试
                 </Button>
+                {workspace.role === "admin" && (
+                  <Button size="small" icon={<Pencil size={14} />} aria-label={`编辑 ${c.name}`} onClick={() => edit(c)}>
+                    编辑
+                  </Button>
+                )}
+                </span>
               ),
             },
           ]}
@@ -124,9 +149,9 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
       </Panel>
       <Modal
         open={open}
-        title="添加数据连接"
-        onCancel={() => !busy && setOpen(false)}
-        closable={{ "aria-label": "关闭添加连接" }}
+        title={editing ? "编辑数据连接" : "添加数据连接"}
+        onCancel={() => { if (!busy) { setOpen(false); setEditing(null); } }}
+        closable={{ "aria-label": editing ? "关闭编辑连接" : "关闭添加连接" }}
         okText={busy ? "测试连接中…" : "测试并保存"}
         okButtonProps={{ loading: busy }}
         cancelText="取消"
@@ -136,10 +161,12 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
         <Form<ConnectionForm>
           form={form}
           layout="vertical"
-          initialValues={{ kind: "postgresql", port: PORTS.postgresql }}
+          initialValues={editing
+            ? { name: editing.name, kind: editing.kind, host: editing.host, port: editing.port, database: editing.database ?? "", username: editing.username }
+            : { kind: "postgresql", port: PORTS.postgresql }}
           onFinish={(values) => void submit(values)}
           onValuesChange={(changed: Partial<ConnectionForm>) => {
-            if (changed.kind) form.setFieldValue("port", PORTS[changed.kind]);
+            if (changed.kind && !editing) form.setFieldValue("port", PORTS[changed.kind]);
           }}
         >
           <Form.Item name="name" label="连接名称" rules={[{ required: true, message: "请填写连接名称" }]}>
@@ -148,6 +175,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
           <Form.Item name="kind" label="数据库类型">
             <Select
               aria-label="数据库类型"
+              disabled={!!editing}
               options={[
                 { value: "postgresql", label: "PostgreSQL" },
                 { value: "mysql", label: "MySQL" },
@@ -168,15 +196,19 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
               <InputNumber aria-label="端口" min={1} max={65535} className="w-full" />
             </Form.Item>
           </div>
-          <Form.Item name="database" label="数据库名称" rules={[{ required: true, message: "请填写数据库名称" }]}>
-            <Input aria-label="数据库名称" />
-          </Form.Item>
+          {/* MySQL and Doris connect to the whole server; libraries are chosen in data management.
+              A PostgreSQL connection cannot be made without its database. */}
+          {(editing?.kind ?? kind) === "postgresql" && (
+            <Form.Item name="database" label="数据库名称" rules={[{ required: true, message: "PostgreSQL 连接需要填写数据库名称" }]}>
+              <Input aria-label="数据库名称" />
+            </Form.Item>
+          )}
           <div className="grid grid-cols-2 gap-x-3">
             <Form.Item name="username" label="查询用户名" rules={[{ required: true, message: "请填写用户名" }]}>
               <Input aria-label="查询用户名" autoComplete="off" />
             </Form.Item>
             <Form.Item name="password" label="密码">
-              <Input.Password aria-label="密码" autoComplete="new-password" />
+              <Input.Password aria-label="密码" autoComplete="new-password" placeholder={editing ? "不修改请留空" : undefined} />
             </Form.Item>
           </div>
           {error && <Alert type="error" showIcon message={error} />}

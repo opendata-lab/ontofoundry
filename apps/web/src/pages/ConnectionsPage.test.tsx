@@ -50,10 +50,11 @@ it("opens the admin form, updates the default port and saves the connection", as
   fireEvent.mouseDown(screen.getByRole("combobox", { name: "数据库类型" }));
   fireEvent.click(await screen.findByText("MySQL", { selector: ".ant-select-item-option-content" }));
   expect(screen.getByRole("spinbutton", { name: "端口" })).toHaveValue("3306");
+  // A MySQL connection reaches the whole server; libraries are chosen when syncing.
+  expect(screen.queryByRole("textbox", { name: "数据库名称" })).toBeNull();
   for (const [name, value] of [
     ["连接名称", "云杉分析库"],
     ["主机", "db.example.invalid"],
-    ["数据库名称", "yunshan_demo"],
     ["查询用户名", "demo_reader"],
   ])
     fireEvent.change(screen.getByRole("textbox", { name }), { target: { value } });
@@ -73,3 +74,17 @@ it("keeps connections readable for members and hides the admin add action", asyn
   expect(await screen.findByRole("cell", { name: "星河只读库" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "添加连接" })).not.toBeInTheDocument();
 });
+
+it("edits a connection without resending an unchanged password", async () => {
+  renderWithProviders(<ConnectionsPage />);
+  fireEvent.click(await screen.findByRole("button", { name: `编辑 ${connection.name}` }));
+  const dialog = await screen.findByRole("dialog", { name: "编辑数据连接" });
+  expect(screen.getByRole("combobox", { name: "数据库类型" })).toBeDisabled();
+  vi.mocked(workspaceRequest).mockResolvedValue({ ...connection, host: "db2.example.invalid" });
+  fireEvent.change(screen.getByRole("textbox", { name: "主机" }), { target: { value: "db2.example.invalid" } });
+  fireEvent.click(screen.getByRole("button", { name: "测试并保存" }));
+  await waitFor(() => expect(workspaceRequest).toHaveBeenCalledWith("w1", `/connections/${connection.id}`, expect.not.objectContaining({ password: expect.anything() }), "PATCH"));
+  expect(vi.mocked(workspaceRequest).mock.calls.at(-1)?.[2]).toMatchObject({ host: "db2.example.invalid" });
+  await waitFor(() => expect(dialog).not.toBeVisible());
+});
+

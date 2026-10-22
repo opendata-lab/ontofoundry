@@ -80,15 +80,16 @@ export function InlineValueEditor({ path, label, value, display, disabled, onSav
 
   if (!editing) {
     return (
-      <div className="group flex items-start gap-1">
-        <div className="min-w-0 flex-1">{display}</div>
+      // The pencil floats over the cell so the diff table keeps its layout.
+      <div className="group relative">
+        {display}
         {!disabled && (
           <Button
             type="text"
             size="small"
             aria-label={`修改${label}`}
-            className="opacity-0 group-hover:opacity-100 focus:opacity-100"
-            icon={<Pencil size={13} />}
+            className="absolute top-1/2 right-0 size-4 min-w-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 focus:opacity-100"
+            icon={<Pencil size={12} />}
             onClick={start}
           />
         )}

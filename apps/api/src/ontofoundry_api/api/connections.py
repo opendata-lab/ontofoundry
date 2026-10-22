@@ -2,7 +2,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import (
     func,
     select,
@@ -31,14 +31,50 @@ def get_connection(db, wid, cid):
     return item
 
 
+ConnectionName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+
+
 class ConnectionCreate(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    name: ConnectionName
     kind: str = Field(pattern="^(postgresql|mysql|doris)$")
     host: str = Field(min_length=1, max_length=240)
     port: int = Field(ge=1, le=65535)
-    database: str = Field(min_length=1, max_length=120)
+    # PostgreSQL only: MySQL and Doris connections reach every database on the server.
+    database: str = Field(default="", max_length=120)
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(max_length=4096)
+
+    @model_validator(mode="after")
+    def database_only_for_postgres(self):
+        if self.kind == "postgresql" and not self.database.strip():
+            raise ValueError("PostgreSQL 连接需要填写数据库")
+        if self.kind != "postgresql":
+            # Libraries are chosen when syncing; a fixed one hid every other library.
+            self.database = ""
+        return self
+
+
+class ConnectionUpdate(BaseModel):
+    """Every field optional; an omitted password keeps the stored one. The engine cannot change."""
+
+    model_config = {"extra": "forbid"}
+    name: ConnectionName | None = None
+    host: str | None = Field(default=None, min_length=1, max_length=240)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    database: str | None = Field(default=None, max_length=120)
+    username: str | None = Field(default=None, min_length=1, max_length=120)
+    password: str | None = Field(default=None, max_length=4096)
+
+
+def _name_taken(db, workspace_id, name, except_id=None):
+    query = select(ConnectionRecord).where(
+        ConnectionRecord.workspace_id == workspace_id,
+        # The name is shown instead of the id, so it must not differ only by case or spaces.
+        func.lower(func.trim(ConnectionRecord.name)) == name.lower(),
+    )
+    if except_id:
+        query = query.where(ConnectionRecord.id != except_id)
+    return db.scalar(query) is not None
 
 
 @router.get("/connections")
@@ -70,13 +106,7 @@ def create_connection(
 ):
     require_member(db, workspace_id, user.id, admin=True)
     # Mappings name their data source, so the name has to identify one connection.
-    if db.scalar(
-        select(ConnectionRecord).where(
-            ConnectionRecord.workspace_id == workspace_id,
-            # The name is shown instead of the id, so it must not differ only by case or spaces.
-            func.lower(func.trim(ConnectionRecord.name)) == body.name.lower(),
-        )
-    ):
+    if _name_taken(db, workspace_id, body.name):
         raise HTTPException(409, "本空间已有同名数据连接，请换一个名称")
     item = ConnectionRecord(
         id=str(uuid4()),
@@ -89,6 +119,38 @@ def create_connection(
     with connect_readonly(item, request.app.state.settings) as conn:
         conn.execute(text("SELECT 1"))
     db.add(item)
+    db.commit()
+    return public_connection(item)
+
+
+@router.patch("/connections/{connection_id}")
+def update_connection(
+    workspace_id: str,
+    connection_id: str,
+    body: ConnectionUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_member(db, workspace_id, user.id, admin=True)
+    item = get_connection(db, workspace_id, connection_id)
+    changes = body.model_dump(exclude_unset=True)
+    if "name" in changes and _name_taken(db, workspace_id, changes["name"], except_id=item.id):
+        raise HTTPException(409, "本空间已有同名数据连接，请换一个名称")
+    config = {**item.config_json, **{k: v for k, v in changes.items() if k in {"host", "port", "database", "username"}}}
+    if item.kind != "postgresql":
+        config["database"] = ""
+    if item.kind == "postgresql" and not (config.get("database") or "").strip():
+        raise HTTPException(422, "PostgreSQL 连接需要填写数据库")
+    candidate = ConnectionRecord(
+        id=item.id, workspace_id=item.workspace_id, name=changes.get("name", item.name), kind=item.kind,
+        config_json=config,
+        secret_encrypted=changes["password"] if changes.get("password") is not None else item.secret_encrypted,
+    )
+    # Save only settings that actually connect.
+    with connect_readonly(candidate, request.app.state.settings) as conn:
+        conn.execute(text("SELECT 1"))
+    item.name, item.config_json, item.secret_encrypted = candidate.name, config, candidate.secret_encrypted
     db.commit()
     return public_connection(item)
 
@@ -124,8 +186,8 @@ def tables(
     from ontofoundry_api.services.metadata_sync import normalize_schema, read_table
 
     connection = get_connection(db, workspace_id, connection_id)
-    # Omitting the schema means the connection's default one, for every engine.
-    schema_name = normalize_schema(connection, schema_name or "") or None
+    # Only PostgreSQL has a default schema; MySQL and Doris require a library.
+    schema_name = normalize_schema(connection, schema_name)
     require_schema(connection, schema_name)
     with connect_readonly(connection, request.app.state.settings) as conn:
         names = list_tables(conn, schema_name)

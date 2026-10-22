@@ -469,11 +469,13 @@
 
 /* Data management shares the compact panel and dialog spacing scale. */
 :root {
-  --data-tables-sidebar-width: 256px;
+  --data-tables-detail-height: 480px;
+  --data-tables-detail-label-width: 96px;
   --data-tables-dialog-width: 960px;
   --data-tables-step-height: 420px;
 }
-.data-tables-layout { display: grid; grid-template-columns: var(--data-tables-sidebar-width) minmax(0, 1fr); gap: var(--space-md); align-items: start; }
-.data-tables-layout .ant-menu-item { height: auto; line-height: inherit; padding-block: var(--space-xs); }
+/* Table detail: tabs over a fixed scrolling body; key-value labels share one width. */
+.table-detail .ant-tabs-content-holder { height: var(--data-tables-detail-height); overflow: auto; padding-top: var(--space-sm); }
+.table-detail-info .ant-descriptions-item-label { width: var(--data-tables-detail-label-width); }
+.table-detail-info .ant-descriptions-row > td { padding-bottom: var(--space-md); }
 .data-tables-step { height: var(--data-tables-step-height); overflow: auto; }
-@media (max-width: 960px) { .data-tables-layout { grid-template-columns: minmax(0, 1fr); } }

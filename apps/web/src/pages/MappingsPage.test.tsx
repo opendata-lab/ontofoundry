@@ -26,6 +26,7 @@ vi.mock("../api/client", () => ({
     syncJob: vi.fn(),
     refreshAssets: vi.fn(),
     retrySync: vi.fn(),
+    deleteTable: vi.fn(),
     tableRows: vi.fn(),
   },
 }));
@@ -133,23 +134,35 @@ describe("data management page", () => {
     renderWithProviders(<MappingsPage />);
     expect(await screen.findByText("sales_orders", {}, { timeout: 10000 })).toBeInTheDocument();
     expect(screen.getByText("当前不可见或不存在")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: /crm ·/ }));
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "库" }));
+    fireEvent.click(await screen.findByText(/^crm ·/, { selector: ".ant-select-item-option-content" }));
     expect(screen.queryByText("sales_orders")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: /全部库/ }));
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "库" }));
+    fireEvent.click(await screen.findByText(/^全部库/, { selector: ".ant-select-item-option-content" }));
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "虚构订单" } });
     expect(screen.getByText("sales_orders")).toBeInTheDocument();
     expect(screen.queryByText("contacts")).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "contacts" } });
     expect(screen.getByText("contacts")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索表名或注释" }), { target: { value: "" } });
-    await choose("排序方向", "降序");
+    fireEvent.click(screen.getByRole("button", { name: "升序" }));
     const firstName = () => within(screen.getAllByRole("row")[1]).getAllByRole("cell")[0].textContent;
     expect(firstName()).toBe("sales_orders");
-    await choose("排序字段", "列数");
+    await choose("排序字段", "按列数");
     expect(firstName()).toBe("contacts");
-    await choose("排序字段", "最近同步时间");
+    await choose("排序字段", "按同步时间");
     expect(firstName()).toBe("sales_orders");
     expect(catalogApi.tables).not.toHaveBeenCalled();
+  });
+
+  it("removes a table from the registered catalog after confirming", async () => {
+    vi.mocked(catalogApi.deleteTable).mockResolvedValue({ schema_name: "crm", table_name: "contacts" });
+    renderWithProviders(<MappingsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "移除 contacts" }, { timeout: 10000 }));
+    expect(await screen.findByText("移除 crm.contacts 的登记？")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "移除" }));
+    await waitFor(() => expect(catalogApi.deleteTable).toHaveBeenCalledWith("w", "c", "crm", "contacts"));
+    await waitFor(() => expect(catalogApi.assets).toHaveBeenCalledTimes(4));
   });
 
   it("submits one full and one partial task, allows back navigation and refreshes on close", async () => {

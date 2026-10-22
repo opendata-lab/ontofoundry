@@ -34,7 +34,8 @@ def connect_readonly(item, settings, *, timeout_ms=None):
                 password=password,
                 host=config.get("host"),
                 port=config.get("port"),
-                database=config.get("database"),
+                # MySQL and Doris connect to the server; statements name their library.
+                database=(config.get("database") or None) if item.kind == "postgresql" else None,
             ),
             connect_args=args,
             pool_pre_ping=False,

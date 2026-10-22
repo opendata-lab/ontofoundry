@@ -106,7 +106,9 @@ def preview_import(db, settings, workspace_id, actor_id, adapter_id, filename, r
         raise NotFoundError("工作空间不存在")
     base = baseline(db, workspace)
     from ontofoundry_api.db_models import ConnectionRecord, MetadataSnapshotRecord
-    connections = tuple({"id": c.id, "name": c.name, "kind": c.kind, "default_schema": c.config_json.get("schema_name") or ("public" if c.kind == "postgresql" else c.config_json.get("database"))} for c in db.scalars(select(ConnectionRecord).where(ConnectionRecord.workspace_id == workspace_id)))
+    from ontofoundry_api.services.metadata_sync import normalize_schema
+
+    connections = tuple({"id": c.id, "name": c.name, "kind": c.kind, "default_schema": normalize_schema(c, None) or None} for c in db.scalars(select(ConnectionRecord).where(ConnectionRecord.workspace_id == workspace_id)))
     ids = [c["id"] for c in connections]
     registered = tuple({"connection_id": snap.connection_id, "schema_name": snap.schema_name, **table} for snap in db.scalars(select(MetadataSnapshotRecord).where(MetadataSnapshotRecord.connection_id.in_(ids))) for table in snap.snapshot_json.get("tables", []) if not table.get("missing"))
     result = adapter.import_document(raw, ImportContext(UUID(workspace_id), connections, registered))

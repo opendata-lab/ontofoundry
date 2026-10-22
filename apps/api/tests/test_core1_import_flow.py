@@ -137,7 +137,13 @@ def publish(client, wid, current):
 
 @pytest.mark.parametrize("name", example_names())
 def test_thirteen_native_files_preview_confirm_review_publish(client, space, name):
-    raw = (EXAMPLES_DIR / (name + ".json")).read_bytes()
+    fixture = json.loads((EXAMPLES_DIR / (name + ".json")).read_bytes())
+    # Server-wide MySQL/Doris connections cannot supply an implicit library.
+    # Keep it explicit before asserting that importing the same file is a no-op.
+    for raw_dataset in fixture["draft"].get("datasets", []):
+        if raw_dataset.get("dialect") in {"mysql", "doris"} and raw_dataset.get("source_kind", "table") == "table" and not raw_dataset.get("schema_name"):
+            raw_dataset["schema_name"] = "fiction"
+    raw = json.dumps(fixture, ensure_ascii=False).encode()
     p = preview(client, space, raw)
     assert not p["document_error"]
     assert not p["proposal_summary"]["blocked"]

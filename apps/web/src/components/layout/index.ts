@@ -13,4 +13,3 @@ export { DetailWorkbench } from "./DetailWorkbench";
 export { FormRow } from "./FormRow";
 
 export { SourceFieldsLayout } from "./SourceFieldsLayout";
-export { DataTablesLayout } from "./DataTablesLayout";

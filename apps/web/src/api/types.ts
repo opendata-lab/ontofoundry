@@ -540,7 +540,8 @@ export type DataConnection = {
   kind: "mysql" | "doris" | "postgresql";
   host: string;
   port: number;
-  database: string;
+  /** PostgreSQL only; MySQL and Doris connections reach the whole server. */
+  database?: string;
   username: string;
 };
 export type CatalogColumn = {

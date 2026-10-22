@@ -261,6 +261,9 @@ export const catalogApi = {
     workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ ...params }), tables?.length ? { scope: "selected", tables } : { scope: "all" }),
   tableRows: (id: string, connectionId: string, params: { table_name: string; schema_name?: string }) =>
     workspaceRequest<TableRows>(id, `/connections/${connectionId}/assets/rows` + query({ ...params })),
+  /** Unregisters one synced table; the source database is untouched. */
+  deleteTable: (id: string, connectionId: string, schemaName: string, tableName: string) =>
+    workspaceRequest<{ schema_name: string; table_name: string }>(id, `/connections/${connectionId}/assets/tables` + query({ schema_name: schemaName, table_name: tableName }), undefined, "DELETE"),
   syncJobs: (id: string, connectionId: string, schema_name?: string) => workspaceRequest<Items<SyncJob>>(id, `/connections/${connectionId}/assets/sync-jobs` + query({ schema_name })),
   syncJob: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}`),
   retrySync: (id: string, connectionId: string, jobId: string) => workspaceRequest<SyncJob>(id, `/connections/${connectionId}/assets/sync-jobs/${jobId}/retry`, {}),

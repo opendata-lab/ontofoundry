@@ -11,7 +11,7 @@ from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import MetadataSnapshotRecord
 from ontofoundry_api.services.access import require_instances, require_mappings
 from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.metadata_catalog import visible_schemas
+from ontofoundry_api.services.metadata_catalog import require_schema, visible_schemas
 from ontofoundry_api.services.metadata_sync import (
     create_job,
     get_job,
@@ -66,9 +66,7 @@ def asset_response(db, wid, connection, record, version_id=None, schema_name="")
             source = resolve_dataset(db, wid, dataset, registered=False)
         except ServiceError:
             continue
-        if dataset.source_kind == "table" and source.connection.id == connection.id and (source.schema or "") == (
-            schema or source.schema or ""
-        ):
+        if dataset.source_kind == "table" and source.connection.id == connection.id and (source.schema or "") == schema:
             datasets.append(authorized_dataset_projection(db, wid, dataset))
     tables = (
         {t["name"]: t for t in record.snapshot_json.get("tables", [])} if record else {}
@@ -113,6 +111,7 @@ def assets(
     connection = get_connection(db, workspace_id, connection_id)
     from ontofoundry_api.services.metadata_sync import normalize_schema
     schema_name = normalize_schema(connection, schema_name)
+    require_schema(connection, schema_name)
     record = db.get(MetadataSnapshotRecord, (connection_id, schema_name))
     return asset_response(db, workspace_id, connection, record, version_id, schema_name)
 
@@ -123,6 +122,15 @@ def table_rows(workspace_id: str, connection_id: str, request: Request, table_na
     require_instances(db, workspace_id, user)
     from ontofoundry_api.services.table_preview import preview_table
     return preview_table(db, get_connection(db, workspace_id, connection_id), schema_name, table_name, request.app.state.settings)
+
+
+@router.delete("/assets/tables")
+def delete_table(workspace_id: str, connection_id: str, table_name: str = Query(min_length=1, max_length=240), schema_name: str = Query(default="", max_length=240), db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    """Remove a table from the registered catalog; datasets bound to it then show it as unsynced."""
+    from ontofoundry_api.services.metadata_sync import remove_table
+
+    require_mappings(db, workspace_id, user)
+    return remove_table(db, get_connection(db, workspace_id, connection_id), schema_name, table_name)
 
 
 @router.post("/assets/sync-jobs", status_code=202)
