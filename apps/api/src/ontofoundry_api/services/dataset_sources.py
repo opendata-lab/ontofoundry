@@ -12,6 +12,7 @@ from ontofoundry_api.services.dataset_sql import (
     qualified_query,
 )
 from ontofoundry_api.services.errors import DatasetSourceError, ServiceError
+from ontofoundry_api.services.metadata_sync import normalize_schema
 
 
 @dataclass(frozen=True)
@@ -28,8 +29,7 @@ def resolve_dataset(db, workspace_id, dataset, *, registered=True):
     if dataset.dialect and dialect_for(dataset.dialect) != dialect_for(connection.kind):
         raise DatasetSourceError("数据集方言与连接引擎不一致", code="DIALECT_MISMATCH")
     config = connection.config_json
-    default = config.get("schema_name") or ("public" if connection.kind == "postgresql" else config.get("database"))
-    source = DatasetSource(connection, config.get("database", ""), dataset.schema_name or default)
+    source = DatasetSource(connection, config.get("database", ""), normalize_schema(connection, dataset.schema_name) or None)
     if registered:
         registered_tables(db, dataset, source)
     return source
@@ -131,7 +131,10 @@ def registered_table_catalog(db, workspace_id, draft=None):
     used = {}
     for dataset in (draft or {}).get("datasets", []):
         if dataset.get("source_kind", "table") == "table" and dataset.get("connection_id"):
-            key = (dataset["connection_id"], dataset.get("schema_name") or "", dataset.get("table_name"))
+            connection = connections.get(dataset["connection_id"])
+            if connection is None:
+                continue
+            key = (connection.id, normalize_schema(connection, dataset.get("schema_name")), dataset.get("table_name"))
             used.setdefault(key, []).append({"id": dataset["id"], "name": dataset["name"], "display_name": dataset.get("display_name")})
     items = []
     snapshots = db.scalars(select(MetadataSnapshotRecord).where(MetadataSnapshotRecord.connection_id.in_(list(connections)))) if connections else []
@@ -153,7 +156,7 @@ def registered_table_catalog(db, workspace_id, draft=None):
                 "kind": table.get("kind", "table"),
                 "comment": table.get("comment") or "",
                 "column_count": len(table.get("columns", [])),
-                "datasets": used.get(key, []) + used.get((connection.id, "", table["name"]), []),
+                "datasets": used.get(key, []),
             })
     items.sort(key=lambda i: (i["connection_name"], i["schema_name"], i["table_name"]))
     return items

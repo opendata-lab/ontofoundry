@@ -50,7 +50,7 @@ def install(client, monkeypatch, engine):
 
 
 def sync(client, connection_id, body):
-    response = client.post(ROOT + f"/connections/{connection_id}/assets/sync-jobs", json=body)
+    response = client.post(ROOT + f"/connections/{connection_id}/assets/sync-jobs", json=body, params={"schema_name": "main"})
     assert response.status_code == 202, response.text
     # TestClient runs background tasks before returning; read the finished job.
     job = client.get(ROOT + f"/connections/{connection_id}/assets/sync-jobs/{response.json()['id']}")
@@ -60,7 +60,7 @@ def sync(client, connection_id, body):
 
 def registered(client, connection_id):
     with client.app.state.session_factory() as db:
-        record = db.get(MetadataSnapshotRecord, (connection_id, ""))
+        record = db.get(MetadataSnapshotRecord, (connection_id, "main"))
         return {t["name"]: t for t in record.snapshot_json["tables"]} if record else {}
 
 
@@ -108,7 +108,7 @@ def test_interrupted_jobs_are_marked_retryable_on_restart(client, tmp_path, monk
     with client.app.state.session_factory() as db:
         connection = db.get(ConnectionRecord, connection_id)
         job = metadata_sync.create_job(
-            db, str(DEMO_WORKSPACE_ID), connection, "", SyncRequest(scope="all"), DEV_USER_ID
+            db, str(DEMO_WORKSPACE_ID), connection, "main", SyncRequest(scope="all"), DEV_USER_ID
         )
         job.state = "running"
         db.commit()
@@ -149,7 +149,7 @@ def test_assets_keep_a_recorded_missing_table_missing(client, tmp_path, monkeypa
     with engine.begin() as conn:
         conn.exec_driver_sql("DROP TABLE fiction_01")
     sync(client, connection_id, {"scope": "all"})
-    items = {t["name"]: t for t in client.get(ROOT + f"/connections/{connection_id}/assets").json()["items"]}
+    items = {t["name"]: t for t in client.get(ROOT + f"/connections/{connection_id}/assets", params={"schema_name": "main"}).json()["items"]}
     assert items["fiction_01"]["missing"] is True
     assert items["fiction_00"]["missing"] is False
 
@@ -160,14 +160,14 @@ def test_assets_expose_per_table_observation_and_keep_unselected_times(client, t
     sync(client, connection_id, {"scope": "all"})
     before = registered(client, connection_id)
     sync(client, connection_id, {"scope": "selected", "tables": ["fiction_00"]})
-    response = client.get(ROOT + f"/connections/{connection_id}/assets").json()
+    response = client.get(ROOT + f"/connections/{connection_id}/assets", params={"schema_name": "main"}).json()
     items = {t["name"]: t for t in response["items"]}
     assert items["fiction_00"]["observed_at"] > before["fiction_00"]["observed_at"]
     assert items["fiction_01"]["observed_at"] == before["fiction_01"]["observed_at"]
     assert response["observed_at"] and len(items) == 3
 
 
-def test_visible_schemas_respects_postgresql_allowlist_and_mysql_database(monkeypatch):
+def test_visible_schemas_respects_postgresql_allowlist_and_mysql_server_scope(monkeypatch):
     from types import SimpleNamespace
 
     from ontofoundry_api.services import metadata_catalog
@@ -181,7 +181,7 @@ def test_visible_schemas_respects_postgresql_allowlist_and_mysql_database(monkey
     postgres.config_json = {}
     assert metadata_catalog.visible_schemas(postgres, source) == ["fiction_crm", "fiction_sales", "information_schema"]
     mysql = SimpleNamespace(kind="mysql", config_json={"database": "fiction_crm"})
-    assert metadata_catalog.visible_schemas(mysql, source) == ["fiction_crm"]
+    assert metadata_catalog.visible_schemas(mysql, source) == ["fiction_crm", "fiction_sales"]
 
 
 def test_table_rows_preview_reads_only_synced_tables_up_to_the_limit(client, tmp_path, monkeypatch):
@@ -194,12 +194,12 @@ def test_table_rows_preview_reads_only_synced_tables_up_to_the_limit(client, tmp
     connection_id, _ = install(client, monkeypatch, engine)
     monkeypatch.setattr(table_preview, "connect_readonly", metadata_sync.connect_readonly)
     url = ROOT + f"/connections/{connection_id}/assets/rows"
-    assert client.get(url, params={"table_name": "fiction_00"}).json()["error"]["code"] == "TABLE_NOT_REGISTERED"
+    assert client.get(url, params={"table_name": "fiction_00", "schema_name": "main"}).json()["error"]["code"] == "TABLE_NOT_REGISTERED"
     sync(client, connection_id, {"scope": "selected", "tables": ["fiction_00"]})
-    body = client.get(url, params={"table_name": "fiction_00"}).json()
+    body = client.get(url, params={"table_name": "fiction_00", "schema_name": "main"}).json()
     assert body["columns"] == ["id", "label"] and body["limit"] == 100
     assert len(body["items"]) == 100 and body["items"][0]["label"] == "虚构0"
-    assert client.get(url, params={"table_name": "fiction_view"}).status_code == 404
+    assert client.get(url, params={"table_name": "fiction_view", "schema_name": "main"}).status_code == 404
 
 
 def test_catalog_reads_stay_inside_the_configured_schemas(client, tmp_path, monkeypatch):
@@ -209,13 +209,14 @@ def test_catalog_reads_stay_inside_the_configured_schemas(client, tmp_path, monk
     connection_id, _ = install(client, monkeypatch, engine)
     monkeypatch.setattr(table_preview, "connect_readonly", metadata_sync.connect_readonly)
     with client.app.state.session_factory() as db:
-        db.get(ConnectionRecord, connection_id).config_json = {"database": "fiction_sales"}
+        db.get(ConnectionRecord, connection_id).config_json = {"database": "", "schemas": ["main"]}
         db.add(MetadataSnapshotRecord(connection_id=connection_id, schema_name="fiction_hidden", snapshot_json={"tables": [{"name": "fiction_00", "columns": []}]}, changes_json=[]))
         db.commit()
     rows = client.get(ROOT + f"/connections/{connection_id}/assets/rows", params={"table_name": "fiction_00", "schema_name": "fiction_hidden"})
     assert rows.status_code == 403 and rows.json()["error"]["code"] == "SCHEMA_NOT_ALLOWED"
     job = client.post(ROOT + f"/connections/{connection_id}/assets/sync-jobs", params={"schema_name": "fiction_hidden"}, json={"scope": "all"})
     assert job.status_code == 403
+    assert client.get(ROOT + f"/connections/{connection_id}/assets", params={"schema_name": "fiction_hidden"}).status_code == 403
     listed = client.get(ROOT + "/registered-tables").json()["items"]
     assert not [t for t in listed if t["connection_id"] == connection_id]
 

@@ -4,8 +4,10 @@ from sqlalchemy import inspect, text
 
 from ontofoundry_api.services.errors import ServiceError
 
-# Doris lists its own system databases next to business ones.
-DORIS_SYSTEM_SCHEMAS = {"information_schema", "mysql", "performance_schema", "sys", "__internal_schema"}
+# MySQL and Doris list their own system databases next to business ones.
+SYSTEM_SCHEMAS = {"information_schema", "mysql", "performance_schema", "sys", "__internal_schema"}
+# Kept for readers of the Doris catalog path.
+DORIS_SYSTEM_SCHEMAS = SYSTEM_SCHEMAS
 
 
 def is_doris(source):
@@ -13,22 +15,20 @@ def is_doris(source):
 
 
 def schema_allowed(connection, schema):
-    """Whether the connection's configuration lets the platform read this schema.
-
-    An empty schema means the connection's default one.
-    """
+    """Whether the connection's configuration lets the platform read this schema."""
     if not schema:
-        return True
+        return connection.kind == "postgresql"
     config = connection.config_json
-    if connection.kind == "mysql" and schema != config.get("database"):
-        return False
-    if connection.kind == "doris" and schema in DORIS_SYSTEM_SCHEMAS:
+    # MySQL and Doris connections cover every permitted business database.
+    if connection.kind in {"mysql", "doris"} and schema in SYSTEM_SCHEMAS:
         return False
     allowed = config.get("schemas")
     return not allowed or schema in allowed
 
 
 def require_schema(connection, schema):
+    if not schema and connection.kind != "postgresql":
+        raise ServiceError("请选择库", code="SCHEMA_REQUIRED", status_code=422)
     if not schema_allowed(connection, schema):
         raise ServiceError("该库不在连接允许的范围内", code="SCHEMA_NOT_ALLOWED", status_code=403)
 
@@ -38,12 +38,19 @@ def visible_schemas(connection, source):
     return sorted({name for name in names if schema_allowed(connection, name)})
 
 
+def require_source_schema(source, schema):
+    """Never let server-wide readers fall back to a driver's default database."""
+    if not schema and getattr(source, "info", {}).get("source_kind") in {"mysql", "doris"}:
+        raise ServiceError("请选择库", code="SCHEMA_REQUIRED", status_code=422)
+
+
 def list_tables(source, schema):
     """Table and view names of one schema.
 
     Doris is read through information_schema with an explicit schema filter
     instead of the MySQL dialect's SHOW statements.
     """
+    require_source_schema(source, schema)
     if is_doris(source):
         rows = source.execute(
             text("SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA = :schema"),
@@ -55,6 +62,7 @@ def list_tables(source, schema):
 
 
 def read_doris_table(source, schema, name, observed_at):
+    require_source_schema(source, schema)
     params = {"schema": schema, "name": name}
     table = source.execute(
         text("SELECT TABLE_TYPE, TABLE_COMMENT FROM information_schema.tables WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :name"),

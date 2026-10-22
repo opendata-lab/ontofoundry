@@ -1,7 +1,7 @@
 {
   "name": "ontofoundry",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "OntoFoundry web frontend",
   "workspaces": [
     "apps/web"

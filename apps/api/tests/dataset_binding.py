@@ -65,6 +65,8 @@ def bind_datasets(client, draft, workspace_id=DEMO_WORKSPACE_ID):
             connection = _connection(db, workspace_id, kind)
             dataset["connection_id"] = connection.id
             schema = dataset.get("schema_name") or ("public" if kind == "postgresql" else "fiction")
+            if kind != "postgresql":
+                dataset["schema_name"] = schema
             _register(db, connection, schema, dataset["table_name"], dataset.get("columns"))
         db.commit()
     return draft

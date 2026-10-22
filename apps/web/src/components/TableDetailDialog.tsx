@@ -6,7 +6,8 @@ import type { AssetTable, SchemaImpactItem, TableRows } from "../api/types";
 import { syncTime } from "../lib/metadataSync";
 import { StatusMark } from "./layout";
 
-const cell = (value: unknown) => value === null || value === undefined ? <Typography.Text type="secondary">NULL</Typography.Text>
+// NULL keeps the cell's own size; only the color sets it apart from a value.
+const cell = (value: unknown) => value === null || value === undefined ? <span className="text-muted">NULL</span>
   : typeof value === "object" ? JSON.stringify(value) : String(value);
 
 /** One synced table: catalog facts, columns and the first rows from the source. */
@@ -56,10 +57,11 @@ export function TableDetailDialog({ workspaceId, connectionId, schema, table, on
     return () => { live = false; };
   }, [tab, rows, table, workspaceId, connectionId, schema]);
   return <Modal open title={`表详情 · ${table.name}`} width="var(--data-tables-dialog-width)" footer={null} onCancel={onClose}>
-    <Tabs activeKey={tab} onChange={setTab} items={[
-      { key: "info", label: "基本信息", children: <Descriptions size="small" column={2} items={[
+    {/* A fixed body keeps the dialog from resizing as tabs change; long content scrolls inside. */}
+    <Tabs className="table-detail" activeKey={tab} onChange={setTab} items={[
+      { key: "info", label: "基本信息", children: <Descriptions className="table-detail-info" size="small" column={2} items={[
         { key: "name", label: "表名", children: table.name },
-        { key: "schema", label: "库", children: schema || "默认库" },
+        { key: "schema", label: "库", children: schema },
         { key: "kind", label: "类型", children: table.kind === "view" ? "视图" : "表" },
         { key: "state", label: "状态", children: <StatusMark state={table.missing ? "error" : "mapped"} label={table.missing ? "当前不可见或不存在" : "已登记"} /> },
         { key: "columns", label: "字段数", children: table.columns.length },
