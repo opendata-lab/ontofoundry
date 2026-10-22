@@ -1,0 +1,126 @@
+{
+ "scenario": "clinic_booking",
+ "prompt": "根据材料和关联的表建立青柠社区诊所的本体。",
+ "schema": "eval_clinic",
+ "tables": [
+  "departments",
+  "doctors",
+  "patients",
+  "appointments",
+  "prescriptions",
+  "prescription_items",
+  "drugs",
+  "daily_visit_stats"
+ ],
+ "concepts": [
+  {
+   "key": "department",
+   "accepted": [
+    "科室",
+    "department"
+   ],
+   "instances": [
+    "全科",
+    "儿科",
+    "口腔科"
+   ]
+  },
+  {
+   "key": "doctor",
+   "accepted": [
+    "医生",
+    "doctor"
+   ],
+   "instances": [
+    "许医生",
+    "唐医生",
+    "D01",
+    "D05"
+   ]
+  },
+  {
+   "key": "patient",
+   "accepted": [
+    "患者",
+    "病人",
+    "patient"
+   ],
+   "instances": []
+  },
+  {
+   "key": "appointment",
+   "accepted": [
+    "预约",
+    "挂号",
+    "appointment",
+    "booking"
+   ],
+   "instances": []
+  },
+  {
+   "key": "prescription",
+   "accepted": [
+    "处方",
+    "prescription"
+   ],
+   "instances": []
+  },
+  {
+   "key": "prescription_item",
+   "accepted": [
+    "处方明细",
+    "处方行",
+    "prescription_item",
+    "prescription_line",
+    "prescription_detail"
+   ],
+   "instances": []
+  },
+  {
+   "key": "drug",
+   "accepted": [
+    "药品",
+    "药物",
+    "drug",
+    "medicine"
+   ],
+   "instances": [
+    "阿莫西林胶囊",
+    "布洛芬混悬液"
+   ]
+  }
+ ],
+ "not_concepts": [
+  {
+   "kind": "attribute",
+   "texts": [
+    "职称",
+    "预约日期",
+    "时段",
+    "预约状态",
+    "性别",
+    "出生日期",
+    "单价",
+    "类别",
+    "数量"
+   ]
+  },
+  {
+   "kind": "metric",
+   "texts": [
+    "爽约率",
+    "人均处方金额"
+   ]
+  },
+  {
+   "kind": "aggregate",
+   "texts": [
+    "每日就诊统计",
+    "每日就诊人次统计",
+    "daily_visit_stats",
+    "visit_stats",
+    "daily_visit_stat"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,99 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-a468fa767df7ea4db1489807b5eeb1f4.json\n本体为空：是\n新增材料：1（青禾科技合同审批管理办法）\n新增关联表：无\n\n## 范围\n建立青禾科技合同审批本体，覆盖六类概念：合同、签约相对方、部门、审批记录、员工、付款计划。合同类型/审批环节/审批结果为字段枚举，不列概念；指标（合同平均审批时长）与规则（超50万须总经理审批）留待抽取轮。\n\n## 实体或变化清单（全量／增量）或问题清单（优化）\n见 entities.json。\n\n## 来源表\n无（材料未附带数据表）。\n\n## 阶段\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n- 无（概念由材料直接归纳，字段枚举与指标/规则不列概念）。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "contract",
+    "display_name": "合同",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 3
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "HT-2026-018《服务器采购合同》",
+     "HT-2026-031《年度运维服务合同》"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "counterparty",
+    "display_name": "签约相对方",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 5
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "北辰数据有限公司",
+     "南溪设备厂"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "department",
+    "display_name": "部门",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 7
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "采购部",
+     "法务部"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "approval_record",
+    "display_name": "审批记录",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   },
+   {
+    "name": "employee",
+    "display_name": "员工",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 9
+     }
+    ],
+    "tables": [],
+    "examples": [
+     "周宁（工号 Q207）"
+    ],
+    "example_count": 1,
+    "status": "new"
+   },
+   {
+    "name": "payment_plan",
+    "display_name": "付款计划",
+    "basis": [
+     {
+      "material_id": "4c2e832a-dcb3-4261-9a34-7a648619f06d",
+      "line": 13
+     }
+    ],
+    "tables": [],
+    "status": "new"
+   }
+  ]
+ }
+}

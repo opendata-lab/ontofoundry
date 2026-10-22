@@ -1,0 +1,113 @@
+{
+ "scenario": "contract_approval",
+ "prompt": "根据材料建立青禾科技合同审批的本体。",
+ "concepts": [
+  {
+   "key": "contract",
+   "accepted": [
+    "合同",
+    "contract"
+   ],
+   "instances": [
+    "HT-2026-018",
+    "HT-2026-031",
+    "服务器采购合同",
+    "年度运维服务合同"
+   ]
+  },
+  {
+   "key": "counterparty",
+   "accepted": [
+    "相对方",
+    "签约相对方",
+    "签约单位",
+    "合同相对方",
+    "外部单位",
+    "counterparty",
+    "contract_party"
+   ],
+   "instances": [
+    "北辰数据有限公司",
+    "南溪设备厂"
+   ]
+  },
+  {
+   "key": "department",
+   "accepted": [
+    "部门",
+    "经办部门",
+    "department"
+   ],
+   "instances": [
+    "采购部",
+    "法务部"
+   ]
+  },
+  {
+   "key": "approval_record",
+   "accepted": [
+    "审批记录",
+    "审批",
+    "approval_record",
+    "approval"
+   ],
+   "instances": []
+  },
+  {
+   "key": "employee",
+   "accepted": [
+    "员工",
+    "审批人",
+    "人员",
+    "employee",
+    "staff",
+    "approver"
+   ],
+   "instances": [
+    "周宁",
+    "Q207"
+   ]
+  },
+  {
+   "key": "payment_plan",
+   "accepted": [
+    "付款计划",
+    "payment_plan",
+    "payment_schedule",
+    "payment_installment"
+   ],
+   "instances": []
+  }
+ ],
+ "not_concepts": [
+  {
+   "kind": "attribute",
+   "texts": [
+    "合同编号",
+    "合同名称",
+    "合同金额",
+    "签订日期",
+    "合同类型",
+    "统一社会信用代码",
+    "单位名称",
+    "联系人",
+    "部门编号",
+    "部门名称",
+    "审批环节",
+    "审批结果",
+    "审批时间",
+    "工号",
+    "期次",
+    "计划付款日期",
+    "计划金额"
+   ]
+  },
+  {
+   "kind": "metric",
+   "texts": [
+    "合同平均审批时长",
+    "平均审批时长"
+   ]
+  }
+ ]
+}

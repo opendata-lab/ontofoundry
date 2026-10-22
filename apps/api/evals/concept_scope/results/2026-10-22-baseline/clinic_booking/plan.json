@@ -1,0 +1,122 @@
+{
+ "plan_md": "场景：全量\n工作包：uploads/ontofoundry-work-pack-6cfc56dd7fbc1e669635a36c832e8891.json\n本体为空：是\n新增材料：1 份（青柠社区诊所预约与处方说明）\n新增关联表：8 张（t1–t8）\n\n## 范围\n\n建立青柠社区诊所（虚构）的「预约—处方」域本体，共 7 个业务概念；派生统计表与字段、指标不在本轮概念范围内。\n\n## 实体或变化清单（全量）\n\n见 entities.json。\n\n## 来源表\n\n- 业务对象表：t1 appointments、t3 departments、t4 doctors、t5 drugs、t6 patients、t7 prescription_items、t8 prescriptions\n- 派生统计表：t2 daily_visit_stats（材料第 9 行明示「不是独立的业务对象」，不建模为概念）\n\n## 阶段\n\n- [x] ①计划 - [ ] ②确认 - [ ] ③抽取 - [ ] ④合并 - [ ] ⑤修正 - [ ] ⑥输出\n\n## 待决定问题\n\n无。留待抽取轮处理的事项：职称、预约状态、性别、药品类别等按属性；爽约率、人均处方金额按指标；材料中的具体对象（科室名、医生、药品）按实例。\n",
+ "entities": {
+  "scenario": "全量",
+  "items": [
+   {
+    "name": "department",
+    "display_name": "科室",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 3
+     }
+    ],
+    "tables": [
+     "t3"
+    ],
+    "examples": [
+     "全科",
+     "儿科",
+     "口腔科"
+    ],
+    "example_count": 3,
+    "status": "new"
+   },
+   {
+    "name": "doctor",
+    "display_name": "医生",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 3
+     }
+    ],
+    "tables": [
+     "t4"
+    ],
+    "examples": [
+     "许医生（D01）",
+     "唐医生（D05）"
+    ],
+    "example_count": 2,
+    "status": "new"
+   },
+   {
+    "name": "patient",
+    "display_name": "患者",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 5
+     }
+    ],
+    "tables": [
+     "t6"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "appointment",
+    "display_name": "预约",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 5
+     }
+    ],
+    "tables": [
+     "t1"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "prescription",
+    "display_name": "处方",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 7
+     }
+    ],
+    "tables": [
+     "t8"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "prescription_item",
+    "display_name": "处方明细",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 7
+     }
+    ],
+    "tables": [
+     "t7"
+    ],
+    "status": "new"
+   },
+   {
+    "name": "drug",
+    "display_name": "药品",
+    "basis": [
+     {
+      "material_id": "3fad8814-a721-4ebe-9a9b-1b99d8da13f2",
+      "line": 7
+     }
+    ],
+    "tables": [
+     "t5"
+    ],
+    "examples": [
+     "阿莫西林胶囊",
+     "布洛芬混悬液"
+    ],
+    "example_count": 2,
+    "status": "new"
+   }
+  ]
+ }
+}

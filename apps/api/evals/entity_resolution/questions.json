@@ -1,0 +1,239 @@
+[
+ {
+  "id": "r01",
+  "type": "编号精确",
+  "mention": "S-003",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-003"
+   ]
+  },
+  "reason": "业务标识完整给出"
+ },
+ {
+  "id": "r02",
+  "type": "编号精确",
+  "mention": "s-003",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-003"
+   ]
+  },
+  "reason": "大小写不同的编号"
+ },
+ {
+  "id": "r03",
+  "type": "编号精确",
+  "mention": "S-0031",
+  "expected": {
+   "status": "NOT_FOUND",
+   "refs": []
+  },
+  "reason": "相近但不存在的编号"
+ },
+ {
+  "id": "r04",
+  "type": "全称精确",
+  "mention": "北辰物流有限公司",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-002"
+   ]
+  },
+  "reason": "完整名称"
+ },
+ {
+  "id": "r05",
+  "type": "全称精确",
+  "mention": "鹭汀五金商行",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-006"
+   ]
+  },
+  "reason": "全称精确优先于另一家的包含命中"
+ },
+ {
+  "id": "r06",
+  "type": "简称唯一",
+  "mention": "云桥包装",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-005"
+   ]
+  },
+  "reason": "简称只包含于一家"
+ },
+ {
+  "id": "r07",
+  "type": "简称唯一",
+  "mention": "北辰物流",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-002"
+   ]
+  },
+  "reason": "简称只包含于一家"
+ },
+ {
+  "id": "r08",
+  "type": "简称多家",
+  "mention": "北辰",
+  "expected": {
+   "status": "AMBIGUOUS",
+   "refs": [
+    "db.S-001",
+    "db.S-002"
+   ]
+  },
+  "reason": "两家都包含，应追问"
+ },
+ {
+  "id": "r09",
+  "type": "简称多家",
+  "mention": "南溪精密",
+  "expected": {
+   "status": "AMBIGUOUS",
+   "refs": [
+    "db.S-003",
+    "db.S-004"
+   ]
+  },
+  "reason": "两家都包含，应追问"
+ },
+ {
+  "id": "r10",
+  "type": "简称多家",
+  "mention": "鹭汀五金",
+  "expected": {
+   "status": "AMBIGUOUS",
+   "refs": [
+    "db.S-006",
+    "db.S-007"
+   ]
+  },
+  "reason": "两家都包含，应追问"
+ },
+ {
+  "id": "r11",
+  "type": "全角与空格",
+  "mention": "ABC电子",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-008"
+   ]
+  },
+  "reason": "源值为全角"
+ },
+ {
+  "id": "r12",
+  "type": "全角与空格",
+  "mention": " 云桥包装材料有限公司 ",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-005"
+   ]
+  },
+  "reason": "首尾空格"
+ },
+ {
+  "id": "r13",
+  "type": "不存在",
+  "mention": "西岭建材",
+  "expected": {
+   "status": "NOT_FOUND",
+   "refs": []
+  },
+  "reason": "无此供应商"
+ },
+ {
+  "id": "r14",
+  "type": "不存在",
+  "mention": "北辰重工",
+  "expected": {
+   "status": "NOT_FOUND",
+   "refs": []
+  },
+  "reason": "共享前缀但不存在"
+ },
+ {
+  "id": "r15",
+  "type": "叫法不同",
+  "mention": "北辰数据公司",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-001"
+   ]
+  },
+  "reason": "省略中间词，非连续子串"
+ },
+ {
+  "id": "r16",
+  "type": "叫法不同",
+  "mention": "云桥包材",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-005"
+   ]
+  },
+  "reason": "行业简称"
+ },
+ {
+  "id": "r17",
+  "type": "叫法不同",
+  "mention": "南溪二厂",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-004"
+   ]
+  },
+  "reason": "简称组合"
+ },
+ {
+  "id": "r18",
+  "type": "需要上下文",
+  "mention": "临江那家北辰",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-001"
+   ]
+  },
+  "reason": "需结合城市判断"
+ },
+ {
+  "id": "r19",
+  "type": "需要上下文",
+  "mention": "青岚的南溪精密",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-004"
+   ]
+  },
+  "reason": "需结合城市判断"
+ },
+ {
+  "id": "r20",
+  "type": "需要上下文",
+  "mention": "城南那家鹭汀",
+  "expected": {
+   "status": "MATCHED",
+   "refs": [
+    "db.S-007"
+   ]
+  },
+  "reason": "需结合门店位置判断"
+ }
+]

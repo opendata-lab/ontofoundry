@@ -1,0 +1,70 @@
+{
+ "object_type": "supplier",
+ "note": "虚构青岚采购协同的供应商；city 仅供标准答案参考，不是模型属性，解析器不读取。",
+ "rows": [
+  {
+   "ref": "db.S-001",
+   "values": {
+    "supplier_code": "S-001",
+    "supplier_name": "北辰数据科技有限公司"
+   },
+   "city": "临江"
+  },
+  {
+   "ref": "db.S-002",
+   "values": {
+    "supplier_code": "S-002",
+    "supplier_name": "北辰物流有限公司"
+   },
+   "city": "青岚"
+  },
+  {
+   "ref": "db.S-003",
+   "values": {
+    "supplier_code": "S-003",
+    "supplier_name": "南溪精密机械厂"
+   },
+   "city": "临江"
+  },
+  {
+   "ref": "db.S-004",
+   "values": {
+    "supplier_code": "S-004",
+    "supplier_name": "南溪精密机械厂（二厂）"
+   },
+   "city": "青岚"
+  },
+  {
+   "ref": "db.S-005",
+   "values": {
+    "supplier_code": "S-005",
+    "supplier_name": "云桥包装材料有限公司"
+   },
+   "city": "临江"
+  },
+  {
+   "ref": "db.S-006",
+   "values": {
+    "supplier_code": "S-006",
+    "supplier_name": "鹭汀五金商行"
+   },
+   "city": "青岚"
+  },
+  {
+   "ref": "db.S-007",
+   "values": {
+    "supplier_code": "S-007",
+    "supplier_name": "鹭汀五金商行城南店"
+   },
+   "city": "青岚"
+  },
+  {
+   "ref": "db.S-008",
+   "values": {
+    "supplier_code": "S-008",
+    "supplier_name": "ＡＢＣ电子"
+   },
+   "city": "临江"
+  }
+ ]
+}

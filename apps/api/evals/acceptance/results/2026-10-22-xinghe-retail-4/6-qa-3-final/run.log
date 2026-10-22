@@ -1,0 +1,46 @@
+topic topic_71632cac93624460ae43af47
+Q1 task task_a8c3a00e6aac4395a1d21d8b
+Q1 status finished None
+Q2 task task_a37fcaaf25a34a7688d7bc9c
+Q2 status finished None
+=== answer ===
+我先确认“销售额”的语义定义，并检查可用的数据来源。## 结论
+
+**口径**：销售额（英文标识 `sales_amount`）指标的本体定义为对订单实付金额 `pay_amount` 做 `SUM`，固定过滤条件为 `status = '已完成'`；时间字段是下单日期 `order_date`。数据来源是 `xinghe_retail.orders`，对应平台数据源为 doris 引擎，名称是「订单数据」`orders`。查询使用半开区间 `[2026-01-01, 2026-04-01)`，并按 `order_date` 自然月分组。该表没有快照日期列，属于订单明细表，因此按业务日期过滤，不做快照去重。
+
+| 月份 | 销售额（元） |
+|---|---|
+| 2026-01 | 257.20 |
+| 2026-02 | 174.60 |
+| 2026-03 | 237.10 |
+| **三个月合计** | **668.90** |
+
+- **三个月合计为 668.90 元**；这一合计是在完整时间范围内重新聚合 `SUM(pay_amount)` 得到的，并非由月均值推算，与逐月结果之和一致，并交叉校验通过；同时范围内已完成订单共 12 笔。上述数值均来自真实查询结果（`result_state=success`，没有截断）。
+- 月度对比看：1 月最高（257.20 元），2 月最低（174.60 元，较 1 月下降 32.1%），3 月回升至 237.10 元（较 2 月增长 35.8%）。如图所示：
+
+{"kind": "chart_spec", "version": 1, "chart_type": "bar", "title": "2026年1-3月销售额（元）", "description": "基于 month 绘制 bar 图", "dataset": [{"month": "2026-01", "sales_amount": 257.2}, {"month": "2026-02", "sales_amount": 174.6}, {"month": "2026-03", "sales_amount": 237.1}], "error": null, "x_field": "month", "series": [{"name": "sales_amount", "field": "sales_amount", "type": "bar"}], "orientation": "vertical"}
+
+说明：查询使用平台 `run_sql.py` 以只读方式执行；生成的 SQL 已先通过 `validate_sql.py` 校验。金额单位按字段 `DECIMAL(12,2)` 原样呈现，未做额外的货币换算；订单状态取值“已完成”来自元数据注释中的枚举定义。
+=== answer ===
+## 结论
+
+**实体理解**：本体中未直接出现“云桥店”。`resolve_entity`（门店 `store`）按名称包含匹配到唯一候选 **星河云桥店（store_id = S03，所在城市：青岚）**，因此按该门店统计。
+
+**口径**：销售额（`sales_amount`）= 订单数据 `orders` 中 `SUM(pay_amount)`，固定过滤 `status = '已完成'`；时间字段为下单日期 `order_date`，区间半开 `[2026-01-01, 2026-04-01)`，按自然月分组；门店维度经本体关系「订单成交门店」`order_at_store` 直接关联：`orders.store_id = stores.store_id`（many_to_one，非一对多，无重复计数风险）。
+
+| 月份 | 销售额（元） | 已完成订单数 |
+|---|---|---|
+| 2026-01 | 120.40 | 1 |
+| 2026-02 | 39.60 | 2 |
+| 2026-03 | 157.10 | 2 |
+| **三个月合计** | **317.10** | **5** |
+
+**云桥店 2026 年 1–3 月销售额合计 317.10 元**（已完成订单 5 笔）。该合计在完整区间重新聚合 `SUM(pay_amount)` 得到，与三个月逐月相加一致（120.40 + 39.60 + 157.10 = 317.10）。如图所示，3 月最高（157.10 元）、2 月最低（39.60 元，为 1 月的约 33%），但 2 月订单数（2 笔）多于 1 月（1 笔），说明 2 月单笔金额明显偏小，属客单价波动而非成交笔数下降。
+
+{"kind": "chart_spec", "version": 1, "chart_type": "bar", "title": "星河云桥店(S03) 2026年1-3月销售额（元）", "description": "基于 month 绘制 bar 图", "dataset": [{"month": "2026-01", "sales_amount": 120.4}, {"month": "2026-02", "sales_amount": 39.6}, {"month": "2026-03", "sales_amount": 157.1}], "error": null, "x_field": "month", "series": [{"name": "sales_amount", "field": "sales_amount", "type": "bar"}], "orientation": "vertical"}
+
+**校验与说明**
+
+- 该店该区间内订单状态只有“已完成”一种（5 笔、317.10 元），不存在被固定过滤剔除的其他状态订单，口径过滤对结果无影响。
+- 区间内全部订单的 `store_id` 均能在门店数据中匹配到（孤儿关联检查返回 0 行），JOIN 未丢失或放大记录。
+- 执行适配：本体数据集元数据标注方言为 mysql，平台 `resolve_datasource` 解析 `xinghe_retail` 的实际数据源为 doris 集群「README 演示集群」；SQL 已通过只读校验后在 doris 引擎执行，业务定义未改动。金额沿用 `DECIMAL(12,2)` 原值，未做币种换算。

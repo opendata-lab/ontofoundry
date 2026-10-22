@@ -1,0 +1,54 @@
+{
+ "scenario": "contract_approval",
+ "predicted": 6,
+ "expected": 6,
+ "correct": 6,
+ "precision": 1.0,
+ "recall": 1.0,
+ "f1": 1.0,
+ "missed": [],
+ "errors": {},
+ "examples_placed": 10,
+ "examples_expected": 10,
+ "details": [
+  {
+   "item": "合同",
+   "result": "正确",
+   "concept": "contract"
+  },
+  {
+   "item": "签约相对方",
+   "result": "正确",
+   "concept": "counterparty"
+  },
+  {
+   "item": "部门",
+   "result": "正确",
+   "concept": "department"
+  },
+  {
+   "item": "审批记录",
+   "result": "正确",
+   "concept": "approval_record"
+  },
+  {
+   "item": "员工",
+   "result": "正确",
+   "concept": "employee"
+  },
+  {
+   "item": "付款计划",
+   "result": "正确",
+   "concept": "payment_plan"
+  }
+ ],
+ "workspace_id": "3d51d235-a063-4d93-80c1-09083a0bfc71",
+ "session_id": "99fb00f5-704c-4253-9676-d4b32b1401d6",
+ "result_state": "awaiting_reply",
+ "seconds": null,
+ "turns": 9,
+ "input": 4715,
+ "cache": 67456,
+ "output": 8026,
+ "tool_errors": 1
+}

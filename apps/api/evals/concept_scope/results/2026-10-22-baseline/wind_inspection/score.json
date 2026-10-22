@@ -1,0 +1,59 @@
+{
+ "scenario": "wind_inspection",
+ "predicted": 7,
+ "expected": 7,
+ "correct": 7,
+ "precision": 1.0,
+ "recall": 1.0,
+ "f1": 1.0,
+ "missed": [],
+ "errors": {},
+ "examples_placed": 11,
+ "examples_expected": 11,
+ "details": [
+  {
+   "item": "风电场",
+   "result": "正确",
+   "concept": "wind_farm"
+  },
+  {
+   "item": "风机",
+   "result": "正确",
+   "concept": "turbine"
+  },
+  {
+   "item": "班组",
+   "result": "正确",
+   "concept": "crew"
+  },
+  {
+   "item": "运维人员",
+   "result": "正确",
+   "concept": "technician"
+  },
+  {
+   "item": "巡检任务",
+   "result": "正确",
+   "concept": "inspection_task"
+  },
+  {
+   "item": "缺陷",
+   "result": "正确",
+   "concept": "defect"
+  },
+  {
+   "item": "维修工单",
+   "result": "正确",
+   "concept": "work_order"
+  }
+ ],
+ "workspace_id": "cb679ccc-e15e-40c1-8ac7-de7e5ad74d57",
+ "session_id": "21b1ef15-ad5b-404b-b6ce-00949f41bb43",
+ "result_state": "awaiting_reply",
+ "seconds": null,
+ "turns": 11,
+ "input": 10055,
+ "cache": 115456,
+ "output": 7805,
+ "tool_errors": 1
+}

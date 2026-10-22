@@ -1,0 +1,125 @@
+{
+ "scenario": "wind_inspection",
+ "prompt": "根据材料建立东岭风电运维的本体。",
+ "concepts": [
+  {
+   "key": "wind_farm",
+   "accepted": [
+    "风电场",
+    "wind_farm"
+   ],
+   "instances": [
+    "东岭一号风电场",
+    "西坡风电场"
+   ]
+  },
+  {
+   "key": "turbine",
+   "accepted": [
+    "风机",
+    "风电机组",
+    "风力发电机",
+    "turbine",
+    "wind_turbine"
+   ],
+   "instances": [
+    "F-07",
+    "F-12",
+    "W-03"
+   ]
+  },
+  {
+   "key": "crew",
+   "accepted": [
+    "班组",
+    "运维班组",
+    "巡检班组",
+    "crew",
+    "team",
+    "maintenance_team"
+   ],
+   "instances": [
+    "东岭巡检一班",
+    "西坡巡检班"
+   ]
+  },
+  {
+   "key": "technician",
+   "accepted": [
+    "运维人员",
+    "人员",
+    "员工",
+    "运维工程师",
+    "technician",
+    "staff",
+    "employee",
+    "maintenance_staff",
+    "operator"
+   ],
+   "instances": [
+    "赵凯",
+    "林溪",
+    "E1021",
+    "E1033"
+   ]
+  },
+  {
+   "key": "inspection_task",
+   "accepted": [
+    "巡检任务",
+    "巡检",
+    "inspection_task",
+    "inspection"
+   ],
+   "instances": []
+  },
+  {
+   "key": "defect",
+   "accepted": [
+    "缺陷",
+    "defect"
+   ],
+   "instances": []
+  },
+  {
+   "key": "work_order",
+   "accepted": [
+    "维修工单",
+    "工单",
+    "work_order",
+    "repair_order",
+    "maintenance_order"
+   ],
+   "instances": []
+  }
+ ],
+ "not_concepts": [
+  {
+   "kind": "attribute",
+   "texts": [
+    "风机编号",
+    "型号",
+    "额定功率",
+    "投运日期",
+    "班组名称",
+    "工号",
+    "姓名",
+    "资质等级",
+    "计划日期",
+    "实际完成日期",
+    "缺陷等级",
+    "派单时间",
+    "完工时间",
+    "维修费用"
+   ]
+  },
+  {
+   "kind": "metric",
+   "texts": [
+    "缺陷闭环率",
+    "月度巡检完成率",
+    "巡检完成率"
+   ]
+  }
+ ]
+}

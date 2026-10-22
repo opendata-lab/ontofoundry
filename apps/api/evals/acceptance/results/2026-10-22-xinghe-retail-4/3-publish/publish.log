@@ -1,0 +1,4 @@
+kinds Counter({('property', 'create'): 29, ('rule', 'create'): 6, ('object_type', 'create'): 6, ('link_type', 'create'): 6, ('dataset', 'create'): 6, ('mapping', 'create'): 5, ('value_type', 'create'): 3, ('metric', 'create'): 3})
+decisions Counter({'accepted': 64})
+publishable True changes 64 bad datasets []
+published 1 None
