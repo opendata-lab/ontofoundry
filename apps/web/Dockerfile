@@ -12,7 +12,7 @@ WORKDIR /build
 # 先只拷清单和本地依赖包，让依赖层能被缓存复用。
 COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/vendor-agent-conversation-*.tgz ./apps/web/
-RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts --no-audit --no-fund
 
 COPY apps/web ./apps/web
 RUN npm run build -w ontofoundry-web
