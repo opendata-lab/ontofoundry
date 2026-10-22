@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
   "minimum_platform_version": "0.1.0",
-  "platform_baseline": "2026-10-21 core-1：工作包、完整提案 v1、分步片段、execution 修正预算、本体关键词检索四工具；仅版本号不足以确认这些能力",
+  "platform_baseline": "2026-10-22 core-1：工作包、完整提案 v1、分步片段、execution 修正预算、本体关键词检索四工具、实例库与 resolve_entity；仅版本号不足以确认这些能力",
   "installation": "manual-admin",
   "skills": [
     {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
