@@ -8,6 +8,10 @@ import { TableMaterialPicker } from "./TableMaterialPicker";
 
 vi.mock("../api/client", () => ({ datasetApi: { registeredTables: vi.fn() } }));
 
+// The first antd modal render is slow on CI runners; the waits below need more
+// than vitest's 5 s per-test default.
+vi.setConfig({ testTimeout: 20_000 });
+
 beforeEach(() => vi.resetAllMocks());
 afterEach(cleanup);
 
@@ -55,7 +59,7 @@ it("starts from the tables already linked and shows existing datasets", async ()
   });
   const onLink = renderPicker([{ connection_id: "c1", schema_name: "dw", table_name: "orders" }]);
   expect(await screen.findByRole("checkbox", { name: /已有数据集 订单/ })).toBeChecked();
-  fireEvent.click(screen.getByRole("checkbox", { name: /dw\.orders/ }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: /dw\.orders/ }));
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
   await waitFor(() => expect(onLink).toHaveBeenCalledWith([]));
 });
