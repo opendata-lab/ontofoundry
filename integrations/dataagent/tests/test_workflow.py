@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from copy import deepcopy
@@ -421,14 +422,14 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
     errors = checker.check_result(batch, SCHEMA, ctx)
     assert errors
     for error in errors:
-        assert (
-            error.startswith("/")
-            and "期望" in error
-            and "实际" in error
-            and "查写法：" in error
-        )
-        command = shlex.split(error.split("查写法：", 1)[1])
-        assert Path(command[1]).is_file()
+        assert re.match(r"错误 \[[A-Z_]+\]：/", error)
+        assert "期望" in error and "实际" in error and "下一步：" in error
+        step = error.split("下一步：", 1)[1]
+        if "show_example.py" not in step:
+            continue
+        # Writing errors point at an example; the printed command runs as is.
+        command = shlex.split(step.split("：", 1)[1])
+        assert command[0] == "$DATAAGENT_PYTHON_BIN" and Path(command[1]).is_file()
         completed = subprocess.run(
             [sys.executable, *command[1:]], capture_output=True, check=False
         )
@@ -450,7 +451,8 @@ def test_prepare_reports_exact_fragment_location_and_preserves_output(
         prepare.assemble(context, [[item]])
     message = str(caught.value)
     assert "/items/0/before" in message and "期望" in message and "实际" in message
-    assert "--operation update" in message and "show_example.py" in message
+    # A stale before is fixed by reading the pinned value, not by an example.
+    assert "show_element.py --work-pack" in message and "33333333-3333-4333-8333-333333333333" in message
     item["target_id"] = "absent"
     with pytest.raises(prepare.PrepareInputError, match="/items/0/target_id"):
         prepare.assemble(context, [[item]])

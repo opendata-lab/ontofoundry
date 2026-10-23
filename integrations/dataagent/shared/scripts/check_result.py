@@ -4,10 +4,15 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
+
+# Also loaded by file path (tests, the platform's offline checks).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from runpaths import command
 
 COLLECTIONS = {
     "object_type": "object_types",
@@ -72,9 +77,6 @@ def preview(value):
 
 
 def example_command(kind="object_type", operation="create", after=None, pointer=""):
-    import shlex
-
-    script = shlex.quote(str(Path(__file__).resolve().with_name("show_example.py")))
     kind = kind if kind in TARGET_KINDS else "object_type"
     operation = operation if operation in {"create", "update", "delete"} else "create"
     after = after if isinstance(after, dict) else {}
@@ -123,17 +125,34 @@ def example_command(kind="object_type", operation="create", after=None, pointer=
         ):
             part = "01"
     if part:
-        return f"python {script} --part {part}"
-    suffix = f" --variant {variant}" if variant else ""
-    return f"python {script} {kind} --operation {operation}{suffix}"
+        return command("show_example.py", "--part", part)
+    return command("show_example.py", kind, "--operation", operation, *(["--variant", variant] if variant else []))
+
+
+def next_step(code, item, pointer):
+    """What to do about one diagnostic; a written example only helps writing errors."""
+    if code.startswith("CONTEXT_MISMATCH"):
+        return "结果头由合并脚本填写，不要手改；改片段后重新合并：" + command("prepare_result.py", "--work-pack", "<工作包>")
+    if code in {"TARGET_NOT_FOUND", "BEFORE_MISMATCH", "TARGET_HASH_MISMATCH"}:
+        target = item.get("target_id") or "<名称或id>"
+        return "读取固定的现值后按它改：" + command("show_element.py", "--work-pack", "<工作包>", str(target))
+    if code == "REPAIR_BUDGET_EXHAUSTED":
+        return "停止修正，本轮不再发布结果；在回答里列出未通过的检查。同参重试无效。"
+    if code.startswith("INPUT_"):
+        return "按原因改正文件或路径后重新执行原命令。"
+    return "查正确写法：" + example_command(item.get("target_kind"), item.get("operation"), item.get("after"), pointer)
 
 
 def diagnostic(pointer, code, expected, actual, item=None):
+    """错误 [CODE]：位置 [项]，期望…；实际…。下一步：…"""
     item = item if isinstance(item, dict) else {}
     label = preview(item.get("client_ref", item.get("target_id", "-")))
+    where = pointer if pointer not in {"", "/"} else "文档根"
+    short, _, detail = code.partition(" ")
+    detail = f"（{detail}）" if detail else ""
     return (
-        f"{pointer} [{label}] {code}；期望 {preview(expected)}；实际 {preview(actual)}；"
-        f"查写法：{example_command(item.get('target_kind'), item.get('operation'), item.get('after'), pointer)}"
+        f"错误 [{short}]：{where} [{label}]{detail}，期望 {preview(expected)}；实际 {preview(actual)}。"
+        f"下一步：{next_step(short, item, pointer)}"
     )
 
 
@@ -382,8 +401,9 @@ def encode(value):
 
 
 def validate_file(
-    result_path, schema_path, context_path=None, *, repair=False, publish=None
+    result_path, schema_path, context_path=None, *, repair=False, publish=None, origins=None
 ):
+    """origins: (fragment file, index) per merged item, so errors point at the part to fix."""
     errors, result, context = [], None, None
     report_path = Path(str(result_path) + ".errors.json")
     try:
@@ -434,14 +454,20 @@ def validate_file(
         result = json.loads(result_bytes)
         errors.extend(check_result(result, schema, context))
     except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        where = getattr(exc, "filename", None) or "候选结果、Schema、固定上下文或修正计数"
+        reason = f"第 {exc.lineno} 行第 {exc.colno} 列 {exc.msg}" if isinstance(exc, json.JSONDecodeError) else str(exc)[:200] or type(exc).__name__
         errors.append(
             diagnostic(
                 "/",
                 f"INPUT_{type(exc).__name__.upper()}",
-                "可读 JSON 文件和本轮有效修正计数",
-                type(exc).__name__,
+                f"可读的 {where}",
+                reason,
             )
         )
+    if origins:
+        from prepare_result import located
+
+        errors = [located(e, origins) for e in errors]
     # Full validator errors remain on disk, never on stdout.
     raw_errors = []
     if result is not None and "schema" in locals():
@@ -461,18 +487,19 @@ def validate_file(
         if len(("\n".join([*shown, line])).encode()) > 2700:
             break
         shown.append(line)
-    summary = f"错误 {len(errors)}；省略 {len(errors) - len(shown)}；完整报告 {report_path}（按 errors 数组索引或 item 提取）"
-    if not errors:
-        summary = f"检查通过；{len(result['items'])} 条提案；完整报告 {report_path}"
+    if errors:
+        omitted = len(errors) - len(shown)
+        summary = (
+            f"检查未通过：共 {len(errors)} 条，显示 {len(shown)} 条" + (f"、省略 {omitted} 条" if omitted else "")
+            + f"。{'最终文件未替换。' if publish else ''}完整报告：{report_path}"
+            + (f"。读后续：{command('read_input.py', str(report_path), '--pointer', f'/errors/{len(shown)}')}" if omitted else "")
+        )
+    else:
+        summary = f"检查通过：{len(result['items'])} 条提案。完整报告：{report_path}"
         if publish:
             atomic_write(publish, result_bytes)
-    print(
-        (
-            summary.encode()[:900].decode("utf-8", errors="ignore")
-            + "\n"
-            + "\n".join(shown)
-        ).strip()
-    )
+            summary += f"。已发布：{publish}"
+    print((summary + "\n" + "\n".join(shown)).strip())
     return int(bool(errors))
 
 

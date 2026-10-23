@@ -51,7 +51,7 @@ def test_oversize_batch_can_be_read_in_separate_bounded_batches(tmp_path):
     path.write_text(original)
     command = [sys.executable, str(SCRIPT), str(path), "--tables"]
     combined = subprocess.run([*command, "t1,t2"], capture_output=True, text=True, check=False)
-    assert combined.returncode == 1 and "分批 --tables" in combined.stdout
+    assert combined.returncode == 1 and "OUTPUT_TOO_LARGE" in combined.stdout and "分 2 批" in combined.stdout
     assert "column_0" not in combined.stdout
     for key in ("t1", "t2"):
         part = subprocess.run([*command, key], capture_output=True, text=True, check=False)

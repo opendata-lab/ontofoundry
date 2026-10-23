@@ -19,7 +19,7 @@ from check_result import (
     schema_errors,
 )
 from prepare_result import PrepareInputError, assemble, effective_ref
-from runpaths import PARTS, HintParser, fragment_paths
+from runpaths import PARTS, HintParser, command, error, existing, fragment_paths
 
 SUMMARY_LIMIT = 4000
 NAMED_KINDS = {"object_type", "property", "value_type", "link_type", "metric", "dataset", "rule"}
@@ -102,7 +102,7 @@ def duplicate_refs(path, items):
                 continue
             other = owner.setdefault(ref, (part.name, mine))
             if other[0] != part.name and (mine or other[1]):
-                found.append(f"client_ref {ref} 与 {other[0] if mine else part.name} 重复；合并会拒收，改成不同的名字")
+                found.append(f"[DUPLICATE_REF] client_ref {ref} 与 {other[0] if mine else part.name} 重复，合并会拒收；把本片段里的这个名字改成别的（如 {ref}_2）")
     return found
 
 
@@ -127,33 +127,59 @@ def main():
         context = json.loads(Path(args.context).read_bytes())
         schema = json.loads(Path(args.schema).read_bytes())
     except (OSError, ValueError, KeyError) as exc:
-        print(f"读取工作包、固定上下文或 Schema 失败：{type(exc).__name__}")
+        which = args.work_pack if not (args.context and args.schema) else f"{args.context} 或 {args.schema}"
+        print(error("INPUT_UNREADABLE", f"读取 {which} 失败：{type(exc).__name__}", "未检查任何片段",
+                    "路径照 init_workflow 打印的本轮工作包复制"))
         return 1
     failed, lines = False, []
     for raw, path in ((name, p) for name in args.fragments for p in fragment_paths(name)):
         try:
             items = json.loads(path.read_bytes())
-        except (OSError, ValueError) as exc:
+        except FileNotFoundError:
             failed = True
-            existing = "、".join(p.name for p in sorted(PARTS.glob("*.json"))) or "无"
-            lines.append(f"{raw}：无法读取为 JSON（{type(exc).__name__}）；modeling/parts/ 现有：{existing}；先写片段再检查，片段写在 modeling/parts/")
+            lines.append(error("FILE_NOT_FOUND", f"片段 {raw} 不存在（找的是 {path}）", f"modeling/parts/ 现有：{existing(PARTS, '*.json')}",
+                               "先把片段写到 modeling/parts/<编号>-<名称>.json，再检查"))
+            continue
+        except json.JSONDecodeError as exc:
+            failed = True
+            lines.append(error("JSON_INVALID", f"{path} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}", "文件已存在，未检查",
+                               f"修正该处后重新检查：{command('check_part.py', '--work-pack', args.work_pack or '<工作包>', str(path))}"))
+            continue
+        except OSError as exc:
+            failed = True
+            lines.append(error("READ_FAILED", f"无法读取 {path}：{type(exc).__name__}", "未检查", retry=False))
             continue
         report = check_fragment(items, context, schema)
         report["errors"] += duplicate_refs(path, items)
-        reports = Path(args.reports)
-        reports.mkdir(parents=True, exist_ok=True)
-        atomic_write(reports / f"{path.stem}.json", encode(report))
+        report_path = Path(args.reports) / f"{path.stem}.json"
+        try:
+            atomic_write(report_path, encode(report))
+            saved = f"完整报告：{report_path}"
+        except OSError as exc:
+            saved = f"报告未保存（{type(exc).__name__}）"
         failed = failed or bool(report["errors"])
-        status = f"{len(report['errors'])} 个错误" if report["errors"] else "通过"
-        lines.append(f"{path}：{status}")
-        lines += ["  " + e for e in report["errors"][:5]]
+        errors = report["errors"]
+        if errors:
+            shown = errors[:5]
+            more = f"，显示 {len(shown)} 个、省略 {len(errors) - len(shown)} 个" if len(errors) > len(shown) else ""
+            lines.append(f"{path}：{len(errors)} 个错误{more}。{saved}")
+            if len(errors) > len(shown):
+                lines.append("  读后续错误：" + command("read_input.py", str(report_path), "--pointer", f"/errors/{len(shown)}"))
+        else:
+            lines.append(f"{path}：通过")
+        lines += ["  " + e for e in errors[:5]]
         if report["pending_refs"]:
             lines.append("  待合并检查的跨片段引用：" + "、".join(report["pending_refs"]))
         lines += ["  " + h for h in report["hints"][:5]]
-    summary = "\n".join(lines)
-    if len(summary.encode()) > SUMMARY_LIMIT:
-        summary = summary.encode()[:SUMMARY_LIMIT].decode("utf-8", "ignore") + f"\n…完整报告见 {args.reports}/"
-    print(summary)
+    # Cut at whole lines so a path or command is never half printed.
+    kept, size = [], 0
+    for line in lines:
+        size += len(line.encode()) + 1
+        if size > SUMMARY_LIMIT:
+            kept.append(f"…其余 {len(lines) - len(kept)} 行省略，各片段完整报告在 {args.reports}/<片段名>.json")
+            break
+        kept.append(line)
+    print("\n".join(kept))
     return 1 if failed else 0
 
 

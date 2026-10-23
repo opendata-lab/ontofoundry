@@ -1,8 +1,9 @@
 """Look up a bounded, executable positive example without loading the schema."""
 
-import argparse
 import json
 from pathlib import Path
+
+from runpaths import HintParser, command, error
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "references/examples"
 LIMIT = 8 * 1024
@@ -41,15 +42,18 @@ def example(target_kind, operation="create", variant=None):
     choices = catalog["lookup"]
     if target_kind not in choices:
         hint = FIELDS.get(target_kind)
-        raise ValueError((f"{target_kind} 不是提案类型，是字段；{hint}。" if hint else "未知类型；") + "可选值：" + "、".join(sorted(choices)))
+        raise ValueError((f"{target_kind} 不是提案类型，是字段，{hint}" if hint else f"未知类型 {target_kind}") + "；类型可选：" + "、".join(sorted(choices)))
     if operation not in choices[target_kind]:
-        raise ValueError("未知操作；可选值：create、update、delete")
+        raise ValueError(f"未知操作 {operation}；可选：create、update、delete")
     if variant:
-        variants = VARIANTS.get(target_kind, {}) if operation == "create" else {}
+        if operation != "create":
+            raise ValueError(f"--variant 只用于 create，本次是 --operation {operation}；去掉 --variant："
+                             + command("show_example.py", target_kind, "--operation", operation))
+        variants = VARIANTS.get(target_kind, {})
         if variant not in variants:
             raise ValueError(
-                "未知分支；本类型 create 可选值："
-                + "、".join(VARIANTS.get(target_kind, {}))
+                f"{target_kind} 没有分支 {variant}；可选："
+                + ("、".join(variants) or "无（直接查 " + command("show_example.py", target_kind) + "）")
             )
         filename, indices = variants[variant]
         items = json.loads((EXAMPLES / filename).read_bytes())
@@ -74,7 +78,7 @@ def without_dependencies(target_kind, items):
 
 
 def main():
-    parser = argparse.ArgumentParser(
+    parser = HintParser(
         description="返回一个或多个类型的最小正例；默认不附依赖，--with-deps 附带；UUID／材料证据须替换为本轮真实值"
     )
     parser.add_argument("target_kinds", nargs="*", metavar="target_kind")
@@ -93,8 +97,11 @@ def main():
                 raise ValueError("固定包入口不能与类型、操作或分支查询混用")
             filename = f"{args.part}.json" if args.part else "values.json" if args.values else "incremental.md" if args.incremental_guide else "guide.md"
             content = (KIT / filename).read_text().rstrip("\n")
-            if len((content + "\n").encode()) > LIMIT:
-                raise ValueError("固定包输出超过8 KiB，请维护更小的片段")
+            size = len((content + "\n").encode())
+            if size > LIMIT:
+                print(error("EXAMPLE_TOO_LARGE", f"固定包 {filename} 有 {size} 字节，超过单次 {LIMIT} 字节上限",
+                            "未回显内容；这是技能自身的问题，需要维护者拆小", retry=False))
+                return 1
             print(content)
             return 0
         if not args.target_kinds:
@@ -109,10 +116,19 @@ def main():
                 for kind in dict.fromkeys(args.target_kinds)
             }
         content = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-        if len((content + "\n").encode()) > LIMIT:
-            raise ValueError("正例超过8 KiB，请分批查询或维护更小的完整正例")
-    except (OSError, ValueError, KeyError) as exc:
-        print(str(exc))
+        size = len((content + "\n").encode())
+        if size > LIMIT:
+            kinds = list(dict.fromkeys(args.target_kinds))
+            step = ("每次查一个类型：" + "；".join(command("show_example.py", k, "--operation", args.operation) for k in kinds)
+                    if len(kinds) > 1 else None)
+            print(error("EXAMPLE_TOO_LARGE", f"正例 {size} 字节，超过单次 {LIMIT} 字节上限", "未回显内容",
+                        step, retry=len(kinds) > 1))
+            return 1
+    except ValueError as exc:
+        print(error("INVALID_ARGUMENT", str(exc), "未返回示例"))
+        return 1
+    except (OSError, KeyError) as exc:
+        print(error("SKILL_ASSET_MISSING", f"技能示例文件缺失或损坏（{type(exc).__name__}）", "未返回示例；需要重新安装技能", retry=False))
         return 1
     print(content)
     return 0

@@ -40,7 +40,9 @@ def diagnostic(pointer, message, expected, actual, item=None):
     return (
         f"{pointer} [{short(item.get('client_ref', item.get('target_id', '-')))}] {message}；"
         f"期望 {short(expected)}；实际 {short(actual)}；"
-        f"查写法（技能目录内执行）：python scripts/show_example.py {kind} --operation {operation}{suffix}"
+        # The platform cannot know where the skill is installed; the skill's
+        # own check_part/prepare_result print the full command.
+        f"下一步：用建模技能的 scripts/show_example.py 查正确写法：{kind} --operation {operation}{suffix}"
     )
 
 

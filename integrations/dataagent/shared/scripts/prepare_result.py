@@ -12,7 +12,15 @@ from check_result import (
     same_json,
     validate_file,
 )
-from runpaths import PARTS, HintParser, existing, fragment_paths
+from runpaths import (
+    PARTS,
+    HintParser,
+    command,
+    error,
+    existing,
+    fragment_paths,
+    relative,
+)
 
 
 class PrepareInputError(ValueError):
@@ -110,6 +118,58 @@ def fragment_files(raw_paths):
     return files
 
 
+def located(message, origins):
+    """Name the fragment file and index behind a merged /items/N pointer."""
+    import re
+
+    match = re.search(r"/items/(\d+)", message)
+    if not match or int(match.group(1)) >= len(origins):
+        return message
+    path, index = origins[int(match.group(1))]
+    return message.replace(match.group(0), f"{path}#/{index}（合并后 {match.group(0)}）", 1)
+
+
+def load_inputs(raw_fragments, context_path):
+    """Fragments with each merged item's origin, and the context; errors name the file."""
+    paths = [p for raw in raw_fragments for p in fragment_paths(raw)]
+    fragments, origins = [], []
+    try:
+        files = fragment_files([str(p) for p in paths])
+    except ValueError as exc:
+        if "没有 JSON 片段" not in str(exc):
+            raise
+        raise InputProblem("NO_FRAGMENTS", str(exc), f"modeling/parts/ 现有：{existing(PARTS, '*.json')}",
+                           "先把片段写成 modeling/parts/<编号>-<名称>.json 再合并") from None
+    for path in files:
+        shown = relative(path)
+        try:
+            fragment = json.loads(path.read_bytes())
+        except FileNotFoundError:
+            raise InputProblem("FILE_NOT_FOUND", f"片段 {shown} 不存在", f"modeling/parts/ 现有：{existing(PARTS, '*.json')}",
+                               "先写片段再合并；片段可写 01、01-types 或路径") from None
+        except json.JSONDecodeError as exc:
+            raise InputProblem("JSON_INVALID", f"片段 {shown} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}", "文件已存在",
+                               f"修正该处后先单独检查：{command('check_part.py', '--work-pack', '<工作包>', shown)}") from None
+        fragments.append(fragment)
+        origins += [(shown, i) for i in range(len(fragment))] if isinstance(fragment, list) else []
+    try:
+        context = json.loads(Path(context_path).read_bytes())
+    except (OSError, ValueError) as exc:
+        raise InputProblem("INPUT_UNREADABLE", f"固定上下文 {context_path} 无法读取（{type(exc).__name__}）", "",
+                           "路径照工作包的 context_file；文件损坏时重新发起本轮", retry=False) from None
+    return fragments, origins, context
+
+
+class InputProblem(Exception):
+    def __init__(self, code, reason, state, next_step=None, retry=True):
+        super().__init__(code)
+        self.args_ = (code, reason, state, next_step, retry)
+
+    def text(self, outcome):
+        code, reason, state, next_step, retry = self.args_
+        return error(code, reason, "；".join(x for x in (state, outcome) if x), next_step, retry)
+
+
 def main():
     parser = HintParser(description="合并片段为提案批次；--work-pack 自动取上下文、Schema 与结果路径")
     parser.add_argument("--work-pack", help="工作包；从中取 context_file、schema_file、result_file")
@@ -119,8 +179,10 @@ def main():
     parser.add_argument("--repair", action="store_true")
     parser.add_argument("fragments", nargs="*", help="片段文件、简称（01、01-types）或目录；省略时合并 modeling/parts/")
     args = parser.parse_args()
+    outcome = "候选文件未生成，最终文件未替换"
     if "-" in args.fragments:
-        print("片段不能从标准输入读取；先写到 modeling/parts/ 再合并")
+        print(error("INVALID_ARGUMENT", "片段不能从标准输入读取", outcome,
+                    "先写到 modeling/parts/ 再合并：" + command("prepare_result.py", "--work-pack", args.work_pack or "<工作包>")))
         return 2
     try:
         if args.work_pack:
@@ -128,45 +190,41 @@ def main():
             args.context = args.context or pack["context_file"]
             args.schema = args.schema or pack["schema_file"]
             args.output = args.output or pack["result_file"]
+    except FileNotFoundError:
+        print(error("FILE_NOT_FOUND", f"工作包 {args.work_pack} 不存在", outcome, "路径照 init_workflow 打印的本轮工作包复制"))
+        return 1
     except (OSError, ValueError, KeyError) as exc:
-        print(f"读取工作包失败：{type(exc).__name__}；检查 --work-pack 路径")
+        print(error("INPUT_UNREADABLE", f"工作包 {args.work_pack} 无法使用（{type(exc).__name__}）", outcome, retry=False))
         return 1
     if not (args.context and args.schema and args.output):
         parser.error("需要 --work-pack <工作包>，或同时给出 --context、--schema、--output")
     raw_fragments = args.fragments or [str(PARTS) + "/"]
+    report = Path(args.output + ".errors.json")
     try:
         output = workspace_path(args.output)
         output.parent.mkdir(parents=True, exist_ok=True)
-        paths = [p for raw in raw_fragments for p in fragment_paths(raw)]
-        fragments = [json.loads(p.read_bytes()) for p in fragment_files([str(p) for p in paths])]
-        context = json.loads(Path(args.context).read_bytes())
+        fragments, origins, context = load_inputs(raw_fragments, args.context)
         candidate = output.with_suffix(".pending.json")
         batch = assemble(context, fragments)
         atomic_write(candidate, encode(batch))
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        message = (
-            str(exc)
-            if isinstance(exc, PrepareInputError)
-            else diagnostic(
-                "/fragments",
-                "PREPARE_INPUT",
-                "工作区内可读 JSON 片段、固定上下文和输出路径",
-                type(exc).__name__,
-            )
-        )
-        report = Path(args.output + ".errors.json")
+    except (InputProblem, PrepareInputError) as exc:
+        message = exc.text(outcome) if isinstance(exc, InputProblem) else located(str(exc), origins) + f"\n{outcome}"
         try:
-            atomic_write(
-                workspace_path(str(report)), encode({"total": 1, "errors": [message]})
-            )
+            atomic_write(workspace_path(str(report)), encode({"total": 1, "errors": [message]}))
+            saved = f"报告：{report}"
         except (OSError, ValueError):
-            pass
-        print(message + f"；未替换最终文件。modeling/parts/ 现有：{existing(PARTS, '*.json')}")
+            saved = "报告未保存"
+        print(f"{message}；{saved}")
+        return 1
+    except ValueError as exc:
+        print(error("PATH_OUT_OF_SCOPE", str(exc), outcome, "片段、候选与输出都用工作区相对路径", retry=False))
+        return 1
+    except OSError as exc:
+        print(error("WRITE_FAILED", f"写入 {relative(output) if 'output' in locals() else args.output} 失败：{type(exc).__name__}", outcome, retry=False))
         return 1
     return validate_file(
-        candidate, args.schema, args.context, repair=args.repair, publish=output
+        candidate, args.schema, args.context, repair=args.repair, publish=output, origins=origins
     )
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

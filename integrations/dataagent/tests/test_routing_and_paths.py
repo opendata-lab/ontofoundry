@@ -3,6 +3,7 @@
 import importlib
 import json
 import re
+import shlex
 import subprocess
 import sys
 
@@ -117,7 +118,7 @@ def test_missing_material_lists_what_exists(tmp_path, monkeypatch, capsys):
     (tmp_path / "uploads/real.md").write_text("x\n")
     assert invoke(monkeypatch, read_input, "uploads/missing.md") == 1
     out = capsys.readouterr().out
-    assert "文件不存在：uploads/missing.md" in out and "real.md" in out
+    assert "错误 [FILE_NOT_FOUND]：工作区文件 uploads/missing.md 不存在" in out and "real.md" in out
 
 
 def fictional_tables(count, columns=40):
@@ -204,3 +205,38 @@ def test_show_example_points_field_names_at_their_kind(capsys, monkeypatch):
     assert invoke(monkeypatch, show_example, "data_join") == 1
     out = capsys.readouterr().out
     assert "属于 link_type" in out and "--variant mapping_table" in out
+
+
+def test_errors_say_why_what_happened_and_what_to_run(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    material = tmp_path / "notes.md"
+    material.write_text("\n".join("澄页图书馆的借阅规则说明" * 30 for _ in range(40)))
+    # Too large: actual size, limit, nothing changed, and the exact range that fits.
+    assert invoke(monkeypatch, read_input, "notes.md") == 1
+    out = capsys.readouterr().out
+    assert out.startswith("错误 [OUTPUT_TOO_LARGE]：输出 ") and "超过单次 8000 字节上限" in out and "notes.md 未改动" in out
+    step = out.split("下一步：", 1)[1].split("，", 1)[0]
+    args = shlex.split(step)[2:]
+    assert invoke(monkeypatch, read_input, *args) == 0
+    capsys.readouterr()
+    # Bad range: the file's real length and a corrected command.
+    assert invoke(monkeypatch, read_input, "notes.md", "--start", "50", "--end", "60") == 1
+    out = capsys.readouterr().out
+    assert "错误 [INVALID_ARGUMENT]：行范围 50–60 无效，notes.md 共 40 行" in out and "--end 40" in out
+    # Broken JSON: line and column.
+    (tmp_path / "bad.json").write_text('{"a": 1,\n "b": }')
+    assert invoke(monkeypatch, read_input, "bad.json", "--pointer", "/a") == 1
+    assert "错误 [JSON_INVALID]：bad.json 第 2 行" in capsys.readouterr().out
+    # Missing pointer: what does exist there.
+    (tmp_path / "ok.json").write_text('{"items": [1, 2, 3]}')
+    assert invoke(monkeypatch, read_input, "ok.json", "--pointer", "/items/7") == 1
+    assert "3 项的数组，有效下标 0–2" in capsys.readouterr().out
+
+
+def test_commands_name_scripts_without_climbing_out_of_the_workspace(tmp_path, monkeypatch):
+    runpaths = importlib.import_module("runpaths")
+    monkeypatch.chdir(tmp_path)
+    # The skill lives outside this workspace: its own path, never "../".
+    printed = runpaths.command("check_part.py", "--work-pack", "uploads/pack.json", "01")
+    assert ".." not in printed and str(runpaths.SKILL_DIR.resolve()) in printed
+    assert runpaths.command("read_input.py", "<材料路径>").endswith(" <材料路径>")

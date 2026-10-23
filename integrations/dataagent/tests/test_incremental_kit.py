@@ -227,9 +227,9 @@ def test_pagination_reconstructs_full_unicode_definition_and_pins_hash(tmp_path)
     assert json.loads(content)["elements"][0]["definition"] == ctx["draft"]["object_types"][0]
     ctx["draft"]["object_types"][0]["description"] += "变化"
     status, error = cli(tmp_path, ctx, *selectors, extra=("--page", "1", "--sha256", pages["sha256"]))
-    assert status == 1 and "已变化" in error["原因"]
+    assert status == 1 and "PAGE_STALE" in error["错误"] and "已变化" in error["错误"]
     status, error = cli(tmp_path, ctx, *selectors, extra=("--page", "0"))
-    assert status == 1 and "页码" in error["原因"]
+    assert status == 1 and "超出范围" in error["错误"]
 
 
 def test_bounded_errors_preserve_all_exact_candidates(tmp_path):

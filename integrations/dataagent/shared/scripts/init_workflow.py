@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 from read_input import table_batches
-from runpaths import HintParser, command, relative, usage
+from runpaths import HintParser, command, error, notice, relative, usage
 
 ROOT = Path("modeling")
 PLAN_TEMPLATE = """场景：全量｜增量｜优化｜小改动（选一个，删去其余）
@@ -38,29 +38,36 @@ def write_new(path, text):
     return True
 
 
+def done(created):
+    return ("已新建：" + "、".join(created) + "；其余未完成") if created else "未新建任何文件"
+
+
 def main():
     parser = HintParser(description="建立 modeling/ 骨架与计划模板；幂等，不覆盖已有文件")
     parser.add_argument("--work-pack", required=True)
     parser.add_argument("--prior-plan", help="平台上传的上一轮已确认计划包")
     args = parser.parse_args()
+    created, step = [], f"读取工作包 {args.work_pack}"
     try:
         pack = json.loads(Path(args.work_pack).read_bytes())
+        step = "创建 modeling/ 与输出目录"
         # Output filenames are supplied by the platform; never infer them.
         for field in ("result_file", "needs_input_file"):
             if pack.get(field):
                 Path(pack[field]).parent.mkdir(parents=True, exist_ok=True)
         for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
             folder.mkdir(parents=True, exist_ok=True)
-        created = []
         if args.prior_plan:
+            step = f"读取前轮计划 {args.prior_plan}"
             prior = json.loads(Path(args.prior_plan).read_bytes())
+            step = "写入前轮计划"
             if prior.get("plan_md") and write_new(ROOT / "plan.md", prior["plan_md"]):
-                created.append("plan.md（上一轮计划）")
+                created.append("modeling/plan.md（上一轮计划）")
             for name in ("entities", "issues"):
                 if prior.get(name) is not None and write_new(
                     ROOT / f"{name}.json", json.dumps(prior[name], ensure_ascii=False, indent=1)
                 ):
-                    created.append(f"{name}.json（上一轮计划）")
+                    created.append(f"modeling/{name}.json（上一轮计划）")
         facts = pack.get("scenario_facts", {})
         plan = PLAN_TEMPLATE.format(
             work_pack=args.work_pack,
@@ -68,12 +75,21 @@ def main():
             new_materials="、".join(facts.get("new_material_ids", [])) or "无",
             new_tables="、".join(facts.get("new_table_keys", [])) or "无",
         )
+        step = "写入 modeling/plan.md 与 notes.md"
         if write_new(ROOT / "plan.md", plan):
-            created.append("plan.md（模板）")
+            created.append("modeling/plan.md（模板）")
         if write_new(ROOT / "notes.md", "# 证据对照与判断（≤2 KB，上下文压缩后先读）\n"):
-            created.append("notes.md")
+            created.append("modeling/notes.md")
+    except json.JSONDecodeError as exc:
+        print(error("JSON_INVALID", f"{step}失败：第 {exc.lineno} 行第 {exc.colno} 列 {exc.msg}", done(created),
+                    "路径照平台本轮提示复制；文件本身损坏时重新发起本轮", retry=False))
+        return 1
+    except FileNotFoundError:
+        print(error("FILE_NOT_FOUND", f"{step}失败：文件不存在", done(created),
+                    "路径照平台本轮提示里的工作包、prior_plan_file 复制"))
+        return 1
     except (OSError, ValueError) as exc:
-        print(f"初始化失败：{type(exc).__name__}；检查工作包与计划包路径")
+        print(error("INIT_FAILED", f"{step}失败：{type(exc).__name__}", done(created), retry=False))
         return 1
     print("modeling/ 已就绪" + ("；新建：" + "、".join(created) if created else "；文件均已存在，未覆盖"))
     print(run_paths(args.work_pack, pack, args.prior_plan))
@@ -84,8 +100,9 @@ def table_commands(tables_file):
     """Ready batches for the linked tables' columns: read each once, nothing re-read."""
     try:
         batches = table_batches(Path(tables_file).read_text()) if tables_file else []
-    except (OSError, ValueError, KeyError, TypeError):
-        return []
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return ["  " + notice("TABLES_UNREADABLE", f"表结构 {tables_file} 无法读取（{type(exc).__name__}），未生成读表命令",
+                              command("read_input.py", tables_file, "--start", "1", "--end", "40"))]
     if not batches:
         return []
     lines = [f"  读表结构（共 {len(batches)} 批，每批读一次，写 03 时不重读）："]
@@ -110,7 +127,7 @@ def run_paths(work_pack, pack, prior_plan):
     lines.append(f"- 模板：概念清单 {protocol}/entities.json；待确认 {protocol}/needs-input-entities.json")
     lines.append(f"- 优化模板：问题清单 {protocol}/issues.json；待选择 {protocol}/needs-input-issues.json")
     lines.append("- 概念清单写 modeling/entities.json，问题清单写 modeling/issues.json（与 plan.md 同级，不放 parts/）")
-    lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；不用 /tmp、绝对路径或 ../，DataAgent 会拦截")
+    lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
     lines += table_commands(pack.get("tables_file"))

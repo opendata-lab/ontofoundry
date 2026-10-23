@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from check_result import TARGET_KINDS, pinned_targets
+from runpaths import command, error
 
 LIMIT = 8192
 PAGE_BYTES = 3000
@@ -210,11 +211,16 @@ class ElementIndex:
         } for i in identities]}, 0
 
 
-def bounded(value, page=None, expected_hash=None):
+class PageProblem(ValueError):
+    pass
+
+
+def bounded(value, page=None, expected_hash=None, rerun=lambda *extra: ""):
+    """rerun(*extra) is this query's own command with extra arguments appended."""
     content = encode(value)
     digest = hashlib.sha256(content.encode()).hexdigest()
     if expected_hash and expected_hash != digest:
-        raise ValueError("查询内容已变化；请移除 --page/--sha256 重新查询")
+        raise PageProblem(error("PAGE_STALE", "分页期间查询内容已变化", "未返回该页", "去掉分页参数重新查询：" + rerun()))
     if len((content + "\n").encode()) <= LIMIT and page is None:
         return content
     chunks, current, size = [], [], 0
@@ -226,14 +232,20 @@ def bounded(value, page=None, expected_hash=None):
         current.append(char)
         size += width
     chunks.append("".join(current))
-    result = {"分页": {"sha256": digest, "pages": len(chunks), "参数": f"保留原查询参数，每次加 --page N --sha256 {digest}，N=1..{len(chunks)}", "重组": "依次拼接各页 text 后解析 JSON；不截断定义"}}
+    current = page or 0
+    result = {"分页": {
+        "sha256": digest, "pages": len(chunks),
+        "说明": f"结果共 {len(chunks)} 页" + (f"，本次第 {page} 页" if page else "，本次未返回内容") + "；依次拼接各页 text 后解析 JSON",
+        **({"下一页": rerun("--page", str(current + 1), "--sha256", digest)} if current < len(chunks) else {}),
+    }}
     if page is not None:
         if not 1 <= page <= len(chunks):
-            raise ValueError(f"页码超出范围；--page 1..{len(chunks)}")
+            raise PageProblem(error("INVALID_ARGUMENT", f"--page {page} 超出范围，共 {len(chunks)} 页", "未返回该页",
+                                    rerun("--page", "1", "--sha256", digest)))
         result.update(page=page, text=chunks[page - 1])
     output = encode(result)
     if len((output + "\n").encode()) > LIMIT:
-        raise ValueError("分页输出超限")
+        raise PageProblem(error("OUTPUT_TOO_LARGE", "单页输出仍超过上限", "未返回该页；需要维护者调小分页", retry=False))
     return output
 
 
@@ -244,13 +256,28 @@ def main():
     parser.add_argument("--page", type=int)
     parser.add_argument("--sha256")
     args = parser.parse_args()
+    def rerun(*extra):
+        return command("show_element.py", "--work-pack", args.work_pack, *args.selectors, *extra)
+
     try:
         pack = json.loads(Path(args.work_pack).read_bytes())
+    except (OSError, ValueError) as exc:
+        print(encode({"错误": error("INPUT_UNREADABLE", f"工作包 {args.work_pack} 无法读取（{type(exc).__name__}）", "未执行查询",
+                                   "路径照 init_workflow 打印的本轮工作包复制")}))
+        return 1
+    try:
         context = json.loads(Path(pack["context_file"]).read_bytes())
-        value, status = ElementIndex(context).query(args.selectors)
-        output = bounded(value, args.page, args.sha256)
     except (OSError, ValueError, KeyError, TypeError) as exc:
-        output, status = encode({"错误": "无法查询元素", "原因": str(exc)[:500]}), 1
+        print(encode({"错误": error("INPUT_UNREADABLE", f"固定上下文 {pack.get('context_file')} 无法读取（{type(exc).__name__}）",
+                                   "未执行查询；文件损坏时重新发起本轮", retry=False)}))
+        return 1
+    try:
+        value, status = ElementIndex(context).query(args.selectors)
+        output = bounded(value, args.page, args.sha256, rerun)
+    except PageProblem as exc:
+        output, status = encode({"错误": str(exc)}), 1
+    except (ValueError, KeyError, TypeError) as exc:
+        output, status = encode({"错误": error("QUERY_FAILED", f"查询失败：{type(exc).__name__}", "未返回元素", retry=False)}), 1
     print(output)
     return status
 
