@@ -34,10 +34,17 @@ def script_path(script):
     return shlex.quote(str(target) if shown.startswith("..") else shown)
 
 
+def current_work_pack():
+    """The --work-pack this script was called with, if any."""
+    return next((sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--work-pack"), None)
+
+
 def command(script, *args):
-    """A ready-to-copy command; placeholders such as <工作包> stay readable."""
-    quoted = [a if a.startswith("<") and a.endswith(">") else shlex.quote(str(a)) for a in args]
-    return " ".join([PY, script_path(script), *quoted])
+    """A ready-to-copy command. <工作包> becomes this run's work pack when known;
+    any placeholder left is quoted, so Bash never reads <x> as a redirect."""
+    known = current_work_pack()
+    filled = [known if a == "<工作包>" and known else str(a) for a in args]
+    return " ".join([PY, script_path(script), *map(shlex.quote, filled)])
 
 
 def error(code, reason, state, next_step=None, retry=True):
@@ -77,10 +84,7 @@ class HintParser(argparse.ArgumentParser):
     """On a wrong argument, print the correct commands instead of only argparse usage."""
 
     def error(self, message):
-        work_pack = next(
-            (sys.argv[i + 1] for i, a in enumerate(sys.argv[:-1]) if a == "--work-pack"),
-            "<工作包>",
-        )
+        work_pack = current_work_pack() or "<工作包>"
         script = Path(sys.argv[0]).name
         print(error("INVALID_ARGUMENT", f"{script} 参数错误：{message}", "脚本未执行",
                     f"按本脚本用法改正参数：{self.format_usage().strip()}"))

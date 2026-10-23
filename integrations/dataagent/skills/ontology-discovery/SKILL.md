@@ -6,7 +6,7 @@ description: 从文档、表结构发现实体类型、属性、关系、数据�
 
 先定范围：概念经用户确认后，再按清单展开属性、关系、实例。
 
-先运行 `"$DATAAGENT_PYTHON_BIN" .claude/skills/ontology-discovery/scripts/init_workflow.py --work-pack <工作包>`（有 prior_plan_file 加 `--prior-plan <prior_plan_file>`），照抄它打印的路径、模板和命令，不必列目录或读源码。
+先用 `"$DATAAGENT_PYTHON_BIN"` 运行本技能目录下的 `scripts/init_workflow.py --work-pack <工作包>`（有 prior_plan_file 加 `--prior-plan <prior_plan_file>`），照抄它打印的路径、模板和命令，不必列目录或读源码。
 
 再只读当前一个步骤文件：
 - 会新增概念，无 prior_plan_file：[计划](references/steps/plan.md)，列概念写待确认后结束，不写提案。

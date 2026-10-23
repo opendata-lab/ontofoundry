@@ -1,6 +1,7 @@
 """Bounded source reads with original line ranges or exact JSON pointers."""
 
 import json
+import shlex
 from pathlib import Path
 
 from runpaths import HintParser, command, error, existing
@@ -69,19 +70,33 @@ def render_tables(text, names):
     return "\n".join(lines)
 
 
-def table_specs(text, table):
-    """The table whole, or column ranges ("t1:1-80") when it alone exceeds one read."""
-    key, total = table["key"], len(table["columns"])
-    if len(render_tables(text, [key]).encode()) <= LIMIT or total <= 1:
+def table_specs(text, table, key=None):
+    """The table whole, or column ranges ("t1:1-80") when it alone exceeds one read.
+
+    With key, table is a column slice of that table and ranges count from 1 in
+    the slice; the caller shifts them back.
+    """
+    whole = key is None
+    key = key or table["key"]
+    total = len(table["columns"])
+    columns = {t["key"]: t for t in json.loads(text)["tables"]}
+    doc = text if whole else json.dumps({"tables": [{**columns[key], "columns": table["columns"]}]}, ensure_ascii=False)
+    if whole and (len(render_tables(text, [key]).encode()) <= LIMIT or total <= 1):
         return [key]
     specs, start = [], 1
     while start <= total:
         end = start
-        while end < total and len(render_tables(text, [f"{key}:{start}-{end + 1}"]).encode()) <= LIMIT:
+        while end < total and len(render_tables(doc, [f"{key}:{start}-{end + 1}"]).encode()) <= LIMIT:
             end += 1
         specs.append(f"{key}:{start}-{end}")
         start = end + 1
     return specs
+
+
+def shift(spec, offset):
+    key, _, span = spec.partition(":")
+    start, _, end = span.partition("-")
+    return f"{key}:{int(start) + offset}-{int(end) + offset}"
 
 
 def table_batches(text):
@@ -112,8 +127,13 @@ def table_commands(path, text, names):
     tables = {t["key"]: t for t in json.loads(text)["tables"]}
     specs = []
     for spec in table_keys(names):
-        key = spec.partition(":")[0]
-        specs += [spec] if ":" in spec else table_specs(text, tables[key])
+        key, _, span = spec.partition(":")
+        if span and len(render_tables(text, [spec]).encode()) > LIMIT:
+            start, _, end = span.partition("-")
+            narrowed = {**tables[key], "columns": tables[key]["columns"][int(start) - 1:int(end)]}
+            specs += [shift(s, int(start) - 1) for s in table_specs(text, narrowed, key)]
+        else:
+            specs += [spec] if span else table_specs(text, tables[key])
     batches, current, size = [], [], 0
     for spec in specs:
         cost = len(render_tables(text, [spec]).encode()) + 1
@@ -185,7 +205,7 @@ def main():
             output = render_lines(text, args.start, end)
     except json.JSONDecodeError as exc:
         print(error("JSON_INVALID", f"{path} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}", "未读取任何内容",
-                    f"不带 --pointer/--tables 按行读原文：{command('read_input.py', path, '--start', str(max(exc.lineno - 2, 1)), '--end', str(exc.lineno + 2))}"))
+                    f"不带 --pointer/--tables 按行读原文：{command('read_input.py', path, '--start', str(max(exc.lineno - 2, 1)), '--end', str(min(exc.lineno + 2, len(text.splitlines()))))}"))
         return 1
     except LookupError as exc:
         print(error("INVALID_ARGUMENT", str(exc), "未读取任何内容", "按上面列出的键或下标改正 --pointer"))
@@ -203,10 +223,18 @@ def main():
         elif args.pointer is not None:
             step = f"改读更小的子路径，例如 {command('read_input.py', path, '--pointer', args.pointer.rstrip('/') + '/0')}（数组）或其中一个键"
         else:
-            last = fitting_end(text, args.start)
-            step = command("read_input.py", path, "--start", str(args.start), "--end", str(last))
-            if last < (args.end or len(text.splitlines())):
-                step += f"，之后从 --start {last + 1} 接着读"
+            first = render_lines(text, args.start, args.start)
+            if len(first.encode()) > LIMIT:
+                line = text.splitlines()[args.start - 1]
+                cut = 2500  # characters; at 3 bytes each a piece stays under the limit
+                pieces = (len(line) + cut - 1) // cut
+                step = (f"第 {args.start} 行单行就有 {len(line.encode())} 字节，按字符分 {pieces} 段读："
+                        f"sed -n '{args.start}p' {shlex.quote(path)} | cut -c 1-{cut}，下一段 cut -c {cut + 1}-{2 * cut}，依此类推")
+            else:
+                last = fitting_end(text, args.start)
+                step = command("read_input.py", path, "--start", str(args.start), "--end", str(last))
+                if last < (args.end or len(text.splitlines())):
+                    step += f"，之后从 --start {last + 1} 接着读"
         print(error("OUTPUT_TOO_LARGE", reason, state, step))
         return 1
     print(output)

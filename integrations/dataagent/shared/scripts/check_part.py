@@ -102,7 +102,9 @@ def duplicate_refs(path, items):
                 continue
             other = owner.setdefault(ref, (part.name, mine))
             if other[0] != part.name and (mine or other[1]):
-                found.append(f"[DUPLICATE_REF] client_ref {ref} 与 {other[0] if mine else part.name} 重复，合并会拒收；把本片段里的这个名字改成别的（如 {ref}_2）")
+                found.append(error(
+                    "DUPLICATE_REF", f"client_ref {ref} 与 {other[0] if mine else part.name} 重复，合并会拒收", "片段未改动",
+                    f"把 {path} 里的这个名字改成别的（如 {ref}_2），再执行 " + command("check_part.py", "--work-pack", "<工作包>", str(path))))
     return found
 
 

@@ -9,4 +9,4 @@ description: 按已有本体约束从文档抽取文档实例、属性值和关�
 - 要用到的类型缺失时，先按 ontology-discovery 计划步骤列概念请用户确认，确认前不写定义或实例提案。
 - 类型齐全时读[实例抽取](references/steps/facts.md)，片段写完后读[收尾](references/steps/finish.md)。
 
-脚本用 `"$DATAAGENT_PYTHON_BIN" .claude/skills/entity-extraction/scripts/<脚本>`，stdout≤8 KiB，同回合多条调用，不拼接输出。
+脚本在本技能目录的 `scripts/` 下，用 `"$DATAAGENT_PYTHON_BIN"` 运行，stdout≤8 KiB，同回合多条调用，不拼接输出。

@@ -239,4 +239,30 @@ def test_commands_name_scripts_without_climbing_out_of_the_workspace(tmp_path, m
     # The skill lives outside this workspace: its own path, never "../".
     printed = runpaths.command("check_part.py", "--work-pack", "uploads/pack.json", "01")
     assert ".." not in printed and str(runpaths.SKILL_DIR.resolve()) in printed
-    assert runpaths.command("read_input.py", "<材料路径>").endswith(" <材料路径>")
+    # A placeholder left in is quoted, so Bash never reads it as a redirect.
+    assert runpaths.command("read_input.py", "<材料路径>").endswith(" '<材料路径>'")
+    monkeypatch.setattr(sys, "argv", ["check_result.py", "--work-pack", "uploads/pack.json"])
+    assert runpaths.command("show_element.py", "--work-pack", "<工作包>", "x").endswith(" --work-pack uploads/pack.json x")
+
+
+def test_reads_that_cannot_shrink_by_lines_or_ranges_still_get_a_way_out(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_json(tmp_path / "tables.json", fictional_tables(1, columns=400))
+    # An explicit range that is still too wide is split further, never repeated.
+    assert invoke(monkeypatch, read_input, "tables.json", "--tables", "t1:1-300") == 1
+    out = capsys.readouterr().out
+    specs = [c.split("--tables ")[1].split("；")[0].split("，")[0].strip() for c in out.split("下一步：", 1)[1].split("；") if "--tables" in c]
+    assert len(specs) > 1 and "t1:1-300" not in specs
+    assert specs[0].startswith("t1:1-") and specs[-1].endswith("-300")
+    for spec in specs:
+        assert invoke(monkeypatch, read_input, "tables.json", "--tables", spec) == 0
+        capsys.readouterr()
+    # One line longer than a read: cut by characters, not the same line again.
+    (tmp_path / "one.md").write_text("澄页" * 4000)
+    assert invoke(monkeypatch, read_input, "one.md") == 1
+    out = capsys.readouterr().out
+    assert "单行就有" in out and "cut -c 1-2500" in out
+    # A broken JSON's suggested lines stay inside the file.
+    (tmp_path / "bad.json").write_text('{"a":\n}')
+    assert invoke(monkeypatch, read_input, "bad.json", "--pointer", "/a") == 1
+    assert "--end 2" in capsys.readouterr().out
