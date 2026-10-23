@@ -108,6 +108,23 @@ test("semantic overview aligns resource explorer and fixed canvas", async ({ pag
   await expect(dialog.getByText("标题属性", { exact: true })).toBeVisible();
   await expect(dialog.getByRole("button", { name: "复制链接", exact: true })).toHaveCount(0);
   await expect(page).toHaveScreenshot("ontology-element-modal.png", { fullPage: true });
+  const graphTransform = await page.locator(".react-flow__viewport").first().getAttribute("style");
+  await dialog.getByRole("tab", { name: /^字段/ }).click();
+  const search = dialog.getByRole("searchbox", { name: "搜索属性", exact: true });
+  const table = dialog.locator(".source-fields-layout .ant-table").last();
+  const before = await table.boundingBox();
+  await search.fill("编号");
+  await dialog.getByRole("tab", { name: /^关系/ }).click();
+  await dialog.getByRole("tab", { name: /^字段/ }).click();
+  await expect(search).toHaveValue("编号");
+  const after = await table.boundingBox();
+  expect(after!.width).toBeCloseTo(before!.width, 0);
+  expect(after!.x).toBeCloseTo(before!.x, 0);
+  await dialog.getByRole("button", { name: "展开弹窗", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "还原弹窗", exact: true })).toBeVisible();
+  await expect(table).toBeVisible();
+  await expect(page.locator(".react-flow__viewport").first()).toHaveAttribute("style", graphTransform!);
+
   await dialog.getByRole("button", { name: "打开详情", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/elements/object_type/${ELEMENTS.object.id}`));
   await expect(dialog).not.toBeVisible();

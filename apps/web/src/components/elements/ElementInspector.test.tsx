@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, modelingApi } from "../../api/client";
-import type { Draft, ElementSaveResult, Workspace } from "../../api/types";
+import { api, ApiError, instancesApi, modelingApi } from "../../api/client";
+import type { Draft, ElementSaveResult, InstanceList, Workspace } from "../../api/types";
+import { PageTabContext } from "../../hooks/usePageTab";
 import { WorkspaceContextProvider } from "../../hooks/useWorkspaceContext";
 import { example } from "../../test/drafts";
 import { renderWithProviders } from "../../test/renderWithProviders";
@@ -24,6 +25,7 @@ vi.mock("../../api/client", async (importOriginal) => {
     },
     catalogApi: { ...original.catalogApi, mappingPreview: vi.fn() },
     metricsApi: { preview: vi.fn() },
+    instancesApi: { ...original.instancesApi, list: vi.fn() },
   };
 });
 
@@ -31,9 +33,17 @@ const workspace = { id: "w", name: "测试空间", role: "admin", version_id: "v
 const refresh = vi.fn();
 
 /** Holds the popup request the way a page does; queries use the former `inspect` keys. */
-function Popup({ initial }: { initial: ElementRequest }) {
+function Popup({ initial, nextId }: { initial: ElementRequest; nextId?: string }) {
   const [request, setRequest] = useState<ElementRequest | null>(initial);
-  return request ? <ElementModal request={request} onChange={setRequest} onClose={() => setRequest(null)} /> : null;
+  const [active, setActive] = useState(true);
+  return <>
+    <button onClick={() => setRequest(initial)}>重新打开</button>
+    <button onClick={() => setRequest({ ...initial, id: nextId ?? initial.id })}>切换元素</button>
+    <button onClick={() => setActive(!active)}>切换页面激活</button>
+    <PageTabContext.Provider value={{ active, update: refresh }}>
+      {request && <ElementModal request={request} onChange={setRequest} onClose={() => setRequest(null)} />}
+    </PageTabContext.Provider>
+  </>;
 }
 
 function show(draft: Draft, query: string, role: Workspace["role"] = "admin") {
@@ -46,7 +56,7 @@ function show(draft: Draft, query: string, role: Workspace["role"] = "admin") {
         path: "/workspaces/:workspaceId/*",
         element: (
           <WorkspaceContextProvider.Provider value={{ workspace: { ...workspace, role }, refresh, user: { id: "u" } as never }}>
-            <Popup initial={request} />
+            <Popup initial={request} nextId={draft.object_types.find((o) => o.id !== request.id)?.id} />
           </WorkspaceContextProvider.Provider>
         ),
       },
@@ -66,6 +76,7 @@ const saved = (draft: Draft): ElementSaveResult => ({
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.workspace).mockResolvedValue(workspace);
+  vi.mocked(instancesApi.list).mockResolvedValue({ items: [], snapshot_dates: [], next_cursor: null, truncated: false } as unknown as InstanceList);
   vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
     current_version_id: "v1",
     session_revision: null,
@@ -622,5 +633,102 @@ describe("element save impact preview", () => {
     const savedProp = savePayload.draft.properties.find((p) => p.id === customerNo.id);
     expect(savedProp?.name).toBe("customer_code");
     expect(savedProp?.value_kind).toBe("integer");
+  });
+});
+
+
+describe("retained popup editing and request lifecycle", () => {
+  it.each(["save", "cancel", "conflict"])("keeps a single cross-tab draft through %s", async (action) => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    const property = draft.properties.find((p) => p.owner_type_id === customer.id)!;
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => {
+      if (action === "conflict") throw new ApiError("当前版本已变化", 409, "VERSION_CHANGED");
+      return saved(payload.draft);
+    });
+    show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "星舟客户" } });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+    const field = dialog.querySelector(`[data-element-id="${property.id}"]`)!;
+    fireEvent.change(within(field as HTMLElement).getByRole("textbox", { name: "属性名称" }), { target: { value: "星舟编号" } });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^概览/ }));
+    expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("星舟客户");
+    if (action === "cancel") {
+      fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
+      await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledTimes(2));
+      await within(dialog).findByRole("button", { name: "编辑" });
+      fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+      await within(dialog).findByText(property.display_name || property.name);
+      expect(within(dialog).queryByText("星舟编号")).not.toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole("tab", { name: /^概览/ }));
+      expect(within(dialog).getByLabelText(customer.display_name || customer.name)).toBeInTheDocument();
+      expect(modelingApi.saveElement).not.toHaveBeenCalled();
+      return;
+    }
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+      expect(payload.draft.object_types.find((o) => o.id === customer.id)?.display_name).toBe("星舟客户");
+      expect(payload.draft.properties.find((p) => p.id === property.id)?.display_name).toBe("星舟编号");
+    }
+    if (action === "conflict") {
+      await within(dialog).findByText(/你的修改仍保留/);
+      expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("星舟客户");
+      fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+      expect(within(dialog).getAllByRole("textbox", { name: "属性名称", hidden: false })[0]).toHaveValue("星舟编号");
+    } else {
+      await within(dialog).findByRole("button", { name: "编辑" });
+      fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+      expect(await within(dialog).findByText("星舟编号")).toBeVisible();
+    }
+  });
+
+  it("retains searches across tabs and resets them on close/reopen or element change", async () => {
+    const draft = example("01-basic-sales");
+    const type = draft.object_types[0];
+    show(draft, `inspect=object_type:${type.id}&inspectTab=properties`);
+    let dialog = await screen.findByRole("dialog");
+    const search = await within(dialog).findByRole("searchbox", { name: "搜索属性" });
+    fireEvent.change(search, { target: { value: "星舟过滤" } });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^规则/ }));
+    fireEvent.change(within(dialog).getByRole("searchbox", { name: "搜索规则" }), { target: { value: "月港过滤" } });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+    expect(within(dialog).getByRole("searchbox", { name: "搜索属性" })).toBe(search);
+    expect(search).toHaveValue("星舟过滤");
+    fireEvent.click(within(dialog).getByRole("button", { name: "关闭对象弹窗" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "重新打开" }));
+    dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByRole("searchbox", { name: "搜索属性" })).toHaveValue("");
+    fireEvent.change(within(dialog).getByRole("searchbox", { name: "搜索属性" }), { target: { value: "再次过滤" } });
+    fireEvent.click(screen.getByRole("button", { name: "切换元素" }));
+    dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(dialog).getByRole("searchbox", { name: "搜索属性" })).toHaveValue(""));
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^规则/ }));
+    expect(within(dialog).getByRole("searchbox", { name: "搜索规则" })).toHaveValue("");
+  });
+
+  it("passes tab visibility and page activation to retained instance reads", async () => {
+    const draft = example("01-basic-sales");
+    draft.material_objects = [];
+    const type = draft.object_types[0];
+    let resolve!: (value: InstanceList) => void;
+    vi.mocked(instancesApi.list).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    show(draft, `inspect=object_type:${type.id}&inspectTab=properties`);
+    const dialog = await screen.findByRole("dialog");
+    await waitFor(() => expect(instancesApi.list).toHaveBeenCalledTimes(1));
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^关系/ }));
+    await act(async () => resolve({ items: [{ id: "old", ref: "old", type_id: type.id, source: "database", display_text: "迟到实例", values: {}, key: [], evidence: [] }], snapshot_dates: [], next_cursor: null, truncated: false } as unknown as InstanceList));
+    expect(within(dialog).queryByText("迟到实例")).not.toBeInTheDocument();
+    await act(async () => { await new Promise((done) => setTimeout(done, 300)); });
+    expect(instancesApi.list).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "切换页面激活" }));
+    await act(async () => { await new Promise((done) => setTimeout(done, 300)); });
+    expect(instancesApi.list).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "切换页面激活" }));
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+    await waitFor(() => expect(instancesApi.list).toHaveBeenCalledTimes(2));
+    expect(within(dialog).queryByText("迟到实例")).not.toBeInTheDocument();
   });
 });

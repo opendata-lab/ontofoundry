@@ -2,7 +2,7 @@ import { Alert, Button, Checkbox, DatePicker, Descriptions, Empty, Input, Popove
 import { DetailWorkbench, PanelToolbar, SectionTitle } from "../layout";
 import dayjs from "dayjs";
 import { ArrowRight, Settings2 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { catalogApi, instancesApi } from "../../api/client";
 import type { Draft, InstanceList, InstanceNeighborhood, LinkType, MaterialObject, ObjectType, Scalar, TypedKey } from "../../api/types";
 import { bindingMode, byId, effectiveProperties, effectiveSources, isA, linkDisplayName, mappingFor, titleProperty } from "../../lib/coreModel";
@@ -98,9 +98,10 @@ function linkLabel(link: LinkType | undefined, outgoing: boolean) {
   return linkDisplayName(link, outgoing);
 }
 
-function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, initialObjectId }: PanelProps<ObjectType> & {
+function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, initialObjectId, active = true }: PanelProps<ObjectType> & {
   canBrowseDatabase: boolean;
   initialObjectId?: string;
+  active?: boolean;
 }) {
   const mode = bindingMode(draft, type.id);
   const databaseReady = canBrowseDatabase && (sessionId
@@ -122,7 +123,6 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
   const [neighborhood, setNeighborhood] = useState<InstanceNeighborhood | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailError, setDetailError] = useState("");
-  const selectionRequest = useRef(0);
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null);
   const allProperties = effectiveProperties(draft, type.id).map((p) => p.definition).filter((p) => !p.identifier);
   const [visiblePropertyIds, setVisiblePropertyIds] = useState<string[]>(() => allProperties.filter((p) => p.id !== titleProperty(draft, type.id)?.id).slice(0, 4).map((p) => p.id));
@@ -142,7 +142,6 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
   const snapshotted = draft.object_types.some((o) => isA(draft, o.id, type.id) &&
     effectiveSources(draft, o.id).some((s) => s.dataset?.snapshot_date_column)) || snapshotDates.some((s) => s.date);
   const clearSelection = () => {
-    selectionRequest.current += 1;
     setSelected(null);
     setNeighborhood(null);
     setDetailError("");
@@ -155,8 +154,9 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
     setDatabaseError(null);
     clearSelection();
   };
-  useEffect(() => {
-    if (!needDatabase) return;
+  // Invalidate at commit so hidden panels cannot accept a settled request.
+  useLayoutEffect(() => {
+    if (!active || !needDatabase) return;
     let live = true;
     setDatabasePage(null);
     setDatabaseError(null);
@@ -190,8 +190,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
       }
     }, 250);
     return () => { live = false; window.clearTimeout(timer); };
-  }, [needDatabase, requestKey, mapping, draft.workspace_id, type.id, sessionId, query, pageStart, snapshotDate, cursor, refresh]);
-  useEffect(() => () => { selectionRequest.current += 1; }, []);
+  }, [active, needDatabase, requestKey, mapping, draft.workspace_id, type.id, sessionId, query, pageStart, snapshotDate, cursor, refresh]);
   const rows = source === "document" ? documentRows.slice(pageStart, pageStart + PAGE_SIZE) : result?.rows ?? [];
   const hasNext = source === "document" ? documentRows.length > pageStart + PAGE_SIZE : Boolean(result?.hasMore);
   const movePage = (next: number) => {
@@ -205,29 +204,37 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
     clearSelection();
     setPage(next);
   };
-  const select = async (row: Row) => {
-    const request = ++selectionRequest.current;
+  const select = (row: Row) => {
+    if (!active) return;
     setSelected(row);
+  };
+  useLayoutEffect(() => {
     setNeighborhood(null);
     setDetailError("");
-    setDetailBusy(row.source === "database");
-    if (row.fact) return;
-    try {
-      const data = sessionId
-        ? row.key ? await instancesApi.draftNeighborhood(draft.workspace_id, {
-            type_id: row.type_id, key: row.key, session_id: sessionId, depth: 1,
-            ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
-          }) : null
-        : await instancesApi.neighborhood(draft.workspace_id, row.ref ?? row.id, {
-            depth: 1, ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
-          });
-      if (selectionRequest.current === request) setNeighborhood(data);
-    } catch (e) {
-      if (selectionRequest.current === request) setDetailError(e instanceof Error ? e.message : "读取关联实例失败");
-    } finally {
-      if (selectionRequest.current === request) setDetailBusy(false);
-    }
-  };
+    setDetailBusy(false);
+    if (!active || !selected || selected.fact) return;
+    let live = true;
+    setDetailBusy(true);
+    const load = async () => {
+      try {
+        const data = sessionId
+          ? selected.key ? await instancesApi.draftNeighborhood(draft.workspace_id, {
+              type_id: selected.type_id, key: selected.key, session_id: sessionId, depth: 1,
+              ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
+            }) : null
+          : await instancesApi.neighborhood(draft.workspace_id, selected.ref ?? selected.id, {
+              depth: 1, ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
+            });
+        if (live) setNeighborhood(data);
+      } catch (e) {
+        if (live) setDetailError(e instanceof Error ? e.message : "读取关联实例失败");
+      } finally {
+        if (live) setDetailBusy(false);
+      }
+    };
+    void load();
+    return () => { live = false; };
+  }, [active, selected, draft.workspace_id, sessionId, snapshotDate]);
   const related: Related[] | null = selected?.fact
     ? draft.material_links.filter((l) => l.source_id === selected.id || l.target_id === selected.id).map((l) => {
         const outgoing = l.source_id === selected.id;
@@ -349,12 +356,12 @@ function LinkInstances({ draft, type, open }: PanelProps<LinkType>) {
 }
 
 export function ElementInstances(
-  props: PanelProps & { canBrowseDatabase: boolean; initialObjectId?: string },
+  props: PanelProps & { canBrowseDatabase: boolean; initialObjectId?: string; active?: boolean; readScope?: string },
 ) {
   const { type } = props;
   return "derived_by" in type ? (
-    <ObjectInstances {...(props as PanelProps<ObjectType> & typeof props)} />
+    <ObjectInstances key={JSON.stringify([props.draft.workspace_id, type.id, props.readScope])} {...(props as PanelProps<ObjectType> & typeof props)} />
   ) : (
-    <LinkInstances {...(props as PanelProps<LinkType>)} />
+    <LinkInstances key={JSON.stringify([props.draft.workspace_id, type.id, props.readScope])} {...(props as PanelProps<LinkType>)} />
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
 import type { Draft, WorkspaceOverview } from "../api/types";
@@ -19,11 +19,7 @@ export function OntologyViewPage() {
   const [model, setModel] = useState<Draft | null>(null);
   const [resourceError, setResourceError] = useState("");
   const [draftSession, setDraftSession] = useState<string | null>(null);
-  const detail = useElementDetail();
-  // Stable callbacks keep the memoized graph from re-rendering when the popup changes.
-  const detailRef = useRef(detail);
-  detailRef.current = detail;
-  const openPage = useCallback((request: ElementRequest) => detailRef.current.open(request), []);
+  const { open: openPage } = useElementDetail();
   // Kept in memory only: a reload returns to the plain graph.
   const [inspected, setInspected] = useState<ElementRequest | null>(null);
   const load = () => setAttempt((value) => value + 1);

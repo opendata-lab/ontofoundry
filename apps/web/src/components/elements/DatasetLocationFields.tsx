@@ -1,12 +1,12 @@
 import { Alert, Form, Select } from "antd";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { catalogApi } from "../../api/client";
 import type { AssetTable, DataConnection, Dataset } from "../../api/types";
 import { FormRow } from "../layout";
 
 /** Only collected tables can become a table source. Discovery belongs to sync. */
-export function DatasetLocationFields({ workspaceId, dataset, nameField, onChange }: {
-  workspaceId: string; dataset: Dataset; nameField: ReactNode; onChange: (patch: Partial<Dataset>) => void;
+export function DatasetLocationFields({ workspaceId, dataset, nameField, onChange, active = true }: {
+  active?: boolean; workspaceId: string; dataset: Dataset; nameField: ReactNode; onChange: (patch: Partial<Dataset>) => void;
 }) {
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [schemas, setSchemas] = useState<string[]>([]);
@@ -17,18 +17,21 @@ export function DatasetLocationFields({ workspaceId, dataset, nameField, onChang
   const choice = useRef(0);
   const [checking, setChecking] = useState(false);
   const needsSchema = connections.find((c) => c.id === dataset.connection_id)?.kind !== "postgresql";
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!active) return;
     let live = true;
     catalogApi.connections(workspaceId).then((r) => { if (live) setConnections(r.items); }).catch((e: Error) => { if (live) setError(e.message); });
     return () => { live = false; };
-  }, [workspaceId]);
-  useEffect(() => {
+  }, [workspaceId, active]);
+  useLayoutEffect(() => {
+    if (!active) return;
     let live = true;
     if (!dataset.connection_id) { setSchemas([]); return; }
     catalogApi.schemas(workspaceId, dataset.connection_id).then((r) => { if (live) setSchemas(r.items); }).catch((e: Error) => { if (live) setError(e.message); });
     return () => { live = false; };
-  }, [workspaceId, dataset.connection_id]);
-  useEffect(() => {
+  }, [workspaceId, dataset.connection_id, active]);
+  useLayoutEffect(() => {
+    if (!active) return;
     let live = true;
     setTables([]);
     setLoading(false); setError("");
@@ -36,9 +39,14 @@ export function DatasetLocationFields({ workspaceId, dataset, nameField, onChang
     setLoading(true); setError("");
     catalogApi.assets(workspaceId, dataset.connection_id, { schema_name: dataset.schema_name || undefined }).then((r) => { if (live) setTables(r.items.filter((t) => !t.missing)); }).catch((e: Error) => { if (live) setError(e.message); }).finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
-  }, [workspaceId, dataset.connection_id, dataset.schema_name, dataset.source_kind, needsSchema]);
+  }, [workspaceId, dataset.connection_id, dataset.schema_name, dataset.source_kind, needsSchema, active]);
+  useLayoutEffect(() => {
+    setChecking(false);
+    return () => { choice.current += 1; };
+  }, [active, workspaceId, dataset]);
   // Keep the schema and table when the new connection has synced them too.
   const changeConnection = async (id: string) => {
+    if (!active) return;
     const base = { connection_id: id, dialect: connections.find((c) => c.id === id)?.kind ?? null };
     const reset = { schema_name: null, table_name: dataset.source_kind === "query" ? null : "", columns: null, snapshot_date_column: null };
     const ticket = ++choice.current;

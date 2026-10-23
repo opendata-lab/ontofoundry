@@ -2,7 +2,7 @@ import { Alert, Button, DatePicker, Spin, Table, Tabs, Typography } from "antd";
 import { PanelToolbar, SectionTitle } from "../layout";
 import type { Dayjs } from "dayjs";
 import { Play, RefreshCw } from "lucide-react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { metricsApi } from "../../api/client";
 import type { Draft, Metric, MetricPreview as Preview, MetricPreviewRequest, SQLReference } from "../../api/types";
 import { metricErrors, previewRequest } from "../../lib/metricEditing";
@@ -52,12 +52,17 @@ const display = (value: unknown) =>
  * that produced it: a later edit marks it out of date, and a slow answer to
  * an older request never replaces a newer one.
  */
-export function MetricPreview({ draft, metric, context }: { draft: Draft; metric: Metric; context: PreviewContext }) {
+export function MetricPreview({ draft, metric, context, active = true }: { draft: Draft; metric: Metric; context: PreviewContext; active?: boolean }) {
   const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [result, setResult] = useState<{ key: string; preview: Preview } | null>(null);
   const [error, setError] = useState<{ key: string; message: string } | null>(null);
   const [running, setRunning] = useState(false);
   const sequence = useRef(0);
+  const contextKey = JSON.stringify(context);
+  useLayoutEffect(() => {
+    setRunning(false);
+    return () => { sequence.current += 1; };
+  }, [active, draft.workspace_id, metric.id, contextKey]);
   const timeRange = range
     ? { start: range[0].format("YYYY-MM-DD"), end: range[1].add(1, "day").format("YYYY-MM-DD") }
     : undefined;
@@ -65,6 +70,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
   const key = JSON.stringify(request);
   const invalid = Object.values(metricErrors(draft, metric))[0];
   const run = async () => {
+    if (!active) return;
     const id = ++sequence.current;
     setRunning(true);
     setError(null);
@@ -84,7 +90,7 @@ export function MetricPreview({ draft, metric, context }: { draft: Draft; metric
       <div className="flex flex-wrap items-center gap-3">
         <Button
           icon={running ? <Spin size="small" /> : preview ? <RefreshCw size={15} /> : <Play size={15} />}
-          disabled={!!invalid || undefined}
+          disabled={!active || !!invalid || undefined}
           onClick={() => void run()}
         >
           {running ? "预览中…" : preview ? "重新预览" : "预览数值"}

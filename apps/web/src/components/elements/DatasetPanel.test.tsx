@@ -1,15 +1,15 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { datasetApi } from "../../api/client";
-import type { Draft } from "../../api/types";
+import { catalogApi, datasetApi } from "../../api/client";
+import type { DatasetCheckResult, DatasetPreview, Draft } from "../../api/types";
 import { example } from "../../test/drafts";
 import { renderWithProviders } from "../../test/renderWithProviders";
 import { DatasetPanel } from "./DatasetPanel";
 
 vi.mock("../../api/client", async (original) => {
   const actual = await original<typeof import("../../api/client")>();
-  return { ...actual, datasetApi: { ...actual.datasetApi, validate: vi.fn(), preview: vi.fn() } };
+  return { ...actual, catalogApi: { ...actual.catalogApi, connections: vi.fn().mockResolvedValue({ items: [] }) }, datasetApi: { ...actual.datasetApi, validate: vi.fn(), preview: vi.fn() } };
 });
 afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
@@ -45,4 +45,28 @@ it("keeps preview controls unavailable without data-preview permission", () => {
   expect(screen.getByRole("heading", { name: "字段结构" })).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "预览前 20 行" })).not.toBeInTheDocument();
   expect(datasetApi.preview).not.toHaveBeenCalled();
+});
+
+
+it.each(["validate", "preview"] as const)("discards a hidden dataset %s response and does not start new reads", async (operation) => {
+  const draft = fixture();
+  const change = vi.fn();
+  let resolve!: (value: DatasetCheckResult & DatasetPreview) => void;
+  vi.mocked(datasetApi[operation]).mockReturnValueOnce(new Promise<DatasetCheckResult & DatasetPreview>((done) => { resolve = done; }));
+  const panel = (active: boolean) => <DatasetPanel draft={draft} dataset={draft.datasets[0]} editing={false} change={change} open={vi.fn()} tab="fields" canPreview active={active} />;
+  const view = renderWithProviders(panel(true));
+  fireEvent.click(screen.getByRole("button", { name: operation === "validate" ? "校验并探测列" : "预览前 20 行" }));
+  view.rerender(panel(false));
+  await act(async () => resolve({ valid: true, diagnostics: [], referenced_tables: [], columns: [{ name: "fictional_late", physical_type: "integer", comment: "迟到列" }], items: [{ fictional_late: 999 }], limit: 20 }));
+  expect(change).not.toHaveBeenCalled();
+  expect(screen.queryByText("999")).not.toBeInTheDocument();
+  expect(screen.queryByText("来源校验通过")).not.toBeInTheDocument();
+  const calls = vi.mocked(catalogApi.connections).mock.calls.length;
+  window.dispatchEvent(new Event("ontofoundry:metadata-synced"));
+  await act(async () => {});
+  expect(catalogApi.connections).toHaveBeenCalledTimes(calls);
+  fireEvent.click(screen.getByRole("button", { name: operation === "validate" ? "校验并探测列" : "预览前 20 行" }));
+  expect(datasetApi[operation]).toHaveBeenCalledTimes(1);
+  view.rerender(panel(true));
+  expect(screen.getByRole("button", { name: operation === "validate" ? "校验并探测列" : "预览前 20 行" })).toBeEnabled();
 });

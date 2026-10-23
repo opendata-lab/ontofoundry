@@ -1,7 +1,7 @@
 import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Radio, Table, Typography } from "antd";
 import { useConnectionNames } from "../../hooks/useConnectionNames";
 import { Eye, ScanLine } from "lucide-react";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { datasetApi } from "../../api/client";
 import type { Dataset, DatasetCheckResult, DatasetPreview, Draft } from "../../api/types";
 import { upsert, metricsOnDataset } from "../../lib/coreModel";
@@ -13,9 +13,9 @@ import { DatasetSnapshotFields } from "../DatasetSnapshotFields";
 
 const { Text, Paragraph } = Typography;
 
-export function DatasetPanel({ draft, dataset, editing, change, open, tab = "basic", canPreview = false, revision }: {
+export function DatasetPanel({ draft, dataset, editing, change, open, tab = "basic", canPreview = false, revision, active = true }: {
   draft: Draft; dataset: Dataset; editing: boolean; change: (next: Draft) => void; open: (request: ElementRequest) => void;
-  tab?: ElementTab; canPreview?: boolean; revision?: number | null;
+  tab?: ElementTab; canPreview?: boolean; revision?: number | null; active?: boolean;
 }) {
   const [checked, setChecked] = useState<{ signature: string; result: DatasetCheckResult } | null>(null);
   const [preview, setPreview] = useState<{ signature: string; result: DatasetPreview } | null>(null);
@@ -23,11 +23,13 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
   const [error, setError] = useState("");
   const generation = useRef(0);
   const signature = JSON.stringify(dataset);
-  const currentSignature = useRef(signature);
-  currentSignature.current = signature;
+  useLayoutEffect(() => {
+    setBusy(null);
+    return () => { generation.current += 1; };
+  }, [active, draft.workspace_id, signature, revision, tab]);
   const result = checked?.signature === signature ? checked.result : null;
   const rows = preview?.signature === signature ? preview.result : null;
-  const connectionNames = useConnectionNames(draft.workspace_id);
+  const connectionNames = useConnectionNames(draft.workspace_id, active);
   const update = (patch: Partial<Dataset>) => {
     generation.current += 1;
     setBusy(null);
@@ -35,17 +37,17 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
     change(upsert(draft, "datasets", { ...dataset, ...patch }));
   };
   const check = async (showPreview = false) => {
-    if (showPreview && !canPreview) return;
+    if (!active || tab !== "fields" || (showPreview && !canPreview)) return;
     const attempt = ++generation.current;
     setBusy(showPreview ? "preview" : "validate");
     setError("");
     try {
       if (showPreview) {
         const value = await datasetApi.preview(draft.workspace_id, dataset);
-        if (attempt === generation.current && currentSignature.current === signature) setPreview({ signature, result: value });
+        if (attempt === generation.current) setPreview({ signature, result: value });
       } else {
         const value = await datasetApi.validate(draft.workspace_id, dataset, revision);
-        if (attempt !== generation.current || currentSignature.current !== signature) return;
+        if (attempt !== generation.current) return;
         const next = { ...dataset, columns: value.columns ?? dataset.columns };
         if (value.valid) change(upsert(draft, "datasets", next));
         setChecked({ signature: JSON.stringify(value.valid ? next : dataset), result: value });
@@ -69,11 +71,11 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
     {error && <Alert type="error" showIcon message={error} />}
     <ContentBlock className="source-fields-source" data-dataset-section="source">
       <SectionTitle title="来源定义">
-        <Button size="small" icon={<ScanLine size={14} />} loading={busy === "validate"} disabled={!!busy || !dataset.connection_id} onClick={() => void check()}>校验并探测列</Button>
+        <Button size="small" icon={<ScanLine size={14} />} loading={busy === "validate"} disabled={!active || !!busy || !dataset.connection_id} onClick={() => void check()}>校验并探测列</Button>
       </SectionTitle>
       {editing ? <Form layout="vertical" component="div" size="small">
         <Form.Item label="来源方式"><Radio.Group value={dataset.source_kind ?? "table"} options={[{ label: "基于表", value: "table" }, { label: "基于表达式", value: "query" }]} onChange={(event) => Modal.confirm({ title: "切换来源方式", content: "切换后需重新选择表或填写 SQL，并重新探测列。", okText: "切换", cancelText: "取消", onOk: () => update({ source_kind: event.target.value, schema_name: null, table_name: event.target.value === "table" ? "" : null, query_sql: event.target.value === "query" ? "" : null, columns: null, snapshot_date_column: null }) })} /></Form.Item>
-        <DatasetLocationFields workspaceId={draft.workspace_id} dataset={dataset} nameField={null} onChange={update} />
+        <DatasetLocationFields active={active} workspaceId={draft.workspace_id} dataset={dataset} nameField={null} onChange={update} />
         {source && <Form.Item label="只读 SELECT" className="mb-0" extra="支持非递归 CTE、JOIN、UNION；只能使用同一连接的已登记表。"><Input.TextArea aria-label="数据集 SQL" value={dataset.query_sql ?? ""} autoSize={{ minRows: 4, maxRows: 20 }} onChange={(event) => update({ query_sql: event.target.value, columns: null })} /></Form.Item>}
       </Form> : <>
         <Descriptions size="small" column={1} items={[
@@ -99,7 +101,7 @@ export function DatasetPanel({ draft, dataset, editing, change, open, tab = "bas
     </ContentBlock>}>
     {canPreview && <ContentBlock data-dataset-section="preview">
       <SectionTitle title="数据预览">
-        <Button size="small" icon={<Eye size={14} />} loading={busy === "preview"} disabled={!!busy || !dataset.connection_id} onClick={() => void check(true)}>预览前 20 行</Button>
+        <Button size="small" icon={<Eye size={14} />} loading={busy === "preview"} disabled={!active || !!busy || !dataset.connection_id} onClick={() => void check(true)}>预览前 20 行</Button>
       </SectionTitle>
       <Text type="secondary" className="text-xs">按当前权限执行只读查询，不统计全表行数。</Text>
       {rows ? <Table size="small" rowKey={(_, index) => String(index)} pagination={false} dataSource={rows.items} columns={rows.columns.map((column) => ({ title: column.name, dataIndex: column.name, render: (value: unknown) => value == null ? "—" : String(value) }))} scroll={{ x: true }} /> : <Empty description="点击预览查看样例数据" />}

@@ -85,6 +85,7 @@ function MetricSummary({ draft, metric, open }: { draft: Draft; metric: Metric; 
 export function MetricPanel({
   draft,
   metric,
+  active = true,
   editing,
   canPreview,
   showErrors,
@@ -95,6 +96,7 @@ export function MetricPanel({
   draft: Draft;
   metric: Metric;
   editing: boolean;
+  active?: boolean;
   canPreview: boolean;
   showErrors: boolean;
   context: PreviewContext;
@@ -119,7 +121,7 @@ export function MetricPanel({
       {canPreview && (
         <ContentBlock>
           <SectionTitle title="数值预览" />
-          <MetricPreview draft={draft} metric={metric} context={context} />
+          <MetricPreview active={active} draft={draft} metric={metric} context={context} />
         </ContentBlock>
       )}
     </div>

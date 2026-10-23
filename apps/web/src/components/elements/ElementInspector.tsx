@@ -645,11 +645,15 @@ export function ElementView({
       : NOUN[kind];
   // Without a display name the title already is the identifier; show it once.
   const technical = element && "display_name" in element && element.display_name ? element.name : "";
+  const readScope = JSON.stringify([workspace.id, kind, element?.id, loaded?.versionId, sessionId, loaded?.session?.revision, previewHash]);
   const contentFor = (tab: ElementTab) => {
+    const panelActive = active && tab === selectedTab;
     if (!draft || !element) return null;
     if (kind === "metric")
       return (
         <MetricPanel
+          key={readScope}
+          active={panelActive}
           draft={draft}
           metric={element as Metric}
           editing={editing}
@@ -665,7 +669,7 @@ export function ElementView({
         />
       );
     if (kind === "dataset")
-      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={tab} canPreview={member} revision={loaded?.session?.revision} />;
+      return <DatasetPanel key={readScope} active={panelActive} draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={tab} canPreview={member} revision={loaded?.session?.revision} />;
     if (!panel) return null;
     if (object) {
       const props = panel as PanelProps<ObjectType>;
@@ -673,7 +677,7 @@ export function ElementView({
         <PropertiesPanel key={`${object.id}:${requestedKind === "property" ? id : "all"}`} {...props} initialPropertyId={requestedKind === "property" ? id : undefined} />
         {member && !creating && <ContentBlock aria-label="实体实例" data-element-instances="">
           <SectionTitle title="实例" />
-          <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
+          <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} active={panelActive} readScope={readScope} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
         </ContentBlock>}
       </div>;
       if (tab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
@@ -684,6 +688,7 @@ export function ElementView({
     if (tab === "mapping") return <LinkDetailsPanel {...(panel as PanelProps<LinkType>)} showBinding={member} />;
     return <LinkOverviewPanel
       {...(panel as PanelProps<LinkType>)}
+      active={panelActive}
       showInstances={member && !creating}
       initialInstances={requestedTab === "instances"}
       canBrowseDatabase={!previewHash && !editing}
@@ -693,7 +698,7 @@ export function ElementView({
   // re-measures them (rc-table forces a full-page layout on mount), which over
   // a large ontology view cost about a second per switch.
   const [visited, setVisited] = useState<ElementTab[]>([]);
-  const elementKey = `${kind}:${element?.id ?? ""}:${editing}`;
+  const elementKey = `${readScope}:${editing}`;
   useEffect(() => setVisited([]), [elementKey]);
   useEffect(() => {
     if (tabs.length && !visited.includes(selectedTab)) setVisited((current) => [...current, selectedTab]);
@@ -701,7 +706,7 @@ export function ElementView({
   const content = !tabs.length || kind === "dataset"
     ? contentFor(selectedTab)
     : (visited.includes(selectedTab) ? visited : [...visited, selectedTab]).map((tab) => (
-        <div key={tab} hidden={tab !== selectedTab} className="min-w-0">{contentFor(tab)}</div>
+        <div key={`${readScope}:${tab}`} hidden={tab !== selectedTab} className="min-w-0">{contentFor(tab)}</div>
       ));
   useLayoutEffect(() => {
     reportElement?.(modal ? { dirty, busy } : { title: displayName(element) || title, dirty, busy });

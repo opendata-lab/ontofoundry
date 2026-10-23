@@ -14,6 +14,7 @@ type DirectJoin = Extract<DataJoin, { kind: "direct" }>;
 
 /** Keeps the business connection and its concrete instances in one overview. */
 export function LinkOverviewPanel(props: PanelProps<LinkType> & {
+  active?: boolean;
   showInstances: boolean;
   initialInstances: boolean;
   canBrowseDatabase: boolean;

@@ -81,3 +81,22 @@ describe("metric value preview", () => {
     expect(await screen.findByText("无法预览：当前数据库不支持这种计算")).toBeInTheDocument();
   });
 });
+
+
+it.each(["hidden", "version", "element"])("ignores preview completion after %s changes", async (change) => {
+  let resolve!: (value: Preview) => void;
+  vi.mocked(metricsApi.preview).mockReturnValueOnce(new Promise((done) => { resolve = done; })).mockResolvedValue(result(222));
+  const view = renderWithProviders(<MetricPreview draft={draft} metric={metric} context={{ expected_current_version_id: "v1" }} active />);
+  fireEvent.click(screen.getByRole("button", { name: /预览数值/ }));
+  const next = <MetricPreview draft={draft} metric={change === "element" ? { ...metric, id: "fictional-metric", name: "fictional_metric" } : metric} context={{ expected_current_version_id: change === "version" ? "v2" : "v1" }} active={change !== "hidden"} />;
+  view.rerender(next);
+  await act(async () => resolve(result(111)));
+  expect(screen.queryByText("111")).not.toBeInTheDocument();
+  if (change === "hidden") {
+    fireEvent.click(screen.getByRole("button", { name: /预览数值/ }));
+    expect(metricsApi.preview).toHaveBeenCalledTimes(1);
+    view.rerender(<MetricPreview draft={draft} metric={metric} context={{ expected_current_version_id: "v1" }} active />);
+  }
+  fireEvent.click(screen.getByRole("button", { name: /预览数值/ }));
+  expect(await screen.findByText("222")).toBeInTheDocument();
+});

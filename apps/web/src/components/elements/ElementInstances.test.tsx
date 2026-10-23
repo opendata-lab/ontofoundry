@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, catalogApi, instancesApi } from "../../api/client";
@@ -255,5 +255,122 @@ describe("instances tab", () => {
     fireEvent.click(link);
     await waitFor(() => expect(instancesApi.neighborhood).toHaveBeenCalledWith("w", "db.dev1", { depth: 1 }));
     expect(await screen.findByText("全部属性")).toBeInTheDocument();
+  });
+});
+
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function databaseRows(typeId: string, label: string): InstanceList {
+  return envelope({ items: [{ id: label, ref: label, type_id: typeId, source: "database", key: [{ type: "string", value: label }], display_text: label, values: {}, evidence: [] }], next_cursor: null });
+}
+
+const tick = () => act(() => vi.advanceTimersByTimeAsync(300));
+
+describe("retained instance panel lifecycle", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it.each([null, "s1"])("does not start hidden or debounced requests (session %s)", async (sessionId) => {
+    const draft = example("01-basic-sales");
+    const type = draft.object_types[0];
+    const view = renderWithProviders(<ElementInstances {...props} draft={draft} type={type} sessionId={sessionId} active={false} />);
+    await tick();
+    expect(instancesApi.list).not.toHaveBeenCalled();
+    expect(catalogApi.mappingPreview).not.toHaveBeenCalled();
+    view.rerender(<ElementInstances {...props} draft={draft} type={type} sessionId={sessionId} active />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索实例" }), { target: { value: "星舟" } });
+    view.rerender(<ElementInstances {...props} draft={draft} type={type} sessionId={sessionId} active={false} />);
+    await tick();
+    expect(instancesApi.list).not.toHaveBeenCalled();
+    expect(catalogApi.mappingPreview).not.toHaveBeenCalled();
+  });
+
+  it.each(["resolve", "reject"] as const)("discards a hidden list %s and resumes the same search", async (outcome) => {
+    const draft = example("01-basic-sales");
+    const type = draft.object_types[0];
+    const old = deferred<InstanceList>();
+    vi.mocked(instancesApi.list).mockReturnValueOnce(old.promise).mockResolvedValue(databaseRows(type.id, "新结果"));
+    const view = renderWithProviders(<ElementInstances {...props} draft={draft} type={type} active />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索实例" }), { target: { value: "星舟" } });
+    await tick();
+    expect(instancesApi.list).toHaveBeenCalledTimes(1);
+    view.rerender(<ElementInstances {...props} draft={draft} type={type} active={false} />);
+    await act(async () => {
+      if (outcome === "resolve") old.resolve(databaseRows(type.id, "旧结果"));
+      else old.reject(new Error("旧错误"));
+    });
+    expect(screen.queryByText("旧结果")).not.toBeInTheDocument();
+    expect(screen.queryByText(/旧错误/)).not.toBeInTheDocument();
+    await tick();
+    expect(instancesApi.list).toHaveBeenCalledTimes(1);
+    view.rerender(<ElementInstances {...props} draft={draft} type={type} active />);
+    expect(screen.getByRole("searchbox", { name: "搜索实例" })).toHaveValue("星舟");
+    await tick();
+    expect(screen.getByRole("button", { name: "新结果" })).toBeInTheDocument();
+    expect(instancesApi.list).toHaveBeenLastCalledWith(draft.workspace_id, expect.objectContaining({ q: "星舟" }));
+  });
+
+  it.each(["element", "version"])("resets selection and search on %s changes and rejects an older list", async (change) => {
+    const draft = example("01-basic-sales");
+    const firstType = draft.object_types[0];
+    const nextType = change === "element" ? draft.object_types[1] : firstType;
+    const old = deferred<InstanceList>();
+    vi.mocked(instancesApi.list).mockReturnValueOnce(old.promise).mockResolvedValue(databaseRows(nextType.id, "当前结果"));
+    const view = renderWithProviders(<ElementInstances {...props} draft={draft} type={firstType} readScope="v1" />);
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索实例" }), { target: { value: "旧筛选" } });
+    await tick();
+    view.rerender(<ElementInstances {...props} draft={draft} type={nextType} readScope={change === "version" ? "v2" : "v1"} />);
+    expect(screen.getByRole("searchbox", { name: "搜索实例" })).toHaveValue("");
+    await tick();
+    await act(async () => old.resolve(databaseRows(firstType.id, "迟到结果")));
+    expect(screen.getByRole("button", { name: "当前结果" })).toBeInTheDocument();
+    expect(screen.queryByText("迟到结果")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "选中实例详情" })).not.toBeInTheDocument();
+  });
+
+  it.each(["hide", "version", "element"])("discards an older neighborhood after %s and resumes without a stuck spinner", async (change) => {
+    const draft = example("01-basic-sales");
+    const type = draft.object_types[0];
+    const old = deferred<Awaited<ReturnType<typeof instancesApi.neighborhood>>>();
+    vi.mocked(instancesApi.list).mockResolvedValue(databaseRows(type.id, "星舟一号"));
+    vi.mocked(instancesApi.neighborhood).mockReturnValueOnce(old.promise).mockResolvedValue(envelope({ center_id: "星舟一号", objects: [], links: [] }));
+    const view = renderWithProviders(<ElementInstances {...props} draft={draft} type={type} readScope="v1" active />);
+    await tick();
+    fireEvent.click(screen.getByRole("button", { name: "星舟一号" }));
+    expect(instancesApi.neighborhood).toHaveBeenCalledTimes(1);
+    view.rerender(<ElementInstances {...props} draft={draft} type={change === "element" ? draft.object_types[1] : type} readScope={change === "version" ? "v2" : "v1"} active={change !== "hide"} />);
+    await act(async () => old.reject(new Error("旧关联错误")));
+    expect(screen.queryByText("旧关联错误")).not.toBeInTheDocument();
+    if (change === "hide") {
+      view.rerender(<ElementInstances {...props} draft={draft} type={type} readScope="v1" active />);
+      await tick();
+      expect(instancesApi.neighborhood).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("没有关联实例")).toBeInTheDocument();
+      expect(screen.queryByText("正在读取关联实例…")).not.toBeInTheDocument();
+    } else {
+      expect(screen.queryByText("星舟一号的实例详情")).not.toBeInTheDocument();
+    }
+  });
+
+  it("rejects a hidden mapping preview even after a newer preview completes", async () => {
+    const draft = example("01-basic-sales");
+    const type = draft.object_types[0];
+    const old = deferred<MappingPreview>();
+    const preview = (label: string): MappingPreview => ({ items: [{ __ref: label, __type_id: type.id, __key: [{ type: "string", value: label }], display_text: label, values: {} }], has_more: false, snapshot_dates: [], source: "database" });
+    vi.mocked(catalogApi.mappingPreview).mockReturnValueOnce(old.promise).mockResolvedValue(preview("当前预览"));
+    const view = renderWithProviders(<ElementInstances {...props} sessionId="s1" draft={draft} type={type} active />);
+    await tick();
+    view.rerender(<ElementInstances {...props} sessionId="s1" draft={draft} type={type} active={false} />);
+    view.rerender(<ElementInstances {...props} sessionId="s1" draft={draft} type={type} active />);
+    await tick();
+    await act(async () => old.resolve(preview("迟到预览")));
+    expect(screen.getByRole("button", { name: "当前预览" })).toBeInTheDocument();
+    expect(screen.queryByText("迟到预览")).not.toBeInTheDocument();
   });
 });
