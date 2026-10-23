@@ -321,3 +321,33 @@ def test_virtual_parent_exact_key_requires_concrete_type(monkeypatch, neighborho
     assert error.value.status_code == 422
     assert error.value.code == "INVALID_OBJECT_REF"
     assert "具体类型" in error.value.message
+
+
+def test_a_child_sharing_a_snapshot_parent_reads_only_the_snapshot_day(tmp_path, monkeypatch):
+    # A child with member conditions and no mapping of its own, over a daily
+    # snapshot table: it must read the chosen day, not every day's copy.
+    from uuid import uuid4
+
+    from ontofoundry_api.domain.core import DerivedSimple, ObjectType, PathCondition
+
+    draft, engine = source_database(tmp_path, monkeypatch, "12-snapshot-and-trends")
+    try:
+        mapping = draft.mappings[0]
+        parent = next(o for o in draft.object_types if o.id == mapping.type_id)
+        identifier = next(p for p in draft.properties if p.owner_type_id == parent.id and p.identifier)
+        whole = query_instances(None, str(draft.workspace_id), draft, parent.id, None)
+        key = whole["items"][0]["values"][identifier.name]
+        child = ObjectType(
+            id=uuid4(), name="picked", synonyms=[], tags=[], extends=parent.id, evidence=[],
+            derived_by=[DerivedSimple(kind="simple", conditions=[PathCondition(
+                path={"links": [], "property_id": identifier.id}, operator="eq", values=[key])])],
+        )
+        draft.object_types.append(child)
+        latest = query_instances(None, str(draft.workspace_id), draft, child.id, None)
+        assert latest["snapshot_dates"] and latest["items"]
+        assert {d["date"] for d in latest["snapshot_dates"]} == {d["date"] for d in whole["snapshot_dates"]}
+        assert len(latest["items"]) == 1
+        older = query_instances(None, str(draft.workspace_id), draft, child.id, None, snapshot_date="2026-12-29")
+        assert {d["date"] for d in older["snapshot_dates"]} == {"2026-12-29"}
+    finally:
+        engine.dispose()
