@@ -1,7 +1,8 @@
 """Quick check of one or more modeling/parts fragments before merging.
 
 Shape follows the item schema, client_ref is unique within the fragment and
-references inside the fragment are closed. References to other fragments are
+across the other fragments already written, and references inside the fragment
+are closed. References to other fragments are
 listed as "待合并检查" rather than reported as errors; the merged check in
 prepare_result.py decides them. Pinned before/hash checks use definitions and the independent instance baseline.
 Repair budgets are never touched.
@@ -17,7 +18,7 @@ from check_result import (
     mapping_local_errors,
     schema_errors,
 )
-from prepare_result import PrepareInputError, assemble
+from prepare_result import PrepareInputError, assemble, effective_ref
 from runpaths import PARTS, HintParser, fragment_paths
 
 SUMMARY_LIMIT = 4000
@@ -78,6 +79,33 @@ def check_fragment(items, context, schema):
 
 
 
+def duplicate_refs(path, items):
+    """Refs this fragment shares with other parts, numbered as the default merge of modeling/parts/ would.
+
+    Only a fragment inside modeling/parts/ is compared; a replacement kept
+    elsewhere is merged by explicit choice, which this cannot know.
+    """
+    parts = sorted(PARTS.glob("*.json"))
+    if path.resolve() not in {p.resolve() for p in parts}:
+        return []
+    owner, index, found = {}, 0, []
+    for part in parts:
+        mine = part.resolve() == path.resolve()
+        try:
+            fragment = items if mine else json.loads(part.read_bytes())
+        except (OSError, ValueError):
+            fragment = []
+        for item in fragment if isinstance(fragment, list) else []:
+            ref = effective_ref(item, index)
+            index += 1
+            if not isinstance(ref, str):
+                continue
+            other = owner.setdefault(ref, (part.name, mine))
+            if other[0] != part.name and (mine or other[1]):
+                found.append(f"client_ref {ref} 与 {other[0] if mine else part.name} 重复；合并会拒收，改成不同的名字")
+    return found
+
+
 def main():
     parser = HintParser(
         description="片段快速检查；跨片段引用留待合并检查，不计修正次数。片段可写 01、01-types 或路径"
@@ -111,6 +139,7 @@ def main():
             lines.append(f"{raw}：无法读取为 JSON（{type(exc).__name__}）；modeling/parts/ 现有：{existing}；先写片段再检查，片段写在 modeling/parts/")
             continue
         report = check_fragment(items, context, schema)
+        report["errors"] += duplicate_refs(path, items)
         reports = Path(args.reports)
         reports.mkdir(parents=True, exist_ok=True)
         atomic_write(reports / f"{path.stem}.json", encode(report))

@@ -19,6 +19,15 @@ class PrepareInputError(ValueError):
     """A precise fragment diagnostic, before any output is replaced."""
 
 
+def effective_ref(item, index):
+    """The client_ref merging gives an item: its own, or a generated one for a create."""
+    if not isinstance(item, dict):
+        return None
+    if item.get("operation") in {"update", "delete"}:
+        return item.get("client_ref")
+    return item.get("client_ref", f"{item.get('target_kind')}-{index + 1}")
+
+
 def assemble(context, fragments):
     items, refs = [], set()
     existing = pinned_targets(context)
@@ -69,7 +78,7 @@ def assemble(context, fragments):
                     item.setdefault("after", None)
             else:
                 item.setdefault("before", None)
-                item.setdefault("client_ref", f"{item['target_kind']}-{index + 1}")
+                item["client_ref"] = effective_ref(item, index)
             ref = item.get("client_ref")
             if isinstance(ref, str):
                 if ref in refs:

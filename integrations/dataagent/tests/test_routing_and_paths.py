@@ -118,3 +118,89 @@ def test_missing_material_lists_what_exists(tmp_path, monkeypatch, capsys):
     assert invoke(monkeypatch, read_input, "uploads/missing.md") == 1
     out = capsys.readouterr().out
     assert "文件不存在：uploads/missing.md" in out and "real.md" in out
+
+
+def fictional_tables(count, columns=40):
+    def table(n):
+        return {"key": f"t{n}", "table": f"ledger.shelf_{n}", "kind": "table", "connection": "澄页只读库",
+                "dialect": "mysql", "comment": "书架", "connection_id": "c1", "schema_name": "ledger",
+                "table_name": f"shelf_{n}", "primary_key": ["shelf_no"], "foreign_keys": [],
+                "columns": [{"name": f"col_{i}", "type": "varchar(64)", "nullable": True, "comment": "书架说明字段"}
+                            for i in range(columns)]}
+    return {"tables": [table(n) for n in range(1, count + 1)]}
+
+
+def test_init_prints_table_reads_that_each_fit_one_read(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    tables = write_json(tmp_path / "uploads/tables.json", fictional_tables(9))
+    write_json(tmp_path / "uploads/pack.json", {"tables_file": "uploads/tables.json", "result_file": "output/r.json"})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
+    commands = [line.split("--tables ")[1] for line in capsys.readouterr().out.splitlines() if "--tables " in line]
+    assert len(commands) > 1
+    assert [k for c in commands for k in c.split(",")] == [f"t{n}" for n in range(1, 10)]
+    for keys in commands:
+        assert len(read_input.render_tables(tables.read_text(), [keys]).encode()) <= read_input.LIMIT
+
+
+def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_json(tmp_path / "tables.json", fictional_tables(3, columns=2))
+    assert invoke(monkeypatch, read_input, "tables.json", "--tables", "t1", "t2,t3") == 0
+    out = capsys.readouterr().out
+    assert all(f"## t{n} " in out for n in (1, 2, 3))
+
+
+def test_check_part_reports_refs_another_fragment_already_defines(tmp_path, monkeypatch, capsys):
+    check_part = importlib.import_module("check_part")
+    monkeypatch.chdir(tmp_path)
+    ctx, items = mapping_example()
+    write_json(tmp_path / "context.json", ctx)
+    pack = write_json(tmp_path / "pack.json", {"context_file": "context.json", "schema_file": str(SCHEMA_PATH)})
+    parts = tmp_path / "modeling/parts"
+    parts.mkdir(parents=True)
+    write_json(parts / "01-types.json", items[:4])
+    clash = {**items[4], "client_ref": items[0]["client_ref"]}
+    write_json(parts / "03-datasets.json", [clash])
+    assert invoke(monkeypatch, check_part, "--work-pack", pack, "03") == 1
+    assert f"client_ref {items[0]['client_ref']} 与 01-types.json 重复" in capsys.readouterr().out
+
+
+def test_a_table_too_wide_for_one_read_is_split_by_column_ranges(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    tables = write_json(tmp_path / "tables.json", fictional_tables(1, columns=200))
+    text = tables.read_text()
+    specs = [spec for batch in read_input.table_batches(text) for spec in batch]
+    assert len(specs) > 1 and all(spec.startswith("t1:") for spec in specs)
+    covered = [n for spec in specs for n in range(int(spec[3:].split("-")[0]), int(spec.split("-")[1]) + 1)]
+    assert covered == list(range(1, 201))
+    for spec in specs:
+        assert invoke(monkeypatch, read_input, "tables.json", "--tables", spec) == 0
+        assert len(capsys.readouterr().out.encode()) <= read_input.LIMIT + 1
+
+
+def test_check_part_counts_generated_refs_and_ignores_replacements_elsewhere(tmp_path, monkeypatch, capsys):
+    check_part = importlib.import_module("check_part")
+    monkeypatch.chdir(tmp_path)
+    ctx, items = mapping_example()
+    write_json(tmp_path / "context.json", ctx)
+    pack = write_json(tmp_path / "pack.json", {"context_file": "context.json", "schema_file": str(SCHEMA_PATH)})
+    parts = tmp_path / "modeling/parts"
+    parts.mkdir(parents=True)
+    first = {k: v for k, v in items[0].items() if k != "client_ref"}
+    write_json(parts / "01-types.json", [first])
+    write_json(parts / "02-other.json", [{**items[4], "client_ref": f"{first['target_kind']}-1"}])
+    assert invoke(monkeypatch, check_part, "--work-pack", pack, "02") == 1
+    assert f"client_ref {first['target_kind']}-1 与 01-types.json 重复" in capsys.readouterr().out
+    # A corrected copy outside modeling/parts/ is merged by explicit choice, not compared.
+    (tmp_path / "modeling/tmp").mkdir()
+    write_json(tmp_path / "modeling/tmp/02-fixed.json", [{**items[4], "client_ref": f"{first['target_kind']}-1"}])
+    invoke(monkeypatch, check_part, "--work-pack", pack, "modeling/tmp/02-fixed.json")
+    assert "重复" not in capsys.readouterr().out
+
+
+def test_show_example_points_field_names_at_their_kind(capsys, monkeypatch):
+    show_example = importlib.import_module("show_example")
+    assert invoke(monkeypatch, show_example, "data_join") == 1
+    out = capsys.readouterr().out
+    assert "属于 link_type" in out and "--variant mapping_table" in out

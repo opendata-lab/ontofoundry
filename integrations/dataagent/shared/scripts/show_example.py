@@ -26,11 +26,22 @@ VARIANTS = {
 }
 
 
+# Field names agents look up as if they were kinds.
+FIELDS = {
+    "data_join": "属于 link_type，外键查 link_type --variant direct，关联表查 link_type --variant mapping_table",
+    "sources": "属于 mapping，查 mapping",
+    "fields": "属于 mapping，列绑定查 mapping，表达式绑定查 mapping --variant expression",
+    "filters": "属于 metric，查 metric",
+    "evidence": "每个元素都有，查对应类型的正例",
+}
+
+
 def example(target_kind, operation="create", variant=None):
     catalog = json.loads((EXAMPLES / "catalog.json").read_bytes())
     choices = catalog["lookup"]
     if target_kind not in choices:
-        raise ValueError("未知类型；可选值：" + "、".join(sorted(choices)))
+        hint = FIELDS.get(target_kind)
+        raise ValueError((f"{target_kind} 不是提案类型，是字段；{hint}。" if hint else "未知类型；") + "可选值：" + "、".join(sorted(choices)))
     if operation not in choices[target_kind]:
         raise ValueError("未知操作；可选值：create、update、delete")
     if variant:

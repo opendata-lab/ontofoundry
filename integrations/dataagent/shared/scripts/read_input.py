@@ -5,6 +5,8 @@ from pathlib import Path
 
 from runpaths import HintParser, existing
 
+LIMIT = 8000
+
 
 def render_lines(text, start=1, end=None):
     lines = text.splitlines()
@@ -24,15 +26,29 @@ def render_lines(text, start=1, end=None):
     )
 
 
+def table_keys(names):
+    """Keys as given: "t1,t3", "t1 t3" or a mix, in order."""
+    names = [names] if isinstance(names, str) else names
+    return [k for n in names for k in n.replace(",", " ").split()]
+
+
 def render_tables(text, names):
     """Compact column listing for several linked tables in one bounded read."""
     tables = {t["key"]: t for t in json.loads(text)["tables"]}
     chosen = []
-    for key in (n.strip() for n in names.split(",") if n.strip()):
+    for spec in table_keys(names):
+        # "t1:41-80" reads columns 41–80 of a table too wide for one read.
+        key, _, span = spec.partition(":")
         if key not in tables:
             options = "、".join(f"{k}={t['connection']}:{t['table']}" for k, t in tables.items())
             raise ValueError(f"没有编号为 {key} 的关联表；请用工作包 tables 里的 key：{options}")
-        chosen.append(tables[key])
+        table = tables[key]
+        if span:
+            start, _, end = span.partition("-")
+            if not (start.isdigit() and end.isdigit() and 1 <= int(start) <= int(end) <= len(table["columns"])):
+                raise ValueError(f"没有编号为 {spec} 的列范围；{key} 共 {len(table['columns'])} 列，写成 {key}:1-{len(table['columns'])}")
+            table = {**table, "columns": table["columns"][int(start) - 1:int(end)]}
+        chosen.append(table)
     lines = []
     for table in chosen:
         lines.append(
@@ -52,13 +68,42 @@ def render_tables(text, names):
     return "\n".join(lines)
 
 
+def table_specs(text, table):
+    """The table whole, or column ranges ("t1:1-80") when it alone exceeds one read."""
+    key, total = table["key"], len(table["columns"])
+    if len(render_tables(text, [key]).encode()) <= LIMIT or total <= 1:
+        return [key]
+    specs, start = [], 1
+    while start <= total:
+        end = start
+        while end < total and len(render_tables(text, [f"{key}:{start}-{end + 1}"]).encode()) <= LIMIT:
+            end += 1
+        specs.append(f"{key}:{start}-{end}")
+        start = end + 1
+    return specs
+
+
+def table_batches(text):
+    """Table keys grouped so each group's listing fits one read."""
+    batches, current, size = [], [], 0
+    for table in json.loads(text)["tables"]:
+        for spec in table_specs(text, table):
+            cost = len(render_tables(text, [spec]).encode()) + 1
+            if current and size + cost > LIMIT:
+                batches.append(current)
+                current, size = [], 0
+            current.append(spec)
+            size += cost
+    return batches + ([current] if current else [])
+
+
 def main():
     parser = HintParser(description="按原行号读材料、按 JSON Pointer 读片段，或用 --tables 读关联表的列")
     parser.add_argument("path")
     parser.add_argument("--pointer")
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--end", type=int)
-    parser.add_argument("--tables", help="逗号分隔的关联表 key（如 t1,t3），从工作包 tables_file 一次读取多张表的列")
+    parser.add_argument("--tables", nargs="+", help="关联表 key，逗号或空格分隔（如 t1,t3）；过宽的表按列范围读（如 t1:1-80）")
     args = parser.parse_args()
     if not Path(args.path).is_file():
         folder = Path(args.path).parent
@@ -76,9 +121,9 @@ def main():
             output = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         else:
             output = render_lines(text, args.start, args.end)
-        if len(output.encode()) > 8000:
+        if len(output.encode()) > LIMIT:
             print(
-                "范围超过 8 KiB；缩小 --start/--end、--pointer 或分批 --tables，原文件完整保留，未回显内容"
+                "范围超过 8 KiB；缩小 --start/--end、--pointer 或分批 --tables（照 init_workflow 打印的分批命令），原文件完整保留，未回显内容"
             )
             return 1
         print(output)

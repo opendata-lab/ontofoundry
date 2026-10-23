@@ -7,7 +7,8 @@ platform as one JSON bundle) is restored into modeling/ first.
 import json
 from pathlib import Path
 
-from runpaths import HintParser, relative, usage
+from read_input import table_batches
+from runpaths import HintParser, command, relative, usage
 
 ROOT = Path("modeling")
 PLAN_TEMPLATE = """场景：全量｜增量｜优化｜小改动（选一个，删去其余）
@@ -79,13 +80,26 @@ def main():
     return 0
 
 
+def table_commands(tables_file):
+    """Ready batches for the linked tables' columns: read each once, nothing re-read."""
+    try:
+        batches = table_batches(Path(tables_file).read_text()) if tables_file else []
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+    if not batches:
+        return []
+    lines = [f"  读表结构（共 {len(batches)} 批，每批读一次，写 03 时不重读）："]
+    lines += ["    " + command("read_input.py", tables_file, "--tables", ",".join(b)) for b in batches]
+    return lines
+
+
 def run_paths(work_pack, pack, prior_plan):
     """This run's files and commands; copy them rather than composing paths."""
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
     for material in pack.get("materials") or []:
         if material.get("path"):
             lines.append(f"- 材料：{material['path']}")
-    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认（只在不交结果的轮次写）", "needs_input_file")):
+    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认", "needs_input_file")):
         if pack.get(key):
             lines.append(f"- {label}：{pack[key]}")
     if prior_plan or pack.get("prior_plan_file"):
@@ -99,6 +113,7 @@ def run_paths(work_pack, pack, prior_plan):
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；不用 /tmp、绝对路径或 ../，DataAgent 会拦截")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
+    lines += table_commands(pack.get("tables_file"))
     return "\n".join(lines)
 
 
