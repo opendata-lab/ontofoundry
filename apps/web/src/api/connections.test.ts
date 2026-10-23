@@ -1,7 +1,22 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { ApiError, workspaceRequest } from "./client";
+import { ApiError, catalogApi, workspaceRequest } from "./client";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it.each([true, false])("preserves encoded table query parameters when URLSearchParams.size is supported: %s", async (supportsSize) => {
+  if (!supportsSize) vi.spyOn(URLSearchParams.prototype, "size", "get").mockReturnValue(undefined as unknown as number);
+  const fetcher = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ items: [] })));
+  vi.stubGlobal("fetch", fetcher);
+
+  await catalogApi.tables("fiction", "fiction-source", { schema_name: "fiction alpha&备份", table: "fiction_orders" });
+  const url = new URL(fetcher.mock.calls[0][0], "http://fiction.invalid");
+  expect(url.pathname).toBe("/api/v1/workspaces/fiction/connections/fiction-source/tables");
+  expect(url.searchParams.get("schema_name")).toBe("fiction alpha&备份");
+  expect(url.searchParams.get("table")).toBe("fiction_orders");
+
+  await catalogApi.tables("fiction", "fiction-source", { schema_name: "", table: undefined });
+  expect(fetcher.mock.calls[1][0]).toBe("/api/v1/workspaces/fiction/connections/fiction-source/tables");
+});
 
 it("sends DELETE through workspaceRequest and accepts an empty 204 response", async () => {
   const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));

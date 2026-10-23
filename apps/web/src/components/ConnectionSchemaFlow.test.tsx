@@ -9,6 +9,7 @@ import { example } from "../test/drafts";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { DatasetPanel } from "./elements/DatasetPanel";
 import { TableMaterialPicker } from "./TableMaterialPicker";
+import { TableSyncDialog } from "./TableSyncDialog";
 
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace: { id: "fiction", role: "admin" } }) }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
@@ -51,7 +52,7 @@ beforeEach(() => {
     throw new Error(`Unexpected request: ${method} ${path}`);
   }));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 // Full flows render several antd dialogs; vitest's 5 s per-test default is tight on CI.
 vi.setConfig({ testTimeout: 20_000 });
@@ -62,6 +63,27 @@ async function choose(label: string, option: string) {
   fireEvent.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }, { timeout: 5000 }));
 }
 const renderPage = (node: React.ReactNode) => renderWithProviders(<MemoryRouter>{node}</MemoryRouter>);
+
+it.each(["mysql", "doris"] as const)("keeps the selected %s database through table discovery and sync without URLSearchParams.size", async (kind) => {
+  connections[0].kind = kind;
+  vi.spyOn(URLSearchParams.prototype, "size", "get").mockReturnValue(undefined as unknown as number);
+  renderPage(<TableSyncDialog workspaceId="fiction" onClose={vi.fn()} />);
+  await waitFor(() => expect(screen.getByRole("button", { name: "下一步" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+  fireEvent.click(await screen.findByRole("checkbox", { name: "fiction_beta" }));
+  fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+  await screen.findByRole("checkbox", { name: "fiction_beta.fiction_orders" });
+  expect(calls.filter((c) => c.path.endsWith("/tables"))).toEqual([
+    expect.objectContaining({ method: "GET", schema: "fiction_beta" }),
+  ]);
+  fireEvent.click(screen.getByRole("button", { name: "全选全部" }));
+  fireEvent.click(screen.getByRole("button", { name: "开始同步" }));
+  await screen.findByText("同步完成", { exact: true });
+  expect(calls.filter((c) => c.path.endsWith("/assets/sync-jobs"))).toEqual([
+    expect.objectContaining({ method: "POST", schema: "fiction_beta", body: { scope: "all" } }),
+  ]);
+  expect(screen.queryByText("请选择库")).not.toBeInTheDocument();
+});
 
 it.each(["mysql", "doris"] as const)("creates a %s server connection, browses all databases, syncs and previews with explicit URL schemas", async (kind) => {
   connections = [];

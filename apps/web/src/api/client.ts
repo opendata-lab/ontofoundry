@@ -168,7 +168,8 @@ function query(params: Record<string, string | number | boolean | undefined | nu
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
   }
-  return search.size ? "?" + search.toString() : "";
+  const encoded = search.toString();
+  return encoded ? "?" + encoded : "";
 }
 
 const ontologyPath = (workspaceId: string) => "/api/v1/ontology/workspaces/" + workspaceId;
