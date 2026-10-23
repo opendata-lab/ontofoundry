@@ -221,6 +221,21 @@ def test_shared_parent_needs_membership_for_readiness():
     assert binding_readiness(draft, vip.id).status == "unbound"
 
 
+def test_a_child_without_its_own_mapping_shares_its_mapped_parent():
+    # As an import leaves it: the parent is bound, the child has no mapping record.
+    draft = example_draft("06-inheritance")
+    vip = obj(draft, "vip_party")
+    draft.mappings = [m for m in draft.mappings if m.type_id != vip.id]
+    validate_core_graph(draft)
+    # Member conditions are all membership needs; the shared mapping is
+    # derivable. (Only vip's own extra properties still lack a binding.)
+    assert binding_readiness(draft, vip.id).reasons == ("属性绑定待补全",)
+    vip.derived_by = []
+    ready = binding_readiness(draft, vip.id)
+    assert ready.status == "unbound"
+    assert any("还没有成员条件：在概览中编辑“成员条件”" in reason for reason in ready.reasons)
+
+
 def test_unknown_metadata_can_save_but_known_missing_column_cannot():
     draft = example_draft("01-basic-sales")
     source = draft.mappings[0].sources[0]

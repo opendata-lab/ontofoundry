@@ -20,7 +20,7 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.elements import ColumnElement
 from sqlglot import Dialect
 
-from ontofoundry_api.domain.bindings import resolve_binding
+from ontofoundry_api.domain.bindings import MEMBERS_MISSING, resolve_binding
 from ontofoundry_api.domain.core import (
     ColumnBinding,
     DerivedSimple,
@@ -250,21 +250,23 @@ class InstancePlan:
                 )
                 resolved = resolve_field_expression(draft, mapping, binding.expression)
                 self.fields[prop.name] = self.compile_expression(resolved)
+        mapped = {m.type_id for m in self.binding.mappings}
         for ancestor in reversed(self.index.lineage(self.type_id)):
             obj = self.index.objects[ancestor]
             mapping = next(
                 (m for m in self.binding.mappings if m.type_id == ancestor), None
             )
-            if mapping is None:
-                if ancestor == self.type_id:
-                    fail("子对象成员绑定待补全")
+            # Below the mapped root every level reads the parent's rows; without
+            # its own mapping it shares them implicitly (the record is derivable).
+            shares = any(a in mapped for a in self.index.ancestors(ancestor))
+            if mapping is None and not shares:
                 continue
             if (
-                mapping.binding_mode == "shared_parent"
+                (mapping is None or mapping.binding_mode == "shared_parent")
                 and not obj.derived_by
-                and not mapping.membership_source_id
+                and not (mapping and mapping.membership_source_id)
             ):
-                fail("子对象成员条件待补全")
+                fail(f"{obj.display_name or obj.name}{MEMBERS_MISSING}")
             branches = []
             for branch in obj.derived_by:
                 if isinstance(branch, DerivedSimple):

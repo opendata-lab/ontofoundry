@@ -72,6 +72,9 @@ def resolve_binding(draft: CoreDraft, type_id: UUID) -> ResolvedBinding:
     return ResolvedBinding(type_id, tuple(chain), sources, fields, links, virtual_types)
 
 
+MEMBERS_MISSING = "还没有成员条件：在概览中编辑“成员条件”，写明父表里哪些行属于本对象"
+
+
 def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
     """Static readiness only. Connection/authorization checks belong to services."""
     from ontofoundry_api.domain.validation import physical_value_kind
@@ -83,20 +86,20 @@ def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
     reasons: list[str] = []
     if binding.main is None or any(not s.key_columns for s in binding.sources.values()):
         return BindingReadiness("missing_key", ("来源逻辑键待补全",))
-    # A descendant without its own mapping has no membership declaration.
-    local = next((m for m in binding.mappings if m.type_id == type_id), None)
+    # A descendant reads its mapped ancestor's table; its own mapping record is
+    # optional (derivable), but which of those rows belong to it is not.
+    mapped = {m.type_id for m in binding.mappings}
     for obj_id in index.lineage(type_id):
         obj = index.objects[obj_id]
         mapping = next((m for m in binding.mappings if m.type_id == obj_id), None)
+        shares = any(a in mapped for a in index.ancestors(obj_id))
         if (
-            mapping is not None
-            and mapping.binding_mode == BindingMode.SHARED_PARENT
+            shares
+            and (mapping is None or mapping.binding_mode == BindingMode.SHARED_PARENT)
             and not obj.derived_by
-            and mapping.membership_source_id is None
+            and (mapping is None or mapping.membership_source_id is None)
         ):
-            reasons.append("共用父绑定的子对象成员条件待补全")
-    if local is None:
-        reasons.append("子对象成员绑定待补全")
+            reasons.append(f"{obj.display_name or obj.name}{MEMBERS_MISSING}")
     if reasons:
         return BindingReadiness("unbound", tuple(reasons))
     if any(p.name not in binding.fields for p in index.effective_properties(type_id)):
