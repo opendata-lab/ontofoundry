@@ -36,7 +36,7 @@ export function useSnapshot(workspace: Workspace) {
         .get(workspace.id, sid)
         .then((s) => accept(s.draft))
         .catch(fail);
-    else if (workspace.role) modelingApi.snapshot(workspace.id).then(accept).catch(fail);
+    else if (workspace.role) modelingApi.snapshot(workspace.id, workspace.version_id).then(accept).catch(fail);
     else if (!workspace.version_id) accept(emptyDraft(workspace.id));
     else
       api

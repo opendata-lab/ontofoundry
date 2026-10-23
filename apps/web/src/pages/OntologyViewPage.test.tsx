@@ -66,9 +66,9 @@ describe("ontology view", () => {
     expect(screen.queryByRole("button", { name: /导入|导出/ })).not.toBeInTheDocument();
   });
 
-  it("reads the published snapshot for members and the presentation for readers", async () => {
+  it("reads the overview fixed version for members and readers", async () => {
     show();
-    await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledWith("w"));
+    await waitFor(() => expect(api.presentation).toHaveBeenCalledWith("w", "v2"));
     expect(await screen.findByText("订单金额")).toBeInTheDocument();
     cleanup();
     context.workspace = { ...context.workspace, role: null };

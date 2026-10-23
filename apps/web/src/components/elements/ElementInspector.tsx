@@ -21,7 +21,7 @@ import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { useErrorMessage } from "../../hooks/useErrorMessage";
 import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
-import { notifyOntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
+import { ONTOLOGY_SAVED, notifyOntologySaved, type OntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
 import { useElementDetail } from "../../hooks/useElementDetail";
 import { relationsFor, rulesFor, type PanelProps } from "../../lib/elementModel";
 import { preservePropertyBindings, type PropertyBindingEdits } from "../../lib/propertyBindingEditing";
@@ -320,6 +320,14 @@ export function ElementView({
   const [notice, setNotice] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [versionChanged, setVersionChanged] = useState(false);
+  useEffect(() => {
+    const published = (event: Event) => {
+      if (!sessionId && !busy && (event as CustomEvent<OntologySaved>).detail.workspaceId === workspace.id) setVersionChanged(true);
+    };
+    window.addEventListener(ONTOLOGY_SAVED, published);
+    return () => window.removeEventListener(ONTOLOGY_SAVED, published);
+  }, [workspace.id, sessionId, busy]);
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(""), 2200);
@@ -328,6 +336,7 @@ export function ElementView({
   useEffect(() => {
     let live = true;
     setError(null);
+    setVersionChanged(false);
     const load = async () => {
       if (!KINDS.has(requestedKind)) throw new Error("不支持的元素类型");
       if (sessionId && !workspace.role) throw new Error("没有权限查看此内容");
@@ -343,14 +352,14 @@ export function ElementView({
         } else source = { draft: session.draft, session, versionId: current.version_id };
       } else {
         const model = workspace.role
-          ? await modelingApi.snapshot(workspace.id)
+          ? await modelingApi.snapshot(workspace.id, current.version_id)
           : current.version_id
             ? (await api.presentation(workspace.id, current.version_id)).model
             : null;
         if (!model) throw new Error("还没有发布内容");
         source = { draft: model, session: null, versionId: current.version_id };
       }
-      let value = source.draft;
+      let value = startEditing || creating ? structuredClone(source.draft) : source.draft;
       if (creating) {
         if (!workspace.role) throw new Error("没有权限新建");
         if (!NEW_KINDS.includes(requestedKind as InspectKind)) throw new Error("请从所属对象或关系中新增");
@@ -606,6 +615,9 @@ export function ElementView({
   };
   const beginEdit = () => {
     if (!loaded || !draft || !member || previewHash || busy) return;
+    const copy = structuredClone(draft);
+    draftRef.current = copy;
+    setDraft(copy);
     setEditing(true);
     setNotice("");
   };
@@ -721,6 +733,7 @@ export function ElementView({
   const actions = (
     <>
       {!modal && status}
+      {versionChanged && <Button size={control} disabled={editing || busy} onClick={() => setAttempt(n => n + 1)}>版本已更新，刷新</Button>}
       {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
       {!editing && member && !previewHash && element && (
         <Button size={control} onClick={beginEdit} disabled={!loaded || busy}>

@@ -19,6 +19,7 @@ import type {
   Decision,
   DecisionResult,
   Draft,
+  Presentation,
   ElementSave,
   ElementSaveImpact,
   ElementSaveResult,
@@ -105,6 +106,8 @@ export class ApiError extends Error {
   }
 }
 
+import { definitionReads } from "./definitionReads";
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -121,6 +124,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       body.message ??
       detailMessage(body.detail) ??
       "请求失败（HTTP " + response.status + "）";
+    if (response.status === 401 || response.status === 403) definitionReads.clear();
     throw new ApiError(
       body.hint ? message + "\n" + body.hint : message,
       response.status,
@@ -205,11 +209,13 @@ export const api = {
     ),
   versions: (workspaceId: string) =>
     request<Items<VersionSummary>>("/api/v1/workspaces/" + workspaceId + "/versions"),
-  presentation: (workspaceId: string, versionId: string) =>
-    request<{ version: VersionSummary; model: Draft }>(
-      `/api/v1/workspaces/${workspaceId}/versions/${versionId}/presentation`,
-    // A past version shows its definitions; instances are live and not part of it.
-    ).then((r): { version: VersionSummary; model: Draft } => ({ ...r, model: { ...r.model, ...NO_INSTANCES } })),
+  presentation: (workspaceId: string, versionId: string): Promise<Presentation> =>
+    definitionReads.get(workspaceId, versionId, async () => {
+      const r = await request<Presentation>(`/api/v1/workspaces/${workspaceId}/versions/${versionId}/presentation`);
+      if (r.version.version_id !== versionId || r.model.workspace_id !== workspaceId)
+        throw new Error("版本内容不一致，请刷新后重试");
+      return { ...r, model: { ...r.model, ...NO_INSTANCES } };
+    }),
   comparison: (workspaceId: string, rightId: string, leftId?: string) =>
     request<Comparison>(
       `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),
@@ -265,7 +271,18 @@ export const modelingApi = {
   abandon: (s: Pick<ModelingSession, "id" | "workspace_id">) =>
     request<{ session_id: string; abandoned_at: string; abandoned_by: string }>(sessionPath(s) + "/abandon", json("POST", {})),
   validate: (s: ModelingSession) => request<ValidationReport>(sessionPath(s) + "/validate", json("POST", {})),
-  snapshot: (id: string) => workspaceRequest<Draft>(id, "/published-snapshot").then((d) => withInstances(d)),
+  snapshot: async (id: string, versionId?: string | null): Promise<Draft> => {
+    const current = await api.workspace(id);
+    const fixed = versionId ?? current.version_id;
+    if (!fixed) return { schema_version: "core-1", workspace_id: id, object_types: [], properties: [], link_types: [], rules: [], metrics: [], datasets: [], mappings: [], value_types: [], ...NO_INSTANCES };
+    const { model } = await api.presentation(id, fixed);
+    // Live instances have no historical baseline. Never join them across publication.
+    if (current.version_id !== fixed) throw new Error("本体版本已更新，请刷新后查看实例");
+    const instances = await instancesFor(id);
+    const after = await api.workspace(id);
+    if (after.version_id !== fixed) throw new Error("本体版本已更新，请刷新后查看实例");
+    return { ...model, ...instances };
+  },
   /** Previews cross-aggregate impact read-only before saving an element. */
   previewElementSave: (id: string, payload: ElementSave) =>
     workspaceRequest<ElementSaveImpact>(id, "/element-saves/preview", payload),

@@ -7,6 +7,9 @@ import type * as Core from "./core.generated";
 type Stored<T> = { [K in keyof T as K extends "display_name" ? never : K]-?: T[K] }
   & Pick<T, Extract<keyof T, "display_name">>;
 
+/** Shared definitions are immutable at runtime; editors clone the complete baseline. */
+export type ReadonlyDefinitions = { readonly [K in keyof Draft]: Draft[K] extends (infer T)[] ? readonly Readonly<T>[] : Draft[K] };
+export type Presentation = { readonly version: VersionSummary; readonly model: Draft };
 export type UUID = string;
 export type ISODate = string;
 export type ISOTime = string;

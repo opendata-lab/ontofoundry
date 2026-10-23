@@ -1,6 +1,7 @@
 // Read-only selectors over a core-1 draft. They mirror the backend's
 // domain/graph.py so pages derive inheritance, links and bindings the same way
 // the server validates them. Nothing here writes back into the draft.
+import { indexedById, owned } from "./definitionIndex";
 import type {
   Aggregation,
   DataJoin,
@@ -73,7 +74,7 @@ export function emptyDraft(workspaceId: UUID): Draft {
 }
 
 export const byId = <T extends { id: UUID }>(items: T[], id: UUID | null | undefined) =>
-  id ? items.find((item) => item.id === id) : undefined;
+  id ? indexedById(items, id) : undefined;
 
 // --- inheritance ------------------------------------------------------------
 
@@ -98,7 +99,7 @@ export function lineage(draft: Draft, typeId: UUID): UUID[] {
 }
 
 export function children(draft: Draft, typeId: UUID): ObjectType[] {
-  return draft.object_types.filter((o) => o.extends === typeId);
+  return owned(draft.object_types, "extends", typeId);
 }
 
 export function isA(draft: Draft, typeId: UUID, ancestorId: UUID) {
@@ -111,8 +112,7 @@ export type Inherited<T> = { definition: T; inheritedFrom: UUID | null };
 export function effectiveProperties(draft: Draft, typeId: UUID): Inherited<Property>[] {
   const owners = lineage(draft, typeId);
   return owners.flatMap((owner) =>
-    draft.properties
-      .filter((p) => p.owner_type_id === owner)
+    owned(draft.properties, "owner_type_id", owner)
       .map((definition) => ({ definition, inheritedFrom: owner === typeId ? null : owner })),
   );
 }
@@ -206,7 +206,7 @@ export function compareUuidBytes(a: string, b: string) {
 // --- datasets and bindings --------------------------------------------------
 
 export function mappingFor(draft: Draft, typeId: UUID): DataMapping | undefined {
-  return draft.mappings.find((m) => m.type_id === typeId);
+  return owned(draft.mappings, "type_id", typeId)[0];
 }
 
 export type ResolvedSource = MappingSource & {

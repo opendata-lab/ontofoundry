@@ -65,7 +65,7 @@ export function OntologyViewPage() {
     setResourceError("");
     const version = overview?.version;
     if (!version) return;
-    (workspace.role ? modelingApi.snapshot(workspace.id) : api.presentation(workspace.id, version.version_id).then((r) => r.model))
+    api.presentation(workspace.id, version.version_id).then((r) => r.model)
       .then((result) => live && setModel(result))
       .catch(() => live && setResourceError("指标和数据集读取失败，请重新打开本体视图。"));
     return () => {

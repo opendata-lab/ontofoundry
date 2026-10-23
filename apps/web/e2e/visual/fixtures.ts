@@ -269,6 +269,7 @@ export async function mockMappingsApi(page: Page) {
     "/api/v1/workspaces": { items: FIXTURE_WORKSPACES },
     [base]: FIXTURE_WORKSPACE,
     [`${base}/published-snapshot`]: FIXTURE_DRAFT,
+    [`${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`]: { version: FIXTURE_VERSIONS[0], model: FIXTURE_DRAFT },
     [`${base}/connections`]: { items: FIXTURE_CONNECTIONS },
     [`${base}/members`]: { items: FIXTURE_MEMBERS },
     [`${base}/settings/dataagent-health`]: FIXTURE_HEALTH,
@@ -581,7 +582,9 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
       const { pathname } = new URL(route.request().url());
-      if (pathname === `${base}/published-snapshot`) {
+      if (pathname === `${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`) {
+        await route.fulfill({ json: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT } });
+      } else if (pathname === `${base}/published-snapshot`) {
         await route.fulfill({ json: ELEMENT_DRAFT });
       } else if (pathname === `/api/v1/modeling/workspaces/${WORKSPACE_ID}/metrics/preview`) {
         await route.fulfill({ json: preview });
@@ -649,6 +652,7 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
   const responses: Record<string, unknown> = {
     [`${base}/overview`]: overview,
     [`${base}/published-snapshot`]: ELEMENT_DRAFT,
+    [`${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`]: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT },
     [`${base}/materials`]: { items: [{ id: "material-visual-guide", name: "星河采购业务说明.md", byte_size: 1280, chunk_count: 6, sha256: "b".repeat(64) }] },
   };
   if (options.emptySession) responses[`${base}/sessions`] = { items: [] };

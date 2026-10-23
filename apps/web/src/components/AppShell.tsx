@@ -1,3 +1,4 @@
+import { definitionReads } from "../api/definitionReads";
 import {
   Box,
   Database,
@@ -63,12 +64,17 @@ export function AppShell() {
     setError("");
     Promise.all([api.workspace(workspaceId), api.me()])
       .then(([w, u]) => {
+        definitionReads.authorize(u.id, w.id, [w.role, w.visibility].join(":"));
         setWorkspace(w);
         setUser(u);
       })
       .catch((e: Error) => setError(e.message));
   }, [workspaceId]);
   useEffect(load, [load]);
+  useEffect(() => {
+    window.addEventListener("focus", load);
+    return () => window.removeEventListener("focus", load);
+  }, [load]);
   useEffect(() => {
     const minimumWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--app-min-width"));
     if (!minimumWidth) return;
