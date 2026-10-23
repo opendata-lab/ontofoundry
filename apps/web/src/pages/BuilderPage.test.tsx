@@ -192,6 +192,24 @@ it("says when the last modeling run is waiting for the user's reply", async () =
   ).toBeInTheDocument();
 });
 
+it("lists the questions that came with the proposals", async () => {
+  context.model.session = {
+    ...session(),
+    task_status: "finished",
+    result_state: "awaiting_reply",
+    task_detail: "已生成 77 条提案，请在“提案”中审阅；另有 1 个问题待你回复",
+    open_questions: ["一次预约能开几张处方？提案按可开多张（多对一）处理，如只能一张请回复。"],
+  };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByText("一次预约能开几张处方？提案按可开多张（多对一）处理，如只能一张请回复。"),
+  ).toBeInTheDocument();
+});
+
 it("shows no reply hint for a run that produced its result", async () => {
   context.model.session = { ...session(), task_status: "finished", result_state: "done" };
   renderWithProviders(

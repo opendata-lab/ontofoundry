@@ -27,6 +27,10 @@ def install_download(monkeypatch, values) -> list[str]:
     paths: list[str] = []
 
     async def download(self, topic_id: str, rel_path: str):
+        # A result run also looks for questions; cases that queue none have
+        # none, and that lookup is not counted as one of the case's downloads.
+        if "needs-input" in rel_path and not queue:
+            raise DataAgentError("missing needs-input", status_code=404)
         paths.append(rel_path)
         # Legacy cases have no intermediate artifacts in the agent workspace.
         if rel_path.startswith("modeling/"):

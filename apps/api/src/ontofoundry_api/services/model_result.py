@@ -119,6 +119,22 @@ PLAN_LIMIT = 16 * 1024
 EXCERPT_LIMIT = 4 * 1024
 
 
+def parse_questions(content: bytes, run_token: str) -> list[str] | None:
+    """This run's questions as plain text; None unless the marker is for this run."""
+    marker = None
+    with suppress(UnicodeDecodeError, json.JSONDecodeError, TypeError):
+        marker = json.loads(content)
+    if not (
+        isinstance(marker, dict)
+        and marker.get("run_token") == run_token
+        and isinstance(marker.get("questions"), list)
+        and marker["questions"]
+        and all(isinstance(q, str) and q.strip() for q in marker["questions"])
+    ):
+        return None
+    return [q.strip() for q in marker["questions"]]
+
+
 async def _optional_download(client: DataAgentClient, topic_id: str, path: str) -> bytes | None:
     """A workflow file, or None when it is absent or cannot be read now."""
     try:
@@ -429,20 +445,10 @@ async def reconcile_run(
                         detail=_permanent_detail(marker_exc),
                     )
             else:
-                with suppress(UnicodeDecodeError, json.JSONDecodeError, TypeError):
-                    marker = json.loads(marker_content)
+                marker = parse_questions(marker_content, run_token)
 
             what = "提案"
-            if not (
-                isinstance(marker, dict)
-                and marker.get("run_token") == run_token
-                and isinstance(marker.get("questions"), list)
-                and marker["questions"]
-                and all(
-                    isinstance(question, str) and question.strip()
-                    for question in marker["questions"]
-                )
-            ):
+            if marker is None:
                 return await _fail_with_workflow(
                     app,
                     workspace_id,
@@ -462,6 +468,7 @@ async def reconcile_run(
                 claimed_at,
                 result_state="awaiting_reply",
                 task_detail=f"智能体需要你确认后才能生成{what}，请在对话中回复",
+                open_questions=marker,
                 **({"run_manifest_json": {**manifest, "prior_plan": plan}} if plan else {}),
             ):
                 return "awaiting_reply"
@@ -523,34 +530,30 @@ async def _consume_proposals(
         draft=manifest["pinned_draft"],
         instance_baseline=manifest.get("instance_baseline", {}),
     )
-    if manifest.get("repair_budget_required"):
-        try:
-            await _client(app, workspace_id, session_id).download(
-                topic_id, f"output/ontofoundry-needs-input-{manifest['run_token']}.json"
-            )
-        except DataAgentError as exc:
-            if exc.status_code != 404:
-                return _finish_failure(
-                    app,
-                    session_id,
-                    task_id,
-                    claimed_at,
-                    state="failed_retriable"
-                    if _is_retriable_download(exc.status_code)
-                    else "failed_permanent",
-                    detail="待确认文件检查暂时失败，等待重试"
-                    if _is_retriable_download(exc.status_code)
-                    else _permanent_detail(exc),
-                )
-        else:
+    # Questions may accompany the proposals; they never cost the proposals.
+    questions, question_warnings = [], []
+    try:
+        marker_content, _ = await _client(app, workspace_id, session_id).download(
+            topic_id, f"output/ontofoundry-needs-input-{manifest['run_token']}.json"
+        )
+    except DataAgentError as exc:
+        if _is_retriable_download(exc.status_code):
             return _finish_failure(
                 app,
                 session_id,
                 task_id,
                 claimed_at,
-                state="failed_permanent",
-                detail="同轮结果与待确认文件互斥，请只保留一种产物",
+                state="failed_retriable",
+                detail="待确认文件下载暂时失败，等待重试",
             )
+        if exc.status_code != 404:
+            question_warnings.append("待确认文件无法读取，问题未显示；提案不受影响")
+    else:
+        parsed_questions = parse_questions(marker_content, manifest["run_token"])
+        if parsed_questions is None:
+            question_warnings.append("待确认文件格式不符合约定，问题未显示；提案不受影响")
+        else:
+            questions = parsed_questions
     budget_failure = None
     if manifest.get("repair_budget_required"):
         try:
@@ -677,10 +680,12 @@ async def _consume_proposals(
                 ModelingSessionRecord.result_claimed_at == claimed_at,
             )
             .values(
-                result_state="done",
-                result_warnings=[],
+                result_state="awaiting_reply" if questions else "done",
+                result_warnings=question_warnings,
+                open_questions=questions,
                 task_status="finished",
-                task_detail=f"已生成 {len(parsed.items)} 条提案，请在“提案”中审阅",
+                task_detail=f"已生成 {len(parsed.items)} 条提案，请在“提案”中审阅"
+                + (f"；另有 {len(questions)} 个问题待你回复，提案已按问题中写明的默认处理，可直接审阅" if questions else ""),
                 updated_at=utc_now(),
             )
         )
@@ -688,7 +693,7 @@ async def _consume_proposals(
             db.rollback()
             return _current_result_state(app, session_id)
         db.commit()
-    return "done"
+    return "awaiting_reply" if questions else "done"
 
 
 def exhaust_retriable_result(app: Any, session_id: str, task_id: str) -> str:

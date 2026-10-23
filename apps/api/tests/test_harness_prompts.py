@@ -87,35 +87,36 @@ def test_dynamic_paths_have_a_single_authoritative_source():
 
 
 @pytest.mark.parametrize(
-    "marker",
+    "marker, state, shown",
     [
-        b"{}",
-        DataAgentError("暂态故障", status_code=503),
-        DataAgentError("无权限", status_code=403),
+        ({"run_token": RUN_TOKEN, "questions": [
+            "人均金额的分母按去重患者计（提案已按此处理），是否确认？",
+            "一次预约能开几张处方？提案按可开多张（多对一）处理，如只能一张请回复。",
+        ]}, "awaiting_reply", 2),
+        (b"{}", "done", 0),
+        (DataAgentError("无权限", status_code=403), "done", 0),
+        (DataAgentError("missing", status_code=404), "done", 0),
+        (DataAgentError("暂态故障", status_code=503), "failed_retriable", 0),
     ],
 )
-def test_result_marker_exclusion_distinguishes_download_failures(
-    client, monkeypatch, marker
+def test_questions_travel_with_the_result_and_never_cost_the_proposals(
+    client, monkeypatch, marker, state, shown
 ):
     session, manifest = proposals_run(client)
-    manifest.update(repair_budget_required=True)
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
-        db.commit()
     install_download(monkeypatch, [result(manifest, []), marker])
 
     async def forbidden(self, **kwargs):
-        pytest.fail("互斥或下载失败不能发起模型修复")
+        pytest.fail("问题文件不能发起模型修复")
 
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
-    state = reconcile(client, session["id"])
-    assert state == (
-        "failed_retriable"
-        if isinstance(marker, DataAgentError) and marker.status_code == 503
-        else "failed_permanent"
-    )
-    if isinstance(marker, bytes):
-        assert "互斥" in row(client, session["id"]).task_detail
+    assert reconcile(client, session["id"]) == state
+    stored = row(client, session["id"])
+    assert len(stored.open_questions) == shown
+    if shown:
+        assert stored.open_questions[1].startswith("一次预约能开几张处方？")
+        assert "2 个问题待你回复" in stored.task_detail
+    elif state == "done" and isinstance(marker, (bytes, DataAgentError)) and getattr(marker, "status_code", 0) != 404:
+        assert "提案不受影响" in stored.result_warnings[0]
 
 
 def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatch):
@@ -128,7 +129,7 @@ def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatc
     marker["run_token"] = RUN_TOKEN
     install_download(monkeypatch, [DataAgentError("missing", status_code=404), marker])
     assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert marker["questions"][0].strip()
+    assert row(client, session["id"]).open_questions == marker["questions"]
 
 
 def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, monkeypatch):
