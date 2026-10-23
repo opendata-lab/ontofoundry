@@ -303,6 +303,15 @@ class MetricCompiler:
         return serialize(tree, self.dialect)
 
     def component(self, metric, trend):
+        if trend and metric.time_field and metric.time_field.column == self.snapshot_column:
+            self.column(self.snapshot_column)
+            snapshot = next(c for c in self.dataset.columns if c.name == self.snapshot_column)
+            if physical_value_kind(snapshot.physical_type) not in {"date", "datetime"}:
+                raise invalid(
+                    "快照日期列不是日期类，无法直接按月归组。请在数据源中提供日期类列，"
+                    "并将指标时间字段设为该列后重试；仅取最新快照时可关闭月趋势。",
+                    "snapshot_time_field_not_date",
+                )
         aggregate = self.aggregate(metric)
         table = self.table()
         where = (
@@ -446,7 +455,7 @@ def execute_metric_preview(
                 chosen = {
                     "dataset_id": str(dataset_for(draft, metric).id),
                     "period": period,
-                    "date": scalar(row[column]),
+                    "date": str(scalar(row[column])),
                 }
                 if chosen not in result["snapshot_dates"]:
                     result["snapshot_dates"].append(chosen)

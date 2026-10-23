@@ -49,8 +49,8 @@ def check_dataset(db, workspace_id, dataset, settings=None, *, probe=False):
         if dataset.snapshot_date_column and result["columns"] is not None:
             from ontofoundry_api.domain.validation import physical_value_kind
             snap = next((c for c in result["columns"] if c["name"] == dataset.snapshot_date_column), None)
-            if not snap or physical_value_kind(snap["physical_type"]) not in {"date", "datetime"}:
-                raise DatasetSourceError("快照日期列不存在或不是日期类型", code="COLUMN_NOT_FOUND")
+            if not snap or physical_value_kind(snap["physical_type"]) not in {None, "date", "datetime", "string", "integer"}:
+                raise DatasetSourceError("快照日期列不存在，或不是日期类、可按日期排序的文本/整数列", code="COLUMN_NOT_FOUND")
     except ServiceError as exc:
         result["diagnostics"].append({"code": exc.code, "severity": "error", "path": "/connection_id" if exc.code == "CONNECTION_UNBOUND" else "/query_sql" if dataset.source_kind == "query" else "/table_name", "message": exc.message, "details": exc.details})
     result["valid"] = not any(d["severity"] == "error" for d in result["diagnostics"])

@@ -402,6 +402,8 @@ Fabric [新体验定义协议](https://learn.microsoft.com/en-us/rest/api/fabric
 
 元数据快照的采集 id 和时间由服务端物理投影附带；列清单只是导出时可携带的元数据副本。没有列清单时只能检查已知元数据中的引用，未知列标记待补全，不伪装成已经验证存在。连接凭据和连接登记保留在平台配置中，不进入 Dataset 或 MCP 合同；平台根据方言和 schema 定位来源，歧义按 §14.3 处理。
 
+快照日期列允许日期、日期时间，以及可按日期排序的文本或整数列（如 `2026-10-23`、`20261023`）；类型未知时仍允许登记。声明者须保证原值排序与日期顺序一致，平台不猜测或转换日期格式，默认用 `MAX` 选最新快照，指定快照时按原值比较；布尔、小数和浮点类型仍拒绝。指标时间字段的日期类要求不变；若已有定义以非日期类快照列作为时间字段，月趋势预览明确报错，提示先在数据源提供日期类列再作为时间字段，或关闭月趋势。
+
 参考依据是分层方式，而非照搬外部模型：[Fabric 本体与 Power BI 语义模型](https://learn.microsoft.com/en-us/fabric/iq/ontology/overview#alignment-with-power-bi-semantic-models)分层，并支持[实体绑定 Lakehouse 表](https://learn.microsoft.com/en-us/fabric/iq/ontology/how-to-bind-data)；[Ossie](https://github.com/apache/ossie/blob/main/ontology/ontology.md)将 ontology 与包含 datasets 的 semantic_model 分开，用 ontology_mappings 连接；[Palantir 对象](https://www.palantir.com/docs/foundry/object-link-types/create-object-type)直接选择 backing datasource。本平台取“扁平数据集登记 + 本体引用它”，不恢复 v3 的 semantic_models、dataset_fields 或递归映射树。
 
 #### 数据映射 `DataMapping`
@@ -1369,6 +1371,7 @@ dataset 的 source、登记名和描述（RT-62、RT-63、RT-60、RT-66 除外�
 | 32 | 删除预聚合提示 | 第 10 轮删除 Metric.pre_aggregations 与 PreAggregationHint（含 dimensions 的 path / column_reference 形式）。它属于执行优化而非语义，Ossie 没有此概念，原设计源自 Cube 的 pre_aggregations，首版删除。汇总表登记成数据集，直接在其上建数据集指标；查询时用不用汇总表由 agent 决定（§3.6） |
 | 33 | 删除导入替换模式 | 第 10 轮删除“以文件为准”模式及 source_inventory 源身份清单、保留集合、权威删除范围、删除依赖组和 total_rows 防误删验收。判断“文件确实缺席”不可靠且复杂，首版删除。平台导入只新增和修改，从不生成 delete 提案；要删除就在会话里手动操作，或让 agent 提删除提案并走正常审阅。转换失败条目仍保留原文，等待 AI 补全或用户选择（§4.5） |
 | D1 | 主附表 | 同连接主表决定实例集合，附表按声明唯一键横向补属性，每属性明示来源，普通纵向映射与联邦延期（§3.7） |
+| D2a | 可排序快照日期列 | 来源：用户 2026-10-23 确认。沿用已有快照语义，允许日期类或可按日期排序的文本/整数列，未知类型仍可登记；不新增字段或模式。原值 `MAX` 支持虚构的组件每日全量表以 `2026-10-23` 或 `20261023` 分区，避免实例与指标总值读取全部历史。格式转换属于执行细节，平台不推断；非日期类快照列不能直接作为月趋势时间字段。取消此支持会使这类全量表无法声明快照（§3.7） |
 | D2 | 快照与期末 | 第 9 轮推翻原“指标可覆盖”的决定，删除 non_additive_over_time；快照只在数据集上声明，simple、expression 可选 time_field，ratio 不存该字段而使用两分量各自时间字段。快照数据集（声明了 snapshot_date_column）每个周期取最后一个有数据的日期，其他数据集取周期内全部行；然后按指标自身算法在整个范围上重新计算，去重、均值、比率等不把每日结果相加。各数据集独立选日，同一数据集所有行用同一天，普通主表与快照附表各按自身声明处理；事件列拆到每日增量表，实例浏览默认取最新一天（§3.6、§3.7） |
 | D3 | 继承三种建法 | 选择覆盖全部子实例的父绑定、无绑定虚拟父对象的实例并集，或两个独立对象，禁止父表之外另存独立子实例（§3.2） |
 | D3b | 继承定义与绑定 | 继承全部属性、普通关系和规则，成员定义放 ObjectType.derived_by，分支取并集，每层限定父范围；同时有扩展表还须取交集；有绑定父对象的子类用派生条件或扩展表，虚拟父的具体子类可绑定继承定义，不重复创建父关系（§3.2、§3.7） |

@@ -412,8 +412,9 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
         if dataset.snapshot_date_column:
             kind = _column(index, dataset.id, dataset.snapshot_date_column)
             _require(
-                kind is None or kind in {ValueKind.DATE, ValueKind.DATETIME},
-                "快照日期列必须是日期类",
+                kind is None
+                or kind in {ValueKind.DATE, ValueKind.DATETIME, ValueKind.STRING, ValueKind.INTEGER},
+                "快照日期列必须是日期类，或可按日期排序的文本/整数列",
             )
     metrics = {metric.id: metric for metric in draft.metrics}
     for metric in draft.metrics:
