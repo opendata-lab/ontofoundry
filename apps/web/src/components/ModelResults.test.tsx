@@ -9,6 +9,7 @@ import { ModelResults } from "./ModelResults";
 vi.mock("./OntologyGraph", () => ({
   OntologyGraph: ({ graph }: { graph: { nodes: unknown[] } }) => <div data-testid="semantic-graph">{graph.nodes.length}</div>,
 }));
+vi.mock("./proposals/ProposalPanel", () => ({ ProposalPanel: () => <div data-testid="proposal-panel" /> }));
 afterEach(cleanup);
 
 function session(extra: Partial<ModelingSession> = {}): ModelingSession {
@@ -74,6 +75,22 @@ describe("modeling results", () => {
     show(session({ draft }));
     fireEvent.click(screen.getByRole("button", { name: /^文档实例 \d+$/ }));
     expect(screen.getAllByText(/^待发布 · /)).toHaveLength(1);
+  });
+
+  it("badges the draft tab only when the draft itself changed", () => {
+    const view = (s: ModelingSession) => (
+      <MemoryRouter>
+        <ModelResults session={s} proposals={{} as never} />
+      </MemoryRouter>
+    );
+    const base = session({ pending_proposal_count: 3, draft_sha256: "a".repeat(64) });
+    const { rerender } = renderWithProviders(view(base));
+    // A run starting or storing its batch bumps the revision, not the draft.
+    rerender(view({ ...base, revision: 1 }));
+    expect(screen.queryByText("+1")).not.toBeInTheDocument();
+    // Accepting proposals changes the draft.
+    rerender(view({ ...base, revision: 2, draft_sha256: "b".repeat(64) }));
+    expect(screen.getByText("+1")).toBeInTheDocument();
   });
 
   it("has an honest empty state before generation", () => {

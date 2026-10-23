@@ -1,0 +1,62 @@
+[
+ {
+  "scenario": "clinic_booking",
+  "level": "basic",
+  "predicted": 7,
+  "expected": 7,
+  "correct": 7,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "missed": [],
+  "errors": {},
+  "examples_placed": 9,
+  "examples_expected": 9,
+  "workspace_id": "4368e411-7baf-4bb8-8165-08ce58af1029",
+  "session_id": "24488c53-71f9-4dc7-a64b-2343a2372282",
+  "result_state": "awaiting_reply",
+  "seconds": 81,
+  "turns": 9,
+  "input": 7023,
+  "cache": 79744,
+  "output": 7314,
+  "tool_errors": 0,
+  "extraction": {
+   "scenario": "clinic_booking",
+   "proposals": 77,
+   "properties": {
+    "found": 22,
+    "expected": 22,
+    "recall": 1.0
+   },
+   "relations": {
+    "found": 6,
+    "expected": 6,
+    "recall": 1.0,
+    "multiplicity_correct": 6
+   },
+   "mappings": {
+    "found": 7,
+    "expected": 7,
+    "recall": 1.0
+   },
+   "instances": {
+    "found": 9,
+    "expected": 9,
+    "recall": 1.0
+   },
+   "metrics": {
+    "found": 2,
+    "expected": 2,
+    "recall": 1.0
+   },
+   "result_state": "done",
+   "seconds": 241,
+   "turns": 19,
+   "input": 28405,
+   "cache": 508544,
+   "output": 28123,
+   "tool_errors": 0
+  }
+ }
+]

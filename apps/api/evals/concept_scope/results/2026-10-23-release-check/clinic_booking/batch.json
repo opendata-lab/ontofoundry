@@ -1,0 +1,4683 @@
+{
+ "id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+ "status": "available",
+ "created_at": "2026-10-23T01:01:31.308089+00:00",
+ "source_session_revision": 3,
+ "base_version_id": null,
+ "counts": {
+  "pending": 77,
+  "accepted": 0,
+  "rejected": 0,
+  "stale": 0,
+  "conflict": 0,
+  "superseded": 0
+ },
+ "error": null,
+ "producer": {
+  "agent_id": "agent_7895f271d13c40f9bc2fabf7",
+  "skill": "ontology-discovery+entity-extraction",
+  "mode": "model"
+ },
+ "items": [
+  {
+   "source_diagnostics": [],
+   "id": "e36ea50a-0037-557c-83fa-35e5fb9c956d",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 0,
+   "client_ref": "department",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+   "display_name": "科室",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "name": "department",
+    "display_name": "科室",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": "01062ae0-4764-5ac5-9d6f-a734598bc1be",
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "16c9b240-3163-5afb-aa65-4ad7fe97990a",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "诊所设有科室，如全科、儿科、口腔科。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "16c9b240-3163-5afb-aa65-4ad7fe97990a",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "诊所设有科室，如全科、儿科、口腔科。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": "03af4233-d113-567d-a31a-5595c0923281",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "36c28164-3979-57d7-9e3e-162147179edd",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 1,
+   "client_ref": "department_dept_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "204d08dc-ab72-5d00-9398-98f7346981e5",
+   "display_name": "科室编号",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "204d08dc-ab72-5d00-9398-98f7346981e5",
+    "owner_type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "name": "dept_id",
+    "display_name": "科室编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "508924f2-9055-5608-9937-2dbac35830f8",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 2,
+   "client_ref": "department_dept_name",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "01062ae0-4764-5ac5-9d6f-a734598bc1be",
+   "display_name": "科室名称",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "01062ae0-4764-5ac5-9d6f-a734598bc1be",
+    "owner_type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "name": "dept_name",
+    "display_name": "科室名称",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": "03af4233-d113-567d-a31a-5595c0923281",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "c45f2979-7453-5d22-b38a-cc292e4361f3",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 3,
+   "client_ref": "doctor",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "26fec915-822c-5449-9a4d-e1135434175b",
+   "display_name": "医生",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "name": "doctor",
+    "display_name": "医生",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": "038e617b-289b-50a3-b6ab-8c6bbf1fc28e",
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "3c59a304-d3ab-5122-93c4-791540fe8677",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "每位医生隶属一个科室，记录医生编号、姓名和职称；职称是医生上的一个字段，取值为主治医师、副主任医师。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "3c59a304-d3ab-5122-93c4-791540fe8677",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "每位医生隶属一个科室，记录医生编号、姓名和职称；职称是医生上的一个字段，取值为主治医师、副主任医师。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": "f3916d3a-7b9a-5f26-b35a-62cc706217e7",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "e274e3c2-fe7e-566f-a0f5-808260239806",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 4,
+   "client_ref": "doctor_doctor_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "68acfeed-c167-58c1-bec1-9fbca6f249d8",
+   "display_name": "医生编号",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "68acfeed-c167-58c1-bec1-9fbca6f249d8",
+    "owner_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "name": "doctor_id",
+    "display_name": "医生编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "dependency_group": [
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 5,
+   "client_ref": "doctor_doctor_name",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "038e617b-289b-50a3-b6ab-8c6bbf1fc28e",
+   "display_name": "医生姓名",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "038e617b-289b-50a3-b6ab-8c6bbf1fc28e",
+    "owner_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "name": "doctor_name",
+    "display_name": "医生姓名",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": "f3916d3a-7b9a-5f26-b35a-62cc706217e7",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "1c6128b4-9f1d-5700-8099-4ee5e10031d3",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 6,
+   "client_ref": "doctor_title",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "350c43bb-78bd-55a7-9b37-2001db67b346",
+   "display_name": "职称",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "350c43bb-78bd-55a7-9b37-2001db67b346",
+    "owner_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "name": "title",
+    "display_name": "职称",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": "56720272-a2a0-5f3c-b8bd-db3600402550",
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "dependency_group": [
+    "1c6128b4-9f1d-5700-8099-4ee5e10031d3",
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 7,
+   "client_ref": "doctor_dept_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "3bc5dba8-42c0-5e24-af35-f9606fe85e14",
+   "display_name": "所属科室编号",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "3bc5dba8-42c0-5e24-af35-f9606fe85e14",
+    "owner_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "name": "dept_id",
+    "display_name": "所属科室编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "dependency_group": [
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "36e7c2a5-de1f-5e05-94ef-1354b6b113b6",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 8,
+   "client_ref": "doctor_title_type",
+   "operation": "create",
+   "target_kind": "value_type",
+   "target_id": "56720272-a2a0-5f3c-b8bd-db3600402550",
+   "display_name": "职称",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "56720272-a2a0-5f3c-b8bd-db3600402550",
+    "name": "doctor_title",
+    "display_name": "职称",
+    "description": "",
+    "value_kind": "string",
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "5cb1fb18-772c-5c92-bbc6-dcca3dd09d4e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 9,
+   "client_ref": "doctor_title_values",
+   "operation": "create",
+   "target_kind": "rule",
+   "target_id": "584f52de-5e42-5a6f-baa7-c7c5320915cc",
+   "display_name": "职称取值",
+   "owner_label": "职称",
+   "before": null,
+   "after": {
+    "id": "584f52de-5e42-5a6f-baa7-c7c5320915cc",
+    "name": "doctor_title_values",
+    "display_name": "职称取值",
+    "description": "",
+    "owner_kind": "value_type",
+    "owner_id": "56720272-a2a0-5f3c-b8bd-db3600402550",
+    "rule_kind": "constraint",
+    "expression": "doctor_title IN ('主治医师', '副主任医师')",
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6"
+   ],
+   "dependency_group": [
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6",
+    "5cb1fb18-772c-5c92-bbc6-dcca3dd09d4e"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 10,
+   "client_ref": "patient",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+   "display_name": "患者",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "name": "patient",
+    "display_name": "患者",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": "ead3768d-42a9-56eb-a0ae-bd39ff5b0b59",
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "32de729f-98f1-5e89-a094-93b22f3359fc",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 5,
+       "line_end": 5
+      },
+      "quote": "患者记录患者编号、姓名、性别和出生日期。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "32de729f-98f1-5e89-a094-93b22f3359fc",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 5,
+      "line_end": 5
+     },
+     "quote": "患者记录患者编号、姓名、性别和出生日期。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": "76a57f50-5c5a-5b8d-8a06-dc09330ec9e8",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "fa19b412-b1bc-5e80-a458-65432a9dfadb"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "51515bed-3a20-5293-91d1-298caacf4e74",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 11,
+   "client_ref": "patient_patient_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "6c9254e0-a601-5175-ba88-e7357917fb33",
+   "display_name": "患者编号",
+   "owner_label": "患者",
+   "before": null,
+   "after": {
+    "id": "6c9254e0-a601-5175-ba88-e7357917fb33",
+    "owner_type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "name": "patient_id",
+    "display_name": "患者编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c"
+   ],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "51515bed-3a20-5293-91d1-298caacf4e74"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "fa19b412-b1bc-5e80-a458-65432a9dfadb",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 12,
+   "client_ref": "patient_patient_name",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "ead3768d-42a9-56eb-a0ae-bd39ff5b0b59",
+   "display_name": "患者姓名",
+   "owner_label": "患者",
+   "before": null,
+   "after": {
+    "id": "ead3768d-42a9-56eb-a0ae-bd39ff5b0b59",
+    "owner_type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "name": "patient_name",
+    "display_name": "患者姓名",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": "76a57f50-5c5a-5b8d-8a06-dc09330ec9e8",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "fa19b412-b1bc-5e80-a458-65432a9dfadb"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "c0d6cf9e-f048-5839-98b1-a9109a6e93a5",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 13,
+   "client_ref": "patient_gender",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "adf6992d-827f-5fd9-aa47-1f969ca80e85",
+   "display_name": "性别",
+   "owner_label": "患者",
+   "before": null,
+   "after": {
+    "id": "adf6992d-827f-5fd9-aa47-1f969ca80e85",
+    "owner_type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "name": "gender",
+    "display_name": "性别",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c"
+   ],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "c0d6cf9e-f048-5839-98b1-a9109a6e93a5"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "5480b9d8-a23d-54e6-a2fe-764f1e09cfc3",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 14,
+   "client_ref": "patient_birth_date",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "d839abe1-7fac-5df0-8112-bddc5c8ab552",
+   "display_name": "出生日期",
+   "owner_label": "患者",
+   "before": null,
+   "after": {
+    "id": "d839abe1-7fac-5df0-8112-bddc5c8ab552",
+    "owner_type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "name": "birth_date",
+    "display_name": "出生日期",
+    "description": "",
+    "value_kind": "date",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c"
+   ],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "5480b9d8-a23d-54e6-a2fe-764f1e09cfc3"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "bdbbb41a-405b-5cb4-8847-f7843d546707",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 15,
+   "client_ref": "appointment",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+   "display_name": "预约",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "appointment",
+    "display_name": "预约",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": null,
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "fe90d80c-811c-5383-b198-64c61e91c29c",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 5,
+       "line_end": 5
+      },
+      "quote": "一次预约对应一位患者和一位医生，记录预约日期、时段和预约状态；预约状态是预约上的一个字段，取值为已预约、已就诊、已取消、爽约。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "fe90d80c-811c-5383-b198-64c61e91c29c",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 5,
+      "line_end": 5
+     },
+     "quote": "一次预约对应一位患者和一位医生，记录预约日期、时段和预约状态；预约状态是预约上的一个字段，取值为已预约、已就诊、已取消、爽约。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 16,
+   "client_ref": "appointment_appt_no",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "9aef8dfb-0725-57af-958d-41cbb7c80ed1",
+   "display_name": "预约编号",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "9aef8dfb-0725-57af-958d-41cbb7c80ed1",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "appt_no",
+    "display_name": "预约编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 17,
+   "client_ref": "appointment_patient_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "8e86774c-8f89-5458-8e8e-45c3b0065432",
+   "display_name": "患者编号",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "8e86774c-8f89-5458-8e8e-45c3b0065432",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "patient_id",
+    "display_name": "患者编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "91580ada-433f-50e2-a98f-4686a70848fb",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 18,
+   "client_ref": "appointment_doctor_id",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "fc17a89f-0fd4-540f-9f16-be9de1ea4f84",
+   "display_name": "医生编号",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "fc17a89f-0fd4-540f-9f16-be9de1ea4f84",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "doctor_id",
+    "display_name": "医生编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "91580ada-433f-50e2-a98f-4686a70848fb",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "abc10da6-c0d1-5bbf-918d-f6a9f3e01817",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 19,
+   "client_ref": "appointment_appt_date",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "257eae88-ea25-5dbf-8cad-91aec7d38db0",
+   "display_name": "预约日期",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "257eae88-ea25-5dbf-8cad-91aec7d38db0",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "appt_date",
+    "display_name": "预约日期",
+    "description": "",
+    "value_kind": "date",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "abc10da6-c0d1-5bbf-918d-f6a9f3e01817",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "af1dfe3f-16de-5073-9372-12e2ed54a9fe",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 20,
+   "client_ref": "appointment_slot",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "e28e3eea-5de3-5150-b3f6-6151c1963a99",
+   "display_name": "时段",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "e28e3eea-5de3-5150-b3f6-6151c1963a99",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "slot",
+    "display_name": "时段",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "af1dfe3f-16de-5073-9372-12e2ed54a9fe",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "d52ac7f5-047e-56bd-973b-e467ef8f8421",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 21,
+   "client_ref": "appointment_status",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "17c508a4-ba52-507e-8e11-b5f2d79fcad4",
+   "display_name": "预约状态",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "17c508a4-ba52-507e-8e11-b5f2d79fcad4",
+    "owner_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "name": "status",
+    "display_name": "预约状态",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": "39ed4e31-1ddf-5832-8468-ad6984e3d069",
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b"
+   ],
+   "dependency_group": [
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b",
+    "d52ac7f5-047e-56bd-973b-e467ef8f8421"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "bee77906-4be1-560f-88d3-b6bc740bfb3b",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 22,
+   "client_ref": "appointment_status_type",
+   "operation": "create",
+   "target_kind": "value_type",
+   "target_id": "39ed4e31-1ddf-5832-8468-ad6984e3d069",
+   "display_name": "预约状态",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "39ed4e31-1ddf-5832-8468-ad6984e3d069",
+    "name": "appointment_status",
+    "display_name": "预约状态",
+    "description": "",
+    "value_kind": "string",
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "07428e44-7504-5473-a727-160bb0622d66",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 23,
+   "client_ref": "appointment_status_values",
+   "operation": "create",
+   "target_kind": "rule",
+   "target_id": "a2bb11f1-60ce-51e4-b0f9-c13fb9ab4a22",
+   "display_name": "预约状态取值",
+   "owner_label": "预约状态",
+   "before": null,
+   "after": {
+    "id": "a2bb11f1-60ce-51e4-b0f9-c13fb9ab4a22",
+    "name": "appointment_status_values",
+    "display_name": "预约状态取值",
+    "description": "",
+    "owner_kind": "value_type",
+    "owner_id": "39ed4e31-1ddf-5832-8468-ad6984e3d069",
+    "rule_kind": "constraint",
+    "expression": "appointment_status IN ('已预约', '已就诊', '已取消', '爽约')",
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b"
+   ],
+   "dependency_group": [
+    "07428e44-7504-5473-a727-160bb0622d66",
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "fd4ce99c-49a8-5f3e-94f7-291f3d564514",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 24,
+   "client_ref": "drug",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+   "display_name": "药品",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "name": "drug",
+    "display_name": "药品",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": "0623b081-8cc4-5b04-b3bd-dfb27b889622",
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "f227d131-4902-5d84-b81c-ffafecbbb5f0",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "f227d131-4902-5d84-b81c-ffafecbbb5f0",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": "af5f8c49-3826-5861-9a98-b03793c64abc",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "604522c8-a088-5d73-b964-b5fbe6a58466",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 25,
+   "client_ref": "drug_drug_code",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "5be074c7-6b53-55c3-a496-bd2fc065be5b",
+   "display_name": "药品编码",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "5be074c7-6b53-55c3-a496-bd2fc065be5b",
+    "owner_type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "name": "drug_code",
+    "display_name": "药品编码",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "604522c8-a088-5d73-b964-b5fbe6a58466",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 26,
+   "client_ref": "drug_drug_name",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "0623b081-8cc4-5b04-b3bd-dfb27b889622",
+   "display_name": "药品名称",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "0623b081-8cc4-5b04-b3bd-dfb27b889622",
+    "owner_type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "name": "drug_name",
+    "display_name": "药品名称",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": "af5f8c49-3826-5861-9a98-b03793c64abc",
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "44d49893-9edb-53ab-b108-2d0e4833b306",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 27,
+   "client_ref": "drug_unit_price",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "4301f5a7-38a8-5409-b7af-0b6dae2c0324",
+   "display_name": "单价",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "4301f5a7-38a8-5409-b7af-0b6dae2c0324",
+    "owner_type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "name": "unit_price",
+    "display_name": "单价",
+    "description": "",
+    "value_kind": "decimal",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "44d49893-9edb-53ab-b108-2d0e4833b306",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "efad9571-c777-514a-862c-8b6c0d231cf8",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 28,
+   "client_ref": "drug_category",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "46060581-fec1-5755-b64c-f1a5997c7f2c",
+   "display_name": "类别",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "46060581-fec1-5755-b64c-f1a5997c7f2c",
+    "owner_type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "name": "category",
+    "display_name": "类别",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "efad9571-c777-514a-862c-8b6c0d231cf8",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 29,
+   "client_ref": "prescription",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+   "display_name": "处方",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "name": "prescription",
+    "display_name": "处方",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": null,
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "4f66b942-8829-5280-8c8a-6000be6cb77f",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "就诊后医生开具处方，一张处方对应一次预约。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "4f66b942-8829-5280-8c8a-6000be6cb77f",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "就诊后医生开具处方，一张处方对应一次预约。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "931af76c-ab9c-52ad-977e-a2d932ff4ae0",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 30,
+   "client_ref": "prescription_rx_no",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "a215e4bd-9bb1-56b2-9c5c-ae8b0dd2f1b8",
+   "display_name": "处方号",
+   "owner_label": "处方",
+   "before": null,
+   "after": {
+    "id": "a215e4bd-9bb1-56b2-9c5c-ae8b0dd2f1b8",
+    "owner_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "name": "rx_no",
+    "display_name": "处方号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": true,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "931af76c-ab9c-52ad-977e-a2d932ff4ae0"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "82b24b81-0cd4-53a8-ae2c-b1a36d68e505",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 31,
+   "client_ref": "prescription_appt_no",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "65fccada-c632-554c-81aa-fd7072cd0108",
+   "display_name": "预约编号",
+   "owner_label": "处方",
+   "before": null,
+   "after": {
+    "id": "65fccada-c632-554c-81aa-fd7072cd0108",
+    "owner_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "name": "appt_no",
+    "display_name": "预约编号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "82b24b81-0cd4-53a8-ae2c-b1a36d68e505"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "b1ed1f22-9aca-5cd5-b32a-f964afb68eb5",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 32,
+   "client_ref": "prescription_issued_at",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "d231d869-9087-53ec-94d4-942422988740",
+   "display_name": "开具时间",
+   "owner_label": "处方",
+   "before": null,
+   "after": {
+    "id": "d231d869-9087-53ec-94d4-942422988740",
+    "owner_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "name": "issued_at",
+    "display_name": "开具时间",
+    "description": "",
+    "value_kind": "datetime",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "b1ed1f22-9aca-5cd5-b32a-f964afb68eb5"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "933c9224-abb1-5e2c-bf1a-9e46fbd8564d",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 33,
+   "client_ref": "prescription_total_amount",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "3349c0e7-754f-54ce-ac78-39ef8ae3fcd7",
+   "display_name": "处方总金额",
+   "owner_label": "处方",
+   "before": null,
+   "after": {
+    "id": "3349c0e7-754f-54ce-ac78-39ef8ae3fcd7",
+    "owner_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "name": "total_amount",
+    "display_name": "处方总金额",
+    "description": "",
+    "value_kind": "decimal",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "933c9224-abb1-5e2c-bf1a-9e46fbd8564d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 34,
+   "client_ref": "prescription_item",
+   "operation": "create",
+   "target_kind": "object_type",
+   "target_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+   "display_name": "处方明细",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "name": "prescription_item",
+    "display_name": "处方明细",
+    "description": "",
+    "synonyms": [],
+    "tags": [],
+    "extends": null,
+    "title_property_id": null,
+    "derived_by": [],
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "69300d73-195a-5aeb-934c-9637cebf2598",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "处方由若干处方明细组成，每条处方明细记录药品和数量，以处方号加行号标识。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "69300d73-195a-5aeb-934c-9637cebf2598",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "处方由若干处方明细组成，每条处方明细记录药品和数量，以处方号加行号标识。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "aa69e51b-05dc-5471-b589-626aaebbd013",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 35,
+   "client_ref": "prescription_item_rx_no",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "d44ed6f1-49af-5e32-91e4-be7be839383b",
+   "display_name": "处方号",
+   "owner_label": "处方明细",
+   "before": null,
+   "after": {
+    "id": "d44ed6f1-49af-5e32-91e4-be7be839383b",
+    "owner_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "name": "rx_no",
+    "display_name": "处方号",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5"
+   ],
+   "dependency_group": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "aa69e51b-05dc-5471-b589-626aaebbd013"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "f2d7138a-03fc-5f61-96eb-a8d5c0b9ab39",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 36,
+   "client_ref": "prescription_item_line_no",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "c5781d3a-5156-55ac-832c-73b8c7722842",
+   "display_name": "行号",
+   "owner_label": "处方明细",
+   "before": null,
+   "after": {
+    "id": "c5781d3a-5156-55ac-832c-73b8c7722842",
+    "owner_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "name": "line_no",
+    "display_name": "行号",
+    "description": "",
+    "value_kind": "integer",
+    "value_type_id": null,
+    "required": true,
+    "identifier": true,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5"
+   ],
+   "dependency_group": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "f2d7138a-03fc-5f61-96eb-a8d5c0b9ab39"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "c4dc3891-e703-5945-91e8-2e60f658459f",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 37,
+   "client_ref": "prescription_item_drug_code",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "2dd584bb-18f0-5004-a62b-a064648fae06",
+   "display_name": "药品编码",
+   "owner_label": "处方明细",
+   "before": null,
+   "after": {
+    "id": "2dd584bb-18f0-5004-a62b-a064648fae06",
+    "owner_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "name": "drug_code",
+    "display_name": "药品编码",
+    "description": "",
+    "value_kind": "string",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5"
+   ],
+   "dependency_group": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "c4dc3891-e703-5945-91e8-2e60f658459f"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "bf205669-d199-5652-b3e0-01c1ad86d513",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 38,
+   "client_ref": "prescription_item_quantity",
+   "operation": "create",
+   "target_kind": "property",
+   "target_id": "0d630401-5a4e-5fd7-9f3d-41a8adbd8d80",
+   "display_name": "数量",
+   "owner_label": "处方明细",
+   "before": null,
+   "after": {
+    "id": "0d630401-5a4e-5fd7-9f3d-41a8adbd8d80",
+    "owner_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "name": "quantity",
+    "display_name": "数量",
+    "description": "",
+    "value_kind": "integer",
+    "value_type_id": null,
+    "required": false,
+    "identifier": false,
+    "unique": false,
+    "synonyms": [],
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5"
+   ],
+   "dependency_group": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "bf205669-d199-5652-b3e0-01c1ad86d513"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "98c58d82-4389-541f-84b7-38f221319837",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 39,
+   "client_ref": "doctor_belongs_department",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "ed6a7a5c-d581-571f-8278-6afc68e5de42",
+   "display_name": "隶属科室",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "ed6a7a5c-d581-571f-8278-6afc68e5de42",
+    "display_name": "隶属科室",
+    "name": "doctor_belongs_department",
+    "description": "",
+    "verbalizes": [
+     "{source}隶属科室{target}",
+     "{target}有{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "target_type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "3bc5dba8-42c0-5e24-af35-f9606fe85e14"
+     ],
+     "target_property_ids": [
+      "204d08dc-ab72-5d00-9398-98f7346981e5"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "98c58d82-4389-541f-84b7-38f221319837",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "cb6f86d4-96d7-5134-856b-55c8108f1a91",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 40,
+   "client_ref": "appointment_for_patient",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "420a2737-c2e3-5a43-928a-c03d95dfbc2b",
+   "display_name": "对应患者",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "420a2737-c2e3-5a43-928a-c03d95dfbc2b",
+    "display_name": "对应患者",
+    "name": "appointment_for_patient",
+    "description": "",
+    "verbalizes": [
+     "{source}对应的患者是{target}",
+     "{target}有{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "target_type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "8e86774c-8f89-5458-8e8e-45c3b0065432"
+     ],
+     "target_property_ids": [
+      "6c9254e0-a601-5175-ba88-e7357917fb33"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+    "51515bed-3a20-5293-91d1-298caacf4e74",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+    "51515bed-3a20-5293-91d1-298caacf4e74",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "cb6f86d4-96d7-5134-856b-55c8108f1a91"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "bc2de0b5-1151-5f71-8c62-8cca224cc1f9",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 41,
+   "client_ref": "appointment_for_doctor",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "1678783a-863b-57d0-a5b1-784d29542427",
+   "display_name": "对应医生",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "1678783a-863b-57d0-a5b1-784d29542427",
+    "display_name": "对应医生",
+    "name": "appointment_for_doctor",
+    "description": "",
+    "verbalizes": [
+     "{source}对应的医生是{target}",
+     "{target}有{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "target_type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "fc17a89f-0fd4-540f-9f16-be9de1ea4f84"
+     ],
+     "target_property_ids": [
+      "68acfeed-c167-58c1-bec1-9fbca6f249d8"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "91580ada-433f-50e2-a98f-4686a70848fb",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "dependency_group": [
+    "91580ada-433f-50e2-a98f-4686a70848fb",
+    "bc2de0b5-1151-5f71-8c62-8cca224cc1f9",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "8bb2d76e-2fec-507a-af28-717425a16afc",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 42,
+   "client_ref": "prescription_for_appointment",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "d3503854-e4f1-5f3d-bb58-68eac39ced77",
+   "display_name": "对应预约",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "d3503854-e4f1-5f3d-bb58-68eac39ced77",
+    "display_name": "对应预约",
+    "name": "prescription_for_appointment",
+    "description": "",
+    "verbalizes": [
+     "{source}对应预约{target}",
+     "{target}对应{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "target_type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "65fccada-c632-554c-81aa-fd7072cd0108"
+     ],
+     "target_property_ids": [
+      "9aef8dfb-0725-57af-958d-41cbb7c80ed1"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+    "82b24b81-0cd4-53a8-ae2c-b1a36d68e505",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+    "82b24b81-0cd4-53a8-ae2c-b1a36d68e505",
+    "8bb2d76e-2fec-507a-af28-717425a16afc",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "00a05565-20d4-51a9-9699-0910819d8f72",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 43,
+   "client_ref": "item_belongs_prescription",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "b01581e3-6b8c-50e9-bc9a-ce2dd4a03755",
+   "display_name": "属于处方",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "b01581e3-6b8c-50e9-bc9a-ce2dd4a03755",
+    "display_name": "属于处方",
+    "name": "item_belongs_prescription",
+    "description": "",
+    "verbalizes": [
+     "{source}属于处方{target}",
+     "{target}包含{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "target_type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "d44ed6f1-49af-5e32-91e4-be7be839383b"
+     ],
+     "target_property_ids": [
+      "a215e4bd-9bb1-56b2-9c5c-ae8b0dd2f1b8"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "931af76c-ab9c-52ad-977e-a2d932ff4ae0",
+    "aa69e51b-05dc-5471-b589-626aaebbd013"
+   ],
+   "dependency_group": [
+    "00a05565-20d4-51a9-9699-0910819d8f72",
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "931af76c-ab9c-52ad-977e-a2d932ff4ae0",
+    "aa69e51b-05dc-5471-b589-626aaebbd013"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "fb6bec64-4779-5659-8404-21f1c15f749e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 44,
+   "client_ref": "item_for_drug",
+   "operation": "create",
+   "target_kind": "link_type",
+   "target_id": "2979c5a7-4d68-574c-bb36-8f7acef1021a",
+   "display_name": "记录药品",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "2979c5a7-4d68-574c-bb36-8f7acef1021a",
+    "display_name": "记录药品",
+    "name": "item_for_drug",
+    "description": "",
+    "verbalizes": [
+     "{source}记录的药品是{target}",
+     "{target}出现在{source}"
+    ],
+    "synonyms": [],
+    "source_type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "target_type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "source_role_name": null,
+    "target_role_name": null,
+    "multiplicity": "many_to_one",
+    "tags": [],
+    "data_join": {
+     "kind": "direct",
+     "source_property_ids": [
+      "2dd584bb-18f0-5004-a62b-a064648fae06"
+     ],
+     "target_property_ids": [
+      "5be074c7-6b53-55c3-a496-bd2fc065be5b"
+     ]
+    },
+    "evidence": []
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "604522c8-a088-5d73-b964-b5fbe6a58466",
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "c4dc3891-e703-5945-91e8-2e60f658459f",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "604522c8-a088-5d73-b964-b5fbe6a58466",
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "c4dc3891-e703-5945-91e8-2e60f658459f",
+    "fb6bec64-4779-5659-8404-21f1c15f749e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "8c920b36-20cf-5ea6-a454-18a6b553a7e7",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 45,
+   "client_ref": "departments_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "eda7384d-8f52-5ec4-866e-a896d76a3a56",
+   "display_name": "科室数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "eda7384d-8f52-5ec4-866e-a896d76a3a56",
+    "name": "departments",
+    "display_name": "科室数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "departments",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "dept_id",
+      "physical_type": "VARCHAR(8)",
+      "comment": ""
+     },
+     {
+      "name": "dept_name",
+      "physical_type": "VARCHAR(40)",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "8c920b36-20cf-5ea6-a454-18a6b553a7e7"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "c47789a4-ff63-5edd-8173-e7b3a2c2e22c",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 46,
+   "client_ref": "department_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "b97c5d6b-19d1-5e4c-89bf-3140c68128ce",
+   "display_name": "科室",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "b97c5d6b-19d1-5e4c-89bf-3140c68128ce",
+    "type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "eda7384d-8f52-5ec4-866e-a896d76a3a56",
+      "key_columns": [
+       "dept_id"
+      ]
+     }
+    ],
+    "fields": {
+     "dept_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "dept_id"
+     },
+     "dept_name": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "dept_name"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "8c920b36-20cf-5ea6-a454-18a6b553a7e7",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "8c920b36-20cf-5ea6-a454-18a6b553a7e7",
+    "c47789a4-ff63-5edd-8173-e7b3a2c2e22c",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "03276c95-ab1f-5d5e-b8d5-1e363d3a58cb",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 47,
+   "client_ref": "doctors_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "54ca6ced-8eff-57a8-8f73-3a421e847160",
+   "display_name": "医生数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "54ca6ced-8eff-57a8-8f73-3a421e847160",
+    "name": "doctors",
+    "display_name": "医生数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "doctors",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "doctor_id",
+      "physical_type": "VARCHAR(8)",
+      "comment": ""
+     },
+     {
+      "name": "doctor_name",
+      "physical_type": "VARCHAR(40)",
+      "comment": ""
+     },
+     {
+      "name": "dept_id",
+      "physical_type": "VARCHAR(8)",
+      "comment": ""
+     },
+     {
+      "name": "title",
+      "physical_type": "VARCHAR(20)",
+      "comment": "职称"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "03276c95-ab1f-5d5e-b8d5-1e363d3a58cb"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "af1ed4c5-ebd5-535e-b78c-a9eb557af151",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 48,
+   "client_ref": "doctor_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "7da10499-c5d4-5349-be21-7b7c6aa876ff",
+   "display_name": "医生",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "7da10499-c5d4-5349-be21-7b7c6aa876ff",
+    "type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "54ca6ced-8eff-57a8-8f73-3a421e847160",
+      "key_columns": [
+       "doctor_id"
+      ]
+     }
+    ],
+    "fields": {
+     "doctor_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "doctor_id"
+     },
+     "doctor_name": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "doctor_name"
+     },
+     "dept_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "dept_id"
+     },
+     "title": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "title"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "03276c95-ab1f-5d5e-b8d5-1e363d3a58cb",
+    "1c6128b4-9f1d-5700-8099-4ee5e10031d3",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "dependency_group": [
+    "03276c95-ab1f-5d5e-b8d5-1e363d3a58cb",
+    "1c6128b4-9f1d-5700-8099-4ee5e10031d3",
+    "36e7c2a5-de1f-5e05-94ef-1354b6b113b6",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "af1ed4c5-ebd5-535e-b78c-a9eb557af151",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "ae12b835-c526-5273-b9dd-b10b8fb31605",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 49,
+   "client_ref": "patients_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "2e767f6d-c8bd-513c-b75a-dedad685afa5",
+   "display_name": "患者数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "2e767f6d-c8bd-513c-b75a-dedad685afa5",
+    "name": "patients",
+    "display_name": "患者数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "patients",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "patient_id",
+      "physical_type": "VARCHAR(12)",
+      "comment": ""
+     },
+     {
+      "name": "patient_name",
+      "physical_type": "VARCHAR(40)",
+      "comment": ""
+     },
+     {
+      "name": "gender",
+      "physical_type": "VARCHAR(4)",
+      "comment": ""
+     },
+     {
+      "name": "birth_date",
+      "physical_type": "DATE",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "ae12b835-c526-5273-b9dd-b10b8fb31605"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "ddf17937-8526-578a-85d4-a144164bc8c5",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 50,
+   "client_ref": "patient_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "677c4f34-e70a-5552-bcb7-7298aca1b0c3",
+   "display_name": "患者",
+   "owner_label": "患者",
+   "before": null,
+   "after": {
+    "id": "677c4f34-e70a-5552-bcb7-7298aca1b0c3",
+    "type_id": "8f9e1be6-fc39-54eb-b760-45b8270401e8",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "2e767f6d-c8bd-513c-b75a-dedad685afa5",
+      "key_columns": [
+       "patient_id"
+      ]
+     }
+    ],
+    "fields": {
+     "patient_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "patient_id"
+     },
+     "patient_name": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "patient_name"
+     },
+     "gender": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "gender"
+     },
+     "birth_date": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "birth_date"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "51515bed-3a20-5293-91d1-298caacf4e74",
+    "5480b9d8-a23d-54e6-a2fe-764f1e09cfc3",
+    "ae12b835-c526-5273-b9dd-b10b8fb31605",
+    "c0d6cf9e-f048-5839-98b1-a9109a6e93a5",
+    "fa19b412-b1bc-5e80-a458-65432a9dfadb"
+   ],
+   "dependency_group": [
+    "22ab7ffd-6e28-5c50-ac2a-e3f656630a2c",
+    "51515bed-3a20-5293-91d1-298caacf4e74",
+    "5480b9d8-a23d-54e6-a2fe-764f1e09cfc3",
+    "ae12b835-c526-5273-b9dd-b10b8fb31605",
+    "c0d6cf9e-f048-5839-98b1-a9109a6e93a5",
+    "ddf17937-8526-578a-85d4-a144164bc8c5",
+    "fa19b412-b1bc-5e80-a458-65432a9dfadb"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "67237800-e1ed-5cde-9df7-ff4759037f20",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 51,
+   "client_ref": "appointments_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+   "display_name": "预约数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+    "name": "appointments",
+    "display_name": "预约数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "appointments",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "appt_no",
+      "physical_type": "VARCHAR(16)",
+      "comment": ""
+     },
+     {
+      "name": "patient_id",
+      "physical_type": "VARCHAR(12)",
+      "comment": ""
+     },
+     {
+      "name": "doctor_id",
+      "physical_type": "VARCHAR(8)",
+      "comment": ""
+     },
+     {
+      "name": "appt_date",
+      "physical_type": "DATE",
+      "comment": ""
+     },
+     {
+      "name": "slot",
+      "physical_type": "VARCHAR(16)",
+      "comment": ""
+     },
+     {
+      "name": "status",
+      "physical_type": "VARCHAR(8)",
+      "comment": "预约状态"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "67237800-e1ed-5cde-9df7-ff4759037f20"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "2481671a-e86d-58a3-8849-3323423aa79b",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 52,
+   "client_ref": "appointment_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "ada24680-8b6d-5d3b-8f1a-f65733f13a64",
+   "display_name": "预约",
+   "owner_label": "预约",
+   "before": null,
+   "after": {
+    "id": "ada24680-8b6d-5d3b-8f1a-f65733f13a64",
+    "type_id": "f4353675-9ea3-5791-9178-cafad750ad6a",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+      "key_columns": [
+       "appt_no"
+      ]
+     }
+    ],
+    "fields": {
+     "appt_no": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "appt_no"
+     },
+     "patient_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "patient_id"
+     },
+     "doctor_id": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "doctor_id"
+     },
+     "appt_date": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "appt_date"
+     },
+     "slot": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "slot"
+     },
+     "status": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "status"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+    "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+    "67237800-e1ed-5cde-9df7-ff4759037f20",
+    "91580ada-433f-50e2-a98f-4686a70848fb",
+    "abc10da6-c0d1-5bbf-918d-f6a9f3e01817",
+    "af1dfe3f-16de-5073-9372-12e2ed54a9fe",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "d52ac7f5-047e-56bd-973b-e467ef8f8421"
+   ],
+   "dependency_group": [
+    "2481671a-e86d-58a3-8849-3323423aa79b",
+    "4156344b-56ad-50a9-8ebc-7d0b3e58d18e",
+    "42fb6dcd-0533-5a49-958b-0f31b63d9853",
+    "67237800-e1ed-5cde-9df7-ff4759037f20",
+    "91580ada-433f-50e2-a98f-4686a70848fb",
+    "abc10da6-c0d1-5bbf-918d-f6a9f3e01817",
+    "af1dfe3f-16de-5073-9372-12e2ed54a9fe",
+    "bdbbb41a-405b-5cb4-8847-f7843d546707",
+    "bee77906-4be1-560f-88d3-b6bc740bfb3b",
+    "d52ac7f5-047e-56bd-973b-e467ef8f8421"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "ec7c2ca5-5b19-5cb5-972b-7aed3baf2573",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 53,
+   "client_ref": "drugs_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "daa6aaf1-fb64-5520-aa6c-8f83e6850ae5",
+   "display_name": "药品数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "daa6aaf1-fb64-5520-aa6c-8f83e6850ae5",
+    "name": "drugs",
+    "display_name": "药品数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "drugs",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "drug_code",
+      "physical_type": "VARCHAR(12)",
+      "comment": ""
+     },
+     {
+      "name": "drug_name",
+      "physical_type": "VARCHAR(60)",
+      "comment": ""
+     },
+     {
+      "name": "unit_price",
+      "physical_type": "DECIMAL(10, 2)",
+      "comment": ""
+     },
+     {
+      "name": "category",
+      "physical_type": "VARCHAR(20)",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "ec7c2ca5-5b19-5cb5-972b-7aed3baf2573"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "fbebf585-4ec6-52de-b8bc-9e784b6b439e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 54,
+   "client_ref": "drug_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "97cd4f43-fc68-51ac-8928-21eea48aa744",
+   "display_name": "药品",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "97cd4f43-fc68-51ac-8928-21eea48aa744",
+    "type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "daa6aaf1-fb64-5520-aa6c-8f83e6850ae5",
+      "key_columns": [
+       "drug_code"
+      ]
+     }
+    ],
+    "fields": {
+     "drug_code": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "drug_code"
+     },
+     "drug_name": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "drug_name"
+     },
+     "unit_price": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "unit_price"
+     },
+     "category": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "category"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "44d49893-9edb-53ab-b108-2d0e4833b306",
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "604522c8-a088-5d73-b964-b5fbe6a58466",
+    "ec7c2ca5-5b19-5cb5-972b-7aed3baf2573",
+    "efad9571-c777-514a-862c-8b6c0d231cf8",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "44d49893-9edb-53ab-b108-2d0e4833b306",
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "604522c8-a088-5d73-b964-b5fbe6a58466",
+    "ec7c2ca5-5b19-5cb5-972b-7aed3baf2573",
+    "efad9571-c777-514a-862c-8b6c0d231cf8",
+    "fbebf585-4ec6-52de-b8bc-9e784b6b439e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "b4325cf0-3e73-5bdd-bb01-2d0e8c46a7be",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 55,
+   "client_ref": "prescriptions_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "8b464165-feb5-5e90-b7f7-47c5867256ed",
+   "display_name": "处方数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "8b464165-feb5-5e90-b7f7-47c5867256ed",
+    "name": "prescriptions",
+    "display_name": "处方数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "prescriptions",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "rx_no",
+      "physical_type": "VARCHAR(16)",
+      "comment": ""
+     },
+     {
+      "name": "appt_no",
+      "physical_type": "VARCHAR(16)",
+      "comment": ""
+     },
+     {
+      "name": "issued_at",
+      "physical_type": "DATETIME",
+      "comment": ""
+     },
+     {
+      "name": "total_amount",
+      "physical_type": "DECIMAL(10, 2)",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "b4325cf0-3e73-5bdd-bb01-2d0e8c46a7be"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "307d83e5-af5f-5cdf-bd3d-856821ecead7",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 56,
+   "client_ref": "prescription_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "2d552433-6f1e-5469-92e7-b8a0060fb48f",
+   "display_name": "处方",
+   "owner_label": "处方",
+   "before": null,
+   "after": {
+    "id": "2d552433-6f1e-5469-92e7-b8a0060fb48f",
+    "type_id": "4eb4f597-c2a1-54af-866d-a2028b9addb0",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "8b464165-feb5-5e90-b7f7-47c5867256ed",
+      "key_columns": [
+       "rx_no"
+      ]
+     }
+    ],
+    "fields": {
+     "rx_no": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "rx_no"
+     },
+     "appt_no": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "appt_no"
+     },
+     "issued_at": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "issued_at"
+     },
+     "total_amount": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "total_amount"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "82b24b81-0cd4-53a8-ae2c-b1a36d68e505",
+    "931af76c-ab9c-52ad-977e-a2d932ff4ae0",
+    "933c9224-abb1-5e2c-bf1a-9e46fbd8564d",
+    "b1ed1f22-9aca-5cd5-b32a-f964afb68eb5",
+    "b4325cf0-3e73-5bdd-bb01-2d0e8c46a7be"
+   ],
+   "dependency_group": [
+    "26f3a546-bcd3-5c29-bed7-ef963b41475a",
+    "307d83e5-af5f-5cdf-bd3d-856821ecead7",
+    "82b24b81-0cd4-53a8-ae2c-b1a36d68e505",
+    "931af76c-ab9c-52ad-977e-a2d932ff4ae0",
+    "933c9224-abb1-5e2c-bf1a-9e46fbd8564d",
+    "b1ed1f22-9aca-5cd5-b32a-f964afb68eb5",
+    "b4325cf0-3e73-5bdd-bb01-2d0e8c46a7be"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "c4dd1682-8c04-5aae-a8f7-c3075c693f2b",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 57,
+   "client_ref": "prescription_items_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "7d5f8407-10d0-558f-8853-f0c9b7c575f8",
+   "display_name": "处方明细数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "7d5f8407-10d0-558f-8853-f0c9b7c575f8",
+    "name": "prescription_items",
+    "display_name": "处方明细数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "prescription_items",
+    "query_sql": null,
+    "description": "",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "rx_no",
+      "physical_type": "VARCHAR(16)",
+      "comment": ""
+     },
+     {
+      "name": "line_no",
+      "physical_type": "INTEGER",
+      "comment": ""
+     },
+     {
+      "name": "drug_code",
+      "physical_type": "VARCHAR(12)",
+      "comment": ""
+     },
+     {
+      "name": "quantity",
+      "physical_type": "INTEGER",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "c4dd1682-8c04-5aae-a8f7-c3075c693f2b"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "2a411b82-8211-5d00-8c78-4bbe6100be3a",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 58,
+   "client_ref": "prescription_item_map",
+   "operation": "create",
+   "target_kind": "mapping",
+   "target_id": "3edaac45-bc0b-53d4-af1d-93ea484b4a65",
+   "display_name": "处方明细",
+   "owner_label": "处方明细",
+   "before": null,
+   "after": {
+    "id": "3edaac45-bc0b-53d4-af1d-93ea484b4a65",
+    "type_id": "e9f7fcf4-04b8-58fb-98ca-27b0ce25b6de",
+    "binding_mode": "independent",
+    "sources": [
+     {
+      "id": "main",
+      "dataset_id": "7d5f8407-10d0-558f-8853-f0c9b7c575f8",
+      "key_columns": [
+       "rx_no",
+       "line_no"
+      ]
+     }
+    ],
+    "fields": {
+     "rx_no": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "rx_no"
+     },
+     "line_no": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "line_no"
+     },
+     "drug_code": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "drug_code"
+     },
+     "quantity": {
+      "kind": "column",
+      "source_id": "main",
+      "column": "quantity"
+     }
+    },
+    "membership_source_id": null,
+    "inherited_link_bindings": {}
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "aa69e51b-05dc-5471-b589-626aaebbd013",
+    "bf205669-d199-5652-b3e0-01c1ad86d513",
+    "c4dc3891-e703-5945-91e8-2e60f658459f",
+    "c4dd1682-8c04-5aae-a8f7-c3075c693f2b",
+    "f2d7138a-03fc-5f61-96eb-a8d5c0b9ab39"
+   ],
+   "dependency_group": [
+    "2a411b82-8211-5d00-8c78-4bbe6100be3a",
+    "89d4e819-4a5b-5025-9c58-ddf0c4a9fee5",
+    "aa69e51b-05dc-5471-b589-626aaebbd013",
+    "bf205669-d199-5652-b3e0-01c1ad86d513",
+    "c4dc3891-e703-5945-91e8-2e60f658459f",
+    "c4dd1682-8c04-5aae-a8f7-c3075c693f2b",
+    "f2d7138a-03fc-5f61-96eb-a8d5c0b9ab39"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "be726bc2-6072-5d86-a33e-b3128ad50e17",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 59,
+   "client_ref": "daily_visit_stats_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "99b33473-2759-5419-84d0-69eeefa75acf",
+   "display_name": "每日就诊人次统计",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "99b33473-2759-5419-84d0-69eeefa75acf",
+    "name": "daily_visit_stats",
+    "display_name": "每日就诊人次统计",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "table",
+    "dialect": "mysql",
+    "schema_name": "eval_clinic",
+    "table_name": "daily_visit_stats",
+    "query_sql": null,
+    "description": "由夜间任务从预约表汇总生成，不是独立的业务对象",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "stat_date",
+      "physical_type": "DATE",
+      "comment": ""
+     },
+     {
+      "name": "dept_id",
+      "physical_type": "VARCHAR(8)",
+      "comment": ""
+     },
+     {
+      "name": "visit_count",
+      "physical_type": "INTEGER",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "be726bc2-6072-5d86-a33e-b3128ad50e17"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [
+    {
+     "code": "SOURCE_NOT_REGISTERED",
+     "severity": "error",
+     "path": "/query_sql",
+     "message": "来源不在连接允许的业务范围",
+     "details": {}
+    }
+   ],
+   "id": "e1287d24-f352-5f80-96bf-afbde4ca2456",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 60,
+   "client_ref": "rx_patient_ds",
+   "operation": "create",
+   "target_kind": "dataset",
+   "target_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+   "display_name": "处方患者数据",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+    "name": "rx_patient",
+    "display_name": "处方患者数据",
+    "connection_id": "7e01a2ab-a90a-487c-86de-91d68471fc0c",
+    "source_kind": "query",
+    "dialect": "mysql",
+    "schema_name": null,
+    "table_name": null,
+    "query_sql": "SELECT p.issued_at AS issued_at, a.patient_id AS patient_id, p.total_amount AS total_amount FROM eval_clinic.prescriptions p JOIN eval_clinic.appointments a ON a.appt_no = p.appt_no",
+    "description": "处方通过预约号关联患者，用于计算开具过处方的患者数；一张处方对应一次预约，不放大行数",
+    "snapshot_date_column": null,
+    "columns": [
+     {
+      "name": "issued_at",
+      "physical_type": "DATETIME",
+      "comment": ""
+     },
+     {
+      "name": "patient_id",
+      "physical_type": "VARCHAR(12)",
+      "comment": ""
+     },
+     {
+      "name": "total_amount",
+      "physical_type": "DECIMAL(10, 2)",
+      "comment": ""
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [],
+   "dependency_group": [
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "befae73f-23c2-5dba-9af1-06b2eb4f91b0",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 61,
+   "client_ref": "visit_count",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "9e99f39c-1626-59fd-ab0d-69da102e373a",
+   "display_name": "就诊人次",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "9e99f39c-1626-59fd-ab0d-69da102e373a",
+    "name": "visit_count",
+    "display_name": "就诊人次",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "simple",
+    "dataset_id": "99b33473-2759-5419-84d0-69eeefa75acf",
+    "aggregation": "sum",
+    "measure": {
+     "dataset_id": "99b33473-2759-5419-84d0-69eeefa75acf",
+     "column": "visit_count"
+    },
+    "filters": [],
+    "time_field": {
+     "dataset_id": "99b33473-2759-5419-84d0-69eeefa75acf",
+     "column": "stat_date"
+    }
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "be726bc2-6072-5d86-a33e-b3128ad50e17"
+   ],
+   "dependency_group": [
+    "be726bc2-6072-5d86-a33e-b3128ad50e17",
+    "befae73f-23c2-5dba-9af1-06b2eb4f91b0"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "fb11b653-1b84-53f8-9787-43132aa67799",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 62,
+   "client_ref": "appointment_count",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "a915afeb-868a-52e5-a2c0-2e529ab41372",
+   "display_name": "预约总数",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "a915afeb-868a-52e5-a2c0-2e529ab41372",
+    "name": "appointment_count",
+    "display_name": "预约总数",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "simple",
+    "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+    "aggregation": "count",
+    "measure": null,
+    "filters": [],
+    "time_field": {
+     "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+     "column": "appt_date"
+    }
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "67237800-e1ed-5cde-9df7-ff4759037f20"
+   ],
+   "dependency_group": [
+    "67237800-e1ed-5cde-9df7-ff4759037f20",
+    "fb11b653-1b84-53f8-9787-43132aa67799"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "4a7ffe98-1866-5ad8-a863-c6e8de01904e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 63,
+   "client_ref": "no_show_count",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "c5fa878b-5568-59aa-af6a-689bf5d0153c",
+   "display_name": "爽约数",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "c5fa878b-5568-59aa-af6a-689bf5d0153c",
+    "name": "no_show_count",
+    "display_name": "爽约数",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "simple",
+    "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+    "aggregation": "count",
+    "measure": null,
+    "filters": [
+     {
+      "column": {
+       "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+       "column": "status"
+      },
+      "operator": "eq",
+      "values": [
+       "爽约"
+      ]
+     }
+    ],
+    "time_field": {
+     "dataset_id": "0f6f9b06-d102-5ff0-ad86-c5ac864487b1",
+     "column": "appt_date"
+    }
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "67237800-e1ed-5cde-9df7-ff4759037f20"
+   ],
+   "dependency_group": [
+    "4a7ffe98-1866-5ad8-a863-c6e8de01904e",
+    "67237800-e1ed-5cde-9df7-ff4759037f20"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "4ab7b9cf-6eee-5165-8b8e-edeeddc8df1a",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 64,
+   "client_ref": "no_show_rate",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "b538e1b0-16d5-5adb-a71f-5dc1afd543dc",
+   "display_name": "爽约率",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "b538e1b0-16d5-5adb-a71f-5dc1afd543dc",
+    "name": "no_show_rate",
+    "display_name": "爽约率",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "ratio",
+    "numerator_id": "c5fa878b-5568-59aa-af6a-689bf5d0153c",
+    "denominator_id": "a915afeb-868a-52e5-a2c0-2e529ab41372"
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "4a7ffe98-1866-5ad8-a863-c6e8de01904e",
+    "fb11b653-1b84-53f8-9787-43132aa67799"
+   ],
+   "dependency_group": [
+    "4a7ffe98-1866-5ad8-a863-c6e8de01904e",
+    "4ab7b9cf-6eee-5165-8b8e-edeeddc8df1a",
+    "67237800-e1ed-5cde-9df7-ff4759037f20",
+    "fb11b653-1b84-53f8-9787-43132aa67799"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [
+    {
+     "code": "DATASET_SOURCE_BLOCKED",
+     "severity": "error",
+     "path": "/measure",
+     "message": "依赖数据集来源未就绪",
+     "details": {
+      "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0"
+     }
+    }
+   ],
+   "id": "9ca64d28-6855-5b3c-9856-6966e7e3faa9",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 65,
+   "client_ref": "rx_total_amount",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "8fc126b4-120e-5a92-b206-8bccef72ba1e",
+   "display_name": "处方总金额",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "8fc126b4-120e-5a92-b206-8bccef72ba1e",
+    "name": "rx_total_amount",
+    "display_name": "处方总金额",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "simple",
+    "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+    "aggregation": "sum",
+    "measure": {
+     "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+     "column": "total_amount"
+    },
+    "filters": [],
+    "time_field": {
+     "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+     "column": "issued_at"
+    }
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "dependency_group": [
+    "9ca64d28-6855-5b3c-9856-6966e7e3faa9",
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [
+    {
+     "code": "DATASET_SOURCE_BLOCKED",
+     "severity": "error",
+     "path": "/measure",
+     "message": "依赖数据集来源未就绪",
+     "details": {
+      "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0"
+     }
+    }
+   ],
+   "id": "8b526fac-c4a0-5a29-abdd-3d912f008998",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 66,
+   "client_ref": "rx_patient_count",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "f20d5370-fa97-5571-bff5-9d3bc88d9eae",
+   "display_name": "开具过处方的患者数",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "f20d5370-fa97-5571-bff5-9d3bc88d9eae",
+    "name": "rx_patient_count",
+    "display_name": "开具过处方的患者数",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "simple",
+    "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+    "aggregation": "count_distinct",
+    "measure": {
+     "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+     "column": "patient_id"
+    },
+    "filters": [],
+    "time_field": {
+     "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0",
+     "column": "issued_at"
+    }
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "dependency_group": [
+    "8b526fac-c4a0-5a29-abdd-3d912f008998",
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [
+    {
+     "code": "DATASET_SOURCE_BLOCKED",
+     "severity": "error",
+     "path": "/components",
+     "message": "依赖数据集来源未就绪",
+     "details": {
+      "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0"
+     }
+    },
+    {
+     "code": "DATASET_SOURCE_BLOCKED",
+     "severity": "error",
+     "path": "/components",
+     "message": "依赖数据集来源未就绪",
+     "details": {
+      "dataset_id": "ad43a488-513e-52eb-b04b-985706ba78a0"
+     }
+    }
+   ],
+   "id": "0a2a1d6d-db54-5b21-8826-a42316e58b53",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 67,
+   "client_ref": "avg_rx_amount_per_patient",
+   "operation": "create",
+   "target_kind": "metric",
+   "target_id": "bd8de472-67f2-5d0d-8152-4fc433e76908",
+   "display_name": "人均处方金额",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "bd8de472-67f2-5d0d-8152-4fc433e76908",
+    "name": "avg_rx_amount_per_patient",
+    "display_name": "人均处方金额",
+    "description": "",
+    "synonyms": [],
+    "evidence": [],
+    "kind": "ratio",
+    "numerator_id": "8fc126b4-120e-5a92-b206-8bccef72ba1e",
+    "denominator_id": "f20d5370-fa97-5571-bff5-9d3bc88d9eae"
+   },
+   "field_changes": [],
+   "evidence": [],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "8b526fac-c4a0-5a29-abdd-3d912f008998",
+    "9ca64d28-6855-5b3c-9856-6966e7e3faa9"
+   ],
+   "dependency_group": [
+    "0a2a1d6d-db54-5b21-8826-a42316e58b53",
+    "8b526fac-c4a0-5a29-abdd-3d912f008998",
+    "9ca64d28-6855-5b3c-9856-6966e7e3faa9",
+    "e1287d24-f352-5f80-96bf-afbde4ca2456"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "960cb2b7-5c81-5cec-a028-725af4a31394",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 68,
+   "client_ref": "dept_quanke",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "e0fddb51-cc3a-5d7f-9e0a-ddb6a8725000",
+   "display_name": "全科",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "e0fddb51-cc3a-5d7f-9e0a-ddb6a8725000",
+    "type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "values": {
+     "dept_name": "全科"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "6407f236-3aec-5358-b40b-fe2b8bdc06a8",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "诊所设有科室，如全科、儿科、口腔科。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "6407f236-3aec-5358-b40b-fe2b8bdc06a8",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "诊所设有科室，如全科、儿科、口腔科。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "960cb2b7-5c81-5cec-a028-725af4a31394",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "af673b1f-7db8-5c5e-ad55-9fd6c2272e9b",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 69,
+   "client_ref": "dept_erke",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "35fc7e95-4a4f-5604-94d5-b1831ec92e08",
+   "display_name": "儿科",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "35fc7e95-4a4f-5604-94d5-b1831ec92e08",
+    "type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "values": {
+     "dept_name": "儿科"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "54431db2-98f7-5d44-83fa-21bb55ed5f86",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "诊所设有科室，如全科、儿科、口腔科。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "54431db2-98f7-5d44-83fa-21bb55ed5f86",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "诊所设有科室，如全科、儿科、口腔科。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "af673b1f-7db8-5c5e-ad55-9fd6c2272e9b",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "9cd759d4-eca1-5d49-ba79-d286b4130d16",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 70,
+   "client_ref": "dept_kouqiang",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "8d786456-b845-5d9c-9262-14cd1061efa3",
+   "display_name": "口腔科",
+   "owner_label": "科室",
+   "before": null,
+   "after": {
+    "id": "8d786456-b845-5d9c-9262-14cd1061efa3",
+    "type_id": "e3ac2d6b-2468-510f-abc0-7958cf47fdef",
+    "values": {
+     "dept_name": "口腔科"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "ee125314-697f-5865-ac15-87613466ee2e",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "诊所设有科室，如全科、儿科、口腔科。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "ee125314-697f-5865-ac15-87613466ee2e",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "诊所设有科室，如全科、儿科、口腔科。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "dependency_group": [
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "9cd759d4-eca1-5d49-ba79-d286b4130d16",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "bb225590-e979-57c7-b51f-6a1d1280bac1",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 71,
+   "client_ref": "doc_xu",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "f5fdaad4-a8d6-5a61-b3c7-06115646ecf8",
+   "display_name": "许医生",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "f5fdaad4-a8d6-5a61-b3c7-06115646ecf8",
+    "type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "values": {
+     "doctor_id": "D01",
+     "doctor_name": "许医生"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "b5b4826e-f8e7-55a4-b2f4-5b38877da76d",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "b5b4826e-f8e7-55a4-b2f4-5b38877da76d",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "dependency_group": [
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "bb225590-e979-57c7-b51f-6a1d1280bac1",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "0b0e2ca9-b6e6-5b63-962c-8d633828f11e",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 72,
+   "client_ref": "doc_tang",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "d5ca1eff-3f2a-54fc-9d11-1a9240c6d74a",
+   "display_name": "唐医生",
+   "owner_label": "医生",
+   "before": null,
+   "after": {
+    "id": "d5ca1eff-3f2a-54fc-9d11-1a9240c6d74a",
+    "type_id": "26fec915-822c-5449-9a4d-e1135434175b",
+    "values": {
+     "doctor_id": "D05",
+     "doctor_name": "唐医生"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "60172b16-3351-5f48-8f92-f9b09800c609",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "60172b16-3351-5f48-8f92-f9b09800c609",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "dependency_group": [
+    "0b0e2ca9-b6e6-5b63-962c-8d633828f11e",
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "d27da018-0270-5cb6-9732-f6818ed544fe",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 73,
+   "client_ref": "drug_amoxicillin",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "82d7449c-0d07-5ac5-ba38-e4a70302bf72",
+   "display_name": "阿莫西林胶囊",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "82d7449c-0d07-5ac5-ba38-e4a70302bf72",
+    "type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "values": {
+     "drug_name": "阿莫西林胶囊"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "1d53ea9e-25ca-5a21-b07b-158431473ed3",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "1d53ea9e-25ca-5a21-b07b-158431473ed3",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "d27da018-0270-5cb6-9732-f6818ed544fe",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "2431be1b-2a54-5e90-b4ce-65953df2b483",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 74,
+   "client_ref": "drug_ibuprofen",
+   "operation": "create",
+   "target_kind": "material_object",
+   "target_id": "dc146594-537d-5c97-99da-ab3d435e7f8d",
+   "display_name": "布洛芬混悬液",
+   "owner_label": "药品",
+   "before": null,
+   "after": {
+    "id": "dc146594-537d-5c97-99da-ab3d435e7f8d",
+    "type_id": "5e41d356-39fa-5e01-a145-f58bea7dd2f2",
+    "values": {
+     "drug_name": "布洛芬混悬液"
+    },
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "288df8f7-674b-528f-af35-ad15c1eb3028",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 7,
+       "line_end": 7
+      },
+      "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "288df8f7-674b-528f-af35-ad15c1eb3028",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "药品记录药品编码、名称、单价和类别，例如阿莫西林胶囊、布洛芬混悬液。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "dependency_group": [
+    "2431be1b-2a54-5e90-b4ce-65953df2b483",
+    "572ec65c-b46f-5cbf-ae8d-a2b72172f11e",
+    "fd4ce99c-49a8-5f3e-94f7-291f3d564514"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "70ee82a1-7c5e-5328-a475-579e67265768",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 75,
+   "client_ref": "doc_xu_in_dept_quanke",
+   "operation": "create",
+   "target_kind": "material_link",
+   "target_id": "867bb110-a9cd-5c15-a642-391791a2c690",
+   "display_name": "许医生 → 全科",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "867bb110-a9cd-5c15-a642-391791a2c690",
+    "type_id": "ed6a7a5c-d581-571f-8278-6afc68e5de42",
+    "source_id": "f5fdaad4-a8d6-5a61-b3c7-06115646ecf8",
+    "target_id": "e0fddb51-cc3a-5d7f-9e0a-ddb6a8725000",
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "d0b2a25f-0c6f-515d-9c46-38f548e69d54",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "d0b2a25f-0c6f-515d-9c46-38f548e69d54",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "960cb2b7-5c81-5cec-a028-725af4a31394",
+    "98c58d82-4389-541f-84b7-38f221319837",
+    "bb225590-e979-57c7-b51f-6a1d1280bac1"
+   ],
+   "dependency_group": [
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "70ee82a1-7c5e-5328-a475-579e67265768",
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "960cb2b7-5c81-5cec-a028-725af4a31394",
+    "98c58d82-4389-541f-84b7-38f221319837",
+    "bb225590-e979-57c7-b51f-6a1d1280bac1",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  },
+  {
+   "source_diagnostics": [],
+   "id": "68b2a551-cb51-5da4-815a-bffc5caecb88",
+   "batch_id": "e3cb0778-c4f1-5d3c-a8c6-bbdb67336b54",
+   "ordinal": 76,
+   "client_ref": "doc_tang_in_dept_erke",
+   "operation": "create",
+   "target_kind": "material_link",
+   "target_id": "454e71a9-f1b6-5a66-bcf6-24c7df093911",
+   "display_name": "唐医生 → 儿科",
+   "owner_label": null,
+   "before": null,
+   "after": {
+    "id": "454e71a9-f1b6-5a66-bcf6-24c7df093911",
+    "type_id": "ed6a7a5c-d581-571f-8278-6afc68e5de42",
+    "source_id": "d5ca1eff-3f2a-54fc-9d11-1a9240c6d74a",
+    "target_id": "35fc7e95-4a4f-5604-94d5-b1831ec92e08",
+    "evidence": [
+     {
+      "kind": "material",
+      "id": "3300355f-d92c-55aa-98bb-3af3d978eabb",
+      "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+      "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+      "locator": {
+       "heading": null,
+       "line_start": 3,
+       "line_end": 3
+      },
+      "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。"
+     }
+    ]
+   },
+   "field_changes": [],
+   "evidence": [
+    {
+     "kind": "material",
+     "id": "3300355f-d92c-55aa-98bb-3af3d978eabb",
+     "material_id": "b3ca482b-cde5-463f-abf3-6d7b7beb5466",
+     "material_sha256": "60e570d28dcf9e57e938f8470fbc6dda87e1ce31528348d7ee4add2afaf7e4b1",
+     "locator": {
+      "heading": null,
+      "line_start": 3,
+      "line_end": 3
+     },
+     "quote": "例如全科的许医生（D01）、儿科的唐医生（D05）。",
+     "material_name": "诊所预约与处方说明.md",
+     "material_archived": false
+    }
+   ],
+   "reason": "",
+   "atomic_group_id": null,
+   "duplicate_candidates": [],
+   "similar_definitions": [],
+   "physical_differences": [],
+   "depends_on": [
+    "0b0e2ca9-b6e6-5b63-962c-8d633828f11e",
+    "98c58d82-4389-541f-84b7-38f221319837",
+    "af673b1f-7db8-5c5e-ad55-9fd6c2272e9b"
+   ],
+   "dependency_group": [
+    "0b0e2ca9-b6e6-5b63-962c-8d633828f11e",
+    "36c28164-3979-57d7-9e3e-162147179edd",
+    "508924f2-9055-5608-9937-2dbac35830f8",
+    "63e8de4a-56eb-5e82-a3cb-114b832ba115",
+    "68b2a551-cb51-5da4-815a-bffc5caecb88",
+    "7a3a2354-aa17-5759-9e04-7d236a2902e0",
+    "98c58d82-4389-541f-84b7-38f221319837",
+    "af673b1f-7db8-5c5e-ad55-9fd6c2272e9b",
+    "c45f2979-7453-5d22-b38a-cc292e4361f3",
+    "e274e3c2-fe7e-566f-a0f5-808260239806",
+    "e36ea50a-0037-557c-83fa-35e5fb9c956d"
+   ],
+   "status": "pending",
+   "stored_status": "pending",
+   "status_reason": "",
+   "accepted_revision": null,
+   "expected_instance_revision": null,
+   "accepted_instance_revision": null,
+   "decided_at": null
+  }
+ ]
+}

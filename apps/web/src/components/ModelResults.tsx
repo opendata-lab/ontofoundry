@@ -110,7 +110,7 @@ export function ModelResults({
   const requested = params.get("panel") as Panel | null;
   const [tab, setTabState] = useState<Panel>(requested ?? (proposals && pending > 0 ? "proposals" : "draft"));
   const [fresh, setFresh] = useState(0);
-  const lastRevision = useRef(session?.revision);
+  const lastDraft = useRef(session?.draft_sha256);
   const setTab = (next: Panel) => {
     setTabState(next);
     if (next === "draft") setFresh(0);
@@ -131,10 +131,12 @@ export function ModelResults({
     seenLatest.current = latest;
   }, [latest, proposals]);
   // Accepted proposals land in the draft; badge the draft tab until viewed.
+  // Keyed on the draft's content, not the revision: starting a run or storing
+  // its result bumps the revision without changing the draft.
   useEffect(() => {
-    const previous = lastRevision.current;
-    lastRevision.current = session?.revision;
-    if (previous !== undefined && session && session.revision > previous && tab === "proposals") setFresh((n) => n + 1);
+    const previous = lastDraft.current;
+    lastDraft.current = session?.draft_sha256;
+    if (previous !== undefined && session && session.draft_sha256 !== previous && tab === "proposals") setFresh((n) => n + 1);
   }, [session, tab]);
   const [kind, setKind] = useState<TargetKind>("object_type");
   const [query, setQuery] = useState("");
