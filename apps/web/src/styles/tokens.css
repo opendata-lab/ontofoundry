@@ -137,7 +137,8 @@
   --inspector-search-width: 240px;
   --inspector-filter-width: 128px;
   --inspector-cardinality-width: 80px;
-  --source-fields-columns: minmax(15rem, 1fr) minmax(0, 3fr);
+  /* One column: the data source sits above the field table (user 2026-10-23). */
+  --source-fields-columns: minmax(0, 1fr);
   --inspector-basic-label-width: 5rem;
   --property-table-min-width: 66rem;
   --property-name-column: 10%;
@@ -446,7 +447,7 @@
   gap: var(--space-xs);
 }
 
-/* Source configuration keeps its own responsive width beside the field table. */
+/* Source configuration above the field table; the token sets the columns. */
 .source-fields-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

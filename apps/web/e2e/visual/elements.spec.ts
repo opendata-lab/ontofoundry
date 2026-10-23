@@ -47,7 +47,8 @@ test("object property editing keeps compact inputs and header save actions", asy
   const source = await detail.locator(".source-fields-source").boundingBox();
   const fields = await detail.locator(".source-fields-layout > section").last().boundingBox();
   const instances = await detail.getByRole("region", { name: "实体实例", exact: true }).boundingBox();
-  expect(source!.x + source!.width).toBeLessThan(fields!.x);
+  // The data source sits above the field table (2026-10-23).
+  expect(source!.y + source!.height).toBeLessThanOrEqual(fields!.y);
   expect(instances!.y).toBeGreaterThanOrEqual(Math.max(source!.y + source!.height, fields!.y + fields!.height));
   for (const selector of await detail.locator(".source-fields-source .ant-select").all()) {
     const box = await selector.boundingBox();
