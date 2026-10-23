@@ -228,25 +228,10 @@ export function BuilderPage() {
         note={session ? "最近保存: " + new Date(session.updated_at).toLocaleString("zh-CN", { hour12: false }) : "尚未开始"}
       />
       <PageBody>
-        {/* A modeling run that ended with questions, with or without
-          proposals. The conversation's own run label only says the turn
-          finished; the user answers in the conversation as plain text. */}
+        {/* A modeling run that ended with questions instead of a result. The
+          conversation's own run label only says the turn finished. */}
         {!running && session?.result_state === "awaiting_reply" && (
-          <Alert
-            type="info"
-            showIcon
-            role="status"
-            message={session.task_detail}
-            description={
-              session.open_questions?.length ? (
-                <ol className="m-0 list-decimal pl-5">
-                  {session.open_questions.map((question) => (
-                    <li key={question}>{question}</li>
-                  ))}
-                </ol>
-              ) : undefined
-            }
-          />
+          <Alert type="info" showIcon role="status" message={session.task_detail} />
         )}
         <div className="flex min-h-0 flex-1 gap-4">
           <Panel fill className={collapsed ? "max-w-16" : "max-w-64 2xl:max-w-80"}>

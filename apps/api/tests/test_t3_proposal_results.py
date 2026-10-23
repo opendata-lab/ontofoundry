@@ -681,10 +681,9 @@ def test_valid_budget_acceptance_and_transient_ledger_download(
         "used": 2,
         "result_sha256": hashlib.sha256(content).hexdigest(),
     }
-    missing = DataAgentError("missing", status_code=404)
-    values = [content, missing, ledger]
+    values = [content, ledger]
     if transient:
-        values = [content, missing, DataAgentError("暂态故障", status_code=503), *values]
+        values = [content, DataAgentError("暂态故障", status_code=503), *values]
     paths = install_download(monkeypatch, values)
 
     async def forbidden(self, **kwargs):
@@ -694,5 +693,5 @@ def test_valid_budget_acceptance_and_transient_ledger_download(
     if transient:
         assert reconcile(client, session["id"]) == "failed_retriable"
     assert reconcile(client, session["id"]) == "done"
-    assert len(paths) == (6 if transient else 3)
+    assert len(paths) == (4 if transient else 2)
     assert len(stored(client, session["id"])[1]) == 3

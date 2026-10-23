@@ -361,7 +361,6 @@ def session_data(item):
         "last_result_task_id": item.last_result_task_id,
         "result_state": item.result_state,
         "result_warnings": item.result_warnings,
-        "open_questions": item.open_questions or [],
         "result_claimed_at": item.result_claimed_at,
         "updated_at": item.updated_at,
         "abandoned_at": item.abandoned_at,

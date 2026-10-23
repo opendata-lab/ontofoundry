@@ -134,9 +134,6 @@ class ModelingSessionRecord(Base):
     last_result_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     result_state: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
     result_warnings: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
-    # Questions from the last run still waiting for the user's reply; cleared
-    # when the next run starts. Earlier questions remain in the conversation.
-    open_questions: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
     result_claimed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

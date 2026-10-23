@@ -847,8 +847,6 @@ async def send_message(
             dataagent_task_mode=mode,
             dataagent_run_token=run_token,
             run_manifest_json=manifest,
-            # The reply that starts this run answers them; history keeps them.
-            open_questions=[],
             revision=expected_revision + 1,
             updated_at=utc_now(),
         )

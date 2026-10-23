@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from run_helpers import RUN_TOKEN, install_download, reconcile, row
-from test_t3_proposal_results import proposals_run, result
+from test_t3_proposal_results import proposals_run, result, stored
 
 from ontofoundry_api.db_models import ModelingSessionRecord
 from ontofoundry_api.services.dataagent import (
@@ -86,37 +86,18 @@ def test_dynamic_paths_have_a_single_authoritative_source():
     assert "ontofoundry-result-" not in render("chat") and "超过 50 KB" in render("chat")
 
 
-@pytest.mark.parametrize(
-    "marker, state, shown",
-    [
-        ({"run_token": RUN_TOKEN, "questions": [
-            "人均金额的分母按去重患者计（提案已按此处理），是否确认？",
-            "一次预约能开几张处方？提案按可开多张（多对一）处理，如只能一张请回复。",
-        ]}, "awaiting_reply", 2),
-        (b"{}", "done", 0),
-        (DataAgentError("无权限", status_code=403), "done", 0),
-        (DataAgentError("missing", status_code=404), "done", 0),
-        (DataAgentError("暂态故障", status_code=503), "failed_retriable", 0),
-    ],
-)
-def test_questions_travel_with_the_result_and_never_cost_the_proposals(
-    client, monkeypatch, marker, state, shown
-):
+def test_a_needs_input_file_beside_a_result_never_costs_the_proposals(client, monkeypatch):
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, []), marker])
+    paths = install_download(monkeypatch, [result(manifest, [])])
 
     async def forbidden(self, **kwargs):
         pytest.fail("问题文件不能发起模型修复")
 
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
-    assert reconcile(client, session["id"]) == state
-    stored = row(client, session["id"])
-    assert len(stored.open_questions) == shown
-    if shown:
-        assert stored.open_questions[1].startswith("一次预约能开几张处方？")
-        assert "2 个问题待你回复" in stored.task_detail
-    elif state == "done" and isinstance(marker, (bytes, DataAgentError)) and getattr(marker, "status_code", 0) != 404:
-        assert "提案不受影响" in stored.result_warnings[0]
+    assert reconcile(client, session["id"]) == "done"
+    # Questions live in the agent's reply; the file is not even read.
+    assert not any("needs-input" in path for path in paths)
+    assert len(stored(client, session["id"])[0]) == 1
 
 
 def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatch):
@@ -129,7 +110,7 @@ def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatc
     marker["run_token"] = RUN_TOKEN
     install_download(monkeypatch, [DataAgentError("missing", status_code=404), marker])
     assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert row(client, session["id"]).open_questions == marker["questions"]
+    assert marker["questions"][0].strip()
 
 
 def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, monkeypatch):

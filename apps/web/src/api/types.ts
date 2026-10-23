@@ -394,8 +394,6 @@ export type ModelingSession = {
   last_result_task_id?: string | null;
   result_state?: string;
   result_warnings?: string[];
-  /** The last run's questions still waiting for a reply, as plain text. */
-  open_questions?: string[];
   result_claimed_at?: ISOTime | null;
   updated_at: ISOTime;
   validation?: ValidationReport;
