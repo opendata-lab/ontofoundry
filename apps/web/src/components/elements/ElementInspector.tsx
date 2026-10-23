@@ -645,7 +645,7 @@ export function ElementView({
       : NOUN[kind];
   // Without a display name the title already is the identifier; show it once.
   const technical = element && "display_name" in element && element.display_name ? element.name : "";
-  const content = (() => {
+  const contentFor = (tab: ElementTab) => {
     if (!draft || !element) return null;
     if (kind === "metric")
       return (
@@ -665,30 +665,44 @@ export function ElementView({
         />
       );
     if (kind === "dataset")
-      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={selectedTab} canPreview={member} revision={loaded?.session?.revision} />;
+      return <DatasetPanel draft={draft} dataset={element as Dataset} editing={editing} change={change} open={open} tab={tab} canPreview={member} revision={loaded?.session?.revision} />;
     if (!panel) return null;
     if (object) {
       const props = panel as PanelProps<ObjectType>;
-      if (selectedTab === "properties") return <div className="flex min-w-0 flex-col gap-4">
+      if (tab === "properties") return <div className="flex min-w-0 flex-col gap-4">
         <PropertiesPanel key={`${object.id}:${requestedKind === "property" ? id : "all"}`} {...props} initialPropertyId={requestedKind === "property" ? id : undefined} />
         {member && !creating && <ContentBlock aria-label="实体实例" data-element-instances="">
           <SectionTitle title="实例" />
           <ElementInstances key={`${object.id}:${editing ? "edit" : "read"}`} {...panel} canBrowseDatabase={!previewHash && !editing} initialObjectId={resolved?.factId} />
         </ContentBlock>}
       </div>;
-      if (selectedTab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
-      if (selectedTab === "rules") return <RulesPanel key={`${object.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
+      if (tab === "relations") return <RelationsPanel key={`${object.id}:${editing ? "edit" : "read"}`} {...props} />;
+      if (tab === "rules") return <RulesPanel key={`${object.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
       return <ObjectBasicPanel {...props} />;
     }
-    if (selectedTab === "rules") return <RulesPanel key={`${link?.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
-    if (selectedTab === "mapping") return <LinkDetailsPanel {...(panel as PanelProps<LinkType>)} showBinding={member} />;
+    if (tab === "rules") return <RulesPanel key={`${link?.id}:${requestedKind === "rule" ? id : "all"}`} {...panel} initialRuleId={requestedKind === "rule" ? id : undefined} />;
+    if (tab === "mapping") return <LinkDetailsPanel {...(panel as PanelProps<LinkType>)} showBinding={member} />;
     return <LinkOverviewPanel
       {...(panel as PanelProps<LinkType>)}
       showInstances={member && !creating}
       initialInstances={requestedTab === "instances"}
       canBrowseDatabase={!previewHash && !editing}
     />;
-  })();
+  };
+  // Visited tabs stay mounted and are only hidden. Remounting a tab's tables
+  // re-measures them (rc-table forces a full-page layout on mount), which over
+  // a large ontology view cost about a second per switch.
+  const [visited, setVisited] = useState<ElementTab[]>([]);
+  const elementKey = `${kind}:${element?.id ?? ""}:${editing}`;
+  useEffect(() => setVisited([]), [elementKey]);
+  useEffect(() => {
+    if (tabs.length && !visited.includes(selectedTab)) setVisited((current) => [...current, selectedTab]);
+  }, [selectedTab, tabs.length, visited]);
+  const content = !tabs.length || kind === "dataset"
+    ? contentFor(selectedTab)
+    : (visited.includes(selectedTab) ? visited : [...visited, selectedTab]).map((tab) => (
+        <div key={tab} hidden={tab !== selectedTab} className="min-w-0">{contentFor(tab)}</div>
+      ));
   useLayoutEffect(() => {
     reportElement?.(modal ? { dirty, busy } : { title: displayName(element) || title, dirty, busy });
     return () => reportElement?.({ dirty: false, busy: false });

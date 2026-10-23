@@ -105,6 +105,19 @@ describe("object popup", () => {
     expect(within(dialog).queryByText(/主数据集 customers/)).not.toBeInTheDocument();
   });
 
+  it("keeps a visited tab mounted, so returning to it does not rebuild its tables", async () => {
+    const draft = example("01-basic-sales");
+    const customer = draft.object_types.find((o) => o.name === "customer")!;
+    show(draft, `inspect=object_type:${customer.id}&inspectTab=properties`);
+    const dialog = await screen.findByRole("dialog");
+    const binding = await within(dialog).findByText("main.customer_id");
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^关系/ }));
+    await waitFor(() => expect(binding).not.toBeVisible());
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
+    // The very same node: hidden and shown again, never remounted.
+    await waitFor(() => expect(within(dialog).getByText("main.customer_id")).toBe(binding));
+  });
+
   it("edits the object and saves only its aggregate against the current version", async () => {
     const draft = example("01-basic-sales");
     const customer = draft.object_types.find((o) => o.name === "customer")!;

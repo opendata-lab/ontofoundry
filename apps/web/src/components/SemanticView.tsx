@@ -1,7 +1,7 @@
 import { Button, Dropdown, Empty, Input, Segmented, Table, Tag, Tooltip, Tree, Typography } from "antd";
 import type { DataNode } from "antd/es/tree";
 import { Box, Database, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Sigma, Workflow } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import type { Draft, TypeGraph } from "../api/types";
 import { usePageActive } from "../hooks/usePageTab";
 import type { ElementRequest } from "../lib/elementInspector";
@@ -35,7 +35,9 @@ function storedCollapsed() {
  * on the graph; metrics and datasets are listed, since they are not ontology
  * nodes. Rules open inside their owner's popup.
  */
-export function SemanticView({
+// Memoized: an element popup over the view changes page state on every tab
+// switch, and re-rendering the whole graph behind it made each switch take seconds.
+export const SemanticView = memo(function SemanticView({
   graph,
   model,
   onOpen,
@@ -308,4 +310,4 @@ export function SemanticView({
       </section>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
 import type { Draft, WorkspaceOverview } from "../api/types";
@@ -20,6 +20,10 @@ export function OntologyViewPage() {
   const [resourceError, setResourceError] = useState("");
   const [draftSession, setDraftSession] = useState<string | null>(null);
   const detail = useElementDetail();
+  // Stable callbacks keep the memoized graph from re-rendering when the popup changes.
+  const detailRef = useRef(detail);
+  detailRef.current = detail;
+  const openPage = useCallback((request: ElementRequest) => detailRef.current.open(request), []);
   // Kept in memory only: a reload returns to the plain graph.
   const [inspected, setInspected] = useState<ElementRequest | null>(null);
   const load = () => setAttempt((value) => value + 1);
@@ -86,7 +90,7 @@ export function OntologyViewPage() {
         <Panel fill>
           {draftSession && <PanelToolbar><Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link></PanelToolbar>}
           <div className="min-h-0 flex-1">
-            {graph ? <SemanticView graph={graph} model={model} onOpen={setInspected} onOpenPage={detail.open} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
+            {graph ? <SemanticView graph={graph} model={model} onOpen={setInspected} onOpenPage={openPage} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
           </div>
         </Panel>
       </PageBody>
