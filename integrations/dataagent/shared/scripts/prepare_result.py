@@ -218,7 +218,7 @@ def platform_check(pack, batch, candidate, retry_command):
             return None
 
     try:
-        config = json.loads(Path(pack["mcp_config_file"]).read_bytes())
+        config = json.loads(Path(pack.get("platform_check_file") or pack["mcp_config_file"]).read_bytes())
         parts = urlsplit(config["url"])
         expected = (
             "/api/v1/ontology/workspaces/"

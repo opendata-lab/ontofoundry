@@ -337,6 +337,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert "ofrun." not in prompt
     access_name = f"ontofoundry-mcp-{manifest['run_token']}.json"
     assert pack["mcp_config_file"] == "inputs/" + access_name
+    assert pack["platform_check_file"] == pack["mcp_config_file"]
     assert "inputs/" + access_name not in prompt
     access = json.loads(uploads[access_name])
     assert access["headers"]["Authorization"].startswith("Bearer ofrun.")

@@ -61,6 +61,7 @@ def build_work_pack(
     context_file: str,
     schema_file: str,
     mcp_config_file: str | None = None,
+    platform_check_file: str | None = None,
     tables: list[dict] | None = None,
     tables_file: str | None = None,
     scenario_facts: dict | None = None,
@@ -115,6 +116,9 @@ def build_work_pack(
     }
     if mcp_config_file:
         pack["mcp_config_file"] = mcp_config_file
+    if platform_check_file:
+        # The run credential for the merge script's platform check.
+        pack["platform_check_file"] = platform_check_file
     pack["workflow_dir"] = "modeling/"
     if scenario_facts:
         pack["scenario_facts"] = scenario_facts

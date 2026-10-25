@@ -960,22 +960,24 @@ async def send_message(
                 json.dumps(result_schema(), ensure_ascii=False).encode(),
                 "application/json",
             )
-            mcp = None
-            if item.base_version_id:
-                access = run_mcp_access(
-                    request, workspace_id, session_id, run_token, item, user.id
-                )
-                uploaded_access = await dataagent.upload(
-                    topic_id,
-                    f"ontofoundry-mcp-{run_token}.json",
-                    json.dumps(mcp_access_file(access), indent=2).encode(),
-                    "application/json",
-                )
-                mcp = {
-                    "url": access["url"],
-                    "version_id": access["version_id"],
-                    "file": str(uploaded_access.get("rel_path") or ""),
-                }
+            # Every run gets its credential: the merge script's platform check
+            # needs it even before anything is published. The MCP config (which
+            # reads the published ontology) is only offered once a version exists.
+            access = run_mcp_access(
+                request, workspace_id, session_id, run_token, item, user.id
+            )
+            uploaded_access = await dataagent.upload(
+                topic_id,
+                f"ontofoundry-mcp-{run_token}.json",
+                json.dumps(mcp_access_file(access), indent=2).encode(),
+                "application/json",
+            )
+            access_path = str(uploaded_access.get("rel_path") or "")
+            mcp = (
+                {"url": access["url"], "version_id": access["version_id"], "file": access_path}
+                if item.base_version_id
+                else None
+            )
             tables_file = material_path_by_id[table_receipt.id] if table_receipt is not None else None
             facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
             prior_plan_file = None
@@ -993,6 +995,7 @@ async def send_message(
                 context_file=str(context.get("rel_path") or ""),
                 schema_file=str(schema.get("rel_path") or ""),
                 mcp_config_file=mcp["file"] if mcp else None,
+                platform_check_file=access_path,
                 tables=table_catalog,
                 tables_file=tables_file,
                 scenario_facts=facts,
@@ -1007,7 +1010,8 @@ async def send_message(
                 "work_pack": work_pack_file,
                 "materials": material_indices,
                 "mcp": mcp["file"] if mcp else None,
-                "mcp_access": {"url": mcp["url"], "user_id": user.id} if mcp else None,
+                "run_access": access_path,
+                "mcp_access": {"url": access["url"], "user_id": user.id},
                 # Fixed for the run: the repair round reuses the same table structure.
                 "tables": table_catalog,
                 "tables_file": tables_file,

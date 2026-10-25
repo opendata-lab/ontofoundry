@@ -232,3 +232,16 @@ def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, mon
     assert "期望" in sent[0] and "实际" in sent[0] and "show_example.py" in sent[0]
     assert "old-pack" not in sent[0] and before["source_draft_sha256"] not in sent[0]
     assert "累计修正：2/2" in sent[0]
+
+
+def test_a_run_before_any_publish_still_gets_its_platform_check_credential():
+    # No published version: no MCP config to read, but the merge script's
+    # platform check still needs this run's credential.
+    context = json.loads((FIXTURES / "budget-context.json").read_bytes())
+    context["execution"] = execution_input("example")
+    pack, _ = build_work_pack(
+        context, [], context_file="inputs/context.json", schema_file="inputs/schema.json",
+        platform_check_file="inputs/ontofoundry-mcp-example.json",
+    )
+    assert pack["platform_check_file"] == "inputs/ontofoundry-mcp-example.json"
+    assert "mcp_config_file" not in pack

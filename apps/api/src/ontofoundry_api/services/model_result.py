@@ -252,7 +252,7 @@ async def _request_repair(
         files = next_manifest.get("input_files", {})
         if not files.get("schema") or "materials" not in files:
             return None
-        if files.get("mcp"):
+        if files.get("mcp") or files.get("run_access"):
             metadata = files.get("mcp_access")
             if not metadata:
                 return None
@@ -280,7 +280,11 @@ async def _request_repair(
                 ),
                 "application/json",
             )
-            files = {**files, "mcp": uploaded_mcp["rel_path"]}
+            files = {
+                **files,
+                "run_access": uploaded_mcp["rel_path"],
+                **({"mcp": uploaded_mcp["rel_path"]} if files.get("mcp") else {}),
+            }
         context = proposal_context(next_manifest, next_manifest["pinned_draft"])
         context["execution"] = execution_input(next_token, next_manifest["repair_used"])
         uploaded = await client.upload(
@@ -295,6 +299,7 @@ async def _request_repair(
             context_file=uploaded["rel_path"],
             schema_file=files["schema"],
             mcp_config_file=files.get("mcp"),
+            platform_check_file=files.get("run_access"),
             tables=files.get("tables"),
             tables_file=files.get("tables_file"),
             scenario_facts=files.get("scenario_facts"),

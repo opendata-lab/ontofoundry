@@ -199,3 +199,11 @@ def test_invalid_platform_reply_never_claims_a_pass(
     assert prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
     output = capsys.readouterr().out
     assert "提示 [PLATFORM_CHECK_SKIPPED]" in output and "平台检查通过" not in output
+
+
+def test_the_platform_check_file_alone_is_enough(tmp_path, monkeypatch, capsys, platform):
+    # A first run has no published ontology, hence no MCP config, only the run credential.
+    origin, handler = platform
+    _, batch, candidate = inputs(tmp_path, monkeypatch, origin)
+    assert prepare.platform_check({"platform_check_file": "mcp.json"}, batch, candidate, "retry")
+    assert handler.requests and "平台检查通过" in capsys.readouterr().out
