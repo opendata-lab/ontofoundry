@@ -117,6 +117,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
+  const permission = response.headers.get("X-Ontology-Authorization");
+  const workspaceId = path.match(/\/workspaces\/([^/?]+)/)?.[1];
+  if (permission && workspaceId) definitionReads.authorizeProjection(workspaceId, permission);
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as ErrorBody;
     const message =
@@ -209,13 +212,16 @@ export const api = {
     ),
   versions: (workspaceId: string) =>
     request<Items<VersionSummary>>("/api/v1/workspaces/" + workspaceId + "/versions"),
-  presentation: (workspaceId: string, versionId: string): Promise<Presentation> =>
-    definitionReads.get(workspaceId, versionId, async () => {
+  presentation: async (workspaceId: string, versionId: string): Promise<Presentation> => {
+    // The browser revalidates this small authorized envelope before in-memory reuse.
+    await api.version(workspaceId, versionId);
+    return definitionReads.get(workspaceId, versionId, async () => {
       const r = await request<Presentation>(`/api/v1/workspaces/${workspaceId}/versions/${versionId}/presentation`);
       if (r.version.version_id !== versionId || r.model.workspace_id !== workspaceId)
         throw new Error("版本内容不一致，请刷新后重试");
       return { ...r, model: { ...r.model, ...NO_INSTANCES } };
-    }),
+    });
+  },
   comparison: (workspaceId: string, rightId: string, leftId?: string) =>
     request<Comparison>(
       `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),

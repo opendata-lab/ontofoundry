@@ -1,6 +1,6 @@
 """Derived instance labels and complete business identities."""
 
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 
 
 def present(value):
@@ -8,14 +8,14 @@ def present(value):
 
 
 def business_identity(draft, type_id, values):
-    props = DraftIndex(draft).identifier(type_id)
+    props = draft_index(draft).identifier(type_id)
     if not props or any(not present(values.get(p.name)) for p in props):
         return None
     return tuple((p.value_kind.value, values[p.name]) for p in props)
 
 
 def _label(draft, type_id, values):
-    prop = DraftIndex(draft).title_property(type_id)
+    prop = draft_index(draft).title_property(type_id)
     if prop and present(values.get(prop.name)):
         return str(values[prop.name])
     identity = business_identity(draft, type_id, values)

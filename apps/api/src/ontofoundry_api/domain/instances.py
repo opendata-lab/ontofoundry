@@ -4,7 +4,7 @@ from uuid import UUID
 
 from ontofoundry_api.domain.canonical import domain_sha256
 from ontofoundry_api.domain.core import MaterialLink, MaterialObject
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 from ontofoundry_api.domain.instance_validation import value_issues
 from ontofoundry_api.domain.models import INSTANCE_COLLECTIONS, OntologyDraft
 
@@ -74,7 +74,7 @@ def validate_instances(draft, objects, links):
 
 def interpretation(draft, kind, element, objects):
     """Only instance-interpreting definitions, excluding labels and descriptions."""
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     if kind == "material_object":
         type_id = UUID(element["type_id"])
         if type_id not in index.objects:
@@ -109,7 +109,7 @@ def interpretation(draft, kind, element, objects):
 def instance_references(draft, objects, links):
     from ontofoundry_api.domain.dependencies import Reference
 
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     result = {}
     for element in objects:
         identity = UUID(element["id"])

@@ -24,7 +24,7 @@ from ontofoundry_api.domain.core import (
     Rule,
     RuleOwnerKind,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 
 _TOKEN = re.compile(
     r"(?P<space>\s+)|(?P<comment>--[^\n]*|/\*[\s\S]*?\*/)|"
@@ -303,7 +303,7 @@ def _resolve(
 ) -> ResolvedExpression:
     if not text.strip():
         raise ExpressionError("表达式不能为空")
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     tokens = _tokens(text)
     references: list[ExpressionReference] = []
     replacements: list[tuple[int, int, str]] = []
@@ -382,7 +382,7 @@ def _resolve(
 
 
 def rule_context(draft: CoreDraft, rule: Rule) -> UUID:
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     try:
         if rule.owner_kind == RuleOwnerKind.OBJECT_TYPE:
             return index.objects[rule.owner_id].id
@@ -427,7 +427,7 @@ def _quoted(name: str) -> str:
 
 def render_references(resolved: ResolvedExpression, draft: CoreDraft) -> str:
     """Render only recorded spans against a candidate graph; preserve all else."""
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     text = resolved.text
     for ref in reversed(resolved.references):
         try:

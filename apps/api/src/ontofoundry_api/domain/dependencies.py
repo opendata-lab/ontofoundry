@@ -26,7 +26,7 @@ from ontofoundry_api.domain.expressions import (
     resolve_metric_expression,
     resolve_rule_expression,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 
 
 @dataclass(frozen=True)
@@ -39,7 +39,7 @@ class Reference:
 
 def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
     """Include dictionary keys, textual references and row-count dataset scopes."""
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     refs: dict[UUID, list[Reference]] = {
         item.id: [] for collection in COLLECTIONS for item in getattr(draft, collection)
     }

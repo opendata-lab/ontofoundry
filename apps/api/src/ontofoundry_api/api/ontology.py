@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, ontology_directory_principal
@@ -86,8 +86,12 @@ def resolve(
     require_instances(session, workspace_id, principal)
     version = current_version(session, workspace_id, None)
     result = resolve_entity(
-        session, workspace_id, CoreDraft.model_validate(snapshot_of(version)),
-        mention=body.mention, object_type_id=body.object_type_id, limit=body.limit,
+        session,
+        workspace_id,
+        CoreDraft.model_validate(snapshot_of(version)),
+        mention=body.mention,
+        object_type_id=body.object_type_id,
+        limit=body.limit,
         settings=request.app.state.settings,
         mappings_readable=can_read_mappings(session, workspace_id, principal),
     )
@@ -164,12 +168,25 @@ def object_graph(
 @router.get("/{workspace_id}/version")
 def version(
     workspace_id: str,
+    request: Request,
+    response: Response,
     version_id: str | None = None,
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    from ontofoundry_api.services.http_reads import conditional, validator
+    from ontofoundry_api.services.ontology_query import version_read_key
+
+    item = current_version(session, workspace_id, version_id, lightweight=True)
+    permission = authorization_fingerprint(session, workspace_id, principal)
+    response.headers["X-Ontology-Authorization"] = permission
+    tag = validator([*version_read_key(item), permission, "version-1"])
+    unchanged = conditional(request, response, tag)
+    if unchanged is not None:
+        unchanged.headers["X-Ontology-Authorization"] = permission
+        return unchanged
     return version_summary(
-        current_version(session, workspace_id, version_id),
+        item,
         include_mappings=can_read_mappings(session, workspace_id, principal),
         include_instances=can_read_instances(session, workspace_id, principal),
     )

@@ -17,7 +17,11 @@ from ontofoundry_api.services.access import (
 from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.metric_query import dataset_for
-from ontofoundry_api.services.ontology_query import current_version, snapshot_of
+from ontofoundry_api.services.ontology_query import (
+    current_version,
+    read_context,
+    snapshot_of,
+)
 from ontofoundry_api.services.workspaces import get_workspace
 
 _ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
@@ -344,7 +348,14 @@ def retrieve(
     expand=True,
     sources: Sequence[RecallSource] = DEFAULT_SOURCES,
 ):
-    elements = visible_elements(draft, mappings=mappings)
+    index = getattr(draft, "_published_index", None)
+    key = ("search-elements", mappings)
+    if index is not None:
+        if key not in index._memo:
+            index._memo[key] = visible_elements(draft, mappings=mappings)
+        elements = index._memo[key]
+    else:
+        elements = visible_elements(draft, mappings=mappings)
     lookup = {e.id: e for e in elements}
     hits: dict[str, RecallHit] = {}
     coverage = []
@@ -394,7 +405,8 @@ def search_ontology(
     )
     if version_id:
         try:
-            snapshot = snapshot_of(current_version(db, workspace_id, version_id))
+            version = current_version(db, workspace_id, version_id)
+            snapshot = snapshot_of(version)
         except ServiceError as exc:
             if pinned_version_id is None:
                 raise
@@ -430,7 +442,7 @@ def search_ontology(
         sources = tuple(source for source in sources if mode[source.name])
     items, retrieval, unmatched = retrieve(
         options.query,
-        CoreDraft.model_validate(snapshot),
+        read_context(version).draft if version_id else CoreDraft.model_validate(snapshot),
         mappings=can_read_mappings(db, workspace_id, principal),
         kinds=options.kinds,
         expand=options.expand,

@@ -3,7 +3,7 @@ from typing import Any, Literal
 from uuid import uuid4
 
 import jsonschema
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -60,7 +60,9 @@ router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"]
 
 
 class ElementSave(Strict):
-    target_kind: Literal["object_type", "link_type", "metric", "dataset", "mapping", "value_type"]
+    target_kind: Literal[
+        "object_type", "link_type", "metric", "dataset", "mapping", "value_type"
+    ]
     target_id: str
     expected_current_version_id: str | None
     session_id: str | None = None
@@ -102,8 +104,13 @@ def save_element(
         )
     if body.expected_instance_change_sequence is not None:
         from ontofoundry_api.services.instance_store import change_sequence
+
         if body.expected_instance_change_sequence != change_sequence(db, workspace_id):
-            raise ServiceError("实例集合在预览后已变化，请重新预览", code="PREVIEW_OUTDATED", status_code=409)
+            raise ServiceError(
+                "实例集合在预览后已变化，请重新预览",
+                code="PREVIEW_OUTDATED",
+                status_code=409,
+            )
     latest = version_snapshot(db, workspace_id, space.current_version_id)
     item = None
     if body.session_id:
@@ -804,8 +811,11 @@ def publish_session(
             )
         raise HTTPException(409, "会话已变化或仍在生成，请刷新后发布")
     from ontofoundry_api.services.instance_store import change_sequence
+
     if body.expected_instance_change_sequence != change_sequence(db, workspace_id):
-        raise ServiceError("实例集合在预览后已变化，请重新预览", code="PREVIEW_OUTDATED", status_code=409)
+        raise ServiceError(
+            "实例集合在预览后已变化，请重新预览", code="PREVIEW_OUTDATED", status_code=409
+        )
     if item.abandoned_at is not None:
         raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     if body.strict and space.current_version_id != body.expected_current_version_id:
@@ -965,13 +975,28 @@ def capabilities(
 def presentation(
     workspace_id: str,
     version_id: str,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    from ontofoundry_api.services.access import can_read_instances, can_read_mappings
+    from ontofoundry_api.services.access import (
+        authorization_fingerprint,
+        can_read_instances,
+        can_read_mappings,
+    )
+    from ontofoundry_api.services.http_reads import conditional, validator
+    from ontofoundry_api.services.ontology_query import version_read_key
     from ontofoundry_api.services.public_projection import authorized_snapshot
 
-    version = current_version(db, workspace_id, version_id)
+    version = current_version(db, workspace_id, version_id, lightweight=True)
+    permission = authorization_fingerprint(db, workspace_id, user)
+    response.headers["X-Ontology-Authorization"] = permission
+    tag = validator([*version_read_key(version), permission, "presentation-1"])
+    unchanged = conditional(request, response, tag)
+    if unchanged is not None:
+        unchanged.headers["X-Ontology-Authorization"] = permission
+        return unchanged
     return {
         "version": version_summary(
             version,
@@ -1024,6 +1049,7 @@ def preview_definition(
         )
     report = validate_draft(merge.merged, space)
     from ontofoundry_api.services.instance_store import publish_impact
+
     instance_impact = {"instance_change_sequence": 0, "affected_instances": []}
     if report["publishable"]:
         instance_impact = publish_impact(db, workspace_id, merge.merged, session_id)
@@ -1031,6 +1057,7 @@ def preview_definition(
             report = {**report, "publishable": False}
     else:
         from ontofoundry_api.services.instance_store import change_sequence
+
         instance_impact["instance_change_sequence"] = change_sequence(db, workspace_id)
     current = current_version(db, workspace_id) if space.current_version_id else None
     changes = element_changes(merge.latest, merge.merged)

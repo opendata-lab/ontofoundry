@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
@@ -39,10 +39,33 @@ def create(
 @router.get("/{workspace_id}")
 def get_one(
     workspace_id: str,
+    request: Request,
+    response: Response,
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
-    return workspace_summary(session, get_workspace(session, workspace_id), principal.id)
+    from ontofoundry_api.services.access import authorization_fingerprint
+    from ontofoundry_api.services.http_reads import conditional, validator
+
+    workspace = get_workspace(session, workspace_id)
+    permission = authorization_fingerprint(session, workspace_id, principal)
+    response.headers["X-Ontology-Authorization"] = permission
+    tag = validator(
+        [
+            workspace.id,
+            workspace.current_version_id,
+            workspace.updated_at,
+            workspace.name,
+            workspace.description,
+            permission,
+            "workspace-1",
+        ]
+    )
+    unchanged = conditional(request, response, tag)
+    if unchanged is not None:
+        unchanged.headers["X-Ontology-Authorization"] = permission
+        return unchanged
+    return workspace_summary(session, workspace, principal.id)
 
 
 @router.get("/{workspace_id}/overview")

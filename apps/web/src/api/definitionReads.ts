@@ -5,6 +5,7 @@ import type { Presentation } from "./types";
 export class DefinitionReads {
   private entries = new Map<string, { promise: Promise<Presentation>; bytes: number }>();
   private permissions = new Map<string, string>();
+  private projections = new Map<string, string>();
   private subject = "";
   private generation = 0;
   constructor(private budget = 32 * 1024 * 1024, private limit = 32) {}
@@ -14,13 +15,18 @@ export class DefinitionReads {
     this.subject = subject;
     this.permissions.set(workspaceId, permission);
   }
+  authorizeProjection(workspaceId: string, permission: string) {
+    if (this.projections.has(workspaceId) && this.projections.get(workspaceId) !== permission) this.clear();
+    this.projections.set(workspaceId, permission);
+  }
   clear() {
     this.generation++;
     this.entries.clear();
     this.permissions.clear();
+    this.projections.clear();
   }
   get(workspaceId: string, versionId: string, read: () => Promise<Presentation>): Promise<Presentation> {
-    const key = JSON.stringify([this.subject, this.generation, workspaceId, versionId, this.permissions.get(workspaceId), "presentation-1"]);
+    const key = JSON.stringify([this.subject, this.generation, workspaceId, versionId, this.permissions.get(workspaceId), this.projections.get(workspaceId), "presentation-1"]);
     const hit = this.entries.get(key);
     if (hit) {
       this.entries.delete(key);

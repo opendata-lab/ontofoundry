@@ -9,12 +9,12 @@ from ontofoundry_api.contracts.read_models import (
 )
 from ontofoundry_api.domain.bindings import resolve_binding
 from ontofoundry_api.domain.core import RatioMetric
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 
 
 def physical_projection(draft, kind, identity, dataset_views):
     """Use the same resolver as execution, including concrete virtual children."""
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     dataset_ids, bindings, types = set(), [], []
     identity = UUID(str(identity))
     if kind == "object_type":

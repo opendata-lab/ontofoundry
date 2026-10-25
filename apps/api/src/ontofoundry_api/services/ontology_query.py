@@ -1,23 +1,43 @@
 """Core-1 resource projections shared by REST and MCP."""
 
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import UTC
+
+from sqlalchemy.orm import load_only
 
 from ontofoundry_api.db_models import OntologyVersionRecord
 from ontofoundry_api.domain.bindings import binding_readiness, resolve_binding
 from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.core import CoreDraft
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 from ontofoundry_api.domain.instance_display import document_display_text
-from ontofoundry_api.domain.snapshot import read_snapshot_json
+from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.errors import NotFoundError
+from ontofoundry_api.services.read_cache import published_reads
 from ontofoundry_api.services.workspaces import get_workspace
 
 
-def current_version(session, workspace_id, version_id=None):
+def current_version(session, workspace_id, version_id=None, *, lightweight=False):
     workspace = get_workspace(session, workspace_id)
     version = (
-        session.get(OntologyVersionRecord, version_id or workspace.current_version_id)
+        session.get(
+            OntologyVersionRecord,
+            version_id or workspace.current_version_id,
+            options=[
+                load_only(
+                    OntologyVersionRecord.id,
+                    OntologyVersionRecord.workspace_id,
+                    OntologyVersionRecord.status,
+                    OntologyVersionRecord.sha256,
+                    OntologyVersionRecord.version_number,
+                    OntologyVersionRecord.created_at,
+                    OntologyVersionRecord.message,
+                )
+            ]
+            if lightweight
+            else None,
+        )
         if version_id or workspace.current_version_id
         else None
     )
@@ -30,15 +50,51 @@ def current_version(session, workspace_id, version_id=None):
     return version
 
 
+@dataclass
+class VersionReadContext:
+    snapshot: dict
+    draft: CoreDraft
+    index: DraftIndex
+    normalized_hash: str
+
+
+def version_read_key(version):
+    return ("published-2", str(version.workspace_id), str(version.id), version.sha256)
+
+
+def read_context(version):
+    def compute():
+        draft = read_snapshot(version.snapshot_json, version.workspace_id)
+        snapshot = draft.model_dump(mode="json")
+        index = DraftIndex(draft)
+        object.__setattr__(draft, "_published_index", index)
+        # Eager pure derivation makes its retained size visible to the cache budget.
+        for obj in draft.object_types:
+            resolve_binding(draft, obj.id)
+            binding_readiness(draft, obj.id)
+            index.effective_rules(obj.id)
+            index.effective_links(obj.id)
+            index.identifier(obj.id)
+            index.children(obj.id)
+        return VersionReadContext(snapshot, draft, index, snapshot_sha256(snapshot))
+
+    raw = vars(version).get("snapshot_json")
+    if raw is not None and raw.get("schema_version") != "core-1":
+        raise ValueError("只接受显式声明 schema_version=core-1 的快照")
+    if not getattr(version, "id", None) or not getattr(version, "sha256", None):
+        return compute()
+    return published_reads.get(version_read_key(version), compute)
+
+
 def snapshot_of(version):
-    return read_snapshot_json(version.snapshot_json, version.workspace_id)
+    return deepcopy(read_context(version).snapshot)
 
 
 def version_hashes(version):
     return {
         "version_sha256": version.sha256,
         "version_content_sha256": version.sha256,
-        "normalized_snapshot_sha256": snapshot_sha256(snapshot_of(version)),
+        "normalized_snapshot_sha256": read_context(version).normalized_hash,
     }
 
 
@@ -88,7 +144,7 @@ def binding_status(draft, type_id, db=None, workspace_id=None):
             try:
                 sources.append(
                     resolve_dataset(
-                        db, workspace_id, DraftIndex(draft).datasets[source.dataset_id]
+                        db, workspace_id, draft_index(draft).datasets[source.dataset_id]
                     )
                 )
             except ServiceError:
@@ -105,7 +161,7 @@ def relationship_binding_status(
     from ontofoundry_api.services.dataset_sources import resolve_dataset
     from ontofoundry_api.services.errors import ServiceError
 
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     source_type_id = source_type_id or link.source_type_id
     target_type_id = target_type_id or link.target_type_id
     source_types = resolve_binding(draft, source_type_id).virtual_types or (source_type_id,)
@@ -198,9 +254,18 @@ def relationship_binding_status(
     return "bound" if statuses and all(s == "bound" for s in statuses) else "unbound"
 
 
-def resource_items(snapshot, *, mappings=True, instances=True, db=None, workspace_id=None):
-    draft = CoreDraft.model_validate(snapshot)
-    index = DraftIndex(draft)
+def resource_items(
+    snapshot,
+    *,
+    mappings=True,
+    instances=True,
+    db=None,
+    workspace_id=None,
+    draft=None,
+    selected=None,
+):
+    draft = draft if draft is not None else CoreDraft.model_validate(snapshot)
+    index = draft_index(draft)
 
     def project(value):
         if isinstance(value, dict):
@@ -353,7 +418,8 @@ def search_types(
     db=None,
 ):
     items = resource_items(
-        snapshot_of(version),
+        read_context(version).snapshot,
+        draft=read_context(version).draft,
         mappings=include_context_elements,
         instances=include_instances,
         db=db,
@@ -403,8 +469,7 @@ def get_type(
         found = [
             i
             for i in items
-            if i["definition"].get("name", "").casefold()
-            == type_id.casefold()
+            if i["definition"].get("name", "").casefold() == type_id.casefold()
         ]
     if not found:
         raise NotFoundError("没有找到该资源")
@@ -467,7 +532,12 @@ def query_view(version):
 
 
 def type_graph(version, *, focus_id=None, depth=1):
-    nodes, edges = _all_graph(snapshot_of(version))
+    nodes, edges = deepcopy(
+        published_reads.get(
+            (*version_read_key(version), "graph"),
+            lambda: _all_graph(read_context(version).snapshot),
+        )
+    )
     if focus_id:
         selected = {focus_id}
         for _ in range(depth):
@@ -483,7 +553,12 @@ def type_graph(version, *, focus_id=None, depth=1):
 
 
 def workspace_overview(
-    version, *, include_private=False, include_mappings=None, include_instances=None, db=None
+    version,
+    *,
+    include_private=False,
+    include_mappings=None,
+    include_instances=None,
+    db=None,
 ):
     if version is None:
         return {"version": None, "graph": None, "details": None}
@@ -503,7 +578,12 @@ def workspace_overview(
         draft = CoreDraft.model_validate(snapshot)
         from ontofoundry_api.domain.core import MaterialLink, MaterialObject
         from ontofoundry_api.services.instance_store import visible
-        stored = visible(db, version.workspace_id, draft) if db is not None else {"objects": [], "links": [], "filtered_count": 0}
+
+        stored = (
+            visible(db, version.workspace_id, draft)
+            if db is not None
+            else {"objects": [], "links": [], "filtered_count": 0}
+        )
         objects = [MaterialObject.model_validate(i["element"]) for i in stored["objects"]]
         links = [MaterialLink.model_validate(i["element"]) for i in stored["links"]]
         details.update(

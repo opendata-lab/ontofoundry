@@ -14,7 +14,7 @@ from ontofoundry_api.domain.core import (
     FieldBinding,
     MappingSource,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 
 
 @dataclass(frozen=True)
@@ -38,11 +38,21 @@ class BindingReadiness:
 
 
 def resolve_binding(draft: CoreDraft, type_id: UUID) -> ResolvedBinding:
+    index = getattr(draft, "_published_index", None)
+    if index is None:
+        return _resolve_binding(draft, type_id)
+    key = ("binding", type_id)
+    if key not in index._memo:
+        index._memo[key] = _resolve_binding(draft, type_id)
+    return index._memo[key]
+
+
+def _resolve_binding(draft: CoreDraft, type_id: UUID) -> ResolvedBinding:
     """Walk from the root; shared children only add local sources and fields."""
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     if type_id not in index.objects:
         raise ValueError("绑定对象不存在")
-    by_type = {mapping.type_id: mapping for mapping in draft.mappings}
+    by_type = index.mappings_by_type
     chain: list[DataMapping] = []
     sources: dict[str, MappingSource] = {}
     fields: dict[str, FieldBinding] = {}
@@ -76,10 +86,20 @@ MEMBERS_MISSING = "还没有成员条件：在概览中编辑“成员条件”�
 
 
 def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
+    index = getattr(draft, "_published_index", None)
+    if index is None:
+        return _binding_readiness(draft, type_id)
+    key = ("readiness", type_id)
+    if key not in index._memo:
+        index._memo[key] = _binding_readiness(draft, type_id)
+    return index._memo[key]
+
+
+def _binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
     """Static readiness only. Connection/authorization checks belong to services."""
     from ontofoundry_api.domain.validation import physical_value_kind
 
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     binding = resolve_binding(draft, type_id)
     if not binding.mappings:
         return BindingReadiness("virtual" if index.children(type_id) else "unbound")
@@ -123,7 +143,7 @@ def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
 def column_binding(
     draft: CoreDraft, type_id: UUID, property_id: UUID
 ) -> ColumnBinding | None:
-    prop = DraftIndex(draft).properties.get(property_id)
+    prop = draft_index(draft).properties.get(property_id)
     if prop is None:
         return None
     binding = resolve_binding(draft, type_id).fields.get(prop.name)

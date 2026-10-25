@@ -31,7 +31,7 @@ from ontofoundry_api.domain.expressions import (
     resolve_derived_expression,
     resolve_field_expression,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.instance_display import database_display_text
 from ontofoundry_api.services.dataset_sources import resolve_dataset
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
@@ -192,7 +192,7 @@ class InstancePlan:
             snapshot_date,
             depth,
         )
-        self.index = DraftIndex(draft)
+        self.index = draft_index(draft)
         self.binding = resolve_binding(draft, self.type_id)
         if self.binding.main is None:
             fail("对象尚无主来源", "MAPPING_REQUIRED")
@@ -495,7 +495,7 @@ def query_instances(
         type_id = UUID(str(type_id))
     except ValueError:
         fail("对象类型引用无效", "INVALID_OBJECT_REF")
-    if type_id not in DraftIndex(draft).objects:
+    if type_id not in draft_index(draft).objects:
         raise NotFoundError("对象类型不存在")
     values = key_values(key) if key is not None else None
     binding = resolve_binding(draft, type_id)
@@ -527,7 +527,7 @@ def query_instances(
             "snapshot_dates": dates,
         }
     source = resolve_dataset(
-        db, workspace_id, DraftIndex(draft).datasets[binding.main.dataset_id]
+        db, workspace_id, draft_index(draft).datasets[binding.main.dataset_id]
     )
     with connect_readonly(source.connection, settings) as conn:
         plan = InstancePlan(

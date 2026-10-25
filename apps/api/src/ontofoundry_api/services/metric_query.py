@@ -8,7 +8,7 @@ from sqlglot.errors import ErrorLevel, SqlglotError
 
 from ontofoundry_api.domain.core import RatioMetric, SimpleMetric
 from ontofoundry_api.domain.expressions import resolve_metric_expression
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.validation import physical_value_kind
 from ontofoundry_api.services.dataset_sources import resolve_dataset
 from ontofoundry_api.services.errors import ServiceError
@@ -175,7 +175,7 @@ def serialize(tree, dialect):
 def dataset_for(draft, metric):
     if isinstance(metric, RatioMetric):
         metric = next(m for m in draft.metrics if m.id == metric.numerator_id)
-    return DraftIndex(draft).datasets[metric.dataset_id]
+    return draft_index(draft).datasets[metric.dataset_id]
 
 
 def value_kind(draft, metric):
@@ -232,7 +232,11 @@ class MetricCompiler:
     def table(self):
         if self.dataset.source_kind == "query":
             from ontofoundry_api.services.dataset_sources import relation_sql
-            tree = parse_expression(relation_sql(self.db, self.workspace_id, self.dataset, source=self.source), self.dialect)
+
+            tree = parse_expression(
+                relation_sql(self.db, self.workspace_id, self.dataset, source=self.source),
+                self.dialect,
+            )
             return "(" + serialize(tree, self.dialect) + ")"
         schema = self.source.schema
         if self.dialect == "sqlite":
@@ -305,7 +309,9 @@ class MetricCompiler:
     def component(self, metric, trend):
         if trend and metric.time_field and metric.time_field.column == self.snapshot_column:
             self.column(self.snapshot_column)
-            snapshot = next(c for c in self.dataset.columns if c.name == self.snapshot_column)
+            snapshot = next(
+                c for c in self.dataset.columns if c.name == self.snapshot_column
+            )
             if physical_value_kind(snapshot.physical_type) not in {"date", "datetime"}:
                 raise invalid(
                     "快照日期列不是日期类，无法直接按月归组。请在数据源中提供日期类列，"

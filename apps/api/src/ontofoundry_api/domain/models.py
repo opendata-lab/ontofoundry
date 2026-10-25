@@ -22,7 +22,7 @@ from ontofoundry_api.domain.core import (
     ValueType,
     _display_name,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 
 
 class ElementKind(StrEnum):
@@ -77,13 +77,13 @@ class OntologyDraft(CoreDraft):
         return self
 
     def type_by_id(self):
-        return DraftIndex(self).objects
+        return draft_index(self).objects
 
     def properties_of(self, type_id):
         return [p for p in self.properties if p.owner_type_id == type_id]
 
     def effective_properties(self, type_id):
-        return DraftIndex(self).effective_properties(type_id)
+        return draft_index(self).effective_properties(type_id)
 
     def rules_of(self, owner_id, kind=None):
         return [
@@ -93,7 +93,7 @@ class OntologyDraft(CoreDraft):
         ]
 
     def ancestors(self, type_id):
-        index = DraftIndex(self)
+        index = draft_index(self)
         return [index.objects[i] for i in index.ancestors(type_id)]
 
     def parent_ids(self, item):
@@ -101,7 +101,7 @@ class OntologyDraft(CoreDraft):
 
     def descendants(self, type_id):
         return {
-            o.id for o in self.object_types if type_id in DraftIndex(self).lineage(o.id)
+            o.id for o in self.object_types if type_id in draft_index(self).lineage(o.id)
         }
 
     def element_kind_of(self):

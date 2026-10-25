@@ -8,10 +8,9 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 from ontofoundry_api.domain.core import MaterialLink, MaterialObject
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.instance_display import document_display_text
 from ontofoundry_api.domain.instance_validation import value_issues
-from ontofoundry_api.domain.snapshot import read_snapshot
 from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
 from ontofoundry_api.services.instance_store import change_sequence, visible
@@ -104,8 +103,10 @@ def mapping_for(draft, type_id):
 
 
 def search_objects(db, version, options, settings, *, permission_fingerprint=""):
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
-    index = DraftIndex(draft)
+    from ontofoundry_api.services.ontology_query import read_context
+
+    draft = read_context(version).draft
+    index = draft_index(draft)
     if options.type_id and options.type_id not in index.objects:
         raise NotFoundError("对象类型不存在")
     if options.source == "document" and options.snapshot_date:
@@ -123,7 +124,9 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
         permission_fingerprint,
         change_sequence(db, version.workspace_id) if options.source == "document" else None,
     ]
-    stored = visible(db, version.workspace_id, draft) if options.source == "document" else {}
+    stored = (
+        visible(db, version.workspace_id, draft) if options.source == "document" else {}
+    )
     offset, _ = decode_cursor(settings, options.cursor, context)
     if options.source == "database":
         if not options.type_id:
@@ -160,7 +163,10 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
         ]
         rows.sort(key=lambda o: o.id.bytes)
         entries = {e["target_id"]: e for e in stored["objects"]}
-        items = [document_object(o, draft, entries[str(o.id)]) for o in rows[offset : offset + options.limit]]
+        items = [
+            document_object(o, draft, entries[str(o.id)])
+            for o in rows[offset : offset + options.limit]
+        ]
         more, dates = len(rows) > offset + options.limit, []
     truncated = more and offset + options.limit > 10000
     return {
@@ -186,7 +192,9 @@ def search_objects(db, version, options, settings, *, permission_fingerprint="")
 
 def get_object(db, version, ref, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    from ontofoundry_api.services.ontology_query import read_context
+
+    draft = read_context(version).draft
     dates = []
     stored = visible(db, version.workspace_id, draft) if source == "document" else {}
     if source == "document":
@@ -197,7 +205,13 @@ def get_object(db, version, ref, settings, snapshot_date=None):
         entry = next((e for e in stored["objects"] if e["target_id"] == identity), None)
         fact = MaterialObject.model_validate(entry["element"]) if entry else None
         if fact is None:
-            raise NotFoundError("该版本中没有此文档实例", details={"filtered_count": stored["filtered_count"], "warnings": stored["warnings"]})
+            raise NotFoundError(
+                "该版本中没有此文档实例",
+                details={
+                    "filtered_count": stored["filtered_count"],
+                    "warnings": stored["warnings"],
+                },
+            )
         item = document_object(fact, draft, entry)
     else:
         from ontofoundry_api.services.instance_plan import query_instances
@@ -227,7 +241,9 @@ def get_object(db, version, ref, settings, snapshot_date=None):
 
 def object_neighborhood(db, version, ref, depth, settings, snapshot_date=None):
     source, identity, key = parse_ref(ref)
-    draft = read_snapshot(version.snapshot_json, version.workspace_id)
+    from ontofoundry_api.services.ontology_query import read_context
+
+    draft = read_context(version).draft
     stored = visible(db, version.workspace_id, draft) if source == "document" else {}
     if source == "database":
         from types import SimpleNamespace

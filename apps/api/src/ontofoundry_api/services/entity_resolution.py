@@ -9,7 +9,7 @@ import unicodedata
 from uuid import UUID
 
 from ontofoundry_api.domain.core import CoreDraft
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 from ontofoundry_api.domain.instance_display import document_display_text
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
 
@@ -34,7 +34,11 @@ def _title_property(index: DraftIndex, type_id: UUID):
 def _grade(mention: str, values: dict, identifier, title):
     """The best level a candidate's values reach, with the property and value that reached it."""
     target = normalize(mention)
-    if identifier is not None and values.get(identifier.name) is not None and normalize(values[identifier.name]) == target:
+    if (
+        identifier is not None
+        and values.get(identifier.name) is not None
+        and normalize(values[identifier.name]) == target
+    ):
         return "identifier_exact", identifier, values[identifier.name]
     if title is not None and values.get(title.name) is not None:
         name = normalize(values[title.name])
@@ -45,8 +49,18 @@ def _grade(mention: str, values: dict, identifier, title):
     return None
 
 
-def resolve_entity(db, workspace_id, draft: CoreDraft, *, mention, object_type_id, limit, settings, mappings_readable):
-    index = DraftIndex(draft)
+def resolve_entity(
+    db,
+    workspace_id,
+    draft: CoreDraft,
+    *,
+    mention,
+    object_type_id,
+    limit,
+    settings,
+    mappings_readable,
+):
+    index = draft_index(draft)
     type_id = UUID(str(object_type_id))
     if type_id not in index.objects:
         raise NotFoundError("实体类型不存在")
@@ -69,8 +83,19 @@ def resolve_entity(db, workspace_id, draft: CoreDraft, *, mention, object_type_i
 
         rows, seen = [], set()
         # Try the typed and the NFKC form so full-width source values are not missed (ER-12).
-        for query in dict.fromkeys([mention.strip(), unicodedata.normalize("NFKC", mention).strip()]):
-            result = query_instances(db, workspace_id, draft, type_id, settings, q=query, offset=0, limit=CANDIDATE_CAP)
+        for query in dict.fromkeys(
+            [mention.strip(), unicodedata.normalize("NFKC", mention).strip()]
+        ):
+            result = query_instances(
+                db,
+                workspace_id,
+                draft,
+                type_id,
+                settings,
+                q=query,
+                offset=0,
+                limit=CANDIDATE_CAP,
+            )
             truncated = truncated or result["has_more"]
             for row in result["items"]:
                 if row["__ref"] not in seen:
@@ -79,7 +104,9 @@ def resolve_entity(db, workspace_id, draft: CoreDraft, *, mention, object_type_i
         for row in rows:
             grade = _grade(mention, row["values"], identifier, title)
             if grade:
-                graded.append(("database", row["__ref"], row["display_text"], row["values"], grade))
+                graded.append(
+                    ("database", row["__ref"], row["display_text"], row["values"], grade)
+                )
     else:
         sources_skipped.append("database")
 
@@ -94,7 +121,15 @@ def resolve_entity(db, workspace_id, draft: CoreDraft, *, mention, object_type_i
             from ontofoundry_api.domain.core import MaterialObject
 
             obj = MaterialObject.model_validate(element)
-            graded.append(("document", f"doc.{element['id']}", document_display_text(draft, obj), element.get("values") or {}, grade))
+            graded.append(
+                (
+                    "document",
+                    f"doc.{element['id']}",
+                    document_display_text(draft, obj),
+                    element.get("values") or {},
+                    grade,
+                )
+            )
 
     best = min((LEVELS[g[4][0]] for g in graded), default=None)
     top = [g for g in graded if LEVELS[g[4][0]] == best] if best else []

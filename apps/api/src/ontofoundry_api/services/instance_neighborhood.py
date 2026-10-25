@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import and_, select
 
 from ontofoundry_api.domain.bindings import resolve_binding
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import draft_index
 from ontofoundry_api.domain.instance_display import database_display_text
 from ontofoundry_api.services.dataset_sources import resolve_dataset
 from ontofoundry_api.services.errors import NotFoundError, ServiceError
@@ -29,7 +29,7 @@ def related_rows(
     if source.main is None:
         raise ServiceError("对象尚无具体绑定", code="BINDING_NOT_READY", status_code=422)
     connection = resolve_dataset(
-        db, wid, DraftIndex(draft).datasets[source.main.dataset_id]
+        db, wid, draft_index(draft).datasets[source.main.dataset_id]
     ).connection
     with connect_readonly(connection, settings) as conn:
         current = InstancePlan(
@@ -103,7 +103,7 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
     obj = database_object(body.type_id, center["items"][0])
     nodes, edges, warnings, dates = {obj["id"]: obj}, {}, set(), center["snapshot_dates"]
     frontier, queries, started, truncated = [obj], 0, monotonic(), False
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     for _ in range(body.depth):
         following = []
         for current in frontier:
@@ -145,7 +145,9 @@ def database_neighborhood(db, workspace_id, draft, body, settings):
                                 body.snapshot_date,
                             )
                         except ServiceError as exc:
-                            warnings.add((link.display_name or link.name) + "：" + exc.message)
+                            warnings.add(
+                                (link.display_name or link.name) + "：" + exc.message
+                            )
                             continue
                         dates += selected
                         truncated |= more

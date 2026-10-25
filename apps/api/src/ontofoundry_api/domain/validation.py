@@ -37,7 +37,7 @@ from ontofoundry_api.domain.expressions import (
     resolve_path,
     resolve_rule_expression,
 )
-from ontofoundry_api.domain.graph import DraftIndex
+from ontofoundry_api.domain.graph import DraftIndex, draft_index
 
 
 class GraphValidationError(ValueError):
@@ -140,7 +140,7 @@ def _condition(operator, values, kind):
 def metric_value_kind(
     draft: CoreDraft, metric, index: DraftIndex | None = None
 ) -> ValueKind | None:
-    index = index or DraftIndex(draft)
+    index = index or draft_index(draft)
     if isinstance(metric, RatioMetric):
         return ValueKind.DECIMAL
     if isinstance(metric, ExpressionMetric):
@@ -320,7 +320,10 @@ def _value_types(draft: CoreDraft, index: DraftIndex) -> None:
         if prop.value_type_id is None:
             continue
         value_type = index.value_types.get(prop.value_type_id)
-        _require(value_type is not None, f"属性 {prop.name} 引用的值类型不存在，请先改绑或一并保留值类型")
+        _require(
+            value_type is not None,
+            f"属性 {prop.name} 引用的值类型不存在，请先改绑或一并保留值类型",
+        )
         _require(
             prop.value_kind == value_type.value_kind,
             f"属性 {prop.name} 的基础类型须与值类型 {value_type.name} 一致（{value_type.value_kind}）",
@@ -346,7 +349,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
         len(set(ids + evidence_ids)) == len(ids) + len(evidence_ids),
         "证据 UUID 重复或与元素冲突",
     )
-    index = DraftIndex(draft)
+    index = draft_index(draft)
     _names(draft.object_types, "对象")
     _names(draft.datasets, "数据集", technical=False)
     _names(draft.metrics, "指标")
@@ -413,7 +416,13 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
             kind = _column(index, dataset.id, dataset.snapshot_date_column)
             _require(
                 kind is None
-                or kind in {ValueKind.DATE, ValueKind.DATETIME, ValueKind.STRING, ValueKind.INTEGER},
+                or kind
+                in {
+                    ValueKind.DATE,
+                    ValueKind.DATETIME,
+                    ValueKind.STRING,
+                    ValueKind.INTEGER,
+                },
                 "快照日期列必须是日期类，或可按日期排序的文本/整数列",
             )
     metrics = {metric.id: metric for metric in draft.metrics}

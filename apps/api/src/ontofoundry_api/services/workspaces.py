@@ -17,7 +17,6 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.canonical import canonical, jcs
 from ontofoundry_api.domain.models import OntologyDraft, WorkspaceCreate
-from ontofoundry_api.domain.snapshot import read_snapshot_json
 from ontofoundry_api.services.core_validation import validation_report
 from ontofoundry_api.services.identities import sync_identities
 
@@ -123,7 +122,9 @@ def workspace_summary(session: Session, workspace: WorkspaceRecord, user_id: str
         if workspace.current_version_id
         else None
     )
-    draft = read_snapshot_json(version.snapshot_json, workspace.id) if version else {}
+    from ontofoundry_api.services.ontology_query import read_context
+
+    draft = read_context(version).snapshot if version else {}
     return {
         "id": workspace.id,
         "slug": workspace.slug,
@@ -177,9 +178,11 @@ def publish_draft(
     session_id: str | None = None,
 ) -> OntologyVersionRecord:
     from ontofoundry_api.services import instance_store
+
     workspace = instance_store.lock_workspace(session, workspace_id)
     if session_id:
         from ontofoundry_api.db_models import ModelingSessionRecord
+
         editing = session.get(ModelingSessionRecord, session_id)
         if editing is None or editing.workspace_id != workspace_id:
             raise NotFoundError("会话不存在")
@@ -208,7 +211,9 @@ def publish_draft(
     if not report["publishable"]:
         raise PublishValidationError("核心校验未通过，版本未发布", report)
 
-    instance_store.check_publish(session, workspace_id, draft.model_dump(mode="json"), session_id)
+    instance_store.check_publish(
+        session, workspace_id, draft.model_dump(mode="json"), session_id
+    )
     next_version = (
         session.scalar(
             select(func.max(OntologyVersionRecord.version_number)).where(
