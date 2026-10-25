@@ -394,6 +394,7 @@ export type ModelingSession = {
   last_result_task_id?: string | null;
   result_state?: string;
   result_warnings?: string[];
+  proposal_notice?: ProposalRunNotice | null;
   result_claimed_at?: ISOTime | null;
   updated_at: ISOTime;
   validation?: ValidationReport;
@@ -484,7 +485,8 @@ export type ProposalStatus =
   | "rejected"
   | "stale"
   | "conflict"
-  | "superseded";
+  | "superseded"
+  | "unacceptable";
 export type EvidenceView = Evidence & { material_name?: string; material_archived?: boolean };
 export type DuplicateCandidate = {
   id: UUID;
@@ -517,7 +519,7 @@ export type ProposalItem = {
   /** Where a declared rule (required) differs from the synced source column (nullable). */
   physical_differences?: { path: string; declared: string; observed: string; column: string; table: string; schema: string | null; connection_name: string; observed_at: ISOTime | null }[];
   status: ProposalStatus;
-  stored_status: "pending" | "accepted" | "rejected" | "superseded";
+  stored_status: "pending" | "accepted" | "rejected" | "superseded" | "unacceptable";
   status_reason: string;
   accepted_revision: number | null;
   decided_at: ISOTime | null;
@@ -1021,4 +1023,13 @@ export type ConnectionReference = {
   type: "dataset" | "dataset_proposal" | "linked_table";
   name: string;
   location: string;
+};
+
+export type ProposalRunNotice = { run_token: string; summary: string; affected_count: number; reviewable_count: number };
+export type ProposalCheckResponse = {
+  passed: boolean;
+  contract_errors: { code: string; message: string }[];
+  unacceptable_groups: { code: string; client_refs: (string | null)[]; item_count: number; reason: string }[];
+  reviewable_count: number;
+  unacceptable_count: number;
 };

@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID, uuid5
 
 from jsonschema import Draft202012Validator
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from ontofoundry_api.contracts.proposal_diagnostics import diagnostic, schema_diagnostic
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
@@ -258,6 +258,8 @@ class ParsedItem:
     depends_on: list[str] = field(default_factory=list)
     atomic_group_id: str | None = None
     expected_instance_revision: int | None = None
+    status: str = "pending"
+    status_reason: str = ""
 
 
 @dataclass
@@ -371,27 +373,11 @@ def apply_items(draft, items):
 def group_items(draft, items, *, references_resolved=False):
     """Group cyclic references and edits requiring simultaneous final-graph validation."""
     before = CoreDraft.model_validate(definitions(draft))
-    candidate = (
-        OntologyDraft.model_validate(definitions(apply_items(draft, items)))
-        if references_resolved
-        else validate_candidate_graph(
-            before, CoreDraft.model_validate(definitions(apply_items(draft, items)))
-        )
-    )
-    instance_candidate = apply_items(draft, [i for i in items if i.target_kind in INSTANCE_KINDS])
-    objects = instance_candidate.get("material_objects", [])
-    links = instance_candidate.get("material_links", [])
-    object_lookup = {o["id"]: o for o in objects}
-    changed_links = [i.after for i in items if i.target_kind == "material_link" and i.after is not None]
-    relevant_ids = {i.target_id for i in items if i.target_kind == "material_object" and i.after is not None}
-    relevant_ids.update(e for link in changed_links for e in (link["source_id"], link["target_id"]))
-    validate_instances(candidate, [object_lookup[i] for i in relevant_ids if i in object_lookup], changed_links)
-    final = {
-        str(e.id): e.model_dump(mode="json")
-        for c in COLLECTIONS.values()
-        for e in getattr(candidate, c)
-    }
-    final.update({e["id"]: e for e in [*objects, *links]})
+    proposed = apply_items(draft, items)
+    candidate = CoreDraft.model_validate(definitions(proposed))
+    objects = proposed.get("material_objects", [])
+    links = proposed.get("material_links", [])
+    final = {e["id"]: e for c in PROPOSAL_COLLECTIONS.values() for e in proposed.get(c, [])}
     by_target = {i.target_id: i for i in items}
     previous_evidence = {
         str(e.id): str(item.id)
@@ -406,7 +392,22 @@ def group_items(draft, items, *, references_resolved=False):
                     str(evidence.id)
                 ] != str(element.id):
                     raise ValueError("证据 UUID 不能转移归属")
-    refs = {**reference_index(candidate), **instance_references(candidate, objects, links)}
+    # Discover references per owner even when another proposed element is invalid.
+    # Structural references remain available when expression resolution fails.
+    refs = {}
+    for element in objects:
+        try:
+            refs.update(instance_references(candidate, [element], []))
+        except (ValueError, KeyError):
+            pass
+    refs.update(instance_references(candidate, [], links))
+    for item in items:
+        if item.after is None or item.target_kind in INSTANCE_KINDS:
+            continue
+        try:
+            refs.update(reference_index(candidate, owner_ids={UUID(item.target_id)}))
+        except (ValueError, KeyError):
+            pass
     deps = {i.id: set(i.depends_on) for i in items}
     for item in items:
         if item.after is not None:
@@ -414,6 +415,15 @@ def group_items(draft, items, *, references_resolved=False):
             item.fingerprint = item_fingerprint(
                 item.operation, item.target_kind, item.target_id, item.after
             )
+        if item.after is not None:
+
+            def dependency(value):
+                proposed_item = by_target.get(str(value))
+                if proposed_item and proposed_item.id != item.id:
+                    deps[item.id].add(proposed_item.id)
+                return value
+
+            walk_references(item.target_kind, item.after, dependency)
         for ref in refs.get(UUID(item.target_id), ()):
             dependency = by_target.get(str(ref.target_id))
             if dependency and dependency.id != item.id:
@@ -421,7 +431,12 @@ def group_items(draft, items, *, references_resolved=False):
     original = {e["id"]: e for c in PROPOSAL_COLLECTIONS.values() for e in draft.get(c, [])}
     # Renames and deletions must include the changed reverse references. A
     # partial accept must never leave an old textual name dangling.
-    old_refs = {**reference_index(before), **instance_references(before, draft.get("material_objects", []), draft.get("material_links", []))}
+    old_refs = {
+        **reference_index(before),
+        **instance_references(
+            before, draft.get("material_objects", []), draft.get("material_links", [])
+        ),
+    }
     for owner, references in old_refs.items():
         for reference in references:
             changed = by_target.get(str(reference.target_id))
@@ -435,9 +450,18 @@ def group_items(draft, items, *, references_resolved=False):
                 dependent = by_target.get(str(owner))
                 if dependent and dependent.id != changed.id:
                     deps[changed.id].add(dependent.id)
-    untouched = set(original) - set(by_target)
-    if any(not strict_equal(final.get(i), original[i]) for i in untouched if i in final):
-        raise ValueError("引用改写涉及批次外元素，请显式补齐受影响提案")
+    # Composite identity edits must be validated together: a prefix of a
+    # multi-property identifier is not a valid single-property identifier.
+    identity_edits = {}
+    for item in items:
+        if item.target_kind == "property":
+            for element in (item.before, item.after):
+                if element and element.get("identifier"):
+                    identity_edits.setdefault(element["owner_type_id"], set()).add(item.id)
+    for members in identity_edits.values():
+        for identity in members:
+            deps[identity].update(members - {identity})
+
     parent = {i.id: i.id for i in items}
 
     def root(x):
@@ -488,7 +512,8 @@ def group_items(draft, items, *, references_resolved=False):
                 and str(names[k]).casefold() == str(old_names[k]).casefold()
                 for k in fields
             ):
-                union(item.id, other.id)
+                deps[item.id].add(other.id)
+                deps[other.id].add(item.id)
     # Tarjan SCCs compress true dependency cycles into atomic decisions.
     next_index = 0
     indices, low, stack, active = {}, {}, [], set()
@@ -529,7 +554,91 @@ def group_items(draft, items, *, references_resolved=False):
         for item in members:
             item.atomic_group_id = group_id
             item.depends_on = sorted(d for d in deps[item.id] if root(d) != root(item.id))
-    return candidate
+    by_id = {item.id: item for item in items}
+    applied = deepcopy(draft)
+    done = set()
+
+    def apply_group(group):
+        if group in done:
+            return
+        done.add(group)
+        members = groups[group]
+        dependencies = sorted(
+            {d for i in members for d in i.depends_on}, key=lambda d: by_id[d].ordinal
+        )
+        for dep in dependencies:
+            apply_group(root(dep))
+        blocked = [by_id[d] for d in dependencies if by_id[d].status == "unacceptable"]
+        reason = ""
+        if blocked:
+            reason = "依赖不可接受：" + "；".join(
+                f"{i.client_ref or i.target_id}：{i.status_reason[:300]}"
+                for i in blocked[:3]
+            )
+        else:
+            try:
+                checked = _validate_group(
+                    applied, members, references_resolved=references_resolved
+                )
+            except (ValueError, KeyError) as exc:
+                reason = (
+                    "；".join(
+                        e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3]
+                    )
+                    if isinstance(exc, ValidationError)
+                    else str(exc)
+                )
+            else:
+                applied.clear()
+                applied.update(checked)
+        for item in members:
+            item.status = "unacceptable" if reason else "pending"
+            item.status_reason = reason
+
+    for group in groups:
+        apply_group(group)
+    return CoreDraft.model_validate(definitions(applied))
+
+
+def _validate_group(draft, items, *, references_resolved):
+    before = CoreDraft.model_validate(definitions(draft))
+    proposed = apply_items(draft, items)
+    candidate = (
+        OntologyDraft.model_validate(definitions(proposed))
+        if references_resolved
+        else validate_candidate_graph(
+            before, CoreDraft.model_validate(definitions(proposed))
+        )
+    )
+    objects = proposed.get("material_objects", [])
+    lookup = {o["id"]: o for o in objects}
+    links = [
+        i.after for i in items if i.target_kind == "material_link" and i.after is not None
+    ]
+    relevant = {
+        i.target_id
+        for i in items
+        if i.target_kind == "material_object" and i.after is not None
+    }
+    relevant.update(
+        identity for link in links for identity in (link["source_id"], link["target_id"])
+    )
+    validate_instances(candidate, [lookup[i] for i in relevant if i in lookup], links)
+    final = candidate.model_dump(mode="json")
+    original = {e["id"]: e for c in COLLECTIONS.values() for e in draft.get(c, [])}
+    checked = {e["id"]: e for c in COLLECTIONS.values() for e in final.get(c, [])}
+    untouched = set(original) - {i.target_id for i in items}
+    if any(
+        not strict_equal(checked.get(i), original[i]) for i in untouched if i in checked
+    ):
+        raise ValueError("引用改写涉及批次外元素，请显式补齐受影响提案")
+    for item in items:
+        if item.after is not None and item.target_kind not in INSTANCE_KINDS:
+            item.after = checked[item.target_id]
+            item.fingerprint = item_fingerprint(
+                item.operation, item.target_kind, item.target_id, item.after
+            )
+    return {**proposed, **final}
 
 
 def parse_result(
@@ -581,10 +690,20 @@ def parse_result(
                 expected=getattr(context, name),
                 actual=data[name],
             )
-    existing = {e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft.get(c, [])}
-    existing.update({identity: (ElementKind(kind), element)
-        for identity, (kind, element) in baseline_elements(context.instance_baseline).items()})
-    instance_entries = {i["target_id"]: i for i in context.instance_baseline.get("items", [])}
+    existing = {
+        e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft.get(c, [])
+    }
+    existing.update(
+        {
+            identity: (ElementKind(kind), element)
+            for identity, (kind, element) in baseline_elements(
+                context.instance_baseline
+            ).items()
+        }
+    )
+    instance_entries = {
+        i["target_id"]: i for i in context.instance_baseline.get("items", [])
+    }
     batch_id = batch_id_for(context.session_id, context.run_token)
     refs, targets = {}, {}
     for n, item in enumerate(data["items"]):
@@ -661,11 +780,12 @@ def parse_result(
                     expected=current,
                     actual=item["before"],
                 )
-            expected_hash = (instance_hash(current, instance_entries[target]["revision"])
-                if kind.value in INSTANCE_KINDS else element_sha256(current, collection=COLLECTIONS[kind]))
-            if expected_hash != item.get(
-                "expected_target_hash"
-            ):
+            expected_hash = (
+                instance_hash(current, instance_entries[target]["revision"])
+                if kind.value in INSTANCE_KINDS
+                else element_sha256(current, collection=COLLECTIONS[kind])
+            )
+            if expected_hash != item.get("expected_target_hash"):
                 fail(
                     "TARGET_HASH_MISMATCH",
                     "目标哈希不一致",
@@ -801,7 +921,9 @@ def parse_result(
     try:
         for item in parsed:
             if item.target_kind in INSTANCE_KINDS and item.operation != "create":
-                item.expected_instance_revision = instance_entries[item.target_id]["revision"]
+                item.expected_instance_revision = instance_entries[item.target_id][
+                    "revision"
+                ]
         group_items(combined_snapshot(context.draft, context.instance_baseline), parsed)
     except ValueError as exc:
         raise ProposalContractError(

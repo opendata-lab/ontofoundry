@@ -264,7 +264,10 @@ def version_snapshot(db, workspace_id: str, version_id: str | None) -> dict:
 def session_response(db, item) -> dict:
     """A session as the API returns it: data plus proposal summary and the
     element-level changes relative to its base version."""
+    from ontofoundry_api.services.proposal_checks import run_notice
+
     data = session_data(item)
+    data["proposal_notice"] = run_notice(db, item)
     data["import_source"] = import_source(db, item.workspace_id, item.id)
     key = _read_key(item)
 

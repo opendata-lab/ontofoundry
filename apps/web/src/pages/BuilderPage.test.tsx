@@ -214,3 +214,22 @@ it("preserves a scenario while toggling the configuration panel", async () => {
   expect(screen.getByRole("textbox", { name: "业务场景描述" })).toHaveValue("星河采购协同");
   await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
 });
+
+it("shows the platform reason in the conversation and retries only 重试 in model mode", async () => {
+  context.model.session = { ...session(), task_status: "finished", proposal_notice: {
+    run_token: "fictional-run", summary: "目标连接列不是唯一属性或完整标识", affected_count: 2, reviewable_count: 3,
+  } };
+  const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  const retry = await screen.findByRole("button", { name: "重试" });
+  await waitFor(() => expect(retry).toBeEnabled());
+  expect(screen.getByText("3 条可审，2 条受影响。")).toBeInTheDocument();
+  expect(screen.getByText("平台消息")).toBeInTheDocument();
+  expect(container.querySelector('[slot="composer-overlay"]')).toHaveTextContent("目标连接列");
+  fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), { target: { value: "另一个场景" } });
+  const conversation = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const sendMessage = vi.fn();
+  Object.defineProperty(conversation, "sendMessage", { value: sendMessage });
+  fireEvent.click(retry);
+  expect(conversation.value).toBe("重试");
+  expect(sendMessage).toHaveBeenCalledWith("重试", { metadata: { mode: "model" } });
+});

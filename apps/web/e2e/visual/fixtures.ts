@@ -369,7 +369,7 @@ const REVIEW_BATCH: ProposalBatchDetail = {
   created_at: "2026-10-17T02:00:00Z",
   source_session_revision: 7,
   base_version_id: "ver-visual-demo-2",
-  counts: { pending: 3, accepted: 1, rejected: 1, stale: 1, conflict: 0, superseded: 0 },
+  counts: { pending: 3, accepted: 1, rejected: 1, stale: 1, conflict: 0, superseded: 0, unacceptable: 0 },
   error: null,
   items: [
     reviewItem({}),
@@ -611,7 +611,7 @@ export const INSTANCE_FACT = ELEMENT_DRAFT.material_objects.find((item) => item.
 export const INSTANCE_LABEL = documentDisplayText(ELEMENT_DRAFT, INSTANCE_FACT);
 
 /** Fixed overview, conversation and document instances share the existing virtual workspace. */
-export async function mockCanvasApi(page: Page, options: { emptySession?: boolean } = {}) {
+export async function mockCanvasApi(page: Page, options: { emptySession?: boolean; proposalIssue?: "failed" | "unacceptable" } = {}) {
   await mockReviewApi(page);
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
   const overview: import("../../src/api/types").WorkspaceOverview = {
@@ -652,6 +652,26 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
     [`${base}/materials`]: { items: [{ id: "material-visual-guide", name: "星河采购业务说明.md", byte_size: 1280, chunk_count: 6, sha256: "b".repeat(64) }] },
   };
   if (options.emptySession) responses[`${base}/sessions`] = { items: [] };
+  if (options.proposalIssue) {
+    const failed = options.proposalIssue === "failed";
+    const notice = { run_token: "fictional-run", summary: failed ? "修正次数已用完，本轮未生成符合契约的结果" : "关系的目标连接列不是唯一属性或完整标识；依赖该关系的提案不可接受", affected_count: failed ? 0 : 2, reviewable_count: failed ? 0 : 4 };
+    responses[`${base}/sessions/${REVIEW_SESSION_ID}`] = { ...REVIEW_SESSION, task_status: failed ? "failed" : "finished", proposal_notice: notice };
+    const batch = structuredClone(REVIEW_BATCH);
+    if (failed) {
+      batch.status = "failed";
+      batch.error = { code: "REPAIR_BUDGET_EXHAUSTED", message: notice.summary };
+      batch.items = [];
+      batch.counts = { pending: 0, accepted: 0, rejected: 0, stale: 0, conflict: 0, superseded: 0, unacceptable: 0 };
+    }
+    else {
+      batch.items.slice(0, 2).forEach((item) => { item.status = "unacceptable"; item.stored_status = "unacceptable"; item.status_reason = notice.summary; });
+      batch.counts.unacceptable = 2;
+      batch.counts.pending = 1;
+    }
+    responses[`${base}/sessions/${REVIEW_SESSION_ID}/proposal-batches`] = { items: [batch], next_cursor: null };
+    responses[`${base}/sessions/${REVIEW_SESSION_ID}/proposal-batches/${batch.id}`] = batch;
+  }
+
   await page.route(
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {

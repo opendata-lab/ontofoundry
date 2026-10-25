@@ -1,5 +1,5 @@
 import { ArrowUp, Ban, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Input, Popconfirm, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
+import { Alert, Button, Checkbox, Dropdown, Flex, Input, Popconfirm, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material } from "../api/types";
@@ -91,6 +91,13 @@ export function BuilderPage() {
     void el.sendMessage(el.value.trim() || (composerMode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
       metadata: { mode: composerMode },
     });
+  };
+  const retry = () => {
+    const el = conversation.current;
+    if (!el) return;
+    setComposerMode("model");
+    el.value = "重试";
+    void el.sendMessage("重试", { metadata: { mode: "model" } });
   };
   const blocked = !capabilities?.agent_configured || running || busy || uploading;
   const canSend = !blocked && (composerMode === "model"
@@ -195,7 +202,7 @@ export function BuilderPage() {
           const current = sendState.current;
           const mode = input.metadata?.mode ?? current.mode;
           const context = current.scenario.trim();
-          const content = mode === "model" && context && input.content.trim() !== context
+          const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== context
             ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
           const run = await transport.sendMessage({ ...input, content, metadata: { ...input.metadata, mode } });
           if (mode === "model") setScenario((value) => value === current.scenario ? "" : value);
@@ -418,6 +425,16 @@ export function BuilderPage() {
               element would clear itself and reload for no reason. */}
             <dataagent-conversation ref={conversation} placeholder={composerMode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
               <BuilderConversationEmpty />
+              {!running && session?.proposal_notice && (
+                <Flex className="builder-platform-message" slot="composer-overlay">
+                  <Alert type="warning" showIcon role="status" message="平台消息"
+                    description={<>
+                      <Typography.Paragraph className="m-0">{session.proposal_notice.reviewable_count} 条可审，{session.proposal_notice.affected_count} 条受影响。</Typography.Paragraph>
+                      <Typography.Paragraph className="m-0" ellipsis={{ rows: 3, expandable: true, symbol: "展开原因" }}>{session.proposal_notice.summary}</Typography.Paragraph>
+                      <Button size="small" disabled={blocked || !!session.abandoned_at} onClick={retry}>重试</Button>
+                    </>} />
+                </Flex>
+              )}
               <div slot="composer-actions" className="flex w-full min-w-0 items-center gap-2">
                 <Dropdown trigger={["click"]} placement="topLeft" disabled={running || busy || uploading}
                   menu={{ selectable: true, selectedKeys: [composerMode], items: [{ type: "group", label: "场景", children: [

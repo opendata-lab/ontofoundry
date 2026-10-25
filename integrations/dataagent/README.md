@@ -61,3 +61,9 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 平台新增 MCP 工具 `resolve_entity`。部署平台新版本后，在 DataAgent 管理后台为已登记的 OntoFoundry MCP 服务刷新工具列表；用 `make -C integrations/dataagent zip` 重新生成并安装 semantic-grounding 与 entity-extraction 技能包，重启 DataAgent。
 
+
+## 2026-10-23 平台提案预检
+
+`prepare_result.py` 本地检查通过后，读取工作包 `mcp_config_file` 中本轮 MCP 地址与 Authorization，调用同空间、同运行的只读 `proposal-check`。契约错误与不可接受组直接进入工具输出；未通过时保留候选和报告，不替换最终结果。平台不可达或配置缺失时输出 `提示 [PLATFORM_CHECK_SKIPPED]`，明确没有完成平台检查；本地通过的结果仍可保存，入库继续使用相同平台规则。最终文件保存不表示提案已接受或本体已发布。
+
+部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。

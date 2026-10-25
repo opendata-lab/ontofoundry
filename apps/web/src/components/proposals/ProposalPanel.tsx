@@ -17,12 +17,13 @@ type Props = {
   running: boolean;
   onRemodel: (text: string) => void;
 };
-type StatusFilter = "pending" | "accepted" | "rejected" | "blocked";
+type StatusFilter = "pending" | "accepted" | "rejected" | "blocked" | "unacceptable";
 const STATUSES: { key: StatusFilter; label: string }[] = [
   { key: "pending", label: "待审" },
   { key: "accepted", label: "已接受" },
   { key: "rejected", label: "已拒绝" },
   { key: "blocked", label: "冲突" },
+  { key: "unacceptable", label: "不可接受" },
 ];
 const KIND_ORDER: TargetKind[] = [
   "object_type",
@@ -75,7 +76,9 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
   const visible = items.filter((item) => matchesKind(item) && matchesSearch(item) && matchesStatus(item, status));
   const statusBase = items.filter((item) => matchesKind(item) && matchesSearch(item));
   const hasConflicts = items.some((item) => matchesStatus(item, "blocked"));
-  const statusChoices = STATUSES.filter((tab) => tab.key !== "blocked" || hasConflicts || status === "blocked");
+  const statusChoices = STATUSES.filter((tab) =>
+    tab.key === "blocked" ? hasConflicts || status === "blocked" :
+    tab.key === "unacceptable" ? items.some((item) => item.status === "unacceptable") : true);
   const acceptable = items.filter((item) => item.status === "pending" && !acceptanceBlock(item, byId));
   const rejectable = items.filter((item) => ["pending", "stale", "conflict"].includes(item.status));
   const selectedIds = [...selected].filter((id) => byId.has(id));
@@ -160,18 +163,6 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
       </>}
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
       {drifted && <Alert type="warning" showIcon message="草稿已更新，部分提案需要重新确认" />}
-      {detail?.status === "failed" && (
-        <Alert
-          type="error"
-          showIcon
-          message={`提案结果被拒收：${detail.error?.message ?? ""}`}
-          action={
-            <Button size="small" disabled={running || busy} onClick={() => onRemodel("请重新建模并按提案格式输出。")}>
-              重新建模
-            </Button>
-          }
-        />
-      )}
       {proposals.error && <Alert type="error" showIcon message={proposals.error} />}
       <Tabs
         size="small"

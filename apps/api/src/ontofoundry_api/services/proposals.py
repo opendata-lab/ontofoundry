@@ -2,7 +2,7 @@
 effective status (design §7.3).
 
 Stored item status is only the decision: pending | accepted | rejected |
-superseded. `stale` and `conflict` are computed on every read from the current
+superseded | unacceptable. `stale` and `conflict` are computed on every read from the current
 draft and never written, so an item whose target is edited back becomes
 pending again by itself.
 """
@@ -124,7 +124,8 @@ def store_batch(
                 field_changes_json=item.field_changes,
                 evidence_json=item.evidence,
                 reason=item.reason,
-                status="pending",
+                status=item.status,
+                status_reason=item.status_reason or None,
                 created_at=utc_now(),
             )
         )
@@ -249,7 +250,7 @@ def effective_statuses(
 
     def own(item: ProposalItemRecord) -> tuple[str, str]:
         if item.status != "pending":
-            return item.status, ""
+            return item.status, item.status_reason or ""
         found = elements.get(item.target_id)
         if item.operation == "create":
             if found is not None:
@@ -296,7 +297,7 @@ def effective_statuses(
                 ):
                     status, reason = "conflict", f"依赖 {label} 接受后已被删除"
                     break
-                if dep_status in ("stale", "conflict"):
+                if dep_status in ("stale", "conflict", "unacceptable"):
                     status = dep_status
                     reason = f"依赖 {label} {'已过期' if dep_status == 'stale' else '冲突'}"
                     break
