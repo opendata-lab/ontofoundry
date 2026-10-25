@@ -26,6 +26,7 @@ export const STATUS: Record<ProposalStatus, string> = {
   stale: "已过期",
   conflict: "冲突",
   superseded: "已被取代",
+  unacceptable: "不可接受",
 };
 
 export const STATUS_COLOR: Record<ProposalStatus, string> = {
@@ -35,6 +36,7 @@ export const STATUS_COLOR: Record<ProposalStatus, string> = {
   stale: "warning",
   conflict: "error",
   superseded: "default",
+  unacceptable: "error",
 };
 
 /** Heading like "属性 · 供应商.信用等级". */

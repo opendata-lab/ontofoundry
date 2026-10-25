@@ -201,7 +201,7 @@ def _ontology_principal(
     if authorization:
         scheme, _, token = authorization.partition(" ")
         if token.startswith("ofrun."):
-            # Run credentials are for the MCP endpoint only.
+            # Run credentials are for MCP and run-scoped proposal checks only.
             if not allow_run or scheme.lower() != "bearer":
                 raise HTTPException(401, "建模运行凭据只能用于本体 MCP")
             return _run_principal(request, session, token, workspace_id)

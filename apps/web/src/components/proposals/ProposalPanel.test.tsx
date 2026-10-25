@@ -81,7 +81,7 @@ function batch(list = items): ProposalBatchDetail {
     created_at: "2026-09-30T10:00:00Z",
     source_session_revision: 7,
     base_version_id: "v",
-    counts: { pending: 4, accepted: 0, rejected: 1, stale: 1, conflict: 0, superseded: 0 },
+    counts: { pending: 4, accepted: 0, rejected: 1, stale: 1, conflict: 0, superseded: 0, unacceptable: 0 },
     error: null,
     items: list,
   };
@@ -266,4 +266,11 @@ describe("proposal review", () => {
     expect(payload.after.values).toMatchObject({ customer_no: "C001", name: "星海贸易有限公司", is_vip: true });
     expect(payload.after.evidence.map((e) => e.id)).toEqual([...customer.evidence.map((e) => e.id), "e"]);
   });
+});
+
+it("lists unacceptable proposals with their reason and no acceptance action", () => {
+  panel(state({ detail: batch([item({ id: "blocked", status: "unacceptable", stored_status: "unacceptable", status_reason: "目标连接列不是唯一属性或完整标识" })]) }));
+  fireEvent.click(screen.getByRole("tab", { name: /不可接受/ }));
+  expect(screen.getByText("目标连接列不是唯一属性或完整标识")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /^接受 / })).not.toBeInTheDocument();
 });

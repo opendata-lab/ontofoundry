@@ -53,7 +53,7 @@ def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
 
 def _counts(items, statuses) -> dict[str, int]:
     counts = dict.fromkeys(
-        ("pending", "accepted", "rejected", "stale", "conflict", "superseded"), 0
+        ("pending", "accepted", "rejected", "stale", "conflict", "superseded", "unacceptable"), 0
     )
     for item in items:
         counts[statuses[item.id][0]] += 1
@@ -310,7 +310,7 @@ def proposal_metrics(
     for batch in batches:
         by_status[batch.status] = by_status.get(batch.status, 0) + 1
     effective: dict[str, int] = dict.fromkeys(
-        ("pending", "accepted", "rejected", "stale", "conflict", "superseded"), 0
+        ("pending", "accepted", "rejected", "stale", "conflict", "superseded", "unacceptable"), 0
     )
     for session in sessions:
         ids = [b.id for b in batches if b.session_id == session.id]

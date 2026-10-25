@@ -122,7 +122,7 @@ def test_nested_column_and_ratio_client_refs():
 
 
 @pytest.mark.parametrize(
-    "mutation", ["duplicate", "unknown", "old_kind", "context", "invalid_graph"]
+    "mutation", ["duplicate", "unknown", "old_kind", "context"]
 )
 def test_whole_result_rejected(mutation):
     ctx = context()
@@ -137,8 +137,6 @@ def test_whole_result_rejected(mutation):
         payload["items"][0]["target_kind"] = "action"
     if mutation == "context":
         payload["run_token"] = "other"
-    if mutation == "invalid_graph":
-        payload["items"][0]["after"]["name"] = "customer"
     with pytest.raises(ProposalContractError):
         parse(payload, ctx)
 

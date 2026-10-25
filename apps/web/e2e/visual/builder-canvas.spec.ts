@@ -145,3 +145,19 @@ test("instance browser aligns filters, table and detail sections", async ({ page
   await page.getByRole("button", { name: "返回详情", exact: true }).click();
   await expect(page.getByRole("heading", { name: "全部属性", exact: true })).toBeVisible();
 });
+
+for (const issue of ["failed", "unacceptable"] as const) {
+  test(`builder platform message explains ${issue} and offers retry in the conversation`, async ({ page }) => {
+    await mockCanvasApi(page, { proposalIssue: issue });
+    await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
+    await expect(page.getByText("平台消息", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "重试", exact: true })).toBeEnabled();
+    if (issue === "unacceptable") {
+      await page.getByRole("tab", { name: /不可接受/ }).click();
+      await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(2);
+    }
+    await expect(page.getByText(/提案结果被拒收：/)).toHaveCount(0);
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page).toHaveScreenshot(`builder-platform-${issue}.png`, { fullPage: true });
+  });
+}

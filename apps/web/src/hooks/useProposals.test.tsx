@@ -70,7 +70,7 @@ describe("useProposals", () => {
     const batches = vi.mocked(proposalsApi.batches);
     const detail: ProposalBatchDetail = {
       id: "b", status: "available", created_at: "", source_session_revision: 3, base_version_id: null,
-      counts: { pending: 0, accepted: 1, rejected: 0, stale: 0, conflict: 0, superseded: 0 },
+      counts: { pending: 0, accepted: 1, rejected: 0, stale: 0, conflict: 0, superseded: 0, unacceptable: 0 },
       error: null,
       items: [],
     };

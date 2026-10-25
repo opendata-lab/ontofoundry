@@ -301,6 +301,7 @@ class ProposalItemRecord(Base):
     reason: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
     # Stored decision state only: pending | accepted | rejected | superseded.
     # stale / conflict are derived on read and never written (design §7.3).
+    status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
     decided_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(

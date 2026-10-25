@@ -144,8 +144,11 @@ def test_final_graph_and_evidence_still_reject(mutation):
             evidence["quote"] = "不存在的原文"
         else:
             evidence["locator"]["line_end"] = 50
-    with pytest.raises(ProposalContractError):
-        server_parse(batch, ctx)
+    if mutation == "cross_dataset":
+        assert any(i.status == "unacceptable" for i in server_parse(batch, ctx).items)
+    else:
+        with pytest.raises(ProposalContractError):
+            server_parse(batch, ctx)
 
 
 def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
@@ -434,10 +437,15 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
             [sys.executable, *command[1:]], capture_output=True, check=False
         )
         assert completed.returncode == 0 and len(completed.stdout) <= 8192
-    with pytest.raises(ProposalContractError) as caught:
-        server_parse(batch, ctx)
-    assert "期望" in str(caught.value) and "实际" in str(caught.value)
-    assert "show_example.py" in str(caught.value) and "/" in str(caught.value)
+    if mutation == "source":
+        parsed = server_parse(batch, ctx)
+        assert parsed.items[-1].status == "unacceptable"
+        assert parsed.items[-1].status_reason
+    else:
+        with pytest.raises(ProposalContractError) as caught:
+            server_parse(batch, ctx)
+        assert "期望" in str(caught.value) and "实际" in str(caught.value)
+        assert "show_example.py" in str(caught.value) and "/" in str(caught.value)
 
 
 def test_prepare_reports_exact_fragment_location_and_preserves_output(

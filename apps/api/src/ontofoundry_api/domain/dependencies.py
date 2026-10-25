@@ -37,11 +37,16 @@ class Reference:
     column: str | None = None
 
 
-def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
+def reference_index(
+    draft: CoreDraft, *, owner_ids: set[UUID] | None = None
+) -> dict[UUID, tuple[Reference, ...]]:
     """Include dictionary keys, textual references and row-count dataset scopes."""
     index = draft_index(draft)
     refs: dict[UUID, list[Reference]] = {
-        item.id: [] for collection in COLLECTIONS for item in getattr(draft, collection)
+        item.id: []
+        for collection in COLLECTIONS
+        for item in getattr(draft, collection)
+        if owner_ids is None or item.id in owner_ids
     }
 
     def add(owner, target, path, column=None):
@@ -81,6 +86,8 @@ def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
                             add(owner, mapping.id, path)
 
     for obj in draft.object_types:
+        if owner_ids is not None and obj.id not in owner_ids:
+            continue
         add(obj.id, obj.extends, "extends")
         add(obj.id, obj.title_property_id, "title_property_id")
         for i, branch in enumerate(obj.derived_by):
@@ -97,16 +104,24 @@ def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
                     for step in condition.path.links:
                         add(obj.id, step.link_type_id, path)
     for prop in draft.properties:
+        if owner_ids is not None and prop.id not in owner_ids:
+            continue
         add(prop.id, prop.owner_type_id, "owner_type_id")
         add(prop.id, prop.value_type_id, "value_type_id")
     for link in draft.link_types:
+        if owner_ids is not None and link.id not in owner_ids:
+            continue
         add(link.id, link.source_type_id, "source_type_id")
         add(link.id, link.target_type_id, "target_type_id")
         join(link.id, link.data_join, "data_join", link.source_type_id, link.target_type_id)
     for rule in draft.rules:
+        if owner_ids is not None and rule.id not in owner_ids:
+            continue
         add(rule.id, rule.owner_id, "owner_id")
         expression(rule.id, resolve_rule_expression(draft, rule), "expression")
     for metric in draft.metrics:
+        if owner_ids is not None and metric.id not in owner_ids:
+            continue
         if isinstance(metric, RatioMetric):
             add(metric.id, metric.numerator_id, "numerator_id")
             add(metric.id, metric.denominator_id, "denominator_id")
@@ -122,6 +137,8 @@ def reference_index(draft: CoreDraft) -> dict[UUID, tuple[Reference, ...]]:
         else:
             expression(metric.id, resolve_metric_expression(draft, metric), "expression")
     for mapping in draft.mappings:
+        if owner_ids is not None and mapping.id not in owner_ids:
+            continue
         add(mapping.id, mapping.type_id, "type_id")
         if mapping.binding_mode == BindingMode.SHARED_PARENT:
             for ancestor in index.ancestors(mapping.type_id):

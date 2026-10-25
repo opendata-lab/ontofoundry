@@ -16,6 +16,7 @@ const REVIEW_STATE: Record<ProposalStatus, StatusState> = {
   stale: "partial",
   conflict: "error",
   superseded: "unmapped",
+  unacceptable: "error",
 };
 
 export function ProposalStatusMark({ status }: { status: ProposalStatus }) {
@@ -42,7 +43,7 @@ export function ProposalActions({
   actions: CardActions;
   size?: "small" | "middle";
 }) {
-  if (item.status === "superseded") return null;
+  if (["superseded", "unacceptable"].includes(item.status)) return null;
   if (item.status === "rejected")
     return (
       <Button size={size} disabled={busy} aria-label={`恢复 ${item.display_name}`} onClick={() => actions.restore(item)}>
@@ -102,7 +103,7 @@ export function ProposalCard({
   const change = changes.find((entry) => entry.path === "name") ?? changes[0];
   const before = change ? valueText(change.before) : "无内容改动";
   const after = change ? valueText(change.after) : "补充证据";
-  const isBlocked = ["conflict", "stale"].includes(item.status);
+  const isBlocked = ["conflict", "stale", "unacceptable"].includes(item.status);
   const deps = requiredIds(item);
   const depNames = deps.map((id) => items?.find((entry) => entry.id === id)?.display_name ?? id).join("、");
   return (

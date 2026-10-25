@@ -208,6 +208,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(instances.router)
     app.include_router(settings_api.router)
     app.include_router(mcp.router)
+    from ontofoundry_api.api import proposal_checks
+    app.include_router(proposal_checks.router)
     if app_settings.web_dist:
         from ontofoundry_api.web import FrontendFiles
 

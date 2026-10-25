@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "run_token": {
+      "title": "Run Token",
+      "type": "string"
+    },
+    "summary": {
+      "title": "Summary",
+      "type": "string"
+    },
+    "affected_count": {
+      "minimum": 0,
+      "title": "Affected Count",
+      "type": "integer"
+    },
+    "reviewable_count": {
+      "minimum": 0,
+      "title": "Reviewable Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_token",
+    "summary",
+    "affected_count",
+    "reviewable_count"
+  ],
+  "title": "ProposalRunNotice",
+  "type": "object"
+}
