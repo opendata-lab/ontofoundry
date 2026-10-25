@@ -37,6 +37,25 @@ def effective_ref(item, index):
     return item.get("client_ref", f"{item.get('target_kind')}-{index + 1}")
 
 
+def material_hashes(pack):
+    """Material id -> sha256 from the work pack, for evidence the agent left unhashed."""
+    return {str(m["id"]): m["sha256"] for m in (pack or {}).get("materials") or [] if m.get("id") and m.get("sha256")}
+
+
+def fill_material_hashes(value, hashes):
+    """Evidence names a material by id; its hash is a fact of the run, not the agent's to copy."""
+    if isinstance(value, dict):
+        if value.get("kind") == "material" and value.get("material_id") and not value.get("material_sha256"):
+            sha = hashes.get(str(value["material_id"]))
+            if sha:
+                value["material_sha256"] = sha
+        for child in value.values():
+            fill_material_hashes(child, hashes)
+    elif isinstance(value, list):
+        for child in value:
+            fill_material_hashes(child, hashes)
+
+
 def assemble(context, fragments):
     items, refs = [], set()
     existing = pinned_targets(context)
@@ -53,6 +72,7 @@ def assemble(context, fragments):
         for raw in fragment:
             index = len(items)
             item = deepcopy(raw)
+            fill_material_hashes(item, context.get("material_hashes") or {})
 
             def fail(
                 field, expected, actual, code="PREPARE_INPUT", index=index, item=item
@@ -391,6 +411,7 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         fragments, origins, context = load_inputs(raw_fragments, args.context)
         candidate = output.with_suffix(".pending.json")
+        context["material_hashes"] = material_hashes(pack if args.work_pack else None)
         batch = assemble(context, fragments)
         atomic_write(candidate, encode(batch))
     except (InputProblem, PrepareInputError) as exc:

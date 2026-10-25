@@ -18,7 +18,7 @@ from check_result import (
     mapping_local_errors,
     schema_errors,
 )
-from prepare_result import PrepareInputError, assemble, effective_ref
+from prepare_result import PrepareInputError, assemble, effective_ref, material_hashes
 from runpaths import PARTS, HintParser, command, error, existing, fragment_paths
 
 SUMMARY_LIMIT = 4000
@@ -128,6 +128,7 @@ def main():
             return 2
         context = json.loads(Path(args.context).read_bytes())
         schema = json.loads(Path(args.schema).read_bytes())
+        context["material_hashes"] = material_hashes(pack if args.work_pack else None)
     except (OSError, ValueError, KeyError) as exc:
         which = args.work_pack if not (args.context and args.schema) else f"{args.context} 或 {args.schema}"
         print(error("INPUT_UNREADABLE", f"读取 {which} 失败：{type(exc).__name__}", "未检查任何片段",

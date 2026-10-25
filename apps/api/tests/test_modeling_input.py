@@ -86,6 +86,18 @@ def test_large_graph_index_pages_keep_every_element_and_pointer():
     assert len(encode(pack)) <= 8192
 
 
+def test_paging_spills_elements_and_keeps_materials_inline():
+    # Every run reads its materials' paths and hashes; only elements page out.
+    ctx = context()
+    for i in range(300):
+        ctx["draft"]["object_types"].append({"id": f"object-{i:04}", "name": f"staff_{i}", "extends": None})
+    material = {"id": "m1", "sha256": "a" * 64, "path": "uploads/fictional.md", "lines": 3, "bytes": 90}
+    pack, pages = build_work_pack(ctx, [material], context_file="context.json", schema_file="schema.json")
+    assert pages and pack["materials"][0]["sha256"] == "a" * 64
+    assert not any("material" in r for page in pages for r in json.loads(page))
+    assert len(encode(pack)) <= 8192
+
+
 @pytest.mark.parametrize(
     "material",
     [{"id": "missing", "sha256": "a" * 64}, {"id": "missing", "path": "material.md"}],

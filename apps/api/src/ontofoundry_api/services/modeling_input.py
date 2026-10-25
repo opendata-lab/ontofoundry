@@ -10,6 +10,8 @@ from ontofoundry_api.db_models import MaterialRecord, utc_now
 from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.material_store import store_text_material
 
+# Room left in an inline pack for the index_pages link and paging notes.
+INDEX_LINK_ROOM = 600
 PACK_LIMIT = 8 * 1024
 READ_LIMIT = 8 * 1024
 EXAMPLES = {
@@ -132,10 +134,19 @@ def build_work_pack(
     if len(encode(pack)) <= PACK_LIMIT:
         return pack, []
     # No index entries disappear: the page list replaces the inline index.
+    # Elements spill first; materials and tables stay inline while they fit,
+    # since every run reads their paths and hashes (a paged material sent the
+    # agent through the index pages just to cite it).
+    spilled = {"elements": pack.pop("elements")}
+    for key in ("tables", "materials"):
+        if len(encode(pack)) + INDEX_LINK_ROOM <= PACK_LIMIT:
+            break
+        if key in pack:
+            spilled[key] = pack.pop(key)
     rows = (
-        [{"material": m} for m in pack.pop("materials")]
-        + [{"table": t} for t in pack.pop("tables", [])]
-        + [{"element": e} for e in pack.pop("elements")]
+        [{"material": m} for m in spilled.get("materials", [])]
+        + [{"table": t} for t in spilled.get("tables", [])]
+        + [{"element": e} for e in spilled["elements"]]
     )
     pages, page = [], []
     for row in rows:
