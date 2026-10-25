@@ -456,9 +456,11 @@ def published_model(db, workspace_id):
         if space.current_version_id
         else None
     )
-    return OntologyDraft.model_validate(
-        version.snapshot_json if version else empty_snapshot(workspace_id)
-    )
+    if version is not None:
+        from ontofoundry_api.services.ontology_query import read_context
+
+        return read_context(version).draft
+    return OntologyDraft.model_validate(empty_snapshot(workspace_id))
 
 
 def state_for(model, published, kind, element, objects, active_ids):

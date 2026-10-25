@@ -25,7 +25,6 @@ from ontofoundry_api.services.ontology_query import (
     current_version,
     read_context,
     resource_items,
-    snapshot_of,
 )
 from ontofoundry_api.services.ontology_search import search_ontology
 from ontofoundry_api.services.workspaces import get_workspace
@@ -106,7 +105,8 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             raise ServiceError(
                 "固定发布版已不可用", code="version_unavailable", status_code=404
             ) from exc
-        snapshot = snapshot_of(version)
+        # Shared immutable definitions are read directly; every response projection is new.
+        snapshot = read_context(version).snapshot
     else:
         snapshot = empty_snapshot(workspace_id)
     envelope = {"workspace_id": workspace_id, "version_id": version_id or None}
@@ -187,18 +187,40 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
             ]
         return value
 
-    resources = resource_items(
-        snapshot,
-        draft=draft,
-        mappings=mappings,
-        instances=instances,
-        db=db if mappings else None,
-        workspace_id=workspace_id,
+    wanted = (
+        {str(i) for i in args.ids}
+        if name == "get_ontology" and args.ids is not None
+        else None
     )
-    if mappings and name == "get_ontology" and "physical" in args.include:
+    resources = (
+        resource_items(
+            snapshot,
+            draft=draft,
+            selected=[UUID(i) for i in wanted],
+            mappings=mappings,
+            instances=instances,
+            db=db if mappings else None,
+            workspace_id=workspace_id,
+        )
+        if name == "get_ontology" and wanted is not None
+        else []
+    )
+    if (
+        mappings
+        and name == "get_ontology"
+        and wanted is not None
+        and "physical" in args.include
+    ):
+        from ontofoundry_api.services.dataset_sources import authorized_dataset_projection
         from ontofoundry_api.services.physical_projection import physical_projection
 
-        datasets = [r["definition"] for r in resources if r["kind"] == "dataset"]
+        def datasets(identities):
+            return [
+                authorized_dataset_projection(db, workspace_id, index.datasets[i])
+                for i in sorted(identities, key=str)
+                if i in index.datasets
+            ]
+
         for resource in resources:
             if resource["kind"] not in {"object_type", "link_type", "metric"}:
                 continue
@@ -214,12 +236,30 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
     lookup = {
         r["definition"]["id"]: r for r in resources if mappings or r["kind"] != "dataset"
     }
+    if name == "get_ontology" and wanted is None:
+        for kind, collection in (
+            ("object_type", "object_types"),
+            ("link_type", "link_types"),
+            ("metric", "metrics"),
+            ("dataset", "datasets"),
+        ):
+            if kind == "dataset" and not mappings:
+                continue
+            for element in snapshot[collection]:
+                lookup[element["id"]] = {
+                    "kind": kind,
+                    "definition": {
+                        key: element.get(key) for key in ("id", "name", "display_name")
+                    },
+                }
     for kind, collection in (
         ("property", "properties"),
         ("rule", "rules"),
         ("value_type", "value_types"),
     ):
-        for e in snapshot.get(collection, []):
+        for e in snapshot.get(collection, []) if name == "get_ontology" else []:
+            if wanted is not None and e["id"] not in wanted:
+                continue
             definition = deepcopy(e)
             if not instances:
                 definition.pop("evidence", None)
@@ -255,26 +295,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
                 for field in ("description", "synonyms", "binding_status"):
                     if field in d:
                         element[field] = d[field]
-                definition = deepcopy(
-                    next(
-                        (
-                            e
-                            for e in snapshot[
-                                {
-                                    "object_type": "object_types",
-                                    "link_type": "link_types",
-                                    "property": "properties",
-                                    "rule": "rules",
-                                    "metric": "metrics",
-                                    "dataset": "datasets",
-                                    "value_type": "value_types",
-                                }[r["kind"]]
-                            ]
-                            if e["id"] == identity
-                        ),
-                        {},
-                    )
-                )
+                definition = index.elements[UUID(identity)][1].model_dump(mode="json")
                 if not instances:
                     definition.pop("evidence", None)
                 if not mappings or "physical" not in args.include:

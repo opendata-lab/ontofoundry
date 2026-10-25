@@ -15,11 +15,12 @@ import {
   type Metric,
   type ModelingSession,
   type ObjectType,
+  type TargetKind,
 } from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
 import { useErrorMessage } from "../../hooks/useErrorMessage";
-import { byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
+import { emptyDraft, byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
 import { ONTOLOGY_SAVED, notifyOntologySaved, type OntologySaved, type ElementRequest, type ElementTab } from "../../lib/elementInspector";
 import { useElementDetail } from "../../hooks/useElementDetail";
@@ -47,7 +48,7 @@ const { Text } = Typography;
 
 type InspectKind = "object_type" | "link_type" | "metric" | "dataset";
 type Element = ObjectType | LinkType | Metric | Dataset;
-type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null };
+type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null; complete: boolean };
 type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
 type ImpactPreview = {
   candidate: ElementSave;
@@ -250,6 +251,7 @@ export function ElementModal({
     <ElementView
       key={`${request.kind}:${request.id}:${sessionId}:${request.previewHash}`}
       variant="modal"
+      versionId={request.versionId ?? null}
       kind={request.kind}
       id={request.id}
       sessionId={sessionId}
@@ -266,6 +268,7 @@ export function ElementModal({
 
 type ViewProps = {
   variant: "modal" | "page";
+  versionId?: string | null;
   kind: string;
   id: string;
   sessionId: string | null;
@@ -281,6 +284,7 @@ type ViewProps = {
 
 export function ElementView({
   variant,
+  versionId: requestedVersionId,
   kind: requestedKind,
   id,
   sessionId,
@@ -313,6 +317,12 @@ export function ElementView({
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const editRead = useRef({ revision: 0, pending: false });
+  useEffect(() => {
+    editRead.current.revision++;
+    if (editRead.current.pending) { editRead.current.pending = false; setBusy(false); }
+    return () => { editRead.current.revision++; };
+  }, [active, workspace.id, requestedKind, id, requestedVersionId]);
   const [error, setError] = useState<ReactNode>(null);
   useErrorMessage(draft ? error : null);
   const [showErrors, setShowErrors] = useState(false);
@@ -348,16 +358,17 @@ export function ElementView({
           const preview = await publishApi.preview(session);
           if (preview.merged_snapshot_sha256 !== previewHash)
             throw new Error("待发布内容已变化，请关闭弹窗并重新预览");
-          source = { draft: { ...preview.merged_model, material_objects: session.draft.material_objects, material_links: session.draft.material_links }, session: null, versionId: preview.current_version_id };
-        } else source = { draft: session.draft, session, versionId: current.version_id };
+          source = { draft: { ...preview.merged_model, material_objects: session.draft.material_objects, material_links: session.draft.material_links }, session: null, versionId: preview.current_version_id, complete: true };
+        } else source = { draft: session.draft, session, versionId: current.version_id, complete: true };
       } else {
-        const model = workspace.role
-          ? await modelingApi.snapshot(workspace.id, current.version_id)
-          : current.version_id
-            ? (await api.presentation(workspace.id, current.version_id)).model
-            : null;
-        if (!model) throw new Error("还没有发布内容");
-        source = { draft: model, session: null, versionId: current.version_id };
+        const fixed = requestedVersionId ?? current.version_id;
+        if (!fixed && !creating) throw new Error("还没有发布内容");
+        const complete = creating || startEditing || requestedKind === "material_object" || requestedKind === "material_link";
+        const model = !fixed ? emptyDraft(workspace.id) : complete
+          ? workspace.role ? await modelingApi.snapshot(workspace.id, fixed) : (await api.presentation(workspace.id, fixed)).model
+          : { ...(await api.elementPresentation(workspace.id, requestedKind as TargetKind, id, fixed)).model, material_objects: [], material_links: [] };
+        source = { draft: model, session: null, versionId: fixed, complete };
+
       }
       let value = startEditing || creating ? structuredClone(source.draft) : source.draft;
       if (creating) {
@@ -377,7 +388,7 @@ export function ElementView({
     return () => {
       live = false;
     };
-  }, [workspace.id, workspace.role, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt]);
+  }, [workspace.id, workspace.role, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt, requestedVersionId]);
   useEffect(() => {
     if (!modal || (!dirty && !busy)) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -469,7 +480,7 @@ export function ElementView({
   // References always lead to a detail page; a page keeps its own edits meanwhile.
   const openPage = (request: ElementRequest) => {
     if (modal) close();
-    detail.open({ ...request, sessionId, previewHash: previewHash ?? undefined });
+    detail.open({ ...request, sessionId, previewHash: previewHash ?? undefined, versionId: loaded?.versionId ?? undefined });
   };
   const open = (request: ElementRequest) => {
     if (busy) return;
@@ -482,7 +493,7 @@ export function ElementView({
   const buildCandidate = (
     sourceDraft: Draft | null = draftRef.current,
   ): { candidate: ElementSave; problem: string | null; signature: string } | null => {
-    if (!sourceDraft || !loaded || !member || previewHash) return null;
+    if (!sourceDraft || !loaded?.complete || !member || previewHash) return null;
     const currentResolved = resolve(sourceDraft, requestedKind, effectiveId);
     const currentKind: InspectKind =
       currentResolved?.kind ??
@@ -512,6 +523,7 @@ export function ElementView({
       draft: result.session?.draft ?? result.draft,
       session: result.session,
       versionId: result.version.version_id,
+      complete: true,
     };
     draftRef.current = next.draft;
     flushSync(() => {
@@ -528,7 +540,7 @@ export function ElementView({
     notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
     refresh();
     setNotice("已保存");
-    if (creating) onCreated({ kind, id: payload.target_id, tab: selectedTab, sessionId });
+    if (creating || requestedVersionId) onCreated({ kind, id: payload.target_id, tab: selectedTab, sessionId, versionId: result.version.version_id });
   };
   const runPreviewAndSave = async () => {
     let current = buildCandidate();
@@ -613,13 +625,22 @@ export function ElementView({
       setBusy(false);
     }
   };
-  const beginEdit = () => {
+  const beginEdit = async () => {
     if (!loaded || !draft || !member || previewHash || busy) return;
-    const copy = structuredClone(draft);
-    draftRef.current = copy;
-    setDraft(copy);
-    setEditing(true);
-    setNotice("");
+    const revision = editRead.current.revision;
+    editRead.current.pending = true;
+    setBusy(true);
+    try {
+      const baseline = loaded.complete ? loaded.draft : await modelingApi.snapshot(workspace.id, loaded.versionId);
+      if (revision !== editRead.current.revision) return;
+      const copy = structuredClone(baseline);
+      setLoaded({ ...loaded, draft: baseline, complete: true });
+      draftRef.current = copy;
+      setDraft(copy);
+      setEditing(true);
+      setNotice("");
+    } catch (problem) { if (revision === editRead.current.revision) setError(errorText(problem)); }
+    finally { if (revision === editRead.current.revision) { editRead.current.pending = false; setBusy(false); } }
   };
   const cancel = () => {
     if (creating) {
@@ -644,7 +665,7 @@ export function ElementView({
   };
   const panel: PanelProps | null =
     draft && (object || link)
-      ? { draft, type: (object ?? link)!, editing, canEdit: member && !previewHash, sessionId, change, open }
+      ? { draft, type: (object ?? link)!, editing, canEdit: member && !previewHash, sessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
       : null;
   const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
   const record = draft && object ? objectMapping(draft, object) : null;
@@ -730,13 +751,25 @@ export function ElementView({
     </span>
   );
   const control = modal ? "small" : "middle";
+  const refreshPublished = async () => {
+    if (editing || busy) return;
+    setBusy(true);
+    try {
+      const current = await api.workspace(workspace.id);
+      if (!current.version_id) throw new Error("还没有发布内容");
+      onCreated({ kind: requestedKind as TargetKind, id, tab: selectedTab, sessionId: null, versionId: current.version_id });
+      setAttempt(value => value + 1);
+      refresh();
+    } catch (problem) { setError(errorText(problem)); }
+    finally { setBusy(false); }
+  };
   const actions = (
     <>
       {!modal && status}
-      {versionChanged && <Button size={control} disabled={editing || busy} onClick={() => setAttempt(n => n + 1)}>版本已更新，刷新</Button>}
+      {versionChanged && <Button size={control} disabled={editing || busy} onClick={() => void refreshPublished()}>版本已更新，刷新</Button>}
       {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
       {!editing && member && !previewHash && element && (
-        <Button size={control} onClick={beginEdit} disabled={!loaded || busy}>
+        <Button size={control} onClick={() => void beginEdit()} disabled={!loaded || busy}>
           编辑
         </Button>
       )}

@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { effectiveProperties } from "../../src/lib/coreModel";
+import { effectiveProperties, effectiveLinks, isA } from "../../src/lib/coreModel";
+import { objectMapping } from "../../src/lib/objectMapping";
 import { documentDisplayText } from "../../src/lib/instanceDisplay";
 import type { CoreDraft } from "../../src/api/core.generated";
 import type {
@@ -310,6 +311,7 @@ export async function mockMappingsApi(page: Page) {
       }
     },
   );
+  await mockFocusedReads(page, FIXTURE_DRAFT);
 }
 
 export const REVIEW_SESSION_ID = "session-visual-review";
@@ -546,6 +548,7 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
     },
   );
   await mockInstances(page, FIXTURE_DRAFT);
+  await mockFocusedReads(page, FIXTURE_DRAFT);
 }
 
 export const ELEMENT_DRAFT = structuredClone(FIXTURE_DRAFT);
@@ -606,6 +609,7 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
     },
   );
   await mockInstances(page, ELEMENT_DRAFT);
+  await mockFocusedReads(page, ELEMENT_DRAFT);
 }
 
 
@@ -665,4 +669,32 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
     },
   );
   await mockInstances(page, ELEMENT_DRAFT);
+  await mockFocusedReads(page, ELEMENT_DRAFT);
+}
+
+
+async function mockFocusedReads(page: Page, draft: Draft) {
+  await page.route(url => url.pathname.includes("/ontology/workspaces/") && (/\/catalog$/.test(url.pathname) || /\/(presentation|document-context)$/.test(url.pathname)), async route => {
+    const url = new URL(route.request().url());
+    const version_id = url.searchParams.get("version_id") ?? FIXTURE_WORKSPACE.version_id;
+    const envelope = { workspace_id: WORKSPACE_ID, version_id };
+    if (url.pathname.endsWith("/document-context")) return route.fulfill({ json: { ...envelope, material_objects: draft.material_objects, material_links: draft.material_links } });
+    if (url.pathname.endsWith("/presentation")) return route.fulfill({ json: { ...envelope, representation: "element-1", complete: false, model: draft } });
+    const kind = url.searchParams.get("kind") ?? "object_type";
+    const collections = { object_type: draft.object_types, link_type: draft.link_types, metric: draft.metrics, dataset: draft.datasets };
+    const values = collections[kind as keyof typeof collections] ?? [];
+    const q = url.searchParams.get("q")?.toLowerCase() ?? "";
+    const items = values.filter(item => JSON.stringify(item).toLowerCase().includes(q)).map(item => {
+      const base = { id: item.id, kind, name: item.name, display_name: item.display_name ?? null, description: item.description, tags: "tags" in item ? item.tags : [] };
+      if (kind === "object_type" && "extends" in item) {
+        const mapping = objectMapping(draft, item);
+        const parent = draft.object_types.find(o => o.id === item.extends);
+        return { ...base, parent, property_count: effectiveProperties(draft,item.id).length, link_count: effectiveLinks(draft,item.id).length, mapping_state: mapping.state, mapping_label: mapping.label, document_instance_count: draft.material_objects.filter(o => isA(draft, o.type_id, item.id)).length };
+      }
+      if ("source_type_id" in item) return { ...base, source: draft.object_types.find(o=>o.id===item.source_type_id), target: draft.object_types.find(o=>o.id===item.target_type_id), multiplicity: item.multiplicity, verbalizes: item.verbalizes, source_role_name: item.source_role_name, target_role_name: item.target_role_name };
+      if ("source_kind" in item) return { ...base, source_kind: item.source_kind, column_count: item.columns?.length };
+      return { ...base, metric_kind: "kind" in item ? item.kind : undefined, dataset_name: "dataset_id" in item ? draft.datasets.find(d=>d.id===item.dataset_id)?.name : null };
+    });
+    return route.fulfill({ json: { ...envelope, items, total: items.length, next_cursor: null, tags: [], counts: { object_types: draft.object_types.length, value_types: draft.value_types.length, link_types: draft.link_types.length, metrics: draft.metrics.length, datasets: draft.datasets.length } } });
+  });
 }

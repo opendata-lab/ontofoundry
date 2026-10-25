@@ -34,6 +34,9 @@ def test_read_schema_artifact_and_check_detect_drift(tmp_path, monkeypatch):
             "ElementSaveImpact",
             "TableRowsRead",
             "OntologySearchRead",
+            "CatalogPageRead",
+            "ElementProjectionRead",
+            "DocumentContextRead",
         )
     }
     export_schema.export(check=True)

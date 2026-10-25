@@ -8,6 +8,7 @@ describe("immutable version definitions", () => {
     const read = vi.fn().mockResolvedValue(value());
     const a = cache.get("w", "v1", read), b = cache.get("w", "v1", read);
     expect(a).toBe(b);
+    expect(cache.peek("w", "v1")).toBe(a);
     expect(await a).toBe(await b);
     expect(read).toHaveBeenCalledTimes(1);
     const fail = vi.fn().mockRejectedValueOnce(new Error("离线")).mockResolvedValue(value());
@@ -21,6 +22,7 @@ describe("immutable version definitions", () => {
     let finish!: (v: Presentation) => void;
     const pending = cache.get("w", "v1", () => new Promise(resolve => { finish = resolve; }));
     cache.authorize("b", "w", "member");
+    expect(cache.peek("w", "v1")).toBeUndefined();
     finish(value());
     await expect(pending).rejects.toThrow("授权已变化");
     const read = vi.fn().mockResolvedValue(value());

@@ -3,7 +3,13 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, ontology_directory_principal
 from ontofoundry_api.api.auth import ontology_principal as current_principal
-from ontofoundry_api.contracts.read_models import OntologySearchRead, OntologySearchRequest
+from ontofoundry_api.contracts.read_models import (
+    CatalogPageRead,
+    DocumentContextRead,
+    ElementProjectionRead,
+    OntologySearchRead,
+    OntologySearchRequest,
+)
 from ontofoundry_api.database import get_db
 from ontofoundry_api.services.access import (
     authorization_fingerprint,
@@ -241,4 +247,79 @@ def neighborhood(
 ) -> dict:
     return type_graph(
         current_version(session, workspace_id, version_id), focus_id=focus_id, depth=depth
+    )
+
+
+@router.get(
+    "/{workspace_id}/catalog",
+    response_model=CatalogPageRead,
+    response_model_exclude_unset=True,
+)
+def catalog(
+    workspace_id: str,
+    request: Request,
+    version_id: str | None = None,
+    kind: str | None = Query(
+        default=None, pattern="^(object_type|link_type|metric|dataset)$"
+    ),
+    q: str = "",
+    tag: str | None = None,
+    limit: int = Query(default=20, ge=1, le=200),
+    cursor: str | None = None,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    from ontofoundry_api.services.catalog_reads import catalog_page
+
+    return catalog_page(
+        session,
+        current_version(session, workspace_id, version_id),
+        principal,
+        request.app.state.settings,
+        kind=kind,
+        q=q,
+        tag=tag,
+        limit=limit,
+        cursor=cursor,
+    )
+
+
+@router.get(
+    "/{workspace_id}/types/{type_id}/presentation", response_model=ElementProjectionRead
+)
+def element_presentation(
+    workspace_id: str,
+    type_id: str,
+    kind: str,
+    version_id: str | None = None,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    from ontofoundry_api.services.catalog_reads import element_projection
+
+    return element_projection(
+        current_version(session, workspace_id, version_id),
+        kind,
+        type_id,
+        mappings=can_read_mappings(session, workspace_id, principal),
+        instances=can_read_instances(session, workspace_id, principal),
+    )
+
+
+@router.get(
+    "/{workspace_id}/types/{type_id}/document-context", response_model=DocumentContextRead
+)
+def element_documents(
+    workspace_id: str,
+    type_id: str,
+    kind: str,
+    version_id: str | None = None,
+    session: Session = Depends(get_db),
+    principal: Principal = Depends(current_principal),
+):
+    from ontofoundry_api.services.catalog_reads import document_context
+
+    require_instances(session, workspace_id, principal)
+    return document_context(
+        session, current_version(session, workspace_id, version_id), kind, type_id
     )

@@ -3,7 +3,7 @@ import { DetailWorkbench, PanelToolbar, SectionTitle } from "../layout";
 import dayjs from "dayjs";
 import { ArrowRight, Settings2 } from "lucide-react";
 import { useLayoutEffect, useMemo, useState } from "react";
-import { catalogApi, instancesApi } from "../../api/client";
+import { api, catalogApi, instancesApi } from "../../api/client";
 import type { Draft, InstanceList, InstanceNeighborhood, LinkType, MaterialObject, ObjectType, Scalar, TypedKey } from "../../api/types";
 import { bindingMode, byId, effectiveProperties, effectiveSources, isA, linkDisplayName, mappingFor, titleProperty } from "../../lib/coreModel";
 import type { PanelProps } from "../../lib/elementModel";
@@ -98,7 +98,7 @@ function linkLabel(link: LinkType | undefined, outgoing: boolean) {
   return linkDisplayName(link, outgoing);
 }
 
-function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, initialObjectId, active = true }: PanelProps<ObjectType> & {
+function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, initialObjectId, versionId, active = true }: PanelProps<ObjectType> & {
   canBrowseDatabase: boolean;
   initialObjectId?: string;
   active?: boolean;
@@ -176,6 +176,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
         } else {
           const data = await instancesApi.list(draft.workspace_id, {
             type_id: type.id, source: "database", q: query, limit: PAGE_SIZE,
+            ...(versionId ? { version_id: versionId } : {}),
             ...(cursor ? { cursor } : {}), ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
           });
           next = {
@@ -190,7 +191,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
       }
     }, 250);
     return () => { live = false; window.clearTimeout(timer); };
-  }, [active, needDatabase, requestKey, mapping, draft.workspace_id, type.id, sessionId, query, pageStart, snapshotDate, cursor, refresh]);
+  }, [active, needDatabase, requestKey, mapping, draft.workspace_id, type.id, sessionId, query, pageStart, snapshotDate, cursor, refresh, versionId]);
   const rows = source === "document" ? documentRows.slice(pageStart, pageStart + PAGE_SIZE) : result?.rows ?? [];
   const hasNext = source === "document" ? documentRows.length > pageStart + PAGE_SIZE : Boolean(result?.hasMore);
   const movePage = (next: number) => {
@@ -223,7 +224,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
               ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
             }) : null
           : await instancesApi.neighborhood(draft.workspace_id, selected.ref ?? selected.id, {
-              depth: 1, ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
+              depth: 1, ...(versionId ? { version_id: versionId } : {}), ...(snapshotDate ? { snapshot_date: snapshotDate } : {}),
             });
         if (live) setNeighborhood(data);
       } catch (e) {
@@ -234,7 +235,7 @@ function ObjectInstances({ draft, type, canEdit, sessionId, canBrowseDatabase, i
     };
     void load();
     return () => { live = false; };
-  }, [active, selected, draft.workspace_id, sessionId, snapshotDate]);
+  }, [active, selected, draft.workspace_id, sessionId, snapshotDate, versionId]);
   const related: Related[] | null = selected?.fact
     ? draft.material_links.filter((l) => l.source_id === selected.id || l.target_id === selected.id).map((l) => {
         const outgoing = l.source_id === selected.id;
@@ -355,13 +356,33 @@ function LinkInstances({ draft, type, open }: PanelProps<LinkType>) {
   );
 }
 
-export function ElementInstances(
+function ScopedElementInstances(
   props: PanelProps & { canBrowseDatabase: boolean; initialObjectId?: string; active?: boolean; readScope?: string },
 ) {
-  const { type } = props;
+  const { type, draft, versionId, partialRead, active = true } = props;
+  const [documents, setDocuments] = useState<Pick<Draft, "material_objects" | "material_links"> | null>(null);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useLayoutEffect(() => {
+    if (!active || !partialRead || !versionId || documents) return;
+    let live = true;
+    api.elementDocuments(draft.workspace_id, "derived_by" in type ? "object_type" : "link_type", type.id, versionId)
+      .then(value => { if (live) { setDocuments({ material_objects: value.material_objects, material_links: value.material_links }); setError(""); } })
+      .catch((problem: Error) => { if (live) setError(problem.message); });
+    return () => { live = false; };
+  }, [active, partialRead, versionId, type, draft.workspace_id, documents, attempt]);
+  if (partialRead && !documents) return error
+    ? <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => setAttempt(n => n + 1)}>重试</Button>} />
+    : <Text type="secondary">正在读取实例…</Text>;
+  const scoped = documents ? { ...props, draft: { ...draft, ...documents } } : props;
   return "derived_by" in type ? (
-    <ObjectInstances key={JSON.stringify([props.draft.workspace_id, type.id, props.readScope])} {...(props as PanelProps<ObjectType> & typeof props)} />
+    <ObjectInstances key={JSON.stringify([draft.workspace_id, type.id, props.readScope])} {...(scoped as PanelProps<ObjectType> & typeof props)} />
   ) : (
-    <LinkInstances key={JSON.stringify([props.draft.workspace_id, type.id, props.readScope])} {...(props as PanelProps<LinkType>)} />
+    <LinkInstances key={JSON.stringify([draft.workspace_id, type.id, props.readScope])} {...(scoped as PanelProps<LinkType>)} />
   );
+}
+
+
+export function ElementInstances(props: PanelProps & { canBrowseDatabase: boolean; initialObjectId?: string; active?: boolean; readScope?: string }) {
+  return <ScopedElementInstances key={JSON.stringify([props.draft.workspace_id, props.type.id, props.versionId, props.partialRead, props.readScope])} {...props} />;
 }

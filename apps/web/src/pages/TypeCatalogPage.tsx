@@ -1,3 +1,4 @@
+import { PublishedTypeCatalogPage } from "./PublishedTypeCatalogPage";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { Button, Empty, Input, Select, Table, Tag, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -26,7 +27,14 @@ type CatalogItem = ObjectType | LinkType | Metric | Dataset;
 const LABELS: Record<CatalogTab, string> = { entities: "实体类型", values: "值类型", relations: "关系", metrics: "指标", datasets: "数据集" };
 
 /** One catalog owns entities, relationships and metrics, including session drafts. */
-export function TypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "object_type" | "link_type" }) {
+export function TypeCatalogPage({ kind = "object_type" }: { kind?: "object_type" | "link_type" }) {
+  const [params] = useSearchParams();
+  return params.get("session") || params.get("catalogTab") === "values"
+    ? <DraftTypeCatalogPage kind={kind} />
+    : <PublishedTypeCatalogPage initialKind={kind} />;
+}
+
+function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "object_type" | "link_type" }) {
   const { workspace, refresh } = useWorkspaceContext();
   const { draft, error, load, sessionId, suffix, setDraft } = useSnapshot(workspace);
   const [createValueType, setCreateValueType] = useState(0);

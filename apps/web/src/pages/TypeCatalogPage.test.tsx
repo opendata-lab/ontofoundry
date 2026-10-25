@@ -41,7 +41,7 @@ it("preserves inherited counts, session detail links and search in the object ta
 
 it("shows a relation's identifier, meaning, multiplicity and the basic detail tab", () => {
   renderWithProviders(
-    <MemoryRouter initialEntries={["/relations"]}>
+    <MemoryRouter initialEntries={["/relations?session=session-demo"]}>
       <TypeCatalogPage kind="link_type" />
     </MemoryRouter>,
   );
@@ -60,7 +60,7 @@ it("searches the optional Chinese relation name and keeps its English identifier
   const draft = example("06-inheritance");
   draft.link_types.find((link) => link.name === "signer")!.display_name = "签约方";
   vi.spyOn(snapshotModule, "useSnapshot").mockReturnValue({ ...snapshotModule.useSnapshot(workspace()), draft });
-  renderWithProviders(<MemoryRouter><TypeCatalogPage kind="link_type" /></MemoryRouter>);
+  renderWithProviders(<MemoryRouter initialEntries={["/?session=session-demo"]}><TypeCatalogPage kind="link_type" /></MemoryRouter>);
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索目录" }), { target: { value: "签约方" } });
   const link = screen.getByRole("link", { name: "签约方" });
   expect(within(link.closest("tr")!).getByText("signer")).toBeInTheDocument();

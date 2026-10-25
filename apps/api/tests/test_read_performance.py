@@ -150,3 +150,16 @@ def test_304_reads_metadata_without_loading_snapshot_or_validation(client):
         event.remove(client.app.state.engine, "before_cursor_execute", capture)
     assert hit.status_code == 304
     assert not any("snapshot_json" in sql or "validation_json" in sql for sql in statements)
+
+
+def test_warm_instance_reads_reuse_the_current_definition(client, monkeypatch):
+    from ontofoundry_api.domain.models import OntologyDraft
+
+    assert client.get(ONTOLOGY + "/version").status_code == 200
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("warm instance read revalidated immutable definitions")
+
+    monkeypatch.setattr(OntologyDraft, "model_validate", forbidden)
+    response = client.get(ONTOLOGY + "/objects", params={"source": "document"})
+    assert response.status_code == 200, response.text

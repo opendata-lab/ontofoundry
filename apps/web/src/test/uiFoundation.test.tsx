@@ -1,9 +1,14 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { Button, DatePicker, Modal, Select, Table } from "antd";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { antdTheme } from "../theme/antdTheme";
 import { renderWithProviders } from "./renderWithProviders";
+
+afterEach(async () => {
+  cleanup();
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+});
 
 describe("antd theme from tokens", () => {
   const tokens: Record<string, string> = {

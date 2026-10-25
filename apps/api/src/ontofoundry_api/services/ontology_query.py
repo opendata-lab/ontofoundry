@@ -281,8 +281,17 @@ def resource_items(
     def dump(item):
         return project(item.model_dump(mode="json"))
 
+    def values(kind, collection):
+        if selected is None:
+            return getattr(draft, collection)
+        return [
+            index.elements[i][1]
+            for i in selected
+            if i in index.elements and index.elements[i][0] == kind
+        ]
+
     items = []
-    for obj in draft.object_types:
+    for obj in values("object_type", "object_types"):
         status = (
             binding_status(draft, obj.id, db, workspace_id) if mappings else "forbidden"
         )
@@ -358,13 +367,13 @@ def resource_items(
             "binding_status": status,
         }
         if mappings:
-            local = next((m for m in draft.mappings if m.type_id == obj.id), None)
+            local = index.mappings_by_type.get(obj.id)
             definition["mapping"] = (
                 {**dump(local), "binding_status": status} if local else None
             )
             definition["instance_source_type_ids"] = [str(i) for i in binding.virtual_types]
         items.append({"kind": "object_type", "definition": definition})
-    for link in draft.link_types:
+    for link in values("link_type", "link_types"):
         definition = {
             **dump(link),
             "direction": "forward",
@@ -381,7 +390,7 @@ def resource_items(
         items.append({"kind": "link_type", "definition": definition})
     from ontofoundry_api.services.metric_query import metric_projection
 
-    for metric in draft.metrics:
+    for metric in values("metric", "metrics"):
         if mappings:
             definition = metric_projection(draft, metric, db=db, workspace_id=workspace_id)
             definition = project(definition)
@@ -394,7 +403,7 @@ def resource_items(
             definition["binding_status"] = "forbidden"
         items.append({"kind": "metric", "definition": definition})
     if mappings:
-        for dataset in draft.datasets:
+        for dataset in values("dataset", "datasets"):
             if db is not None:
                 from ontofoundry_api.services.dataset_sources import (
                     authorized_dataset_projection,
@@ -458,19 +467,33 @@ def get_type(
     include_instances=True,
     db=None,
 ):
-    items = search_types(
-        version,
-        include_context_elements=include_context_elements,
-        include_instances=include_instances,
+    index = read_context(version).index
+    from uuid import UUID
+
+    try:
+        identity = UUID(type_id)
+    except ValueError:
+        identity = None
+    located = (
+        [index.elements[identity]]
+        if identity in index.elements
+        else index.names.get(type_id.casefold(), [])
+    )
+    located = [
+        (kind, element)
+        for kind, element in located
+        if kind in {"object_type", "link_type", "metric", "dataset"}
+        and (include_context_elements or kind != "dataset")
+    ]
+    found = resource_items(
+        read_context(version).snapshot,
+        draft=read_context(version).draft,
+        selected=[element.id for _, element in located],
+        mappings=include_context_elements,
+        instances=include_instances,
         db=db,
-    )["items"]
-    found = [i for i in items if i["definition"]["id"] == type_id]
-    if not found:
-        found = [
-            i
-            for i in items
-            if i["definition"].get("name", "").casefold() == type_id.casefold()
-        ]
+        workspace_id=version.workspace_id,
+    )
     if not found:
         raise NotFoundError("没有找到该资源")
     return {

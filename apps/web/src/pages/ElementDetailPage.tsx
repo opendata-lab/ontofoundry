@@ -18,6 +18,7 @@ export function ElementDetailPage() {
     <ElementView
       key={`${kind}:${id}:${sessionId}:${previewHash}`}
       variant="page"
+      versionId={params.get("version")}
       kind={kind}
       id={id}
       sessionId={sessionId}

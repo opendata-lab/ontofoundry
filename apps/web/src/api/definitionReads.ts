@@ -25,8 +25,17 @@ export class DefinitionReads {
     this.permissions.clear();
     this.projections.clear();
   }
+  peek(workspaceId: string, versionId: string): Promise<Presentation> | undefined {
+    const key = this.key(workspaceId, versionId);
+    const entry = this.entries.get(key);
+    if (entry) { this.entries.delete(key); this.entries.set(key, entry); }
+    return entry?.promise;
+  }
+  private key(workspaceId: string, versionId: string) {
+    return JSON.stringify([this.subject, this.generation, workspaceId, versionId, this.permissions.get(workspaceId), this.projections.get(workspaceId), "presentation-1"]);
+  }
   get(workspaceId: string, versionId: string, read: () => Promise<Presentation>): Promise<Presentation> {
-    const key = JSON.stringify([this.subject, this.generation, workspaceId, versionId, this.permissions.get(workspaceId), this.projections.get(workspaceId), "presentation-1"]);
+    const key = this.key(workspaceId, versionId);
     const hit = this.entries.get(key);
     if (hit) {
       this.entries.delete(key);

@@ -8,14 +8,14 @@ import { PageTabContext } from "../../hooks/usePageTab";
 import { WorkspaceContextProvider } from "../../hooks/useWorkspaceContext";
 import { example } from "../../test/drafts";
 import { renderWithProviders } from "../../test/renderWithProviders";
-import { legacyInspectRequest, type ElementRequest } from "../../lib/elementInspector";
+import { legacyInspectRequest, notifyOntologySaved, type ElementRequest } from "../../lib/elementInspector";
 import { ElementModal } from "./ElementInspector";
 
 vi.mock("../../api/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../api/client")>();
   return {
     ...original,
-    api: { ...original.api, workspace: vi.fn(), presentation: vi.fn() },
+    api: { ...original.api, workspace: vi.fn(), presentation: vi.fn(), elementPresentation: vi.fn(), elementDocuments: vi.fn() },
     modelingApi: {
       ...original.modelingApi,
       snapshot: vi.fn(),
@@ -46,9 +46,12 @@ function Popup({ initial, nextId }: { initial: ElementRequest; nextId?: string }
   </>;
 }
 
-function show(draft: Draft, query: string, role: Workspace["role"] = "admin") {
+function show(draft: Draft, query: string, role: Workspace["role"] = "admin", versionId?: string) {
   const request = legacyInspectRequest(new URLSearchParams(query))!;
+  if (versionId) request.versionId = versionId;
   vi.mocked(modelingApi.snapshot).mockResolvedValue(draft);
+  vi.mocked(api.elementPresentation).mockResolvedValue({ model: draft, version_id: "v1", workspace_id: "w", complete: false, representation: "element-1" } as never);
+  vi.mocked(api.elementDocuments).mockResolvedValue({ material_objects: draft.material_objects, material_links: draft.material_links, version_id: "v1", workspace_id: "w" } as never);
   vi.mocked(api.presentation).mockResolvedValue({ model: draft, version: {} as never });
   const router = createMemoryRouter(
     [
@@ -96,7 +99,7 @@ describe("object popup", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
     expect(within(dialog).getByLabelText(`${customer.display_name || customer.name}的关系图`)).toBe(graph);
     expect(dialog.querySelector(".object-overview-columns")).toBe(layout);
-    expect(within(dialog).getByRole("textbox", { name: "名称" })).toBeEnabled();
+    expect(await within(dialog).findByRole("textbox", { name: "名称" })).toBeEnabled();
   });
   it("shows the populated tabs, mapping status and column bindings", async () => {
     const draft = example("01-basic-sales");
@@ -136,7 +139,7 @@ describe("object popup", () => {
     show(draft, `inspect=object_type:${customer.id}&inspectTab=basic`);
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(await within(dialog).findByRole("button", { name: "编辑" }));
-    fireEvent.change(within(dialog).getByRole("textbox", { name: "名称" }), { target: { value: "重要客户" } });
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "重要客户" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
@@ -191,7 +194,7 @@ describe("object popup", () => {
       "关系1",
       "规则0",
     ]));
-    expect(api.presentation).toHaveBeenCalledWith("w", "v1");
+    expect(api.elementPresentation).toHaveBeenCalledWith("w", "object_type", draft.object_types[0].id, "v1");
     expect(within(dialog).queryByRole("button", { name: "编辑" })).not.toBeInTheDocument();
   });
 
@@ -731,4 +734,42 @@ describe("retained popup editing and request lifecycle", () => {
     await waitFor(() => expect(instancesApi.list).toHaveBeenCalledTimes(2));
     expect(within(dialog).queryByText("迟到实例")).not.toBeInTheDocument();
   });
+});
+
+
+it("loads a complete independent baseline before editing an incomplete view", async () => {
+  const draft = example("01-basic-sales");
+  const object = draft.object_types[0];
+  vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+  show(draft, `inspect=object_type:${object.id}`);
+  vi.mocked(api.elementPresentation).mockResolvedValue({ model: { ...draft, object_types: [object] }, version_id: "v1", workspace_id: "w", complete: false, representation: "element-1" } as never);
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findByRole("button", { name: "编辑" });
+  expect(modelingApi.snapshot).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
+  await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledWith("w", "v1"));
+  fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "星舟客户" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+  const payload = vi.mocked(modelingApi.saveElement).mock.calls[0][1];
+  expect(payload.draft.object_types).toHaveLength(draft.object_types.length);
+  expect(draft.object_types[0].display_name).not.toBe("星舟客户");
+});
+
+
+it("keeps a pinned view until an explicit refresh moves every definition to the new version", async () => {
+  const draft = example("01-basic-sales");
+  const object = draft.object_types[0];
+  show(draft, `inspect=object_type:${object.id}`, "admin", "v1");
+  const dialog = await screen.findByRole("dialog");
+  await within(dialog).findByRole("button", { name: "编辑" });
+  const next = structuredClone(draft);
+  next.object_types[0].display_name = "星舟新版客户";
+  vi.mocked(api.workspace).mockResolvedValue({ ...workspace, version_id: "v2" });
+  vi.mocked(api.elementPresentation).mockResolvedValue({ model: next, version_id: "v2", workspace_id: "w", complete: false, representation: "element-1" } as never);
+  act(() => notifyOntologySaved({ workspaceId: "w", session: null }));
+  expect(within(dialog).queryByText("星舟新版客户")).not.toBeInTheDocument();
+  fireEvent.click(await within(dialog).findByRole("button", { name: "版本已更新，刷新" }));
+  await waitFor(() => expect(api.elementPresentation).toHaveBeenLastCalledWith("w", "object_type", object.id, "v2"));
+  expect((await within(dialog).findAllByText("星舟新版客户")).length).toBeGreaterThan(0);
 });

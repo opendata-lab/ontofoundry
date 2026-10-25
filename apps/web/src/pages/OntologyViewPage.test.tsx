@@ -57,7 +57,7 @@ describe("ontology view", () => {
       expect(screen.getAllByText("指标").some((el) => /指标\s*10/.test(el.parentElement?.textContent ?? ""))).toBe(true),
     );
     fireEvent.doubleClick(screen.getByText("客户"));
-    expect(open).toHaveBeenCalledWith({ kind: "object_type", id: draft.object_types[0].id, tab: "basic", sessionId: null });
+    expect(open).toHaveBeenCalledWith({ kind: "object_type", id: draft.object_types[0].id, tab: "basic", sessionId: null, versionId: "v2" });
   });
 
   it("offers no import or export while P2 adapters are offline", async () => {

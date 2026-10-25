@@ -1,4 +1,5 @@
 import type {
+  CatalogPage, ElementProjection, DocumentContext, TargetKind,
   Dataset, DatasetCheckResult, DatasetPreview, SyncJob,
   ExportPreview,
   ImportPreview,
@@ -197,6 +198,25 @@ export const api = {
     workspaceId: string,
     params?: { kind?: ResourceKind; q?: string; version_id?: string },
   ) => request<TypeList>(ontologyPath(workspaceId) + "/types" + query({ ...params })),
+  catalog: (workspaceId: string, params: { version_id: string; kind?: ResourceKind; q?: string; tag?: string; limit?: number; cursor?: string }) =>
+    request<CatalogPage>(ontologyPath(workspaceId) + "/catalog" + query({ ...params })),
+  elementPresentation: async (workspaceId: string, kind: TargetKind, typeId: string, versionId: string): Promise<ElementProjection> => {
+    await api.version(workspaceId, versionId);
+    const cached = definitionReads.peek(workspaceId, versionId);
+    if (cached) {
+      const { version, model } = await cached;
+      return { ...version, representation: "element-1", complete: false, model };
+    }
+    const result = await request<ElementProjection>(ontologyPath(workspaceId) + "/types/" + encodeURIComponent(typeId) + "/presentation" + query({ kind, version_id: versionId }));
+    if (result.version_id !== versionId || result.workspace_id !== workspaceId || result.complete !== false)
+      throw new Error("版本内容不一致，请刷新后重试");
+    return result;
+  },
+  elementDocuments: async (workspaceId: string, kind: "object_type" | "link_type", typeId: string, versionId: string): Promise<DocumentContext> => {
+    const result = await request<DocumentContext>(ontologyPath(workspaceId) + "/types/" + encodeURIComponent(typeId) + "/document-context" + query({ kind, version_id: versionId }));
+    if (result.version_id !== versionId || result.workspace_id !== workspaceId) throw new Error("实例版本已变化，请刷新后重试");
+    return result;
+  },
   /** Ranked search over the published ontology; the same service as the MCP search_ontology tool. */
   searchOntology: (
     workspaceId: string,

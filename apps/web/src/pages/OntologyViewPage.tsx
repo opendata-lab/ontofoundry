@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
 import type { Draft, WorkspaceOverview } from "../api/types";
@@ -72,6 +72,8 @@ export function OntologyViewPage() {
       live = false;
     };
   }, [workspace.id, workspace.role, overview]);
+  const openModal = useCallback((request: ElementRequest) => setInspected({ ...request, versionId: overview?.version?.version_id }), [overview?.version?.version_id]);
+  const openFixedPage = useCallback((request: ElementRequest) => openPage({ ...request, versionId: overview?.version?.version_id }), [openPage, overview?.version?.version_id]);
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (workspace.current_version && !overview) return <LoadingSurface label="正在读取本体图谱…" />;
   const graph = overview?.graph;
@@ -86,7 +88,7 @@ export function OntologyViewPage() {
         <Panel fill>
           {draftSession && <PanelToolbar><Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link></PanelToolbar>}
           <div className="min-h-0 flex-1">
-            {graph ? <SemanticView graph={graph} model={model} onOpen={setInspected} onOpenPage={openPage} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
+            {graph ? <SemanticView graph={graph} model={model} onOpen={openModal} onOpenPage={openFixedPage} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
           </div>
         </Panel>
       </PageBody>

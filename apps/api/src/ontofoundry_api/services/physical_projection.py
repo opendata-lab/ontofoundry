@@ -73,6 +73,7 @@ def physical_projection(draft, kind, identity, dataset_views):
                 links=links,
             ).model_dump(mode="json")
         )
+    dataset_views = dataset_views(dataset_ids) if callable(dataset_views) else dataset_views
     return {
         "effective_bindings": bindings,
         "datasets": [d for d in dataset_views if UUID(d["id"]) in dataset_ids],

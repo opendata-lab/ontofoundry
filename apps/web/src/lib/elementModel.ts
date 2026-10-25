@@ -23,6 +23,8 @@ export type PanelProps<T = ElementType> = {
   editing: boolean;
   canEdit: boolean;
   sessionId: string | null;
+  versionId?: string;
+  partialRead?: boolean;
   change: (next: Draft) => void;
   open: (request: ElementRequest) => void;
 };

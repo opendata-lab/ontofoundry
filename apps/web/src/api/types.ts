@@ -1025,3 +1025,19 @@ export type ConnectionReference = {
   name: string;
   location: string;
 };
+
+
+export type CatalogReference = { id: UUID; name: string; display_name?: string | null };
+export type CatalogItem = {
+  id: UUID; kind: ResourceKind; name: string; display_name: string | null; description: string; tags: string[];
+  parent?: CatalogReference | null; property_count?: number; link_count?: number; document_instance_count?: number | null;
+  mapping_state?: "mapped" | "partial" | "unmapped"; mapping_label?: string;
+  source?: CatalogReference | null; target?: CatalogReference | null; multiplicity?: LinkType["multiplicity"];
+  verbalizes?: string[]; source_role_name?: string | null; target_role_name?: string | null;
+  source_kind?: "table" | "query"; column_count?: number | null;
+  metric_kind?: Metric["kind"]; dataset_name?: string | null;
+};
+export type CatalogPage = VersionEnvelope & { items: CatalogItem[]; counts: Record<string, number>; tags: string[]; total: number; next_cursor: string | null };
+/** This target closure is incomplete and must never be submitted as a save baseline. */
+export type ElementProjection = VersionEnvelope & { representation: "element-1"; complete: false; model: Omit<Draft, "material_objects" | "material_links"> };
+export type DocumentContext = VersionEnvelope & Pick<Draft, "material_objects" | "material_links">;

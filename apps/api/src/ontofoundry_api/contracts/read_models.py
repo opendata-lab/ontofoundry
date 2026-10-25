@@ -11,10 +11,13 @@ from ontofoundry_api.domain.core import (
     BindingMode,
     ColumnReference,
     Condition,
+    CoreDraft,
     DataJoin,
     DerivedBranch,
     FieldBinding,
     MappingSource,
+    MaterialLink,
+    MaterialObject,
     Multiplicity,
     Strict,
     ValueKind,
@@ -171,6 +174,71 @@ class OntologySearchRead(Strict):
     unmatched_terms: list[str]
 
 
+class CatalogReferenceRead(Strict):
+    id: UUID
+    name: str
+    display_name: str | None = None
+
+
+class CatalogItemRead(Strict):
+    id: UUID
+    kind: Literal["object_type", "link_type", "metric", "dataset"]
+    name: str
+    display_name: str | None
+    description: str
+    tags: list[str]
+    parent: CatalogReferenceRead | None = None
+    property_count: int | None = None
+    link_count: int | None = None
+    document_instance_count: int | None = None
+    mapping_state: Literal["mapped", "partial", "unmapped"] | None = None
+    mapping_label: str | None = None
+    source: CatalogReferenceRead | None = None
+    target: CatalogReferenceRead | None = None
+    multiplicity: Multiplicity | None = None
+    verbalizes: list[str] | None = None
+    source_role_name: str | None = None
+    target_role_name: str | None = None
+    source_kind: Literal["table", "query"] | None = None
+    column_count: int | None = None
+    metric_kind: Literal["simple", "ratio", "expression"] | None = None
+    dataset_name: str | None = None
+
+
+class CatalogPageRead(Strict):
+    workspace_id: UUID
+    version_id: UUID
+    version_sha256: str
+    version_content_sha256: str
+    normalized_snapshot_sha256: str
+    items: list[CatalogItemRead]
+    counts: dict[str, int]
+    tags: list[str]
+    total: int
+    next_cursor: str | None
+
+
+class ElementProjectionRead(Strict):
+    workspace_id: UUID
+    version_id: UUID
+    version_sha256: str
+    version_content_sha256: str
+    normalized_snapshot_sha256: str
+    representation: Literal["element-1"]
+    complete: Literal[False]
+    model: CoreDraft
+
+
+class DocumentContextRead(Strict):
+    workspace_id: UUID
+    version_id: UUID
+    version_sha256: str
+    version_content_sha256: str
+    normalized_snapshot_sha256: str
+    material_objects: list[MaterialObject]
+    material_links: list[MaterialLink]
+
+
 def read_models_schema():
     schema = TypeAdapter(
         MembershipRead
@@ -179,6 +247,9 @@ def read_models_schema():
         | ElementSaveImpact
         | TableRowsRead
         | OntologySearchRead
+        | CatalogPageRead
+        | ElementProjectionRead
+        | DocumentContextRead
     ).json_schema(mode="serialization")
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
     schema["$id"] = "ontofoundry.api-read.v1.schema.json"

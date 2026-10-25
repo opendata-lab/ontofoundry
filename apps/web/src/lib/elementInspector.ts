@@ -22,12 +22,14 @@ export type ElementRequest = {
   mode?: "view" | "edit";
   sessionId?: string | null;
   previewHash?: string;
+  versionId?: string;
   /** For a new link or metric: the object or dataset it starts from. */
   owner?: string;
 };
 /** The address of an element's own detail page. */
 export function elementHref(workspaceId: string, request: ElementRequest) {
   const params = new URLSearchParams();
+  if (request.versionId) params.set("version", request.versionId);
   if (request.tab) params.set("tab", request.tab);
   if (request.mode === "edit") params.set("mode", "edit");
   if (request.owner) params.set("owner", request.owner);
