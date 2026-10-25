@@ -131,7 +131,7 @@ def main():
     print("modeling/ 已就绪" + ("；新建：" + "、".join(created) if created else "；文件均已存在，未覆盖"))
     if archived:
         print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的片段与检查报告已移到 {archived}/，本轮从空的 modeling/parts/ 开始",
-                     "只写本轮的变化；需要参考上一轮写法时再读该目录"))
+                     "只写本轮的变化；已入库的定义用 show_element.py 查，不必读该目录"))
     print(run_paths(args.work_pack, pack, args.prior_plan))
     return 0
 

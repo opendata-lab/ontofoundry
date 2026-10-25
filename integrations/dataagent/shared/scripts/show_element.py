@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from check_result import TARGET_KINDS, pinned_targets
-from runpaths import command, error
+from runpaths import command, error, without_material_hashes
 
 LIMIT = 8192
 PAGE_BYTES = 3000
@@ -216,7 +216,7 @@ class ElementIndex:
         reverse = self.reverse_refs()
         return {"elements": [{
             "kind": self.elements[i][0], "selector": self.exact_selector(i),
-            "definition": self.elements[i][1], "hash": self.hashes[i],
+            "definition": without_material_hashes(self.elements[i][1]), "hash": self.hashes[i],
             "referenced_by": [{"id": r, **({"name": self.elements[r][1]["name"]} if "name" in self.elements[r][1] else {})} for r in sorted(reverse[i])],
         } for i in identities]}, 0
 

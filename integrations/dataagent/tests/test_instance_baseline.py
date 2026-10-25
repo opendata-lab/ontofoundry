@@ -1,16 +1,17 @@
 """Pinned instance edits stay separate from definitions and copy revision hashes."""
 
-from copy import deepcopy
 import json
+from copy import deepcopy
 
 import pytest
 from jsonschema import Draft202012Validator
 from ontofoundry_api.contracts.proposals import ProposalContractError
 from ontofoundry_api.domain.canonical import domain_sha256
 from ontofoundry_api.domain.instances import instance_hash
+from runpaths import without_material_hashes
+from show_element import ElementIndex
 from test_stepwise_workflow import check_part
 from test_workflow import BASE, SCHEMA, SKILL, checker, pinned, prepare, server_parse
-from show_element import ElementIndex
 
 
 def context():
@@ -109,7 +110,7 @@ def test_exact_instance_reads_use_baseline_and_include_instance_references():
     result, status = ElementIndex(ctx).query([f'{e["target_kind"]}:{e["target_id"]}' for e in entries])
     assert status == 0
     for actual, entry in zip(result["elements"], entries, strict=True):
-        assert actual["definition"] == entry["element"]
+        assert actual["definition"] == without_material_hashes(entry["element"])
         assert actual["hash"] == entry["hash"]
     link = next(e for e in entries if e["target_kind"] == "material_link")
     for endpoint in (link["element"]["source_id"], link["element"]["target_id"]):

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 BASE = Path(__file__).resolve().parents[1]
 
 """Offline incremental authoring through public examples and exact element reads."""
@@ -16,12 +17,18 @@ from ontofoundry_api.contracts.proposals import apply_items
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.dependencies import reference_index
-from ontofoundry_api.domain.instances import definitions, instance_hash, instance_references
+from ontofoundry_api.domain.instances import (
+    definitions,
+    instance_hash,
+    instance_references,
+)
 from test_extract_kit import KIT, MATERIAL_ID, RETAIL, atoms, load_parts, parse, prove
 from test_stepwise_workflow import lookup, write_json
 from test_workflow import SKILL, budget, checker, pinned, prepare, server_parse
 
 element_reader = importlib.import_module("show_element")
+from runpaths import without_material_hashes
+
 ElementIndex = element_reader.ElementIndex
 bounded = element_reader.bounded
 
@@ -174,7 +181,7 @@ def test_exact_queries_return_full_definitions_hashes_and_only_small_reference_l
     existing = {e["id"]: e for c in checker.COLLECTIONS.values() for e in ctx["draft"][c]}
     for element in data["elements"]:
         definition = element["definition"]
-        assert definition == existing[definition["id"]]
+        assert definition == without_material_hashes(existing[definition["id"]])
         assert element["hash"] == ctx["element_hashes"][definition["id"]]
         assert all(set(r) <= {"id", "name"} for r in element["referenced_by"])
         status, by_id = cli(tmp_path, ctx, definition["id"])
@@ -224,7 +231,7 @@ def test_pagination_reconstructs_full_unicode_definition_and_pins_hash(tmp_path)
         assert status == 0
         content += part["text"]
     assert hashlib.sha256(content.encode()).hexdigest() == pages["sha256"]
-    assert json.loads(content)["elements"][0]["definition"] == ctx["draft"]["object_types"][0]
+    assert json.loads(content)["elements"][0]["definition"] == without_material_hashes(ctx["draft"]["object_types"][0])
     ctx["draft"]["object_types"][0]["description"] += "变化"
     status, error = cli(tmp_path, ctx, *selectors, extra=("--page", "1", "--sha256", pages["sha256"]))
     assert status == 1 and "PAGE_STALE" in error["错误"] and "已变化" in error["错误"]
@@ -315,7 +322,7 @@ def test_skill_incremental_instructions_and_guide_are_bounded():
     assert len(skill) <= 1100
     step = (BASE / "skills/ontology-discovery/references/steps/incremental.md").read_text()
     assert "references/steps/incremental.md" in skill.decode()
-    assert "不读 context_file 全文、脚本源码或 Schema" in step
+    assert "context_file 全文、脚本源码或 Schema" in step and "sha256 由脚本补" in step
     for args in [("--incremental-guide",), ("--part", "edit"), ("--part", "update")]:
         result = lookup(*args)
         assert result.returncode == 0 and len(result.stdout) <= 8192

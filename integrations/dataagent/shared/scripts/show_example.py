@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from runpaths import HintParser, command, error
+from runpaths import HintParser, command, error, without_material_hashes
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "references/examples"
 LIMIT = 8 * 1024
@@ -35,17 +35,6 @@ FIELDS = {
     "filters": "属于 metric，查 metric",
     "evidence": "每个元素都有，查对应类型的正例",
 }
-
-
-def without_material_hashes(value):
-    """Examples show evidence as id, locator and quote: the merge fills
-    material_sha256 by id, so the agent never copies a 64-digit hash."""
-    if isinstance(value, dict):
-        return {k: without_material_hashes(v) for k, v in value.items()
-                if not (k == "material_sha256" and value.get("kind") == "material")}
-    if isinstance(value, list):
-        return [without_material_hashes(v) for v in value]
-    return value
 
 
 def example(target_kind, operation="create", variant=None):

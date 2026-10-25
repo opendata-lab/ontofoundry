@@ -563,3 +563,14 @@ def test_examples_never_show_material_hashes():
     for args in (["--part", "01"], ["material_object", "--operation", "create"], ["material_link", "--operation", "update"]):
         completed = subprocess.run([sys.executable, str(SKILL / "scripts/show_example.py"), *args], capture_output=True, check=True)
         assert b"material_sha256" not in completed.stdout and b'"material_id"' in completed.stdout
+
+
+def test_hashes_of_earlier_materials_come_from_recorded_evidence():
+    # Definitions are shown without hashes; an update copied from one still merges.
+    ctx = {"draft": {"object_types": [{"evidence": [
+        {"kind": "material", "material_id": "m-old", "material_sha256": "a" * 64}]}]}}
+    pack = {"materials": [{"id": "m-new", "sha256": "b" * 64}]}
+    assert prepare.material_hashes(pack, ctx) == {"m-old": "a" * 64, "m-new": "b" * 64}
+    item = {"after": {"evidence": [{"kind": "material", "material_id": "m-old", "quote": "q"}]}}
+    prepare.fill_material_hashes(item, prepare.material_hashes(pack, ctx))
+    assert item["after"]["evidence"][0]["material_sha256"] == "a" * 64

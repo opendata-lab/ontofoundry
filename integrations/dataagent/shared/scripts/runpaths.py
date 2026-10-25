@@ -103,3 +103,14 @@ def fragment_paths(raw):
         return sorted(PARTS.glob(f"{raw}-*.json")) or [path]
     named = PARTS / f"{raw.removesuffix('.json')}.json"
     return [named] if named.is_file() else [path]
+
+
+def without_material_hashes(value):
+    """Shown definitions and examples name a material by id; the merge fills
+    material_sha256, so the agent never copies or computes a 64-digit hash."""
+    if isinstance(value, dict):
+        return {k: without_material_hashes(v) for k, v in value.items()
+                if not (k == "material_sha256" and value.get("kind") == "material")}
+    if isinstance(value, list):
+        return [without_material_hashes(v) for v in value]
+    return value
