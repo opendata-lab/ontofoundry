@@ -1,8 +1,8 @@
-import { ArrowUp, Ban, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen, Search, Sparkles } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Flex, Input, Popconfirm, Segmented, Tag, Tooltip, Typography, Upload } from "antd";
+import { ArrowUp, Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Alert, Button, Checkbox, Dropdown, Flex, Input, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
-import type { Capabilities, Material } from "../api/types";
+import type { Capabilities, Material, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import type { AgentConversationElement, CompleteDetail, ErrorDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
@@ -29,6 +29,20 @@ const CONVERSATION = [
   "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 
+const MODES: Record<SessionMode, { label: string; note: string }> = {
+  model: { label: "建模模式", note: "构建和完善本体模型" },
+  chat: { label: "日常模式", note: "基于本体模型提问" },
+};
+const MODE_ITEMS = (Object.keys(MODES) as SessionMode[]).map((key) => ({
+  key,
+  label: (
+    <span className="flex flex-col">
+      <span>{MODES[key].label}</span>
+      <span className="text-xs text-muted">{MODES[key].note}</span>
+    </span>
+  ),
+}));
+
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
   const model = useModeling(workspace.id, true, true);
@@ -41,7 +55,11 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
-  const [composerMode, setComposerMode] = useState<"model" | "chat">("model");
+  // A session's mode is fixed once its conversation starts; before a session
+  // exists, the choice is held here and used to create it.
+  const [newMode, setNewMode] = useState<SessionMode>("model");
+  const mode: SessionMode = session?.mode ?? newMode;
+  const modeLocked = !!session?.dataagent_topic_id;
   const [composerDraft, setComposerDraft] = useState("");
   const scenarioId = useId();
   const conversation = useRef<AgentConversationElement>(null);
@@ -88,24 +106,28 @@ export function BuilderPage() {
   const send = () => {
     const el = conversation.current;
     if (!el) return;
-    void el.sendMessage(el.value.trim() || (composerMode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
-      metadata: { mode: composerMode },
+    void el.sendMessage(el.value.trim() || (mode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
+      metadata: { mode },
     });
   };
   const retry = () => {
     const el = conversation.current;
     if (!el) return;
-    setComposerMode("model");
     el.value = "重试";
     void el.sendMessage("重试", { metadata: { mode: "model" } });
   };
+  const changeMode = (next: SessionMode) => {
+    setNewMode(next);
+    if (session && session.mode !== next)
+      void act(async () => setSession(await modelingApi.save(session, session.draft, { mode: next })));
+  };
   const blocked = !capabilities?.agent_configured || running || busy || uploading;
-  const canSend = !blocked && (composerMode === "model"
+  const canSend = !blocked && (mode === "model"
     ? !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length || !!scenario.trim() || !!composerDraft.trim()
     : !!composerDraft.trim());
-  const sendState = useRef({ mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length });
+  const sendState = useRef({ mode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length });
   useLayoutEffect(() => {
-    sendState.current = { mode: composerMode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length };
+    sendState.current = { mode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length };
   });
   const attach = async (material: Material) => {
     const current = await model.ensure();
@@ -200,7 +222,8 @@ export function BuilderPage() {
         ...transport,
         async sendMessage(input) {
           const current = sendState.current;
-          const mode = input.metadata?.mode ?? current.mode;
+          // The session's mode decides, whichever path sent the message.
+          const mode = current.mode;
           const context = current.scenario.trim();
           const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== context
             ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
@@ -220,7 +243,7 @@ export function BuilderPage() {
     // right already renders. The raw JSON behind it is not something to hand
     // the user as a file.
     el.showAttachments = false;
-    el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current()).id}/agent-conversation`;
+    el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current(sendState.current.mode)).id}/agent-conversation`;
   }, [workspace.id]);
   useLayoutEffect(() => {
     const el = conversation.current;
@@ -241,7 +264,7 @@ export function BuilderPage() {
           <Alert type="info" showIcon role="status" message={session.task_detail} />
         )}
         <div className="flex min-h-0 flex-1 gap-4">
-          <Panel fill className={collapsed ? "max-w-16" : "max-w-64 2xl:max-w-80"}>
+          {mode === "model" && <Panel fill className={collapsed ? "max-w-16" : "max-w-64 2xl:max-w-80"}>
             <PanelToolbar>
               {!collapsed && <SectionTitle title="构建配置" />}
               <Button
@@ -388,13 +411,13 @@ export function BuilderPage() {
                 </section>
               </div>
             )}
-          </Panel>
+          </Panel>}
           <Panel fill className="min-w-0">
             <PanelToolbar extra={<>
               <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
               <Tooltip title="新建会话">
                 <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
-                  onClick={() => act(async () => { await model.create(); })} />
+                  onClick={() => act(async () => { await model.create(undefined, mode); })} />
               </Tooltip>
               {session && !session.abandoned_at && (
                 <Popconfirm
@@ -414,7 +437,17 @@ export function BuilderPage() {
                 </Popconfirm>
               )}
             </>}>
-              <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? "建模对话"}</span>} />
+              {modeLocked ? (
+                <Typography.Text type="secondary" className="text-xs whitespace-nowrap" role="status">{MODES[mode].label} · 模式已固定</Typography.Text>
+              ) : (
+                <Dropdown trigger={["click"]} disabled={busy || uploading}
+                  menu={{ selectable: true, selectedKeys: [mode], items: MODE_ITEMS, onClick: ({ key }) => changeMode(key as SessionMode) }}>
+                  <Button size="small" type="text" aria-label="选择会话模式" icon={<ChevronDown size={14} />} iconPosition="end" disabled={busy || uploading}>
+                    {MODES[mode].label}
+                  </Button>
+                </Dropdown>
+              )}
+              <SectionTitle title={<span className="block max-w-40 truncate" title={session?.title}>{session?.title ?? (mode === "model" ? "建模对话" : "日常对话")}</span>} />
             </PanelToolbar>
             {session?.abandoned_at && (
               <Alert type="warning" showIcon banner message="本会话已放弃，待发布实例已丢弃，不能继续建模或发布。请新建会话。" />
@@ -423,8 +456,8 @@ export function BuilderPage() {
               That object is null while a session loads, and an endpoint that
               momentarily goes empty reads as a conversation switch — the
               element would clear itself and reload for no reason. */}
-            <dataagent-conversation ref={conversation} placeholder={composerMode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
-              <BuilderConversationEmpty />
+            <dataagent-conversation ref={conversation} placeholder={mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
+              <BuilderConversationEmpty mode={mode} />
               {!running && session?.proposal_notice && (
                 <Flex className="builder-platform-message" slot="composer-overlay">
                   <Alert type="warning" showIcon role="status" message="平台消息"
@@ -436,23 +469,18 @@ export function BuilderPage() {
                 </Flex>
               )}
               <div slot="composer-actions" className="flex w-full min-w-0 items-center gap-2">
-                <Dropdown trigger={["click"]} placement="topLeft" disabled={running || busy || uploading}
-                  menu={{ selectable: true, selectedKeys: [composerMode], items: [{ type: "group", label: "场景", children: [
-                    { key: "model", label: "本体建模", icon: <Sparkles size={15} /> },
-                    { key: "chat", label: "本体查询", icon: <Search size={15} /> },
-                  ] }], onClick: ({ key }) => setComposerMode(key as "model" | "chat") }}>
-                  <Button size="small" type="text" aria-label="选择场景" icon={<Plus size={15} />} disabled={running || busy || uploading} />
-                </Dropdown>
-                <span className="min-w-0 flex-1" role="status"><Tag className="m-0 border-accent bg-accent-soft text-accent">{composerMode === "model" ? "本体建模" : "本体查询"}</Tag></span>
+                <span className="min-w-0 flex-1" />
                 {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
                   <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
                 </Tooltip>}
               </div>
             </dataagent-conversation>
           </Panel>
-          <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
-            <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />
-          </div>
+          {mode === "model" && (
+            <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
+              <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />
+            </div>
+          )}
         </div>
       </PageBody>
     </div>

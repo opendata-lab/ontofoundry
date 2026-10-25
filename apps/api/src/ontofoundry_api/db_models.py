@@ -120,6 +120,9 @@ class ModelingSessionRecord(Base):
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
     # Registered tables linked in the builder; the agent proposes datasets on them.
     linked_tables: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
+    # model: builds and refines the ontology; chat: asks about it. Fixed once
+    # the conversation starts.
+    mode: Mapped[str] = mapped_column(String(8), nullable=False, server_default="model")
     task_status: Mapped[str] = mapped_column(String(24), default="idle")
     task_detail: Mapped[str] = mapped_column(Text, default="")
     dataagent_topic_id: Mapped[str | None] = mapped_column(String(64), nullable=True)

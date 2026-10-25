@@ -32,6 +32,7 @@ import type {
   InstanceNeighborhood,
   Items,
   LinkedTable,
+  SessionMode,
   MappingPreview,
   MappingPreviewRequest,
   Material,
@@ -287,11 +288,11 @@ export function definitionsOnly(draft: Draft) {
 
 export const modelingApi = {
   sessions: (id: string) => workspaceRequest<Items<ModelingSessionSummary>>(id, "/sessions"),
-  create: (id: string, title = "新的建模会话") =>
-    workspaceRequest<ModelingSession>(id, "/sessions", { title }).then(withSessionInstances),
+  create: (id: string, title = "新的建模会话", mode: SessionMode = "model") =>
+    workspaceRequest<ModelingSession>(id, "/sessions", { title, mode }).then(withSessionInstances),
   get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid).then(withSessionInstances),
   /** Saves the whole session draft; it does not publish. */
-  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[] } = {}) =>
+  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[]; mode?: SessionMode } = {}) =>
     request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft: definitionsOnly(draft), ...extra })).then(withSessionInstances),
   /** Abandons a session: drops its staged instances; published content is untouched. */
   abandon: (s: Pick<ModelingSession, "id" | "workspace_id">) =>

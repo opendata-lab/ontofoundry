@@ -244,3 +244,30 @@ it("shows only the failure reason and retry when this run has no batch", async (
   expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
   expect(screen.queryByText(/条可审，.*条受影响/)).toBeNull();
 });
+
+it("switches an unstarted session's mode and shows chat without builder side panels", async () => {
+  const chat = { ...session(), mode: "chat" as const };
+  vi.mocked(modelingApi.save).mockResolvedValue(chat);
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByRole("heading", { name: "构建配置" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "选择会话模式" }));
+  fireEvent.click(await screen.findByText("日常模式"));
+  await waitFor(() => expect(modelingApi.save).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }), expect.anything(), { mode: "chat" }));
+  expect(context.model.setSession).toHaveBeenCalledWith(chat);
+});
+
+it("fixes the mode once the conversation has started", () => {
+  context.model.session = { ...session(), mode: "chat", dataagent_topic_id: "topic-1" };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("日常模式 · 模式已固定")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "选择会话模式" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "构建配置" })).toBeNull();
+});

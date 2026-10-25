@@ -10,7 +10,7 @@ const ACTIVE_TASK_STATUSES = [
   "waiting_input",
   "waiting_permission",
 ];
-import type { ModelingSession, ModelingSessionSummary } from "../api/types";
+import type { ModelingSession, ModelingSessionSummary, SessionMode } from "../api/types";
 import { usePageActive } from "./usePageTab";
 import { ONTOLOGY_SAVED, type OntologySaved } from "../lib/elementInspector";
 
@@ -152,8 +152,8 @@ export function useModeling(
       clearTimeout(timer);
     };
   }, [workspaceId, sessionId, taskStatus, pageActive]);
-  const create = async (title = "新的建模会话") => {
-    const created = await modelingApi.create(workspaceId, title);
+  const create = async (title = "新的建模会话", mode: SessionMode = "model") => {
+    const created = await modelingApi.create(workspaceId, title, mode);
     if (!sessionId) setSession(created);
     setSessions((list) => [
       {
@@ -169,11 +169,12 @@ export function useModeling(
     select(created.id, true);
     return created;
   };
-  const ensure = async () => {
+  /** The current session, created on demand in `mode`. */
+  const ensure = async (mode: SessionMode = "model") => {
     if (session) return session;
     if (sessionId) return modelingApi.get(workspaceId, sessionId);
     if (!pending.current)
-      pending.current = create().finally(() => {
+      pending.current = create(undefined, mode).finally(() => {
         pending.current = null;
       });
     return pending.current;

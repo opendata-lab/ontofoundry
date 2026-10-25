@@ -25,8 +25,11 @@ ROOT = f"/api/v1/workspaces/{DEMO_WORKSPACE_ID}"
 OTHER_WORKSPACE_ID = "00000000-0000-0000-0000-000000000099"
 
 
-def _create_session(client, title: str = "Agent Conversation 契约") -> dict:
-    response = client.post(ROOT + "/sessions", json={"title": title})
+def _create_session(
+    client, title: str = "Agent Conversation 契约", mode: str = "chat"
+) -> dict:
+    # Transport contracts run in chat mode; modeling runs need a work pack.
+    response = client.post(ROOT + "/sessions", json={"title": title, "mode": mode})
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -1200,3 +1203,47 @@ def test_cancel_and_interactions_dispatch_by_kind(client, monkeypatch):
         "question-answer",
         "cancel",
     ]
+
+
+def test_a_message_cannot_switch_the_session_mode(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client, mode="chat")
+    delivered: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/topics"):
+            return httpx.Response(200, json={"topic_id": "topic-1"})
+        if request.url.path.endswith("/files"):
+            return httpx.Response(200, json={"rel_path": "uploads/context.json"})
+        delivered.append(_json_request(request))
+        return httpx.Response(200, json={"task_id": "task-1", "task_status": "waiting"})
+
+    _install_transport(monkeypatch, handler)
+    response = client.post(
+        _endpoint(session["id"]) + "/messages",
+        json={"content": "订单有哪些属性", "metadata": {"mode": "model"}},
+    )
+    assert response.status_code == 202, response.text
+    assert response.json()["metadata"] == {"mode": "chat"}
+    assert "普通对话" in delivered[0]["content"]
+    assert _session_row(client, session["id"]).dataagent_task_mode == "chat"
+
+
+def test_mode_changes_until_the_conversation_starts(client):
+    session = _create_session(client, mode="model")
+    assert session["mode"] == "model"
+
+    def put(current, mode):
+        return client.put(
+            ROOT + f"/sessions/{current['id']}",
+            json={"revision": current["revision"], "draft": current["draft"], "mode": mode},
+        )
+
+    switched = put(session, "chat")
+    assert switched.status_code == 200, switched.text
+    assert switched.json()["mode"] == "chat"
+    _set_session(client, session["id"], dataagent_topic_id="topic-1")
+    locked = put(switched.json(), "model")
+    assert locked.status_code == 409
+    assert locked.json()["error"]["code"] == "SESSION_MODE_LOCKED"
+    assert _session_row(client, session["id"]).mode == "chat"

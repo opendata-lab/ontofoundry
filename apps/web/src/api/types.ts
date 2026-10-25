@@ -368,6 +368,9 @@ export type ElementChange = {
   after: CoreElement | null;
 };
 
+/** model: builds and refines the ontology; chat: asks questions about it. */
+export type SessionMode = "model" | "chat";
+
 export type ModelingSession = {
   /** Set once the session is explicitly abandoned (IS-10); it then accepts no writes, runs or publishing. */
   abandoned_at?: ISOTime | null;
@@ -387,6 +390,8 @@ export type ModelingSession = {
   material_ids: string[];
   /** Registered tables linked to the session; the agent proposes datasets on them. */
   linked_tables?: LinkedTable[];
+  /** Fixed once the conversation starts (dataagent_topic_id set). */
+  mode: SessionMode;
   task_status: string;
   task_detail: string;
   dataagent_topic_id: string | null;

@@ -198,6 +198,7 @@ def test_chat_does_not_upload_or_reference_confirmed_plan(client, fake_agent):
         session["id"],
         result_state="awaiting_reply",
         run_manifest_json={**manifest, "prior_plan": PRIOR},
+        mode="chat",
     )
     uploads, prompts = fake_agent
     current = send(client, session["id"], "chat")

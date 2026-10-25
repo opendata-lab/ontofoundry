@@ -757,7 +757,8 @@ async def send_message(
         raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     _require_configured(request)
 
-    mode = _mode(body.metadata.get("mode"))
+    # The session's mode is fixed; a message cannot switch it.
+    mode = _mode(item.mode)
     request_material = store_request_material(
         db, request.app.state.settings, workspace_id, body.content, mode
     )

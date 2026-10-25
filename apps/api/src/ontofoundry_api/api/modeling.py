@@ -350,6 +350,7 @@ def session_data(item):
         "draft": draft,
         "material_ids": item.material_ids,
         "linked_tables": item.linked_tables or [],
+        "mode": item.mode,
         "task_status": item.task_status,
         "task_detail": item.task_detail,
         "dataagent_topic_id": item.dataagent_topic_id,
@@ -434,8 +435,12 @@ def validate_draft(draft, workspace):
     return validation_report(draft)
 
 
+SessionMode = Literal["model", "chat"]
+
+
 class SessionCreate(BaseModel):
     title: str = Field(default="新的建模会话", min_length=1, max_length=240)
+    mode: SessionMode = "model"
 
 
 class DraftSave(Strict):
@@ -444,6 +449,7 @@ class DraftSave(Strict):
     title: str | None = Field(default=None, min_length=1, max_length=240)
     material_ids: list[str] | None = None
     linked_tables: list[LinkedTable] | None = Field(default=None, max_length=200)
+    mode: SessionMode | None = None
 
 
 class SessionPublish(Strict):
@@ -675,6 +681,7 @@ def create_session(
         workspace_id=workspace_id,
         created_by=user.id,
         title=body.title,
+        mode=body.mode,
         base_version_id=space.current_version_id,
         base_version_sha256=snapshot_sha256(draft),
         draft_json=draft,
@@ -737,6 +744,12 @@ def save_session(
 
     validate_source_columns(draft)
     values = {"draft_json": draft}
+    if body.mode is not None and body.mode != item.mode:
+        if item.dataagent_topic_id:
+            raise ServiceError(
+                "会话已开始对话，模式不能再修改", code="SESSION_MODE_LOCKED", status_code=409
+            )
+        values["mode"] = body.mode
     if body.title is not None:
         values["title"] = body.title
     if body.material_ids is not None:

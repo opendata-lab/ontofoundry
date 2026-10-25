@@ -69,6 +69,7 @@ def test_request_is_original_markdown_in_work_pack_and_valid_evidence(client, mo
 ])
 def test_eligibility(client, fake_agent, content, mode, saved):
     session = create_session(client)
+    set_row(client, session["id"], mode=mode)
     assert send(client, session["id"], content, mode).status_code == 202
     with client.app.state.session_factory() as db:
         current = db.get(ModelingSessionRecord, session["id"])
