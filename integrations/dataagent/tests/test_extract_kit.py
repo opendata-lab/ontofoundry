@@ -39,15 +39,20 @@ def prove(parts, ctx, material, material_id, tmp_path, monkeypatch):
     tmp_path.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(tmp_path)
     context = write_json(tmp_path / "context.json", ctx)
+    output = tmp_path / "output/result.json"
+    # As in a real run, the work pack lists the materials whose hashes the merge fills in.
+    pack = write_json(tmp_path / "work-pack.json", {
+        "context_file": str(context), "schema_file": str(SCHEMA_PATH), "result_file": str(output),
+        "materials": [{"id": material_id, "sha256": hashlib.sha256(material).hexdigest()}],
+    })
     directory = tmp_path / "parts"
     directory.mkdir()
     for name, part in zip(PART_NAMES, parts, strict=True):
         fragment = write_json(directory / f"{name}.json", part)
-        assert invoke(monkeypatch, check_part, "--context", context, "--schema", SCHEMA_PATH, fragment) == 0
+        assert invoke(monkeypatch, check_part, "--work-pack", pack, fragment) == 0
         report = json.loads((tmp_path / f"modeling/checks/{name}.json").read_bytes())
         assert report["errors"] == []
-    output = tmp_path / "output/result.json"
-    assert invoke(monkeypatch, prepare, "--context", context, "--schema", SCHEMA_PATH, "--output", output, directory) == 0
+    assert invoke(monkeypatch, prepare, "--work-pack", pack, directory) == 0
     batch = json.loads(output.read_bytes())
     assert checker.check_result(batch, SCHEMA, ctx) == []
     parsed = parse(batch, ctx, material, material_id)

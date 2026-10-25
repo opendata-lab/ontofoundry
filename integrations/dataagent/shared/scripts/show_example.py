@@ -37,6 +37,17 @@ FIELDS = {
 }
 
 
+def without_material_hashes(value):
+    """Examples show evidence as id, locator and quote: the merge fills
+    material_sha256 by id, so the agent never copies a 64-digit hash."""
+    if isinstance(value, dict):
+        return {k: without_material_hashes(v) for k, v in value.items()
+                if not (k == "material_sha256" and value.get("kind") == "material")}
+    if isinstance(value, list):
+        return [without_material_hashes(v) for v in value]
+    return value
+
+
 def example(target_kind, operation="create", variant=None):
     catalog = json.loads((EXAMPLES / "catalog.json").read_bytes())
     choices = catalog["lookup"]
@@ -97,6 +108,8 @@ def main():
                 raise ValueError("固定包入口不能与类型、操作或分支查询混用")
             filename = f"{args.part}.json" if args.part else "values.json" if args.values else "incremental.md" if args.incremental_guide else "guide.md"
             content = (KIT / filename).read_text().rstrip("\n")
+            if filename.endswith(".json"):
+                content = json.dumps(without_material_hashes(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
             size = len((content + "\n").encode())
             if size > LIMIT:
                 print(error("EXAMPLE_TOO_LARGE", f"固定包 {filename} 有 {size} 字节，超过单次 {LIMIT} 字节上限",
@@ -115,7 +128,7 @@ def main():
                 kind: without_dependencies(kind, example(kind, args.operation, args.variant))
                 for kind in dict.fromkeys(args.target_kinds)
             }
-        content = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        content = json.dumps(without_material_hashes(value), ensure_ascii=False, separators=(",", ":"))
         size = len((content + "\n").encode())
         if size > LIMIT:
             kinds = list(dict.fromkeys(args.target_kinds))

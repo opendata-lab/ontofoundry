@@ -34,6 +34,12 @@ CATALOG = json.loads((SKILL / "references/examples/catalog.json").read_bytes())
 EXAMPLES = [SKILL / "references/examples" / e["file"] for e in CATALOG["examples"]]
 
 
+# Examples leave material_sha256 out; the merge fills it from the work pack's materials.
+MATERIAL_HASHES = {
+    "11111111-1111-4111-8111-111111111111": "0425cde725fc030b9f379fc14eed7e7bcadbf4e5c275bdc87e0f714bbf429e26",
+}
+
+
 def pinned(example):
     entry = next(e for e in CATALOG["examples"] if e["file"] == example.name)
     ctx = json.loads(
@@ -43,6 +49,7 @@ def pinned(example):
         ctx["draft"] = empty_snapshot(ctx["run"]["workspace_id"])
         ctx["element_hashes"] = {}
         ctx["run"]["source_draft_sha256"] = snapshot_sha256(ctx["draft"])
+    ctx["material_hashes"] = MATERIAL_HASHES
     return ctx
 
 
@@ -549,3 +556,10 @@ def test_branch_lookup_output_is_a_positive_example(kind, variant, filename):
     batch = prepare.assemble(ctx, [json.loads(completed.stdout)])
     assert not checker.check_result(batch, SCHEMA, ctx)
     assert server_parse(batch, ctx)
+
+
+def test_examples_never_show_material_hashes():
+    # The agent writes material id, locator and quote; the merge fills the hash.
+    for args in (["--part", "01"], ["material_object", "--operation", "create"], ["material_link", "--operation", "update"]):
+        completed = subprocess.run([sys.executable, str(SKILL / "scripts/show_example.py"), *args], capture_output=True, check=True)
+        assert b"material_sha256" not in completed.stdout and b'"material_id"' in completed.stdout

@@ -16,7 +16,7 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 from build_packages import SKILLS, build
 from generate_output_schemas import INSTANCE_SOURCE, SOURCE, TARGETS, generate
-from test_workflow import SCHEMA, pinned
+from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
 
 
 @pytest.fixture(scope="module")
@@ -65,8 +65,8 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path):
     (tmp_path / "schema.json").write_text(json.dumps(SCHEMA))
     run(scripts / "init_workflow.py", tmp_path, "--work-pack", _pack(tmp_path))
     run(scripts / "read_input.py", tmp_path, "context.json", "--start", "1", "--end", "1")
-    run(scripts / "check_part.py", tmp_path, "--context", "context.json", "--schema", "schema.json", *sorted(parts.glob("*.json")))
-    run(scripts / "prepare_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "--output", "result.json", "parts")
+    run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", *sorted(parts.glob("*.json")))
+    run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "parts")
     batch = json.loads((tmp_path / "result.json").read_bytes())
     assert len(batch["items"]) > 10
     assert batch["workspace_id"] == context["run"]["workspace_id"]
@@ -100,7 +100,10 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path):
 
 def _pack(tmp_path):
     path = tmp_path / "work-pack.json"
-    path.write_text(json.dumps({"context_file": "context.json", "schema_file": "schema.json"}))
+    path.write_text(json.dumps({
+        "context_file": "context.json", "schema_file": "schema.json", "result_file": "result.json",
+        "materials": [{"id": mid, "sha256": sha} for mid, sha in MATERIAL_HASHES.items()],
+    }))
     return path
 
 
