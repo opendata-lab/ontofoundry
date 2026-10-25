@@ -421,8 +421,8 @@ def byte_report():
         "工作包": encode(incremental_pack),
         "带原行号材料": extract_inputs["带原行号材料"],
         "表结构": (render_tables(json.dumps({"tables": incremental_tables}), ",".join(t["key"] for t in incremental_tables)) + "\n").encode(),
-        "原则": resource("references/principles.md").read_bytes(),
-        **{f"写法包/{name}": (kit / name).read_bytes() for name in ("incremental.md", "values.json", "update.json")},
+        # The incremental step reads only the guide and the update example.
+        **{f"写法包/{name}": (kit / name).read_bytes() for name in ("incremental.md", "update.json")},
         # Targets are looked up by name with show_element, so index pages stay unread.
     }
     index = ElementIndex(incremental_context)
@@ -442,7 +442,7 @@ def byte_report():
         "bytes": incremental_bytes, "limit": INCREMENTAL_ROUTE_LIMIT,
         "pass": incremental_bytes <= INCREMENTAL_ROUTE_LIMIT,
         "components": incremental_components,
-        "scope": "离线零售 v1＋独立图书馆写法：完整工作包（索引页不读，按名称精确查询）、全部材料、六表结构、提示、原则、增量指南、取值、update 和两组精确查询；不读 context／源码／Schema，无前轮计划；名称删除另加 edit",
+        "scope": "离线零售 v1＋独立图书馆写法：完整工作包（索引页不读，按名称精确查询）、全部材料、六表结构、提示、增量指南、update 和两组精确查询；不读 context／源码／Schema，无前轮计划；名称删除另加 edit",
         "optional_edit_bytes": (kit / "edit.json").stat().st_size,
         "estimated_rounds": {
             "normal": [6, 8], "two_repairs": [10, 12], "first_part_by": [3, 4],

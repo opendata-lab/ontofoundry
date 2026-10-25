@@ -295,7 +295,9 @@ def test_incremental_read_budget_counts_public_outputs_and_enforces_limit(monkey
     assert route["estimated_rounds"]["normal"] == [6, 8]
     assert route["estimated_rounds"]["two_repairs"] == [10, 12]
     assert route["optional_edit_bytes"] == len(lookup("--part", "edit").stdout)
-    assert {"工作包", "带原行号材料", "表结构", "原则", "技能入口", "写法包/incremental.md", "写法包/values.json", "写法包/update.json", "已有元素/0", "已有元素/1"} <= route["components"].keys()
+    assert {"工作包", "带原行号材料", "表结构", "技能入口", "写法包/incremental.md", "写法包/update.json", "已有元素/0", "已有元素/1"} <= route["components"].keys()
+    # The step no longer sends the agent through principles or the values table.
+    assert not {"原则", "写法包/values.json"} & route["components"].keys()
     # Targets are found by name, so the work-pack index pages are not read.
     assert not any(k.startswith("工作包索引/") for k in route["components"])
     for n, selectors in enumerate(budget.INCREMENTAL_QUERIES):
@@ -376,3 +378,22 @@ def test_library_event_query_keeps_both_event_dates_without_repeating_deposits()
         """)
         rows = connection.execute("SELECT substr(event_on,1,7), SUM(deposit_total), SUM(charge) FROM (" + query + ") GROUP BY 1").fetchall()
     assert rows == [("2026-01", 120, 0), ("2026-02", 0, 15)]
+
+
+def test_instances_are_found_by_their_values():
+    path = SKILL / "references/examples/facts.json"
+    ctx = pinned(path)
+    combined = apply_items(ctx["draft"], server_parse(prepare.assemble(ctx, [json.loads(path.read_bytes())]), ctx).items)
+    ctx["draft"] = definitions(combined)
+    ctx["instance_baseline"] = {"change_sequence": 1, "items": [
+        {"target_kind": "material_object", "target_id": e["id"], "element": e,
+         "revision": 1, "state": "active", "session_id": None, "hash": instance_hash(e, 1)}
+        for e in combined.get("material_objects", [])
+    ]}
+    index = ElementIndex(ctx)
+    instance = combined["material_objects"][0]
+    value = next(v for v in instance["values"].values() if isinstance(v, str) and v.strip())
+    type_name = next(o for o in ctx["draft"]["object_types"] if o["id"] == instance["type_id"])["name"]
+    for selector in (value, f"{type_name}:{value}"):
+        found, error = index.find(selector)
+        assert found == str(instance["id"]) or (error and str(instance["id"]) in json.dumps(error)), selector

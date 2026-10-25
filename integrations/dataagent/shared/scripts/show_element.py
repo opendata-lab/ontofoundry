@@ -65,6 +65,16 @@ class ElementIndex:
             if owner and self.elements[owner][1].get(key):
                 qualified = self.elements[owner][1][key] + "." + label
                 aliases.update((qualified, f"{kind}:{qualified}"))
+        if kind == "material_object":
+            # An instance has no name of its own: its text values ("onemesh")
+            # select it, alone or as "<type name>:<value>".
+            type_element = self.elements.get(str(element.get("type_id")), (None, {}))[1]
+            for value in (element.get("values") or {}).values():
+                if isinstance(value, str) and value.strip():
+                    aliases.add(value)
+                    for key in ("name", "display_name"):
+                        if type_element.get(key):
+                            aliases.add(f"{type_element[key]}:{value}")
         return aliases
 
     def exact_selector(self, identity):
@@ -88,7 +98,7 @@ class ElementIndex:
             return matches[0], None
         candidates = matches or [i for i, (k, _) in self.elements.items() if kind not in TARGET_KINDS or kind == k]
         return None, {
-            "查询": selector, **({"code": "TARGET_NOT_FOUND"} if not matches else {}), "错误": "名称有歧义，按候选精确写法重查" if matches else "元素不存在（支持精确的中文名称、英文标识、实体.属性或 id，不做模糊匹配）",
+            "查询": selector, **({"code": "TARGET_NOT_FOUND"} if not matches else {}), "错误": "名称有歧义，按候选精确写法重查" if matches else "元素不存在（支持精确的中文名称、英文标识、实体.属性、实例的取值（可写成 类型:取值）或 id，不做模糊匹配）",
             "候选精确写法": sorted(self.exact_selector(i) for i in candidates),
         }
 

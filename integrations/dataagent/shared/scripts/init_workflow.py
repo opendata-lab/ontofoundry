@@ -38,6 +38,39 @@ def write_new(path, text):
     return True
 
 
+RUN_MARK = ROOT / ".run_token"
+PREVIOUS = ROOT / "previous"
+
+
+def run_token(pack):
+    return str((pack.get("run") or {}).get("run_token") or "")
+
+
+def archive_previous_parts(pack):
+    """Move another run's fragments out of modeling/parts/ before this run starts.
+
+    The DataAgent topic keeps its workspace across turns, so a new request
+    (e.g. an incremental change) found the last run's 01–05 fragments and the
+    default merge would have resubmitted them. A repair round is the same run
+    under a new token and keeps its fragments, so only a fresh run (no repair
+    used yet) moves them.
+    """
+    token = run_token(pack)
+    previous = RUN_MARK.read_text().strip() if RUN_MARK.exists() else ""
+    repair_used = int((pack.get("execution") or {}).get("repair_used") or 0)
+    fragments = sorted((ROOT / "parts").glob("*.json")) if (ROOT / "parts").is_dir() else []
+    if not fragments or previous == token or repair_used:
+        return None
+    target = PREVIOUS / (previous or "unknown")
+    for folder in ("parts", "checks"):
+        source = ROOT / folder
+        if source.is_dir() and any(source.iterdir()):
+            (target / folder).mkdir(parents=True, exist_ok=True)
+            for item in source.iterdir():
+                item.replace(target / folder / item.name)
+    return target
+
+
 def done(created):
     return ("已新建：" + "、".join(created) + "；其余未完成") if created else "未新建任何文件"
 
@@ -55,8 +88,12 @@ def main():
         for field in ("result_file", "needs_input_file"):
             if pack.get(field):
                 Path(pack[field]).parent.mkdir(parents=True, exist_ok=True)
+        step = "整理上一轮的片段"
+        archived = archive_previous_parts(pack)
+        step = "创建 modeling/ 与输出目录"
         for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
             folder.mkdir(parents=True, exist_ok=True)
+        RUN_MARK.write_text(run_token(pack))
         if args.prior_plan:
             step = f"读取前轮计划 {args.prior_plan}"
             prior = json.loads(Path(args.prior_plan).read_bytes())
@@ -92,6 +129,9 @@ def main():
         print(error("INIT_FAILED", f"{step}失败：{type(exc).__name__}", done(created), retry=False))
         return 1
     print("modeling/ 已就绪" + ("；新建：" + "、".join(created) if created else "；文件均已存在，未覆盖"))
+    if archived:
+        print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的片段与检查报告已移到 {archived}/，本轮从空的 modeling/parts/ 开始",
+                     "只写本轮的变化；需要参考上一轮写法时再读该目录"))
     print(run_paths(args.work_pack, pack, args.prior_plan))
     return 0
 
