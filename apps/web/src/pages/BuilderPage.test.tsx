@@ -45,7 +45,7 @@ vi.mock("../api/client", () => ({
   },
   proposalsApi: {
     batches: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
-    batch: vi.fn(),
+    batch: vi.fn().mockResolvedValue(null),
     decide: vi.fn(),
   },
   ApiError: class extends Error {},
@@ -217,7 +217,7 @@ it("preserves a scenario while toggling the configuration panel", async () => {
 
 it("shows the platform reason in the conversation and retries only 重试 in model mode", async () => {
   context.model.session = { ...session(), task_status: "finished", proposal_notice: {
-    run_token: "fictional-run", summary: "目标连接列不是唯一属性或完整标识", affected_count: 2, reviewable_count: 3,
+    run_token: "fictional-run", batch_id: "fictional-batch", summary: "目标连接列不是唯一属性或完整标识", affected_count: 2, reviewable_count: 3,
   } };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   const retry = await screen.findByRole("button", { name: "重试" });
@@ -232,4 +232,15 @@ it("shows the platform reason in the conversation and retries only 重试 in mod
   fireEvent.click(retry);
   expect(conversation.value).toBe("重试");
   expect(sendMessage).toHaveBeenCalledWith("重试", { metadata: { mode: "model" } });
+});
+
+
+it("shows only the failure reason and retry when this run has no batch", async () => {
+  context.model.session = { ...session(), latest_batch_id: "previous-batch", task_status: "failed", proposal_notice: {
+    run_token: "fictional-run", batch_id: null, summary: "修正次数已用完", affected_count: 0, reviewable_count: 0,
+  } };
+  renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  expect(await screen.findByText("修正次数已用完")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
+  expect(screen.queryByText(/条可审，.*条受影响/)).toBeNull();
 });

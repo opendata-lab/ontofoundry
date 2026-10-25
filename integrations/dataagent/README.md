@@ -67,3 +67,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 `prepare_result.py` 本地检查通过后，读取工作包 `mcp_config_file` 中本轮 MCP 地址与 Authorization，调用同空间、同运行的只读 `proposal-check`。契约错误与不可接受组直接进入工具输出；未通过时保留候选和报告，不替换最终结果。平台不可达或配置缺失时输出 `提示 [PLATFORM_CHECK_SKIPPED]`，明确没有完成平台检查；本地通过的结果仍可保存，入库继续使用相同平台规则。最终文件保存不表示提案已接受或本体已发布。
 
 部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。
+
+## 对话需求材料与实例方法路径（2026-10-25）
+
+平台将符合门槛的建模消息保存为“对话需求”材料并放入当前工作包，Agent 仍按材料 id、SHA256 和原行号引用，不新增证据类型。本次修正 ontology-discovery 抽取步骤与 entity-extraction 实例步骤，明确 `extract-facts.md` 位于 entity-extraction；平台工作包示例索引也注明归属。重新打包并安装技能到当前 DataAgent 的 `SKILLS_ROOT_DIR` 后重启；没有修改 Agent 提示词或配置，不需要重新发布 Agent。

@@ -429,7 +429,7 @@ export function BuilderPage() {
                 <Flex className="builder-platform-message" slot="composer-overlay">
                   <Alert type="warning" showIcon role="status" message="平台消息"
                     description={<>
-                      <Typography.Paragraph className="m-0">{session.proposal_notice.reviewable_count} 条可审，{session.proposal_notice.affected_count} 条受影响。</Typography.Paragraph>
+                      {session.proposal_notice.batch_id && <Typography.Paragraph className="m-0">{session.proposal_notice.reviewable_count} 条可审，{session.proposal_notice.affected_count} 条受影响。</Typography.Paragraph>}
                       <Typography.Paragraph className="m-0" ellipsis={{ rows: 3, expandable: true, symbol: "展开原因" }}>{session.proposal_notice.summary}</Typography.Paragraph>
                       <Button size="small" disabled={blocked || !!session.abandoned_at} onClick={retry}>重试</Button>
                     </>} />

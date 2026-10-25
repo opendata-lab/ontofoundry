@@ -118,6 +118,7 @@ def run_notice(db, session):
     )
     return ProposalRunNotice(
         run_token=session.dataagent_run_token,
+        batch_id=batch.id if batch else None,
         summary=summary,
         affected_count=len(blocked) if blocked else len(items),
         reviewable_count=len(items) - len(blocked),

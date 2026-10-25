@@ -12,7 +12,7 @@ from ontofoundry_api.db_models import MaterialChunkRecord, MaterialRecord
 
 def store_text_material(
     db, settings, workspace_id, name, text,
-    *, origin: Literal["upload", "table_receipt"] = "upload",
+    *, origin: Literal["upload", "table_receipt", "conversation_request"] = "upload",
 ):
     data = text.encode("utf-8")
     sha = hashlib.sha256(data).hexdigest()

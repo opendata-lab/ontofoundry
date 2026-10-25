@@ -39,7 +39,8 @@
         "origin": {
           "enum": [
             "upload",
-            "table_receipt"
+            "table_receipt",
+            "conversation_request"
           ],
           "title": "Origin",
           "type": "string"

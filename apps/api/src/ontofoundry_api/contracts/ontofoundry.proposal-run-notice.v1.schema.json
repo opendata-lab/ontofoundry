@@ -6,6 +6,18 @@
       "title": "Run Token",
       "type": "string"
     },
+    "batch_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Batch Id"
+    },
     "summary": {
       "title": "Summary",
       "type": "string"

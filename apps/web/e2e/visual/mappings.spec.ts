@@ -73,3 +73,24 @@ test("sync dialog walks through connection, schemas, tables and results", async 
   await dialog.getByText("查看每张表结果").first().click();
   await expect(page).toHaveScreenshot("tables-sync-results.png");
 });
+
+
+test("conversation requests have their own material source", async ({ page }) => {
+  await mockMappingsApi(page);
+  await page.route(`**/api/v1/workspaces/${WORKSPACE_ID}/materials/overview`, route => route.fulfill({ json: {
+    items: [{
+      id: "fictional-request", name: "建模需求-2026-10-25-1646.md", origin: "conversation_request",
+      sha256: "c".repeat(64), byte_size: 128, chunk_count: 1,
+      created_at: "2026-10-25T08:46:00Z", archived_at: null,
+      usage: { object_types: 0, link_types: 0, properties: 0, rules: 0, metrics: 0, material_objects: 0, material_links: 0, references: ["建模会话"], can_delete: false },
+    }],
+  } }));
+  await page.goto(`/workspaces/${WORKSPACE_ID}/mappings`);
+  await page.getByRole("tab", { name: "文档", exact: true }).click();
+  await page.locator(".ant-select").filter({ has: page.getByRole("combobox", { name: "文档来源", exact: true }) }).click();
+  await page.getByText("对话需求", { exact: true }).click();
+  await expect(page.getByRole("cell", { name: "建模需求-2026-10-25-1646.md", exact: true })).toBeVisible();
+  await expect(page.getByText("1 个文档", { exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page).toHaveScreenshot("materials-conversation-request.png", { fullPage: true });
+});

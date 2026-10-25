@@ -56,6 +56,7 @@ def test_partial_ingestion_persists_diagnostics_and_refuses_acceptance(client, m
     assert detail["items"][0]["status_reason"] == items[0].status_reason
     notice = client.get(path).json()["proposal_notice"]
     assert notice["affected_count"] == 2 and notice["reviewable_count"] == 1
+    assert notice["batch_id"] == batches[0].id
     refused = client.post(
         path + "/proposal-decisions",
         json={
@@ -312,4 +313,5 @@ def test_failed_run_without_a_batch_still_has_a_conversation_notice(client):
         "summary": "本轮没有写出结果文件",
         "affected_count": 0,
         "reviewable_count": 0,
+        "batch_id": None,
     }

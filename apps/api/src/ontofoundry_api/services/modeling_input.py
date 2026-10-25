@@ -18,7 +18,7 @@ EXAMPLES = {
     "类型": "references/extract-types.md",
     "映射": "references/extract-mappings.md",
     "指标规则": "references/extract-metrics-rules.md",
-    "事实": "references/extract-facts.md",
+    "事实": "entity-extraction/references/extract-facts.md（实例抽取技能）",
     "查写法": "python <技能目录>/scripts/show_example.py <target_kind> --operation create",
 }
 

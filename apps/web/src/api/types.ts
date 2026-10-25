@@ -776,7 +776,7 @@ export type Material = {
   created_at?: ISOTime;
   archived_at?: ISOTime | null;
   /** upload: a document someone uploaded; table_receipt: table structures a modeling run used. */
-  origin?: "upload" | "table_receipt";
+  origin?: "upload" | "table_receipt" | "conversation_request";
 };
 export type MaterialUsage = {
   object_types: number;
@@ -1043,7 +1043,7 @@ export type CatalogPage = VersionEnvelope & { items: CatalogItem[]; counts: Reco
 /** This target closure is incomplete and must never be submitted as a save baseline. */
 export type ElementProjection = VersionEnvelope & { representation: "element-1"; complete: false; model: Omit<Draft, "material_objects" | "material_links"> };
 export type DocumentContext = VersionEnvelope & Pick<Draft, "material_objects" | "material_links">;
-export type ProposalRunNotice = { run_token: string; summary: string; affected_count: number; reviewable_count: number };
+export type ProposalRunNotice = { run_token: string; batch_id: UUID | null; summary: string; affected_count: number; reviewable_count: number };
 export type ProposalCheckResponse = {
   passed: boolean;
   contract_errors: { code: string; message: string }[];

@@ -662,7 +662,7 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
   if (options.emptySession) responses[`${base}/sessions`] = { items: [] };
   if (options.proposalIssue) {
     const failed = options.proposalIssue === "failed";
-    const notice = { run_token: "fictional-run", summary: failed ? "修正次数已用完，本轮未生成符合契约的结果" : "关系的目标连接列不是唯一属性或完整标识；依赖该关系的提案不可接受", affected_count: failed ? 0 : 2, reviewable_count: failed ? 0 : 4 };
+    const notice = { run_token: "fictional-run", batch_id: failed ? null : "fictional-batch", summary: failed ? "修正次数已用完，本轮未生成符合契约的结果" : "关系的目标连接列不是唯一属性或完整标识；依赖该关系的提案不可接受", affected_count: failed ? 0 : 2, reviewable_count: failed ? 0 : 4 };
     responses[`${base}/sessions/${REVIEW_SESSION_ID}`] = { ...REVIEW_SESSION, task_status: failed ? "failed" : "finished", proposal_notice: notice };
     const batch = structuredClone(REVIEW_BATCH);
     if (failed) {

@@ -131,3 +131,47 @@ def test_follows_the_task_dataagent_started_to_replace_a_suspended_one():
         )
         is None
     )
+
+
+def test_tool_paths_are_presented_without_changing_records_or_answers():
+    from copy import deepcopy
+
+    skill = "/Users/fictional/project/dataagent/.claude/skills/entity-extraction/references/extract-facts.md"
+    workspace = "/srv/dataagent_runtime/topic_fictional/workspace/modeling/parts/05-facts.json"
+    original = {
+        "sender_type": "assistant", "content": skill,
+        "records": [{"event_type": "tool.completed", "data": {
+            "title": f"读取文件：{skill}",
+            "input": {"file_path": skill, "nested": [workspace]},
+            "output": [{"type": "text", "text": f"已写入 {workspace}"}],
+        }}],
+    }
+    stored = deepcopy(original)
+    shown = present_messages([original])[0]
+    data = shown["records"][0]["data"]
+    assert data["title"] == "读取文件：技能 entity-extraction/references/extract-facts.md"
+    assert data["input"]["file_path"] == "技能 entity-extraction/references/extract-facts.md"
+    assert data["input"]["nested"] == ["modeling/parts/05-facts.json"]
+    assert data["output"][0]["text"] == "已写入 modeling/parts/05-facts.json"
+    assert shown["content"] == skill
+    assert original == stored
+    event = original["records"][0]
+    assert json.loads(_compact_payload(json.dumps(event)))["data"] == data
+    block = present_messages([{"blocks": [{"type": "tool_use", "input": {"file_path": skill}}]}])[0]
+    assert block["blocks"][0]["input"]["file_path"].startswith("技能 entity-extraction/")
+
+
+def test_tool_path_presentation_preserves_relative_paths_and_urls():
+    from ontofoundry_api.services.tool_presentation import present_tool_value
+
+    value = {
+        "relative": "uploads/需求.md", "url": "https://fictional.example/Users/guide.md",
+        "legacy": "/home/fictional/topic_fictional/uploads/需求.md",
+        "other": "/tmp/fictional-host/log.txt",
+        "windows": r"C:\Users\fictional\.claude\skills\ontology-discovery\SKILL.md",
+    }
+    shown = present_tool_value(value)
+    assert shown["relative"] == value["relative"] and shown["url"] == value["url"]
+    assert shown["legacy"] == "uploads/需求.md"
+    assert shown["other"] == "log.txt"
+    assert shown["windows"] == "技能 ontology-discovery/SKILL.md"

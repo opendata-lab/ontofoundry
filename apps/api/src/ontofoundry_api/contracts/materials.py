@@ -21,7 +21,7 @@ class MaterialUsage(Strict):
 class ManagedMaterial(Strict):
     id: str
     name: str
-    origin: Literal["upload", "table_receipt"]
+    origin: Literal["upload", "table_receipt", "conversation_request"]
     sha256: str
     byte_size: int
     chunk_count: int

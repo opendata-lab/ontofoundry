@@ -152,6 +152,9 @@ for (const issue of ["failed", "unacceptable"] as const) {
     await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
     await expect(page.getByText("平台消息", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "重试", exact: true })).toBeEnabled();
+    if (issue === "failed") {
+      await expect(page.getByText("0 条可审，0 条受影响。", { exact: true })).toHaveCount(0);
+    }
     if (issue === "unacceptable") {
       await page.getByRole("tab", { name: /不可接受/ }).click();
       await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(2);

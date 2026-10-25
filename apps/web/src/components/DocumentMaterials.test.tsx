@@ -13,6 +13,7 @@ beforeEach(() => {
   vi.spyOn(modelingApi, "materialOverview").mockResolvedValue({
     items: [
       material({ id: "doc", name: "虚构采购说明.md", origin: "upload" }),
+      material({ id: "request", name: "建模需求-2026-10-25-1646.md", origin: "conversation_request" }),
       material({ id: "receipt", name: "表结构收据 · 虚构采购库 · 2026-10-21", origin: "table_receipt" }),
     ],
   });
@@ -20,6 +21,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("document materials", () => {
+  it("distinguishes conversation requests from uploaded documents", async () => {
+    renderWithProviders(<DocumentMaterials workspace={{ id: "w", role: "admin" } as Workspace} />);
+    await screen.findByText("虚构采购说明.md");
+    expect(screen.queryByText("建模需求-2026-10-25-1646.md")).toBeNull();
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "文档来源" }));
+    fireEvent.click(await screen.findByText("对话需求", { selector: ".ant-select-item-option-content" }));
+    expect(await screen.findByText("建模需求-2026-10-25-1646.md")).toBeInTheDocument();
+    expect(screen.queryByText("虚构采购说明.md")).toBeNull();
+    expect(screen.getByText("1 个文档")).toBeInTheDocument();
+  });
+
   it("lists uploaded documents by default and table receipts on demand", async () => {
     renderWithProviders(<DocumentMaterials workspace={{ id: "w", role: "admin" } as Workspace} />);
     expect(await screen.findByText("虚构采购说明.md")).toBeInTheDocument();

@@ -56,9 +56,11 @@ from ontofoundry_api.services.modeling_input import (
     upload_work_pack,
 )
 from ontofoundry_api.services.proposals import proposal_context, proposal_header
+from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import RunGrant
 from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
 from ontofoundry_api.services.run_credentials import issue as issue_run_credential
+from ontofoundry_api.services.tool_presentation import present_tool_value
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -136,7 +138,7 @@ def _shorten(text: str, limit: int, what: str) -> str:
 
 
 def _compact_tool_io(item: dict[str, Any]) -> dict[str, Any]:
-    item = dict(item)
+    item = present_tool_value(item)
     output = item.get("output")
     if isinstance(output, str):
         item["output"] = _shorten(output, TOOL_TEXT_LIMIT, "工具输出")
@@ -755,15 +757,21 @@ async def send_message(
         raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
     _require_configured(request)
 
+    mode = _mode(body.metadata.get("mode"))
+    request_material = store_request_material(
+        db, request.app.state.settings, workspace_id, body.content, mode
+    )
+    selected_material_ids = list(item.material_ids)
+    if request_material is not None and request_material.id not in selected_material_ids:
+        selected_material_ids.append(request_material.id)
     materials = [
         material
-        for material_id in item.material_ids
+        for material_id in selected_material_ids
         if (material := db.get(MaterialRecord, material_id)) is not None
     ]
     if sum(material.byte_size for material in materials) > 2 * 1024**3:
         raise HTTPException(422, "所选材料总量超过 2 GB，请分批建模")
 
-    mode = _mode(body.metadata.get("mode"))
     expected_revision = item.revision
     run_token = secrets.token_hex(16)
     topic_id = item.dataagent_topic_id
@@ -841,6 +849,7 @@ async def send_message(
         )
         .values(
             title=title,
+            material_ids=selected_material_ids,
             task_status="submitting",
             task_detail="正在提交到 DataAgent",
             dataagent_task_id=None,

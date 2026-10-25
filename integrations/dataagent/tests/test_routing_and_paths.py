@@ -266,3 +266,11 @@ def test_reads_that_cannot_shrink_by_lines_or_ranges_still_get_a_way_out(tmp_pat
     (tmp_path / "bad.json").write_text('{"a":\n}')
     assert invoke(monkeypatch, read_input, "bad.json", "--pointer", "/a") == 1
     assert "--end 2" in capsys.readouterr().out
+
+
+def test_facts_method_belongs_to_entity_extraction_on_both_routes():
+    discovery = (SKILLS / "ontology-discovery/references/steps/extract.md").read_text()
+    facts = (SKILLS / "entity-extraction/references/steps/facts.md").read_text()
+    assert "entity-extraction/references/extract-facts.md" in discovery
+    assert "实例抽取技能 entity-extraction" in facts
+    assert "不在 ontology-discovery" in discovery and "不在 ontology-discovery" in facts
