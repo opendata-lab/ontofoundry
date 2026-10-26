@@ -19,7 +19,7 @@ from check_result import (
     schema_errors,
 )
 from prepare_result import PrepareInputError, assemble, effective_ref, material_hashes
-from runpaths import PARTS, HintParser, command, error, existing, fragment_paths
+from runpaths import PARTS, HintParser, command, error, existing, fragment_paths, plan_not_approved
 
 SUMMARY_LIMIT = 4000
 NAMED_KINDS = {"object_type", "property", "value_type", "link_type", "metric", "dataset", "rule"}
@@ -118,6 +118,9 @@ def main():
     parser.add_argument("--reports", default="modeling/checks")
     parser.add_argument("fragments", nargs="+")
     args = parser.parse_args()
+    if refusal := plan_not_approved():
+        print(refusal)
+        return 2
     try:
         if args.work_pack:
             pack = json.loads(Path(args.work_pack).read_bytes())

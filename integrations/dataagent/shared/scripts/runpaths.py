@@ -57,6 +57,23 @@ def error(code, reason, state, next_step=None, retry=True):
     return "".join(parts)
 
 
+def plan_not_approved():
+    """The refusal to print while a plan-mode run waits for the user's approval.
+
+    DataAgent publishes the run's plan state to commands as
+    DATAAGENT_PLAN_STATE (pending until the user approves the plan). Outside
+    plan mode the variable is absent and nothing is held.
+    """
+    if os.environ.get("DATAAGENT_PLAN_STATE") != "pending":
+        return None
+    return error(
+        "PLAN_NOT_APPROVED",
+        "计划还没获批准，不能检查片段或生成结果",
+        "未读取或写入任何文件",
+        "把概念清单或问题清单写进计划，调用 ExitPlanMode 提交；用户要求调整时按意见修改后重新提交，获批准后再继续",
+    )
+
+
 def notice(code, what, next_step=None):
     """提示 [CODE]: the call succeeded, with something the agent should know."""
     return f"提示 [{code}]：{what.rstrip('。')}。" + (f"下一步：{next_step}" if next_step else "")

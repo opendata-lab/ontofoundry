@@ -20,6 +20,7 @@ from runpaths import (
     existing,
     fragment_paths,
     notice,
+    plan_not_approved,
     relative,
 )
 
@@ -375,6 +376,9 @@ def main():
         help="片段文件、简称（01、01-types）或目录；省略时合并 modeling/parts/",
     )
     args = parser.parse_args()
+    if refusal := plan_not_approved():
+        print(refusal)
+        return 1
     outcome = "候选文件未生成，最终文件未替换"
     if "-" in args.fragments:
         print(

@@ -16,6 +16,7 @@ from test_workflow import budget as offline_budget
 # test_workflow adds the standalone scripts directory to the import path.
 check_part = importlib.import_module("check_part")
 init_workflow = importlib.import_module("init_workflow")
+prepare_result = importlib.import_module("prepare_result")
 
 
 def write_json(path, value):
@@ -349,3 +350,20 @@ def test_stepwise_routes_and_updated_limits_pass():
     assert route["bytes"] == sum(c["bytes"] for c in components.values())
     assert route["estimated_rounds"]["normal"] == [9, 11]
     assert route["estimated_rounds"]["two_repairs"] == [13, 15]
+
+
+@pytest.mark.parametrize("module", [check_part, prepare_result])
+def test_result_scripts_wait_for_an_approved_plan(tmp_path, monkeypatch, capsys, module):
+    # Bash stays open for research in plan mode, so the scripts that check and
+    # merge results hold until DataAgent reports the plan approved.
+    monkeypatch.chdir(tmp_path)
+    pack = write_json(tmp_path / "pack.json", {})
+    monkeypatch.setenv("DATAAGENT_PLAN_STATE", "pending")
+    assert invoke(monkeypatch, module, "--work-pack", pack, "01") != 0
+    out = capsys.readouterr().out
+    assert "错误 [PLAN_NOT_APPROVED]" in out and "ExitPlanMode" in out
+    assert not (tmp_path / "modeling").exists()
+
+    monkeypatch.setenv("DATAAGENT_PLAN_STATE", "approved")
+    invoke(monkeypatch, module, "--work-pack", pack, "01")
+    assert "PLAN_NOT_APPROVED" not in capsys.readouterr().out
