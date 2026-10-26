@@ -1,7 +1,7 @@
 """Create the modeling/ workspace skeleton; existing files are never overwritten.
 
-With --prior-plan, the plan confirmed in the previous run (uploaded by the
-platform as one JSON bundle) is restored into modeling/ first.
+The user approves the concept or issue list inside the run (the plan card),
+so there is no earlier plan to restore.
 """
 
 import json
@@ -78,33 +78,20 @@ def done(created):
 def main():
     parser = HintParser(description="建立 modeling/ 骨架与计划模板；幂等，不覆盖已有文件")
     parser.add_argument("--work-pack", required=True)
-    parser.add_argument("--prior-plan", help="平台上传的上一轮已确认计划包")
     args = parser.parse_args()
     created, step = [], f"读取工作包 {args.work_pack}"
     try:
         pack = json.loads(Path(args.work_pack).read_bytes())
         step = "创建 modeling/ 与输出目录"
         # Output filenames are supplied by the platform; never infer them.
-        for field in ("result_file", "needs_input_file"):
-            if pack.get(field):
-                Path(pack[field]).parent.mkdir(parents=True, exist_ok=True)
+        if pack.get("result_file"):
+            Path(pack["result_file"]).parent.mkdir(parents=True, exist_ok=True)
         step = "整理上一轮的片段"
         archived = archive_previous_parts(pack)
         step = "创建 modeling/ 与输出目录"
         for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
             folder.mkdir(parents=True, exist_ok=True)
         RUN_MARK.write_text(run_token(pack))
-        if args.prior_plan:
-            step = f"读取前轮计划 {args.prior_plan}"
-            prior = json.loads(Path(args.prior_plan).read_bytes())
-            step = "写入前轮计划"
-            if prior.get("plan_md") and write_new(ROOT / "plan.md", prior["plan_md"]):
-                created.append("modeling/plan.md（上一轮计划）")
-            for name in ("entities", "issues"):
-                if prior.get(name) is not None and write_new(
-                    ROOT / f"{name}.json", json.dumps(prior[name], ensure_ascii=False, indent=1)
-                ):
-                    created.append(f"modeling/{name}.json（上一轮计划）")
         facts = pack.get("scenario_facts", {})
         plan = PLAN_TEMPLATE.format(
             work_pack=args.work_pack,
@@ -123,7 +110,7 @@ def main():
         return 1
     except FileNotFoundError:
         print(error("FILE_NOT_FOUND", f"{step}失败：文件不存在", done(created),
-                    "路径照平台本轮提示里的工作包、prior_plan_file 复制"))
+                    "路径照平台本轮提示里的工作包复制"))
         return 1
     except (OSError, ValueError) as exc:
         print(error("INIT_FAILED", f"{step}失败：{type(exc).__name__}", done(created), retry=False))
@@ -132,7 +119,7 @@ def main():
     if archived:
         print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的片段与检查报告已移到 {archived}/，本轮从空的 modeling/parts/ 开始",
                      "只写本轮的变化；已入库的定义用 show_element.py 查，不必读该目录"))
-    print(run_paths(args.work_pack, pack, args.prior_plan))
+    print(run_paths(args.work_pack, pack))
     return 0
 
 
@@ -150,22 +137,19 @@ def table_commands(tables_file):
     return lines
 
 
-def run_paths(work_pack, pack, prior_plan):
+def run_paths(work_pack, pack):
     """This run's files and commands; copy them rather than composing paths."""
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
     for material in pack.get("materials") or []:
         if material.get("path"):
             lines.append(f"- 材料：{material['path']}")
-    for label, key in (("表结构", "tables_file"), ("结果", "result_file"), ("待确认", "needs_input_file")):
+    for label, key in (("表结构", "tables_file"), ("结果", "result_file")):
         if pack.get(key):
             lines.append(f"- {label}：{pack[key]}")
-    if prior_plan or pack.get("prior_plan_file"):
-        lines.append(f"- 前轮计划：{prior_plan or pack['prior_plan_file']}")
     references = relative(Path(__file__).resolve().parents[1] / "references")
     protocol = f"{references}/examples/protocol"
     lines.append(f"- 技能参考：{references}/")
-    lines.append(f"- 模板：概念清单 {protocol}/entities.json；待确认 {protocol}/needs-input-entities.json")
-    lines.append(f"- 优化模板：问题清单 {protocol}/issues.json；待选择 {protocol}/needs-input-issues.json")
+    lines.append(f"- 模板：概念清单 {protocol}/entities.json；问题清单 {protocol}/issues.json（计划获批准后再写）")
     lines.append("- 概念清单写 modeling/entities.json，问题清单写 modeling/issues.json（与 plan.md 同级，不放 parts/）")
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
     lines.append("常用命令：")

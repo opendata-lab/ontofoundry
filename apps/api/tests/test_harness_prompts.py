@@ -77,40 +77,25 @@ def test_dynamic_paths_have_a_single_authoritative_source():
         mcp_config_file="inputs/mcp.json",
     )
     assert pack["mcp_config_file"] == "inputs/mcp.json"
-    assert pack["result_file"] in render("mcp") and pack["needs_input_file"] in render(
-        "mcp"
-    )
+    assert pack["result_file"] in render("mcp") and "needs_input_file" not in pack
     assert "inputs/mcp.json" not in render("mcp") and "source_draft_sha256" not in render(
         "first"
     )
     assert "ontofoundry-result-" not in render("chat") and "超过 50 KB" in render("chat")
 
 
-def test_a_needs_input_file_beside_a_result_never_costs_the_proposals(client, monkeypatch):
+def test_a_result_is_consumed_without_looking_for_questions(client, monkeypatch):
     session, manifest = proposals_run(client)
     paths = install_download(monkeypatch, [result(manifest, [])])
 
     async def forbidden(self, **kwargs):
-        pytest.fail("问题文件不能发起模型修复")
+        pytest.fail("有结果时不能发起模型修复")
 
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
     assert reconcile(client, session["id"]) == "done"
-    # Questions live in the agent's reply; the file is not even read.
+    # Questions are answered inside the run; no question file is read.
     assert not any("needs-input" in path for path in paths)
     assert len(stored(client, session["id"])[0]) == 1
-
-
-def test_needs_input_protocol_positive_reaches_existing_state(client, monkeypatch):
-    session, _ = proposals_run(client)
-    marker = json.loads(
-        (
-            FIXTURES.parent.parent / "shared/references/examples/protocol/needs-input.json"
-        ).read_bytes()
-    )
-    marker["run_token"] = RUN_TOKEN
-    install_download(monkeypatch, [DataAgentError("missing", status_code=404), marker])
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert marker["questions"][0].strip()
 
 
 def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, monkeypatch):
@@ -139,7 +124,6 @@ def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, mon
         tables=[{"table": "retail.orders", "connection": "虚构零售库", "kind": "table", "comment": "虚构订单", "column_count": 2}],
         tables_file="inputs/tables.json",
         scenario_facts={"draft_empty": False, "new_material_ids": ["fictional-material"], "new_table_keys": ["t1"]},
-        prior_plan_file="inputs/previous-confirmed-plan.json",
     )
     manifest["repair_used"] = 1
     before = deepcopy(manifest)
@@ -227,7 +211,7 @@ def test_repair_rebuilds_pack_with_preserved_inputs_and_actual_error(client, mon
         == 401
     )
     assert "ofrun." not in sent[0]
-    assert pack["result_file"] in sent[0] and pack["needs_input_file"] in sent[0]
+    assert pack["result_file"] in sent[0] and "待确认" not in sent[0]
     assert "TARGET_HASH_MISMATCH" in sent[0] and "/items/2/expected_target_hash" in sent[0]
     assert "期望" in sent[0] and "实际" in sent[0] and "show_example.py" in sent[0]
     assert "old-pack" not in sent[0] and before["source_draft_sha256"] not in sent[0]

@@ -46,19 +46,18 @@ def test_scope_is_confirmed_before_any_proposal_on_every_path():
     plan = (SKILLS / "ontology-discovery/references/steps/plan.md").read_text()
     extraction = (SKILLS / "entity-extraction/SKILL.md").read_text()
     agent = (BASE / "agents/agent_ontofoundry.md").read_text().split("系统提示词：", 1)[1]
-    assert "不写提案" in discovery and "不写提案" in plan
-    # Named things are instances shown as examples, never their own types or confirmations.
-    assert "具名的具体事物" in plan and "examples" in plan and "不逐个请用户确认" in plan
-    assert "不定标识、对应表、关系、属性" in plan and "第 3 轮前写完" in plan
-    assert "确认前不写定义或实例提案" in extraction
-    assert "确认范围" in agent
+    # The scope is approved inside the run through the plan card.
+    assert "获批准" in discovery and "ExitPlanMode" in plan and "AskUserQuestion" in plan
+    # Named things are instances shown as examples, never their own types.
+    assert "具名的具体事物" in plan and "例子" in plan
+    assert "不定标识、对应表、关系、属性" in plan and "第 3 轮前定稿" in plan
+    assert "获批准前不写定义或实例" in extraction
+    assert "新概念先交计划，批准后写提案" in agent
 
 
 def test_protocol_templates_show_concepts_with_examples():
     entities = json.loads((SKILL / "references/examples/protocol/entities.json").read_bytes())
     assert any(item.get("examples") for item in entities["items"])
-    question = json.loads((SKILL / "references/examples/protocol/needs-input-entities.json").read_bytes())["questions"][0]
-    assert "不需逐个确认" in question
 
 
 def test_init_prints_this_runs_paths_and_commands(tmp_path, monkeypatch, capsys):
@@ -66,16 +65,16 @@ def test_init_prints_this_runs_paths_and_commands(tmp_path, monkeypatch, capsys)
     (tmp_path / "uploads").mkdir()
     (tmp_path / "uploads/fictional.md").write_text("澄页图书馆\n")
     pack = write_json(tmp_path / "uploads/pack.json", {
-        "result_file": "output/result.json", "needs_input_file": "output/needs.json",
+        "result_file": "output/result.json",
         "context_file": "uploads/context.json", "schema_file": "uploads/schema.json",
         "tables_file": "uploads/tables.json", "materials": [{"id": "m", "path": "uploads/fictional.md", "lines": 1}],
     })
     assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
     out = capsys.readouterr().out
-    for text in ("uploads/fictional.md", "output/result.json", "output/needs.json", "uploads/tables.json",
+    for text in ("uploads/fictional.md", "output/result.json", "uploads/tables.json",
                  "check_part.py --work-pack uploads/pack.json 01",
                  "prepare_result.py --work-pack uploads/pack.json modeling/parts/", "modeling/tmp/", "/tmp",
-                 "references/examples/protocol/entities.json", "references/examples/protocol/needs-input-entities.json",
+                 "references/examples/protocol/entities.json",
                  "references/examples/protocol/issues.json"):
         assert text in out, text
     assert (tmp_path / "modeling/tmp").is_dir() and (tmp_path / "output").is_dir()

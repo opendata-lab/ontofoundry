@@ -67,7 +67,6 @@ def build_work_pack(
     tables: list[dict] | None = None,
     tables_file: str | None = None,
     scenario_facts: dict | None = None,
-    prior_plan_file: str | None = None,
 ) -> tuple[dict, list[bytes]]:
     """Keep all index entries, spilling oversized indices to bounded pages."""
     if any(not m.get("path") or "lines" not in m for m in materials):
@@ -108,7 +107,6 @@ def build_work_pack(
         "run": context["run"],
         "execution": context["execution"],
         "result_file": f"output/ontofoundry-result-{context['run']['run_token']}.json",
-        "needs_input_file": f"output/ontofoundry-needs-input-{context['run']['run_token']}.json",
         "context_file": context_file,
         "schema_file": schema_file,
         "materials": sorted(materials, key=lambda m: m["id"]),
@@ -124,9 +122,6 @@ def build_work_pack(
     pack["workflow_dir"] = "modeling/"
     if scenario_facts:
         pack["scenario_facts"] = scenario_facts
-    if prior_plan_file:
-        # The confirmed plan from the previous run; this turn's message is the reply.
-        pack["prior_plan_file"] = prior_plan_file
     if tables:
         # Linked registered tables: a catalog only; columns live in tables_file.
         pack["tables"] = tables

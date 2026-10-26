@@ -51,6 +51,29 @@ test("builder proposals retain session and material controls", async ({ page }) 
   await expect(page).toHaveScreenshot("builder-result-modal.png", { fullPage: true });
 });
 
+test("builder shows an expanded plan in the results column", async ({ page }) => {
+  await mockCanvasApi(page);
+  await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
+  await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(3);
+  await expect(page.locator("dataagent-conversation").getByRole("button", { name: /计划/ })).toBeVisible();
+  await page.locator("dataagent-conversation").evaluate((el) => {
+    el.dispatchEvent(new CustomEvent("dataagent-plan-open", {
+      cancelable: true,
+      detail: {
+        title: "星河采购建模计划",
+        markdown: "# 星河采购建模计划\n\n## 目标\n建立供应商与采购订单。",
+        body: "## 目标\n建立供应商与采购订单。\n\n## 步骤\n1. 新建对象 **供应商**，映射 `dim_supplier`\n2. 新建对象 **采购订单**，与供应商建立“供货”关系\n3. 定义指标：采购金额、订单数\n\n| 概念 | 依据 |\n| --- | --- |\n| 供应商 | 星河采购业务说明.md 第 3 行 |\n| 采购订单 | dwd_purchase_order |",
+        requestId: "plan-1",
+      },
+    }));
+  });
+  await expect(page.getByRole("heading", { name: "星河采购建模计划", exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page).toHaveScreenshot("builder-plan-panel.png", { fullPage: true });
+  await page.getByRole("button", { name: "关闭计划", exact: true }).click();
+  await expect(page.getByLabel("提案审核面板", { exact: true })).toBeVisible();
+});
+
 test("semantic canvas releases explorer space and preserves zoom controls", async ({ page }) => {
   await mockCanvasApi(page);
   await page.goto(`${base}/view`);

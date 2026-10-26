@@ -306,13 +306,12 @@ def test_error_routes_are_structural_and_executable(kind, after, pointer, expect
         assert f"--operation {operation}" in command and "--part" not in command
 
 
-def test_init_creates_both_requested_parent_directories_idempotently(tmp_path, monkeypatch):
+def test_init_creates_the_result_parent_directory_idempotently(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    pack = write_json(tmp_path / "pack.json", {"result_file": "output/results/run.json", "needs_input_file": "output/questions/run.json"})
+    pack = write_json(tmp_path / "pack.json", {"result_file": "output/results/run.json"})
     for _ in range(2):
         assert invoke(monkeypatch, init_workflow, "--work-pack", pack) == 0
         assert (tmp_path / "output/results").is_dir()
-        assert (tmp_path / "output/questions").is_dir()
     assert not (tmp_path / "output/results/run.json").exists()
 
 

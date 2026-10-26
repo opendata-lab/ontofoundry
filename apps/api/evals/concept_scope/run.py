@@ -1,15 +1,18 @@
 """Run the plan step of each scenario on a live platform and score the concept list.
 
-With --extract, scenarios that have extraction.json also get the confirming
-reply; the resulting proposal batch is scored for properties, relations,
-instances, mappings and metrics (score_extraction.py).
+Runs go out in plan mode. The agent submits its concept list as a plan card
+(ExitPlanMode) and the run waits; the list is scored from that plan and the
+run is cancelled. With --extract, scenarios that have extraction.json get the
+plan approved instead (a confirm_reply other than “确认” is sent first as a
+revision note), and the proposal batch the same run produces is scored for
+properties, relations, instances, mappings and metrics (score_extraction.py).
+Question cards are answered with their recommended options.
 
 This calls the platform's HTTP API like the browser does, so it spends model
 tokens: run it off-peak and only with the user's agreement. The agent receives
 materials (and linked tables) only; gold.json never leaves this machine.
 
     cd apps/api
-    set -a; . <api env>; set +a        # ONTOFOUNDRY_DATABASE_URL for reading the saved plan
     .venv/bin/python evals/concept_scope/run.py --api http://<ip>:8000 --origin http://<ip>:5199 \
         --output-dir evals/concept_scope/results/<日期-说明> [--scenario wind_inspection ...]
 
@@ -32,7 +35,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-import sqlalchemy as sa
+import re
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from score import score  # noqa: E402
@@ -40,7 +43,8 @@ from score_extraction import score_extraction  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent / "scenarios"
 SETS = {"public": ROOT, "heldout": ROOT.parent / "heldout"}
-ACTIVE = {"queued", "running", "waiting_permission"}
+ACTIVE = {"queued", "running", "waiting_input", "waiting_permission"}
+RECOMMENDED = re.compile(r"\s*[（(](推荐|Recommended|recommended)[）)]\s*$")
 
 
 class Platform:
@@ -97,17 +101,100 @@ def prepare(platform, name, gold, stamp, root=ROOT):
 
 
 def run_turn(platform, workspace_id, session_id, prompt, timeout_s=900):
+    """Send a plan-mode message; return when the run ends or waits on a plan card."""
+    base = f"/workspaces/{workspace_id}/sessions/{session_id}"
+    platform.call("POST", base + "/agent-conversation/messages",
+                  {"content": prompt, "metadata": {"mode": "model"}, "settings": {"permission_mode": "plan"}})
+    return wait(platform, workspace_id, session_id, timeout_s)
+
+
+def wait(platform, workspace_id, session_id, timeout_s, answered=()):
+    """Poll until the run ends or shows a plan card not answered yet.
+
+    Question cards are answered on the spot with their recommended options,
+    the same answers the timeout policy would give.
+    """
     base = f"/workspaces/{workspace_id}/sessions/{session_id}"
     started = time.monotonic()
-    platform.call("POST", base + "/agent-conversation/messages", {"content": prompt, "metadata": {"mode": "model"}})
     seen_active = False
     while time.monotonic() - started < timeout_s:
         time.sleep(10)
         state = platform.call("GET", base)
-        seen_active = seen_active or state["task_status"] in ACTIVE
-        if seen_active and state["task_status"] not in ACTIVE:
-            return state, round(time.monotonic() - started)
+        status = state["task_status"]
+        seen_active = seen_active or status in ACTIVE
+        if status == "waiting_input":
+            card = pending(conversation(platform, workspace_id, session_id), "question_request")
+            if card:
+                interact(platform, workspace_id, session_id, state, "question", card["request_id"],
+                         {"answers": recommended_answers(card.get("questions") or [])})
+            continue
+        if status == "waiting_permission":
+            card = pending(conversation(platform, workspace_id, session_id), "permission_request")
+            if card and card.get("request_id") not in answered:
+                return state, card, round(time.monotonic() - started)
+            continue
+        if seen_active and status not in ACTIVE:
+            return state, None, round(time.monotonic() - started)
     raise SystemExit("运行超时")
+
+
+def interact(platform, workspace_id, session_id, state, kind, request_id, payload):
+    platform.call("POST", f"/workspaces/{workspace_id}/sessions/{session_id}/agent-conversation/interactions",
+                  {"task_id": state["dataagent_task_id"], "kind": kind, "request_id": request_id, "payload": payload})
+
+
+def pending(record, record_type):
+    """The newest unanswered card of this type in the conversation."""
+    answered_type = {"question_request": "question_answer", "permission_request": "permission_decision"}[record_type]
+    requests, answered = {}, set()
+    for message in record.get("messages") or []:
+        for event in message.get("records") or []:
+            data = event.get("data") or {}
+            if event.get("record_type") == record_type:
+                requests[data.get("request_id")] = data
+            elif event.get("record_type") == answered_type:
+                answered.add(data.get("request_id"))
+    open_cards = [data for request_id, data in requests.items() if request_id not in answered]
+    return open_cards[-1] if open_cards else None
+
+
+def recommended_answers(questions):
+    answers = []
+    for question in questions:
+        labels = [o.get("label", "") if isinstance(o, dict) else str(o) for o in question.get("options") or []]
+        picks = [label for o, label in zip(question.get("options") or [], labels)
+                 if (isinstance(o, dict) and o.get("recommended") is True) or RECOMMENDED.search(label)]
+        picks = picks if question.get("multiSelect") else picks[:1]
+        answers.append({"header": question.get("header", ""), "question": question.get("question", ""),
+                        "selected": picks, "other": "", "skipped": not picks})
+    return answers
+
+
+def plan_entities(markdown):
+    """The concept table of a plan as {items: [{display_name, name}]}.
+
+    The plan card is free Markdown; the first table whose header names the
+    concept is read row by row, its first cell split on ／ or / into Chinese
+    name and identifier (a separate 英文标识 column is used when present).
+    """
+    rows = [line.strip().strip("|").split("|") for line in markdown.splitlines() if line.strip().startswith("|")]
+    if not rows:
+        return {"items": []}
+    header = [cell.strip() for cell in rows[0]]
+    english = next((i for i, cell in enumerate(header) if "英文" in cell or "标识" in cell), None)
+    items = []
+    for cells in rows[1:]:
+        cells = [cell.strip().strip("`*") for cell in cells]
+        if not cells or set("".join(cells)) <= set("-: "):
+            continue
+        parts = [part.strip().strip("`*") for part in re.split(r"[／/]", cells[0]) if part.strip()]
+        item = {"display_name": parts[0] if parts else ""}
+        if english is not None and english < len(cells) and english != 0:
+            item["name"] = cells[english]
+        elif len(parts) > 1:
+            item["name"] = parts[1]
+        items.append(item)
+    return {"items": items}
 
 
 def latest_batch(platform, workspace_id, session_id):
@@ -116,9 +203,23 @@ def latest_batch(platform, workspace_id, session_id):
     return platform.call("GET", f"{base}/{page[0]['id']}") if page else {"items": []}
 
 
-def extract(platform, workspace_id, session_id, extraction, gold, out):
-    """Confirm the plan, then score and archive the proposal batch."""
-    state, seconds = run_turn(platform, workspace_id, session_id, extraction["confirm_reply"], timeout_s=1800)
+def extract(platform, workspace_id, session_id, state, card, extraction, gold, out):
+    """Approve the plan (after any revision note), then score and archive the proposal batch."""
+    reply = extraction["confirm_reply"].strip()
+    answered = {card["request_id"]}
+    seconds = 0
+    if reply not in {"确认", "确认。"}:
+        interact(platform, workspace_id, session_id, state, "permission", card["request_id"],
+                 {"decision": "deny", "note": reply})
+        state, card, seconds = wait(platform, workspace_id, session_id, 1800, answered)
+        if card is None:
+            raise SystemExit("调整计划后运行结束，没有再次提交计划")
+        answered.add(card["request_id"])
+    interact(platform, workspace_id, session_id, state, "permission", card["request_id"], {"decision": "allow"})
+    state, extra, more = wait(platform, workspace_id, session_id, 1800, answered)
+    if extra is not None:
+        raise SystemExit("批准后又提交了新计划")
+    seconds += more
     batch = latest_batch(platform, workspace_id, session_id)
     datasets = (state.get("draft") or {}).get("datasets") or []
     result = score_extraction(gold, extraction, batch.get("items") or [], datasets)
@@ -128,16 +229,6 @@ def extract(platform, workspace_id, session_id, extraction, gold, out):
     write(out / "batch.json", batch)
     write(out / "extraction-answer.md", answer)
     return summary
-
-
-def saved_plan(session_id):
-    engine = sa.create_engine(os.environ["ONTOFOUNDRY_DATABASE_URL"])
-    with engine.connect() as connection:
-        manifest = connection.execute(
-            sa.text("SELECT run_manifest_json FROM modeling_sessions WHERE id = :id"), {"id": session_id}
-        ).scalar()
-    engine.dispose()
-    return (manifest or {}).get("prior_plan") or {}
 
 
 def conversation(platform, workspace_id, session_id):
@@ -182,7 +273,7 @@ def main():
     parser.add_argument("--level", choices=["basic", "advanced"], help="只跑某个难度的公开场景")
     parser.add_argument("--scenario", action="append", help="场景目录名，可重复；默认全部")
     parser.add_argument("--output-dir", required=True, help="结果目录，如 evals/concept_scope/results/2026-10-22-baseline")
-    parser.add_argument("--extract", action="store_true", help="计划轮后回复确认，继续给抽取轮的提案打分（只跑有 extraction.json 的场景）")
+    parser.add_argument("--extract", action="store_true", help="批准计划卡片，继续给同一运行产出的提案打分（只跑有 extraction.json 的场景）")
     parser.add_argument("--score-only", help="不重跑，只给已有的 workspace_id:session_id 打分并存档（需配合单个 --scenario）")
     args = parser.parse_args()
     platform = Platform(args.api, args.origin)
@@ -203,28 +294,35 @@ def main():
         if args.score_only:
             workspace_id, session_id = args.score_only.split(":")
             state, seconds = platform.call("GET", f"/workspaces/{workspace_id}/sessions/{session_id}"), None
+            card = pending(conversation(platform, workspace_id, session_id), "permission_request")
         else:
             workspace_id, session_id = prepare(platform, name, gold, stamp, root)
-            state, seconds = run_turn(platform, workspace_id, session_id, gold["prompt"])
-        plan = saved_plan(session_id)
-        result = score(gold, plan.get("entities"))
+            state, card, seconds = run_turn(platform, workspace_id, session_id, gold["prompt"])
+        plan_md = (card or {}).get("summary") or ""
+        entities = plan_entities(plan_md)
+        result = score(gold, entities)
         record = conversation(platform, workspace_id, session_id)
         totals, answer = usage(record)
         summary = {**result, "workspace_id": workspace_id, "session_id": session_id,
                    "result_state": state.get("result_state"), "seconds": seconds, **totals}
         write(out / name / "score.json", summary)
-        write(out / name / "plan.json", plan)
+        write(out / name / "plan.md", plan_md)
+        write(out / name / "plan.json", entities)
         write(out / name / "conversation.json", record)
         write(out / name / "answer.md", answer)
         print(f"{name}: 准确率 {result['precision']} 召回率 {result['recall']} "
               f"错误 {result['errors'] or '无'} 漏掉 {result['missed'] or '无'} 轮数 {totals['turns']}")
-        if args.extract and not args.score_only:
+        if args.extract and not args.score_only and card:
             extraction = json.loads((root / name / "extraction.json").read_text(encoding="utf-8"))
-            done = extract(platform, workspace_id, session_id, extraction, gold, out / name)
+            done = extract(platform, workspace_id, session_id, state, card, extraction, gold, out / name)
             summary["extraction"] = {k: v for k, v in done.items() if k != "details"}
             write(out / name / "conversation.json", conversation(platform, workspace_id, session_id))
             print(f"{name} 抽取: " + " ".join(f"{k} {done[k]['found']}/{done[k]['expected']}"
                                              for k in ("properties", "relations", "instances", "mappings", "metrics")))
+        elif card and not args.score_only:
+            # Only the plan is scored: stop the run instead of letting it wait.
+            platform.call("POST", f"/workspaces/{workspace_id}/sessions/{session_id}/agent-conversation/cancel",
+                          {"task_id": state["dataagent_task_id"]})
         results.append({k: v for k, v in summary.items() if k != "details"})
     write(out / "summary.json", results)
 

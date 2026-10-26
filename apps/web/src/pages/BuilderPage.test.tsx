@@ -175,32 +175,44 @@ it("uploads business knowledge files through Upload.Dragger and switches to the 
   expect(await screen.findByText("采购制度.md")).toBeInTheDocument();
 });
 
-it("says when the last modeling run is waiting for the user's reply", async () => {
-  context.model.session = {
-    ...session(),
-    task_status: "finished",
-    result_state: "awaiting_reply",
-    task_detail: "智能体需要你确认后才能生成提案，请在对话中回复",
-  };
-  renderWithProviders(
-    <MemoryRouter>
-      <BuilderPage />
-    </MemoryRouter>,
-  );
-  expect(
-    await screen.findByText("智能体需要你确认后才能生成提案，请在对话中回复"),
-  ).toBeInTheDocument();
+it("turns the plan switch on for modeling and leaves it out of daily mode", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container, unmount } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
+  unmount();
+
+  context.model.session = { ...session(), mode: "chat" };
+  const daily = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const chat = daily.container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(chat.composerConfig).toEqual({});
 });
 
-it("shows no reply hint for a run that produced its result", async () => {
-  context.model.session = { ...session(), task_status: "finished", result_state: "done" };
-  renderWithProviders(
-    <MemoryRouter>
-      <BuilderPage />
-    </MemoryRouter>,
-  );
+it("opens an expanded plan in the results column and closes back", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
-  expect(screen.queryByText(/请在对话中回复/)).toBeNull();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const event = new CustomEvent("dataagent-plan-open", {
+    cancelable: true,
+    detail: {
+      title: "星河采购建模计划",
+      body: "## 步骤\n1. 新建对象 **供应商**",
+      markdown: "# 星河采购建模计划\n\n## 步骤\n1. 新建对象 **供应商**",
+      requestId: "plan-1",
+    },
+  });
+  act(() => { el.dispatchEvent(event); });
+
+  // The page claims the plan, so the card does not also expand in place.
+  expect(event.defaultPrevented).toBe(true);
+  expect(await screen.findByRole("heading", { name: "星河采购建模计划" })).toBeInTheDocument();
+  expect(screen.getByText("供应商")).toBeInTheDocument();
+  expect(screen.getAllByText("星河采购建模计划")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "关闭计划" }));
+  expect(screen.queryByRole("heading", { name: "星河采购建模计划" })).toBeNull();
 });
 
 

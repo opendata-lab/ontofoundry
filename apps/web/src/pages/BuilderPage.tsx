@@ -4,9 +4,10 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
-import type { AgentConversationElement, CompleteDetail, ErrorDetail, RunChangeDetail } from "../types/agent-conversation";
+import type { AgentConversationElement, CompleteDetail, ErrorDetail, PlanOpenDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
 import { ModelResults } from "../components/ModelResults";
+import { PlanPanel, type OpenPlan } from "../components/PlanPanel";
 import { BuilderConversationEmpty } from "../components/BuilderConversationEmpty";
 import { TableMaterialPicker } from "../components/TableMaterialPicker";
 import { tableKey, tableLabel } from "../lib/linkedTables";
@@ -61,6 +62,10 @@ export function BuilderPage() {
   const mode: SessionMode = session?.mode ?? newMode;
   const modeLocked = !!session?.dataagent_topic_id;
   const [composerDraft, setComposerDraft] = useState("");
+  // A plan card expanded from the conversation takes the results column
+  // until it is closed.
+  const [openPlan, setOpenPlan] = useState<OpenPlan | null>(null);
+  useEffect(() => setOpenPlan(null), [sessionId]);
   const scenarioId = useId();
   const conversation = useRef<AgentConversationElement>(null);
   usePageTab({
@@ -153,6 +158,12 @@ export function BuilderPage() {
 
     const onDraft = (event: Event) => setComposerDraft((event as CustomEvent<{ value: string }>).detail.value);
 
+    const onPlanOpen = (event: Event) => {
+      const { title, body, markdown } = (event as CustomEvent<PlanOpenDetail>).detail;
+      event.preventDefault();
+      setOpenPlan({ title, body, markdown });
+    };
+
     const onRun = (event: Event) => {
       const { status } = (event as CustomEvent<RunChangeDetail>).detail;
       const active = ["queued", "running", "waiting_input", "waiting_permission"].includes(status);
@@ -190,7 +201,9 @@ export function BuilderPage() {
     el.addEventListener("dataagent-draft-change", onDraft);
     el.addEventListener("dataagent-complete", onComplete);
     el.addEventListener("dataagent-error", onError);
+    el.addEventListener("dataagent-plan-open", onPlanOpen);
     return () => {
+      el.removeEventListener("dataagent-plan-open", onPlanOpen);
       el.removeEventListener("dataagent-run-change", onRun);
       el.removeEventListener("dataagent-draft-change", onDraft);
       el.removeEventListener("dataagent-complete", onComplete);
@@ -245,6 +258,13 @@ export function BuilderPage() {
     el.showAttachments = false;
     el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current(sendState.current.mode)).id}/agent-conversation`;
   }, [workspace.id]);
+  // Modeling plans before it writes: the plan switch starts on. Daily mode
+  // only asks questions, so it has no switch.
+  useLayoutEffect(() => {
+    const el = conversation.current;
+    if (!el) return;
+    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: true } } : {};
+  }, [mode]);
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
@@ -258,11 +278,6 @@ export function BuilderPage() {
         note={session ? "最近保存: " + new Date(session.updated_at).toLocaleString("zh-CN", { hour12: false }) : "尚未开始"}
       />
       <PageBody>
-        {/* A modeling run that ended with questions instead of a result. The
-          conversation's own run label only says the turn finished. */}
-        {!running && session?.result_state === "awaiting_reply" && (
-          <Alert type="info" showIcon role="status" message={session.task_detail} />
-        )}
         <div className="flex min-h-0 flex-1 gap-4">
           {mode === "model" && <Panel fill className={collapsed ? "max-w-16" : "max-w-64 2xl:max-w-80"}>
             <PanelToolbar>
@@ -468,7 +483,7 @@ export function BuilderPage() {
                     </>} />
                 </Flex>
               )}
-              <div slot="composer-actions" className="flex w-full min-w-0 items-center gap-2">
+              <div slot="composer-actions" className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="min-w-0 flex-1" />
                 {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
                   <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
@@ -478,7 +493,9 @@ export function BuilderPage() {
           </Panel>
           {mode === "model" && (
             <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
-              <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />
+              {openPlan
+                ? <PlanPanel plan={openPlan} onClose={() => setOpenPlan(null)} />
+                : <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />}
             </div>
           )}
         </div>

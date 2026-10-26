@@ -506,9 +506,6 @@
     }
   },
   "protocols": [
-    "protocol/needs-input.json",
-    "protocol/needs-input-entities.json",
-    "protocol/needs-input-issues.json",
     "protocol/entities.json",
     "protocol/issues.json"
   ],

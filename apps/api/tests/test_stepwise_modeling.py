@@ -17,15 +17,6 @@ from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 from ontofoundry_api.services.modeling_input import scenario_facts
 
-EXAMPLES = (
-    Path(__file__).resolve().parents[3]
-    / "integrations/dataagent/shared/references/examples/protocol"
-)
-PRIOR = {
-    "plan_md": "场景：全量\n虚构订单与会员",
-    "entities": {"items": [{"name": "fictional_order", "display_name": "虚构订单"}]},
-}
-
 
 def set_row(client, session_id, **values):
     with client.app.state.session_factory() as db:
@@ -54,61 +45,22 @@ def downloads(monkeypatch, files):
     return paths
 
 
-@pytest.mark.parametrize("protocol", ["needs-input-entities", "needs-input-issues"])
-def test_awaiting_reply_saves_confirmed_plan_and_new_protocol(
-    client, monkeypatch, protocol
-):
-    session, manifest = proposals_run(client)
-    marker = json.loads((EXAMPLES / f"{protocol}.json").read_bytes())
-    marker["run_token"] = RUN_TOKEN
-    plan = deepcopy(PRIOR)
-    if protocol.endswith("issues"):
-        plan.pop("entities")
-        plan["issues"] = json.loads((EXAMPLES / "issues.json").read_bytes())
-    files = {
-        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json": marker,
-        "modeling/plan.md": plan["plan_md"].encode(),
-    }
-    files.update(
-        {f"modeling/{key}.json": value for key, value in plan.items() if key != "plan_md"}
+def test_finished_run_without_result_fails_and_ignores_old_marker(client, monkeypatch):
+    # Questions and plan approval now happen inside the run; a leftover
+    # needs-input file from an older skill is not a reason to wait.
+    session, _ = proposals_run(client)
+    paths = downloads(
+        monkeypatch,
+        {f"output/ontofoundry-needs-input-{RUN_TOKEN}.json": {"run_token": RUN_TOKEN, "questions": ["请确认范围"]}},
     )
-    paths = downloads(monkeypatch, files)
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    current = row(client, session["id"])
-    assert current.run_manifest_json == {**manifest, "prior_plan": plan}
-    assert current.task_status == "finished"
-    assert paths[-3:] == [
-        "modeling/plan.md",
-        "modeling/entities.json",
-        "modeling/issues.json",
-    ]
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert len(paths) == 5
-
-
-def test_plan_download_503_does_not_prevent_awaiting_reply(client, monkeypatch):
-    session, manifest = proposals_run(client)
-    files = {
-        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json": {
-            "run_token": RUN_TOKEN,
-            "questions": ["请确认虚构实体"],
-        }
-    }
-    files.update(
-        {
-            f"modeling/{name}": DataAgentError("unavailable", status_code=503)
-            for name in ("plan.md", "entities.json", "issues.json")
-        }
-    )
-    downloads(monkeypatch, files)
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert row(client, session["id"]).run_manifest_json == manifest
-    assert "prior_plan" not in row(client, session["id"]).run_manifest_json
+    assert reconcile(client, session["id"]) == "failed_permanent"
+    assert not any("needs-input" in path for path in paths)
+    assert "没有产出提案" in row(client, session["id"]).task_detail
 
 
 @pytest.fixture
 def fake_agent(client, monkeypatch):
-    uploads, prompts = {}, []
+    uploads, prompts, delivered = {}, [], []
 
     class FakeAgent:
         async def create_topic(self, *_):
@@ -122,18 +74,23 @@ def fake_agent(client, monkeypatch):
 
         async def deliver(self, **kwargs):
             prompts.append(kwargs["content"])
+            delivered.append(kwargs)
             return {"task_id": f"fictional-task-{len(prompts)}", "task_status": "running"}
 
     monkeypatch.setattr(agent_conversation, "_client", lambda *_: FakeAgent())
     monkeypatch.setattr(agent_conversation, "_require_configured", lambda *_: None)
     client.app.state.settings.modeling_result_contract = "proposals"
+    fake_agent_deliveries.clear()
+    fake_agent_deliveries.extend([delivered])
     return uploads, prompts
 
+fake_agent_deliveries: list[list[dict]] = []
 
-def send(client, session_id, mode="model"):
+
+def send(client, session_id, mode="model", settings=None):
     response = client.post(
         ROOT + f"/sessions/{session_id}/agent-conversation/messages",
-        json={"content": "确认虚构订单范围", "metadata": {"mode": mode}},
+        json={"content": "确认虚构订单范围", "metadata": {"mode": mode}, **({"settings": settings} if settings else {})},
     )
     assert response.status_code == 202, response.text
     return row(client, session_id).run_manifest_json
@@ -143,68 +100,37 @@ def work_pack(uploads, manifest):
     return json.loads(uploads[manifest["input_files"]["work_pack"]])
 
 
-def test_next_run_uploads_prior_bundle_and_third_run_drops_it(
-    client, monkeypatch, fake_agent
-):
+@pytest.mark.parametrize(
+    ("settings", "expected"),
+    [({"permission_mode": "plan"}, "plan"), ({"permission_mode": "default"}, "default"), (None, "default")],
+)
+def test_plan_switch_reaches_dataagent(client, fake_agent, settings, expected):
     session, _ = proposals_run(client)
-    downloads(
-        monkeypatch,
-        {
-            f"output/ontofoundry-needs-input-{RUN_TOKEN}.json": {
-                "run_token": RUN_TOKEN,
-                "questions": ["请确认范围"],
-            },
-            "modeling/plan.md": PRIOR["plan_md"].encode(),
-            "modeling/entities.json": PRIOR["entities"],
-        },
-    )
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    uploads, prompts = fake_agent
-    manifest = send(client, session["id"])
-    pack = work_pack(uploads, manifest)
-    prior_path = f"inputs/ontofoundry-prior-plan-{manifest['run_token']}.json"
-    assert pack["prior_plan_file"] == prior_path
-    assert json.loads(uploads[prior_path]) == PRIOR
-    assert pack["workflow_dir"] == "modeling/"
-    assert "prior_plan" not in manifest
-    assert "工作流：modeling/" in prompts[-1]
-    assert prompts[-1].endswith("确认虚构订单范围")
     set_row(client, session["id"], task_status="finished", result_state="done")
-    manifest = send(client, session["id"])
-    assert "prior_plan_file" not in work_pack(uploads, manifest)
-    assert "prior_plan" not in manifest
-    assert len([p for p in uploads if "ontofoundry-prior-plan-" in p]) == 1
-
-
-@pytest.mark.parametrize("state", ["done", "failed_permanent", ""])
-def test_model_only_uses_plan_after_awaiting_reply(client, fake_agent, state):
-    session, manifest = proposals_run(client)
-    set_row(
-        client,
-        session["id"],
-        run_manifest_json={**manifest, "prior_plan": PRIOR},
-        result_state=state,
-    )
-    uploads, _ = fake_agent
-    current = send(client, session["id"])
-    assert "prior_plan_file" not in work_pack(uploads, current)
-    assert not any("ontofoundry-prior-plan-" in p for p in uploads)
-
-
-def test_chat_does_not_upload_or_reference_confirmed_plan(client, fake_agent):
-    session, manifest = proposals_run(client)
-    set_row(
-        client,
-        session["id"],
-        result_state="awaiting_reply",
-        run_manifest_json={**manifest, "prior_plan": PRIOR},
-        mode="chat",
-    )
     uploads, prompts = fake_agent
-    current = send(client, session["id"], "chat")
-    assert "prior_plan" not in current and "input_files" not in current
-    assert not any("prior-plan" in p or "work-pack" in p for p in uploads)
-    assert "工作流：modeling/" not in prompts[-1]
+    manifest = send(client, session["id"], settings=settings)
+    assert fake_agent_deliveries[0][-1]["permission_mode"] == expected
+    pack = work_pack(uploads, manifest)
+    assert "needs_input_file" not in pack and "prior_plan_file" not in pack
+    assert "待确认" not in prompts[-1]
+    assert "工作流：modeling/" in prompts[-1]
+
+
+def test_chat_never_plans(client, fake_agent):
+    session, _ = proposals_run(client)
+    set_row(client, session["id"], task_status="finished", result_state="done", mode="chat")
+    send(client, session["id"], "chat", settings={"permission_mode": "plan"})
+    assert fake_agent_deliveries[0][-1]["permission_mode"] is None
+
+
+def test_unknown_permission_mode_is_rejected(client, fake_agent):
+    session, _ = proposals_run(client)
+    set_row(client, session["id"], task_status="finished", result_state="done")
+    response = client.post(
+        ROOT + f"/sessions/{session['id']}/agent-conversation/messages",
+        json={"content": "确认虚构订单范围", "settings": {"permission_mode": "bypassPermissions"}},
+    )
+    assert response.status_code == 422
 
 
 def test_scenario_facts_first_then_added_material_and_table_are_in_pack(

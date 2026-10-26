@@ -886,7 +886,10 @@ def test_request_schema_has_no_revision_and_sanitizes_metadata(client, monkeypat
 
     schema = client.get("/openapi.json").json()
     request_schema = schema["components"]["schemas"]["ConversationMessageRequest"]
-    assert set(request_schema["properties"]) == {"content", "metadata"}
+    # The plan switch is the only composer setting the BFF accepts.
+    assert set(request_schema["properties"]) == {"content", "metadata", "settings"}
+    # A chat session never plans, whatever the composer sent.
+    assert "permission_mode" not in delivered[0]
 
 
 def test_files_proxy_bytes_and_content_type(client, monkeypatch):

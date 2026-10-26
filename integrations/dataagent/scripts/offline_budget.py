@@ -314,7 +314,7 @@ def byte_report():
             "scope": "同一完整工作包和材料，不裁剪；实际完整目标回读量按任务另计",
         }
     # The plan route is retained for comparison. Extraction now has its own
-    # complete input fixture, including prior plan, material and physical columns.
+    # complete input fixture, including the approved plan, material and physical columns.
     fixed = len(system_body.encode()) + len(prompt.encode()) + len(encode(pack))
     stepwise = {
         "第一步（计划）": (
@@ -344,7 +344,6 @@ def byte_report():
         extract_context, extract_materials,
         context_file="inputs/context.json", schema_file="inputs/schema.json",
         tables=extract_tables, tables_file="inputs/tables.json",
-        prior_plan_file="inputs/prior-plan.json",
         scenario_facts={"draft_empty": True},
     )
     if extract_pages:
@@ -369,7 +368,7 @@ def byte_report():
         "收尾步骤": resource("references/steps/finish.md").read_bytes(),
         "工作包": encode(extract_pack),
         "带原行号材料": (render_lines(extract_material.decode()) + "\n").encode(),
-        "前轮计划": (fixture / "prior-plan.json").read_bytes(),
+        "已批准计划": (fixture / "approved-plan.json").read_bytes(),
         "表结构": (render_tables(json.dumps({"tables": extract_tables}), ",".join(t["key"] for t in extract_tables)) + "\n").encode(),
         "原则": resource("references/principles.md").read_bytes(),
         **{f"写法包/{name}": (kit / name).read_bytes() for name in ["guide.md", "values.json", "01.json", "02.json", "03.json", "04.json", "05.json"]},
@@ -468,7 +467,6 @@ def byte_report():
     combined_pack, combined_pages = build_work_pack(
         combined_context, combined_materials,
         context_file="inputs/context.json", schema_file="inputs/schema.json",
-        prior_plan_file="inputs/combined-plan.json",
     )
     if combined_pages:
         raise ValueError("组合预算样本不应分页")
@@ -492,7 +490,7 @@ def byte_report():
         "实例步骤": resource("references/steps/facts.md").read_bytes(),
         "收尾步骤": resource("references/steps/finish.md").read_bytes(),
         "工作包": encode(combined_pack), "带原行号材料": render_lines(combined_material.decode()).encode(),
-        "前轮计划": resource("tests/fixtures/combined-plan.json").read_bytes(),
+        "已批准计划": resource("tests/fixtures/combined-plan.json").read_bytes(),
         "原则": resource("references/principles.md").read_bytes(),
         "实例方法": resource("references/extract-facts.md").read_bytes(),
         "实例正例": resource("references/examples/facts.json").read_bytes(),

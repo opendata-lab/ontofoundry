@@ -330,8 +330,8 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] not in prompt
     token = manifest["run_token"]
     assert pack["result_file"] == f"output/ontofoundry-result-{token}.json"
-    assert pack["needs_input_file"] == f"output/ontofoundry-needs-input-{token}.json"
-    assert pack["needs_input_file"] in prompt and pack["result_file"] in prompt
+    assert "needs_input_file" not in pack and "待确认" not in prompt
+    assert pack["result_file"] in prompt
     assert "questions" not in prompt and "结果头" not in prompt
     assert session["base_version_id"] == pack["run"]["base_version_id"]
     assert "ofrun." not in prompt
@@ -414,55 +414,12 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
     assert manifest["materials"][0]["path"] == f"inputs/{material['id']}-a.md"
 
 
-def test_proposals_run_with_needs_input_marker_asks_for_a_reply(client, monkeypatch):
-    session, _ = proposals_run(client)
-    paths = install_download(
-        monkeypatch,
-        [
-            DataAgentError("missing", status_code=404),
-            {"run_token": RUN_TOKEN, "questions": ["需要包含哪些业务对象？"]},
-        ],
-    )
-
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    current = row(client, session["id"])
-    assert current.task_status == "finished"
-    assert current.task_detail == "智能体需要你确认后才能生成提案，请在对话中回复"
-    assert stored(client, session["id"])[0] == []
-    detail = client.get(ROOT + "/sessions/" + session["id"]).json()
-    assert detail["result_state"] == "awaiting_reply"
-    assert detail["task_detail"] == current.task_detail
-
-    assert reconcile(client, session["id"]) == "awaiting_reply"
-    assert paths == [
-        f"output/ontofoundry-result-{RUN_TOKEN}.json",
-        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
-        "modeling/plan.md",
-        "modeling/entities.json",
-        "modeling/issues.json",
-    ]
-
-
-@pytest.mark.parametrize(
-    "marker",
-    [
-        pytest.param(DataAgentError("missing marker", status_code=404), id="missing"),
-        pytest.param(b"not json", id="invalid-json"),
-        pytest.param(
-            {"run_token": "previous-round", "questions": ["是否继续？"]},
-            id="wrong-token",
-        ),
-        pytest.param({"run_token": RUN_TOKEN, "questions": []}, id="empty-questions"),
-        pytest.param({"run_token": RUN_TOKEN, "questions": ["   "]}, id="blank-question"),
-        pytest.param({"run_token": RUN_TOKEN, "questions": [1]}, id="non-string-question"),
-    ],
-)
-def test_proposals_run_without_valid_marker_fails_permanently(client, monkeypatch, marker):
+def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
+    # Questions and plan approval happen inside the run, so a finished run
+    # without a result file produced nothing and nothing is waiting.
     session, _ = proposals_run(client)
     before = row(client, session["id"])
-    paths = install_download(
-        monkeypatch, [DataAgentError("missing", status_code=404), marker]
-    )
+    paths = install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     current = row(client, session["id"])
@@ -476,12 +433,10 @@ def test_proposals_run_without_valid_marker_fails_permanently(client, monkeypatc
     assert current.candidates_json == before.candidates_json
     assert current.revision == before.revision
     assert stored(client, session["id"])[0] == []
-    detail = client.get(ROOT + "/sessions/" + session["id"]).json()
-    assert detail["result_state"] == "failed_permanent"
-    assert detail["task_detail"] == current.task_detail
 
     assert reconcile(client, session["id"]) == "failed_permanent"
-    assert paths[2:] == [
+    assert not any("needs-input" in path for path in paths)
+    assert paths[1:] == [
         "modeling/plan.md",
         "modeling/notes.md",
         "modeling/parts/01-types.json",
@@ -489,38 +444,6 @@ def test_proposals_run_without_valid_marker_fails_permanently(client, monkeypatc
         "modeling/parts/03-datasets.json",
         "modeling/parts/04-metrics-rules.json",
         "modeling/parts/05-facts.json",
-    ]
-
-
-@pytest.mark.parametrize("status_code", [408, 425, 429, 500, 502, 503])
-def test_proposals_marker_download_error_is_retriable(client, monkeypatch, status_code):
-    session, _ = proposals_run(client)
-    before = row(client, session["id"])
-    paths = install_download(
-        monkeypatch,
-        [
-            DataAgentError("missing", status_code=404),
-            DataAgentError("marker unavailable", status_code=status_code),
-            result(before.run_manifest_json, []),
-        ],
-    )
-
-    assert reconcile(client, session["id"]) == "failed_retriable"
-    current = row(client, session["id"])
-    assert current.result_state == "failed_retriable"
-    assert current.task_status == "finished"
-    assert current.task_detail == "建模结果下载暂时失败，等待重试：marker unavailable"
-    assert current.draft_json == before.draft_json
-    assert current.candidates_json == before.candidates_json
-    assert current.revision == before.revision
-    assert stored(client, session["id"])[0] == []
-
-    assert reconcile(client, session["id"]) == "done"
-    assert reconcile(client, session["id"]) == "done"
-    assert paths == [
-        f"output/ontofoundry-result-{RUN_TOKEN}.json",
-        f"output/ontofoundry-needs-input-{RUN_TOKEN}.json",
-        f"output/ontofoundry-result-{RUN_TOKEN}.json",
     ]
 
 
@@ -582,8 +505,6 @@ def test_local_and_platform_repairs_share_two_rounds(client, monkeypatch, local_
         batch = result(current, some_items(session["draft"]))
         batch["items"][2]["expected_target_hash"] = "0" * 64
         content = json.dumps(batch, ensure_ascii=False).encode()
-        if "needs-input" in rel_path:
-            raise DataAgentError("missing", status_code=404)
         if "budget" in rel_path:
             return json.dumps(
                 {
@@ -621,7 +542,7 @@ def test_local_and_platform_repairs_share_two_rounds(client, monkeypatch, local_
             )
             assert contexts[-1]["schema_file"] == "inputs/schema.json"
             assert contexts[-1]["result_file"].endswith(f"{after.dataagent_run_token}.json")
-            assert contexts[-1]["needs_input_file"] in sent[-1]
+            assert contexts[-1]["result_file"] in sent[-1]
             assert contexts[-1]["run"]["source_draft_sha256"] not in sent[-1]
             task_id = after.dataagent_task_id
             with client.app.state.session_factory() as db:

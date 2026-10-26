@@ -75,9 +75,16 @@ router = APIRouter(
 )
 
 
+class ConversationSettings(BaseModel):
+    # The composer's plan switch. Other composer settings (model, provider)
+    # are DataAgent's to choose and are ignored here.
+    permission_mode: Literal["plan", "default"] | None = None
+
+
 class ConversationMessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=12000)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    settings: ConversationSettings = Field(default_factory=ConversationSettings)
 
 
 class CancelRequest(BaseModel):
@@ -793,13 +800,8 @@ async def send_message(
         if entry.get("path")
     }
     # The previous run, read before the claim replaces its manifest: its
-    # confirmed plan and inputs are the baseline for this run's facts.
+    # inputs are the baseline for this run's facts.
     previous_manifest = dict(item.run_manifest_json or {})
-    prior_plan = (
-        previous_manifest.get("prior_plan")
-        if mode == "model" and item.result_state == "awaiting_reply"
-        else None
-    )
     # Everything this run is pinned to. The claim below bumps the revision,
     # so the run's source revision is the one after it.
     manifest = {
@@ -981,15 +983,6 @@ async def send_message(
             )
             tables_file = material_path_by_id[table_receipt.id] if table_receipt is not None else None
             facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
-            prior_plan_file = None
-            if prior_plan:
-                uploaded_plan = await dataagent.upload(
-                    topic_id,
-                    f"ontofoundry-prior-plan-{run_token}.json",
-                    encode(prior_plan),
-                    "application/json",
-                )
-                prior_plan_file = str(uploaded_plan.get("rel_path") or "")
             pack, pages = build_work_pack(
                 fixed_context,
                 material_indices,
@@ -1000,7 +993,6 @@ async def send_message(
                 tables=table_catalog,
                 tables_file=tables_file,
                 scenario_facts=facts,
-                prior_plan_file=prior_plan_file,
             )
             work_pack_file = await upload_work_pack(
                 dataagent, topic_id, run_token, pack, pages
@@ -1051,6 +1043,9 @@ async def send_message(
             content=prompt,
             agent_id=request.app.state.settings.dataagent_agent_id,
             execution_mode=request.app.state.settings.dataagent_execution_mode,
+            # Plan mode is a modeling choice: the agent submits its plan and
+            # waits for approval inside the same run.
+            permission_mode=(body.settings.permission_mode or "default") if mode == "model" else None,
         )
         task_id = str(submitted.get("task_id") or "")
         if not task_id:

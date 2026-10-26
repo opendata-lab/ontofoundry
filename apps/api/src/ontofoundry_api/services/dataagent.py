@@ -207,18 +207,18 @@ class DataAgentClient:
         content: str,
         agent_id: str,
         execution_mode: str,
+        permission_mode: str | None = None,
     ) -> dict[str, Any]:
-        return await self._json(
-            "POST",
-            f"{self.prefix}/tasks/deliver-message",
-            json_body={
-                "topic_id": topic_id,
-                "content": content,
-                "agent_id": agent_id,
-                "execution_mode": execution_mode,
-                "debug": False,
-            },
-        )
+        body: dict[str, Any] = {
+            "topic_id": topic_id,
+            "content": content,
+            "agent_id": agent_id,
+            "execution_mode": execution_mode,
+            "debug": False,
+        }
+        if permission_mode:
+            body["permission_mode"] = permission_mode
+        return await self._json("POST", f"{self.prefix}/tasks/deliver-message", json_body=body)
 
     async def task(self, task_id: str) -> dict[str, Any]:
         return await self._json("GET", f"{self.prefix}/tasks/{task_id}")
@@ -317,7 +317,6 @@ def proposal_instructions(
         f"工作包：{work_pack_file}\n"
         f"run_token：{run_token}\n"
         f"结果：output/ontofoundry-result-{run_token}.json\n"
-        f"待确认：output/ontofoundry-needs-input-{run_token}.json\n"
         "工作流：modeling/\n"
         # Real runs spent their first turns listing directories and reading the
         # context and schema in full; the skill entry already says where to start.

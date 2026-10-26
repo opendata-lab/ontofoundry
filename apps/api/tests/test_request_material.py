@@ -81,7 +81,7 @@ def test_repeated_request_confirmation_and_cross_session_reuse(client, fake_agen
     first = create_session(client)
     assert send(client, first["id"]).status_code == 202
     for content in (REQUEST, "确认", "重试"):
-        set_row(client, first["id"], task_status="finished", result_state="awaiting_reply")
+        set_row(client, first["id"], task_status="finished", result_state="done")
         assert send(client, first["id"], content).status_code == 202
     second = create_session(client)
     assert send(client, second["id"]).status_code == 202

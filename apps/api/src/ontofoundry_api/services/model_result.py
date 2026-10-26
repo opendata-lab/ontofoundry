@@ -6,7 +6,6 @@ import hashlib
 import json
 import logging
 import secrets
-from contextlib import suppress
 from datetime import timedelta
 from typing import Any
 
@@ -104,7 +103,6 @@ def _finish_failure(
 # Stepwise modeling keeps intermediate files in the agent workspace under
 # modeling/ (harness design §11 items 14/15).
 WORKFLOW_DIR = "modeling/"
-PLAN_FILES = ("plan.md", "entities.json", "issues.json")
 PART_FILES = tuple(
     "parts/" + name
     for name in (
@@ -115,24 +113,7 @@ PART_FILES = tuple(
         "05-facts.json",
     )
 )
-PLAN_LIMIT = 16 * 1024
 EXCERPT_LIMIT = 4 * 1024
-
-
-def parse_questions(content: bytes, run_token: str) -> list[str] | None:
-    """This run's questions as plain text; None unless the marker is for this run."""
-    marker = None
-    with suppress(UnicodeDecodeError, json.JSONDecodeError, TypeError):
-        marker = json.loads(content)
-    if not (
-        isinstance(marker, dict)
-        and marker.get("run_token") == run_token
-        and isinstance(marker.get("questions"), list)
-        and marker["questions"]
-        and all(isinstance(q, str) and q.strip() for q in marker["questions"])
-    ):
-        return None
-    return [q.strip() for q in marker["questions"]]
 
 
 async def _optional_download(client: DataAgentClient, topic_id: str, path: str) -> bytes | None:
@@ -148,27 +129,6 @@ async def _optional_download(client: DataAgentClient, topic_id: str, path: str) 
 
 def _text(content: bytes, limit: int) -> str:
     return content[:limit].decode("utf-8", "ignore")
-
-
-async def saved_plan(client: DataAgentClient, topic_id: str) -> dict[str, Any] | None:
-    """The plan the user is asked to confirm, kept for the next run."""
-    plan: dict[str, Any] = {}
-    for name in PLAN_FILES:
-        content = await _optional_download(client, topic_id, WORKFLOW_DIR + name)
-        if content is None:
-            continue
-        if name == "plan.md":
-            plan["plan_md"] = _text(content, PLAN_LIMIT)
-            continue
-        with suppress(UnicodeDecodeError, json.JSONDecodeError):
-            plan[name.removesuffix(".json")] = json.loads(content)
-    if not plan:
-        return None
-    for name in ("issues", "entities"):
-        if len(encode(plan)) > PLAN_LIMIT and name in plan:
-            plan.pop(name)
-            plan["truncated"] = True
-    return plan
 
 
 async def workflow_diagnostics(client: DataAgentClient, topic_id: str) -> list[dict[str, Any]]:
@@ -423,60 +383,18 @@ async def reconcile_run(
         )
     except DataAgentError as exc:
         if exc.status_code == 404:
-            # Only an explicit marker for this run means the agent is waiting.
-            needs_input_path = f"output/ontofoundry-needs-input-{run_token}.json"
-            marker = None
-            try:
-                marker_content, _ = await _client(app, workspace_id, session_id).download(
-                    topic_id, needs_input_path
-                )
-            except DataAgentError as marker_exc:
-                if _is_retriable_download(marker_exc.status_code):
-                    return _finish_failure(
-                        app,
-                        session_id,
-                        task_id,
-                        claimed_at,
-                        state="failed_retriable",
-                        detail=f"建模结果下载暂时失败，等待重试：{marker_exc}",
-                    )
-                if marker_exc.status_code != 404:
-                    return _finish_failure(
-                        app,
-                        session_id,
-                        task_id,
-                        claimed_at,
-                        state="failed_permanent",
-                        detail=_permanent_detail(marker_exc),
-                    )
-            else:
-                marker = parse_questions(marker_content, run_token)
-
-            what = "提案"
-            if marker is None:
-                return await _fail_with_workflow(
-                    app,
-                    workspace_id,
-                    session_id,
-                    task_id,
-                    claimed_at,
-                    topic_id=topic_id,
-                    manifest=manifest,
-                    detail=f"建模没有产出{what}：智能体结束时没有写入结果文件，请重试或换个说法描述需求",
-                )
-            # The entity list or issue list the user confirms is reused next run.
-            plan = await saved_plan(_client(app, workspace_id, session_id), topic_id)
-            if _guarded_result_values(
+            # Questions and plan approval happen inside the run (DataAgent's
+            # cards), so a finished run without a result produced nothing.
+            return await _fail_with_workflow(
                 app,
+                workspace_id,
                 session_id,
                 task_id,
                 claimed_at,
-                result_state="awaiting_reply",
-                task_detail=f"智能体需要你确认后才能生成{what}，请在对话中回复",
-                **({"run_manifest_json": {**manifest, "prior_plan": plan}} if plan else {}),
-            ):
-                return "awaiting_reply"
-            return _current_result_state(app, session_id)
+                topic_id=topic_id,
+                manifest=manifest,
+                detail="建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求",
+            )
         if _is_retriable_download(exc.status_code):
             return _finish_failure(
                 app,
@@ -534,8 +452,6 @@ async def _consume_proposals(
         draft=manifest["pinned_draft"],
         instance_baseline=manifest.get("instance_baseline", {}),
     )
-    # Questions belong in the agent's reply. A needs-input file left beside a
-    # result is not read: it must never cost the proposals.
     budget_failure = None
     if manifest.get("repair_budget_required"):
         try:

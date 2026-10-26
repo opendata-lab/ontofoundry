@@ -11,3 +11,4 @@ export type RunChangeDetail =
 export type CompleteDetail =
   AgentConversationEventMap["dataagent-complete"]["detail"];
 export type ErrorDetail = AgentConversationEventMap["dataagent-error"]["detail"];
+export type PlanOpenDetail = AgentConversationEventMap["dataagent-plan-open"]["detail"];

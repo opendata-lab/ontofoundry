@@ -68,35 +68,12 @@ def test_init_template_is_idempotent_and_preserves_all_existing_files(
     } == before
 
 
-@pytest.mark.parametrize("existing", [False, True])
-def test_init_restores_prior_plan_without_overwriting(tmp_path, monkeypatch, existing):
+def test_init_has_no_prior_plan_to_restore(tmp_path, monkeypatch):
+    # The plan is approved inside the run; nothing carries over between runs.
     monkeypatch.chdir(tmp_path)
     pack = write_json(tmp_path / "pack.json", {})
-    prior = {
-        "plan_md": "场景：全量\n已确认范围",
-        "entities": {"items": [{"name": "fictional_order"}]},
-        "issues": {"items": []},
-    }
-    bundle = write_json(tmp_path / "prior.json", prior)
-    root = tmp_path / "modeling"
-    root.mkdir()
-    if existing:
-        for name in ("plan.md", "entities.json", "issues.json", "notes.md"):
-            (root / name).write_text("已有文件")
-    assert (
-        invoke(monkeypatch, init_workflow, "--work-pack", pack, "--prior-plan", bundle)
-        == 0
-    )
-    if existing:
-        assert all(
-            (root / name).read_text() == "已有文件"
-            for name in ("plan.md", "entities.json", "issues.json", "notes.md")
-        )
-    else:
-        assert (root / "plan.md").read_text() == prior["plan_md"]
-        for name in ("entities", "issues"):
-            assert json.loads((root / f"{name}.json").read_bytes()) == prior[name]
-        assert (root / "notes.md").is_file()
+    with pytest.raises(SystemExit):
+        invoke(monkeypatch, init_workflow, "--work-pack", pack, "--prior-plan", "plan.json")
 
 
 def mapping_example():
@@ -338,19 +315,15 @@ def test_show_example_with_deps_rejects_multiple_kinds():
 
 
 def test_new_protocol_examples_are_registered():
-    names = {"needs-input-entities", "needs-input-issues", "entities", "issues"}
+    names = {"entities", "issues"}
     assert {f"protocol/{name}.json" for name in names} <= set(CATALOG["protocols"])
+    assert not [name for name in CATALOG["protocols"] if "needs-input" in name]
     assert CATALOG["future_topics"] == {}
     for name in names:
         value = json.loads(
             (SKILL / f"references/examples/protocol/{name}.json").read_bytes()
         )
-        if name.startswith("needs-input"):
-            assert value["run_token"] == "example"
-            assert isinstance(value["questions"], list) and value["questions"]
-            assert all(isinstance(q, str) and q.strip() for q in value["questions"])
-        else:
-            assert isinstance(value["items"], list) and value["items"]
+        assert isinstance(value["items"], list) and value["items"]
 
 
 def test_stepwise_routes_and_updated_limits_pass():
@@ -361,7 +334,7 @@ def test_stepwise_routes_and_updated_limits_pass():
     assert report["limits"]["系统正文"]["limit"] == 450
     combined = report["routes"]["定义与实例组合"]
     assert combined["limit"] == 36000 and combined["pass"]
-    assert {"技能入口", "实例技能入口", "抽取步骤", "实例步骤", "收尾步骤", "工作包", "带原行号材料", "前轮计划", "实例方法", "实例正例"} <= combined["components"].keys()
+    assert {"技能入口", "实例技能入口", "抽取步骤", "实例步骤", "收尾步骤", "工作包", "带原行号材料", "已批准计划", "实例方法", "实例正例"} <= combined["components"].keys()
     assert combined["bytes"] == sum(c["bytes"] for c in combined["components"].values())
     for name, limit in (("第一步（计划）", 15500), ("第二步（抽取）", 36000)):
         route = report["routes"][name]
@@ -371,7 +344,7 @@ def test_stepwise_routes_and_updated_limits_pass():
         assert report["limits"][name]["pass"]
     route = report["routes"]["第二步（抽取）"]
     components = route["components"]
-    assert {"工作包", "带原行号材料", "前轮计划", "表结构", "原则", "技能入口"} <= components.keys()
+    assert {"工作包", "带原行号材料", "已批准计划", "表结构", "原则", "技能入口"} <= components.keys()
     assert {f"写法包/{name}" for name in ("guide.md", "values.json", "01.json", "02.json", "03.json", "04.json", "05.json")} <= components.keys()
     assert route["bytes"] == sum(c["bytes"] for c in components.values())
     assert route["estimated_rounds"]["normal"] == [9, 11]
