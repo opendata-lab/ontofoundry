@@ -1,11 +1,9 @@
 """Share proposal diagnostics between preflight and result ingestion."""
 
-from sqlalchemy import select
 
 from ontofoundry_api.contracts.proposal_checks import (
     ProposalCheckError,
     ProposalCheckResponse,
-    ProposalRunNotice,
     UnacceptableGroup,
 )
 from ontofoundry_api.contracts.proposals import (
@@ -13,10 +11,8 @@ from ontofoundry_api.contracts.proposals import (
     RunContext,
     parse_result,
 )
-from ontofoundry_api.db_models import ProposalBatchRecord, ProposalItemRecord
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.materials_lookup import material_lookup
-from ontofoundry_api.services.run_status import TERMINAL_RUN_STATUSES
 
 
 def context_from_manifest(manifest):
@@ -82,44 +78,3 @@ def check_result(db, settings, manifest, raw):
         reviewable_count=len(parsed.items) - count,
         unacceptable_count=count,
     )
-
-
-def run_notice(db, session):
-    if session.task_status not in TERMINAL_RUN_STATUSES or not session.dataagent_run_token:
-        return None
-    batch = db.scalar(
-        select(ProposalBatchRecord).where(
-            ProposalBatchRecord.workspace_id == session.workspace_id,
-            ProposalBatchRecord.session_id == session.id,
-            ProposalBatchRecord.run_token == session.dataagent_run_token,
-        )
-    )
-    items = (
-        list(
-            db.scalars(
-                select(ProposalItemRecord).where(ProposalItemRecord.batch_id == batch.id)
-            )
-        )
-        if batch
-        else []
-    )
-    blocked = [i for i in items if i.status == "unacceptable"]
-    if session.task_status != "failed" and not blocked:
-        return None
-    reasons = list(dict.fromkeys(i.status_reason for i in blocked if i.status_reason))
-    if not reasons:
-        reasons = (
-            [message]
-            if batch and (message := (batch.error_json or {}).get("message"))
-            else []
-        )
-    summary = (
-        "；".join(reasons[:3]) or session.task_detail or "本轮运行失败，未生成可审提案"
-    )
-    return ProposalRunNotice(
-        run_token=session.dataagent_run_token,
-        batch_id=batch.id if batch else None,
-        summary=summary,
-        affected_count=len(blocked) if blocked else len(items),
-        reviewable_count=len(items) - len(blocked),
-    ).model_dump()

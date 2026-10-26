@@ -26,10 +26,3 @@ class ProposalCheckResponse(Strict):
     reviewable_count: int = Field(ge=0)
     unacceptable_count: int = Field(ge=0)
 
-
-class ProposalRunNotice(Strict):
-    run_token: str
-    batch_id: str | None = None
-    summary: str
-    affected_count: int = Field(ge=0)
-    reviewable_count: int = Field(ge=0)

@@ -227,34 +227,13 @@ it("preserves a scenario while toggling the configuration panel", async () => {
   await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
 });
 
-it("shows the platform reason in the conversation and retries only 重试 in model mode", async () => {
-  context.model.session = { ...session(), task_status: "finished", proposal_notice: {
-    run_token: "fictional-run", batch_id: "fictional-batch", summary: "目标连接列不是唯一属性或完整标识", affected_count: 2, reviewable_count: 3,
-  } };
+it("shows a failed run only in the conversation, without a platform message or retry", async () => {
+  context.model.session = { ...session(), task_status: "failed", task_detail: "提案结果被拒收：目标连接列不是唯一属性" };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  const retry = await screen.findByRole("button", { name: "重试" });
-  await waitFor(() => expect(retry).toBeEnabled());
-  expect(screen.getByText("3 条可审，2 条受影响。")).toBeInTheDocument();
-  expect(screen.getByText("平台消息")).toBeInTheDocument();
-  expect(container.querySelector('[slot="composer-overlay"]')).toHaveTextContent("目标连接列");
-  fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), { target: { value: "另一个场景" } });
-  const conversation = container.querySelector("dataagent-conversation") as AgentConversationElement;
-  const sendMessage = vi.fn();
-  Object.defineProperty(conversation, "sendMessage", { value: sendMessage });
-  fireEvent.click(retry);
-  expect(conversation.value).toBe("重试");
-  expect(sendMessage).toHaveBeenCalledWith("重试", { metadata: { mode: "model" } });
-});
-
-
-it("shows only the failure reason and retry when this run has no batch", async () => {
-  context.model.session = { ...session(), latest_batch_id: "previous-batch", task_status: "failed", proposal_notice: {
-    run_token: "fictional-run", batch_id: null, summary: "修正次数已用完", affected_count: 0, reviewable_count: 0,
-  } };
-  renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  expect(await screen.findByText("修正次数已用完")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "重试" })).toBeInTheDocument();
-  expect(screen.queryByText(/条可审，.*条受影响/)).toBeNull();
+  await screen.findByRole("button", { name: "发送" });
+  expect(container.querySelector('[slot="composer-overlay"]')).toBeNull();
+  expect(screen.queryByText("平台消息")).toBeNull();
+  expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
 });
 
 it("switches an unstarted session's mode and shows chat without builder side panels", async () => {

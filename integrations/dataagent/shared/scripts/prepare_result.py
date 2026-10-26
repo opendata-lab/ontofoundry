@@ -254,8 +254,13 @@ def platform_check(pack, batch, candidate, retry_command):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
 
+    check_file = pack.get("platform_check_file") or pack.get("mcp_config_file")
+    if not check_file:
+        # Offline use without a platform: nothing to ask, say so.
+        print(notice("PLATFORM_CHECK_SKIPPED", "工作包没有平台检查配置，只做了本地检查"))
+        return True
     try:
-        config = json.loads(Path(pack.get("platform_check_file") or pack["mcp_config_file"]).read_bytes())
+        config = json.loads(Path(check_file).read_bytes())
         parts = urlsplit(config["url"])
         expected = (
             "/api/v1/ontology/workspaces/"
@@ -326,23 +331,26 @@ def platform_check(pack, batch, candidate, retry_command):
                 )
             )
             return False
+        # The result is only written once the platform has checked it.
         print(
-            notice(
-                "PLATFORM_CHECK_SKIPPED",
+            error(
+                "PLATFORM_CHECK_UNAVAILABLE",
                 f"平台暂时不可达（HTTP {exc.code}），未完成平台检查",
-                retry_command,
+                "最终文件未替换",
+                f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台检查不可用",
             )
         )
-        return True
+        return False
     except (OSError, ValueError, KeyError, TypeError, URLError) as exc:
         print(
-            notice(
-                "PLATFORM_CHECK_SKIPPED",
+            error(
+                "PLATFORM_CHECK_UNAVAILABLE",
                 f"平台检查未执行或未完成（{type(exc).__name__}），不能确认候选图合法",
-                retry_command,
+                "最终文件未替换",
+                f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台检查不可用",
             )
         )
-        return True
+        return False
     report_path = candidate.with_suffix(".platform-check.json")
     atomic_write(report_path, encode(report))
     if report["passed"]:
@@ -370,6 +378,11 @@ def main():
     parser.add_argument("--schema")
     parser.add_argument("--output")
     parser.add_argument("--repair", action="store_true")
+    parser.add_argument(
+        "--drop-unacceptable",
+        action="store_true",
+        help="修正两轮后仍有不可接受的提案组时，去掉这些组再交平台检查，其余照常交付",
+    )
     parser.add_argument(
         "fragments",
         nargs="*",
@@ -490,10 +503,43 @@ def main():
         )
     )
     if not platform_check(pack, batch, candidate, retry_command):
-        return 1
+        dropped = drop_unacceptable(batch, candidate) if args.drop_unacceptable else None
+        if not dropped or not platform_check(pack, batch, candidate, retry_command):
+            return 1
+        print(
+            notice(
+                "UNACCEPTABLE_DROPPED",
+                f"已去掉不可接受的提案组 {'、'.join(dropped)}，其余提案通过平台检查",
+                "在回答中列出这些未交付项和原因",
+            )
+        )
     atomic_write(output, candidate.read_bytes())
     print(f"已保存最终结果：{relative(output)}；等待平台入库与用户审核")
     return 0
+
+
+def drop_unacceptable(batch, candidate):
+    """Remove the groups the platform reported unacceptable; their client_refs, or None.
+
+    Only whole groups the report names by client_ref are removed. A contract
+    error, or a group without client_refs, cannot be dropped this way.
+    """
+    try:
+        report = json.loads(candidate.with_suffix(".platform-check.json").read_bytes())
+    except (OSError, ValueError):
+        return None
+    groups = report.get("unacceptable_groups") or []
+    refs = {ref for group in groups for ref in group.get("client_refs") or [] if ref}
+    if report.get("contract_errors") or not groups or not refs or any(
+        not group.get("client_refs") for group in groups
+    ):
+        return None
+    kept = [item for item in batch["items"] if item.get("client_ref") not in refs]
+    if not kept or len(kept) == len(batch["items"]):
+        return None
+    batch["items"] = kept
+    atomic_write(candidate, encode(batch))
+    return sorted(refs)
 
 
 if __name__ == "__main__":

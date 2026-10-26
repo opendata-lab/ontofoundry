@@ -223,50 +223,33 @@ def test_a_new_batch_supersedes_older_pending_items_on_the_same_target(client, m
     assert [i.status for i in new] == ["pending"]
 
 
-def test_a_rejected_result_is_handed_back_for_repair(client, monkeypatch):
-    async def upload(self, topic_id, name, data, media_type):
-        return {"rel_path": "inputs/" + name}
-
-    monkeypatch.setattr(DataAgentClient, "upload", upload)
-
+def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch):
+    # The run checked its result with the platform before writing it; a
+    # rejection at ingestion ends the run with the reason instead of starting
+    # another model turn.
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["items"][2]["expected_target_hash"] = "0" * 64
     install_download(monkeypatch, [bad])
-    sent: list[str] = []
 
-    async def deliver(self, **kwargs):
-        sent.append(kwargs["content"])
-        return {"task_id": "task-repair"}
+    async def forbidden(self, **kwargs):
+        pytest.fail("入库拒收不再发起修复运行")
 
-    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
+    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
 
-    assert reconcile(client, session["id"]) == ""
+    assert reconcile(client, session["id"]) == "failed_permanent"
     after = row(client, session["id"])
-    assert after.dataagent_task_id == "task-repair"
-    assert after.run_manifest_json["run_token"] == after.dataagent_run_token != RUN_TOKEN
-    assert "TARGET_HASH_MISMATCH" in sent[0]
-    assert (
-        after.dataagent_run_token in sent[0]
-    )  # The new dynamic entry points carry the token.
-    assert stored(client, session["id"])[0] == []
+    assert after.dataagent_task_id == TASK_ID and after.dataagent_run_token == RUN_TOKEN
+    assert "TARGET_HASH_MISMATCH" in after.task_detail or "提案结果被拒收" in after.task_detail
+    (batch,), items, _ = stored(client, session["id"])
+    assert batch.status == "failed" and items == []
 
 
-def test_a_rejected_result_without_repair_is_kept_as_a_failed_batch(client, monkeypatch):
-    async def upload(self, topic_id, name, content, media_type):
-        return {"rel_path": "inputs/" + name}
-
-    monkeypatch.setattr(DataAgentClient, "upload", upload)
-
+def test_a_rejected_result_is_kept_as_a_failed_batch(client, monkeypatch):
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["run_token"] = "wrong"
     install_download(monkeypatch, [bad])
-
-    async def refuse(self, **_kwargs):
-        raise DataAgentError("unavailable")
-
-    monkeypatch.setattr(DataAgentClient, "deliver", refuse)
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     (batch,), items, _ = stored(client, session["id"])
@@ -324,7 +307,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert pack["run"] == context["run"]
     assert pack["execution"]["repair_used"] == 0
     assert pack["elements"] and len(json.dumps(pack, ensure_ascii=False).encode()) < 8192
-    assert manifest["repair_budget_required"] is True
+    assert "repair_budget_required" not in manifest and "repair_used" not in manifest
     assert "ontofoundry.proposals.v1.schema.json" in uploads
     (prompt,) = prompts
     assert manifest["run_token"] in prompt and manifest["source_draft_sha256"] not in prompt
@@ -447,13 +430,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     ]
 
 
-@pytest.mark.parametrize("repair", [True, False])
-def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch, repair):
-    async def upload(self, topic_id, name, data, media_type):
-        return {"rel_path": "inputs/" + name}
-
-    monkeypatch.setattr(DataAgentClient, "upload", upload)
-
+def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
     from ontofoundry_api.services import model_result
 
     session, manifest = proposals_run(client)
@@ -462,158 +439,15 @@ def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch, r
     def broken(*args, **kwargs):
         raise KeyError("client_ref")
 
-    sent = []
-
-    async def deliver(self, **kwargs):
-        sent.append(kwargs["content"])
-        if not repair:
-            raise DataAgentError("unavailable")
-        return {"task_id": "task-repair"}
+    async def forbidden(self, **kwargs):
+        pytest.fail("入库拒收不再发起修复运行")
 
     monkeypatch.setattr(model_result, "parse_result", broken)
-    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
-    assert reconcile(client, session["id"]) == ("" if repair else "failed_permanent")
-    assert "RESULT_VALIDATION_FAILED" in sent[0]
+    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
+    assert reconcile(client, session["id"]) == "failed_permanent"
     assert row(client, session["id"]).draft_json == session["draft"]
     batches, items, _ = stored(client, session["id"])
     assert items == []
-    if repair:
-        assert batches == []
-        assert row(client, session["id"]).dataagent_task_id == "task-repair"
-    else:
-        assert batches[0].error_json["code"] == "RESULT_VALIDATION_FAILED"
+    assert batches[0].error_json["code"] == "RESULT_VALIDATION_FAILED"
 
 
-@pytest.mark.parametrize("local_used", [0, 1, 2])
-def test_local_and_platform_repairs_share_two_rounds(client, monkeypatch, local_used):
-    import hashlib
-
-    session, manifest = proposals_run(client)
-    manifest.update(
-        repair_used=0,
-        repair_budget_required=True,
-        input_files={"schema": "inputs/schema.json", "materials": []},
-    )
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
-        db.commit()
-    sent, contexts = [], []
-    current_used = local_used
-
-    async def download(self, topic_id, rel_path):
-        current = row(client, session["id"]).run_manifest_json
-        batch = result(current, some_items(session["draft"]))
-        batch["items"][2]["expected_target_hash"] = "0" * 64
-        content = json.dumps(batch, ensure_ascii=False).encode()
-        if "budget" in rel_path:
-            return json.dumps(
-                {
-                    "run_token": current["run_token"],
-                    "used": current_used,
-                    "result_sha256": hashlib.sha256(content).hexdigest(),
-                }
-            ).encode(), "application/json"
-        return content, "application/json"
-
-    async def upload(self, topic_id, name, content, media_type):
-        contexts.append(json.loads(content))
-        return {"rel_path": "inputs/" + name}
-
-    async def deliver(self, **kwargs):
-        sent.append(kwargs["content"])
-        return {"task_id": f"repair-{len(sent)}"}
-
-    monkeypatch.setattr(DataAgentClient, "download", download)
-    monkeypatch.setattr(DataAgentClient, "upload", upload)
-    monkeypatch.setattr(DataAgentClient, "deliver", deliver)
-    task_id = TASK_ID
-    for used in range(local_used, 3):
-        current_used = used
-        state = reconcile(client, session["id"], task_id)
-        assert state == ("" if used < 2 else "failed_permanent")
-        if used < 2:
-            after = row(client, session["id"])
-            assert after.run_manifest_json["repair_used"] == used + 1
-            assert contexts[-1]["execution"]["repair_used"] == used + 1
-            assert contexts[-1]["run"]["run_token"] == after.dataagent_run_token
-            assert contexts[-2]["draft"] == session["draft"]
-            assert contexts[-1]["context_file"].endswith(
-                f"{after.dataagent_run_token}.json"
-            )
-            assert contexts[-1]["schema_file"] == "inputs/schema.json"
-            assert contexts[-1]["result_file"].endswith(f"{after.dataagent_run_token}.json")
-            assert contexts[-1]["result_file"] in sent[-1]
-            assert contexts[-1]["run"]["source_draft_sha256"] not in sent[-1]
-            task_id = after.dataagent_task_id
-            with client.app.state.session_factory() as db:
-                db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
-                db.commit()
-    assert len(sent) == 2 - local_used
-    assert row(client, session["id"]).draft_json == session["draft"]
-    assert stored(client, session["id"])[0][-1].status == "failed"
-
-
-@pytest.mark.parametrize(
-    "ledger",
-    [
-        None,
-        {"used": 0, "run_token": "old", "result_sha256": "a" * 64},
-        {"used": 3, "run_token": RUN_TOKEN, "result_sha256": "a" * 64},
-    ],
-)
-def test_missing_stale_or_exhausted_budget_cannot_trigger_deliver(
-    client, monkeypatch, ledger
-):
-    session, manifest = proposals_run(client)
-    manifest.update(repair_used=0, repair_budget_required=True)
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
-        db.commit()
-    install_download(
-        monkeypatch,
-        [result(manifest, []), DataAgentError("missing", status_code=404), ledger],
-    )
-
-    async def forbidden(self, **kwargs):
-        pytest.fail("计数失效不得自动调用模型")
-
-    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
-    assert reconcile(client, session["id"]) == "failed_permanent"
-    assert (
-        stored(client, session["id"])[0][-1].error_json["code"] == "REPAIR_BUDGET_INVALID"
-    )
-
-
-@pytest.mark.parametrize("transient", [False, True])
-def test_valid_budget_acceptance_and_transient_ledger_download(
-    client, monkeypatch, transient
-):
-    import hashlib
-
-    session, manifest = proposals_run(client)
-    manifest.update(repair_used=0, repair_budget_required=True)
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = manifest
-        db.commit()
-    content = json.dumps(
-        result(manifest, some_items(session["draft"])), ensure_ascii=False
-    ).encode()
-    ledger = {
-        "run_token": RUN_TOKEN,
-        "used": 2,
-        "result_sha256": hashlib.sha256(content).hexdigest(),
-    }
-    values = [content, ledger]
-    if transient:
-        values = [content, DataAgentError("暂态故障", status_code=503), *values]
-    paths = install_download(monkeypatch, values)
-
-    async def forbidden(self, **kwargs):
-        pytest.fail("有效结果或暂态下载不应请求模型")
-
-    monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
-    if transient:
-        assert reconcile(client, session["id"]) == "failed_retriable"
-    assert reconcile(client, session["id"]) == "done"
-    assert len(paths) == (4 if transient else 2)
-    assert len(stored(client, session["id"])[1]) == 3

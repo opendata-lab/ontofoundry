@@ -1,6 +1,6 @@
 # 抽取：按已确认的范围展开
 
-概念清单已获批准（modeling/entities.json）。按清单展开属性、关系、数据集、映射、指标、规则和实例，不再改范围；清单外的新概念写进回答的未交付项，留待下次确认。
+概念清单已获批准（modeling/entities.json）。按清单展开属性、关系、数据集、映射、指标、规则和实例，不再改范围；“已有”概念用 show_element 取 id 引用，只为“新增”写 create；清单外的新概念写进回答的未交付项，留待下次确认。
 
 1. 批量读齐 modeling/plan.md 与 entities.json（已读的不重读）、材料（`read_input.py <材料>` 保留行号）、列（照初始化打印的分批读表命令，每批一次）。
 2. 同回合读 principles.md，分别执行 `show_example.py --guide`、`--values`、`--part 01` 至 `--part 05`。不按业务选包；已读的示例、表结构和计划步骤不重读。

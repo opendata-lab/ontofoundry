@@ -123,7 +123,7 @@ def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, pla
 
 @pytest.mark.parametrize(
     "status,allowed,code",
-    [(401, False, "PLATFORM_CHECK_REJECTED"), (503, True, "PLATFORM_CHECK_SKIPPED")],
+    [(401, False, "PLATFORM_CHECK_REJECTED"), (503, False, "PLATFORM_CHECK_UNAVAILABLE")],
 )
 def test_platform_http_errors_are_explicit(
     tmp_path, monkeypatch, capsys, platform, status, allowed, code
@@ -193,12 +193,13 @@ def test_main_preserves_final_result_when_platform_rejects(
 def test_invalid_platform_reply_never_claims_a_pass(
     tmp_path, monkeypatch, capsys, platform, report
 ):
+    # No usable check means no result: the platform is the gate before output.
     origin, handler = platform
     handler.report = report
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
-    assert prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
+    assert not prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "提示 [PLATFORM_CHECK_SKIPPED]" in output and "平台检查通过" not in output
+    assert "错误 [PLATFORM_CHECK_UNAVAILABLE]" in output and "平台检查通过" not in output
 
 
 def test_the_platform_check_file_alone_is_enough(tmp_path, monkeypatch, capsys, platform):
@@ -207,3 +208,39 @@ def test_the_platform_check_file_alone_is_enough(tmp_path, monkeypatch, capsys, 
     _, batch, candidate = inputs(tmp_path, monkeypatch, origin)
     assert prepare.platform_check({"platform_check_file": "mcp.json"}, batch, candidate, "retry")
     assert handler.requests and "平台检查通过" in capsys.readouterr().out
+
+
+def test_unacceptable_groups_can_be_dropped_and_the_rest_delivered(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    batch = {"items": [{"client_ref": "a"}, {"client_ref": "b"}, {"client_ref": "c"}]}
+    candidate = Path("candidate.json")
+    candidate.write_text(json.dumps(batch))
+    report = {
+        "passed": False,
+        "contract_errors": [],
+        "unacceptable_groups": [{"client_refs": ["a", "b"], "reason": "英文标识重复"}],
+        "reviewable_count": 1,
+        "unacceptable_count": 2,
+    }
+    Path("candidate.platform-check.json").write_text(json.dumps(report))
+    assert prepare.drop_unacceptable(batch, candidate) == ["a", "b"]
+    assert json.loads(candidate.read_text())["items"] == [{"client_ref": "c"}]
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        {"contract_errors": [{"message": "契约错误"}], "unacceptable_groups": [{"client_refs": ["a"]}]},
+        {"contract_errors": [], "unacceptable_groups": [{"client_refs": []}]},
+        {"contract_errors": [], "unacceptable_groups": [{"client_refs": ["a", "b", "c"]}]},
+    ],
+)
+def test_contract_errors_or_unnamed_groups_are_never_dropped(tmp_path, monkeypatch, report):
+    monkeypatch.chdir(tmp_path)
+    batch = {"items": [{"client_ref": "a"}, {"client_ref": "b"}, {"client_ref": "c"}]}
+    candidate = Path("candidate.json")
+    candidate.write_text(json.dumps(batch))
+    Path("candidate.platform-check.json").write_text(json.dumps(report))
+    assert prepare.drop_unacceptable(batch, candidate) is None
+    assert len(json.loads(candidate.read_text())["items"]) == 3
+

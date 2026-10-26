@@ -11,10 +11,7 @@ from test_t1_proposal_contract import context, create, parse
 from test_t1_proposal_contract import result as contract_result
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 
-from ontofoundry_api.contracts.proposal_checks import (
-    ProposalCheckResponse,
-    ProposalRunNotice,
-)
+from ontofoundry_api.contracts.proposal_checks import ProposalCheckResponse
 from ontofoundry_api.db_models import ModelingSessionRecord, ProposalBatchRecord
 from ontofoundry_api.services.run_credentials import RunGrant, issue
 
@@ -54,9 +51,8 @@ def test_partial_ingestion_persists_diagnostics_and_refuses_acceptance(client, m
     detail = client.get(path + f"/proposal-batches/{batches[0].id}").json()
     assert detail["counts"]["unacceptable"] == 2
     assert detail["items"][0]["status_reason"] == items[0].status_reason
-    notice = client.get(path).json()["proposal_notice"]
-    assert notice["affected_count"] == 2 and notice["reviewable_count"] == 1
-    assert notice["batch_id"] == batches[0].id
+    # Unacceptable proposals are seen in the proposals panel, not in a side notice.
+    assert "proposal_notice" not in client.get(path).json()
     refused = client.post(
         path + "/proposal-decisions",
         json={
@@ -164,10 +160,7 @@ def test_check_honors_run_mcp_authorization(client, scope):
 
 def test_check_schemas_are_generated_from_models():
     root = Path(__file__).resolve().parents[1] / "src/ontofoundry_api/contracts"
-    for model, name in [
-        (ProposalCheckResponse, "proposal-check"),
-        (ProposalRunNotice, "proposal-run-notice"),
-    ]:
+    for model, name in [(ProposalCheckResponse, "proposal-check")]:
         schema = json.loads((root / f"ontofoundry.{name}.v1.schema.json").read_text())
         schema.pop("$schema")
         assert schema == model.model_json_schema()
@@ -300,18 +293,13 @@ def test_proposal_reason_migration_preserves_existing_items():
     engine.dispose()
 
 
-def test_failed_run_without_a_batch_still_has_a_conversation_notice(client):
-    session, manifest = proposals_run(client)
+def test_failed_run_is_reported_by_its_status_not_a_notice(client):
+    session, _ = proposals_run(client)
     with client.app.state.session_factory() as db:
         record = db.get(ModelingSessionRecord, session["id"])
         record.task_status = "failed"
         record.task_detail = "本轮没有写出结果文件"
         db.commit()
-    notice = client.get(ROOT + f"/sessions/{session['id']}").json()["proposal_notice"]
-    assert notice == {
-        "run_token": manifest["run_token"],
-        "summary": "本轮没有写出结果文件",
-        "affected_count": 0,
-        "reviewable_count": 0,
-        "batch_id": None,
-    }
+    detail = client.get(ROOT + f"/sessions/{session['id']}").json()
+    assert "proposal_notice" not in detail
+    assert detail["task_status"] == "failed" and detail["task_detail"] == "本轮没有写出结果文件"

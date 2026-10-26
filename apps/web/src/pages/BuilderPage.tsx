@@ -1,5 +1,5 @@
 import { ArrowUp, Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Flex, Input, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
+import { Alert, Button, Checkbox, Dropdown, Input, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { modelingApi } from "../api/client";
 import type { Capabilities, Material, SessionMode } from "../api/types";
@@ -114,12 +114,6 @@ export function BuilderPage() {
     void el.sendMessage(el.value.trim() || (mode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
       metadata: { mode },
     });
-  };
-  const retry = () => {
-    const el = conversation.current;
-    if (!el) return;
-    el.value = "重试";
-    void el.sendMessage("重试", { metadata: { mode: "model" } });
   };
   const changeMode = (next: SessionMode) => {
     setNewMode(next);
@@ -473,16 +467,6 @@ export function BuilderPage() {
               element would clear itself and reload for no reason. */}
             <dataagent-conversation ref={conversation} placeholder={mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
               <BuilderConversationEmpty mode={mode} />
-              {!running && session?.proposal_notice && (
-                <Flex className="builder-platform-message" slot="composer-overlay">
-                  <Alert type="warning" showIcon role="status" message="平台消息"
-                    description={<>
-                      {session.proposal_notice.batch_id && <Typography.Paragraph className="m-0">{session.proposal_notice.reviewable_count} 条可审，{session.proposal_notice.affected_count} 条受影响。</Typography.Paragraph>}
-                      <Typography.Paragraph className="m-0" ellipsis={{ rows: 3, expandable: true, symbol: "展开原因" }}>{session.proposal_notice.summary}</Typography.Paragraph>
-                      <Button size="small" disabled={blocked || !!session.abandoned_at} onClick={retry}>重试</Button>
-                    </>} />
-                </Flex>
-              )}
               <div slot="composer-actions" className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="min-w-0 flex-1" />
                 {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>

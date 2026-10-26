@@ -1069,7 +1069,7 @@ def test_stale_first_submit_without_topic_is_released_and_can_retry(client, monk
     assert retried.json()["task_id"] == "task-retry"
 
 
-def test_old_event_stream_closes_without_completing_a_new_task(client, monkeypatch):
+def test_old_event_stream_ends_with_its_own_task_and_leaves_the_new_one(client, monkeypatch):
     _configure(client)
     session = _create_session(client)
     _set_session(
@@ -1101,7 +1101,9 @@ def test_old_event_stream_closes_without_completing_a_new_task(client, monkeypat
     response = client.get(_endpoint(session["id"]) + "/events")
     assert response.status_code == 200, response.text
     assert ": ping\n\n" in response.text
-    assert "event: done" not in response.text
+    # The old stream ends cleanly, naming only its own task; the new run is untouched.
+    done = response.text.split("event: done\ndata: ", 1)[1].split("\n\n", 1)[0]
+    assert json.loads(done)["task_id"] == "task-old"
     row = _session_row(client, session["id"])
     assert row.dataagent_task_id == "task-new"
     assert row.task_status == "running"

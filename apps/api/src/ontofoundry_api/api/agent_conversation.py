@@ -383,8 +383,8 @@ def _persist_task_projection(
             and current.result_state
             and current.result_state != "processing"
         ):
-            # The settled result owns status and detail (waiting for a reply,
-            # rejected, done); a later poll must not reset them to "finished".
+            # The settled result owns status and detail (rejected, done); a
+            # later poll must not reset them to "finished".
             values = {"dataagent_task_id": task_id}
         changed = db.execute(
             update(ModelingSessionRecord)
@@ -815,8 +815,6 @@ async def send_message(
         "source_session_revision": expected_revision + 1,
         "source_draft_sha256": draft_sha256(draft),
         "materials": [{"id": m.id, "sha256": m.sha256} for m in materials],
-        "repair_used": 0,
-        "repair_budget_required": mode == "model",
         "producer": {
             "agent_id": request.app.state.settings.dataagent_agent_id,
             # The agent picks among its mounted skills per task.
@@ -1137,6 +1135,10 @@ def _data_payload(frame: str) -> str | None:
     return "\n".join(lines) if lines else None
 
 
+def _done_frame(run: dict[str, Any]) -> str:
+    return "event: done\ndata: " + json.dumps(run, ensure_ascii=False, separators=(",", ":")) + "\n\n"
+
+
 @router.get("/events")
 async def events(
     workspace_id: str,
@@ -1194,9 +1196,18 @@ async def events(
                 detail=_detail(upstream_status, task.get("error")),
             )
             if status is None:
-                # This stream belongs to an older generation. Closing it without
-                # a terminal event prevents the SDK from completing the new run
-                # with the old task id/status.
+                # A newer run owns the session. End this task's stream with its
+                # own status rather than cutting it: an EOF without a terminal
+                # frame reads as an interrupted stream. The SDK closes only
+                # this task's turn and keeps the newer run.
+                yield _done_frame(
+                    _run_ref(
+                        task_id,
+                        to_run_status(upstream_status),
+                        mode=mode,
+                        detail=_detail(upstream_status, task.get("error")),
+                    )
+                )
                 return
             if upstream_status in ACTIVE_TASK_STATUSES:
                 delay = 0.25 if saw_event else reconnect_delay
@@ -1218,8 +1229,16 @@ async def events(
                 if current is not None:
                     if current.dataagent_task_id != task_id:
                         # Result reconciliation can outlive the generation it
-                        # started on. Never complete its successor from this
-                        # old task's event stream.
+                        # started on. Report this task's own end; the SDK
+                        # leaves its successor alone.
+                        yield _done_frame(
+                            _run_ref(
+                                task_id,
+                                to_run_status(upstream_status),
+                                mode=mode,
+                                detail=_detail(upstream_status, task.get("error")),
+                            )
+                        )
                         return
                     status = current.task_status
                     detail = current.task_detail
@@ -1232,11 +1251,7 @@ async def events(
                 mode=mode,
                 detail=detail,
             )
-            yield (
-                "event: done\ndata: "
-                + json.dumps(run, ensure_ascii=False, separators=(",", ":"))
-                + "\n\n"
-            )
+            yield _done_frame(run)
             return
 
     return StreamingResponse(

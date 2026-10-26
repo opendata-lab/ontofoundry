@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
-import secrets
 from datetime import timedelta
 from typing import Any
 
@@ -19,22 +17,7 @@ from ontofoundry_api.contracts.proposals import (
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
 from ontofoundry_api.services.materials_lookup import material_lookup
-from ontofoundry_api.services.model_review import (
-    build_proposal_repair_request,
-)
-from ontofoundry_api.services.modeling_input import (
-    build_work_pack,
-    encode,
-    execution_input,
-    upload_work_pack,
-)
-from ontofoundry_api.services.proposals import (
-    proposal_context,
-    store_batch,
-    store_failed_batch,
-)
-from ontofoundry_api.services.run_credentials import RunGrant, access_file
-from ontofoundry_api.services.run_credentials import issue as issue_run_credential
+from ontofoundry_api.services.proposals import store_batch, store_failed_batch
 
 logger = logging.getLogger(__name__)
 
@@ -169,144 +152,6 @@ async def _fail_with_workflow(
     if _guarded_result_values(app, session_id, task_id, claimed_at, **values):
         return "failed_permanent"
     return _current_result_state(app, session_id)
-
-
-async def _request_repair(
-    app: Any,
-    workspace_id: str,
-    session_id: str,
-    task_id: str,
-    claimed_at,
-    *,
-    topic_id: str,
-    problems: list[str],
-    manifest: dict[str, Any] | None = None,
-) -> str | None:
-    """Hand the complaints back to the agent and let it produce a fix.
-
-    Returns the new result-state on success, or None when the caller should fall
-    through to its own ending — no topic, or DataAgent refused the turn. Failing
-    to ask must never be worse than not trying: the original outcome still
-    applies.
-
-    The claim is released only after DataAgent accepts the follow-up, so a
-    refusal leaves the lease exactly as it was.
-    """
-    if not topic_id or not problems or (manifest or {}).get("repair_used", 0) >= 2:
-        return None
-
-    next_token = secrets.token_hex(16)
-    next_manifest = (
-        {
-            **manifest,
-            "run_token": next_token,
-            "repair_used": manifest.get("repair_used", 0) + 1,
-        }
-        if manifest
-        else None
-    )
-    if next_manifest is None:
-        return None
-    try:
-        client = _client(app, workspace_id, session_id)
-        files = next_manifest.get("input_files", {})
-        if not files.get("schema") or "materials" not in files:
-            return None
-        if files.get("mcp") or files.get("run_access"):
-            metadata = files.get("mcp_access")
-            if not metadata:
-                return None
-            credential = issue_run_credential(
-                app.state.settings.session_secret,
-                RunGrant(
-                    workspace_id=workspace_id,
-                    session_id=session_id,
-                    run_token=next_token,
-                    version_id=next_manifest.get("base_version_id"),
-                    user_id=metadata["user_id"],
-                ),
-            )
-            uploaded_mcp = await client.upload(
-                topic_id,
-                f"ontofoundry-mcp-{next_token}.json",
-                encode(
-                    access_file(
-                        {
-                            "url": metadata["url"],
-                            "version_id": next_manifest.get("base_version_id"),
-                            "credential": credential,
-                        }
-                    )
-                ),
-                "application/json",
-            )
-            files = {
-                **files,
-                "run_access": uploaded_mcp["rel_path"],
-                **({"mcp": uploaded_mcp["rel_path"]} if files.get("mcp") else {}),
-            }
-        context = proposal_context(next_manifest, next_manifest["pinned_draft"])
-        context["execution"] = execution_input(next_token, next_manifest["repair_used"])
-        uploaded = await client.upload(
-            topic_id,
-            f"ontofoundry-context-{next_token}.json",
-            encode(context),
-            "application/json",
-        )
-        pack, pages = build_work_pack(
-            context,
-            files["materials"],
-            context_file=uploaded["rel_path"],
-            schema_file=files["schema"],
-            mcp_config_file=files.get("mcp"),
-            platform_check_file=files.get("run_access"),
-            tables=files.get("tables"),
-            tables_file=files.get("tables_file"),
-            scenario_facts=files.get("scenario_facts"),
-        )
-        work_pack_file = await upload_work_pack(client, topic_id, next_token, pack, pages)
-        next_manifest["input_files"] = {
-            **files,
-            "context": uploaded["rel_path"],
-            "work_pack": work_pack_file,
-        }
-        content = build_proposal_repair_request(
-            problems,
-            run_token=next_token,
-            work_pack_file=work_pack_file,
-            repair_used=next_manifest["repair_used"],
-        )
-        submitted = await client.deliver(
-            topic_id=topic_id,
-            content=content,
-            agent_id=app.state.settings.dataagent_agent_id,
-            execution_mode=app.state.settings.dataagent_execution_mode,
-        )
-    except DataAgentError:
-        return None
-
-    next_task_id = str(submitted.get("task_id") or "")
-    if not next_task_id:
-        return None
-
-    # The new task becomes the session's run. `last_result_task_id` stays on the
-    # task being abandoned so this result is never consumed again, and
-    # result_state clears so the next reconcile can claim the new one.
-    if not _guarded_result_values(
-        app,
-        session_id,
-        task_id,
-        claimed_at,
-        dataagent_task_id=next_task_id,
-        dataagent_run_token=next_token,
-        **({"run_manifest_json": next_manifest} if next_manifest else {}),
-        result_state="",
-        result_claimed_at=None,
-        task_status="running",
-        task_detail="结果未通过校验，已把问题交回 DataAgent 修正",
-    ):
-        return _current_result_state(app, session_id)
-    return ""
 
 
 def _permanent_detail(exc: DataAgentError) -> str:
@@ -452,44 +297,9 @@ async def _consume_proposals(
         draft=manifest["pinned_draft"],
         instance_baseline=manifest.get("instance_baseline", {}),
     )
-    budget_failure = None
-    if manifest.get("repair_budget_required"):
-        try:
-            ledger_bytes, _ = await _client(app, workspace_id, session_id).download(
-                topic_id, execution_input(manifest["run_token"])["budget_file"]
-            )
-            ledger = json.loads(ledger_bytes)
-            used = ledger["used"]
-            if (
-                ledger["run_token"] != manifest["run_token"]
-                or type(used) is not int
-                or not manifest.get("repair_used", 0) <= used <= 2
-                or ledger["result_sha256"] != hashlib.sha256(content).hexdigest()
-            ):
-                raise ValueError("invalid correction ledger")
-            manifest = {**manifest, "repair_used": used}
-        except DataAgentError as exc:
-            if _is_retriable_download(exc.status_code):
-                return _finish_failure(
-                    app,
-                    session_id,
-                    task_id,
-                    claimed_at,
-                    state="failed_retriable",
-                    detail="修正计数下载暂时失败，等待重试",
-                )
-            budget_failure = ProposalContractError(
-                "REPAIR_BUDGET_INVALID", "修正计数缺失，无法继续本轮"
-            )
-        except (ValueError, KeyError, TypeError, AttributeError):
-            budget_failure = ProposalContractError(
-                "REPAIR_BUDGET_INVALID", "修正计数缺失、过期或耗尽，请结束本轮"
-            )
     with app.state.session_factory() as db:
         lookup = material_lookup(db, app.state.settings, workspace_id)
         try:
-            if budget_failure:
-                raise budget_failure
             parsed = parse_result(content, context, material_lookup=lookup)
         except ProposalContractError as exc:
             parsed, failure = None, exc
@@ -502,18 +312,9 @@ async def _consume_proposals(
                 ),
             )
     if parsed is None:
-        repaired = await _request_repair(
-            app,
-            workspace_id,
-            session_id,
-            task_id,
-            claimed_at,
-            topic_id=topic_id,
-            problems=[f"{failure.code}：{failure}"],
-            manifest={**manifest, "repair_used": 2} if budget_failure else manifest,
-        )
-        if repaired is not None:
-            return repaired
+        # The run checked its result with the platform before writing it, so a
+        # rejection here is not something another model turn should paper over:
+        # the run ends with the reason.
         with app.state.session_factory() as db:
             current = db.scalar(
                 select(ModelingSessionRecord)

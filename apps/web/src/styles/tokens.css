@@ -484,11 +484,3 @@
 .table-detail-info .ant-descriptions-row > td { padding-bottom: var(--space-md); }
 .data-tables-step { height: var(--data-tables-step-height); overflow: auto; }
 
-/* Platform diagnostics stay with the conversation above its composer. */
-.builder-platform-message {
-  padding: var(--space-sm) var(--builder-conversation-padding);
-}
-.builder-platform-message .ant-alert {
-  width: 100%;
-  min-width: 0;
-}

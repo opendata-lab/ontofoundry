@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from ontofoundry_api.contracts.connections import ConnectionInUseResponse
-from ontofoundry_api.contracts.proposal_checks import ProposalCheckResponse, ProposalRunNotice
+from ontofoundry_api.contracts.proposal_checks import ProposalCheckResponse
 from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
 from ontofoundry_api.contracts.exports import exports_schema
@@ -77,7 +77,7 @@ def export(*, check=False):
             raise SystemExit("接口读模型 schema 与模型不一致，请重新生成")
     else:
         READ_TARGET.write_text(read_payload)
-    for model, name in ((ProposalCheckResponse, "proposal-check"), (ProposalRunNotice, "proposal-run-notice")):
+    for model, name in ((ProposalCheckResponse, "proposal-check"),):
         target = Path(__file__).with_name(f"ontofoundry.{name}.v1.schema.json")
         schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", **model.model_json_schema()}
         payload = json.dumps(schema, ensure_ascii=False, indent=2) + "\n"
