@@ -30,6 +30,8 @@ const CONVERSATION = [
   "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 
+const SETTLED_RUN = ["finished", "failed", "cancelled", "suspended"];
+
 const MODES: Record<SessionMode, { label: string; note: string }> = {
   model: { label: "建模模式", note: "构建和完善本体模型" },
   chat: { label: "日常模式", note: "基于本体模型提问" },
@@ -78,9 +80,27 @@ export function BuilderPage() {
   // still a live run, and treating it as idle would unlock editing mid-run.
   const [running, setRunning] = useState(false);
   const wasRunning = useRef(false);
+  // A modeling run's proposals are settled when the session is next read, a
+  // few seconds after the conversation ends. Until that read lands, the
+  // results column keeps saying proposals are on their way.
+  const [settling, setSettling] = useState(false);
   const proposals = useProposals(session, setSession, model.reload);
   const reloadProposals = proposals.reload;
   const reloadModel = model.reload;
+  // Whether the latest modeling run's result is still on its way, from the
+  // session itself so a page refresh shows it too.
+  const resultPending = mode === "model" && (settling || ["processing", "failed_retriable"].includes(session?.result_state ?? ""));
+  useEffect(() => {
+    if (!resultPending) return;
+    const settled = !!session && SETTLED_RUN.includes(session.task_status) && !["processing", "failed_retriable"].includes(session.result_state ?? "");
+    if (settled || error) {
+      setSettling(false);
+      return;
+    }
+    // Still being turned into proposals: look again shortly.
+    const timer = window.setTimeout(reloadModel, 3000);
+    return () => window.clearTimeout(timer);
+  }, [resultPending, session, error, reloadModel]);
   // A stale proposal is re-modelled by the user, not automatically: fill the
   // composer and focus it, never send.
   const remodel = (text: string) => {
@@ -173,6 +193,7 @@ export function BuilderPage() {
     const onComplete = (event: Event) => {
       setRunning(false);
       wasRunning.current = false;
+      if (sendState.current.mode === "model") setSettling(true);
       // Reload on any terminal state: a modeling result is stored (a new
       // proposal batch, or a replaced draft for a legacy run) before
       // completion is reported.
@@ -479,7 +500,7 @@ export function BuilderPage() {
             <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
               {openPlan
                 ? <PlanPanel plan={openPlan} onClose={() => setOpenPlan(null)} />
-                : <ModelResults session={session} proposals={proposals} running={running} busy={busy || uploading} onRemodel={remodel} />}
+                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} onRemodel={remodel} />}
             </div>
           )}
         </div>

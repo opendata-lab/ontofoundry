@@ -227,7 +227,7 @@ it("preserves a scenario while toggling the configuration panel", async () => {
   await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
 });
 
-it("shows a failed run only in the conversation, without a platform message or retry", async () => {
+it("adds no platform message or retry button for a failed run", async () => {
   context.model.session = { ...session(), task_status: "failed", task_detail: "提案结果被拒收：目标连接列不是唯一属性" };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });

@@ -68,10 +68,12 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     asked = _upstream(monkeypatch, ["finished"])
     paths = install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
 
-    # The read answers from what is stored and syncs after responding.
+    # A detail read settles the finished run first, so the page that reads it
+    # when the conversation ends sees the new proposals.
     first = client.get(ROOT + "/sessions/" + session["id"])
     assert first.status_code == 200, first.text
-    assert first.json()["task_status"] == "queued"
+    assert first.json()["task_status"] == "finished"
+    assert first.json()["pending_proposal_count"] == 3
     assert len(asked) == 1 and len(paths) == 1
 
     current = row(client, session["id"])
@@ -103,13 +105,13 @@ def test_list_read_syncs_a_live_run_without_claiming_anything(client, monkeypatc
     assert current.task_detail == "DataAgent 正在处理"
 
 
-def test_reads_are_throttled_per_session(client, monkeypatch):
+def test_list_reads_are_throttled_per_session(client, monkeypatch):
     _configure(client)
-    session, _ = _queued_run(client)
+    _queued_run(client)
     asked = _upstream(monkeypatch, ["running"])
 
     for _ in range(3):
-        assert client.get(ROOT + "/sessions/" + session["id"]).status_code == 200
+        assert client.get(ROOT + "/sessions").status_code == 200
     assert len(asked) == 1
 
 

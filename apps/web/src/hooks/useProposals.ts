@@ -45,6 +45,8 @@ export function useProposals(
   const revision = session?.revision;
 
   const reload = useCallback(() => setRefresh((n) => n + 1), []);
+  // How many reads are in flight, so the list can show it is fetching.
+  const [fetching, setFetching] = useState(0);
   useEffect(() => {
     const synced = () => reload();
     window.addEventListener("ontofoundry:metadata-synced", synced);
@@ -59,8 +61,10 @@ export function useProposals(
       return;
     }
     let active = true;
+    setFetching((n) => n + 1);
     proposalsApi
       .batches({ id: sessionId, workspace_id: workspaceId })
+      .finally(() => setFetching((n) => n - 1))
       .then((r) => {
         if (!active) return;
         setBatches(r.items);
@@ -86,8 +90,10 @@ export function useProposals(
       return;
     }
     let active = true;
+    setFetching((n) => n + 1);
     proposalsApi
       .batch({ id: sessionId, workspace_id: workspaceId }, selected)
+      .finally(() => setFetching((n) => n - 1))
       .then((value) => active && setDetail(value))
       .catch((e: Error) => active && setError(e.message));
     return () => {
@@ -231,6 +237,7 @@ export function useProposals(
     error,
     itemErrors,
     busy,
+    loading: fetching > 0,
     reload,
     decide,
     revise,

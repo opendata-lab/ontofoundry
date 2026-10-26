@@ -93,12 +93,15 @@ export function ModelResults({
   session,
   proposals,
   running = false,
+  loading = false,
   busy = false,
   onRemodel = () => undefined,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
   running?: boolean;
+  /** The selected session has not arrived yet. */
+  loading?: boolean;
   busy?: boolean;
   onRemodel?: (text: string) => void;
 }) {
@@ -185,7 +188,7 @@ export function ModelResults({
                     label: (
                       <span className="inline-flex items-center gap-2">提案 {pending > 0 && <StatusMark state="pending" label={pending} />}</span>
                     ),
-                    children: <ProposalPanel session={session} proposals={proposals} running={running} onRemodel={onRemodel} />,
+                    children: <ProposalPanel session={session} proposals={proposals} running={running} loading={loading} onRemodel={onRemodel} />,
                   },
                 ]
               : []),

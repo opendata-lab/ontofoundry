@@ -690,17 +690,24 @@ def create_session(
 
 
 @router.get("/sessions/{session_id}")
-def read_session(
+async def read_session(
     workspace_id: str,
     session_id: str,
     request: Request,
-    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    """The session as it stands now: a run that has finished gets its result
+    settled before the answer, so the page reading it after the conversation
+    ends sees the new proposals."""
+    from ontofoundry_api.api.agent_conversation import needs_run_sync, settle_session_run
+
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
-    schedule_run_sync(request, background, [item])
+    if needs_run_sync(request.app, item):
+        await settle_session_run(request.app, workspace_id, session_id)
+        db.expire(item)
+        item = get_modeling_session(db, workspace_id, session_id)
     return session_response(db, item)
 
 

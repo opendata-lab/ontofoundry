@@ -97,6 +97,7 @@ function state(extra: Partial<ProposalsState> = {}): ProposalsState {
     error: "",
     itemErrors: {},
     busy: false,
+    loading: false,
     reload: vi.fn(),
     decide: vi.fn().mockResolvedValue(true),
     revise: vi.fn().mockResolvedValue(true),
@@ -122,6 +123,35 @@ const panel = (proposals = state(), s = session()) =>
     </MemoryRouter>,
   );
 const row = (name: string) => screen.getByRole("article", { name: new RegExp(name) });
+
+describe("run outcome", () => {
+  it("says why the latest run produced no proposals", () => {
+    const failed = session({ result_state: "failed_permanent", task_detail: "建模没有产出提案：智能体结束时没有写入结果文件" });
+    panel(state(), failed);
+    expect(screen.getByRole("alert")).toHaveTextContent("建模没有产出提案");
+  });
+
+  it("explains an empty panel with the failure instead of the starter hint", () => {
+    const failed = session({ result_state: "failed_permanent", task_detail: "建模结果下载失败：重试三次后仍失败" });
+    panel({ ...state(), batches: [] }, failed);
+    expect(screen.getByText("建模结果下载失败：重试三次后仍失败")).toBeInTheDocument();
+    expect(screen.queryByText(/向智能体描述场景/)).toBeNull();
+  });
+});
+
+describe("fetching", () => {
+  it("spins over the list while proposals are being fetched", () => {
+    panel(state({ loading: true }));
+    expect(screen.getByRole("status", { name: "正在加载提案" })).toBeInTheDocument();
+    expect(screen.getByRole("list")).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("spins instead of the starter hint before the first batch arrives", () => {
+    panel(state({ loading: true, batches: [], detail: null }));
+    expect(screen.getByText("正在加载提案…")).toBeInTheDocument();
+    expect(screen.queryByText(/向智能体描述场景/)).toBeNull();
+  });
+});
 
 describe("proposal review", () => {
   it("shows pending rows with technical identity, change summary and kind", () => {

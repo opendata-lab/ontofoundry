@@ -643,7 +643,7 @@ def test_post_rejects_every_active_status_without_remote_side_effect(
     assert remote_calls == 0
 
 
-def test_events_transform_frames_ping_resubscribe_and_done_after_reconcile(
+def test_events_pass_through_frames_resubscribe_and_end_without_settling(
     client, monkeypatch
 ):
     _configure(client)
@@ -690,7 +690,8 @@ def test_events_transform_frames_ping_resubscribe_and_done_after_reconcile(
     assert "event: done\n" in body
     assert '"status":"finished"' in body
     assert body.index("event: agent-event") < body.index("event: done")
-    assert order == ["reconcile"]
+    # The stream only relays DataAgent; results are settled when the session is read.
+    assert order == []
     assert stream_count == 2
 
 
@@ -1107,54 +1108,6 @@ def test_old_event_stream_ends_with_its_own_task_and_leaves_the_new_one(client, 
     row = _session_row(client, session["id"])
     assert row.dataagent_task_id == "task-new"
     assert row.task_status == "running"
-
-
-def test_events_waits_when_exhaustion_loses_to_a_new_result_lease(client, monkeypatch):
-    _configure(client)
-    session = _create_session(client)
-    _set_session(
-        client,
-        session["id"],
-        task_status="finished",
-        dataagent_topic_id="topic-1",
-        dataagent_task_id="task-1",
-        dataagent_task_mode="model",
-    )
-    stream_count = 0
-    reconcile_count = 0
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        nonlocal stream_count
-        if request.url.path.endswith("/sdk-events/stream"):
-            stream_count += 1
-            return httpx.Response(200, content=b"")
-        if request.url.path.endswith("/tasks/task-1"):
-            return httpx.Response(
-                200, json={"task_id": "task-1", "task_status": "finished"}
-            )
-        raise AssertionError(request.url.path)
-
-    async def reconcile(*args):
-        nonlocal reconcile_count
-        reconcile_count += 1
-        return "failed_retriable" if reconcile_count <= 4 else "done"
-
-    async def no_sleep(_delay):
-        return None
-
-    _install_transport(monkeypatch, handler)
-    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
-    monkeypatch.setattr(
-        "ontofoundry_api.api.agent_conversation.exhaust_retriable_result",
-        lambda *args: "processing",
-    )
-    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.asyncio.sleep", no_sleep)
-
-    response = client.get(_endpoint(session["id"]) + "/events")
-    assert response.status_code == 200, response.text
-    assert "event: done" in response.text
-    assert reconcile_count == 5
-    assert stream_count == 2
 
 
 def test_cancel_and_interactions_dispatch_by_kind(client, monkeypatch):

@@ -1,4 +1,4 @@
-import { Alert, Button, Checkbox, Dropdown, Empty, Input, Modal, Select, Tabs, Tooltip, Typography } from "antd";
+import { Alert, Button, Checkbox, Dropdown, Empty, Flex, Input, Modal, Select, Spin, Tabs, Tooltip, Typography } from "antd";
 import { MoreHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelingSession, ProposalItem, TargetKind } from "../../api/types";
@@ -15,6 +15,8 @@ type Props = {
   session: ModelingSession | null;
   proposals: ProposalsState;
   running: boolean;
+  /** The session is still loading. */
+  loading?: boolean;
   onRemodel: (text: string) => void;
 };
 type StatusFilter = "pending" | "accepted" | "rejected" | "blocked" | "unacceptable";
@@ -39,9 +41,28 @@ const KIND_ORDER: TargetKind[] = [
 const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
   status === "blocked" ? ["stale", "conflict"].includes(item.status) : item.status === status;
 
+// The latest modeling run's outcome belongs to the proposals it was meant to
+// produce, so a run that produced none says why here, not in the conversation.
+const failedRun = (session: ModelingSession | null | undefined) =>
+  session?.result_state === "failed_permanent" ? session.task_detail || "本轮没有产出提案" : "";
+
 export function ProposalPanel(props: Props) {
+  if (props.loading || (props.proposals.loading && !props.proposals.batches.length))
+    return (
+      <Flex vertical align="center" gap="small" className="p-6" role="status">
+        <Spin />
+        <Text type="secondary">正在加载提案…</Text>
+      </Flex>
+    );
+  if (props.session && props.running && !props.proposals.batches.length)
+    return (
+      <Flex vertical align="center" gap="small" className="p-6" role="status">
+        <Spin />
+        <Text type="secondary">正在生成提案…</Text>
+      </Flex>
+    );
   if (!props.session || (!props.proposals.batches.length && !props.running))
-    return <Empty className="m-0 p-6" description="向智能体描述场景并开始建模，提案会出现在这里" />;
+    return <Empty className="m-0 p-6" description={failedRun(props.session) || "向智能体描述场景并开始建模，提案会出现在这里"} />;
   return (
     <ProposalReview key={`${props.session.id}:${props.proposals.detail?.id ?? "loading"}`} {...props} session={props.session} />
   );
@@ -162,6 +183,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
         <ImportReportDialog open={reportOpen} source={importSource} session={session} onClose={() => setReportOpen(false)} onChanged={(result) => { proposals.select(result.batch_id); proposals.reload(); }} />
       </>}
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
+      {!running && failedRun(session) && <Alert type="error" showIcon message={failedRun(session)} />}
       {drifted && <Alert type="warning" showIcon message="草稿已更新，部分提案需要重新确认" />}
       {proposals.error && <Alert type="error" showIcon message={proposals.error} />}
       <Tabs
@@ -270,8 +292,13 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
           </Dropdown>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto" role="list">
-        {visible.length ? (
+      <div className="relative min-h-0 flex-1 overflow-auto" role="list" aria-busy={proposals.loading}>
+        {proposals.loading && (
+          <div className="absolute inset-0 z-10 flex justify-center bg-surface/60 pt-8" role="status" aria-label="正在加载提案">
+            <Spin />
+          </div>
+        )}
+        {visible.length || proposals.loading ? (
           visible.map((item) => (
             <ProposalCard
               key={item.id}

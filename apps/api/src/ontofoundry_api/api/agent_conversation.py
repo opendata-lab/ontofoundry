@@ -556,6 +556,17 @@ async def sync_session_run(app, workspace_id: str, session_id: str) -> None:
             _syncing.discard(session_id)
 
 
+async def settle_session_run(app, workspace_id: str, session_id: str) -> None:
+    """Sync one session's run now, for a reader that needs its outcome.
+
+    Unthrottled: the result lease keeps concurrent settlement to one writer,
+    and a DataAgent outage leaves the stored state as it was."""
+    try:
+        await _sync_session_run(app, workspace_id, session_id)
+    except DataAgentError as exc:
+        logger.warning("同步会话 %s 的 DataAgent 任务失败：%s", session_id, exc)
+
+
 async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
     with app.state.session_factory() as db:
         item = db.get(ModelingSessionRecord, session_id)
@@ -1186,72 +1197,25 @@ async def events(
                 yield f"event: agent-event\ndata: {redact_credentials(_compact_payload(payload))}\n\n"
 
             yield ": ping\n\n"
+            # A pass-through of DataAgent's run: when its stream closes on a
+            # live task, reconnect; once the task ends, say so. Turning the
+            # result into proposals is the session's business, settled when
+            # the session is read, never part of the conversation stream.
             task = await dataagent.task(task_id)
             upstream_status = str(task.get("task_status") or "")
-            status = _persist_task_projection(
-                request.app.state.session_factory,
-                session_id,
-                task_id=task_id,
-                upstream_status=upstream_status,
-                detail=_detail(upstream_status, task.get("error")),
-            )
-            if status is None:
-                # A newer run owns the session. End this task's stream with its
-                # own status rather than cutting it: an EOF without a terminal
-                # frame reads as an interrupted stream. The SDK closes only
-                # this task's turn and keeps the newer run.
-                yield _done_frame(
-                    _run_ref(
-                        task_id,
-                        to_run_status(upstream_status),
-                        mode=mode,
-                        detail=_detail(upstream_status, task.get("error")),
-                    )
-                )
-                return
             if upstream_status in ACTIVE_TASK_STATUSES:
                 delay = 0.25 if saw_event else reconnect_delay
                 await asyncio.sleep(delay)
                 reconnect_delay = 0.25 if saw_event else min(delay * 2, 5.0)
                 continue
-
-            result_state = await settle_result(
-                request.app, workspace_id, session_id, task_id
+            yield _done_frame(
+                _run_ref(
+                    task_id,
+                    to_run_status(upstream_status),
+                    mode=mode,
+                    detail=_detail(upstream_status, task.get("error")),
+                )
             )
-            if result_state == "processing":
-                # Another request still owns a valid lease. It must be the
-                # one to commit or fail the result before any terminal SDK
-                # event is emitted.
-                continue
-
-            with request.app.state.session_factory() as current_db:
-                current = current_db.get(ModelingSessionRecord, session_id)
-                if current is not None:
-                    if current.dataagent_task_id != task_id:
-                        # Result reconciliation can outlive the generation it
-                        # started on. Report this task's own end; the SDK
-                        # leaves its successor alone.
-                        yield _done_frame(
-                            _run_ref(
-                                task_id,
-                                to_run_status(upstream_status),
-                                mode=mode,
-                                detail=_detail(upstream_status, task.get("error")),
-                            )
-                        )
-                        return
-                    status = current.task_status
-                    detail = current.task_detail
-                    mode = _mode(current.dataagent_task_mode)
-                else:  # pragma: no cover - a live request owns this session
-                    detail = _detail(upstream_status, task.get("error"))
-            run = _run_ref(
-                task_id,
-                status,
-                mode=mode,
-                detail=detail,
-            )
-            yield _done_frame(run)
             return
 
     return StreamingResponse(
