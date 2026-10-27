@@ -256,9 +256,8 @@ def platform_check(pack, batch, candidate, retry_command):
 
     check_file = pack.get("platform_check_file") or pack.get("mcp_config_file")
     if not check_file:
-        # Offline use without a platform: nothing to ask, say so.
-        print(notice("PLATFORM_CHECK_SKIPPED", "工作包没有平台检查配置，只做了本地检查"))
-        return True
+        print(error("PLATFORM_CHECK_CONFIG_MISSING", "工作包没有平台检查配置", "最终文件未替换", "重新发起建模以获取检查配置", retry=False))
+        return False
     try:
         config = json.loads(Path(check_file).read_bytes())
         parts = urlsplit(config["url"])
@@ -298,25 +297,15 @@ def platform_check(pack, batch, candidate, retry_command):
             or not isinstance(report.get("passed"), bool)
             or any(
                 type(report.get(key)) is not int or report[key] < 0
-                for key in ("reviewable_count", "unacceptable_count")
+                for key in ("reviewable_count",)
             )
             or not isinstance(report.get("contract_errors"), list)
-            or not isinstance(report.get("unacceptable_groups"), list)
             or any(
                 not isinstance(problem, dict)
                 or not isinstance(problem.get("message"), str)
                 for problem in report["contract_errors"]
             )
-            or any(
-                not isinstance(group, dict) or not isinstance(group.get("reason"), str)
-                for group in report["unacceptable_groups"]
-            )
-            or report["passed"]
-            != (
-                not report["contract_errors"]
-                and not report["unacceptable_groups"]
-                and not report["unacceptable_count"]
-            )
+            or report["passed"] != (not report["contract_errors"])
         ):
             raise ValueError("平台未返回有效的检查结果")
     except HTTPError as exc:
@@ -357,13 +346,11 @@ def platform_check(pack, batch, candidate, retry_command):
         print(f"平台检查通过：{report['reviewable_count']} 条可审。仅检查，未入库。")
         return True
     print(
-        f"平台检查未通过：{report['reviewable_count']} 条可审，{report['unacceptable_count']} 条不可接受。最终文件未替换。完整报告：{relative(report_path)}"
+        f"平台检查未通过：整批校验失败。最终文件未替换。完整报告：{relative(report_path)}"
     )
     for problem in report["contract_errors"]:
         print(problem["message"])
-    for group in report["unacceptable_groups"]:
-        print(group["reason"])
-    print("下一步：修正片段后执行 " + retry_command)
+    print("下一步：修正片段后重试 " + retry_command)
     return False
 
 
@@ -378,11 +365,6 @@ def main():
     parser.add_argument("--schema")
     parser.add_argument("--output")
     parser.add_argument("--repair", action="store_true")
-    parser.add_argument(
-        "--drop-unacceptable",
-        action="store_true",
-        help="修正两轮后仍有不可接受的提案组时，去掉这些组再交平台检查，其余照常交付",
-    )
     parser.add_argument(
         "fragments",
         nargs="*",
@@ -503,43 +485,10 @@ def main():
         )
     )
     if not platform_check(pack, batch, candidate, retry_command):
-        dropped = drop_unacceptable(batch, candidate) if args.drop_unacceptable else None
-        if not dropped or not platform_check(pack, batch, candidate, retry_command):
-            return 1
-        print(
-            notice(
-                "UNACCEPTABLE_DROPPED",
-                f"已去掉不可接受的提案组 {'、'.join(dropped)}，其余提案通过平台检查",
-                "在回答中列出这些未交付项和原因",
-            )
-        )
+        return 1
     atomic_write(output, candidate.read_bytes())
     print(f"已保存最终结果：{relative(output)}；等待平台入库与用户审核")
     return 0
-
-
-def drop_unacceptable(batch, candidate):
-    """Remove the groups the platform reported unacceptable; their client_refs, or None.
-
-    Only whole groups the report names by client_ref are removed. A contract
-    error, or a group without client_refs, cannot be dropped this way.
-    """
-    try:
-        report = json.loads(candidate.with_suffix(".platform-check.json").read_bytes())
-    except (OSError, ValueError):
-        return None
-    groups = report.get("unacceptable_groups") or []
-    refs = {ref for group in groups for ref in group.get("client_refs") or [] if ref}
-    if report.get("contract_errors") or not groups or not refs or any(
-        not group.get("client_refs") for group in groups
-    ):
-        return None
-    kept = [item for item in batch["items"] if item.get("client_ref") not in refs]
-    if not kept or len(kept) == len(batch["items"]):
-        return None
-    batch["items"] = kept
-    atomic_write(candidate, encode(batch))
-    return sorted(refs)
 
 
 if __name__ == "__main__":

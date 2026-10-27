@@ -64,7 +64,7 @@ test("proposal list groups filters, selection and compact rows in one result pan
   const review = page.getByLabel("提案审核面板", { exact: true });
   await expect(review.getByRole("article")).toHaveCount(3);
   await review.getByRole("checkbox", { name: "选择 供应范围", exact: true }).check();
-  await expect(review.getByText("显示 3 / 6 条", { exact: true })).toBeVisible();
+  await expect(review.getByText("显示 3 / 5 条", { exact: true })).toBeVisible();
   await expect(review.getByText("联动 1 项", { exact: true })).toBeVisible();
   await expect(review.getByRole("searchbox", { name: "搜索提案名称" })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "已打开的页面" }).locator("[role=tab][aria-selected]")).toHaveCount(1);
@@ -74,8 +74,8 @@ test("proposal list groups filters, selection and compact rows in one result pan
   await review.getByRole("searchbox", { name: "搜索提案名称" }).fill("service_scope");
   await expect(review.getByRole("article")).toHaveCount(1);
   await review.getByRole("button", { name: "清除筛选", exact: true }).click();
-  await review.getByRole("tab", { name: /^冲突\s*1$/, exact: false }).click();
-  await expect(review.getByText("已过期", { exact: true })).toBeVisible();
+  await review.getByRole("tab", { name: /^已拒绝\s*1$/, exact: false }).click();
+  await expect(review.getByRole("button", { name: /恢复/ })).toBeVisible();
 });
 
 test("proposal detail and evidence popover show field changes, quotes and source ids", async ({ page }) => {

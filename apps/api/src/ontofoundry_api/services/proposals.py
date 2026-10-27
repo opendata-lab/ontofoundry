@@ -1,18 +1,11 @@
-"""Proposal batches: storing a parsed result, and reading items with their
-effective status (design §7.3).
-
-Stored item status is only the decision: pending | accepted | rejected |
-superseded | unacceptable. `stale` and `conflict` are computed on every read from the current
-draft and never written, so an item whose target is edited back becomes
-pending again by itself.
-"""
+"""Store atomic proposal batches and read persisted review decisions."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, ParsedBatch
@@ -23,11 +16,8 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
-from ontofoundry_api.domain.canonical import (
-    domain_sha256,
-    element_sha256,
-)
-from ontofoundry_api.domain.instances import INSTANCE_KINDS, definitions, instance_hash
+from ontofoundry_api.domain.canonical import element_sha256
+from ontofoundry_api.domain.instances import definitions
 from ontofoundry_api.domain.models import COLLECTIONS, PROPOSAL_COLLECTIONS, ElementKind
 
 
@@ -39,13 +29,9 @@ def store_batch(
     task_id: str | None,
     manifest: dict[str, Any],
     parsed: ParsedBatch,
+    settings,
 ) -> ProposalBatchRecord:
-    """Insert batch, items and dependencies in the caller's transaction.
-
-    Idempotent per run: a batch for the same run token is returned as is.
-    Older pending items aimed at a target this batch also proposes to change
-    are superseded; history is kept.
-    """
+    """Insert a validated batch and its dependencies in the caller's transaction."""
     if manifest.get("invalidated"):
         from ontofoundry_api.services.errors import ServiceError
         raise ServiceError("运行固定上下文已失效，请重新运行", code="RUN_CONTEXT_INVALIDATED", status_code=409)
@@ -58,6 +44,13 @@ def store_batch(
     )
     if existing is not None:
         return existing
+    from ontofoundry_api.services.errors import ConflictError
+    from ontofoundry_api.services.proposal_apply import trial_apply
+    from ontofoundry_api.services.session_gate import has_pending, lock_session
+    session = lock_session(db, workspace_id, session_id)
+    if has_pending(db, session):
+        raise ConflictError("请先处理完待审提案", code="PENDING_PROPOSALS")
+    parsed.items = trial_apply(db, workspace_id, session, parsed.items, settings).items
     batch = ProposalBatchRecord(
         id=parsed.id,
         workspace_id=workspace_id,
@@ -77,32 +70,6 @@ def store_batch(
     )
     db.add(batch)
     db.flush()
-    targets = [item.target_id for item in parsed.items]
-    if targets:
-        older_groups = set(
-            db.scalars(
-                select(ProposalItemRecord.atomic_group_id).where(
-                    ProposalItemRecord.workspace_id == workspace_id,
-                    ProposalItemRecord.session_id == session_id,
-                    ProposalItemRecord.status == "pending",
-                    ProposalItemRecord.target_id.in_(targets),
-                    ProposalItemRecord.atomic_group_id.is_not(None),
-                )
-            )
-        )
-        db.execute(
-            update(ProposalItemRecord)
-            .where(
-                ProposalItemRecord.workspace_id == workspace_id,
-                ProposalItemRecord.session_id == session_id,
-                ProposalItemRecord.status == "pending",
-                or_(
-                    ProposalItemRecord.target_id.in_(targets),
-                    ProposalItemRecord.atomic_group_id.in_(older_groups),
-                ),
-            )
-            .values(status="superseded")
-        )
     for item in parsed.items:
         db.add(
             ProposalItemRecord(
@@ -143,50 +110,6 @@ def store_batch(
             )
     return batch
 
-
-def store_failed_batch(
-    db: Session,
-    *,
-    workspace_id: str,
-    session_id: str,
-    task_id: str | None,
-    manifest: dict[str, Any],
-    result_sha256: str,
-    code: str,
-    message: str,
-) -> None:
-    """Keep a rejected result visible in the proposals tab, with its reason."""
-    exists = db.scalar(
-        select(ProposalBatchRecord.id).where(
-            ProposalBatchRecord.workspace_id == workspace_id,
-            ProposalBatchRecord.session_id == session_id,
-            ProposalBatchRecord.run_token == manifest["run_token"],
-        )
-    )
-    if exists:
-        return
-    from ontofoundry_api.contracts.proposals import batch_id_for
-
-    db.add(
-        ProposalBatchRecord(
-            id=batch_id_for(session_id, manifest["run_token"]),
-            workspace_id=workspace_id,
-            session_id=session_id,
-            dataagent_task_id=task_id,
-            run_token=manifest["run_token"],
-            schema_version=SCHEMA_VERSION,
-            base_version_id=manifest.get("base_version_id"),
-            base_version_sha256=manifest["base_version_sha256"],
-            source_session_revision=manifest["source_session_revision"],
-            source_draft_sha256=manifest["source_draft_sha256"],
-            material_manifest_json=manifest.get("materials") or [],
-            producer_json=manifest.get("producer") or {},
-            result_sha256=result_sha256,
-            status="failed",
-            error_json={"code": code, "message": message},
-            created_at=utc_now(),
-        )
-    )
 
 
 # --- run context ----------------------------------------------------------------
@@ -240,73 +163,7 @@ def effective_statuses(
     draft: dict[str, Any],
     instance_baseline: dict | None = None,
 ) -> dict[str, tuple[str, str]]:
-    """item id -> (effective status, reason). Pure; see module docstring."""
-    from ontofoundry_api.domain.instances import baseline_elements
-    elements = _elements(draft)
-    elements.update(baseline_elements(instance_baseline))
-    revisions = {i["target_id"]: i["revision"] for i in (instance_baseline or {}).get("items", [])}
-    by_id = {item.id: item for item in items}
-    result: dict[str, tuple[str, str]] = {}
-
-    def own(item: ProposalItemRecord) -> tuple[str, str]:
-        if item.status != "pending":
-            return item.status, item.status_reason or ""
-        found = elements.get(item.target_id)
-        if item.operation == "create":
-            if found is not None:
-                return "conflict", "目标 id 已被草稿中的元素占用"
-            return "pending", ""
-        if found is None or found[0] != item.target_kind:
-            return "conflict", "目标元素已被删除或类型已改变"
-        collection = PROPOSAL_COLLECTIONS[ElementKind(found[0])]
-        current_hash = (instance_hash(found[1], revisions[item.target_id])
-            if found[0] in INSTANCE_KINDS and item.target_id in revisions
-            else element_sha256(found[1], collection=collection))
-        if current_hash != item.expected_target_hash:
-            previous = item.before_json
-            legacy_unchanged = (
-                item.target_kind == "link_type"
-                and isinstance(previous, dict)
-                and "name" in previous
-                and domain_sha256(previous) == item.expected_target_hash
-                and element_sha256(previous, collection=collection) == current_hash
-            )
-            if not legacy_unchanged:
-                return "stale", "目标在提案生成后已被修改"
-        return "pending", ""
-
-    def resolve(item_id: str, trail: tuple[str, ...] = ()) -> tuple[str, str]:
-        if item_id in result:
-            return result[item_id]
-        item = by_id[item_id]
-        status, reason = own(item)
-        if status == "pending":
-            for dep_id in dependencies.get(item_id, []):
-                if dep_id in trail or dep_id not in by_id:
-                    continue
-                dep = by_id[dep_id]
-                dep_status, _ = resolve(dep_id, (*trail, item_id))
-                label = dep.client_ref or dep.target_id
-                if dep_status in ("rejected", "superseded"):
-                    status, reason = "conflict", f"依赖 {label} 已被拒绝或取代"
-                    break
-                if (
-                    dep_status == "accepted"
-                    and dep.target_id not in elements
-                    and dep.operation != "delete"
-                ):
-                    status, reason = "conflict", f"依赖 {label} 接受后已被删除"
-                    break
-                if dep_status in ("stale", "conflict", "unacceptable"):
-                    status = dep_status
-                    reason = f"依赖 {label} {'已过期' if dep_status == 'stale' else '冲突'}"
-                    break
-        result[item_id] = (status, reason)
-        return result[item_id]
-
-    for item in items:
-        resolve(item.id)
-    return result
+    return {item.id: (item.status, item.status_reason or "") for item in items}
 
 
 def dependency_map(

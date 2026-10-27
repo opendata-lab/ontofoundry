@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID, uuid5
 
 from jsonschema import Draft202012Validator
-from pydantic import TypeAdapter, ValidationError
+from pydantic import TypeAdapter
 
 from ontofoundry_api.contracts.proposal_diagnostics import diagnostic, schema_diagnostic
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
@@ -359,21 +359,29 @@ def walk_references(kind, value, resolve):
 
 
 def apply_items(draft, items):
+    """The draft with each item applied: updates stay where the element was,
+    creates are appended, deletes are removed."""
     candidate = deepcopy(draft)
     for item in items:
         collection = PROPOSAL_COLLECTIONS[ElementKind(item.target_kind)]
-        candidate[collection] = [
-            e for e in candidate.get(collection, []) if e["id"] != item.target_id
-        ]
-        if item.after is not None:
-            candidate[collection].append(deepcopy(item.after))
+        elements = candidate.get(collection, [])
+        at = next((i for i, e in enumerate(elements) if e["id"] == item.target_id), None)
+        if at is None:
+            if item.after is not None:
+                elements = [*elements, deepcopy(item.after)]
+        elif item.after is None:
+            elements = elements[:at] + elements[at + 1 :]
+        else:
+            elements = [*elements[:at], deepcopy(item.after), *elements[at + 1 :]]
+        candidate[collection] = elements
     return candidate
 
 
 def group_items(draft, items, *, references_resolved=False):
     """Group cyclic references and edits requiring simultaneous final-graph validation."""
+    proposed = _validate_group(draft, items, references_resolved=references_resolved)
+    references_resolved = True
     before = CoreDraft.model_validate(definitions(draft))
-    proposed = apply_items(draft, items)
     candidate = CoreDraft.model_validate(definitions(proposed))
     objects = proposed.get("material_objects", [])
     links = proposed.get("material_links", [])
@@ -568,32 +576,9 @@ def group_items(draft, items, *, references_resolved=False):
         )
         for dep in dependencies:
             apply_group(root(dep))
-        blocked = [by_id[d] for d in dependencies if by_id[d].status == "unacceptable"]
-        reason = ""
-        if blocked:
-            reason = "依赖不可接受：" + "；".join(
-                f"{i.client_ref or i.target_id}：{i.status_reason[:300]}"
-                for i in blocked[:3]
-            )
-        else:
-            try:
-                checked = _validate_group(
-                    applied, members, references_resolved=references_resolved
-                )
-            except (ValueError, KeyError) as exc:
-                reason = (
-                    "；".join(
-                        e["msg"].removeprefix("Value error, ") for e in exc.errors()[:3]
-                    )
-                    if isinstance(exc, ValidationError)
-                    else str(exc)
-                )
-            else:
-                applied.clear()
-                applied.update(checked)
-        for item in members:
-            item.status = "unacceptable" if reason else "pending"
-            item.status_reason = reason
+        checked = _validate_group(applied, members, references_resolved=True)
+        applied.clear()
+        applied.update(checked)
 
     for group in groups:
         apply_group(group)

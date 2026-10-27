@@ -97,15 +97,10 @@ def test_two_sessions_merge_and_conflict(client):
     assert publish(client, resolved.json()).status_code == 200
 
 
-def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
+def test_incomplete_graph_can_be_stashed_but_not_published(client):
     from pr23_fixtures import example_session
-    from test_t4_proposal_decisions import decide, seed_batch, update
 
     session = example_session(client, "01-basic-sales", published=True)
-    metric = session["draft"]["metrics"][0]
-    batch = seed_batch(
-        client, session, [update("metric", metric, description="待接受的口径说明")]
-    )
     incomplete = deepcopy(session["draft"])
     incomplete["object_types"][1]["name"] = incomplete["object_types"][0]["name"]
     response = save(client, session, incomplete)
@@ -115,11 +110,6 @@ def test_incomplete_graph_can_be_stashed_but_not_accepted_or_published(client):
     assert not stashed["validation"]["publishable"]
     assert any("英文标识重复" in e["message"] for e in stashed["validation"]["errors"])
     assert client.get(ROOT + f"/sessions/{session['id']}").json()["draft"] == incomplete
-    refused = decide(client, stashed, [(batch["items"][0]["id"], "accept")])
-    assert (
-        refused.status_code == 422
-        and refused.json()["error"]["code"] == "VALIDATION_FAILED"
-    )
     version = client.get(ONTOLOGY + "/version").json()["version_id"]
     invalid_preview = preview(client, stashed)
     assert invalid_preview.status_code == 200, invalid_preview.text

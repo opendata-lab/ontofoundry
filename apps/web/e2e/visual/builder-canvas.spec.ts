@@ -169,13 +169,11 @@ test("instance browser aligns filters, table and detail sections", async ({ page
   await expect(page.getByRole("heading", { name: "全部属性", exact: true })).toBeVisible();
 });
 
-test("builder lists unacceptable proposals in their tab without a platform message", async ({ page }) => {
-  await mockCanvasApi(page, { proposalIssue: "unacceptable" });
+test("builder shows a rejected result without creating a batch", async ({ page }) => {
+  await mockCanvasApi(page, { proposalIssue: "failed" });
   await page.goto(`${base}/builder?session=${REVIEW_SESSION_ID}&panel=proposals`);
-  await page.getByRole("tab", { name: /不可接受/ }).click();
-  await expect(page.getByLabel("提案审核面板", { exact: true }).getByRole("article")).toHaveCount(2);
-  await expect(page.getByText("平台消息", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "重试", exact: true })).toHaveCount(0);
+  await expect(page.getByText("提案结果被拒收：候选图校验未通过，请修正后重新建模")).toBeVisible();
+  await expect(page.getByRole("tab", { name: /不可接受|冲突/ })).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
-  await expect(page).toHaveScreenshot("builder-unacceptable.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("builder-result-failed.png", { fullPage: true });
 });

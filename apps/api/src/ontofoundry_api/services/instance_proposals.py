@@ -51,7 +51,7 @@ def cascade_history(db, workspace_id, item):
     ).all()
 
 
-def apply_changes(db, workspace_id, session_id, combined, accepted, undone, actor, lookup):
+def apply_changes(db, workspace_id, session_id, combined, accepted, undone, actor, lookup, *, instance_states=None):
     model = OntologyDraft.model_validate(definitions(combined))
     objects = {o["id"]: o for o in combined.get("material_objects", [])}
     links = list(combined.get("material_links", []))
@@ -96,6 +96,8 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             if after
             else None
         )
+        if instance_states is not None:
+            state = instance_states[item.id]
         result = instance_store.write(
             db,
             workspace_id,
@@ -112,6 +114,7 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             operation="undo" if undo else item.operation,
             lookup=lookup,
             model=model,
+            validated=instance_states is not None,
         )
         item.accepted_instance_revision = result["revision"] if not undo else None
         if state == "active":

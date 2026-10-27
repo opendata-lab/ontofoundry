@@ -16,6 +16,7 @@ from ontofoundry_api.api.modeling import (
     require_member,
     session_draft,
 )
+from ontofoundry_api.contracts.proposal_reviews import ProposalBatchSummary
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     MaterialRecord,
@@ -37,6 +38,7 @@ from ontofoundry_api.services.proposals import (
     dependency_map,
     effective_statuses,
 )
+from ontofoundry_api.services.session_gate import batch_read_only
 
 router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/sessions/{session_id}", tags=["proposals"]
@@ -53,15 +55,15 @@ def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
 
 def _counts(items, statuses) -> dict[str, int]:
     counts = dict.fromkeys(
-        ("pending", "accepted", "rejected", "stale", "conflict", "superseded", "unacceptable"), 0
+        ("pending", "accepted", "rejected"), 0
     )
     for item in items:
         counts[statuses[item.id][0]] += 1
     return counts
 
 
-def _batch_summary(batch: ProposalBatchRecord, items, statuses) -> dict[str, Any]:
-    return {
+def _batch_summary(batch: ProposalBatchRecord, items, statuses, session) -> dict[str, Any]:
+    return ProposalBatchSummary(**{
         "id": batch.id,
         "status": batch.status,
         "created_at": batch.created_at,
@@ -70,7 +72,8 @@ def _batch_summary(batch: ProposalBatchRecord, items, statuses) -> dict[str, Any
         "counts": _counts(items, statuses),
         "error": batch.error_json,
         "producer": batch.producer_json,
-    }
+        "read_only": batch_read_only(session, batch),
+    }).model_dump(mode="json")
 
 
 def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[dict]:
@@ -206,7 +209,7 @@ def list_batches(
     for item in items:
         by_batch.setdefault(item.batch_id, []).append(item)
     return {
-        "items": [_batch_summary(b, by_batch.get(b.id, []), statuses) for b in page],
+        "items": [_batch_summary(b, by_batch.get(b.id, []), statuses, session) for b in page],
         "next_cursor": page[-1].id if len(batches) > limit else None,
     }
 
@@ -248,7 +251,7 @@ def read_batch(
 
     alignment = AlignmentContext(db, workspace_id, draft)
     return {
-        **_batch_summary(batch, items, statuses),
+        **_batch_summary(batch, items, statuses, session),
         "items": [
             _item_view(db, workspace_id, i, statuses, dependencies, elements, alignment)
             for i in items
@@ -310,7 +313,7 @@ def proposal_metrics(
     for batch in batches:
         by_status[batch.status] = by_status.get(batch.status, 0) + 1
     effective: dict[str, int] = dict.fromkeys(
-        ("pending", "accepted", "rejected", "stale", "conflict", "superseded", "unacceptable"), 0
+        ("pending", "accepted", "rejected"), 0
     )
     for session in sessions:
         ids = [b.id for b in batches if b.session_id == session.id]
@@ -331,16 +334,12 @@ def proposal_metrics(
     ):
         decisions[row.decision] = decisions.get(row.decision, 0) + 1
     total_batches = len(batches)
-    open_items = effective["pending"] + effective["stale"] + effective["conflict"]
     return {
         "batches": {"total": total_batches, **by_status},
         "batch_failure_rate": round(by_status.get("failed", 0) / total_batches, 4)
         if total_batches
         else 0.0,
         "items": effective,
-        "stale_rate": round((effective["stale"] + effective["conflict"]) / open_items, 4)
-        if open_items
-        else 0.0,
         "decisions": decisions,
     }
 
@@ -422,6 +421,7 @@ def revise_proposal_content(
     session_id: str,
     proposal_id: str,
     body: ProposalContentRevision,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -435,6 +435,7 @@ def revise_proposal_content(
         proposal_id,
         body.fields,
         body.expected_session_revision,
+        request.app.state.settings,
     )
 
 
@@ -449,6 +450,7 @@ def revise_dataset_source(
     session_id: str,
     proposal_id: str,
     body: DatasetProposalRevision,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -462,4 +464,5 @@ def revise_dataset_source(
         proposal_id,
         body.dataset,
         body.expected_session_revision,
+        request.app.state.settings,
     )

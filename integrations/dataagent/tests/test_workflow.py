@@ -151,11 +151,8 @@ def test_final_graph_and_evidence_still_reject(mutation):
             evidence["quote"] = "不存在的原文"
         else:
             evidence["locator"]["line_end"] = 50
-    if mutation == "cross_dataset":
-        assert any(i.status == "unacceptable" for i in server_parse(batch, ctx).items)
-    else:
-        with pytest.raises(ProposalContractError):
-            server_parse(batch, ctx)
+    with pytest.raises(ProposalContractError):
+        server_parse(batch, ctx)
 
 
 def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
@@ -178,7 +175,7 @@ def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
     assert len(capsys.readouterr().out.encode()) <= 4096
 
 
-def test_automatic_local_budget_and_atomic_publish(tmp_path, monkeypatch, capsys):
+def test_automatic_local_budget_never_publishes(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     ctx = pinned(SKILL / "references/examples/facts.json")
     ctx["execution"] = {"repair_used": 0, "budget_file": "output/budget.json"}
@@ -193,14 +190,11 @@ def test_automatic_local_budget_and_atomic_publish(tmp_path, monkeypatch, capsys
         batch["items"][0]["after"]["description"] = str(used)
         result.write_text(json.dumps(batch))
         assert checker.validate_file(
-            result, SCHEMA_PATH, context, publish=final
+            result, SCHEMA_PATH, context
         ) == int(used > 2)
         ledger = json.loads((tmp_path / "output/budget.json").read_bytes())
         assert ledger["used"] == used
-        if used <= 2:
-            assert final.read_bytes() == result.read_bytes()
-        else:
-            assert final.read_bytes() != result.read_bytes()
+        assert not final.exists()
     assert not list(tmp_path.glob("**/.pending-*"))
     assert "REPAIR_BUDGET_EXHAUSTED" in capsys.readouterr().out
 
@@ -444,15 +438,11 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
             [sys.executable, *command[1:]], capture_output=True, check=False
         )
         assert completed.returncode == 0 and len(completed.stdout) <= 8192
-    if mutation == "source":
-        parsed = server_parse(batch, ctx)
-        assert parsed.items[-1].status == "unacceptable"
-        assert parsed.items[-1].status_reason
-    else:
-        with pytest.raises(ProposalContractError) as caught:
-            server_parse(batch, ctx)
-        assert "期望" in str(caught.value) and "实际" in str(caught.value)
-        assert "show_example.py" in str(caught.value) and "/" in str(caught.value)
+    with pytest.raises(ProposalContractError) as caught:
+        server_parse(batch, ctx)
+    assert "期望" in str(caught.value) and "实际" in str(caught.value)
+    assert "show_example.py" in str(caught.value) and "/" in str(caught.value)
+
 
 
 def test_prepare_reports_exact_fragment_location_and_preserves_output(

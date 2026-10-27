@@ -31,6 +31,7 @@ const CONVERSATION = [
 ].join(" ");
 
 const SETTLED_RUN = ["finished", "failed", "cancelled", "suspended"];
+const SETTLED_RESULTS = ["done", "failed_permanent"];
 
 const MODES: Record<SessionMode, { label: string; note: string }> = {
   model: { label: "建模模式", note: "构建和完善本体模型" },
@@ -89,10 +90,13 @@ export function BuilderPage() {
   const reloadModel = model.reload;
   // Whether the latest modeling run's result is still on its way, from the
   // session itself so a page refresh shows it too.
-  const resultPending = mode === "model" && (settling || ["processing", "failed_retriable"].includes(session?.result_state ?? ""));
+  // Same rule as the server's session gate: a finished modeling run whose
+  // result is neither stored nor failed for good.
+  const resultUnsettled = mode === "model" && session?.task_status === "finished" && !!session.dataagent_task_id && !SETTLED_RESULTS.includes(session.result_state ?? "");
+  const resultPending = mode === "model" && (settling || resultUnsettled);
   useEffect(() => {
     if (!resultPending) return;
-    const settled = !!session && SETTLED_RUN.includes(session.task_status) && !["processing", "failed_retriable"].includes(session.result_state ?? "");
+    const settled = !!session && SETTLED_RUN.includes(session.task_status) && !resultUnsettled;
     if (settled || error) {
       setSettling(false);
       return;
@@ -100,15 +104,7 @@ export function BuilderPage() {
     // Still being turned into proposals: look again shortly.
     const timer = window.setTimeout(reloadModel, 3000);
     return () => window.clearTimeout(timer);
-  }, [resultPending, session, error, reloadModel]);
-  // A stale proposal is re-modelled by the user, not automatically: fill the
-  // composer and focus it, never send.
-  const remodel = (text: string) => {
-    const el = conversation.current;
-    if (!el) return;
-    el.value = text;
-    el.focus();
-  };
+  }, [resultPending, resultUnsettled, session, error, reloadModel]);
   useEffect(() => {
     Promise.all([modelingApi.materials(workspace.id), modelingApi.capabilities(workspace.id)])
       .then(([m, c]) => {
@@ -140,7 +136,7 @@ export function BuilderPage() {
     if (session && session.mode !== next)
       void act(async () => setSession(await modelingApi.save(session, session.draft, { mode: next })));
   };
-  const blocked = !capabilities?.agent_configured || running || busy || uploading;
+  const blocked = !capabilities?.agent_configured || running || resultPending || !!session?.pending_proposal_count || busy || uploading;
   const canSend = !blocked && (mode === "model"
     ? !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length || !!scenario.trim() || !!composerDraft.trim()
     : !!composerDraft.trim());
@@ -490,7 +486,7 @@ export function BuilderPage() {
               <BuilderConversationEmpty mode={mode} />
               <div slot="composer-actions" className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="min-w-0 flex-1" />
-                {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
+                {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : resultPending ? "上一轮结果还在处理，请稍候" : session?.pending_proposal_count ? "请先处理完待审提案，或在提案上修订" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
                   <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
                 </Tooltip>}
               </div>
@@ -500,7 +496,7 @@ export function BuilderPage() {
             <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
               {openPlan
                 ? <PlanPanel plan={openPlan} onClose={() => setOpenPlan(null)} />
-                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} onRemodel={remodel} />}
+                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} />}
             </div>
           )}
         </div>

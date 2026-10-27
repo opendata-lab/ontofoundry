@@ -137,19 +137,14 @@ def test_undo_of_a_delete_refuses_a_recreated_target(client):
     assert current(client, session)["draft"] == draft
 
 
-def test_undo_requires_accepted_dependents_and_reverts_them_first(client):
+def test_undo_expands_accepted_dependents_and_reverts_them_first(client):
     original = create_session(client)
     proposals = chain(original)
     proposals[2]["depends_on"] = ["po-no"]
     session, batch = accepted(client, original, proposals)
-    root, prop, link = batch["items"]
-    refused = decide(client, session, [(root["id"], "reject")])
-    assert refused.status_code == 422
-    assert refused.json()["error"]["code"] == "DEPENDENCY_INCOMPLETE"
-    assert current(client, session)["draft"] == session["draft"]
-    # Request ordering must not determine the draft application ordering.
-    response = decide(client, session, [(i["id"], "reject") for i in (root, prop, link)])
+    response = decide(client, session, [(batch["items"][0]["id"], "reject")])
     assert response.status_code == 200, response.text
+    assert len(response.json()["results"]) == 3
     assert response.json()["session"]["draft"] == original["draft"]
     assert response.json()["session"]["revision"] == session["revision"] + 1
 

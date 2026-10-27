@@ -5,7 +5,7 @@ import { byId, effectiveProperties } from "../../lib/coreModel";
 import { SectionTitle, StatusMark } from "../layout";
 import { ReviewEvidence } from "./EvidencePopover";
 import { ProposalActions, ProposalStatusMark, type CardActions } from "./ProposalCard";
-import { OPERATION, STATUS } from "./elementMeta";
+import { OPERATION } from "./elementMeta";
 import { FieldDiff } from "./FieldDiff";
 import { useSourceIssues } from "./ProposalSourceIssues";
 import { useConnectionNames } from "../../hooks/useConnectionNames";
@@ -50,7 +50,7 @@ function ReviseDialog({
       ) : (
         <div className="flex flex-col gap-3">
           <p className="m-0 text-xs text-muted">
-            提案不再新建实例，而是更新已有实例：保留已有证据，追加本提案的证据；提案中有值的属性覆盖已有值。修订后会生成新的待审提案。
+            提案不再新建实例，而是更新已有实例：保留已有证据，追加本提案的证据；提案中有值的属性覆盖已有值。修订在当前批次内保存，并重新校验全部待审提案。
           </p>
           <Table
             size="small"
@@ -143,7 +143,7 @@ export function ProposalDetail({
             {item.status === "accepted"
               ? "已接受。拒绝将撤销此项修改。"
               : item.status === "rejected"
-                ? "恢复后回到待审；冲突项会保留原标记。"
+                ? "恢复后回到待审，并重新校验整个批次。"
                 : blocked || "接受后将更新本体草稿。"}
           </Text>
           <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} size="middle" />
@@ -151,9 +151,6 @@ export function ProposalDetail({
       }
     >
       <div className="flex max-h-review-detail flex-col gap-4 overflow-auto">
-        {["conflict", "stale"].includes(item.status) && (
-          <Alert type="warning" showIcon message={`${STATUS[item.status]}：${item.status_reason || "当前目标已发生变化，请重新评估"}`} />
-        )}
         {source.notes}
         {source.dialogs}
         {canRevise && (

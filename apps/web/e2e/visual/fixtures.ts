@@ -369,10 +369,11 @@ function reviewItem(overrides: Partial<ProposalItem>): ProposalItem {
 const REVIEW_BATCH: ProposalBatchDetail = {
   id: "batch-visual-review",
   status: "available",
+  read_only: false,
   created_at: "2026-10-17T02:00:00Z",
   source_session_revision: 7,
   base_version_id: "ver-visual-demo-2",
-  counts: { pending: 3, accepted: 1, rejected: 1, stale: 1, conflict: 0, superseded: 0, unacceptable: 0 },
+  counts: { pending: 3, accepted: 1, rejected: 1 },
   error: null,
   items: [
     reviewItem({}),
@@ -405,7 +406,6 @@ const REVIEW_BATCH: ProposalBatchDetail = {
     reviewItem({ id: "proposal-visual-name", ordinal: 2, display_name: "供应商名称", evidence: [] }),
     reviewItem({ id: "proposal-visual-accepted", ordinal: 3, status: "accepted", stored_status: "accepted", accepted_revision: 7 }),
     reviewItem({ id: "proposal-visual-rejected", ordinal: 4, status: "rejected", stored_status: "rejected" }),
-    reviewItem({ id: "proposal-visual-stale", ordinal: 5, status: "stale", status_reason: "目标在提案生成后已被修改" }),
   ],
 };
 
@@ -619,7 +619,7 @@ export const INSTANCE_FACT = ELEMENT_DRAFT.material_objects.find((item) => item.
 export const INSTANCE_LABEL = documentDisplayText(ELEMENT_DRAFT, INSTANCE_FACT);
 
 /** Fixed overview, conversation and document instances share the existing virtual workspace. */
-export async function mockCanvasApi(page: Page, options: { emptySession?: boolean; proposalIssue?: "unacceptable" } = {}) {
+export async function mockCanvasApi(page: Page, options: { emptySession?: boolean; proposalIssue?: "failed" } = {}) {
   await mockReviewApi(page);
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
   const overview: import("../../src/api/types").WorkspaceOverview = {
@@ -662,14 +662,12 @@ export async function mockCanvasApi(page: Page, options: { emptySession?: boolea
   };
   if (options.emptySession) responses[`${base}/sessions`] = { items: [] };
   if (options.proposalIssue) {
-    const reason = "关系的目标连接列不是唯一属性或完整标识；依赖该关系的提案不可接受";
-    responses[`${base}/sessions/${REVIEW_SESSION_ID}`] = { ...REVIEW_SESSION, task_status: "finished" };
-    const batch = structuredClone(REVIEW_BATCH);
-    batch.items.slice(0, 2).forEach((item) => { item.status = "unacceptable"; item.stored_status = "unacceptable"; item.status_reason = reason; });
-    batch.counts.unacceptable = 2;
-    batch.counts.pending = 1;
-    responses[`${base}/sessions/${REVIEW_SESSION_ID}/proposal-batches`] = { items: [batch], next_cursor: null };
-    responses[`${base}/sessions/${REVIEW_SESSION_ID}/proposal-batches/${batch.id}`] = batch;
+    responses[`${base}/sessions/${REVIEW_SESSION_ID}`] = {
+      ...REVIEW_SESSION, task_status: "finished", result_state: "failed_permanent",
+      pending_proposal_count: 0, latest_batch_id: null,
+      task_detail: "提案结果被拒收：候选图校验未通过，请修正后重新建模",
+    };
+    responses[`${base}/sessions/${REVIEW_SESSION_ID}/proposal-batches`] = { items: [], next_cursor: null };
   }
 
   await page.route(

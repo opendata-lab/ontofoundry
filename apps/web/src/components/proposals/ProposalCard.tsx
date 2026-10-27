@@ -13,10 +13,6 @@ const REVIEW_STATE: Record<ProposalStatus, StatusState> = {
   pending: "pending",
   accepted: "mapped",
   rejected: "unmapped",
-  stale: "partial",
-  conflict: "error",
-  superseded: "unmapped",
-  unacceptable: "error",
 };
 
 export function ProposalStatusMark({ status }: { status: ProposalStatus }) {
@@ -43,7 +39,6 @@ export function ProposalActions({
   actions: CardActions;
   size?: "small" | "middle";
 }) {
-  if (["superseded", "unacceptable"].includes(item.status)) return null;
   if (item.status === "rejected")
     return (
       <Button size={size} disabled={busy} aria-label={`恢复 ${item.display_name}`} onClick={() => actions.restore(item)}>
@@ -103,7 +98,6 @@ export function ProposalCard({
   const change = changes.find((entry) => entry.path === "name") ?? changes[0];
   const before = change ? valueText(change.before) : "无内容改动";
   const after = change ? valueText(change.after) : "补充证据";
-  const isBlocked = ["conflict", "stale", "unacceptable"].includes(item.status);
   const deps = requiredIds(item);
   const depNames = deps.map((id) => items?.find((entry) => entry.id === id)?.display_name ?? id).join("、");
   return (
@@ -111,7 +105,7 @@ export function ProposalCard({
       tabIndex={0}
       data-row={item.id}
       aria-label={`${reviewKindName(item.target_kind)} ${technical}，${OPERATION[item.operation]}，${STATUS[item.status]}。按 Enter 查看详情`}
-      className={`flex cursor-pointer items-start gap-2 border-b border-rule-soft px-4 py-2 outline-none hover:bg-surface-soft focus-visible:bg-accent-soft ${selected ? "bg-accent-soft" : ""} ${isBlocked ? "border-l-2 border-l-danger" : ""}`}
+      className={`flex cursor-pointer items-start gap-2 border-b border-rule-soft px-4 py-2 outline-none hover:bg-surface-soft focus-visible:bg-accent-soft ${selected ? "bg-accent-soft" : ""}`}
       onClick={(event) => {
         if (!(event.target as HTMLElement).closest("button,input,label,.ant-popover")) actions.open(item);
       }}
@@ -176,12 +170,7 @@ export function ProposalCard({
           <strong className="truncate">{after}</strong>
           {changes.length > 1 && <Text type="secondary">+{changes.length - 1}</Text>}
         </div>
-        {isBlocked && (
-          <Text type="danger" className="text-xs" title={item.status_reason}>
-            {item.status_reason || "当前目标已发生变化，请重新评估"}
-          </Text>
-        )}
-        {!isBlocked && item.status === "pending" && blocked.startsWith("数据来源未就绪") && (
+        { item.status === "pending" && blocked.startsWith("数据来源未就绪") && (
           <Text type="danger" className="text-xs" title={blocked}>
             {blocked}
           </Text>

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "status": {
+      "const": "available",
+      "title": "Status",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "source_session_revision": {
+      "title": "Source Session Revision",
+      "type": "integer"
+    },
+    "base_version_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Base Version Id"
+    },
+    "counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "propertyNames": {
+        "enum": [
+          "pending",
+          "accepted",
+          "rejected"
+        ]
+      },
+      "title": "Counts",
+      "type": "object"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Error"
+    },
+    "producer": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Producer"
+    },
+    "read_only": {
+      "title": "Read Only",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "status",
+    "created_at",
+    "source_session_revision",
+    "base_version_id",
+    "counts",
+    "error",
+    "producer",
+    "read_only"
+  ],
+  "title": "ProposalBatchSummary",
+  "type": "object"
+}

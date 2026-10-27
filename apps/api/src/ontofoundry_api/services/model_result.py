@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, or_, update
 
 from ontofoundry_api.contracts.proposals import (
     ProposalContractError,
     RunContext,
-    parse_result,
 )
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
-from ontofoundry_api.services.materials_lookup import material_lookup
-from ontofoundry_api.services.proposals import store_batch, store_failed_batch
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.proposal_apply import parse_agent
+from ontofoundry_api.services.proposals import store_batch
 
 logger = logging.getLogger(__name__)
 
@@ -76,8 +75,6 @@ def _finish_failure(
     detail: str,
 ) -> str:
     values: dict[str, Any] = {"result_state": state, "task_detail": detail}
-    if state == "failed_permanent":
-        values["task_status"] = "failed"
     if _guarded_result_values(app, session_id, task_id, claimed_at, **values):
         return state
     return _current_result_state(app, session_id)
@@ -143,7 +140,6 @@ async def _fail_with_workflow(
     found = await workflow_diagnostics(_client(app, workspace_id, session_id), topic_id)
     values: dict[str, Any] = {
         "result_state": "failed_permanent",
-        "task_status": "failed",
         "task_detail": detail
         + ("；已取回中间文件：" + "、".join(f["path"] for f in found) if found else ""),
     }
@@ -281,8 +277,7 @@ async def _consume_proposals(
     manifest: dict[str, Any],
     content: bytes,
 ) -> str:
-    """Store an ontofoundry.proposals/v1 result as a batch. Never touches the
-    draft: a session edited during the run only makes affected items stale."""
+    """Validate and store a complete batch within the result lease transaction."""
     if manifest.get("invalidated") or "pinned_draft" not in manifest:
         return _finish_failure(app, session_id, task_id, claimed_at,
             state="failed_permanent", detail="运行固定上下文已失效，请重新运行")
@@ -297,99 +292,48 @@ async def _consume_proposals(
         draft=manifest["pinned_draft"],
         instance_baseline=manifest.get("instance_baseline", {}),
     )
-    with app.state.session_factory() as db:
-        lookup = material_lookup(db, app.state.settings, workspace_id)
-        try:
-            parsed = parse_result(content, context, material_lookup=lookup)
-        except ProposalContractError as exc:
-            parsed, failure = None, exc
-        except Exception:
-            logger.exception("Unexpected proposal result validation failure")
-            parsed, failure = (
-                None,
-                ProposalContractError(
-                    "RESULT_VALIDATION_FAILED", "建模结果校验异常，请按本轮契约重新生成"
-                ),
-            )
-    if parsed is None:
-        # The run checked its result with the platform before writing it, so a
-        # rejection here is not something another model turn should paper over:
-        # the run ends with the reason.
+    try:
         with app.state.session_factory() as db:
-            current = db.scalar(
-                select(ModelingSessionRecord)
+            from ontofoundry_api.services.session_gate import lock_session
+            current = lock_session(db, workspace_id, session_id)
+            if (current.dataagent_task_id != task_id
+                or current.result_claimed_at is None
+                or current.result_claimed_at.replace(tzinfo=claimed_at.tzinfo) != claimed_at
+                or current.result_state != "processing"
+                or (current.run_manifest_json or {}).get("invalidated")):
+                return str(current.result_state or "")
+            parsed = parse_agent(db, app.state.settings, current, content, context)
+            store_batch(db, workspace_id=workspace_id, session_id=session_id,
+                        task_id=task_id, manifest=manifest, parsed=parsed,
+                        settings=app.state.settings)
+            changed = db.execute(
+                update(ModelingSessionRecord)
                 .where(
                     ModelingSessionRecord.id == session_id,
                     ModelingSessionRecord.dataagent_task_id == task_id,
+                    ModelingSessionRecord.last_result_task_id == task_id,
+                    ModelingSessionRecord.result_state == "processing",
                     ModelingSessionRecord.result_claimed_at == claimed_at,
                 )
-                .with_for_update()
+                .values(
+                    result_state="done",
+                    result_warnings=[],
+                    task_status="finished",
+                    task_detail=f"已生成 {len(parsed.items)} 条提案，请在“提案”中审阅",
+                    updated_at=utc_now(),
+                )
             )
-            if current is None:
+            if changed.rowcount != 1:
+                db.rollback()
                 return _current_result_state(app, session_id)
-            store_failed_batch(
-                db,
-                workspace_id=workspace_id,
-                session_id=session_id,
-                task_id=task_id,
-                manifest=manifest,
-                result_sha256=hashlib.sha256(content).hexdigest(),
-                code=failure.code,
-                message=str(failure),
-            )
             db.commit()
-        return await _fail_with_workflow(
-            app,
-            workspace_id,
-            session_id,
-            task_id,
-            claimed_at,
-            topic_id=topic_id,
-            manifest=manifest,
-            detail=f"提案结果被拒收：{failure}",
-        )
-
-    with app.state.session_factory() as db:
-        current = db.scalar(
-            select(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == task_id,
-                ModelingSessionRecord.result_claimed_at == claimed_at,
-            )
-            .with_for_update()
-        )
-        if current is None:
-            return _current_result_state(app, session_id)
-        store_batch(
-            db,
-            workspace_id=workspace_id,
-            session_id=session_id,
-            task_id=task_id,
-            manifest=manifest,
-            parsed=parsed,
-        )
-        changed = db.execute(
-            update(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == task_id,
-                ModelingSessionRecord.last_result_task_id == task_id,
-                ModelingSessionRecord.result_state == "processing",
-                ModelingSessionRecord.result_claimed_at == claimed_at,
-            )
-            .values(
-                result_state="done",
-                result_warnings=[],
-                task_status="finished",
-                task_detail=f"已生成 {len(parsed.items)} 条提案，请在“提案”中审阅",
-                updated_at=utc_now(),
-            )
-        )
-        if changed.rowcount != 1:
-            db.rollback()
-            return _current_result_state(app, session_id)
-        db.commit()
+    except (ServiceError, ProposalContractError) as exc:
+        return await _fail_with_workflow(app, workspace_id, session_id, task_id, claimed_at,
+            topic_id=topic_id, manifest=manifest, detail=f"提案结果被拒收：{exc}")
+    except Exception:
+        logger.exception("Unexpected proposal result validation failure")
+        return _finish_failure(app, session_id, task_id, claimed_at,
+            state="failed_permanent", detail="建模结果校验异常，请按本轮契约重新生成")
     return "done"
 
 
@@ -412,7 +356,6 @@ def exhaust_retriable_result(app: Any, session_id: str, task_id: str) -> str:
             )
             .values(
                 result_state="failed_permanent",
-                task_status="failed",
                 task_detail=detail,
                 updated_at=utc_now(),
             )

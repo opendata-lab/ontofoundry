@@ -401,7 +401,7 @@ def encode(value):
 
 
 def validate_file(
-    result_path, schema_path, context_path=None, *, repair=False, publish=None, origins=None
+    result_path, schema_path, context_path=None, *, repair=False, origins=None
 ):
     """origins: (fragment file, index) per merged item, so errors point at the part to fix."""
     errors, result, context = [], None, None
@@ -491,14 +491,11 @@ def validate_file(
         omitted = len(errors) - len(shown)
         summary = (
             f"检查未通过：共 {len(errors)} 条，显示 {len(shown)} 条" + (f"、省略 {omitted} 条" if omitted else "")
-            + f"。{'最终文件未替换。' if publish else ''}完整报告：{report_path}"
+            + f"。完整报告：{report_path}"
             + (f"。读后续：{command('read_input.py', str(report_path), '--pointer', f'/errors/{len(shown)}')}" if omitted else "")
         )
     else:
         summary = f"检查通过：{len(result['items'])} 条提案。完整报告：{report_path}"
-        if publish:
-            atomic_write(publish, result_bytes)
-            summary += f"。已发布：{publish}"
     print((summary + "\n" + "\n".join(shown)).strip())
     return int(bool(errors))
 
@@ -508,11 +505,10 @@ def main():
     parser.add_argument("--schema", required=True)
     parser.add_argument("--context")
     parser.add_argument("--repair", action="store_true")
-    parser.add_argument("--publish", help="检查通过后原子替换最终文件")
     parser.add_argument("result")
     args = parser.parse_args()
     return validate_file(
-        args.result, args.schema, args.context, repair=args.repair, publish=args.publish
+        args.result, args.schema, args.context, repair=args.repair
     )
 
 

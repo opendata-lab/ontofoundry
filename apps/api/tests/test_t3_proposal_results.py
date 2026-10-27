@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from copy import deepcopy
 from urllib.parse import urlsplit
 
 import pytest
@@ -20,7 +19,6 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
-from ontofoundry_api.services.proposals import dependency_map, effective_statuses
 
 
 def proposals_run(client) -> tuple[dict, dict]:
@@ -168,59 +166,10 @@ def test_consuming_the_same_result_twice_changes_nothing(client, monkeypatch):
     assert len(batches) == 1 and len(items) == 3
 
 
-def test_edits_during_the_run_only_make_affected_items_stale(client, monkeypatch):
-    session, manifest = proposals_run(client)
-    edited = deepcopy(session["draft"])
-    edited["object_types"][0]["description"] = "运行期间的人工修改"
-    with client.app.state.session_factory() as db:
-        item = db.get(ModelingSessionRecord, session["id"])
-        item.draft_json = edited
-        item.revision += 1
-        db.commit()
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
-
-    assert reconcile(client, session["id"]) == "done"
-
-    _, items, _ = stored(client, session["id"])
-    with client.app.state.session_factory() as db:
-        deps = dependency_map(
-            db, [items[0].batch_id], session["workspace_id"], session["id"]
-        )
-    statuses = effective_statuses(items, deps, edited)
-    assert statuses[items[2].id][0] == "stale"  # the edited target
-    assert statuses[items[0].id][0] == statuses[items[1].id][0] == "pending"
-    # Editing the target back makes the item pending again: nothing was written.
-    assert effective_statuses(items, deps, session["draft"])[items[2].id][0] == "pending"
 
 
-def test_a_new_batch_supersedes_older_pending_items_on_the_same_target(client, monkeypatch):
-    session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
-    assert reconcile(client, session["id"]) == "done"
 
-    second = {**manifest, "run_token": "f" * 32}
-    with client.app.state.session_factory() as db:
-        db.execute(
-            update(ModelingSessionRecord)
-            .where(ModelingSessionRecord.id == session["id"])
-            .values(
-                dataagent_task_id="task-2",
-                dataagent_run_token="f" * 32,
-                result_state="",
-                run_manifest_json=second,
-            )
-        )
-        db.commit()
-    install_download(monkeypatch, [result(second, some_items(session["draft"])[2:])])
-    assert reconcile(client, session["id"], "task-2") == "done"
 
-    _, items, _ = stored(client, session["id"])
-    by_batch = {}
-    for item in items:
-        by_batch.setdefault(item.batch_id, []).append(item)
-    old, new = sorted(by_batch.values(), key=len, reverse=True)
-    assert [i.status for i in old] == ["pending", "pending", "superseded"]
-    assert [i.status for i in new] == ["pending"]
 
 
 def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch):
@@ -241,20 +190,19 @@ def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch
     after = row(client, session["id"])
     assert after.dataagent_task_id == TASK_ID and after.dataagent_run_token == RUN_TOKEN
     assert "TARGET_HASH_MISMATCH" in after.task_detail or "提案结果被拒收" in after.task_detail
-    (batch,), items, _ = stored(client, session["id"])
-    assert batch.status == "failed" and items == []
+    batches, items, _ = stored(client, session["id"])
+    assert batches == [] and items == []
 
 
-def test_a_rejected_result_is_kept_as_a_failed_batch(client, monkeypatch):
+def test_a_rejected_result_creates_no_batch(client, monkeypatch):
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["run_token"] = "wrong"
     install_download(monkeypatch, [bad])
 
     assert reconcile(client, session["id"]) == "failed_permanent"
-    (batch,), items, _ = stored(client, session["id"])
-    assert batch.status == "failed" and items == []
-    assert batch.error_json["code"] == "RESULT_CONTEXT_MISMATCH"
+    batches, items, _ = stored(client, session["id"])
+    assert batches == [] and items == []
     assert row(client, session["id"]).draft_json == session["draft"]
 
 
@@ -382,7 +330,8 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
         assert response.status_code == 202, response.text
         with client.app.state.session_factory() as db:
             item = db.get(ModelingSessionRecord, session["id"])
-            item.task_status = "finished"
+            # Finished and settled, so the next turn may start.
+            item.task_status, item.result_state = "finished", "done"
             db.commit()
 
     turn()
@@ -407,7 +356,8 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     assert reconcile(client, session["id"]) == "failed_permanent"
     current = row(client, session["id"])
     assert current.result_state == "failed_permanent"
-    assert current.task_status == "failed"
+    # The run itself finished on DataAgent; only its result failed.
+    assert current.task_status == "finished"
     assert (
         current.task_detail
         == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
@@ -442,12 +392,13 @@ def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
     async def forbidden(self, **kwargs):
         pytest.fail("入库拒收不再发起修复运行")
 
-    monkeypatch.setattr(model_result, "parse_result", broken)
+    monkeypatch.setattr(model_result, "parse_agent", broken)
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert row(client, session["id"]).draft_json == session["draft"]
     batches, items, _ = stored(client, session["id"])
     assert items == []
-    assert batches[0].error_json["code"] == "RESULT_VALIDATION_FAILED"
+    assert batches == []
+    assert "校验异常" in row(client, session["id"]).task_detail
 
 

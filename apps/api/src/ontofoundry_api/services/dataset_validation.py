@@ -57,8 +57,8 @@ def check_dataset(db, workspace_id, dataset, settings=None, *, probe=False):
     return result
 
 
-def enforce_dataset(db, workspace_id, dataset, settings):
-    checked = check_dataset(db, workspace_id, dataset, settings, probe=dataset.source_kind == "query")
+def enforce_dataset(db, workspace_id, dataset, settings, *, probe=True):
+    checked = check_dataset(db, workspace_id, dataset, settings, probe=probe and dataset.source_kind == "query")
     if not checked["valid"]:
         raise DatasetSourceError("数据集来源未就绪", details={"diagnostics": checked["diagnostics"]})
     return dataset.model_copy(update={"columns": [DatasetColumn.model_validate(c) for c in checked["columns"]] if checked["columns"] is not None else dataset.columns})

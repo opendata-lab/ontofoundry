@@ -12,17 +12,8 @@ class ProposalCheckError(Strict):
     message: str
 
 
-class UnacceptableGroup(Strict):
-    client_refs: list[str | None]
-    item_count: int = Field(ge=1)
-    reason: str
-    code: str = "PROPOSAL_GROUP_UNACCEPTABLE"
-
-
 class ProposalCheckResponse(Strict):
     passed: bool
     contract_errors: list[ProposalCheckError]
-    unacceptable_groups: list[UnacceptableGroup]
     reviewable_count: int = Field(ge=0)
-    unacceptable_count: int = Field(ge=0)
 

@@ -23,20 +23,12 @@ export const STATUS: Record<ProposalStatus, string> = {
   pending: "待审",
   accepted: "已接受",
   rejected: "已拒绝",
-  stale: "已过期",
-  conflict: "冲突",
-  superseded: "已被取代",
-  unacceptable: "不可接受",
 };
 
 export const STATUS_COLOR: Record<ProposalStatus, string> = {
   pending: "default",
   accepted: "success",
   rejected: "default",
-  stale: "warning",
-  conflict: "error",
-  superseded: "default",
-  unacceptable: "error",
 };
 
 /** Heading like "属性 · 供应商.信用等级". */

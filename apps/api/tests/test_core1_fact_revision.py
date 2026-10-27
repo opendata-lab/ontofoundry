@@ -37,7 +37,10 @@ def test_fact_revision_only_revises_pending_proposal(client):
     old = client.get(
         ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}"
     ).json()
-    assert old["items"][0]["stored_status"] == "superseded"
+    assert revised.json()["id"] == batch["id"]
+    assert new_item["id"] == item["id"]
+    assert old["items"][0]["stored_status"] == "pending"
+    session["revision"] += 1
     accepted = decide(client, session, [(new_item["id"], "accept")])
     assert accepted.status_code == 200, accepted.text
     assert (
@@ -173,6 +176,8 @@ def test_fact_revision_preserves_upstream_dependencies_and_rewrites_endpoints(cl
     assert (
         next(i for i in before["items"] if i["target_id"] == target["target_id"]) == target
     )
+    # Revising a pending fact moves the session revision, like other revisions.
+    session = client.get(ROOT + f"/sessions/{session['id']}").json()
     accepted = decide(client, session, [(i["id"], "accept") for i in revised])
     assert accepted.status_code == 200, accepted.text
     assert (

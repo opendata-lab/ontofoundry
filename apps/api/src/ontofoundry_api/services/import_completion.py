@@ -1,4 +1,4 @@
-"""Explicit human corrections create new reviewable batches; reports stay immutable."""
+"""Update pending import candidates while keeping the original report immutable."""
 
 from __future__ import annotations
 
@@ -39,7 +39,6 @@ from ontofoundry_api.services.proposals import (
     batch_items,
     dependency_map,
     effective_statuses,
-    store_batch,
 )
 
 
@@ -258,7 +257,13 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         get_import,
         identities,
     )
-
+    from ontofoundry_api.services.instance_store import lock_workspace
+    from ontofoundry_api.services.session_gate import (
+        lock_session,
+        require_current_batch,
+        require_idle,
+    )
+    lock_workspace(db, workspace_id)
     record = get_import(db, workspace_id, adapter_id, import_id, lock=True)
     if not record.session_id:
         raise ConflictError("请先确认导入，再处理待补全", code="IMPORT_NOT_CONFIRMED")
@@ -276,15 +281,9 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
             raise ConflictError("同一补全请求不能提交不同内容", code="IDEMPOTENCY_CONFLICT")
         return {**confirmed_view(record), "batch_id": replay["batch_id"]}
     check_artifacts(record, settings, db=db)
-    session = db.scalar(
-        select(ModelingSessionRecord)
-        .where(
-            ModelingSessionRecord.id == record.session_id,
-            ModelingSessionRecord.workspace_id == workspace_id,
-        )
-        .with_for_update()
-        .execution_options(populate_existing=True)
-    )
+    session = lock_session(db, workspace_id, record.session_id)
+    require_idle(session)
+    require_current_batch(db, session, record.batch_id)
     if (
         session.revision != body.expected_session_revision
         or session.draft_sha256 != body.expected_draft_sha256
@@ -292,14 +291,6 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         raise ConflictError(
             "草稿已变化，请刷新报告后重新补全", code="SESSION_REVISION_CHANGED"
         )
-    if session.task_status in {
-        "submitting",
-        "queued",
-        "running",
-        "waiting_input",
-        "waiting_permission",
-    }:
-        raise ConflictError("建模运行中，请结束后再补全", code="SESSION_RUNNING")
     issue = next(
         (
             i
@@ -516,7 +507,6 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         raise ConflictError(
             "此修订已在当前草稿或待审提案中", code="IMPORT_COMPLETION_UNCHANGED"
         )
-    # Include all still-pending dependencies, so the replacement batch is self-contained.
     final_result = build_candidate_graph(
         CoreDraft.model_validate(session.draft_json),
         result.model,
@@ -527,7 +517,7 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         raise ConflictError(
             "修订结果没有可生成的新提案", code="IMPORT_COMPLETION_UNCHANGED"
         )
-    batch_id = str(uuid5(UUID(record.id), "completion:" + body.idempotency_key))
+    batch_id = record.batch_id
     lines = material_source_path(db, settings, correction_material).read_text().splitlines()
     for target in target_ids:
         evidence[target] = [
@@ -547,43 +537,24 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         lookup=material_lookup(db, settings, workspace_id),
         evidence_by_target=evidence,
     )
-    duplicate_batch = db.scalar(
-        select(ProposalBatchRecord.id).where(
-            ProposalBatchRecord.workspace_id == workspace_id,
-            ProposalBatchRecord.session_id == session.id,
-            ProposalBatchRecord.result_sha256 == parsed.result_sha256,
-        )
-    )
-    if duplicate_batch:
-        raise ConflictError(
-            "相同修订已生成提案，请审阅已有批次",
-            code="IMPORT_COMPLETION_UNCHANGED",
-            details={"batch_id": duplicate_batch},
-        )
-    store_batch(
-        db,
-        workspace_id=workspace_id,
-        session_id=session.id,
-        task_id=None,
-        manifest={
-            "run_token": "completion:" + body.idempotency_key,
-            "base_version_id": session.base_version_id,
-            "base_version_sha256": session.base_version_sha256,
-            "source_session_revision": session.revision,
-            "source_draft_sha256": session.draft_sha256,
-            "materials": [
-                {"id": correction_material.id, "sha256": correction_material.sha256}
-            ],
-            "producer": {
-                "kind": "import",
-                "adapter": record.adapter,
-                "report_id": record.id,
-                "issue_id": issue["id"],
-                "actor_id": actor_id,
-            },
-        },
-        parsed=parsed,
-    )
+    from ontofoundry_api.services.proposal_apply import save_pending, trial_apply
+    rows = batch_items(db, [batch_id], workspace_id, session.id)
+    pending = {row.target_id: row for row in rows if row.status == "pending"}
+    remap = {}
+    for item in parsed.items:
+        old_id = item.id
+        if item.target_id in pending:
+            row = pending[item.target_id]
+            item.id = row.id
+            item.evidence = evidence.get(item.target_id, row.evidence_json or [])
+        elif any(row.id == item.id for row in rows):
+            item.id = str(uuid5(UUID(batch_id), body.idempotency_key + ":" + item.target_id))
+        remap[old_id] = item.id
+    for item in parsed.items:
+        item.depends_on = [remap.get(dep, dep) for dep in item.depends_on]
+    trial = trial_apply(db, workspace_id, session, parsed.items, settings)
+    save_pending(db, session, batch_id, trial)
+    session.revision += 1
     record.completions_json = [
         *record.completions_json,
         {

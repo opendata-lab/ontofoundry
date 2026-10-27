@@ -9,7 +9,7 @@ from ontofoundry_api.db_models import ModelingSessionRecord
 @pytest.mark.parametrize(
     "status", ["submitting", "queued", "running", "waiting_input", "waiting_permission"]
 )
-def test_active_run_blocks_publish_but_not_proposal_draft_edits(client, status):
+def test_active_run_blocks_publish_and_draft_edits(client, status):
     s = create_session(client)
     with client.app.state.session_factory() as db:
         row = db.get(ModelingSessionRecord, s["id"])
@@ -18,8 +18,9 @@ def test_active_run_blocks_publish_but_not_proposal_draft_edits(client, status):
         db.commit()
     s["draft"]["object_types"][0]["description"] = "运行中编辑"
     response = save(client, s, s["draft"])
-    assert response.status_code == 200, response.text
-    assert publish(client, response.json()).status_code == 409
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "SESSION_RUNNING"
+    assert publish(client, s).status_code == 409
 
 
 def test_old_publish_envelope_rejected(client):

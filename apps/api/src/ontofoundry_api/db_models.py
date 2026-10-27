@@ -255,7 +255,7 @@ class ProposalBatchRecord(Base):
     )
     producer_json: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)
     result_sha256: Mapped[str] = mapped_column(String(64))
-    # validating | available | failed — never "stale": staleness is per item.
+    # Available batches contain only validated proposals.
     status: Mapped[str] = mapped_column(String(16))
     error_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime | None] = mapped_column(
@@ -302,8 +302,7 @@ class ProposalItemRecord(Base):
     )
     evidence_json: Mapped[list | None] = mapped_column(JSON, nullable=True, default=list)
     reason: Mapped[str | None] = mapped_column(Text, nullable=True, default="")
-    # Stored decision state only: pending | accepted | rejected | superseded.
-    # stale / conflict are derived on read and never written (design §7.3).
+    # Stored decision state: pending | accepted | rejected.
     status_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="pending")
     decided_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)

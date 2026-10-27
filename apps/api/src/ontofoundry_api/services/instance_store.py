@@ -251,6 +251,7 @@ def write(
     operation=None,
     lookup=None,
     model=None,
+    validated=False,
 ):
     """Compare-and-set content, evidence and history. Deleted IDs are never reused."""
     if kind not in INSTANCE_KINDS:
@@ -334,14 +335,15 @@ def write(
         needed = {e for link in related for e in (link["source_id"], link["target_id"])}
         if kind == "material_object":
             needed.add(target_id)
-        try:
-            validate_instances(
-                effective,
-                [o for identity, o in objects.items() if identity in needed],
-                related,
-            )
-        except ValueError as exc:
-            raise ServiceError(str(exc), code="VALIDATION_FAILED", status_code=422) from exc
+        if not validated:
+            try:
+                validate_instances(
+                    effective,
+                    [o for identity, o in objects.items() if identity in needed],
+                    related,
+                )
+            except ValueError as exc:
+                raise ServiceError(str(exc), code="VALIDATION_FAILED", status_code=422) from exc
         state = state or state_for(
             effective,
             published_model(db, workspace_id),

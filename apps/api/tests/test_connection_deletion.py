@@ -239,7 +239,7 @@ def test_historical_versions_and_decided_proposals_do_not_block_deletion(client,
             validation_json={}, sha256="fiction", published_by=DEV_USER_ID,
         ))
         session = add_session(db)
-        for status in ["accepted", "rejected", "superseded"]:
+        for status in ["accepted", "rejected"]:
             add_proposal(db, session, dataset(connection), status=status)
         db.commit()
     assert client.delete(ROOT + f"/connections/{connection}").status_code == 204

@@ -143,8 +143,9 @@ def test_two_sessions_cannot_overwrite_or_undo_each_other(client):
     first = response.json()["session"]
     refused = decide(client, other, [(two["items"][0]["id"], "accept")])
     assert (
-        refused.status_code == 409 and refused.json()["error"]["code"] == "PROPOSAL_STALE"
+        refused.status_code == 409 and refused.json()["error"]["code"] == "PROPOSAL_TARGET_CHANGED"
     )
+    assert decide(client, other, [(two["items"][0]["id"], "reject")]).status_code == 200
     current = baseline(client, other)["items"][0]
     other, _ = accept_all(
         client, other, [instance_update(current, values={"label": "重新审阅后修改"})]
@@ -549,6 +550,7 @@ def test_invalidated_run_cannot_store_results(client):
                 task_id="old-run",
                 manifest={"invalidated": "INSTANCE_STORE_CUTOVER"},
                 parsed=ParsedBatch(str(uuid4()), "a" * 64, []),
+                settings=client.app.state.settings,
             )
         assert error.value.code == "RUN_CONTEXT_INVALIDATED"
 

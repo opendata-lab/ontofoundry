@@ -11,15 +11,15 @@ from sqlalchemy import update
 from test_modeling import ROOT
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 
-from ontofoundry_api.api import agent_conversation
 from ontofoundry_api.db_models import ModelingSessionRecord
+from ontofoundry_api.services import modeling_runs
 
 
 @pytest.fixture(autouse=True)
 def _fresh_throttle():
-    agent_conversation._last_sync.clear()
+    modeling_runs._last_sync.clear()
     yield
-    agent_conversation._last_sync.clear()
+    modeling_runs._last_sync.clear()
 
 
 def _configure(client) -> None:
@@ -83,7 +83,7 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     assert len(batches) == 1 and len(items) == 3
 
     # Idempotent: a claimed run is neither asked about nor downloaded again.
-    agent_conversation._last_sync.clear()
+    modeling_runs._last_sync.clear()
     second = client.get(ROOT + "/sessions/" + session["id"]).json()
     assert second["task_status"] == "finished"
     assert second["pending_proposal_count"] == 3

@@ -71,19 +71,25 @@ def proposal_diagnostics(db, workspace_id, item):
     return result
 
 
-def revise_dataset(db, workspace_id, session_id, proposal_id, dataset, expected_revision):
-    session = db.get(ModelingSessionRecord, session_id)
+def revise_dataset(db, workspace_id, session_id, proposal_id, dataset, expected_revision, settings):
+    from ontofoundry_api.services.proposal_apply import save_pending, trial_pending
+    from ontofoundry_api.services.session_gate import (
+        lock_session,
+        require_current_batch,
+        require_idle,
+    )
+    session = lock_session(db, workspace_id, session_id)
+    require_idle(session)
     item = db.get(ProposalItemRecord, proposal_id)
-    if not session or session.workspace_id != workspace_id or not item or item.session_id != session_id or item.workspace_id != workspace_id:
+    if item is None or item.session_id != session_id or item.workspace_id != workspace_id:
         raise DatasetSourceError("提案不存在", code="PROPOSAL_NOT_FOUND", status_code=404)
+    require_current_batch(db, session, item.batch_id)
     if item.target_kind != "dataset" or item.status != "pending" or item.operation == "delete" or str(dataset.id) != item.target_id:
         raise DatasetSourceError("只有待审阅数据集提案可以修改来源", code="PROPOSAL_NOT_DECIDABLE")
+    trial = trial_pending(db, session, item.batch_id, settings, {item.id: dataset.model_dump(mode="json")})
     changed = db.execute(update(ModelingSessionRecord).where(ModelingSessionRecord.id == session_id, ModelingSessionRecord.revision == expected_revision).values(revision=expected_revision + 1))
     if changed.rowcount != 1:
         raise DatasetSourceError("会话已更新，请重新读取", code="SESSION_REVISION_CHANGED", status_code=409)
-    from ontofoundry_api.contracts.proposals import item_fingerprint
-    item.after_json = dataset.model_dump(mode="json")
-    item.fingerprint = item_fingerprint(item.operation, item.target_kind, item.target_id, item.after_json)
-    item.field_changes_json = []
+    save_pending(db, session, item.batch_id, trial)
     db.commit()
     return {"proposal_id": item.id, "session_revision": expected_revision + 1}

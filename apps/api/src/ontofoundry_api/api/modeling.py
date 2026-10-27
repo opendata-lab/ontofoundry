@@ -49,6 +49,7 @@ from ontofoundry_api.services.publish_preview import (
 )
 from ontofoundry_api.services.read_cache import session_reads, version_snapshots
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
+from ontofoundry_api.services.session_gate import lock_session, require_draft_edit
 from ontofoundry_api.services.version_diff import compare_snapshots
 from ontofoundry_api.services.workspaces import (
     get_workspace,
@@ -124,7 +125,9 @@ def save_element(
         )
         if not item:
             raise HTTPException(404, "建模会话不存在")
-        if item.revision != body.expected_session_revision or blocks_edits(item):
+        item = lock_session(db, workspace_id, item.id)
+        require_draft_edit(db, item)
+        if item.revision != body.expected_session_revision:
             raise ServiceError(
                 "内容已变化，请重新打开后再保存",
                 code="SESSION_REVISION_CHANGED",
@@ -383,13 +386,8 @@ def session_data(item):
     }
 
 
-def blocks_edits(item):
-    if item.abandoned_at is not None:
-        raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
-    return False
-
-
 def revise(db, item, revision, **values):
+    item = lock_session(db, item.workspace_id, item.id)
     if "draft_json" in values:
         if values["draft_json"].get("schema_version") != "core-1":
             raise ServiceError(
@@ -399,12 +397,16 @@ def revise(db, item, revision, **values):
             mode="json"
         )
         values["draft_sha256"] = draft_sha256(values["draft_json"])
+    # Only a real change to the draft waits for the run and the review; saving
+    # materials or settings carries the draft along unchanged.
+    if values.get("draft_sha256", item.draft_sha256) != item.draft_sha256 or (
+        "base_version_id" in values and values["base_version_id"] != item.base_version_id
+    ):
+        require_draft_edit(db, item)
     if "base_version_id" in values:
         values["base_version_sha256"] = version_snapshot_sha256(
             db, item.workspace_id, values["base_version_id"]
         )
-    if blocks_edits(item):
-        raise HTTPException(409, "当前会话正在生成，请等待完成或取消后编辑")
     guard = [
         ModelingSessionRecord.id == item.id,
         ModelingSessionRecord.revision == revision,
@@ -550,7 +552,8 @@ def resolve_merge(
 ):
     require_member(db, workspace_id, user.id)
     space = get_workspace(db, workspace_id)
-    item = get_modeling_session(db, workspace_id, session_id)
+    item = lock_session(db, workspace_id, session_id)
+    require_draft_edit(db, item)
     expected_current = body.expected_current_version_id
     revision = body.expected_session_revision
     if space.current_version_id != expected_current:
@@ -599,7 +602,7 @@ def resolve_merge(
 def schedule_run_sync(request: Request, background: BackgroundTasks, items) -> None:
     """Let reads converge a run nobody is watching: after the response, sync
     each session whose stored run state may lag DataAgent."""
-    from ontofoundry_api.api.agent_conversation import needs_run_sync, sync_session_run
+    from ontofoundry_api.services.modeling_runs import needs_run_sync, sync_session_run
 
     for item in items:
         if needs_run_sync(request.app, item):
@@ -700,7 +703,7 @@ async def read_session(
     """The session as it stands now: a run that has finished gets its result
     settled before the answer, so the page reading it after the conversation
     ends sees the new proposals."""
-    from ontofoundry_api.api.agent_conversation import needs_run_sync, settle_session_run
+    from ontofoundry_api.services.modeling_runs import needs_run_sync, settle_session_run
 
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
@@ -721,7 +724,8 @@ def save_session(
     user: Principal = Depends(current_principal),
 ):
     require_member(db, workspace_id, user.id)
-    item = get_modeling_session(db, workspace_id, session_id)
+    # revise() waits for the run and the review only when the draft changes.
+    item = lock_session(db, workspace_id, session_id)
     if body.draft.get("workspace_id") != workspace_id:
         raise ServiceError("草稿空间不匹配", code="WORKSPACE_MISMATCH", status_code=422)
     if body.draft.get("schema_version") != "core-1":
@@ -1045,7 +1049,8 @@ def preview_definition(
     from ontofoundry_api.services.join_validation import dataset_checks
 
     require_member(db, workspace_id, user.id)
-    item = get_modeling_session(db, workspace_id, session_id)
+    item = lock_session(db, workspace_id, session_id)
+    require_draft_edit(db, item)
     if item.revision != body.session_revision:
         raise ServiceError(
             "草稿已更新，请重新预览", code="SESSION_REVISION_CHANGED", status_code=409

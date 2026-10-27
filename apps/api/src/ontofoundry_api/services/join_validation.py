@@ -85,11 +85,16 @@ def dataset_checks(db, workspace_id, before, after, settings):
     return result
 
 
-def validate_join_columns(db, workspace_id, before, after, settings):
+def validate_join_columns(db, workspace_id, before, after, settings, *, probe=True, allow_unbound=False):
+    """Check changed datasets' sources. ``allow_unbound`` lets a proposal carry
+    a dataset whose connection the reviewer has yet to choose; accepting it
+    still requires one."""
     from ontofoundry_api.services.dataset_validation import enforce_dataset
 
     for index, dataset in datasets_to_check(before, after):
-        checked = enforce_dataset(db, workspace_id, dataset, settings)
+        if allow_unbound and not dataset.connection_id:
+            continue
+        checked = enforce_dataset(db, workspace_id, dataset, settings, probe=probe)
         after["datasets"][index] = checked.model_dump(mode="json")
 
     validate_source_columns(after)

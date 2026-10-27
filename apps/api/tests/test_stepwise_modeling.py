@@ -2,7 +2,6 @@
 
 import json
 from copy import deepcopy
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -255,7 +254,8 @@ def test_permanent_failure_records_only_workflow_excerpts_and_sizes(
         assert entry["path"] in current.task_detail
     assert "large-private-body" not in json.dumps(current.run_manifest_json)
     assert paths[-7:] == list(files)[:7]
-    assert current.task_status == "failed"
+    assert current.task_status == "finished"
+    assert current.result_state == "failed_permanent"
     assert (
         "没有产出提案" in current.task_detail
         if failure == "missing_result"

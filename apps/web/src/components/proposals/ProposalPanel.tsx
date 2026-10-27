@@ -17,15 +17,12 @@ type Props = {
   running: boolean;
   /** The session is still loading. */
   loading?: boolean;
-  onRemodel: (text: string) => void;
 };
-type StatusFilter = "pending" | "accepted" | "rejected" | "blocked" | "unacceptable";
+type StatusFilter = "pending" | "accepted" | "rejected";
 const STATUSES: { key: StatusFilter; label: string }[] = [
   { key: "pending", label: "待审" },
   { key: "accepted", label: "已接受" },
   { key: "rejected", label: "已拒绝" },
-  { key: "blocked", label: "冲突" },
-  { key: "unacceptable", label: "不可接受" },
 ];
 const KIND_ORDER: TargetKind[] = [
   "object_type",
@@ -39,7 +36,7 @@ const KIND_ORDER: TargetKind[] = [
   "material_link",
 ];
 const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
-  status === "blocked" ? ["stale", "conflict"].includes(item.status) : item.status === status;
+  item.status === status;
 
 // The latest modeling run's outcome belongs to the proposals it was meant to
 // produce, so a run that produced none says why here, not in the conversation.
@@ -68,7 +65,7 @@ export function ProposalPanel(props: Props) {
   );
 }
 
-function ProposalReview({ session, proposals, running, onRemodel }: Props & { session: ModelingSession }) {
+function ProposalReview({ session, proposals, running }: Props & { session: ModelingSession }) {
   const { detail } = proposals;
   const [reportOpen, setReportOpen] = useState(false);
   const producer = detail?.producer;
@@ -86,7 +83,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
   const [undoSteps, setUndoSteps] = useState<Parameters<ProposalsState["decide"]>[0][]>([]);
   const [undoBusy, setUndoBusy] = useState(false);
   const submitting = useRef(false);
-  const busy = proposals.busy || undoBusy;
+  const busy = proposals.busy || undoBusy || running || !!detail?.read_only;
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
   const matchesKind = (item: ProposalItem) => !kindFilter.length || kindFilter.includes(item.target_kind);
   const matchesSearch = (item: ProposalItem) => {
@@ -96,18 +93,12 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
   };
   const visible = items.filter((item) => matchesKind(item) && matchesSearch(item) && matchesStatus(item, status));
   const statusBase = items.filter((item) => matchesKind(item) && matchesSearch(item));
-  const hasConflicts = items.some((item) => matchesStatus(item, "blocked"));
-  const statusChoices = STATUSES.filter((tab) =>
-    tab.key === "blocked" ? hasConflicts || status === "blocked" :
-    tab.key === "unacceptable" ? items.some((item) => item.status === "unacceptable") : true);
+  const statusChoices = STATUSES;
   const acceptable = items.filter((item) => item.status === "pending" && !acceptanceBlock(item, byId));
-  const rejectable = items.filter((item) => ["pending", "stale", "conflict"].includes(item.status));
+  const rejectable = items.filter((item) => item.status === "pending");
   const selectedIds = [...selected].filter((id) => byId.has(id));
   const selectedVisible = visible.filter((item) => selected.has(item.id)).length;
   const hasFilters = !!kindFilter.length || !!terms.length || status !== "pending";
-  // Every decision bumps the session revision, so a moved revision alone is
-  // normal; warn only when it actually left proposals stale or conflicting.
-  const drifted = !!detail && hasConflicts && detail.source_session_revision !== session.revision;
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
     if (!toast || undoBusy) return;
@@ -184,7 +175,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
       </>}
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
       {!running && failedRun(session) && <Alert type="error" showIcon message={failedRun(session)} />}
-      {drifted && <Alert type="warning" showIcon message="草稿已更新，部分提案需要重新确认" />}
+      {detail?.read_only && <Alert type="info" showIcon message="新一轮已开始，此批次只读" />}
       {proposals.error && <Alert type="error" showIcon message={proposals.error} />}
       <Tabs
         size="small"
@@ -193,7 +184,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
         renderTabBar={(props, DefaultTabBar) => <PanelToolbar tabBar={<DefaultTabBar {...props} />} />}
         items={statusChoices.map((tab) => {
           const count = statusBase.filter((item) => matchesStatus(item, tab.key)).length;
-          const alert = tab.key === "blocked" && count > 0;
+          const alert = false;
           return {
             key: tab.key,
             label: (
@@ -268,7 +259,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
               </Button>
             </>
           ) : (
-            <Tooltip title={acceptable.length ? "接受全部可接受且无冲突的待审提案，不受当前筛选影响" : "没有可接受的无冲突待审提案"}>
+            <Tooltip title={acceptable.length ? "接受全部待审提案及其依赖，不受当前筛选影响" : "没有待审提案"}>
               <span className="inline-flex">
                 <Button
                   size="small"
@@ -382,7 +373,7 @@ function ProposalReview({ session, proposals, running, onRemodel }: Props & { se
           );
         }}
       >
-        <Text>将拒绝全部待审提案（含冲突 / 过期项），不受当前筛选影响。操作后可撤销。</Text>
+        <Text>将拒绝全部待审提案及其依赖项，不受当前筛选影响。新一轮开始前可撤销。</Text>
       </Modal>
     </div>
   );

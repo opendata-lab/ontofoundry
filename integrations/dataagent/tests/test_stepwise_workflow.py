@@ -25,6 +25,8 @@ def write_json(path, value):
 
 
 def invoke(monkeypatch, module, *args):
+    if module.__name__ == "prepare_result":
+        monkeypatch.setattr(module, "platform_check", lambda *_: True)
     monkeypatch.setattr(sys, "argv", [module.__name__ + ".py", *map(str, args)])
     return module.main()
 

@@ -4,15 +4,11 @@
 from ontofoundry_api.contracts.proposal_checks import (
     ProposalCheckError,
     ProposalCheckResponse,
-    UnacceptableGroup,
 )
-from ontofoundry_api.contracts.proposals import (
-    ProposalContractError,
-    RunContext,
-    parse_result,
-)
+from ontofoundry_api.contracts.proposals import RunContext
+from ontofoundry_api.db_models import ModelingSessionRecord
 from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.materials_lookup import material_lookup
+from ontofoundry_api.services.proposal_apply import parse_agent
 
 
 def context_from_manifest(manifest):
@@ -43,38 +39,9 @@ def context_from_manifest(manifest):
 def check_result(db, settings, manifest, raw):
     context = context_from_manifest(manifest)
     try:
-        parsed = parse_result(
-            raw, context, material_lookup(db, settings, context.workspace_id)
-        )
-    except ProposalContractError as exc:
-        return ProposalCheckResponse(
-            passed=False,
-            contract_errors=[
-                ProposalCheckError(
-                    code=exc.code, message=f"错误 [{exc.code}]：{exc}。本次仅检查，未入库。"
-                )
-            ],
-            unacceptable_groups=[],
-            reviewable_count=0,
-            unacceptable_count=0,
-        )
-    groups = {}
-    for item in parsed.items:
-        if item.status == "unacceptable":
-            groups.setdefault(item.atomic_group_id or item.id, []).append(item)
-    diagnostics = [
-        UnacceptableGroup(
-            client_refs=[i.client_ref for i in members],
-            item_count=len(members),
-            reason=f"错误 [PROPOSAL_GROUP_UNACCEPTABLE]：提案组 {', '.join(i.client_ref or str(i.ordinal) for i in members)}：{members[0].status_reason}。本次仅检查，未入库。下一步：修正该组片段后重新执行合并命令。",
-        )
-        for members in groups.values()
-    ]
-    count = sum(g.item_count for g in diagnostics)
-    return ProposalCheckResponse(
-        passed=not diagnostics,
-        contract_errors=[],
-        unacceptable_groups=diagnostics,
-        reviewable_count=len(parsed.items) - count,
-        unacceptable_count=count,
-    )
+        session = db.get(ModelingSessionRecord, context.session_id)
+        parsed = parse_agent(db, settings, session, raw, context)
+    except ServiceError as exc:
+        return ProposalCheckResponse(passed=False, contract_errors=[ProposalCheckError(
+            code=exc.code, message=f"错误 [{exc.code}]：{exc}。本次整批检查未通过，未入库。")], reviewable_count=0)
+    return ProposalCheckResponse(passed=True, contract_errors=[], reviewable_count=len(parsed.items))

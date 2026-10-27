@@ -414,6 +414,7 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
             },
         },
         parsed=parsed,
+        settings=settings,
     )
     record.session_id, record.batch_id, record.confirmation_sha256 = (
         session.id,

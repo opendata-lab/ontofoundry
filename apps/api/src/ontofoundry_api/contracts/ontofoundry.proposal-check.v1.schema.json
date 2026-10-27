@@ -19,46 +19,6 @@
       ],
       "title": "ProposalCheckError",
       "type": "object"
-    },
-    "UnacceptableGroup": {
-      "additionalProperties": false,
-      "properties": {
-        "client_refs": {
-          "items": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "title": "Client Refs",
-          "type": "array"
-        },
-        "item_count": {
-          "minimum": 1,
-          "title": "Item Count",
-          "type": "integer"
-        },
-        "reason": {
-          "title": "Reason",
-          "type": "string"
-        },
-        "code": {
-          "default": "PROPOSAL_GROUP_UNACCEPTABLE",
-          "title": "Code",
-          "type": "string"
-        }
-      },
-      "required": [
-        "client_refs",
-        "item_count",
-        "reason"
-      ],
-      "title": "UnacceptableGroup",
-      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -74,30 +34,16 @@
       "title": "Contract Errors",
       "type": "array"
     },
-    "unacceptable_groups": {
-      "items": {
-        "$ref": "#/$defs/UnacceptableGroup"
-      },
-      "title": "Unacceptable Groups",
-      "type": "array"
-    },
     "reviewable_count": {
       "minimum": 0,
       "title": "Reviewable Count",
-      "type": "integer"
-    },
-    "unacceptable_count": {
-      "minimum": 0,
-      "title": "Unacceptable Count",
       "type": "integer"
     }
   },
   "required": [
     "passed",
     "contract_errors",
-    "unacceptable_groups",
-    "reviewable_count",
-    "unacceptable_count"
+    "reviewable_count"
   ],
   "title": "ProposalCheckResponse",
   "type": "object"

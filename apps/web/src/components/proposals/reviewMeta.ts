@@ -67,7 +67,7 @@ export function requiredIds(item: ProposalItem): string[] {
   return [...new Set([...item.depends_on, ...item.dependency_group])].filter((id) => id !== item.id);
 }
 
-/** Block missing, rejected or stale dependencies, including transitive groups. */
+/** Block missing or rejected dependencies, including transitive groups. */
 export function acceptanceBlock(item: ProposalItem, byIdMap: Map<string, ProposalItem>, visited = new Set<string>()): string {
   if (item.status === "accepted") return "";
   if (item.status !== "pending") return item.status_reason || `提案${STATUS[item.status]}`;
@@ -104,7 +104,7 @@ export function decisionIds(items: ProposalItem[], requested: string[], decision
     if (decision === "accept") {
       if (item.status === "pending" && !acceptanceBlock(item, byIdMap)) accept(item);
     } else if (
-      decision === "restore" ? item.status === "rejected" : ["pending", "stale", "conflict", "accepted"].includes(item.status)
+      decision === "restore" ? item.status === "rejected" : ["pending", "accepted"].includes(item.status)
     )
       ids.add(id);
   }
@@ -113,7 +113,7 @@ export function decisionIds(items: ProposalItem[], requested: string[], decision
     while (changed) {
       changed = false;
       for (const item of items) {
-        if (item.status === "accepted" && !ids.has(item.id) && item.depends_on.some((id) => ids.has(id))) {
+        if (["pending", "accepted"].includes(item.status) && !ids.has(item.id) && (item.depends_on.some((id) => ids.has(id)) || items.some((peer) => ids.has(peer.id) && !!item.atomic_group_id && item.atomic_group_id === peer.atomic_group_id))) {
           ids.add(item.id);
           changed = true;
         }

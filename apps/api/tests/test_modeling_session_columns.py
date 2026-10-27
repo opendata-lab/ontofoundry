@@ -12,7 +12,7 @@ from sqlalchemy import JSON, DateTime, String, create_engine, inspect, text, upd
 
 from ontofoundry_api.api.modeling import revise, session_data
 from ontofoundry_api.database import Base, build_session_factory
-from ontofoundry_api.db_models import ModelingSessionRecord
+from ontofoundry_api.db_models import ModelingSessionRecord, WorkspaceRecord
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.errors import ServiceError
@@ -38,7 +38,12 @@ ACTIVE_STATUSES = (
 def session_factory(tmp_path):
     engine = create_engine(f"sqlite+pysqlite:///{tmp_path / 'model.db'}")
     Base.metadata.create_all(engine)
-    yield build_session_factory(engine)
+    factory = build_session_factory(engine)
+    with factory() as db:
+        # revise() locks the workspace row before touching the session.
+        db.add(WorkspaceRecord(id=str(DEMO_WORKSPACE_ID), slug="fiction_columns", name="虚构字段空间", created_by="test-user"))
+        db.commit()
+    yield factory
     engine.dispose()
 
 
@@ -119,15 +124,17 @@ def test_explicit_dataagent_model_columns_match_the_contract():
 
 
 @pytest.mark.parametrize("status", ACTIVE_STATUSES)
-def test_revise_allows_edits_in_core_proposal_runs(session_factory, status):
+def test_revise_refuses_draft_edits_while_a_run_is_active(session_factory, status):
+    # A session does one thing at a time: the draft a run started from is
+    # the draft its proposals are reviewed against.
     with session_factory() as db:
         item = _new_record(status=status)
         db.add(item)
         db.commit()
 
-        previous_revision = item.revision
-        result = revise(db, item, previous_revision, draft_json=item.draft_json)
-        assert result["revision"] == previous_revision + 1
+        with pytest.raises(ServiceError) as exc_info:
+            revise(db, item, item.revision, draft_json=item.draft_json)
+        assert exc_info.value.status_code == 409
 
 
 def test_revise_cas_rejects_status_changed_by_another_transaction(session_factory):

@@ -3,7 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from core1_fixtures import EXAMPLES_DIR, example_names
@@ -38,7 +38,42 @@ def import_root(wid, adapter="ontofoundry-core-1"):
     return f"/api/v1/modeling/workspaces/{wid}/imports/{adapter}"
 
 
+def prepare_sources(client, wid, raw, adapter):
+    from dataset_binding import _connection, _register
+
+    from ontofoundry_api.adapters.base import ImportContext
+    from ontofoundry_api.db_models import ConnectionRecord
+    from ontofoundry_api.services.dataset_sql import parse_query, physical_tables
+    from ontofoundry_api.services.imports import adapter_for
+
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return raw
+    translated = adapter_for(adapter).import_document(raw, ImportContext(UUID(wid)))
+    datasets = translated.model.model_dump(mode="json")["datasets"]
+    bind_datasets(client, {"datasets": datasets}, wid)
+    names = {}
+    with client.app.state.session_factory() as db:
+        for dataset in datasets:
+            if dataset["source_kind"] == "query":
+                kind = {"postgres": "postgresql", "mysql": "mysql", "doris": "mysql"}.get(dataset.get("dialect"), "postgresql")
+                connection = _connection(db, wid, kind)
+                dataset["connection_id"] = connection.id
+                for ref in physical_tables(parse_query(dataset["query_sql"], kind)):
+                    _register(db, connection, ref.schema or dataset.get("schema_name") or "public", ref.name, dataset["columns"])
+            connection = db.get(ConnectionRecord, dataset.get("connection_id"))
+            if connection:
+                names[dataset["id"]] = connection.name
+        db.commit()
+    if data.get("format") == "ontofoundry" and "draft" in data:
+        data["connection_names"] = names
+        return json.dumps(data, ensure_ascii=False).encode()
+    return raw
+
+
 def preview(client, wid, raw, adapter="ontofoundry-core-1"):
+    raw = prepare_sources(client, wid, raw, adapter)
     response = client.post(import_root(wid, adapter) + "?name=fiction.json", content=raw)
     assert response.status_code == 201, response.text
     return response.json()
@@ -144,7 +179,7 @@ def test_thirteen_native_files_preview_confirm_review_publish(client, space, nam
     for raw_dataset in fixture["draft"].get("datasets", []):
         if raw_dataset.get("dialect") in {"mysql", "doris"} and raw_dataset.get("source_kind", "table") == "table" and not raw_dataset.get("schema_name"):
             raw_dataset["schema_name"] = "fiction"
-    raw = json.dumps(fixture, ensure_ascii=False).encode()
+    raw = prepare_sources(client, space, json.dumps(fixture, ensure_ascii=False).encode(), "ontofoundry-core-1")
     p = preview(client, space, raw)
     assert not p["document_error"]
     assert not p["proposal_summary"]["blocked"]
@@ -344,10 +379,10 @@ def test_count_completion_is_explicit_reviewable_idempotent_and_report_immutable
     response = client.post(url, json=body)
     assert response.status_code == 200, response.text
     revised = response.json()
-    assert revised["batch_id"] != result["batch_id"]
+    assert revised["batch_id"] == result["batch_id"]
     assert client.post(url, json=body).json() == revised
     duplicate = client.post(
-        url, json={**body, "idempotency_key": "fiction-completion-duplicate"}
+        url, json={**body, "expected_session_revision": current["revision"] + 1, "idempotency_key": "fiction-completion-duplicate"}
     )
     assert (
         duplicate.status_code == 409
@@ -424,6 +459,7 @@ def test_dataset_metadata_completion_generates_proposal_without_changing_source_
     dataset = completion["dataset"]
     dataset["dialect"] = "postgres"
     dataset["columns"][0]["physical_type"] = "VARCHAR"
+    bind_datasets(client, {"datasets": [dataset]}, space)
     response = client.post(
         import_root(space, p["adapter"]) + f"/{p['import_id']}/completions",
         json={
@@ -456,7 +492,7 @@ def test_dataset_metadata_completion_generates_proposal_without_changing_source_
     )
 
 
-def test_correcting_conflicting_parent_unblocks_reverse_dependents_in_new_batch(
+def test_correcting_conflicting_parent_unblocks_dependents_in_current_batch(
     client, space
 ):
     from test_core1_import_matching import graph, object_type

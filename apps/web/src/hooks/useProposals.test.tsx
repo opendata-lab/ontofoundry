@@ -55,7 +55,7 @@ describe("useProposals", () => {
   it("puts refusal reasons on the items and resyncs", async () => {
     const { hook, onStale } = setup();
     vi.spyOn(proposalsApi, "decide").mockRejectedValue(
-      new ApiError("过期", 409, "PROPOSAL_STALE", undefined, {
+      new ApiError("目标已变化", 409, "PROPOSAL_TARGET_CHANGED", undefined, {
         items: [{ proposal_id: "p", reason: "目标已修改" }],
       }),
     );
@@ -69,8 +69,8 @@ describe("useProposals", () => {
     await waitFor(() => expect(proposalsApi.batches).toHaveBeenCalled());
     const batches = vi.mocked(proposalsApi.batches);
     const detail: ProposalBatchDetail = {
-      id: "b", status: "available", created_at: "", source_session_revision: 3, base_version_id: null,
-      counts: { pending: 0, accepted: 1, rejected: 0, stale: 0, conflict: 0, superseded: 0, unacceptable: 0 },
+      id: "b", status: "available", read_only: false, created_at: "", source_session_revision: 3, base_version_id: null,
+      counts: { pending: 0, accepted: 1, rejected: 0 },
       error: null,
       items: [],
     };

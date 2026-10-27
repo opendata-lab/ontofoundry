@@ -202,6 +202,7 @@ def test_topic_is_lazy_created_then_reused_across_refresh_and_second_send(
     assert len(refreshed.json()["messages"]) == 1
     assert _session_row(client, session["id"]).dataagent_topic_id == "topic-1"
 
+    client.get(base.removesuffix("/agent-conversation"))
     second = client.post(
         base + "/messages",
         json={"content": "第二轮", "metadata": {"mode": "chat"}},
@@ -308,7 +309,7 @@ def test_history_shows_the_users_words_and_never_a_run_credential(client, monkey
 
     assert response.status_code == 200, response.text
     user, assistant = response.json()["messages"]
-    assert user["content"] == "补充采购员"
+    assert user["content"] == prompt.replace(credential, "ofrun.***")
     assert "ofrun..eJ" not in response.text
     assert assistant["blocks"][0]["input"]["command"] == 'TOKEN="ofrun.***" curl …'
 
@@ -376,6 +377,7 @@ def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
         == 202
     )
     assert client.get(base).status_code == 200
+    client.get(base.removesuffix("/agent-conversation"))
     assert (
         client.post(base + "/messages", json={"content": "two", "metadata": {}}).status_code
         == 202
@@ -522,6 +524,7 @@ def test_unknown_deliver_outcome_stays_submitting_then_reconciles_without_redeli
         session["id"],
         updated_at=utc_now() - timedelta(seconds=121),
     )
+    client.get(base.removesuffix("/agent-conversation"))
     reconciled = client.get(base)
     assert reconciled.status_code == 200, reconciled.text
     assert reconciled.json()["run"]["task_id"] == "task-lost-response"
@@ -583,6 +586,7 @@ def test_new_topic_is_persisted_before_unknown_deliver_and_can_be_reconciled(
         session["id"],
         updated_at=utc_now() - timedelta(seconds=121),
     )
+    client.get(base.removesuffix("/agent-conversation"))
     reconciled = client.get(base)
     assert reconciled.status_code == 200, reconciled.text
     assert reconciled.json()["run"]["task_id"] == "task-first-turn"
@@ -680,7 +684,7 @@ def test_events_pass_through_frames_resubscribe_and_end_without_settling(
         return None
 
     _install_transport(monkeypatch, handler)
-    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
+    monkeypatch.setattr("ontofoundry_api.services.modeling_runs.reconcile_run", reconcile)
     monkeypatch.setattr("ontofoundry_api.api.agent_conversation.asyncio.sleep", no_sleep)
     response = client.get(_endpoint(session["id"]) + "/events")
     assert response.status_code == 200, response.text
@@ -772,90 +776,10 @@ def test_get_rebuilds_run_metadata_from_persisted_mode(client, monkeypatch):
     assert response.json()["run"]["metadata"] == {"mode": "model"}
 
 
-def test_slow_old_snapshot_cannot_project_over_a_new_task(client, monkeypatch):
-    """Browser A's late task-A response must not replace browser B's task B."""
-    _configure(client)
-    session = _create_session(client)
-    _set_session(
-        client,
-        session["id"],
-        task_status="running",
-        dataagent_topic_id="topic-1",
-        dataagent_task_id="task-old",
-        dataagent_run_token="old-token",
-    )
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/messages"):
-            return _messages_response([])
-        if request.url.path.endswith("/tasks/task-old"):
-            _set_session(
-                client,
-                session["id"],
-                task_status="running",
-                dataagent_task_id="task-new",
-                dataagent_run_token="new-token",
-            )
-            return httpx.Response(
-                200, json={"task_id": "task-old", "task_status": "finished"}
-            )
-        raise AssertionError(request.url.path)
-
-    _install_transport(monkeypatch, handler)
-    response = client.get(_endpoint(session["id"]))
-    assert response.status_code == 200, response.text
-    assert response.json()["run"]["task_id"] == "task-new"
-    assert response.json()["run"]["status"] == "running"
-    row = _session_row(client, session["id"])
-    assert row.dataagent_task_id == "task-new"
-    assert row.dataagent_run_token == "new-token"
-    assert row.task_status == "running"
 
 
-def test_snapshot_result_reconcile_returns_the_new_task_owner(client, monkeypatch):
-    _configure(client)
-    session = _create_session(client)
-    _set_session(
-        client,
-        session["id"],
-        task_status="finished",
-        dataagent_topic_id="topic-1",
-        dataagent_task_id="task-old",
-        dataagent_task_mode="model",
-        dataagent_run_token="old-token",
-    )
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/messages"):
-            return _messages_response([])
-        if request.url.path.endswith("/tasks/task-old"):
-            return httpx.Response(
-                200, json={"task_id": "task-old", "task_status": "finished"}
-            )
-        raise AssertionError(request.url.path)
 
-    async def reconcile(*args):
-        _set_session(
-            client,
-            session["id"],
-            task_status="running",
-            task_detail="new task running",
-            dataagent_task_id="task-new",
-            dataagent_task_mode="chat",
-            dataagent_run_token="new-token",
-        )
-        return ""
-
-    _install_transport(monkeypatch, handler)
-    monkeypatch.setattr("ontofoundry_api.api.agent_conversation.reconcile_run", reconcile)
-    response = client.get(_endpoint(session["id"]))
-    assert response.status_code == 200, response.text
-    assert response.json()["run"] == {
-        "task_id": "task-new",
-        "status": "running",
-        "detail": "new task running",
-        "metadata": {"mode": "chat"},
-    }
 
 
 def test_request_schema_has_no_revision_and_sanitizes_metadata(client, monkeypatch):
@@ -962,10 +886,10 @@ def test_stale_submitting_claims_matching_remote_task_without_redelivery(
         raise AssertionError(path)
 
     _install_transport(monkeypatch, handler)
-    response = client.get(_endpoint(session["id"]))
+    response = client.get(_endpoint(session["id"]).removesuffix("/agent-conversation"))
     assert response.status_code == 200, response.text
-    assert response.json()["run"]["task_id"] == "task-lost-response"
-    assert response.json()["run"]["status"] == "queued"
+    assert response.json()["dataagent_task_id"] == "task-lost-response"
+    assert response.json()["task_status"] == "queued"
     row = _session_row(client, session["id"])
     assert row.dataagent_task_id == "task-lost-response"
     assert row.task_status == "queued"
@@ -989,9 +913,9 @@ def test_stale_submitting_without_matching_task_becomes_failed(client, monkeypat
         return _messages_response([])
 
     _install_transport(monkeypatch, handler)
-    response = client.get(_endpoint(session["id"]))
+    response = client.get(_endpoint(session["id"]).removesuffix("/agent-conversation"))
     assert response.status_code == 200, response.text
-    assert response.json()["run"]["status"] == "failed"
+    assert response.json()["task_status"] == "failed"
     row = _session_row(client, session["id"])
     assert row.task_status == "failed"
     assert "重试" in row.task_detail
@@ -1022,10 +946,10 @@ def test_stale_reconciler_cannot_fail_a_newer_run(client, monkeypatch):
         return _messages_response([])
 
     _install_transport(monkeypatch, handler)
-    response = client.get(_endpoint(session["id"]))
+    response = client.get(_endpoint(session["id"]).removesuffix("/agent-conversation"))
     assert response.status_code == 200, response.text
-    assert response.json()["run"]["task_id"] == "task-new"
-    assert response.json()["run"]["status"] == "running"
+    assert response.json()["dataagent_task_id"] == "task-new"
+    assert response.json()["task_status"] == "running"
     row = _session_row(client, session["id"])
     assert row.dataagent_task_id == "task-new"
     assert row.dataagent_run_token == "new-token"
@@ -1045,9 +969,9 @@ def test_stale_first_submit_without_topic_is_released_and_can_retry(client, monk
         updated_at=utc_now() - timedelta(seconds=121),
     )
 
-    stale = client.get(_endpoint(session["id"]))
+    stale = client.get(_endpoint(session["id"]).removesuffix("/agent-conversation"))
     assert stale.status_code == 200, stale.text
-    assert stale.json()["run"]["status"] == "failed"
+    assert stale.json()["task_status"] == "failed"
     assert _session_row(client, session["id"]).task_status == "failed"
 
     def handler(request: httpx.Request) -> httpx.Response:

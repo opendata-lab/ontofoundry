@@ -20,9 +20,7 @@ def platform():
         report: ClassVar[dict] = {
             "passed": True,
             "contract_errors": [],
-            "unacceptable_groups": [],
             "reviewable_count": 1,
-            "unacceptable_count": 0,
         }
         requests: ClassVar[list] = []
 
@@ -100,23 +98,17 @@ def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, pla
     handler.report = {
         "passed": False,
         "reviewable_count": 1,
-        "unacceptable_count": 2,
         "contract_errors": [
             {
                 "code": "RESULT_CONTEXT_MISMATCH",
                 "message": "错误 [RESULT_CONTEXT_MISMATCH]：固定上下文不一致。下一步：修正片段。",
             }
         ],
-        "unacceptable_groups": [
-            {
-                "reason": "错误 [PROPOSAL_GROUP_UNACCEPTABLE]：目标列不唯一。下一步：修正关系。"
-            }
-        ],
     }
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
     assert not prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "错误 [RESULT_CONTEXT_MISMATCH]" in output and "目标列不唯一" in output
+    assert "错误 [RESULT_CONTEXT_MISMATCH]" in output
     assert "copyable-retry-command" in output and "平台检查通过" not in output
     assert Path("candidate.platform-check.json").is_file()
 
@@ -139,11 +131,11 @@ def test_platform_http_errors_are_explicit(
     assert code in output and "平台检查通过" not in output and "ofrun." not in output
 
 
-def test_missing_config_skips_without_claiming_success(tmp_path, monkeypatch, capsys):
+def test_missing_config_fails_without_claiming_success(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    assert prepare.platform_check({}, {}, Path("unused.json"), "copyable-retry-command")
+    assert not prepare.platform_check({}, {}, Path("unused.json"), "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "提示 [PLATFORM_CHECK_SKIPPED]" in output and "平台检查通过" not in output
+    assert "PLATFORM_CHECK_CONFIG_MISSING" in output and "平台检查通过" not in output
 
 
 def test_main_preserves_final_result_when_platform_rejects(
@@ -183,10 +175,8 @@ def test_main_preserves_final_result_when_platform_rejects(
         {"passed": True},
         {
             "passed": True,
-            "contract_errors": [],
-            "unacceptable_groups": [],
+            "contract_errors": [{"message": "候选图错误"}],
             "reviewable_count": 1,
-            "unacceptable_count": 2,
         },
     ],
 )
@@ -210,37 +200,8 @@ def test_the_platform_check_file_alone_is_enough(tmp_path, monkeypatch, capsys, 
     assert handler.requests and "平台检查通过" in capsys.readouterr().out
 
 
-def test_unacceptable_groups_can_be_dropped_and_the_rest_delivered(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    batch = {"items": [{"client_ref": "a"}, {"client_ref": "b"}, {"client_ref": "c"}]}
-    candidate = Path("candidate.json")
-    candidate.write_text(json.dumps(batch))
-    report = {
-        "passed": False,
-        "contract_errors": [],
-        "unacceptable_groups": [{"client_refs": ["a", "b"], "reason": "英文标识重复"}],
-        "reviewable_count": 1,
-        "unacceptable_count": 2,
-    }
-    Path("candidate.platform-check.json").write_text(json.dumps(report))
-    assert prepare.drop_unacceptable(batch, candidate) == ["a", "b"]
-    assert json.loads(candidate.read_text())["items"] == [{"client_ref": "c"}]
 
 
-@pytest.mark.parametrize(
-    "report",
-    [
-        {"contract_errors": [{"message": "契约错误"}], "unacceptable_groups": [{"client_refs": ["a"]}]},
-        {"contract_errors": [], "unacceptable_groups": [{"client_refs": []}]},
-        {"contract_errors": [], "unacceptable_groups": [{"client_refs": ["a", "b", "c"]}]},
-    ],
-)
-def test_contract_errors_or_unnamed_groups_are_never_dropped(tmp_path, monkeypatch, report):
-    monkeypatch.chdir(tmp_path)
-    batch = {"items": [{"client_ref": "a"}, {"client_ref": "b"}, {"client_ref": "c"}]}
-    candidate = Path("candidate.json")
-    candidate.write_text(json.dumps(batch))
-    Path("candidate.platform-check.json").write_text(json.dumps(report))
-    assert prepare.drop_unacceptable(batch, candidate) is None
-    assert len(json.loads(candidate.read_text())["items"]) == 3
+
+
 

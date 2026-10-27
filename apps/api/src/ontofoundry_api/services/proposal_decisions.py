@@ -127,18 +127,18 @@ def _inverse(item: ProposalItemRecord, context: dict) -> SimpleNamespace:
 
 
 def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str, settings):
-    instance_store.lock_workspace(db, workspace_id)
-    # 1. Lock the session row.
-    session = db.scalar(
-        select(ModelingSessionRecord)
-        .where(
-            ModelingSessionRecord.id == session_id,
-            ModelingSessionRecord.workspace_id == workspace_id,
-        )
-        .with_for_update()
+    from ontofoundry_api.services.proposal_apply import (
+        apply_trial,
+        stored_items,
+        trial_apply,
+        trial_pending,
     )
-    if session.abandoned_at is not None:
-        raise _fail(409, "SESSION_ABANDONED", "会话已放弃")
+    from ontofoundry_api.services.session_gate import (
+        lock_session,
+        require_current_batch,
+        require_idle,
+    )
+    session = lock_session(db, workspace_id, session_id)
     # 2. Idempotency before anything else, so a replay after success returns
     #    the first response even though the revision has moved on.
     request_hash = _request_sha256(body)
@@ -153,6 +153,7 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         if previous.request_sha256 != request_hash:
             raise _fail(409, "IDEMPOTENCY_MISMATCH", "同一幂等键已用于不同的请求")
         return _decision_response(previous)
+    require_idle(session)
     # 2a. Revision.
     if session.revision != body.expected_session_revision:
         raise _fail(409, "SESSION_REVISION_CHANGED", "草稿已更新，请刷新后重新确认")
@@ -182,27 +183,46 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     batch_ids = sorted({item.batch_id for item in items.values()})
     batch_items = _batch_items(db, batch_ids, workspace_id, session_id)
     dependencies = dependency_map(db, batch_ids, workspace_id, session_id)
+    for batch_id in batch_ids:
+        require_current_batch(db, session, batch_id)
+    by_id = {item.id: item for item in batch_items}
     explicit = {d.proposal_id: d.decision for d in body.decisions}
     expanded = dict(explicit)
-    groups = {i.atomic_group_id for i in items.values() if i.atomic_group_id}
-    for group in groups:
-        members = [i for i in batch_items if i.atomic_group_id == group]
-        choices = {explicit[i.id] for i in members if i.id in explicit}
-        if len(choices) != 1:
-            raise _fail(409, "PROPOSAL_CONFLICT", "同一原子组不能收到相反决定")
-        for member in members:
-            expanded[member.id] = next(iter(choices))
-            items[member.id] = member
+
+    def include(identity, decision):
+        if identity in expanded and expanded[identity] != decision:
+            raise _fail(409, "PROPOSAL_CONFLICT", "依赖组不能收到相反决定")
+        expanded[identity] = decision
+
+    changed = True
+    while changed:
+        previous_expanded = dict(expanded)
+        for identity, decision in list(expanded.items()):
+            item = by_id[identity]
+            if item.atomic_group_id:
+                for peer in batch_items:
+                    if peer.atomic_group_id == item.atomic_group_id:
+                        include(peer.id, decision)
+            if decision in {"accept", "restore"}:
+                for dep in dependency_group(identity, dependencies):
+                    if dep == identity or by_id[dep].status == "accepted":
+                        continue
+                    required = "pending" if decision == "accept" else "rejected"
+                    if by_id[dep].status == required:
+                        include(dep, decision)
+                    elif decision == "accept":
+                        raise _fail(409, "PROPOSAL_NOT_DECIDABLE", "依赖提案已拒绝，请先恢复")
+            else:
+                for dep in dependent_group(identity, dependencies):
+                    if by_id[dep].status in {"pending", "accepted"}:
+                        include(dep, decision)
+        changed = previous_expanded != expanded
     if len(expanded) > 500:
-        raise _fail(422, "DEPENDENCY_INCOMPLETE", "展开后的原子组超过决定数量上限")
-    body = body.model_copy(
-        update={
-            "decisions": [
-                type(body.decisions[0])(proposal_id=i, decision=d)
-                for i, d in expanded.items()
-            ]
-        }
-    )
+        raise _fail(422, "DEPENDENCY_INCOMPLETE", "展开后的依赖组超过决定数量上限")
+    items = {identity: by_id[identity] for identity in expanded}
+    body = body.model_copy(update={"decisions": [
+        type(body.decisions[0])(proposal_id=i, decision=d) for i, d in expanded.items()
+    ]})
     draft = instance_store.session_snapshot(
         db, workspace_id, session_id, deepcopy(session.draft_json)
     )
@@ -224,16 +244,12 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
     for decision in body.decisions:
         status, reason = statuses[decision.proposal_id]
         if decision.decision == "accept" and status != "pending":
-            code = {"stale": "PROPOSAL_STALE", "conflict": "PROPOSAL_CONFLICT"}.get(
-                status, "PROPOSAL_NOT_DECIDABLE"
-            )
+            code = "PROPOSAL_NOT_DECIDABLE"
             problems.append(
                 (409, code, decision.proposal_id, reason or f"提案当前为 {status}")
             )
         elif decision.decision == "reject" and status not in (
             "pending",
-            "stale",
-            "conflict",
             "accepted",
         ):
             problems.append(
@@ -265,40 +281,6 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             items=[{"proposal_id": p[2], "reason": p[3]} for p in problems],
         )
 
-    # Dependency groups are accepted together (or were accepted before).
-    for proposal_id in accepts:
-        for dep in dependency_group(proposal_id, dependencies):
-            if dep == proposal_id:
-                continue
-            if by_id[dep].status == "accepted" and dep not in undoes:
-                continue
-            if dep not in accepts:
-                raise _fail(
-                    422,
-                    "DEPENDENCY_INCOMPLETE",
-                    "接受提案时必须一并接受其依赖",
-                    items=[{"proposal_id": proposal_id, "reason": f"缺少依赖 {dep}"}],
-                )
-
-    for proposal_id in undoes:
-        missing_dependents = [
-            dep
-            for dep in dependent_group(proposal_id, dependencies)
-            if by_id[dep].status == "accepted" and dep not in undoes
-        ]
-        if missing_dependents:
-            raise _fail(
-                422,
-                "DEPENDENCY_INCOMPLETE",
-                "撤销已接受提案时必须一并拒绝依赖它的已接受提案",
-                items=[
-                    {
-                        "proposal_id": proposal_id,
-                        "reason": "缺少已接受的依赖提案：" + "、".join(missing_dependents),
-                    }
-                ],
-            )
-
     before_mapping_write = deepcopy(draft)
     accepted_items = _topological([items[i] for i in accepts], dependencies)
     undone_items = list(reversed(_topological([items[i] for i in undoes], dependencies)))
@@ -309,53 +291,29 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         else:
             _check_undo(draft, item, {}, {})
         _apply(draft, _inverse(item, {}))
-    for item in accepted_items:
-        _apply(draft, item)
+    trial = None
+    if accepted_items:
+        trial = trial_apply(db, workspace_id, session, stored_items(accepted_items, dependencies), settings,
+                            draft=definitions(draft), accepting=True)
+        draft = trial.candidate
     changed_items = [*undone_items, *accepted_items]
     if changed_items:
-        try:
-            model = OntologyDraft.model_validate(definitions(draft))
-        except ValidationError as exc:
-            message = str(exc.errors()[0]["msg"]).removeprefix("Value error, ")
-            raise _fail(
-                422,
-                "VALIDATION_FAILED",
-                f"{'撤销' if undone_items else '接受'}后草稿校验未通过：{message}",
-                items=[{"proposal_id": i.id, "reason": message} for i in changed_items],
-            ) from exc
-        from ontofoundry_api.services.join_validation import validate_join_columns
-
-        checked_draft = model.model_dump(mode="json")
-        validate_join_columns(
-            db,
-            workspace_id,
-            definitions(before_mapping_write),
-            checked_draft,
-            settings,
-        )
-        check_identities(
-            db,
-            workspace_id,
-            {
-                item.target_id: item.target_kind
-                for item in accepted_items
-                if item.operation == "create" and item.target_kind not in INSTANCE_KINDS
-            },
-        )
         from ontofoundry_api.services.materials_lookup import material_lookup
-
-        checked_draft = instance_proposals.apply_changes(
-            db,
-            workspace_id,
-            session_id,
-            draft,
-            accepted_items,
-            undone_items,
-            actor_id,
-            material_lookup(db, settings, workspace_id),
-        )
-        draft = checked_draft
-        check_identities(db, workspace_id, element_kinds(draft))
+        if trial is not None and not undone_items:
+            draft = apply_trial(db, workspace_id, session_id, trial, accepted_items, actor_id,
+                                material_lookup(db, settings, workspace_id))
+        else:
+            from ontofoundry_api.services.join_validation import validate_join_columns
+            try:
+                model = OntologyDraft.model_validate(definitions(draft))
+            except ValidationError as exc:
+                raise _fail(422, "VALIDATION_FAILED", "撤销后草稿校验未通过：" + str(exc)) from exc
+            checked_draft = model.model_dump(mode="json")
+            validate_join_columns(db, workspace_id, definitions(before_mapping_write), checked_draft, settings, probe=False)
+            draft = {**draft, **checked_draft}
+            draft = instance_proposals.apply_changes(db, workspace_id, session_id, draft,
+                accepted_items, undone_items, actor_id, material_lookup(db, settings, workspace_id))
+            check_identities(db, workspace_id, element_kinds(draft))
 
     now = utc_now()
     new_revision = session.revision + 1 if changed_items else session.revision
@@ -389,6 +347,9 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
             item.status = "pending"
         item.decided_by, item.decided_at = actor_id, now
     db.flush()
+    if any(d.decision == "restore" for d in body.decisions):
+        for batch_id in batch_ids:
+            trial_pending(db, session, batch_id, settings)
     after_statuses = effective_statuses(
         _batch_items(db, batch_ids, workspace_id, session_id),
         dependencies,

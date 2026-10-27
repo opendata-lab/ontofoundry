@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from uuid import uuid4
 
 from dataset_binding import bind_datasets
+from sqlalchemy import select
 from test_modeling import ROOT, create_session, save
 
 from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, RunContext, parse_result
-from ontofoundry_api.db_models import ModelingSessionRecord, OntologyElementIdentityRecord
+from ontofoundry_api.db_models import (
+    ModelingSessionRecord,
+    OntologyElementIdentityRecord,
+    ProposalItemRecord,
+)
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
 from ontofoundry_api.services.demo import DEMO_WORKSPACE_ID
 from ontofoundry_api.services.materials_lookup import material_lookup
@@ -55,6 +61,7 @@ def seed_batch(
             task_id=None,
             manifest=manifest,
             parsed=parsed,
+            settings=client.app.state.settings,
         )
         db.commit()
     return client.get(
@@ -182,86 +189,46 @@ def test_accepting_an_update_writes_the_draft_once(client):
     assert body["session"]["pending_proposal_count"] == 0
 
 
-def test_dependencies_must_be_accepted_together(client):
+def test_acceptance_expands_pending_dependencies(client):
     session = create_session(client)
     po, prop, link = seed_batch(client, session, chain(session))["items"]
-
-    alone = decide(client, session, [(prop["id"], "accept")])
-    assert alone.status_code == 422
-    assert alone.json()["error"]["code"] == "DEPENDENCY_INCOMPLETE"
-    assert current(client, session)["revision"] == session["revision"]
-
-    together = decide(
-        client,
-        session,
-        [(po["id"], "accept"), (prop["id"], "accept"), (link["id"], "accept")],
-    )
-    assert together.status_code == 200, together.text
-    draft = together.json()["session"]["draft"]
-    assert {t["name"] for t in draft["object_types"]} >= {"purchase_order"}
-    assert any(p["name"] == "order_no" for p in draft["properties"])
-    assert any(link["name"] == "supplied_by" for link in draft["link_types"])
+    response = decide(client, session, [(link["id"], "accept"), (prop["id"], "accept")])
+    assert response.status_code == 200, response.text
+    assert {r["proposal_id"] for r in response.json()["results"]} == {po["id"], prop["id"], link["id"]}
+    assert {r["status"] for r in response.json()["results"]} == {"accepted"}
 
 
-def test_rejecting_a_root_makes_dependents_conflict_and_restore_undoes_it(client):
+def test_rejecting_a_root_rejects_dependents_and_restore_expands_dependencies(client):
     session = create_session(client)
-    batch = seed_batch(client, session, chain(session))
-    po, prop, _ = batch["items"]
-
-    rejected = decide(client, session, [(po["id"], "reject")])
-    assert rejected.status_code == 200
-    assert current(client, session)["draft"] == session["draft"]  # reject never writes
-    detail = client.get(
-        ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}"
-    ).json()
-    statuses = {i["id"]: i["status"] for i in detail["items"]}
-    assert statuses[po["id"]] == "rejected"
-    assert statuses[prop["id"]] == "conflict"
-
-    assert decide(client, session, [(po["id"], "restore")]).status_code == 200
-    detail = client.get(
-        ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}"
-    ).json()
-    assert {i["status"] for i in detail["items"]} == {"pending"}
-
-    not_rejected = decide(client, session, [(prop["id"], "restore")])
-    assert not_rejected.status_code == 409
-    assert not_rejected.json()["error"]["code"] == "PROPOSAL_NOT_RESTORABLE"
+    proposal_chain = chain(session)
+    proposal_chain[2]["depends_on"] = ["po-no"]
+    batch = seed_batch(client, session, proposal_chain)
+    root, _, leaf = batch["items"]
+    rejected = decide(client, session, [(root["id"], "reject")])
+    assert rejected.status_code == 200, rejected.text
+    assert {r["status"] for r in rejected.json()["results"]} == {"rejected"}
+    assert len(rejected.json()["results"]) == 3
+    assert current(client, session)["draft"] == session["draft"]
+    restored = decide(client, session, [(leaf["id"], "restore")])
+    assert restored.status_code == 200, restored.text
+    assert len(restored.json()["results"]) == 3
+    assert {r["status"] for r in restored.json()["results"]} == {"pending"}
+    refused = decide(client, session, [(leaf["id"], "restore")])
+    assert refused.status_code == 409
 
 
-def test_a_stale_item_cannot_be_accepted_until_its_target_is_back(client):
+def test_pending_proposals_block_draft_edits(client):
     session = create_session(client)
     target = session["draft"]["object_types"][0]
-    (item,) = seed_batch(
-        client, session, [update("object_type", target, description="提案")]
-    )["items"]
-
-    edited = current(client, session)
-    edited["draft"]["object_types"][0]["description"] = "人工改动"
-    edited = save(client, edited, edited["draft"]).json()
-    refused = decide(client, edited, [(item["id"], "accept")])
-    assert refused.status_code == 409
-    assert refused.json()["error"]["code"] == "PROPOSAL_STALE"
-    assert current(client, session)["revision"] == edited["revision"]
-
-    # Still rejectable while stale.
-    edited["draft"]["object_types"][0]["description"] = target["description"]
-    restored = save(client, edited, edited["draft"]).json()
-    assert decide(client, restored, [(item["id"], "accept")]).status_code == 200
-
-
-def test_an_accept_that_breaks_the_draft_changes_nothing(client):
-    session = create_session(client)
-    proposal = create(
-        "dup", "object_type", {"display_name": "新增对象", "name": "new_object"}
-    )
-    (item,) = seed_batch(client, session, [proposal])["items"]
-    session["draft"]["object_types"][0]["name"] = "new_object"
-    session = save(client, session, session["draft"]).json()
-    response = decide(client, session, [(item["id"], "accept")])
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "VALIDATION_FAILED"
+    seed_batch(client, session, [update("object_type", target, description="提案")])
+    draft = {**session["draft"], "object_types": [{**target, "description": "人工修改"}, *session["draft"]["object_types"][1:]]}
+    response = save(client, session, draft)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PENDING_PROPOSALS"
     assert current(client, session)["draft"] == session["draft"]
+
+
+
 
 
 def test_an_id_registered_as_another_kind_cannot_be_created(client):
@@ -324,23 +291,29 @@ def test_items_of_another_session_are_refused(client):
     assert response.json()["error"]["code"] == "PROPOSAL_NOT_FOUND"
 
 
-def test_edits_are_allowed_during_a_proposals_run_but_not_a_legacy_one(client):
+def test_edits_are_blocked_during_a_modeling_run(client):
     session = create_session(client)
     with client.app.state.session_factory() as db:
-        item = db.get(ModelingSessionRecord, session["id"])
-        item.task_status = "running"
-        item.run_manifest_json = {"result_contract": "proposals"}
+        row = db.get(ModelingSessionRecord, session["id"])
+        row.task_status = "running"
         db.commit()
-    session["draft"]["object_types"][0]["description"] = "运行中编辑"
-    assert save(client, session, session["draft"]).status_code == 200
+    edited = deepcopy(session["draft"])
+    edited["object_types"][0]["description"] = "运行中编辑"
+    response = save(client, session, edited)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "SESSION_RUNNING"
 
 
 def test_batches_page_by_keyset_cursor(client):
     session = create_session(client)
-    ids = [
-        seed_batch(client, session, chain(session)[:1], run_token=f"run-{i}")["id"]
-        for i in range(3)
-    ]
+    ids = []
+    for i in range(3):
+        ids.append(seed_batch(client, session, chain(session)[:1], run_token=f"run-{i}")["id"])
+        # A session reviews one batch before the next run produces another.
+        with client.app.state.session_factory() as db:
+            for item in db.scalars(select(ProposalItemRecord).where(ProposalItemRecord.batch_id == ids[-1])):
+                item.status = "rejected"
+            db.commit()
     first = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches?limit=2").json()
     assert len(first["items"]) == 2 and first["next_cursor"]
     rest = client.get(

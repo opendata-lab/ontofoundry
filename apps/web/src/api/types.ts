@@ -486,14 +486,7 @@ export type ElementSaveResult = {
 
 // --- proposals ------------------------------------------------------------
 
-export type ProposalStatus =
-  | "pending"
-  | "accepted"
-  | "rejected"
-  | "stale"
-  | "conflict"
-  | "superseded"
-  | "unacceptable";
+export type ProposalStatus = "pending" | "accepted" | "rejected";
 export type EvidenceView = Evidence & { material_name?: string; material_archived?: boolean };
 export type DuplicateCandidate = {
   id: UUID;
@@ -526,7 +519,7 @@ export type ProposalItem = {
   /** Where a declared rule (required) differs from the synced source column (nullable). */
   physical_differences?: { path: string; declared: string; observed: string; column: string; table: string; schema: string | null; connection_name: string; observed_at: ISOTime | null }[];
   status: ProposalStatus;
-  stored_status: "pending" | "accepted" | "rejected" | "superseded" | "unacceptable";
+  stored_status: ProposalStatus;
   status_reason: string;
   accepted_revision: number | null;
   decided_at: ISOTime | null;
@@ -534,7 +527,8 @@ export type ProposalItem = {
 export type ProposalBatch = {
   producer?: { kind?: string; adapter?: string; report_id?: UUID; issue_id?: UUID };
   id: UUID;
-  status: "validating" | "available" | "failed";
+  status: "available";
+  read_only: boolean;
   created_at: ISOTime;
   source_session_revision: number;
   base_version_id: UUID | null;
@@ -1050,7 +1044,5 @@ export type DocumentContext = VersionEnvelope & Pick<Draft, "material_objects" |
 export type ProposalCheckResponse = {
   passed: boolean;
   contract_errors: { code: string; message: string }[];
-  unacceptable_groups: { code: string; client_refs: (string | null)[]; item_count: number; reason: string }[];
   reviewable_count: number;
-  unacceptable_count: number;
 };

@@ -95,7 +95,6 @@ export function ModelResults({
   running = false,
   loading = false,
   busy = false,
-  onRemodel = () => undefined,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
@@ -103,7 +102,6 @@ export function ModelResults({
   /** The selected session has not arrived yet. */
   loading?: boolean;
   busy?: boolean;
-  onRemodel?: (text: string) => void;
 }) {
   const [params, setParams] = useSearchParams();
   // Draft rows and graph nodes open in place, like the semantic view.
@@ -188,7 +186,7 @@ export function ModelResults({
                     label: (
                       <span className="inline-flex items-center gap-2">提案 {pending > 0 && <StatusMark state="pending" label={pending} />}</span>
                     ),
-                    children: <ProposalPanel session={session} proposals={proposals} running={running} loading={loading} onRemodel={onRemodel} />,
+                    children: <ProposalPanel session={session} proposals={proposals} running={running} loading={loading} />,
                   },
                 ]
               : []),

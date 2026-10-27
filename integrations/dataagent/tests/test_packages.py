@@ -17,6 +17,7 @@ sys.path.insert(0, str(BASE))
 from build_packages import SKILLS, build
 from generate_output_schemas import INSTANCE_SOURCE, SOURCE, TARGETS, generate
 from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
+from test_platform_check import platform as platform
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +36,8 @@ def run(script, cwd, *args):
 
 
 @pytest.mark.parametrize("name", SKILLS)
-def test_each_archive_runs_in_isolation(name, packages, tmp_path):
+def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
+    _configure_check(tmp_path, platform[0])
     with ZipFile(packages / f"{name}.zip") as archive:
         assert all(path.startswith(name + "/") for path in archive.namelist())
         assert not any("/tests/" in path or "offline_budget.py" in path or "__pycache__" in path for path in archive.namelist())
@@ -87,7 +89,7 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path):
         item.pop("expected_target_hash", None)
     (tmp_path / "edits.json").write_text(json.dumps(edits))
     run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", "edits.json")
-    run(scripts / "prepare_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "--output", "mixed.json", "edits.json")
+    run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "--context", "context.json", "--schema", "schema.json", "--output", "mixed.json", "edits.json")
     run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "mixed.json")
     mixed = json.loads((tmp_path / "mixed.json").read_bytes())
     assert {i["target_kind"] for i in mixed["items"]} == {"property", "material_object", "material_link"}
@@ -102,6 +104,7 @@ def _pack(tmp_path):
     path = tmp_path / "work-pack.json"
     path.write_text(json.dumps({
         "context_file": "context.json", "schema_file": "schema.json", "result_file": "result.json",
+        "platform_check_file": "platform-check.json",
         "materials": [{"id": mid, "sha256": sha} for mid, sha in MATERIAL_HASHES.items()],
     }))
     return path
@@ -210,7 +213,9 @@ def test_plugin_install_only_copies_skills_and_reports_admin_work(packages, tmp_
     assert failed.returncode != 0 and not Path(env["SKILLS_ROOT_DIR"]).exists()
 
 
-def test_two_extraction_skills_merge_into_one_result(packages, tmp_path):
+def test_two_extraction_skills_merge_into_one_result(packages, tmp_path, platform):
+    _configure_check(tmp_path, platform[0])
+    _pack(tmp_path)
     for name in ("ontology-discovery", "entity-extraction"):
         with ZipFile(packages / f"{name}.zip") as archive:
             archive.extractall(tmp_path)
@@ -229,7 +234,17 @@ def test_two_extraction_skills_merge_into_one_result(packages, tmp_path):
         assert fragment
         (parts / f"{name}.json").write_text(json.dumps(fragment))
         run(skill / "scripts/check_part.py", tmp_path, "--schema", skill / "output-schema.json", "--context", "context.json", parts / f"{name}.json")
-    run(discovery / "scripts/prepare_result.py", tmp_path, "--schema", "schema.json", "--context", "context.json", "--output", "result.json", "parts")
+    run(discovery / "scripts/prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "--schema", "schema.json", "--context", "context.json", "--output", "result.json", "parts")
     result = json.loads((tmp_path / "result.json").read_bytes())
     assert len(result["items"]) == len(items)
     assert {i["target_kind"] for i in result["items"]} == {"object_type", "property", "link_type", "material_object", "material_link"}
+
+
+def _configure_check(tmp_path, origin):
+    wid = "11111111-1111-4111-8111-111111111111"
+    context = pinned(BASE / "shared/references/examples/create-object_type.json")
+    wid = context["run"]["workspace_id"]
+    (tmp_path / "platform-check.json").write_text(json.dumps({
+        "url": f"{origin}/api/v1/ontology/workspaces/{wid}/mcp",
+        "headers": {"Authorization": "Bearer ofrun.fictional"},
+    }))

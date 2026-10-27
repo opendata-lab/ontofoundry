@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import codecs
 import json
 import logging
 import re
 import secrets
-import threading
-import time
 from contextlib import suppress
-from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 import httpx
@@ -42,10 +40,6 @@ from ontofoundry_api.services.material_source import (
     material_source_path,
 )
 from ontofoundry_api.services.material_types import material_media_type
-from ontofoundry_api.services.model_result import (
-    exhaust_retriable_result,
-    reconcile_run,
-)
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
     encode,
@@ -55,15 +49,14 @@ from ontofoundry_api.services.modeling_input import (
     store_linked_tables_receipt,
     upload_work_pack,
 )
+from ontofoundry_api.services.modeling_runs import _persist_task_projection
 from ontofoundry_api.services.proposals import proposal_context, proposal_header
 from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import RunGrant
 from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
 from ontofoundry_api.services.run_credentials import issue as issue_run_credential
-from ontofoundry_api.services.tool_presentation import present_tool_value
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
-    TERMINAL_RUN_STATUSES,
     to_run_status,
 )
 
@@ -130,112 +123,8 @@ def redact_credentials(text: str) -> str:
     return _RUN_CREDENTIAL.sub("ofrun.***", text)
 
 
-# A modeling run reads whole context files and writes the result JSON through
-# tools, and the model thinks at length. Rendered in full that is hundreds of
-# KB of Markdown, enough to freeze the page for seconds. The chat only needs
-# to show what happened; DataAgent keeps the full record. Answers are never cut.
-TOOL_TEXT_LIMIT = 600
-REASONING_LIMIT = 1500
-
-
-def _shorten(text: str, limit: int, what: str) -> str:
-    if len(text) <= limit:
-        return text
-    return text[:limit] + f"\n…（{what}较长，已省略 {len(text) - limit} 字）"
-
-
-def _compact_tool_io(item: dict[str, Any]) -> dict[str, Any]:
-    item = present_tool_value(item)
-    output = item.get("output")
-    if isinstance(output, str):
-        item["output"] = _shorten(output, TOOL_TEXT_LIMIT, "工具输出")
-    elif isinstance(output, list):
-        item["output"] = [
-            {**part, "text": _shorten(part["text"], TOOL_TEXT_LIMIT, "工具输出")}
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
-            else part
-            for part in output
-        ]
-    if isinstance(item.get("input"), dict):
-        item["input"] = {
-            key: _shorten(value, TOOL_TEXT_LIMIT, "工具输入")
-            if isinstance(value, str)
-            else value
-            for key, value in item["input"].items()
-        }
-    return item
-
-
-def compact_event(event: dict[str, Any]) -> dict[str, Any]:
-    """One agent event or stored record, with tool I/O and reasoning bounded."""
-    data = event.get("data")
-    if not isinstance(data, dict):
-        return event
-    kind = str(event.get("event_type") or "")
-    if kind.startswith("tool."):
-        data = _compact_tool_io(data)
-    elif data.get("kind") == "reasoning" and isinstance(data.get("text"), str):
-        data = {**data, "text": _shorten(data["text"], REASONING_LIMIT, "思考过程")}
-    return {**event, "data": data}
-
-
-def compact_message(message: dict[str, Any]) -> dict[str, Any]:
-    blocks = message.get("blocks")
-    records = message.get("records")
-    if not isinstance(blocks, list) and not isinstance(records, list):
-        return message
-    message = dict(message)
-    if isinstance(records, list) and records and isinstance(blocks, list):
-        # The SDK renders from records when there are any; blocks would be a
-        # second copy of the same run that only costs parsing and reactivity.
-        message["blocks"] = []
-        blocks = None
-    if isinstance(blocks, list):
-        message["blocks"] = [
-            _compact_tool_io(block)
-            if isinstance(block, dict) and block.get("type") == "tool_use"
-            else {**block, "text": _shorten(block["text"], REASONING_LIMIT, "思考过程")}
-            if isinstance(block, dict)
-            and block.get("type") == "thinking"
-            and isinstance(block.get("text"), str)
-            else block
-            for block in blocks
-        ]
-    if isinstance(records, list):
-        message["records"] = [
-            compact_event(record) if isinstance(record, dict) else record
-            for record in records
-        ]
-    return message
-
-
-def _compact_payload(payload: str) -> str:
-    try:
-        event = json.loads(payload)
-    except ValueError:
-        return payload
-    if not isinstance(event, dict):
-        return payload
-    compacted = compact_event(event)
-    # Untouched events go through byte for byte.
-    return payload if compacted == event else json.dumps(compacted, ensure_ascii=False)
-
-
 def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    shown = []
-    for message in messages:
-        message = compact_message(message)
-        content = message.get("content")
-        if (
-            message.get("sender_type") == "user"
-            and isinstance(content, str)
-            and USER_MESSAGE_MARK in content
-        ):
-            message = {**message, "content": content.split(USER_MESSAGE_MARK, 1)[1]}
-        shown.append(
-            json.loads(redact_credentials(json.dumps(message, ensure_ascii=False)))
-        )
-    return shown
+    return json.loads(redact_credentials(json.dumps(messages, ensure_ascii=False)))
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
@@ -322,12 +211,6 @@ def _raise_dataagent(exc: DataAgentError) -> None:
     raise exc
 
 
-def _is_stale(updated_at: datetime) -> bool:
-    if updated_at.tzinfo is None:
-        updated_at = updated_at.replace(tzinfo=UTC)
-    return utc_now() - updated_at > timedelta(seconds=120)
-
-
 def _delivery_outcome_is_unknown(exc: DataAgentError) -> bool:
     """Whether deliver may have reached DataAgent before failing locally."""
     if exc.status_code == 408:
@@ -335,295 +218,6 @@ def _delivery_outcome_is_unknown(exc: DataAgentError) -> bool:
     if 400 <= exc.status_code < 500:
         return False
     return not isinstance(exc.__cause__, httpx.ConnectError)
-
-
-def _fail_stale_submission(
-    session_factory,
-    item: ModelingSessionRecord,
-    *,
-    detail: str,
-) -> bool:
-    """Release only the stale submitting generation observed by this request."""
-    with session_factory() as db:
-        changed = db.execute(
-            update(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == item.id,
-                ModelingSessionRecord.task_status == "submitting",
-                ModelingSessionRecord.dataagent_run_token
-                == str(item.dataagent_run_token or ""),
-                ModelingSessionRecord.dataagent_task_id.is_(None),
-            )
-            .values(
-                dataagent_task_id=None,
-                task_status="failed",
-                task_detail=detail,
-                updated_at=utc_now(),
-            )
-        )
-        db.commit()
-        return changed.rowcount == 1
-
-
-def _persist_task_projection(
-    session_factory,
-    session_id: str,
-    *,
-    task_id: str | None,
-    upstream_status: str,
-    detail: str,
-) -> str | None:
-    status = to_run_status(upstream_status)
-    with session_factory() as db:
-        values = {"dataagent_task_id": task_id, "task_status": status, "task_detail": detail}
-        current = db.get(ModelingSessionRecord, session_id)
-        if (
-            current is not None
-            and current.last_result_task_id == task_id
-            and current.result_state
-            and current.result_state != "processing"
-        ):
-            # The settled result owns status and detail (rejected, done); a
-            # later poll must not reset them to "finished".
-            values = {"dataagent_task_id": task_id}
-        changed = db.execute(
-            update(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == task_id,
-            )
-            .values(**values, updated_at=utc_now())
-        )
-        db.commit()
-    return (current.task_status if len(values) == 1 else status) if changed.rowcount == 1 else None
-
-
-def replacement_task_id(messages: list[dict[str, Any]], task_id: str) -> str | None:
-    """The task DataAgent started to continue `task_id`'s turn, if any: the
-    latest assistant message after it that belongs to another task."""
-    seen = False
-    found = None
-    for message in messages:
-        current = str(message.get("task_id") or "")
-        if current == task_id:
-            seen = True
-        elif seen and current and message.get("sender_type") == "assistant":
-            found = current
-    return found
-
-
-def _adopt_replacement(session_factory, session_id: str, old: str, new: str) -> bool:
-    with session_factory() as db:
-        changed = db.execute(
-            update(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == session_id,
-                ModelingSessionRecord.dataagent_task_id == old,
-            )
-            .values(
-                dataagent_task_id=new,
-                task_status="running",
-                task_detail="DataAgent 恢复了中断的任务，继续处理",
-                updated_at=utc_now(),
-            )
-        )
-        db.commit()
-    return changed.rowcount == 1
-
-
-def _current_run_projection(
-    session_factory,
-    session_id: str,
-) -> tuple[str | None, str, str, str, str]:
-    """Read the generation that currently owns the session."""
-    with session_factory() as db:
-        item = db.get(ModelingSessionRecord, session_id)
-        if item is None:  # pragma: no cover - the request already owns this row
-            return None, "", "", "chat", ""
-        return (
-            item.dataagent_task_id,
-            str(item.task_status or ""),
-            str(item.task_detail or ""),
-            _mode(item.dataagent_task_mode),
-            str(item.dataagent_run_token or ""),
-        )
-
-
-async def _reconcile_stale_submission(
-    request: Request,
-    item: ModelingSessionRecord,
-    messages: list[dict[str, Any]],
-    dataagent: DataAgentClient,
-) -> tuple[str | None, dict[str, Any] | None]:
-    token = str(item.dataagent_run_token or "")
-    task_id = next(
-        (
-            str(message.get("task_id"))
-            for message in reversed(messages)
-            if message.get("task_id")
-            and token
-            and token in str(message.get("content") or "")
-        ),
-        None,
-    )
-    if task_id:
-        task = await dataagent.task(task_id)
-        upstream_status = str(task.get("task_status") or "")
-        with request.app.state.session_factory() as db:
-            claimed = db.execute(
-                update(ModelingSessionRecord)
-                .where(
-                    ModelingSessionRecord.id == item.id,
-                    ModelingSessionRecord.task_status == "submitting",
-                    ModelingSessionRecord.dataagent_run_token == token,
-                    ModelingSessionRecord.dataagent_task_id.is_(None),
-                )
-                .values(
-                    dataagent_task_id=task_id,
-                    task_status=to_run_status(upstream_status),
-                    task_detail=_detail(upstream_status, task.get("error")),
-                    updated_at=utc_now(),
-                )
-            )
-            db.commit()
-        if claimed.rowcount == 1:
-            return task_id, task
-        return None, None
-
-    _fail_stale_submission(
-        request.app.state.session_factory,
-        item,
-        detail="未找到上次提交对应的 DataAgent 任务，请重试",
-    )
-    return None, None
-
-
-# Statuses a session read may sync from DataAgent. `submitting` is left to the
-# conversation view: reconciling it needs the topic's message history.
-SYNCABLE_RUN_STATUSES = ACTIVE_RUN_STATUSES - {"submitting"}
-_SYNC_INTERVAL_SECONDS = 3.0
-_sync_lock = threading.Lock()
-_syncing: set[str] = set()
-_last_sync: dict[str, float] = {}
-
-
-def needs_run_sync(app, item: ModelingSessionRecord) -> bool:
-    """Whether a session's stored run state may lag DataAgent: a live task, or a
-    finished model run whose result has not been claimed (or awaits a retry)."""
-    if not app.state.settings.dataagent_base_url or not item.dataagent_task_id:
-        return False
-    if item.task_status in SYNCABLE_RUN_STATUSES:
-        return True
-    return (
-        item.task_status == "finished"
-        and item.dataagent_task_mode == "model"
-        and (
-            item.last_result_task_id != item.dataagent_task_id
-            or item.result_state in {"failed_retriable", "processing"}
-        )
-    )
-
-
-async def sync_session_run(app, workspace_id: str, session_id: str) -> None:
-    """Bring one session's run up to date without a conversation view open.
-
-    Session reads schedule this after responding, so a run that finished while
-    nobody watched still gets its status and its proposal batch. It reuses the
-    view's guarded writes: a projection only lands on the task that still owns
-    the session, and results are claimed under the result lease, so concurrent
-    reads, views and workers converge on one outcome. Throttled per session.
-    """
-    now = time.monotonic()
-    with _sync_lock:
-        if (
-            session_id in _syncing
-            or now - _last_sync.get(session_id, -1e9) < _SYNC_INTERVAL_SECONDS
-        ):
-            return
-        if len(_last_sync) > 1024:  # forget sessions no longer throttled
-            for key in [
-                k for k, at in _last_sync.items() if now - at >= _SYNC_INTERVAL_SECONDS
-            ]:
-                del _last_sync[key]
-        _syncing.add(session_id)
-        _last_sync[session_id] = now
-    try:
-        await _sync_session_run(app, workspace_id, session_id)
-    except DataAgentError as exc:
-        logger.warning("同步会话 %s 的 DataAgent 任务失败：%s", session_id, exc)
-    finally:
-        with _sync_lock:
-            _syncing.discard(session_id)
-
-
-async def settle_session_run(app, workspace_id: str, session_id: str) -> None:
-    """Sync one session's run now, for a reader that needs its outcome.
-
-    Unthrottled: the result lease keeps concurrent settlement to one writer,
-    and a DataAgent outage leaves the stored state as it was."""
-    try:
-        await _sync_session_run(app, workspace_id, session_id)
-    except DataAgentError as exc:
-        logger.warning("同步会话 %s 的 DataAgent 任务失败：%s", session_id, exc)
-
-
-async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
-    with app.state.session_factory() as db:
-        item = db.get(ModelingSessionRecord, session_id)
-        if (
-            item is None
-            or item.workspace_id != workspace_id
-            or not needs_run_sync(app, item)
-        ):
-            return
-        task_id = str(item.dataagent_task_id)
-        topic_id = str(item.dataagent_topic_id or "")
-        status = str(item.task_status or "")
-
-    if status in SYNCABLE_RUN_STATUSES:
-        dataagent = _app_client(app, workspace_id, session_id)
-        task = await dataagent.task(task_id)
-        if (
-            str(task.get("task_status") or "") == "suspended"
-            and not task.get("cancel_requested_at")
-            and topic_id
-            and (
-                replacement := replacement_task_id(
-                    await dataagent.messages(topic_id), task_id
-                )
-            )
-            and _adopt_replacement(
-                app.state.session_factory, session_id, task_id, replacement
-            )
-        ):
-            task_id = replacement
-            task = await dataagent.task(replacement)
-        upstream_status = str(task.get("task_status") or "")
-        projected = _persist_task_projection(
-            app.state.session_factory,
-            session_id,
-            task_id=task_id,
-            upstream_status=upstream_status,
-            detail=_detail(upstream_status, task.get("error")),
-        )
-        if projected is None or projected not in TERMINAL_RUN_STATUSES:
-            return
-    await settle_result(app, workspace_id, session_id, task_id)
-
-
-async def settle_result(app, workspace_id: str, session_id: str, task_id: str) -> str:
-    """Claim a finished run's result, retrying a transient download failure
-    with backoff and failing visibly once the retries are spent."""
-    result_state = await reconcile_run(app, workspace_id, session_id, task_id)
-    if result_state in {"failed_retriable", "processing"}:
-        for delay in (2, 4, 8):
-            await asyncio.sleep(delay)
-            result_state = await reconcile_run(app, workspace_id, session_id, task_id)
-            if result_state not in {"failed_retriable", "processing"}:
-                break
-        if result_state == "failed_retriable":
-            result_state = exhaust_retriable_result(app, session_id, task_id)
-    return result_state
 
 
 @router.get("")
@@ -637,126 +231,17 @@ async def snapshot(
     require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
     if not item.dataagent_topic_id:
-        if item.task_status == "submitting" and _is_stale(item.updated_at):
-            detail = "上次提交未创建可对账的 DataAgent Topic，请重试"
-            if _fail_stale_submission(
-                request.app.state.session_factory,
-                item,
-                detail=detail,
-            ):
-                return {
-                    "messages": [],
-                    "run": _run_ref(
-                        None,
-                        "failed",
-                        mode=item.dataagent_task_mode,
-                        detail=detail,
-                    ),
-                }
-            task_id, status, detail, mode, _token = _current_run_projection(
-                request.app.state.session_factory,
-                item.id,
-            )
-            if task_id or status in ACTIVE_RUN_STATUSES | TERMINAL_RUN_STATUSES:
-                return {
-                    "messages": [],
-                    "run": _run_ref(
-                        task_id,
-                        "queued" if status == "submitting" else status,
-                        mode=mode,
-                        detail=detail,
-                    ),
-                }
         return {"messages": [], "run": None}
-
     _require_configured(request)
     dataagent = _client(request, workspace_id, session_id)
-    try:
-        messages = await dataagent.messages(item.dataagent_topic_id)
-        task_id = item.dataagent_task_id
-        task: dict[str, Any] | None = None
-        local_status = item.task_status
-        local_detail = item.task_detail
-        local_mode = _mode(item.dataagent_task_mode)
-        ownership_lost = False
-
-        if local_status == "submitting" and _is_stale(item.updated_at):
-            task_id, task = await _reconcile_stale_submission(
-                request, item, messages, dataagent
-            )
-            if task is None:
-                task_id, local_status, local_detail, local_mode, current_token = (
-                    _current_run_projection(
-                        request.app.state.session_factory,
-                        item.id,
-                    )
-                )
-                ownership_lost = current_token != str(item.dataagent_run_token or "")
-
-        if task_id and task is None and not ownership_lost:
-            task = await dataagent.task(task_id)
-            # DataAgent suspends a task it believes stalled (for example after a
-            # clock jump) and continues the turn in a replacement task. Follow
-            # it, rather than reporting a run the user never cancelled as cancelled.
-            if (
-                str(task.get("task_status") or "") == "suspended"
-                and not task.get("cancel_requested_at")
-                and (replacement := replacement_task_id(messages, task_id))
-                and _adopt_replacement(
-                    request.app.state.session_factory, item.id, task_id, replacement
-                )
-            ):
-                task_id = replacement
-                task = await dataagent.task(replacement)
-
-        if task is not None:
-            upstream_status = str(task.get("task_status") or "")
-            projected_status = _persist_task_projection(
-                request.app.state.session_factory,
-                item.id,
-                task_id=task_id,
-                upstream_status=upstream_status,
-                detail=_detail(upstream_status, task.get("error")),
-            )
-            if projected_status is None:
-                task_id, local_status, local_detail, local_mode, _current_token = (
-                    _current_run_projection(
-                        request.app.state.session_factory,
-                        item.id,
-                    )
-                )
-                ownership_lost = True
-            else:
-                local_status = projected_status
-                local_detail = _detail(upstream_status, task.get("error"))
-            if not ownership_lost and local_status in TERMINAL_RUN_STATUSES:
-                result_state = await reconcile_run(
-                    request.app, workspace_id, session_id, task_id
-                )
-                with request.app.state.session_factory() as current_db:
-                    current = current_db.get(ModelingSessionRecord, item.id)
-                    if current is not None:
-                        task_id = current.dataagent_task_id
-                        local_status = current.task_status
-                        local_detail = current.task_detail
-                        local_mode = _mode(current.dataagent_task_mode)
-                if result_state in {"failed_retriable", "processing"}:
-                    # Keep the SDK run reconnectable; only /events owns the
-                    # bounded automatic retry and eventual terminal event.
-                    local_status = "running"
-
-        run = None
-        if task_id or local_status in ACTIVE_RUN_STATUSES | TERMINAL_RUN_STATUSES:
-            visible_status = "queued" if local_status == "submitting" else local_status
-            run = _run_ref(
-                task_id,
-                visible_status,
-                mode=local_mode,
-                detail=local_detail,
-            )
-        return {"messages": present_messages(messages), "run": run}
-    except DataAgentError as exc:
-        _raise_dataagent(exc)
+    messages = await dataagent.messages(item.dataagent_topic_id)
+    run = None
+    if item.dataagent_task_id:
+        task = await dataagent.task(item.dataagent_task_id)
+        upstream_status = str(task.get("task_status") or "")
+        run = _run_ref(item.dataagent_task_id, to_run_status(upstream_status),
+                       mode=item.dataagent_task_mode, detail=_detail(upstream_status, task.get("error")))
+    return {"messages": present_messages(messages), "run": run}
 
 
 @router.post("/messages", status_code=202)
@@ -769,10 +254,9 @@ async def send_message(
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
     require_member(db, workspace_id, user.id)
-    item = get_modeling_session(db, workspace_id, session_id)
-    if item.abandoned_at is not None:
-        from ontofoundry_api.services.errors import ServiceError
-        raise ServiceError("会话已放弃", code="SESSION_ABANDONED", status_code=409)
+    from ontofoundry_api.services.session_gate import lock_session, require_draft_edit
+    item = lock_session(db, workspace_id, session_id)
+    require_draft_edit(db, item)
     _require_configured(request)
 
     # The session's mode is fixed; a message cannot switch it.
@@ -868,6 +352,10 @@ async def send_message(
             dataagent_task_mode=mode,
             dataagent_run_token=run_token,
             run_manifest_json=manifest,
+            result_state="",
+            last_result_task_id=None,
+            result_claimed_at=None,
+            result_warnings=[],
             revision=expected_revision + 1,
             updated_at=utc_now(),
         )
@@ -1098,6 +586,7 @@ async def send_message(
                 .where(
                     ModelingSessionRecord.id == item.id,
                     ModelingSessionRecord.dataagent_run_token == run_token,
+                    ModelingSessionRecord.task_status == "submitting",
                 )
                 .values(
                     task_status=status,
@@ -1174,9 +663,10 @@ async def events(
         reconnect_delay = 0.25
         while True:
             buffer = ""
+            decoder = codecs.getincrementaldecoder("utf-8")()
             saw_event = False
             async for chunk in dataagent.stream(task_id, cursor):
-                buffer += chunk.decode("utf-8", errors="replace")
+                buffer += decoder.decode(chunk)
                 frames, buffer = _event_frames(buffer)
                 for frame in frames:
                     payload = _data_payload(frame)
@@ -1186,15 +676,16 @@ async def events(
                     with suppress(ValueError, TypeError):
                         event = json.loads(payload)
                         cursor = max(cursor, int(event.get("seq_id") or cursor))
-                    yield f"event: agent-event\ndata: {redact_credentials(_compact_payload(payload))}\n\n"
+                    yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
 
+            buffer += decoder.decode(b"", final=True)
             payload = _data_payload(buffer)
             if payload is not None:
                 saw_event = True
                 with suppress(ValueError, TypeError):
                     event = json.loads(payload)
                     cursor = max(cursor, int(event.get("seq_id") or cursor))
-                yield f"event: agent-event\ndata: {redact_credentials(_compact_payload(payload))}\n\n"
+                yield f"event: agent-event\ndata: {redact_credentials(payload)}\n\n"
 
             yield ": ping\n\n"
             # A pass-through of DataAgent's run: when its stream closes on a

@@ -71,17 +71,17 @@ const items = [
     evidence: [evidence],
   }),
   item({ id: "metric", target_kind: "metric", display_name: "订单数", after: element({ display_name: "订单数", name: "order_count", kind: "simple" }) }),
-  item({ id: "old", operation: "update", display_name: "物料", status: "stale", status_reason: "目标在提案生成后已被修改" }),
   item({ id: "gone", display_name: "旧提案", status: "rejected", stored_status: "rejected" }),
 ];
 function batch(list = items): ProposalBatchDetail {
   return {
     id: "b",
     status: "available",
+    read_only: false,
     created_at: "2026-09-30T10:00:00Z",
     source_session_revision: 7,
     base_version_id: "v",
-    counts: { pending: 4, accepted: 0, rejected: 1, stale: 1, conflict: 0, superseded: 0, unacceptable: 0 },
+    counts: { pending: 4, accepted: 0, rejected: 1 },
     error: null,
     items: list,
   };
@@ -119,7 +119,7 @@ function session(extra: Partial<ModelingSession> = {}): ModelingSession {
 const panel = (proposals = state(), s = session()) =>
   renderWithProviders(
     <MemoryRouter>
-      <ProposalPanel session={s} proposals={proposals} running={false} onRemodel={vi.fn()} />
+      <ProposalPanel session={s} proposals={proposals} running={false} />
     </MemoryRouter>,
   );
 const row = (name: string) => screen.getByRole("article", { name: new RegExp(name) });
@@ -180,9 +180,9 @@ describe("proposal review", () => {
 
   it("filters by status, kind and search text", async () => {
     panel();
-    fireEvent.click(screen.getByRole("tab", { name: /冲突\s*1/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /已拒绝\s*1/ }));
     expect(screen.getAllByRole("article")).toHaveLength(1);
-    expect(within(row("old")).getByText("目标在提案生成后已被修改")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^恢复 / })).toBeEnabled();
     fireEvent.click(screen.getByRole("tab", { name: /待审\s*4/ }));
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索提案名称" }), { target: { value: "purchase" } });
     expect(screen.getAllByRole("article")).toHaveLength(2);
@@ -298,9 +298,15 @@ describe("proposal review", () => {
   });
 });
 
-it("lists unacceptable proposals with their reason and no acceptance action", () => {
-  panel(state({ detail: batch([item({ id: "blocked", status: "unacceptable", stored_status: "unacceptable", status_reason: "目标连接列不是唯一属性或完整标识" })]) }));
-  fireEvent.click(screen.getByRole("tab", { name: /不可接受/ }));
-  expect(screen.getByText("目标连接列不是唯一属性或完整标识")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /^接受 / })).not.toBeInTheDocument();
+it("disables decisions for historical batches", () => {
+  const detail = { ...batch(), read_only: true };
+  panel(state({ detail }));
+  expect(screen.getByText("新一轮已开始，此批次只读")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "全部接受（4）" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "接受 订单号" })).toBeDisabled();
+});
+
+it("disables decisions while a run is occupied", () => {
+  renderWithProviders(<ProposalPanel session={session()} proposals={state()} running />);
+  expect(screen.getByRole("button", { name: "全部接受（4）" })).toBeDisabled();
 });
