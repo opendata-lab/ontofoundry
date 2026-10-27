@@ -51,6 +51,13 @@ export function ProposalPanel(props: Props) {
         <Text type="secondary">正在加载提案…</Text>
       </Flex>
     );
+  if (props.proposals.error && !props.proposals.batches.length)
+    return (
+      <Flex vertical gap="small" className="p-6">
+        <Alert type="error" showIcon message={props.proposals.error} />
+        <Button size="small" className="self-start" onClick={props.proposals.reload}>重新加载</Button>
+      </Flex>
+    );
   if (props.session && props.running && !props.proposals.batches.length)
     return (
       <Flex vertical align="center" gap="small" className="p-6" role="status">

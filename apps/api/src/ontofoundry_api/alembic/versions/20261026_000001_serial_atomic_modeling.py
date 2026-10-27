@@ -4,6 +4,8 @@ Revision ID: 20261026_000001
 Revises: 20261025_000001
 """
 
+import json
+
 import sqlalchemy as sa
 from alembic import op
 
@@ -35,6 +37,28 @@ def upgrade():
     db.execute(sa.update(imports).where(imports.c.batch_id.in_(failed)).values(batch_id=None))
     db.execute(sa.delete(batches).where(batches.c.status == "failed"))
     db.execute(sa.update(items).where(items.c.status == "superseded").values(status="rejected"))
+    # Older batches are read-only now (session_gate.batch_read_only), so a
+    # pending proposal left in one could never be decided and would block the
+    # session for good. Reject exactly those.
+    sessions = sa.Table("modeling_sessions", metadata, autoload_with=db)
+    started = {}
+    for session_id, manifest in db.execute(sa.select(sessions.c.id, sessions.c.run_manifest_json)):
+        if isinstance(manifest, str):
+            manifest = json.loads(manifest or "null")
+        started[session_id] = (manifest or {}).get("source_session_revision", -1)
+    stale = [
+        batch_id
+        for batch_id, session_id, revision in db.execute(
+            sa.select(batches.c.id, batches.c.session_id, batches.c.source_session_revision)
+        )
+        if started.get(session_id, -1) > revision
+    ]
+    if stale:
+        db.execute(
+            sa.update(items)
+            .where(items.c.status == "pending", items.c.batch_id.in_(stale))
+            .values(status="rejected")
+        )
 
 
 def downgrade():

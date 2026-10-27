@@ -524,7 +524,9 @@ def revised_material_bookkeeping(item, material_ids):
     A terminal run's proposal batch keeps its own material manifest, so this
     session-level copy only blocks deletion of documents the user unchecked.
     """
-    if item.task_status in ACTIVE_RUN_STATUSES:
+    from ontofoundry_api.services.session_gate import occupied
+
+    if occupied(item):
         return {}
     selected = set(material_ids)
     values = {}
@@ -815,6 +817,7 @@ def publish_session(
     )
     if not item:
         raise ServiceError("建模会话不存在", code="SESSION_NOT_FOUND", status_code=404)
+    require_draft_edit(db, item)
     if (
         body.expected_merged_snapshot_sha256 is None
         or "expected_current_version_id" not in body.model_fields_set

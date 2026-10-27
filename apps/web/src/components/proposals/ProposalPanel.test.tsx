@@ -140,6 +140,15 @@ describe("run outcome", () => {
 });
 
 describe("fetching", () => {
+  it("shows a failed first load with a reload instead of the starter hint", () => {
+    const reload = vi.fn();
+    panel(state({ error: "提案加载失败", batches: [], detail: null, reload }));
+    expect(screen.getByRole("alert")).toHaveTextContent("提案加载失败");
+    fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(reload).toHaveBeenCalled();
+    expect(screen.queryByText(/向智能体描述场景/)).toBeNull();
+  });
+
   it("spins over the list while proposals are being fetched", () => {
     panel(state({ loading: true }));
     expect(screen.getByRole("status", { name: "正在加载提案" })).toBeInTheDocument();

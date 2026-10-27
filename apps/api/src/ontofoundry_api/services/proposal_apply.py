@@ -25,6 +25,7 @@ from ontofoundry_api.domain.instances import (
     combined_snapshot,
     definitions,
     instance_hash,
+    validate_instances,
 )
 from ontofoundry_api.domain.models import (
     COLLECTIONS,
@@ -59,7 +60,21 @@ def stored_items(rows, dependencies):
         evidence=deepcopy(row.evidence_json or []), reason=row.reason or "",
         fingerprint=row.fingerprint,
         depends_on=[dep for dep in dependencies.get(row.id, []) if dep in ids],
+        atomic_group_id=row.atomic_group_id,
     ) for row in rows]
+
+
+def _unfold_groups(items):
+    """Put back the mutual edges parsing folded into atomic_group_id, so a
+    batch tried again (stored, revised, accepted) finds the same groups."""
+    groups: dict[str, set[str]] = {}
+    for item in items:
+        if item.atomic_group_id:
+            groups.setdefault(item.atomic_group_id, set()).add(item.id)
+    for item in items:
+        peers = groups.get(item.atomic_group_id, set()) - {item.id}
+        if peers:
+            item.depends_on = sorted({*item.depends_on, *peers})
 
 
 def _evidence(db, workspace_id, before, candidate, items, lookup):
@@ -93,12 +108,33 @@ def _evidence(db, workspace_id, before, candidate, items, lookup):
                 check_material_evidence(evidence, lookup, "证据")
 
 
+def _instances(model, candidate, items):
+    """Check changed instances together with the relations that touch them.
+
+    An instance whose type changes can break a relation the batch does not
+    edit; acceptance checks those relations, so the trial does too."""
+    changed = {i.target_id for i in items if i.target_kind in INSTANCE_KINDS}
+    if not changed:
+        return
+    objects = {o["id"]: o for o in candidate.get("material_objects", [])}
+    # Deleting an instance cascades to its relations.
+    deleted = {i.target_id for i in items if i.operation == "delete"}
+    links = [
+        link for link in candidate.get("material_links", [])
+        if (link["id"] in changed or {link["source_id"], link["target_id"]} & changed)
+        and not {link["source_id"], link["target_id"]} & deleted
+    ]
+    ids = (changed & set(objects)) | {end for link in links for end in (link["source_id"], link["target_id"])}
+    validate_instances(model, [objects[key] for key in ids if key in objects], links)
+
+
 def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, draft=None, accepting=False):
     """Apply ``items`` to the draft in memory under every rule acceptance uses.
 
     Building or revising a batch may leave a dataset unbound (an imported file
     or an unsynced table); ``accepting`` requires every dataset to be bound."""
     items = deepcopy(items)
+    _unfold_groups(items)
     baseline = baseline if baseline is not None else instance_store.baseline(db, workspace_id, session.id)
     draft = draft if draft is not None else session.draft_json
     before = combined_snapshot(draft, baseline)
@@ -151,6 +187,7 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         group_items(before, items, references_resolved=True)
         candidate = apply_items(before, items)
         model = OntologyDraft.model_validate(definitions(candidate))
+        _instances(model, candidate, items)
         _evidence(db, workspace_id, before, candidate, items, lookup)
         check_identities(db, workspace_id, element_kinds(candidate))
         published = instance_store.published_model(db, workspace_id)
@@ -186,6 +223,9 @@ def save_pending(db, session, batch_id, trial):
     from ontofoundry_api.services.proposals import batch_items
     rows = {r.id: r for r in batch_items(db, [batch_id], session.workspace_id, session.id)}
     pending_ids = [i.id for i in trial.items]
+    decided = {r.fingerprint for r in rows.values() if r.status != "pending" and r.id not in pending_ids}
+    if any(item.id not in rows and item.fingerprint in decided for item in trial.items):
+        raise ConflictError("相同内容的提案已在本批次中决定过，可在“已拒绝”中恢复", code="PROPOSAL_DUPLICATE")
     removed = [row.id for row in rows.values() if row.status == "pending" and row.id not in pending_ids]
     db.execute(delete(ProposalItemDependencyRecord).where(
         ProposalItemDependencyRecord.batch_id == batch_id,

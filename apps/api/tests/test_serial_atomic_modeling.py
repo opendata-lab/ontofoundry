@@ -281,3 +281,157 @@ def test_unbound_dataset_is_proposed_but_not_accepted_until_bound(client):
     assert response.status_code == 422, response.text
     assert response.json()["error"]["code"] == "DATASET_SOURCE_INVALID"
     assert current(client, session)["revision"] == session["revision"]
+
+
+def test_publishing_waits_for_pending_proposals(client):
+    from test_modeling import publish
+
+    session = create_session(client)
+    seed_batch(client, session, chain(session)[:1])
+    response = publish(client, current(client, session))
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "PENDING_PROPOSALS"
+
+
+def test_an_undone_instance_proposal_is_not_restored(client):
+    session = create_session(client)
+    batch = seed_batch(client, session, [create_instance(session)])
+    item = batch["items"][0]
+    accepted = decide(client, session, [(item["id"], "accept")])
+    assert accepted.status_code == 200, accepted.text
+    undone = decide(client, accepted.json()["session"], [(item["id"], "reject")])
+    assert undone.status_code == 200, undone.text
+    restored = decide(client, undone.json()["session"], [(item["id"], "restore")])
+    assert restored.status_code == 409, restored.text
+    assert restored.json()["error"]["items"][0]["reason"] == "已撤销的实例提案不能恢复，请重新建模"
+
+
+def test_a_decided_duplicate_is_refused_with_a_business_error(client):
+    from ontofoundry_api.services.errors import ConflictError
+    from ontofoundry_api.services.proposal_apply import Trial, save_pending, stored_items
+
+    session = create_session(client)
+    batch = seed_batch(client, session, chain(session)[:1])
+    item = batch["items"][0]
+    assert decide(client, session, [(item["id"], "reject")]).status_code == 200
+    with client.app.state.session_factory() as db:
+        row = db.get(ProposalItemRecord, item["id"])
+        (again,) = stored_items([row], {})
+        again.id = str(uuid4())
+        record = db.get(ModelingSessionRecord, session["id"])
+        with pytest.raises(ConflictError) as raised:
+            save_pending(db, record, batch["id"], Trial([again], {}, {}))
+        assert raised.value.code == "PROPOSAL_DUPLICATE"
+
+
+def test_migration_rejects_pending_proposals_left_in_read_only_batches(client):
+    import importlib.util
+    from pathlib import Path
+
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    session = create_session(client)
+    batch = seed_batch(client, session, chain(session)[:1])
+    with client.app.state.session_factory() as db:
+        # A later run (the old rules allowed it) started after this batch.
+        db.get(ModelingSessionRecord, session["id"]).run_manifest_json = {
+            "source_session_revision": session["revision"] + 1
+        }
+        db.commit()
+    path = Path(__file__).resolve().parents[1] / "src/ontofoundry_api/alembic/versions/20261026_000001_serial_atomic_modeling.py"
+    spec = importlib.util.spec_from_file_location("serial_atomic_pending", path)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    with client.app.state.session_factory() as db:
+        with Operations.context(MigrationContext.configure(db.connection())):
+            migration.upgrade()
+        db.commit()
+        db.expire_all()
+        assert db.get(ProposalItemRecord, batch["items"][0]["id"]).status == "rejected"
+
+
+def test_unselecting_materials_keeps_the_run_manifest_until_the_result_settles(client):
+    session, manifest = proposals_run(client)
+    from test_materials import save_materials
+
+    with client.app.state.session_factory() as db:
+        record = db.get(ModelingSessionRecord, session["id"])
+        record.result_state = ""
+        db.commit()
+        before = deepcopy(record.run_manifest_json)
+    current_session = client.get(ROOT + f"/sessions/{session['id']}").json()
+    with client.app.state.session_factory() as db:
+        # The read may settle the run; put it back to unsettled for the check.
+        record = db.get(ModelingSessionRecord, session["id"])
+        record.result_state, record.task_status = "", "finished"
+        db.commit()
+    saved = save_materials(client, current_session, [])
+    assert saved.status_code == 200, saved.text
+    assert row(client, session["id"]).run_manifest_json == before
+
+
+def test_trial_checks_relations_an_instance_change_breaks(client):
+    from types import SimpleNamespace
+
+    from ontofoundry_api.domain.models import OntologyDraft
+    from ontofoundry_api.services.proposal_apply import _instances
+
+    session = create_session(client)
+    draft = session["draft"]
+    customer, order = (next(o for o in draft["object_types"] if o["name"] == n) for n in ("customer", "order"))
+    buyer = draft["link_types"][0]
+    model = OntologyDraft.model_validate(draft)
+    retyped = {"id": str(uuid4()), "type_id": order["id"], "values": {"order_no": "虚构-01"}, "evidence": []}
+    placed = {"id": str(uuid4()), "type_id": order["id"], "values": {"order_no": "虚构-02"}, "evidence": []}
+    link = {"id": str(uuid4()), "type_id": buyer["id"], "source_id": placed["id"], "target_id": retyped["id"], "evidence": []}
+    candidate = {"material_objects": [retyped, placed], "material_links": [link]}
+    # Only the instance changes; the relation it no longer fits is untouched.
+    with pytest.raises(ValueError):
+        _instances(model, candidate, [SimpleNamespace(target_id=retyped["id"], target_kind="material_object", operation="update")])
+    retyped["type_id"] = customer["id"]
+    retyped["values"] = {"label": "虚构客户"}
+    _instances(model, candidate, [SimpleNamespace(target_id=retyped["id"], target_kind="material_object", operation="update")])
+
+
+def test_explicit_cycle_stays_one_group_after_a_revision(client):
+    from test_t1_proposal_contract import create as contract_create
+
+    session = create_session(client)
+    first = contract_create("cycle-a", "object_type", {"name": "fictional_dock", "display_name": "虚构码头"})
+    second = contract_create("cycle-b", "object_type", {"name": "fictional_berth", "display_name": "虚构泊位"})
+    first["depends_on"], second["depends_on"] = ["cycle-b"], ["cycle-a"]
+    batch = seed_batch(client, session, [first, second])
+    groups = {item["atomic_group_id"] for item in batch["items"]}
+    assert len(groups) == 1 and None not in groups
+    response = client.patch(ROOT + f"/sessions/{session['id']}/proposals/{batch['items'][0]['id']}/after", json={
+        "expected_session_revision": session["revision"], "fields": {"description": "修订后的码头"},
+    })
+    assert response.status_code == 200, response.text
+    after = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}").json()
+    regrouped = {item["atomic_group_id"] for item in after["items"]}
+    assert len(regrouped) == 1 and None not in regrouped
+
+
+def test_value_type_name_swap_is_one_decision(client):
+    from test_t4_proposal_decisions import update
+
+    session = create_session(client)
+    draft = deepcopy(session["draft"])
+    draft["value_types"] = [
+        {"id": str(uuid4()), "name": "fictional_grade", "display_name": "虚构等级", "value_kind": "string"},
+        {"id": str(uuid4()), "name": "fictional_tier", "display_name": "虚构层级", "value_kind": "string"},
+    ]
+    saved = save(client, session, draft)
+    assert saved.status_code == 200, saved.text
+    session = saved.json()
+    grade, tier = session["draft"]["value_types"]
+    batch = seed_batch(client, session, [
+        update("value_type", grade, name=tier["name"], display_name=tier["display_name"]),
+        update("value_type", tier, name=grade["name"], display_name=grade["display_name"]),
+    ])
+    groups = {item["atomic_group_id"] for item in batch["items"]}
+    assert len(groups) == 1 and None not in groups
+    accepted = decide(client, session, [(batch["items"][0]["id"], "accept")])
+    assert accepted.status_code == 200, accepted.text
+    assert len(accepted.json()["results"]) == 2

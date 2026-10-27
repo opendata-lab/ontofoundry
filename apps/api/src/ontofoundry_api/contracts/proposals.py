@@ -489,6 +489,9 @@ def group_items(draft, items, *, references_resolved=False):
         )
         if kind in {"property", "link_type"}:
             return ("property_link", owner)
+        if kind in {"object_type", "value_type"}:
+            # Validation keeps one English-name namespace for both.
+            return ("type_name", None)
         if kind == "rule":
             return (kind, element["owner_kind"], owner)
         return (kind, owner)
@@ -496,6 +499,7 @@ def group_items(draft, items, *, references_resolved=False):
     for item in items:
         if item.after is None or item.target_kind not in {
             "object_type",
+            "value_type",
             "property",
             "link_type",
             "rule",

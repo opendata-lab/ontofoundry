@@ -126,6 +126,17 @@ def _inverse(item: ProposalItemRecord, context: dict) -> SimpleNamespace:
     )
 
 
+def _undone_instance(db: Session, item) -> bool:
+    """An instance proposal that was accepted and then undone."""
+    from ontofoundry_api.db_models import InstanceHistoryRecord
+
+    return item.target_kind in INSTANCE_KINDS and db.scalar(
+        select(InstanceHistoryRecord.revision)
+        .where(InstanceHistoryRecord.proposal_item_id == item.id, InstanceHistoryRecord.operation == "undo")
+        .limit(1)
+    ) is not None
+
+
 def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str, settings):
     from ontofoundry_api.services.proposal_apply import (
         apply_trial,
@@ -259,6 +270,12 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
                     decision.proposal_id,
                     f"提案当前为 {status}",
                 )
+            )
+        elif decision.decision == "restore" and _undone_instance(db, items[decision.proposal_id]):
+            # Undoing wrote a new instance revision; restoring the old content
+            # would need a fresh check against it, so it takes a new run instead.
+            problems.append(
+                (409, "PROPOSAL_NOT_RESTORABLE", decision.proposal_id, "已撤销的实例提案不能恢复，请重新建模")
             )
         elif (
             decision.decision == "restore"
