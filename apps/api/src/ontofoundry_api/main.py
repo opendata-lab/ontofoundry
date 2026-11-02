@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from ontofoundry_api import __version__
 from ontofoundry_api.api import (
     agent_conversation,
     assets,
@@ -124,7 +125,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="OntoFoundry API",
-        version="0.1.0",
+        version=__version__,
         description="企业本体建模、发布与只读查询服务。",
         lifespan=lifespan,
     )

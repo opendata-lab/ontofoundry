@@ -94,6 +94,36 @@ def test_check_contract_errors_and_pass(client):
     )
 
 
+@pytest.mark.parametrize("uses_current_value", [False, True])
+def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
+    client, monkeypatch, uses_current_value
+):
+    session, manifest, url, headers = running_check(client)
+    variable = "member_level" if uses_current_value else "level"
+    payload = result(manifest, [
+        create("level_type", "value_type", {"name": "member_level", "value_kind": "string"}),
+        create("level_constraint", "rule", {
+            "name": "member_level_constraint", "owner_kind": "value_type",
+            "owner_id": {"client_ref": "level_type"}, "rule_kind": "constraint",
+            "expression": f"{variable} IN ('普通', '金卡')",
+        }),
+    ])
+    response = client.post(url, json=payload, headers=headers)
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["passed"] is uses_current_value
+    if not uses_current_value:
+        assert "值类型约束必须引用当前值 member_level" in report["contract_errors"][0]["message"]
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
+        db.commit()
+    install_download(monkeypatch, [payload])
+    assert reconcile(client, session["id"]) == ("done" if uses_current_value else "failed_permanent")
+    batches, items, _ = stored(client, session["id"])
+    assert len(batches) == int(uses_current_value)
+    assert len(items) == (2 if uses_current_value else 0)
+
+
 @pytest.mark.parametrize(
     "scope", ["different-run", "different-space", "expired", "no-token"]
 )

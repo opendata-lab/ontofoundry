@@ -1,9 +1,9 @@
 {
   "name": "ontofoundry-dataagent",
-  "version": "0.1.0",
+  "version": "0.2.6",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
-  "minimum_platform_version": "0.1.0",
-  "platform_baseline": "2026-10-22 core-1：工作包、完整提案 v1、分步片段、execution 修正预算、本体关键词检索四工具、实例库与 resolve_entity；仅版本号不足以确认这些能力",
+  "minimum_platform_version": "0.2.6",
+  "platform_baseline": "2026-10-27 core-1：运行级平台预检必须通过后才写结果，预检、入库与接受共用试应用；建模串行化与整批原子化，数据库迁移 20261026_000001；工作包、实例库与 resolve_entity",
   "installation": "manual-admin",
   "skills": [
     {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
