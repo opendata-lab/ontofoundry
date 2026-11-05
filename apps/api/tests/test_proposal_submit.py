@@ -154,6 +154,17 @@ def test_rejection_carries_the_structured_diagnostics():
     assert _reason(exc) == "数据集来源未就绪；[SOURCE_NOT_REGISTERED] /query_sql 来源不在连接允许的业务范围"
 
 
+def test_an_invalidated_run_cannot_submit(client):
+    session, manifest, url, headers = running_submit(client)
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        row.run_manifest_json = {**row.run_manifest_json, "invalidated": True}
+        db.commit()
+    report = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
+    assert report["errors"][0]["code"] == "RUN_CONTEXT_INVALIDATED"
+    assert stored(client, session["id"])[0] == []
+
+
 def test_submit_contract_errors_then_pass(client):
     session, manifest, url, headers = running_submit(client)
     payload = result(manifest, some_items(session["draft"]))

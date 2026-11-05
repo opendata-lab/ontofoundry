@@ -12,7 +12,7 @@ from ontofoundry_api.services.dataagent import (
     build_turn_prompt,
     proposal_instructions,
 )
-from ontofoundry_api.services.modeling_input import build_work_pack, execution_input
+from ontofoundry_api.services.modeling_input import build_work_pack
 
 FIXTURES = (
     Path(__file__).resolve().parents[3]
@@ -27,10 +27,6 @@ def render(case):
         proposal_instructions(
             run_token=token,
             work_pack_file=f"inputs/work-pack-{case}.json",
-            header={"workspace_id": "fictional", "source_draft_sha256": "absent"},
-            materials=[{"id": "history", "sha256": "a" * 64, "path": "inputs/history.md"}],
-            schema_file="inputs/schema.json",
-            mcp={"file": "inputs/mcp.json"},
         )
         if modeling
         else None
@@ -58,7 +54,6 @@ def test_prompt_snapshot(case):
 
 def test_dynamic_paths_have_a_single_authoritative_source():
     context = json.loads((FIXTURES / "budget-context.json").read_bytes())
-    context["execution"] = execution_input("example")
     pack, _ = build_work_pack(
         context,
         [],
@@ -92,7 +87,6 @@ def test_a_run_before_any_publish_still_gets_its_platform_check_credential():
     # No published version: no MCP config to read, but the merge script's
     # platform check still needs this run's credential.
     context = json.loads((FIXTURES / "budget-context.json").read_bytes())
-    context["execution"] = execution_input("example")
     pack, _ = build_work_pack(
         context, [], context_file="inputs/context.json", schema_file="inputs/schema.json",
         platform_check_file="inputs/ontofoundry-mcp-example.json",

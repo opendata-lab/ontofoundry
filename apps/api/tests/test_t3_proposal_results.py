@@ -254,7 +254,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     )
     assert pack["context_file"].startswith("inputs/ontofoundry-context-")
     assert pack["run"] == context["run"]
-    assert pack["execution"]["repair_used"] == 0
+    assert "execution" not in pack
     assert pack["elements"] and len(json.dumps(pack, ensure_ascii=False).encode()) < 8192
     assert "repair_budget_required" not in manifest and "repair_used" not in manifest
     assert "ontofoundry.proposals.v1.schema.json" in uploads

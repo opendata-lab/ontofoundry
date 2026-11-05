@@ -275,24 +275,23 @@ def test_facts_method_belongs_to_entity_extraction_on_both_routes():
     assert "不在 ontology-discovery" in discovery and "不在 ontology-discovery" in facts
 
 
-def test_a_new_run_moves_the_last_runs_fragments_but_a_repair_keeps_them(tmp_path, monkeypatch, capsys):
+def test_a_new_run_moves_the_last_runs_fragments_but_the_same_run_keeps_them(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "uploads").mkdir()
-    def run(token, repair=0):
-        write_json(tmp_path / "uploads/pack.json", {"run": {"run_token": token}, "execution": {"repair_used": repair}})
+    def run(token):
+        write_json(tmp_path / "uploads/pack.json", {"run": {"run_token": token}})
         assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
         return capsys.readouterr().out
     run("first")
     write_json(tmp_path / "modeling/parts/01-types.json", [{"operation": "create"}])
-    # Same run again, or a repair round under a new token: fragments stay.
+    # The same run again (repairs happen inside the run): fragments stay.
     assert "PREVIOUS_PARTS_MOVED" not in run("first")
-    assert "PREVIOUS_PARTS_MOVED" not in run("second", repair=1)
     assert (tmp_path / "modeling/parts/01-types.json").exists()
     # A new request: the last run's fragments move out of the way.
-    out = run("third")
-    assert "PREVIOUS_PARTS_MOVED" in out and "modeling/previous/second" in out
+    out = run("second")
+    assert "PREVIOUS_PARTS_MOVED" in out and "modeling/previous/first" in out
     assert not list((tmp_path / "modeling/parts").glob("*.json"))
-    assert (tmp_path / "modeling/previous/second/parts/01-types.json").exists()
+    assert (tmp_path / "modeling/previous/first/parts/01-types.json").exists()
 
 
 def test_merge_fills_the_hash_of_a_material_named_by_id():

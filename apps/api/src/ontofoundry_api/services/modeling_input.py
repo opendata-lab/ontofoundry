@@ -48,12 +48,7 @@ def material_index(material: dict, content: bytes, path: str) -> dict:
     }
 
 
-def execution_input(run_token: str, repair_used: int = 0) -> dict:
-    """Informational: the platform counts repair rounds on rejected submissions."""
-    return {"repair_limit": REPAIR_LIMIT, "repair_used": repair_used}
 
-
-REPAIR_LIMIT = 2
 
 
 def build_work_pack(
@@ -105,7 +100,6 @@ def build_work_pack(
             )
     pack = {
         "run": context["run"],
-        "execution": context["execution"],
         "result_file": f"output/ontofoundry-result-{context['run']['run_token']}.json",
         "context_file": context_file,
         "schema_file": schema_file,

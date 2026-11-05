@@ -52,21 +52,10 @@ def store_batch(
     task_id: str | None,
     manifest: dict[str, Any],
     parsed: ParsedBatch,
-    settings,
 ) -> ProposalBatchRecord:
-    """Insert an already trial-applied batch (SC-04: nothing is rewritten here)
-    and its dependencies in the caller's transaction, under the session lock."""
-    if manifest.get("invalidated"):
-        from ontofoundry_api.services.errors import ServiceError
-        raise ServiceError("运行固定上下文已失效，请重新运行", code="RUN_CONTEXT_INVALIDATED", status_code=409)
-    existing = submitted_batch(db, workspace_id, session_id, manifest["run_token"])
-    if existing is not None:
-        return existing
-    from ontofoundry_api.services.errors import ConflictError
-    from ontofoundry_api.services.session_gate import has_pending, lock_session
-    session = lock_session(db, workspace_id, session_id)
-    if has_pending(db, session):
-        raise ConflictError("请先处理完待审提案", code="PENDING_PROPOSALS")
+    """Insert an already trial-applied batch and its dependencies in the
+    caller's transaction (SC-04: nothing is checked or rewritten here; the
+    submit endpoint and import confirmation own their guards)."""
     batch = ProposalBatchRecord(
         id=parsed.id,
         workspace_id=workspace_id,

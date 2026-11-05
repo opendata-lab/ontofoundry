@@ -400,7 +400,7 @@ def encode(value):
 
 
 def validate_file(
-    result_path, schema_path, context_path=None, *, repair=False, origins=None
+    result_path, schema_path, context_path=None, *, origins=None
 ):
     """origins: (fragment file, index) per merged item, so errors point at the part to fix."""
     errors, result, context = [], None, None
@@ -464,11 +464,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--schema", required=True)
     parser.add_argument("--context")
-    parser.add_argument("--repair", action="store_true")
     parser.add_argument("result")
     args = parser.parse_args()
     return validate_file(
-        args.result, args.schema, args.context, repair=args.repair
+        args.result, args.schema, args.context
     )
 
 

@@ -304,10 +304,6 @@ class DataAgentClient:
 def proposal_instructions(
     *,
     run_token: str,
-    header: dict,
-    materials: list[dict],
-    schema_file: str,
-    mcp: dict | None,
     work_pack_file: str = "",
 ) -> str:
     """Render only dynamic modeling entry points; the pack owns input facts."""

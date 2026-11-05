@@ -61,7 +61,6 @@ def seed_batch(
             task_id=None,
             manifest=manifest,
             parsed=parsed,
-            settings=client.app.state.settings,
         )
         db.commit()
     return client.get(

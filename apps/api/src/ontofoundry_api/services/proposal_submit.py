@@ -12,8 +12,7 @@ from ontofoundry_api.contracts.proposal_submit import (
 )
 from ontofoundry_api.contracts.proposals import RunContext
 from ontofoundry_api.db_models import utc_now
-from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.modeling_input import REPAIR_LIMIT
+from ontofoundry_api.services.errors import ConflictError, ServiceError
 from ontofoundry_api.services.proposal_apply import parse_agent
 from ontofoundry_api.services.proposals import (
     batch_item_count,
@@ -21,9 +20,12 @@ from ontofoundry_api.services.proposals import (
     submitted_batch,
 )
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
-from ontofoundry_api.services.session_gate import lock_session
+from ontofoundry_api.services.session_gate import has_pending, lock_session
 
 logger = logging.getLogger(__name__)
+
+# Rejected submissions after the first that a run may repair (CO-02).
+REPAIR_LIMIT = 2
 
 
 def context_from_manifest(manifest):
@@ -123,12 +125,13 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
             int(manifest.get("repair_used") or 0),
         )
     try:
+        if has_pending(db, session):
+            raise ConflictError("请先处理完待审提案", code="PENDING_PROPOSALS")
         context = context_from_manifest(manifest)
         parsed = parse_agent(db, settings, session, raw, context)
         batch = store_batch(
             db, workspace_id=workspace_id, session_id=session_id,
             task_id=session.dataagent_task_id, manifest=manifest, parsed=parsed,
-            settings=settings,
         )
     except ServiceError as exc:
         db.rollback()

@@ -17,7 +17,6 @@ from test_t4_proposal_decisions import create, decide, seed_batch
 
 from ontofoundry_api.contracts.instances import InstanceBaseline
 from ontofoundry_api.contracts.proposals import (
-    ParsedBatch,
     ProposalContractError,
     RunContext,
     parse_result,
@@ -32,7 +31,7 @@ from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.instances import instance_hash
 from ontofoundry_api.services import instance_store
 from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.proposals import proposal_context, store_batch
+from ontofoundry_api.services.proposals import proposal_context
 from ontofoundry_api.services.workspaces import DEV_USER_ID
 
 
@@ -537,22 +536,6 @@ def test_direct_store_rejects_stale_revision_and_preserves_manual_evidence(clien
                 actor=DEV_USER_ID,
             )
         assert error.value.code == "MANUAL_EVIDENCE_IMMUTABLE"
-
-
-def test_invalidated_run_cannot_store_results(client):
-    session = create_session(client)
-    with client.app.state.session_factory() as db:
-        with pytest.raises(ServiceError) as error:
-            store_batch(
-                db,
-                workspace_id=session["workspace_id"],
-                session_id=session["id"],
-                task_id="old-run",
-                manifest={"invalidated": "INSTANCE_STORE_CUTOVER"},
-                parsed=ParsedBatch(str(uuid4()), "a" * 64, []),
-                settings=client.app.state.settings,
-            )
-        assert error.value.code == "RUN_CONTEXT_INVALIDATED"
 
 
 def test_baseline_context_and_parser_enforce_revision_hash(client):

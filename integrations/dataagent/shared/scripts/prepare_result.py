@@ -255,7 +255,7 @@ def platform_submit(pack, candidate, retry_command):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
 
-    submit_file = pack.get("platform_check_file") or pack.get("mcp_config_file")
+    submit_file = pack.get("platform_check_file")
     if not submit_file:
         print(error("PLATFORM_SUBMIT_CONFIG_MISSING", "工作包没有平台提交配置", "未提交，最终文件未替换", "重新发起建模以获取提交配置", retry=False))
         return False
@@ -327,7 +327,6 @@ def main():
     parser.add_argument("--context")
     parser.add_argument("--schema")
     parser.add_argument("--output")
-    parser.add_argument("--repair", action="store_true")
     parser.add_argument(
         "fragments",
         nargs="*",
@@ -429,7 +428,7 @@ def main():
         )
         return 1
     checked = validate_file(
-        candidate, args.schema, args.context, repair=args.repair, origins=origins
+        candidate, args.schema, args.context, origins=origins
     )
     if checked:
         return checked

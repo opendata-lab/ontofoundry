@@ -48,14 +48,13 @@ from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
     encode,
-    execution_input,
     material_index,
     scenario_facts,
     store_linked_tables_receipt,
     upload_work_pack,
 )
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
-from ontofoundry_api.services.proposals import proposal_context, proposal_header
+from ontofoundry_api.services.proposals import proposal_context
 from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import RunGrant
 from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
@@ -458,7 +457,6 @@ async def send_message(
         proposal_prompt = None
         if proposals:
             fixed_context = proposal_context(manifest, draft)
-            fixed_context["execution"] = execution_input(run_token)
             context_body = encode(fixed_context)
             context = await dataagent.upload(
                 topic_id,
@@ -522,10 +520,6 @@ async def send_message(
             proposal_prompt = proposal_instructions(
                 work_pack_file=manifest["input_files"]["work_pack"],
                 run_token=run_token,
-                header=proposal_header(manifest),
-                materials=material_indices,
-                schema_file=str(schema.get("rel_path") or ""),
-                mcp=mcp,
             )
         else:
             context_body = json.dumps(draft, ensure_ascii=False, indent=2).encode()
