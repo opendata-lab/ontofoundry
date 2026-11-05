@@ -16,9 +16,8 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
     utc_now,
 )
-from ontofoundry_api.domain.canonical import element_sha256
 from ontofoundry_api.domain.instances import definitions
-from ontofoundry_api.domain.models import COLLECTIONS, PROPOSAL_COLLECTIONS, ElementKind
+from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS, ElementKind
 
 
 def submitted_batch(db: Session, workspace_id: str, session_id: str, run_token: str | None):
@@ -120,34 +119,13 @@ def store_batch(
 # --- run context ----------------------------------------------------------------
 
 
-def proposal_header(manifest: dict[str, Any]) -> dict[str, Any]:
-    """The literal result header a proposals run must return."""
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "run_token": manifest["run_token"],
-        "workspace_id": manifest["workspace_id"],
-        "session_id": manifest["session_id"],
-        "base_version_id": manifest["base_version_id"],
-        "base_version_sha256": manifest["base_version_sha256"],
-        "source_session_revision": manifest["source_session_revision"],
-        "source_draft_sha256": manifest["source_draft_sha256"],
-        "items": [],
-    }
-
-
 def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[str, Any]:
-    """What the agent reads: the pinned draft and the hash of every element,
-    which update and delete proposals must quote as expected_target_hash."""
-    elements = draft
+    """What the agent reads: which run this is, the pinned draft and the
+    instance baseline. Hashes and before-images are the platform's (SC-08)."""
     return {
-        "run": {k: v for k, v in proposal_header(manifest).items() if k != "items"},
+        "run": {k: manifest[k] for k in ("run_token", "workspace_id", "session_id")},
         "draft": draft,
         "instance_baseline": manifest.get("instance_baseline", {"change_sequence": 0, "items": []}),
-        "element_hashes": {
-            str(element["id"]): element_sha256(element, collection=collection)
-            for collection in COLLECTIONS.values()
-            for element in elements.get(collection) or []
-        },
     }
 
 

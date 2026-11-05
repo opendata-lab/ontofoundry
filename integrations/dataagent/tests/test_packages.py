@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 from build_packages import SKILLS, build
-from generate_output_schemas import INSTANCE_SOURCE, SOURCE, TARGETS, generate
+from generate_output_schemas import SOURCE, TARGETS, generate
 from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
 from test_platform_submit import platform as platform
 
@@ -71,7 +71,7 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "parts")
     batch = json.loads((tmp_path / "result.json").read_bytes())
     assert len(batch["items"]) > 10
-    assert batch["workspace_id"] == context["run"]["workspace_id"]
+    assert set(batch) == {"items"}  # SC-08: the run is the platform's
     run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "result.json")
 
     # Exercise baseline reads and mixed instance/definition edits in every ZIP.
@@ -81,7 +81,7 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     assert json.loads(output)[0]["target_kind"] == "material_object"
     entries = context["instance_baseline"]["items"]
     selected = json.loads(run(scripts / "show_element.py", tmp_path, "--work-pack", "work-pack.json", *[f'{e["target_kind"]}:{e["target_id"]}' for e in entries]))
-    assert [e["hash"] for e in selected["elements"]] == [e["hash"] for e in entries]
+    assert [e["definition"]["id"] for e in selected["elements"]] == [e["target_id"] for e in entries]
     edits = json.loads((skill / "references/examples/instance-baseline.json").read_bytes())
     # Omitted guards must also be filled by the isolated script.
     for item in edits:
@@ -93,11 +93,12 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     run(scripts / "check_result.py", tmp_path, "--context", "context.json", "--schema", "schema.json", "mixed.json")
     mixed = json.loads((tmp_path / "mixed.json").read_bytes())
     assert {i["target_kind"] for i in mixed["items"]} == {"property", "material_object", "material_link"}
+    # SC-08: edits name their target only; the platform supplies before and hash.
+    targets = {e["target_id"] for e in entries}
     for item in mixed["items"]:
+        assert "before" not in item and "expected_target_hash" not in item
         if item["target_kind"] in {"material_object", "material_link"}:
-            entry = next(e for e in entries if e["target_id"] == item["target_id"])
-            assert item["before"] == entry["element"]
-            assert item["expected_target_hash"] == entry["hash"]
+            assert item["target_id"] in targets
 
 
 def _pack(tmp_path):
@@ -131,29 +132,18 @@ def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_pat
             if not isinstance(items, list):
                 continue
             for raw in items:
-                raw = {"before": None, **raw}
                 if not Draft202012Validator({"$ref": "#/$defs/item", "$defs": source["$defs"]}).is_valid(raw):
                     continue
                 validator = Draft202012Validator({"$ref": "#/$defs/item", "$defs": schema["$defs"]})
                 assert validator.is_valid(raw) == (raw["target_kind"] in targets), (name, example, raw)
     # A changed contract must flow through the generator rather than a copied fixture.
-    source["properties"]["run_token"]["maxLength"] = 97
+    source["properties"]["items"]["maxItems"] = 97
     modified = tmp_path / "modified.json"
     modified.write_text(json.dumps(source))
     generate(modified, tmp_path / "changed")
     for name in TARGETS:
         schema = json.loads((tmp_path / "changed" / name / "output-schema.json").read_bytes())
-        assert schema["properties"]["run_token"]["maxLength"] == 97
-
-
-def test_schema_generation_rejects_instance_contract_drift(tmp_path):
-    instances = json.loads(INSTANCE_SOURCE.read_bytes())
-    instances["$defs"]["MaterialObject"]["properties"]["values"]["maxProperties"] = 17
-    path = tmp_path / "instances.json"
-    path.write_text(json.dumps(instances))
-    with pytest.raises(ValueError, match="Instance/proposal contracts differ: MaterialObject"):
-        generate(SOURCE, tmp_path / "output", instance_source=path)
-    assert not (tmp_path / "output").exists()
+        assert schema["properties"]["items"]["maxItems"] == 97
 
 
 def grounding():

@@ -122,9 +122,12 @@ def _after_schema(kind):
             # MappingSource.id is a caller-defined local source name, not a
             # server-assigned core element UUID.
             transform(definition, preserve_id=name == "MappingSource")
-    # Evidence IDs may be assigned by the receiver; authorship is checked separately.
+    # Evidence ids and material hashes are the receiver's to assign (SC-08);
+    # authorship is checked separately.
     if "MaterialEvidence" in defs:
-        defs["MaterialEvidence"]["required"].remove("id")
+        for name in ("id", "material_sha256"):
+            if name in defs["MaterialEvidence"]["required"]:
+                defs["MaterialEvidence"]["required"].remove(name)
     renamed = json.loads(
         json.dumps({"schema": schema, "defs": defs}).replace("#/$defs/", "#/$defs/After")
     )
@@ -139,22 +142,13 @@ def result_schema():
     for kind in ElementKind:
         after = _after_schema(kind)
         defs.update(after["defs"])
-        full = TypeAdapter(ELEMENT_MODELS[kind]).json_schema(ref_template="#/$defs/{model}")
-        defs.update(full.pop("$defs", {}))
         defs[f"{kind.value}_after"] = after["schema"]
-        defs[f"{kind.value}_element"] = full
         variants.append(
             {
                 "properties": {
                     "target_kind": {"const": kind.value},
                     "after": {
                         "anyOf": [{"$ref": f"#/$defs/{kind.value}_after"}, {"type": "null"}]
-                    },
-                    "before": {
-                        "anyOf": [
-                            {"$ref": f"#/$defs/{kind.value}_element"},
-                            {"type": "null"},
-                        ]
                     },
                 }
             }
@@ -166,10 +160,6 @@ def result_schema():
             "operation": {"enum": ["create", "update", "delete"]},
             "target_kind": {"enum": [k.value for k in ElementKind]},
             "target_id": {"anyOf": [_UUID, {"type": "null"}]},
-            "expected_target_hash": {
-                "anyOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"type": "null"}]
-            },
-            "before": {},
             "after": {},
             "field_changes": {
                 "type": "array",
@@ -184,7 +174,7 @@ def result_schema():
             "evidence": {
                 "type": "array",
                 "maxItems": 50,
-                "items": {"$ref": "#/$defs/MaterialEvidence"},
+                "items": {"$ref": "#/$defs/AfterMaterialEvidence"},
             },
             "depends_on": {
                 "type": "array",
@@ -193,7 +183,7 @@ def result_schema():
             },
             "reason": {"type": "string", "maxLength": 2000},
         },
-        "required": ["operation", "target_kind", "before", "after"],
+        "required": ["operation", "target_kind"],
         "additionalProperties": False,
         "oneOf": variants,
     }
@@ -202,32 +192,16 @@ def result_schema():
         "$id": "https://ontofoundry.local/schemas/ontofoundry.proposals.v1.json",
         "title": SCHEMA_VERSION,
         "type": "object",
+        # SC-08: only the items; the run identity and pinned facts are the
+        # platform's, taken from the run the submission is authenticated for.
         "properties": {
-            "schema_version": {"const": SCHEMA_VERSION},
-            "run_token": {"type": "string", "minLength": 1, "maxLength": 128},
-            "workspace_id": _UUID,
-            "session_id": _UUID,
-            "base_version_id": {"anyOf": [_UUID, {"type": "null"}]},
-            "base_version_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-            "source_session_revision": {"type": "integer", "minimum": 0},
-            "source_draft_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "items": {
                 "type": "array",
                 "maxItems": MAX_ITEMS,
                 "items": {"$ref": "#/$defs/item"},
             },
         },
-        "required": [
-            "schema_version",
-            "run_token",
-            "workspace_id",
-            "session_id",
-            "base_version_id",
-            "base_version_sha256",
-            "source_session_revision",
-            "source_draft_sha256",
-            "items",
-        ],
+        "required": ["items"],
         "additionalProperties": False,
         "$defs": {**defs, "item": item},
     }
@@ -275,6 +249,12 @@ class ParsedBatch:
     id: str
     result_sha256: str
     items: list[ParsedItem]
+
+
+def result_digest(run_token: str, raw: bytes) -> str:
+    """A result is identified within its run: two runs may submit the same items
+    (SC-08 removed the run header that used to make the bytes differ)."""
+    return hashlib.sha256(run_token.encode() + b"\n" + raw).hexdigest()
 
 
 def batch_id_for(session_id: str, run_token: str) -> str:
@@ -638,6 +618,14 @@ def _validate_group(draft, items, *, references_resolved):
     return {**proposed, **final}
 
 
+def _fill_material_sha(evidence, material_lookup):
+    """Evidence names a material by id; its hash is the platform's to supply."""
+    if not evidence.get("material_sha256"):
+        found = material_lookup(str(evidence.get("material_id", "")))
+        if found:
+            evidence["material_sha256"] = found[0]
+
+
 def parse_result(
     raw: bytes, context: RunContext, material_lookup: MaterialLookup
 ) -> ParsedBatch:
@@ -670,23 +658,6 @@ def parse_result(
         raise ProposalContractError(
             "RESULT_SCHEMA_INVALID", schema_diagnostic(errors[0], result_schema(), data)
         )
-    for name in (
-        "workspace_id",
-        "session_id",
-        "run_token",
-        "base_version_id",
-        "base_version_sha256",
-        "source_session_revision",
-        "source_draft_sha256",
-    ):
-        if data[name] != getattr(context, name):
-            fail(
-                "RESULT_CONTEXT_MISMATCH",
-                f"建模结果的 {name} 与固定上下文不一致",
-                pointer="/" + name,
-                expected=getattr(context, name),
-                actual=data[name],
-            )
     existing = {
         e["id"]: (k, e) for k, c in COLLECTIONS.items() for e in context.draft.get(c, [])
     }
@@ -702,7 +673,7 @@ def parse_result(
         i["target_id"]: i for i in context.instance_baseline.get("items", [])
     }
     batch_id = batch_id_for(context.session_id, context.run_token)
-    refs, targets = {}, {}
+    refs, targets, befores, hashes = {}, {}, {}, {}
     problems: list[tuple[str, str]] = []
     for n, item in enumerate(data["items"]):
         try:
@@ -722,22 +693,13 @@ def parse_result(
                 if (
                     not ref
                     or item.get("target_id") is not None
-                    or item["before"] is not None
-                    or item["after"] is None
+                    or item.get("after") is None
                 ):
                     fail(
                         "OPERATION_SHAPE",
-                        "新增必须有 client_ref 和 after，且无目标和 before",
-                        expected={
-                            "client_ref": "非空",
-                            "before": None,
-                            "target_id": None,
-                            "after": "对象",
-                        },
-                        actual={
-                            k: item.get(k)
-                            for k in ("client_ref", "target_id", "before", "after")
-                        },
+                        "新增必须有 client_ref 和 after，且无目标",
+                        expected={"client_ref": "非空", "target_id": None, "after": "对象"},
+                        actual={k: item.get(k) for k in ("client_ref", "target_id", "after")},
                     )
                 targets[n] = create_target_id(batch_id, ref)
             else:
@@ -759,39 +721,22 @@ def parse_result(
                         expected=kind.value,
                         actual=item["target_kind"],
                     )
-                if item["before"] is None or (item["operation"] == "update") != (
-                    item["after"] is not None
-                ):
+                if (item["operation"] == "update") != (item.get("after") is not None):
                     fail(
                         "OPERATION_SHAPE",
-                        "更新或删除的 before/after 形态不正确",
-                        expected={
-                            "before": "完整旧对象",
-                            "after": "对象" if item["operation"] == "update" else None,
-                        },
-                        actual={"before": item["before"], "after": item["after"]},
+                        "更新必须有 after，删除不能有 after",
+                        expected={"after": "对象" if item["operation"] == "update" else None},
+                        actual={"after": item.get("after")},
                     )
-                if canonical(item["before"]) != canonical(current):
-                    fail(
-                        "BEFORE_MISMATCH",
-                        "before 与固定草稿不一致",
-                        pointer=current_pointer + "/before",
-                        expected=current,
-                        actual=item["before"],
-                    )
-                expected_hash = (
+                # SC-08: the agent no longer copies before or the target hash;
+                # both come from the pinned context, and trial_apply still
+                # compares them with the live state (optimistic concurrency).
+                befores[n] = deepcopy(current)
+                hashes[n] = (
                     instance_hash(current, instance_entries[target]["revision"])
                     if kind.value in INSTANCE_KINDS
                     else element_sha256(current, collection=COLLECTIONS[kind])
                 )
-                if expected_hash != item.get("expected_target_hash"):
-                    fail(
-                        "TARGET_HASH_MISMATCH",
-                        "目标哈希不一致",
-                        pointer=current_pointer + "/expected_target_hash",
-                        expected=expected_hash,
-                        actual=item.get("expected_target_hash"),
-                    )
                 targets[n] = target
         except ProposalContractError as exc:
             # Report every independently broken item, not only the first.
@@ -853,7 +798,7 @@ def parse_result(
                         actual=ref,
                     )
                 deps.add(ids[refs[ref]])
-            after = raw_item["after"]
+            after = raw_item.get("after")
             if after is not None:
                 after = walk_references(raw_item["target_kind"], after, resolve)
                 after["id"] = targets[n]
@@ -861,6 +806,7 @@ def parse_result(
                 if after is not None:
                     for evidence in after.get("evidence", []):
                         if evidence["kind"] == "material":
+                            _fill_material_sha(evidence, material_lookup)
                             evidence.setdefault(
                                 "id", str(uuid5(UUID(targets[n]), canonical(evidence)))
                             )
@@ -877,16 +823,17 @@ def parse_result(
                             key=lambda e: e["id"],
                         )
 
-                    if manual(after) != manual(raw_item["before"]):
+                    if manual(after) != manual(befores.get(n)):
                         fail(
                             "MANUAL_EVIDENCE_FORBIDDEN",
                             "智能体不能新增、修改或删除人工证据",
                             pointer=current_pointer + "/after/evidence",
-                            expected=manual(raw_item["before"]),
+                            expected=manual(befores.get(n)),
                             actual=manual(after),
                         )
                 evidence = deepcopy(raw_item.get("evidence", []))
                 for e in evidence:
+                    _fill_material_sha(e, material_lookup)
                     e.setdefault("id", str(uuid5(UUID(targets[n]), canonical(e))))
                     MaterialEvidence.model_validate(e)
                     check_material_evidence(e, material_lookup, "evidence")
@@ -911,8 +858,8 @@ def parse_result(
                     raw_item["operation"],
                     raw_item["target_kind"],
                     targets[n],
-                    raw_item.get("expected_target_hash"),
-                    raw_item["before"],
+                    hashes.get(n),
+                    befores.get(n),
                     after,
                     raw_item.get("field_changes", []),
                     evidence,
@@ -940,7 +887,7 @@ def parse_result(
             "ELEMENT_INVALID",
             diagnostic("/items", "候选图校验未通过", "完整合法的候选图", str(exc)),
         ) from exc
-    return ParsedBatch(batch_id, hashlib.sha256(raw).hexdigest(), parsed)
+    return ParsedBatch(batch_id, result_digest(context.run_token, raw), parsed)
 
 
 def validate_draft_model(draft):

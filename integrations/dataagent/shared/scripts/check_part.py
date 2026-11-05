@@ -4,7 +4,7 @@ Shape follows the item schema, client_ref is unique within the fragment and
 across the other fragments already written, and references inside the fragment
 are closed. References to other fragments are
 listed as "待合并检查" rather than reported as errors; the merged check in
-prepare_result.py decides them. Pinned before/hash checks use definitions and the independent instance baseline.
+prepare_result.py decides them. Before-images and hashes are the platform's (SC-08).
 Repair budgets are never touched.
 """
 
@@ -18,7 +18,7 @@ from check_result import (
     mapping_local_errors,
     schema_errors,
 )
-from prepare_result import PrepareInputError, assemble, effective_ref, material_hashes
+from prepare_result import PrepareInputError, assemble, effective_ref
 from runpaths import PARTS, HintParser, command, error, existing, fragment_paths, plan_not_approved
 
 SUMMARY_LIMIT = 4000
@@ -131,7 +131,6 @@ def main():
             return 2
         context = json.loads(Path(args.context).read_bytes())
         schema = json.loads(Path(args.schema).read_bytes())
-        context["material_hashes"] = material_hashes(pack if args.work_pack else None, context)
     except (OSError, ValueError, KeyError) as exc:
         which = args.work_pack if not (args.context and args.schema) else f"{args.context} 或 {args.schema}"
         print(error("INPUT_UNREADABLE", f"读取 {which} 失败：{type(exc).__name__}", "未检查任何片段",

@@ -57,8 +57,6 @@ def example(target_kind, operation="create", variant=None):
             )
         filename, indices = variants[variant]
         items = json.loads((EXAMPLES / filename).read_bytes())
-        for item in items:
-            item.setdefault("before", None)
         return [items[i] for i in indices] if indices else items
     return json.loads((EXAMPLES / choices[target_kind][operation]).read_bytes())
 

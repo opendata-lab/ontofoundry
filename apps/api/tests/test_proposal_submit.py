@@ -172,8 +172,9 @@ def test_submit_contract_errors_then_pass(client):
     mismatched = {**payload, "run_token": "different-run"}
     report = client.post(url, json=mismatched, headers=headers).json()
     assert not report["passed"] and report["reviewable_count"] == 0
-    assert report["errors"][0]["code"] == "RESULT_CONTEXT_MISMATCH"
-    assert report["errors"][0]["message"].startswith("错误 [RESULT_CONTEXT_MISMATCH]")
+    # SC-08: the run identity is not part of the result; extra fields are refused.
+    assert report["errors"][0]["code"] == "RESULT_SCHEMA_INVALID"
+    assert report["errors"][0]["message"].startswith("错误 [RESULT_SCHEMA_INVALID]")
     assert (
         client.post(url, content=b"{", headers=headers).json()["errors"][0]["code"]
         == "RESULT_JSON_INVALID"

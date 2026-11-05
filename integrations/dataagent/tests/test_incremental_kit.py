@@ -123,8 +123,10 @@ def test_new_incremental_route_proves_seven_items_final_graph_and_sqlite(tmp_pat
     final = apply_items(ctx["draft"], parsed.items)
     update = parsed.items[0]
     assert update.before == dataset
+    # SC-08: the platform supplied the pinned hash; the merged file carries none.
     batch = json.loads((tmp_path / "proof/output/result.json").read_bytes())
-    assert batch["items"][0]["expected_target_hash"] == ctx["element_hashes"][dataset["id"]]
+    assert "expected_target_hash" not in batch["items"][0]
+    assert update.expected_target_hash == ctx["element_hashes"][dataset["id"]]
     assert len(next(d for d in final["datasets"] if d["id"] == dataset["id"])["columns"]) == 5
     assert not any(i.target_kind in {"property", "object_type", "link_type"} for i in parsed.items)
 
@@ -182,7 +184,7 @@ def test_exact_queries_return_full_definitions_hashes_and_only_small_reference_l
     for element in data["elements"]:
         definition = element["definition"]
         assert definition == without_material_hashes(existing[definition["id"]])
-        assert element["hash"] == ctx["element_hashes"][definition["id"]]
+        assert "hash" not in element  # nothing for the agent to copy (SC-08)
         assert all(set(r) <= {"id", "name"} for r in element["referenced_by"])
         status, by_id = cli(tmp_path, ctx, definition["id"])
         assert status == 0 and by_id["elements"] == [element]

@@ -107,7 +107,7 @@ def test_values_are_exactly_derived_from_current_contract():
         "rule_kind": "AfterRuleKind", "rule_owner_kind": "AfterRuleOwnerKind",
     }.items()}
     for key, names in {
-        "binding_kind": ["ColumnBinding", "ExpressionBinding"],
+        "binding_kind": ["AfterColumnBinding", "AfterExpressionBinding"],
         "data_join_kind": ["AfterDirectJoin", "AfterMappingTableJoin"],
         "metric_kind": ["AfterSimpleMetric", "AfterRatioMetric", "AfterExpressionMetric"],
     }.items():

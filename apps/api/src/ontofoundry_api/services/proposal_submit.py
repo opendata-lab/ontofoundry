@@ -3,14 +3,13 @@
 The agent is still running when it submits, so every rejection reaches it as
 tool output it can fix; nothing is checked again after the run ends."""
 
-import hashlib
 import logging
 
 from ontofoundry_api.contracts.proposal_submit import (
     ProposalSubmitIssue,
     ProposalSubmitResponse,
 )
-from ontofoundry_api.contracts.proposals import RunContext
+from ontofoundry_api.contracts.proposals import RunContext, result_digest
 from ontofoundry_api.db_models import utc_now
 from ontofoundry_api.services.errors import ConflictError, ServiceError
 from ontofoundry_api.services.proposal_apply import parse_agent
@@ -108,7 +107,7 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
     session = lock_session(db, workspace_id, session_id)
     if session.dataagent_run_token != run_token:
         return _rejected("RUN_NOT_CURRENT", "本轮运行已不是会话的当前运行，请重新发起建模")
-    digest = hashlib.sha256(raw).hexdigest()
+    digest = result_digest(run_token, raw)
     # Before the pending gate: a retry after a lost response finds its own batch.
     existing = submitted_batch(db, workspace_id, session_id, run_token)
     if existing is not None:

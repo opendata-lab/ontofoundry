@@ -294,14 +294,3 @@ def test_a_new_run_moves_the_last_runs_fragments_but_the_same_run_keeps_them(tmp
     assert (tmp_path / "modeling/previous/first/parts/01-types.json").exists()
 
 
-def test_merge_fills_the_hash_of_a_material_named_by_id():
-    prepare = importlib.import_module("prepare_result")
-    item = {"operation": "create", "target_kind": "object_type", "after": {"name": "shelf", "evidence": [
-        {"kind": "material", "material_id": "m1", "locator": {"line_start": 1, "line_end": 1}, "quote": "书架"}]}}
-    hashes = prepare.material_hashes({"materials": [{"id": "m1", "sha256": "b" * 64}]})
-    prepare.fill_material_hashes(item, hashes)
-    assert item["after"]["evidence"][0]["material_sha256"] == "b" * 64
-    # A hash the agent wrote is never replaced.
-    item["after"]["evidence"][0]["material_sha256"] = "c" * 64
-    prepare.fill_material_hashes(item, hashes)
-    assert item["after"]["evidence"][0]["material_sha256"] == "c" * 64

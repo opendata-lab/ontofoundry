@@ -7,7 +7,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from check_result import TARGET_KINDS, pinned_targets
+from check_result import COLLECTIONS, TARGET_KINDS
 from runpaths import command, error, without_material_hashes
 
 LIMIT = 8192
@@ -22,6 +22,22 @@ TOKEN = re.compile(
 )
 
 
+def pinned_elements(context):
+    """Definitions of the pinned draft plus the instances this run may change."""
+    elements = {
+        e["id"]: (kind, e)
+        for kind, collection in COLLECTIONS.items()
+        for e in context.get("draft", {}).get(collection, [])
+    }
+    for entry in context.get("instance_baseline", {}).get("items", []):
+        if entry["state"] == "active" or (
+            entry["state"] == "staged"
+            and entry["session_id"] == context.get("run", {}).get("session_id")
+        ):
+            elements[entry["target_id"]] = (entry["target_kind"], entry["element"])
+    return elements
+
+
 def encode(value):
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
@@ -29,9 +45,7 @@ def encode(value):
 class ElementIndex:
     def __init__(self, context):
         self.context = context
-        targets = pinned_targets(context)
-        self.elements = {identity: (kind, e) for (kind, identity), (e, _) in targets.items()}
-        self.hashes = {identity: h for (_, identity), (_, h) in targets.items()}
+        self.elements = pinned_elements(context)
 
     def lineage(self, identity):
         seen = set()
@@ -216,7 +230,7 @@ class ElementIndex:
         reverse = self.reverse_refs()
         return {"elements": [{
             "kind": self.elements[i][0], "selector": self.exact_selector(i),
-            "definition": without_material_hashes(self.elements[i][1]), "hash": self.hashes[i],
+            "definition": without_material_hashes(self.elements[i][1]),
             "referenced_by": [{"id": r, **({"name": self.elements[r][1]["name"]} if "name" in self.elements[r][1] else {})} for r in sorted(reverse[i])],
         } for i in identities]}, 0
 

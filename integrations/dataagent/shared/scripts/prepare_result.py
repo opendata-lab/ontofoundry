@@ -8,8 +8,6 @@ from check_result import (
     atomic_write,
     diagnostic,
     encode,
-    pinned_targets,
-    same_json,
     validate_file,
 )
 from runpaths import (
@@ -38,44 +36,8 @@ def effective_ref(item, index):
     return item.get("client_ref", f"{item.get('target_kind')}-{index + 1}")
 
 
-def material_hashes(pack, context=None):
-    """Material id -> sha256 for evidence the agent left unhashed: this run's
-    materials from the work pack, earlier materials from evidence the draft and
-    instance baseline already carry."""
-    hashes = {}
-
-    def recorded(value):
-        if isinstance(value, dict):
-            if value.get("kind") == "material" and value.get("material_id") and value.get("material_sha256"):
-                hashes.setdefault(str(value["material_id"]), value["material_sha256"])
-            for child in value.values():
-                recorded(child)
-        elif isinstance(value, list):
-            for child in value:
-                recorded(child)
-
-    recorded([(context or {}).get("draft"), (context or {}).get("instance_baseline")])
-    hashes.update({str(m["id"]): m["sha256"] for m in (pack or {}).get("materials") or [] if m.get("id") and m.get("sha256")})
-    return hashes
-
-
-def fill_material_hashes(value, hashes):
-    """Evidence names a material by id; its hash is a fact of the run, not the agent's to copy."""
-    if isinstance(value, dict):
-        if value.get("kind") == "material" and value.get("material_id") and not value.get("material_sha256"):
-            sha = hashes.get(str(value["material_id"]))
-            if sha:
-                value["material_sha256"] = sha
-        for child in value.values():
-            fill_material_hashes(child, hashes)
-    elif isinstance(value, list):
-        for child in value:
-            fill_material_hashes(child, hashes)
-
-
 def assemble(context, fragments):
     items, refs = [], set()
-    existing = pinned_targets(context)
     for fragment_index, fragment in enumerate(fragments):
         if not isinstance(fragment, list):
             raise PrepareInputError(
@@ -89,7 +51,6 @@ def assemble(context, fragments):
         for raw in fragment:
             index = len(items)
             item = deepcopy(raw)
-            fill_material_hashes(item, context.get("material_hashes") or {})
 
             def fail(
                 field, expected, actual, code="PREPARE_INPUT", index=index, item=item
@@ -109,32 +70,9 @@ def assemble(context, fragments):
             for field in ("operation", "target_kind"):
                 if field not in item:
                     fail(field, "必填字段", "缺失")
-            if item["operation"] in {"update", "delete"}:
-                target = item.get("target_id")
-                found = (
-                    existing.get((item["target_kind"], target))
-                    if isinstance(target, str)
-                    else None
-                )
-                if found is None:
-                    fail(
-                        "target_id",
-                        "固定草稿中的定义或实例基线中的实例 UUID",
-                        target,
-                        "TARGET_NOT_FOUND",
-                    )
-                before, target_hash = found
-                for field, value, code in (
-                    ("before", before, "BEFORE_MISMATCH"),
-                    ("expected_target_hash", target_hash, "TARGET_HASH_MISMATCH"),
-                ):
-                    if field in item and not same_json(item[field], value):
-                        fail(field, value, item[field], code)
-                    item[field] = deepcopy(value)
-                if item["operation"] == "delete":
-                    item.setdefault("after", None)
-            else:
-                item.setdefault("before", None)
+            if item["operation"] == "delete":
+                item.setdefault("after", None)
+            elif item["operation"] not in {"update", "delete"}:
                 item["client_ref"] = effective_ref(item, index)
             ref = item.get("client_ref")
             if isinstance(ref, str):
@@ -142,7 +80,8 @@ def assemble(context, fragments):
                     fail("client_ref", "不重复的 client_ref", ref)
                 refs.add(ref)
             items.append(item)
-    return {**context["run"], "items": items}
+    # SC-08: only the items; the platform supplies the run and pinned facts.
+    return {"items": items}
 
 
 def workspace_path(raw):
@@ -388,7 +327,6 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         fragments, origins, context = load_inputs(raw_fragments, args.context)
         candidate = output.with_suffix(".pending.json")
-        context["material_hashes"] = material_hashes(pack if args.work_pack else None, context)
         batch = assemble(context, fragments)
         atomic_write(candidate, encode(batch))
     except (InputProblem, PrepareInputError) as exc:

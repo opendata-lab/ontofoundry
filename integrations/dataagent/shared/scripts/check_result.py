@@ -1,4 +1,7 @@
-"""Check the supplied schema, operation shapes, references and pinned context."""
+"""Check the supplied schema, operation shapes and references locally.
+
+Pinned facts (before-images, target hashes, material hashes) are the
+platform's to supply and check (SC-08)."""
 
 import argparse
 import json
@@ -25,45 +28,6 @@ COLLECTIONS = {
 }
 INSTANCE_KINDS = frozenset({"material_object", "material_link"})
 TARGET_KINDS = COLLECTIONS.keys() | INSTANCE_KINDS
-
-
-def same_json(left, right):
-    """Keep boolean and numeric instance values distinct when checking a copy."""
-    if type(left) is not type(right):
-        return False
-    if isinstance(left, dict):
-        return left.keys() == right.keys() and all(same_json(v, right[k]) for k, v in left.items())
-    if isinstance(left, list):
-        return len(left) == len(right) and all(same_json(a, b) for a, b in zip(left, right))
-    return left == right
-
-
-def pinned_targets(context):
-    """Index definitions and revision-bound instances from their pinned sources."""
-    targets = {
-        (kind, e["id"]): (e, context.get("element_hashes", {}).get(e["id"]))
-        for kind, collection in COLLECTIONS.items()
-        for e in context.get("draft", {}).get(collection, [])
-    }
-    for entry in context.get("instance_baseline", {}).get("items", []):
-        if entry["state"] == "active" or (
-            entry["state"] == "staged"
-            and entry["session_id"] == context.get("run", {}).get("session_id")
-        ):
-            targets[(entry["target_kind"], entry["target_id"])] = (entry["element"], entry["hash"])
-    return targets
-
-
-HEADER_FIELDS = (
-    "schema_version",
-    "workspace_id",
-    "session_id",
-    "run_token",
-    "base_version_id",
-    "base_version_sha256",
-    "source_session_revision",
-    "source_draft_sha256",
-)
 
 
 def preview(value):
@@ -204,7 +168,7 @@ def check_result(result, schema, context=None):
             errors.append(diagnostic(base + path, code, expected, actual, item))
 
         operation = item["operation"]
-        before, after = item.get("before"), item.get("after")
+        after = item.get("after")
         ref = item.get("client_ref")
         if ref and ref in seen_refs:
             add("/client_ref", "CHECK", "client_ref 不重复", ref)
@@ -213,28 +177,17 @@ def check_result(result, schema, context=None):
         if operation == "create":
             if not ref:
                 add("/client_ref", "CHECK", "create 需非空 client_ref", ref)
-            for key in ("target_id", "before"):
-                if item.get(key) is not None:
-                    add("/" + key, "CHECK", "create 必须为空", item[key])
+            if item.get("target_id") is not None:
+                add("/target_id", "CHECK", "create 必须为空", item["target_id"])
             if not isinstance(after, dict):
                 add("/after", "CHECK", "create 需对象", after)
         elif operation in {"update", "delete"}:
-            for key in ("target_id", "before", "expected_target_hash"):
-                if not item.get(key) or (
-                    key == "before" and not isinstance(before, dict)
-                ):
-                    add(
-                        "/" + key,
-                        "CHECK",
-                        "update/delete 需 target_id、before 与 expected_target_hash",
-                        item.get(key),
-                    )
+            if not item.get("target_id"):
+                add("/target_id", "CHECK", "update/delete 需 target_id", item.get("target_id"))
             if operation == "update" and not isinstance(after, dict):
                 add("/after", "CHECK", "update 需对象", after)
             if operation == "delete" and after is not None:
                 add("/after", "CHECK", "delete 必须为空", after)
-            if isinstance(before, dict) and before.get("id") != item.get("target_id"):
-                add("/before/id", "CHECK", item.get("target_id"), before.get("id"))
             if item.get("target_id") in targets:
                 add(
                     "/target_id",
@@ -273,39 +226,6 @@ def check_result(result, schema, context=None):
                     {"depends_on 引用未闭合，可用": refs},
                     dependency,
                 )
-    if context is not None:
-        run = context.get("run", context)
-        for key in HEADER_FIELDS:
-            if key in run and result.get(key) != run[key]:
-                errors.append(
-                    diagnostic(
-                        "/" + key,
-                        "CONTEXT_MISMATCH 固定上下文不一致",
-                        run[key],
-                        result.get(key),
-                    )
-                )
-        existing = pinned_targets(context)
-        for index, item in enumerate(items):
-            if item["operation"] not in {"update", "delete"}:
-                continue
-            base = f"/items/{index}"
-            target = item.get("target_id")
-            found = existing.get((item["target_kind"], target))
-            if found is None:
-                errors.append(diagnostic(
-                    base + "/target_id", "TARGET_NOT_FOUND",
-                    "固定草稿中的定义或实例基线中的实例", target, item,
-                ))
-                continue
-            for field, code, expected in (
-                ("before", "BEFORE_MISMATCH", found[0]),
-                ("expected_target_hash", "TARGET_HASH_MISMATCH", found[1]),
-            ):
-                if not same_json(expected, item.get(field)):
-                    errors.append(diagnostic(
-                        base + "/" + field, code, expected, item.get(field), item,
-                    ))
     return errors
 
 

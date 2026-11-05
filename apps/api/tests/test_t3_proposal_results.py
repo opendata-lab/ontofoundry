@@ -9,8 +9,8 @@ import pytest
 from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row, submit
 from sqlalchemy import select, update
 from test_modeling import ROOT, create_session, save
+from test_t1_proposal_contract import items_only
 
-from ontofoundry_api.contracts.proposals import SCHEMA_VERSION
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
     ProposalBatchRecord,
@@ -60,22 +60,7 @@ def proposals_run(client) -> tuple[dict, dict]:
 
 
 def result(manifest: dict, items: list[dict]) -> dict:
-    return {
-        "schema_version": SCHEMA_VERSION,
-        **{
-            key: manifest[key]
-            for key in (
-                "run_token",
-                "workspace_id",
-                "session_id",
-                "base_version_id",
-                "base_version_sha256",
-                "source_session_revision",
-                "source_draft_sha256",
-            )
-        },
-        "items": items,
-    }
+    return {"items": items_only(items)}
 
 
 def some_items(draft: dict) -> list[dict]:
@@ -212,7 +197,7 @@ def test_a_rejected_result_creates_no_batch(client, monkeypatch):
     assert row(client, session["id"]).draft_json == session["draft"]
 
 
-def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypatch):
+def test_proposals_prompt_carries_the_run_and_pinned_mcp(client, monkeypatch):
     from ontofoundry_api.api import agent_conversation
 
     uploads: dict[str, bytes] = {}
@@ -249,11 +234,9 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     context = json.loads(
         next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-"))
     )
-    assert context["run"] == {k: v for k, v in result(manifest, []).items() if k != "items"}
-    first = session["draft"]["object_types"][0]
-    assert context["element_hashes"][first["id"]] == element_sha256(
-        first, collection="object_types"
-    )
+    assert context["run"] == {k: manifest[k] for k in ("run_token", "workspace_id", "session_id")}
+    # SC-08: hashes and before-images are the platform's, not in the context.
+    assert "element_hashes" not in context
     pack = json.loads(
         next(v for k, v in uploads.items() if k.startswith("ontofoundry-work-pack-"))
     )
@@ -270,7 +253,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert "needs_input_file" not in pack and "待确认" not in prompt
     assert pack["result_file"] in prompt
     assert "questions" not in prompt and "结果头" not in prompt
-    assert session["base_version_id"] == pack["run"]["base_version_id"]
+    assert pack["run"] == context["run"]  # the pinned version reaches the agent via the MCP config below
     assert "ofrun." not in prompt
     access_name = f"ontofoundry-mcp-{manifest['run_token']}.json"
     assert pack["mcp_config_file"] == "inputs/" + access_name
