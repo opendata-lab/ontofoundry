@@ -145,6 +145,15 @@ def test_a_passing_submission_after_repairs_is_stored(client):
     assert len(stored(client, session["id"])[0]) == 1
 
 
+def test_rejection_carries_the_structured_diagnostics():
+    from ontofoundry_api.services.errors import DatasetSourceError
+    from ontofoundry_api.services.proposal_submit import _reason
+
+    exc = DatasetSourceError("数据集来源未就绪", details={"diagnostics": [
+        {"code": "SOURCE_NOT_REGISTERED", "path": "/query_sql", "message": "来源不在连接允许的业务范围"}]})
+    assert _reason(exc) == "数据集来源未就绪；[SOURCE_NOT_REGISTERED] /query_sql 来源不在连接允许的业务范围"
+
+
 def test_submit_contract_errors_then_pass(client):
     session, manifest, url, headers = running_submit(client)
     payload = result(manifest, some_items(session["draft"]))

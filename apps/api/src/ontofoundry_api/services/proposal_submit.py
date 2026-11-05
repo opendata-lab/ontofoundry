@@ -51,6 +51,17 @@ def context_from_manifest(manifest):
     )
 
 
+def _reason(exc):
+    """The message plus its structured diagnostics: the agent can only fix
+    what it can read (a bare "来源未就绪" hid SOURCE_NOT_REGISTERED)."""
+    parts = [str(exc)]
+    for item in (getattr(exc, "details", None) or {}).get("diagnostics") or []:
+        if isinstance(item, dict) and item.get("message"):
+            where = item.get("path") or ""
+            parts.append(f"[{item.get('code', '')}] {where} {item['message']}".strip())
+    return "；".join(parts)
+
+
 def _rejected(code, message, repair_used=0):
     return ProposalSubmitResponse(
         passed=False,
@@ -119,7 +130,7 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
         )
     except ServiceError as exc:
         db.rollback()
-        return _rejected(exc.code, str(exc), _record_rejection(db, workspace_id, session_id, digest))
+        return _rejected(exc.code, _reason(exc), _record_rejection(db, workspace_id, session_id, digest))
     except Exception:
         # Reported to the agent like any rejection, so it never looks like an outage.
         logger.exception("Unexpected proposal submit failure")
