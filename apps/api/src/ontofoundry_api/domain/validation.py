@@ -70,6 +70,7 @@ def physical_value_kind(physical_type: str | None) -> ValueKind | None:
         "int4",
         "int8",
         "largeint",
+        "year",  # MySQL YEAR is a four-digit integer
     }:
         return ValueKind.INTEGER
     if name in {"decimal", "numeric", "number", "money"}:
@@ -86,6 +87,12 @@ def physical_value_kind(physical_type: str | None) -> ValueKind | None:
         "nvarchar",
         "nchar",
         "text",
+        "tinytext",
+        "mediumtext",
+        "longtext",
+        # MySQL ENUM/SET values arrive as strings.
+        "enum",
+        "set",
         "string",
         "uuid",
         "character",
