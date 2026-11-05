@@ -64,7 +64,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 ## 2026-10-23 平台提案预检
 
-`prepare_result.py` 本地检查通过后，读取工作包 `mcp_config_file` 中本轮 MCP 地址与 Authorization，调用同空间、同运行的只读 `proposal-check`。整批校验错误直接进入工具输出；未通过时保留候选和报告，不替换最终结果。平台不可达或配置缺失时直接报错，不写最终结果。最多修正两轮，仍未通过则不交付结果并说明原因。`check_result.py` 仅检查候选，最终结果只能由合并脚本在平台检查通过后写入。最终文件保存不表示提案已接受或本体已发布。
+`prepare_result.py` 本地检查通过后，读取工作包 `platform_check_file` 中的 `submit_url` 与 Authorization，把结果提交到同空间、同运行的 `runs/{run_token}/proposals`。平台在同一事务里检查并入库：通过即成为待审提案，未通过不入库，全部错误直接进入工具输出，当场修正后重新提交。平台不可达或配置缺失时直接报错。最多修正两轮，仍未通过则不交付结果并说明原因。运行结束后平台不再下载结果文件；结果文件只作留档。入库不表示提案已接受或本体已发布。
 
 部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。
 

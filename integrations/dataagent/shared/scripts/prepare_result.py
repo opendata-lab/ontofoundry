@@ -244,111 +244,72 @@ class InputProblem(Exception):
         )
 
 
-def platform_check(pack, batch, candidate, retry_command):
-    """Use the run's uploaded MCP address and credential; never duplicate graph rules."""
+def platform_submit(pack, candidate, retry_command):
+    """Submit to the platform, which checks and stores in one step (SC-05).
+    Never duplicate graph rules here: the platform's verdict is the only one."""
     from urllib.error import HTTPError, URLError
-    from urllib.parse import quote, urlsplit, urlunsplit
+    from urllib.parse import urlsplit
     from urllib.request import HTTPRedirectHandler, Request, build_opener
 
     class NoRedirect(HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
 
-    check_file = pack.get("platform_check_file") or pack.get("mcp_config_file")
-    if not check_file:
-        print(error("PLATFORM_CHECK_CONFIG_MISSING", "工作包没有平台检查配置", "最终文件未替换", "重新发起建模以获取检查配置", retry=False))
+    submit_file = pack.get("platform_check_file") or pack.get("mcp_config_file")
+    if not submit_file:
+        print(error("PLATFORM_SUBMIT_CONFIG_MISSING", "工作包没有平台提交配置", "未提交，最终文件未替换", "重新发起建模以获取提交配置", retry=False))
         return False
     try:
-        config = json.loads(Path(check_file).read_bytes())
-        parts = urlsplit(config["url"])
-        expected = (
-            "/api/v1/ontology/workspaces/"
-            + quote(batch["workspace_id"], safe="")
-            + "/mcp"
-        )
-        if (
-            parts.scheme not in {"http", "https"}
-            or not parts.netloc
-            or not parts.path.endswith(expected)
-        ):
-            raise ValueError("MCP 地址与本轮工作空间不一致")
-        path = (
-            parts.path.removesuffix("/mcp")
-            + "/runs/"
-            + quote(batch["run_token"], safe="")
-            + "/proposal-check"
-        )
-        url = urlunsplit((parts.scheme, parts.netloc, path, "", ""))
-        credential = config["headers"]["Authorization"]
+        config = json.loads(Path(submit_file).read_bytes())
+        url = config["submit_url"]
+        parts = urlsplit(url)
+        if parts.scheme not in {"http", "https"} or not parts.netloc:
+            raise ValueError("提交地址无效")
         request = Request(
             url,
             data=candidate.read_bytes(),
             method="POST",
             headers={
-                "Authorization": credential,
+                "Authorization": config["headers"]["Authorization"],
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             },
         )
-        with build_opener(NoRedirect()).open(request, timeout=15) as response:
+        # Submitting can probe query datasets on the business source.
+        with build_opener(NoRedirect()).open(request, timeout=60) as response:
             report = json.load(response)
         if (
             not isinstance(report, dict)
             or not isinstance(report.get("passed"), bool)
+            or type(report.get("reviewable_count")) is not int
+            or report["reviewable_count"] < 0
+            or not isinstance(report.get("errors"), list)
+            or not isinstance(report.get("warnings", []), list)
             or any(
-                type(report.get(key)) is not int or report[key] < 0
-                for key in ("reviewable_count",)
+                not isinstance(problem, dict) or not isinstance(problem.get("message"), str)
+                for problem in [*report["errors"], *report.get("warnings", [])]
             )
-            or not isinstance(report.get("contract_errors"), list)
-            or any(
-                not isinstance(problem, dict)
-                or not isinstance(problem.get("message"), str)
-                for problem in report["contract_errors"]
-            )
-            or report["passed"] != (not report["contract_errors"])
+            or report["passed"] != (not report["errors"])
         ):
-            raise ValueError("平台未返回有效的检查结果")
+            raise ValueError("平台未返回有效的提交结果")
     except HTTPError as exc:
         if exc.code < 500:
-            print(
-                error(
-                    "PLATFORM_CHECK_REJECTED",
-                    f"平台检查请求被拒绝（HTTP {exc.code}）",
-                    "最终文件未替换",
-                    "重新发起建模以获取有效运行凭据",
-                    retry=False,
-                )
-            )
+            print(error("PLATFORM_SUBMIT_REJECTED", f"平台提交请求被拒绝（HTTP {exc.code}）", "未提交，最终文件未替换", "重新发起建模以获取有效运行凭据", retry=False))
             return False
-        # The result is only written once the platform has checked it.
-        print(
-            error(
-                "PLATFORM_CHECK_UNAVAILABLE",
-                f"平台暂时不可达（HTTP {exc.code}），未完成平台检查",
-                "最终文件未替换",
-                f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台检查不可用",
-            )
-        )
+        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台暂时不可达（HTTP {exc.code}），未完成提交", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
         return False
     except (OSError, ValueError, KeyError, TypeError, URLError) as exc:
-        print(
-            error(
-                "PLATFORM_CHECK_UNAVAILABLE",
-                f"平台检查未执行或未完成（{type(exc).__name__}），不能确认候选图合法",
-                "最终文件未替换",
-                f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台检查不可用",
-            )
-        )
+        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台提交未执行或未完成（{type(exc).__name__}），结果未入库", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
         return False
-    report_path = candidate.with_suffix(".platform-check.json")
+    report_path = candidate.with_suffix(".platform-submit.json")
     atomic_write(report_path, encode(report))
+    for warning in report.get("warnings", []):
+        print("提示：" + warning["message"])
     if report["passed"]:
-        print(f"平台检查通过：{report['reviewable_count']} 条可审。仅检查，未入库。")
+        print(f"平台检查通过并已入库：{report['reviewable_count']} 条待审。")
         return True
-    print(
-        f"平台检查未通过：整批校验失败。最终文件未替换。完整报告：{relative(report_path)}"
-    )
-    for problem in report["contract_errors"]:
+    print(f"平台检查未通过，未入库。最终文件未替换。完整报告：{relative(report_path)}")
+    for problem in report["errors"]:
         print(problem["message"])
     print("下一步：修正片段后重试 " + retry_command)
     return False
@@ -484,10 +445,10 @@ def main():
             *args.fragments,
         )
     )
-    if not platform_check(pack, batch, candidate, retry_command):
+    if not platform_submit(pack, candidate, retry_command):
         return 1
     atomic_write(output, candidate.read_bytes())
-    print(f"已保存最终结果：{relative(output)}；等待平台入库与用户审核")
+    print(f"已保存结果留档：{relative(output)}；提案已入库，等待用户审核")
     return 0
 
 

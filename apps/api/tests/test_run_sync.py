@@ -6,7 +6,7 @@ from functools import partial
 
 import httpx
 import pytest
-from run_helpers import TASK_ID, install_download, row
+from run_helpers import TASK_ID, install_download, row, submit
 from sqlalchemy import update
 from test_modeling import ROOT
 from test_t3_proposal_results import proposals_run, result, some_items, stored
@@ -66,7 +66,8 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     _configure(client)
     session, manifest = _queued_run(client)
     asked = _upstream(monkeypatch, ["finished"])
-    paths = install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    paths = install_download(monkeypatch, [])
+    submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     # A detail read settles the finished run first, so the page that reads it
     # when the conversation ends sees the new proposals.
@@ -74,7 +75,7 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     assert first.status_code == 200, first.text
     assert first.json()["task_status"] == "finished"
     assert first.json()["pending_proposal_count"] == 3
-    assert len(asked) == 1 and len(paths) == 1
+    assert len(asked) == 1 and paths == []
 
     current = row(client, session["id"])
     assert current.task_status == "finished"
@@ -87,7 +88,7 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     second = client.get(ROOT + "/sessions/" + session["id"]).json()
     assert second["task_status"] == "finished"
     assert second["pending_proposal_count"] == 3
-    assert len(asked) == 1 and len(paths) == 1
+    assert len(asked) == 1 and paths == []
     assert len(stored(client, session["id"])[0]) == 1
 
 
@@ -121,10 +122,11 @@ def test_a_finished_but_unclaimed_run_is_claimed_without_asking_dataagent(
     _configure(client)
     session, manifest = proposals_run(client)  # finished, result never claimed
     asked = _upstream(monkeypatch, [])
-    paths = install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    paths = install_download(monkeypatch, [])
+    submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     client.get(ROOT + "/sessions/" + session["id"])
-    assert asked == [] and len(paths) == 1
+    assert asked == [] and paths == []
     assert row(client, session["id"]).result_state == "done"
 
 

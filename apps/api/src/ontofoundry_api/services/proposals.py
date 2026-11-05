@@ -21,6 +21,29 @@ from ontofoundry_api.domain.instances import definitions
 from ontofoundry_api.domain.models import COLLECTIONS, PROPOSAL_COLLECTIONS, ElementKind
 
 
+def submitted_batch(db: Session, workspace_id: str, session_id: str, run_token: str | None):
+    """The batch a run submitted, if any (SC-05)."""
+    if not run_token:
+        return None
+    return db.scalar(
+        select(ProposalBatchRecord).where(
+            ProposalBatchRecord.workspace_id == workspace_id,
+            ProposalBatchRecord.session_id == session_id,
+            ProposalBatchRecord.run_token == run_token,
+        )
+    )
+
+
+def batch_item_count(db: Session, batch: ProposalBatchRecord) -> int:
+    from sqlalchemy import func
+
+    return db.scalar(
+        select(func.count()).select_from(ProposalItemRecord).where(
+            ProposalItemRecord.batch_id == batch.id
+        )
+    ) or 0
+
+
 def store_batch(
     db: Session,
     *,
@@ -31,26 +54,19 @@ def store_batch(
     parsed: ParsedBatch,
     settings,
 ) -> ProposalBatchRecord:
-    """Insert a validated batch and its dependencies in the caller's transaction."""
+    """Insert an already trial-applied batch (SC-04: nothing is rewritten here)
+    and its dependencies in the caller's transaction, under the session lock."""
     if manifest.get("invalidated"):
         from ontofoundry_api.services.errors import ServiceError
         raise ServiceError("运行固定上下文已失效，请重新运行", code="RUN_CONTEXT_INVALIDATED", status_code=409)
-    existing = db.scalar(
-        select(ProposalBatchRecord).where(
-            ProposalBatchRecord.workspace_id == workspace_id,
-            ProposalBatchRecord.session_id == session_id,
-            ProposalBatchRecord.run_token == manifest["run_token"],
-        )
-    )
+    existing = submitted_batch(db, workspace_id, session_id, manifest["run_token"])
     if existing is not None:
         return existing
     from ontofoundry_api.services.errors import ConflictError
-    from ontofoundry_api.services.proposal_apply import trial_apply
     from ontofoundry_api.services.session_gate import has_pending, lock_session
     session = lock_session(db, workspace_id, session_id)
     if has_pending(db, session):
         raise ConflictError("请先处理完待审提案", code="PENDING_PROPOSALS")
-    parsed.items = trial_apply(db, workspace_id, session, parsed.items, settings).items
     batch = ProposalBatchRecord(
         id=parsed.id,
         workspace_id=workspace_id,

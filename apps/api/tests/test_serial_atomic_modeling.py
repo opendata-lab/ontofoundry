@@ -8,7 +8,7 @@ from run_helpers import TASK_ID, install_download, reconcile, row
 from sqlalchemy import select
 from test_instance_store import create_instance
 from test_modeling import ROOT, create_session, save
-from test_proposal_checks import running_check
+from test_proposal_submit import running_submit
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 from test_t4_proposal_decisions import chain, current, decide, seed_batch
 
@@ -98,7 +98,7 @@ def test_old_batch_is_read_only_after_a_new_run_starts(client, decision):
 
 
 def test_reused_evidence_id_is_rejected_during_check(client):
-    session, manifest, url, headers = running_check(client)
+    session, manifest, url, headers = running_submit(client)
     material = client.post(ROOT + "/materials?name=虚构实例证据.md", content="星湾客户与月港客户".encode()).json()
     evidence = {"id": str(uuid4()), "kind": "material", "material_id": material["id"],
         "material_sha256": material["sha256"], "locator": {"line_start": 1, "line_end": 1}, "quote": "星湾客户"}
@@ -110,13 +110,13 @@ def test_reused_evidence_id_is_rejected_during_check(client):
     response = client.post(url, json=result(manifest, [one, two]), headers=headers)
     assert response.status_code == 200, response.text
     assert not response.json()["passed"]
-    assert response.json()["contract_errors"][0]["code"] == "EVIDENCE_ID_DUPLICATE"
+    assert response.json()["errors"][0]["code"] == "EVIDENCE_ID_DUPLICATE"
     with client.app.state.session_factory() as db:
         assert db.scalar(select(ProposalBatchRecord.id)) is None
 
 
 def test_checked_query_dataset_and_instances_are_accepted_without_live_probe(client, monkeypatch):
-    session, manifest, url, headers = running_check(client)
+    session, manifest, url, headers = running_submit(client)
     source = bind_datasets(client, {"datasets": [{"name": "fictional_orders", "table_name": "fictional_orders",
         "schema_name": "public", "dialect": "postgres", "columns": [{"name": "code", "physical_type": "text"}]}]})["datasets"][0]
     query = {**source, "source_kind": "query", "table_name": None, "schema_name": None,
@@ -158,17 +158,17 @@ def test_cancelled_run_never_stores_a_late_result(client, monkeypatch):
 
 
 def test_batch_storage_and_result_completion_roll_back_together(client, monkeypatch):
-    from ontofoundry_api.services import model_result
+    from ontofoundry_api.services import proposal_submit
 
     session, manifest = proposals_run(client)
     install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
-    original = model_result.store_batch
+    original = proposal_submit.store_batch
 
     def fail_after_insert(*args, **kwargs):
         original(*args, **kwargs)
         raise RuntimeError("fictional transaction failure")
 
-    monkeypatch.setattr(model_result, "store_batch", fail_after_insert)
+    monkeypatch.setattr(proposal_submit, "store_batch", fail_after_insert)
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert stored(client, session["id"])[0:2] == ([], [])
     assert row(client, session["id"]).draft_json == session["draft"]

@@ -55,6 +55,7 @@ def access_file(access: dict) -> dict:
     """The credential appears only in this uploaded file, never the turn text."""
     return {
         "url": access["url"],
+        "submit_url": access["submit_url"],
         "version_id": access["version_id"],
         "headers": {
             "Authorization": "Bearer " + access["credential"],

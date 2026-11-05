@@ -1,4 +1,4 @@
-"""Whole-batch checks and ingestion share the same validation rules."""
+"""Submitting a run's result checks and stores it in one step (SC-05)."""
 
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ from test_t1_proposal_contract import context, create, parse
 from test_t1_proposal_contract import result as contract_result
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 
-from ontofoundry_api.contracts.proposal_checks import ProposalCheckResponse
+from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.proposals import ProposalContractError
 from ontofoundry_api.db_models import ModelingSessionRecord, ProposalBatchRecord
 from ontofoundry_api.services.run_credentials import RunGrant, issue
@@ -39,7 +39,7 @@ def test_invalid_batch_creates_no_proposals(client, monkeypatch):
     assert batches == [] and items == []
 
 
-def running_check(client):
+def running_submit(client):
     session, manifest = proposals_run(client)
     with client.app.state.session_factory() as db:
         row = db.get(ModelingSessionRecord, session["id"])
@@ -55,50 +55,88 @@ def running_check(client):
             ),
         )
         db.commit()
-    url = f"/api/v1/ontology/workspaces/{session['workspace_id']}/runs/{manifest['run_token']}/proposal-check"
+    url = f"/api/v1/ontology/workspaces/{session['workspace_id']}/runs/{manifest['run_token']}/proposals"
     return session, manifest, url, {"Authorization": "Bearer " + credential}
 
 
-def test_check_is_read_only_and_rejects_the_same_batch_as_ingestion(client, monkeypatch):
-    session, manifest, url, headers = running_check(client)
+def finish(client, session_id, status="finished"):
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session_id).task_status = status
+        db.commit()
+
+
+def test_failed_submit_stores_nothing_and_the_run_settles_without_a_batch(client, monkeypatch):
+    session, manifest, url, headers = running_submit(client)
     payload = result(manifest, mixed_items(session["draft"]))
     response = client.post(url, json=payload, headers=headers)
     assert response.status_code == 200, response.text
-    report = ProposalCheckResponse.model_validate(response.json())
-    assert not report.passed and report.contract_errors and report.reviewable_count == 0
+    report = ProposalSubmitResponse.model_validate(response.json())
+    assert not report.passed and report.errors and report.reviewable_count == 0
     with client.app.state.session_factory() as db:
         assert not list(db.scalars(select(ProposalBatchRecord)))
-        row = db.get(ModelingSessionRecord, session["id"])
-        assert row.draft_json == session["draft"]
-        row.task_status = "finished"
-        db.commit()
-    install_download(monkeypatch, [payload])
+        assert db.get(ModelingSessionRecord, session["id"]).draft_json == session["draft"]
+    finish(client, session["id"])
+    install_download(monkeypatch, [])
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert stored(client, session["id"])[0] == []
 
 
-def test_check_contract_errors_and_pass(client):
-    session, manifest, url, headers = running_check(client)
+def test_passed_submit_is_stored_and_the_run_settles_done(client, monkeypatch):
+    session, manifest, url, headers = running_submit(client)
+    payload = result(manifest, some_items(session["draft"]))
+    report = client.post(url, json=payload, headers=headers).json()
+    count = len(payload["items"])
+    assert report["passed"] and report["batch_id"] and report["reviewable_count"] == count
+    batches, items, _ = stored(client, session["id"])
+    assert len(batches) == 1 and len(items) == count
+    finish(client, session["id"])
+    install_download(monkeypatch, [])
+    assert reconcile(client, session["id"]) == "done"
+    # A retry after a lost response gets the receipt, even once the run ended.
+    again = client.post(url, json=payload, headers=headers).json()
+    assert again["passed"] and again["batch_id"] == report["batch_id"]
+    payload["items"] = payload["items"][:1]
+    other = client.post(url, json=payload, headers=headers).json()
+    assert not other["passed"] and other["errors"][0]["code"] == "RUN_ALREADY_SUBMITTED"
+
+
+def test_stopping_after_submit_keeps_the_batch(client):
+    from ontofoundry_api.services.modeling_runs import _persist_task_projection
+
+    session, manifest, url, headers = running_submit(client)
     payload = result(manifest, some_items(session["draft"]))
     assert client.post(url, json=payload, headers=headers).json()["passed"]
-    payload["run_token"] = "different-run"
-    report = client.post(url, json=payload, headers=headers).json()
-    assert not report["passed"] and report["reviewable_count"] == 0
-    assert report["contract_errors"][0]["code"] == "RESULT_CONTEXT_MISMATCH"
-    assert report["contract_errors"][0]["message"].startswith(
-        "错误 [RESULT_CONTEXT_MISMATCH]"
+    _persist_task_projection(
+        client.app.state.session_factory, session["id"],
+        task_id="task-model-1", upstream_status="suspended", detail="已停止",
     )
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert row.task_status == "cancelled" and row.result_state == "done"
+        assert not (row.run_manifest_json or {}).get("invalidated")
+    assert len(stored(client, session["id"])[1]) == len(payload["items"])
+
+
+def test_submit_contract_errors_then_pass(client):
+    session, manifest, url, headers = running_submit(client)
+    payload = result(manifest, some_items(session["draft"]))
+    mismatched = {**payload, "run_token": "different-run"}
+    report = client.post(url, json=mismatched, headers=headers).json()
+    assert not report["passed"] and report["reviewable_count"] == 0
+    assert report["errors"][0]["code"] == "RESULT_CONTEXT_MISMATCH"
+    assert report["errors"][0]["message"].startswith("错误 [RESULT_CONTEXT_MISMATCH]")
     assert (
-        client.post(url, content=b"{", headers=headers).json()["contract_errors"][0]["code"]
+        client.post(url, content=b"{", headers=headers).json()["errors"][0]["code"]
         == "RESULT_JSON_INVALID"
     )
+    assert client.post(url, json=payload, headers=headers).json()["passed"]
 
 
 @pytest.mark.parametrize("uses_current_value", [False, True])
-def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
+def test_value_type_expression_submit_outcome(
     client, monkeypatch, uses_current_value
 ):
-    session, manifest, url, headers = running_check(client)
+    session, manifest, url, headers = running_submit(client)
     variable = "member_level" if uses_current_value else "level"
     payload = result(manifest, [
         create("level_type", "value_type", {"name": "member_level", "value_kind": "string"}),
@@ -113,11 +151,9 @@ def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
     report = response.json()
     assert report["passed"] is uses_current_value
     if not uses_current_value:
-        assert "值类型约束必须引用当前值 member_level" in report["contract_errors"][0]["message"]
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
-        db.commit()
-    install_download(monkeypatch, [payload])
+        assert "值类型约束必须引用当前值 member_level" in report["errors"][0]["message"]
+    finish(client, session["id"])
+    install_download(monkeypatch, [])
     assert reconcile(client, session["id"]) == ("done" if uses_current_value else "failed_permanent")
     batches, items, _ = stored(client, session["id"])
     assert len(batches) == int(uses_current_value)
@@ -127,24 +163,25 @@ def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
 @pytest.mark.parametrize(
     "scope", ["different-run", "different-space", "expired", "no-token"]
 )
-def test_check_honors_run_mcp_authorization(client, scope):
-    session, manifest, url, headers = running_check(client)
+def test_submit_honors_run_authorization(client, scope):
+    session, manifest, url, headers = running_submit(client)
     if scope == "different-run":
         url = url.replace(manifest["run_token"], "other")
     elif scope == "different-space":
         url = url.replace(session["workspace_id"], "00000000-0000-4000-8000-000000000000")
     elif scope == "expired":
-        with client.app.state.session_factory() as db:
-            db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
-            db.commit()
+        finish(client, session["id"])
+        report = client.post(url, json=result(manifest, []), headers=headers).json()
+        assert report["errors"][0]["code"] == "RUN_NOT_ACTIVE"
+        return
     else:
         headers = {}
     assert client.post(url, json=result(manifest, []), headers=headers).status_code == 401
 
 
-def test_check_schemas_are_generated_from_models():
+def test_submit_schema_is_generated_from_model():
     root = Path(__file__).resolve().parents[1] / "src/ontofoundry_api/contracts"
-    for model, name in [(ProposalCheckResponse, "proposal-check")]:
+    for model, name in [(ProposalSubmitResponse, "proposal-submit")]:
         schema = json.loads((root / f"ontofoundry.{name}.v1.schema.json").read_text())
         schema.pop("$schema")
         assert schema == model.model_json_schema()

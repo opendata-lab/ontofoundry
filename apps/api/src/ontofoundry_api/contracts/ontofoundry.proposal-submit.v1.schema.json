@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
-    "ProposalCheckError": {
+    "ProposalSubmitIssue": {
       "additionalProperties": false,
       "properties": {
         "code": {
@@ -17,7 +17,7 @@
         "code",
         "message"
       ],
-      "title": "ProposalCheckError",
+      "title": "ProposalSubmitIssue",
       "type": "object"
     }
   },
@@ -27,24 +27,43 @@
       "title": "Passed",
       "type": "boolean"
     },
-    "contract_errors": {
+    "errors": {
       "items": {
-        "$ref": "#/$defs/ProposalCheckError"
+        "$ref": "#/$defs/ProposalSubmitIssue"
       },
-      "title": "Contract Errors",
+      "title": "Errors",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/ProposalSubmitIssue"
+      },
+      "title": "Warnings",
       "type": "array"
     },
     "reviewable_count": {
       "minimum": 0,
       "title": "Reviewable Count",
       "type": "integer"
+    },
+    "batch_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Batch Id"
     }
   },
   "required": [
     "passed",
-    "contract_errors",
+    "errors",
     "reviewable_count"
   ],
-  "title": "ProposalCheckResponse",
+  "title": "ProposalSubmitResponse",
   "type": "object"
 }

@@ -25,7 +25,12 @@ from ontofoundry_api.api.modeling import (
 )
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import MaterialRecord, ModelingSessionRecord, utc_now
+from ontofoundry_api.db_models import (
+    MaterialRecord,
+    ModelingSessionRecord,
+    ProposalBatchRecord,
+    utc_now,
+)
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.dataagent import (
     ACTIVE_TASK_STATUSES,
@@ -98,6 +103,7 @@ def run_mcp_access(
     base = (settings.public_base_url or str(request.base_url)).rstrip("/")
     return {
         "url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/mcp",
+        "submit_url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/runs/{run_token}/proposals",
         "version_id": item.base_version_id,
         "credential": issue_run_credential(
             settings.session_secret,
@@ -602,6 +608,17 @@ async def send_message(
                     updated_at=utc_now(),
                 )
             )
+            if claimed.rowcount == 1:
+                # A fast agent can submit before its task id is recorded.
+                success_db.execute(
+                    update(ProposalBatchRecord)
+                    .where(
+                        ProposalBatchRecord.session_id == item.id,
+                        ProposalBatchRecord.run_token == run_token,
+                        ProposalBatchRecord.dataagent_task_id.is_(None),
+                    )
+                    .values(dataagent_task_id=task_id)
+                )
             success_db.commit()
         if claimed.rowcount != 1:
             # Another turn owns the session now. The task we just created is

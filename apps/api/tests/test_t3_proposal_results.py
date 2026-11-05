@@ -189,7 +189,8 @@ def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch
     assert reconcile(client, session["id"]) == "failed_permanent"
     after = row(client, session["id"])
     assert after.dataagent_task_id == TASK_ID and after.dataagent_run_token == RUN_TOKEN
-    assert "TARGET_HASH_MISMATCH" in after.task_detail or "提案结果被拒收" in after.task_detail
+    # The agent saw the rejection when it submitted; the run reports no batch.
+    assert "本轮没有提交通过检查的结果" in after.task_detail
     batches, items, _ = stored(client, session["id"])
     assert batches == [] and items == []
 
@@ -360,7 +361,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     assert current.task_status == "finished"
     assert (
         current.task_detail
-        == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
+        == "建模没有产出提案：本轮没有提交通过检查的结果，请重试或换个说法描述需求"
     )
     assert current.draft_json == before.draft_json
     assert current.candidates_json == before.candidates_json
@@ -369,7 +370,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert not any("needs-input" in path for path in paths)
-    assert paths[1:] == [
+    assert paths == [  # only workflow files, no result download
         "modeling/plan.md",
         "modeling/notes.md",
         "modeling/parts/01-types.json",
@@ -381,10 +382,12 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
 
 
 def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
-    from ontofoundry_api.services import model_result
+    from run_helpers import submit
+
+    from ontofoundry_api.services import proposal_submit
 
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, [])])
+    install_download(monkeypatch, [])
 
     def broken(*args, **kwargs):
         raise KeyError("client_ref")
@@ -392,13 +395,15 @@ def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
     async def forbidden(self, **kwargs):
         pytest.fail("入库拒收不再发起修复运行")
 
-    monkeypatch.setattr(model_result, "parse_agent", broken)
+    monkeypatch.setattr(proposal_submit, "parse_agent", broken)
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
+    report = submit(client, session["id"], result(manifest, []))
+    assert not report.passed and "校验异常" in report.errors[0].message
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert row(client, session["id"]).draft_json == session["draft"]
     batches, items, _ = stored(client, session["id"])
     assert items == []
     assert batches == []
-    assert "校验异常" in row(client, session["id"]).task_detail
+    assert "本轮没有提交通过检查的结果" in row(client, session["id"]).task_detail
 
 

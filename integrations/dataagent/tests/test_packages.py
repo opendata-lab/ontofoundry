@@ -17,7 +17,7 @@ sys.path.insert(0, str(BASE))
 from build_packages import SKILLS, build
 from generate_output_schemas import INSTANCE_SOURCE, SOURCE, TARGETS, generate
 from test_workflow import MATERIAL_HASHES, SCHEMA, pinned
-from test_platform_check import platform as platform
+from test_platform_submit import platform as platform
 
 
 @pytest.fixture(scope="module")
@@ -246,5 +246,6 @@ def _configure_check(tmp_path, origin):
     wid = context["run"]["workspace_id"]
     (tmp_path / "platform-check.json").write_text(json.dumps({
         "url": f"{origin}/api/v1/ontology/workspaces/{wid}/mcp",
+        "submit_url": f"{origin}/api/v1/ontology/workspaces/{wid}/runs/{context['run']['run_token']}/proposals",
         "headers": {"Authorization": "Bearer ofrun.fictional"},
     }))

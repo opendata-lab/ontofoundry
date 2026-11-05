@@ -13,7 +13,8 @@ from sqlalchemy import update
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
-from ontofoundry_api.services.model_result import exhaust_retriable_result, reconcile_run
+from ontofoundry_api.services.model_result import reconcile_run
+from ontofoundry_api.services.proposals import submitted_batch
 from ontofoundry_api.services.run_status import (
     ACTIVE_RUN_STATUSES,
     TERMINAL_RUN_STATUSES,
@@ -102,8 +103,13 @@ def _persist_task_projection(
     status = to_run_status(upstream_status)
     with session_factory() as db:
         values = {"dataagent_task_id": task_id, "task_status": status, "task_detail": detail}
-        if status in {"failed", "cancelled"}:
-            current = db.get(ModelingSessionRecord, session_id)
+        current = db.get(ModelingSessionRecord, session_id)
+        # A submitted batch settles the run's result (SC-10): a later failure
+        # or stop changes the run status only.
+        submitted = current is not None and submitted_batch(
+            db, current.workspace_id, session_id, current.dataagent_run_token
+        ) is not None
+        if status in {"failed", "cancelled"} and not submitted:
             values.update(result_state="failed_permanent", last_result_task_id=task_id)
             if status == "cancelled" and current is not None:
                 values["run_manifest_json"] = {**(current.run_manifest_json or {}), "invalidated": True}
@@ -224,7 +230,7 @@ def needs_run_sync(app, item: ModelingSessionRecord) -> bool:
         and item.dataagent_task_mode == "model"
         and (
             item.last_result_task_id != item.dataagent_task_id
-            or item.result_state in {"failed_retriable", "processing"}
+            or item.result_state == "processing"
         )
     )
 
@@ -330,17 +336,13 @@ async def _sync_session_run(app, workspace_id: str, session_id: str) -> None:
 
 
 async def settle_result(app, workspace_id: str, session_id: str, task_id: str) -> str:
-    """Claim a finished run's result, retrying a transient download failure
-    with backoff and failing visibly once the retries are spent."""
+    """Settle a finished run; wait briefly while another worker holds it."""
     result_state = await reconcile_run(app, workspace_id, session_id, task_id)
-    if result_state in {"failed_retriable", "processing"}:
-        for delay in (2, 4, 8):
-            await asyncio.sleep(delay)
-            result_state = await reconcile_run(app, workspace_id, session_id, task_id)
-            if result_state not in {"failed_retriable", "processing"}:
-                break
-        if result_state == "failed_retriable":
-            result_state = exhaust_retriable_result(app, session_id, task_id)
+    for delay in (2, 4, 8):
+        if result_state != "processing":
+            break
+        await asyncio.sleep(delay)
+        result_state = await reconcile_run(app, workspace_id, session_id, task_id)
     return result_state
 
 
