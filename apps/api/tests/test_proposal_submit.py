@@ -164,7 +164,9 @@ def test_a_passing_submission_after_repairs_is_stored(client):
     session, manifest, url, headers = running_submit(client)
     assert not client.post(url, json=result(manifest, mixed_items(session["draft"])), headers=headers).json()["passed"]
     report = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
-    assert report["passed"] and report["repair_used"] == 0
+    assert report["passed"] and report["repair_used"] == 1  # the passing fix is one repair
+    again = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
+    assert again["batch_id"] == report["batch_id"] and again["repair_used"] == 1
     assert len(stored(client, session["id"])[0]) == 1
 
 
