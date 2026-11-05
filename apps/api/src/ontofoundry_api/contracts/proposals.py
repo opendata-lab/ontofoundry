@@ -885,7 +885,9 @@ def parse_result(
     except ValueError as exc:
         raise ProposalContractError(
             "ELEMENT_INVALID",
-            diagnostic("/items", "候选图校验未通过", "完整合法的候选图", str(exc)),
+            diagnostic(
+                "/items", "候选图校验未通过", "完整合法的候选图", str(exc), graph=True
+            ),
         ) from exc
     return ParsedBatch(batch_id, result_digest(context.run_token, raw), parsed)
 
