@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 
 from ontofoundry_api.db_models import ModelingSessionRecord
 from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
@@ -23,29 +22,14 @@ def row(client, session_id: str) -> ModelingSessionRecord:
         return item
 
 
-_SUBMISSIONS: list = []
-
-
-def install_download(monkeypatch, values) -> list[str]:
-    """Queue what the agent hands in. Since SC-05 the merge script submits the
-    result during the run; `reconcile` replays that submission first. An
-    exception stands for a run that submitted nothing."""
-    queue = list(values)
-    # Through monkeypatch, so a queue never leaks into the next test.
-    monkeypatch.setattr(sys.modules[__name__], "_SUBMISSIONS", list(values))
+def install_download(monkeypatch) -> list[str]:
+    """Stub DataAgent downloads: a run that submitted nothing leaves only
+    (absent) workflow files to fetch. Returns the paths asked for."""
     paths: list[str] = []
 
     async def download(self, topic_id: str, rel_path: str):
         paths.append(rel_path)
-        # Legacy cases have no intermediate artifacts in the agent workspace.
-        if rel_path.startswith("modeling/"):
-            raise DataAgentError("missing workflow file", status_code=404)
-        value = queue.pop(0)
-        if isinstance(value, BaseException):
-            raise value
-        if isinstance(value, bytes):
-            return value, "application/json"
-        return json.dumps(value, ensure_ascii=False).encode(), "application/json"
+        raise DataAgentError("missing workflow file", status_code=404)
 
     monkeypatch.setattr(DataAgentClient, "download", download)
     return paths
@@ -69,12 +53,6 @@ def submit(client, session_id: str, value):
 
 
 def reconcile(client, session_id: str, task_id: str = TASK_ID) -> str:
-    pending = sys.modules[__name__]._SUBMISSIONS
-    while pending:
-        value = pending.pop(0)
-        if not isinstance(value, BaseException):
-            submit(client, session_id, value)
-            break
     return asyncio.run(
         reconcile_run(client.app, str(DEMO_WORKSPACE_ID), session_id, task_id)
     )

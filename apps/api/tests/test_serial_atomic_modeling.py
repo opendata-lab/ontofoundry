@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 from dataset_binding import bind_datasets
-from run_helpers import TASK_ID, install_download, reconcile, row
+from run_helpers import TASK_ID, install_download, reconcile, row, submit
 from sqlalchemy import select
 from test_instance_store import create_instance
 from test_modeling import ROOT, create_session, save
@@ -133,7 +133,8 @@ def test_checked_query_dataset_and_instances_are_accepted_without_live_probe(cli
     with client.app.state.session_factory() as db:
         db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
         db.commit()
-    install_download(monkeypatch, [payload])
+    install_download(monkeypatch)
+    submit(client, session["id"], payload)
     assert reconcile(client, session["id"]) == "done"
     batches, items, _ = stored(client, session["id"])
     assert len(batches) == 1
@@ -161,7 +162,7 @@ def test_batch_storage_and_result_completion_roll_back_together(client, monkeypa
     from ontofoundry_api.services import proposal_submit
 
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    install_download(monkeypatch)
     original = proposal_submit.store_batch
 
     def fail_after_insert(*args, **kwargs):
@@ -169,6 +170,7 @@ def test_batch_storage_and_result_completion_roll_back_together(client, monkeypa
         raise RuntimeError("fictional transaction failure")
 
     monkeypatch.setattr(proposal_submit, "store_batch", fail_after_insert)
+    assert not submit(client, session["id"], result(manifest, some_items(session["draft"]))).passed
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert stored(client, session["id"])[0:2] == ([], [])
     assert row(client, session["id"]).draft_json == session["draft"]

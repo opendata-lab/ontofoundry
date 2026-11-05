@@ -68,11 +68,12 @@ def test_a_new_revision_recomputes_every_derived_part(client, monkeypatch):
 
 
 def test_a_decision_without_a_draft_change_recomputes_the_summary(client, monkeypatch):
-    from run_helpers import install_download, reconcile
+    from run_helpers import install_download, reconcile, submit
     from test_t3_proposal_results import proposals_run, result, some_items
 
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, some_items(session["draft"])))
     assert reconcile(client, session["id"]) == "done"
     assert _read(client, session["id"])["pending_proposal_count"] == 3
 

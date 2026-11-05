@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from run_helpers import install_download, reconcile
+from run_helpers import install_download, reconcile, submit
 from test_t3_proposal_results import proposals_run, result, stored
 
 from ontofoundry_api.services.dataagent import (
@@ -71,7 +71,8 @@ def test_dynamic_paths_have_a_single_authoritative_source():
 
 def test_a_result_is_consumed_without_looking_for_questions(client, monkeypatch):
     session, manifest = proposals_run(client)
-    paths = install_download(monkeypatch, [result(manifest, [])])
+    paths = install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, []))
 
     async def forbidden(self, **kwargs):
         pytest.fail("有结果时不能发起模型修复")

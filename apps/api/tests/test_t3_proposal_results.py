@@ -6,7 +6,7 @@ import json
 from urllib.parse import urlsplit
 
 import pytest
-from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row
+from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row, submit
 from sqlalchemy import select, update
 from test_modeling import ROOT, create_session, save
 
@@ -18,7 +18,7 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
 )
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
-from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+from ontofoundry_api.services.dataagent import DataAgentClient
 
 
 def proposals_run(client) -> tuple[dict, dict]:
@@ -141,7 +141,8 @@ def stored(client, session_id):
 def test_result_is_stored_as_a_batch_and_the_draft_is_untouched(client, monkeypatch):
     session, manifest = proposals_run(client)
     before = row(client, session["id"])
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     assert reconcile(client, session["id"]) == "done"
 
@@ -159,7 +160,9 @@ def test_result_is_stored_as_a_batch_and_the_draft_is_untouched(client, monkeypa
 def test_consuming_the_same_result_twice_changes_nothing(client, monkeypatch):
     session, manifest = proposals_run(client)
     payload = result(manifest, some_items(session["draft"]))
-    install_download(monkeypatch, [payload, payload])
+    install_download(monkeypatch)
+    submit(client, session["id"], payload)
+    submit(client, session["id"], payload)
     assert reconcile(client, session["id"]) == "done"
     assert reconcile(client, session["id"]) == "done"
     batches, items, _ = stored(client, session["id"])
@@ -179,7 +182,8 @@ def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["items"][2]["expected_target_hash"] = "0" * 64
-    install_download(monkeypatch, [bad])
+    install_download(monkeypatch)
+    submit(client, session["id"], bad)
 
     async def forbidden(self, **kwargs):
         pytest.fail("入库拒收不再发起修复运行")
@@ -199,7 +203,8 @@ def test_a_rejected_result_creates_no_batch(client, monkeypatch):
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["run_token"] = "wrong"
-    install_download(monkeypatch, [bad])
+    install_download(monkeypatch)
+    submit(client, session["id"], bad)
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     batches, items, _ = stored(client, session["id"])
@@ -352,7 +357,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     # without a result file produced nothing and nothing is waiting.
     session, _ = proposals_run(client)
     before = row(client, session["id"])
-    paths = install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+    paths = install_download(monkeypatch)
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     current = row(client, session["id"])
@@ -382,12 +387,11 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
 
 
 def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
-    from run_helpers import submit
 
     from ontofoundry_api.services import proposal_submit
 
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [])
+    install_download(monkeypatch)
 
     def broken(*args, **kwargs):
         raise KeyError("client_ref")

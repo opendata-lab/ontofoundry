@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 import pytest
-from run_helpers import TASK_ID, install_download, reconcile
+from run_helpers import TASK_ID, install_download, reconcile, submit
 from test_t3_proposal_results import proposals_run, result, some_items
 
 from ontofoundry_api.db_models import ModelingSessionRecord, utc_now
@@ -18,7 +18,8 @@ def test_expired_processing_lease_recovered(client, monkeypatch):
         item.last_result_task_id = TASK_ID
         item.result_claimed_at = utc_now() - timedelta(minutes=6)
         db.commit()
-    paths = install_download(monkeypatch, [result(m, some_items(s["draft"]))])
+    paths = install_download(monkeypatch)
+    submit(client, s["id"], result(m, some_items(s["draft"])))
     assert reconcile(client, s["id"]) == "done"
     assert reconcile(client, s["id"]) == "done"
     assert paths == []  # the submitted batch settles the run; nothing is downloaded
@@ -30,7 +31,7 @@ def test_deleted_session_old_callback_is_noop(client, monkeypatch):
         item = db.get(ModelingSessionRecord, s["id"])
         db.delete(item)
         db.commit()
-    paths = install_download(monkeypatch, [])
+    paths = install_download(monkeypatch)
     assert reconcile(client, s["id"]) == ""
     assert paths == []
 

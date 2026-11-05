@@ -66,7 +66,7 @@ def test_detail_read_projects_a_finished_run_and_claims_its_batch(client, monkey
     _configure(client)
     session, manifest = _queued_run(client)
     asked = _upstream(monkeypatch, ["finished"])
-    paths = install_download(monkeypatch, [])
+    paths = install_download(monkeypatch)
     submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     # A detail read settles the finished run first, so the page that reads it
@@ -96,7 +96,7 @@ def test_list_read_syncs_a_live_run_without_claiming_anything(client, monkeypatc
     _configure(client)
     session, _ = _queued_run(client)
     asked = _upstream(monkeypatch, ["running"])
-    paths = install_download(monkeypatch, [])
+    paths = install_download(monkeypatch)
 
     response = client.get(ROOT + "/sessions")
     assert response.status_code == 200, response.text
@@ -122,7 +122,7 @@ def test_a_finished_but_unclaimed_run_is_claimed_without_asking_dataagent(
     _configure(client)
     session, manifest = proposals_run(client)  # finished, result never claimed
     asked = _upstream(monkeypatch, [])
-    paths = install_download(monkeypatch, [])
+    paths = install_download(monkeypatch)
     submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     client.get(ROOT + "/sessions/" + session["id"])
@@ -167,7 +167,7 @@ def test_a_newer_run_is_never_overwritten_by_a_slow_sync(client, monkeypatch):
         "AsyncClient",
         partial(httpx.AsyncClient, transport=httpx.MockTransport(handler)),
     )
-    paths = install_download(monkeypatch, [])
+    paths = install_download(monkeypatch)
     client.get(ROOT + "/sessions/" + session["id"])
     current = row(client, session["id"])
     assert (current.dataagent_task_id, current.task_status, current.task_detail) == (

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from run_helpers import install_download, reconcile
+from run_helpers import install_download, reconcile, submit
 from sqlalchemy import select
 from test_modeling import ROOT
 from test_t1_proposal_contract import context, create, parse
@@ -33,7 +33,8 @@ def test_invalid_group_rejects_the_entire_batch():
 
 def test_invalid_batch_creates_no_proposals(client, monkeypatch):
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, mixed_items(session["draft"]))])
+    install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, mixed_items(session["draft"])))
     assert reconcile(client, session["id"]) == "failed_permanent"
     batches, items, _ = stored(client, session["id"])
     assert batches == [] and items == []
@@ -76,7 +77,7 @@ def test_failed_submit_stores_nothing_and_the_run_settles_without_a_batch(client
         assert not list(db.scalars(select(ProposalBatchRecord)))
         assert db.get(ModelingSessionRecord, session["id"]).draft_json == session["draft"]
     finish(client, session["id"])
-    install_download(monkeypatch, [])
+    install_download(monkeypatch)
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert stored(client, session["id"])[0] == []
 
@@ -90,7 +91,7 @@ def test_passed_submit_is_stored_and_the_run_settles_done(client, monkeypatch):
     batches, items, _ = stored(client, session["id"])
     assert len(batches) == 1 and len(items) == count
     finish(client, session["id"])
-    install_download(monkeypatch, [])
+    install_download(monkeypatch)
     assert reconcile(client, session["id"]) == "done"
     # A retry after a lost response gets the receipt, even once the run ended.
     again = client.post(url, json=payload, headers=headers).json()
@@ -201,7 +202,7 @@ def test_value_type_expression_submit_outcome(
     if not uses_current_value:
         assert "值类型约束必须引用当前值 member_level" in report["errors"][0]["message"]
     finish(client, session["id"])
-    install_download(monkeypatch, [])
+    install_download(monkeypatch)
     assert reconcile(client, session["id"]) == ("done" if uses_current_value else "failed_permanent")
     batches, items, _ = stored(client, session["id"])
     assert len(batches) == int(uses_current_value)
