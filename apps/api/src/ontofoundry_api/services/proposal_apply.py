@@ -214,7 +214,9 @@ def parse_agent(db, settings, session, raw, context):
     try:
         parsed = parse_result(raw, context, material_lookup(db, settings, context.workspace_id))
     except ProposalContractError as exc:
-        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
+        problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
+        raise ServiceError(str(exc), code=exc.code, status_code=422,
+                           details={"problems": problems}) from exc
     trial = trial_apply(db, context.workspace_id, session, parsed.items, settings)
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 

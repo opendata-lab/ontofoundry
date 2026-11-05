@@ -62,12 +62,14 @@ def _reason(exc):
     return "；".join(parts)
 
 
-def _rejected(code, message, repair_used=0):
+def _rejected(code, message, repair_used=0, problems=None):
+    problems = problems or [(code, message)]
     return ProposalSubmitResponse(
         passed=False,
-        errors=[ProposalSubmitIssue(
-            code=code, message=f"错误 [{code}]：{message}。本次整批提交未通过，未入库。"
-        )],
+        errors=[
+            ProposalSubmitIssue(code=c, message=f"错误 [{c}]：{m}。本次整批提交未通过，未入库。")
+            for c, m in problems
+        ],
         reviewable_count=0,
         repair_used=repair_used,
         repair_limit=REPAIR_LIMIT,
@@ -130,7 +132,8 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
         )
     except ServiceError as exc:
         db.rollback()
-        return _rejected(exc.code, _reason(exc), _record_rejection(db, workspace_id, session_id, digest))
+        return _rejected(exc.code, _reason(exc), _record_rejection(db, workspace_id, session_id, digest),
+                         problems=(exc.details or {}).get("problems"))
     except Exception:
         # Reported to the agent like any rejection, so it never looks like an outage.
         logger.exception("Unexpected proposal submit failure")

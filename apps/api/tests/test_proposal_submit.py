@@ -352,3 +352,20 @@ def test_failed_run_is_reported_by_its_status_not_a_notice(client):
     detail = client.get(ROOT + f"/sessions/{session['id']}").json()
     assert "proposal_notice" not in detail
     assert detail["task_status"] == "failed" and detail["task_detail"] == "本轮没有写出结果文件"
+
+
+def test_every_broken_item_is_reported_in_one_submission(client):
+    # SC-06: two independent mistakes cost one repair round, not two.
+    session, manifest, url, headers = running_submit(client)
+    items = some_items(session["draft"])
+    missing = "00000000-0000-4000-8000-00000000abcd"
+    broken = [
+        {**items[1], "target_id": missing},
+        {**items[2], "target_id": "00000000-0000-4000-8000-00000000abce"},
+    ]
+    report = client.post(url, json=result(manifest, [items[0], *broken]), headers=headers).json()
+    assert not report["passed"]
+    assert len(report["errors"]) == 2, report["errors"]
+    assert "/items/1" in report["errors"][0]["message"] and "/items/2" in report["errors"][1]["message"]
+    # One round is counted for the whole rejected submission.
+    assert report["repair_used"] == 0
