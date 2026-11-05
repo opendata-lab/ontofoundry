@@ -367,6 +367,88 @@ def _value_types(draft: CoreDraft, index: DraftIndex) -> None:
             _require(rule.owner_id in index.value_types, "规则归属的值类型不存在")
 
 
+def _derived(draft, index, obj):
+    for branch in obj.derived_by:
+        if isinstance(branch, DerivedExpression):
+            resolve_derived_expression(draft, obj.extends, branch.expression)
+            continue
+        for condition in branch.conditions:
+            resolve_path(
+                index,
+                obj.extends,
+                [(s.link_type_id, s.direction) for s in condition.path.links],
+                condition.path.property_id,
+            )
+            _condition(
+                condition.operator,
+                condition.values,
+                index.properties[condition.path.property_id].value_kind,
+            )
+
+
+def _dataset(index, dataset):
+    if dataset.snapshot_date_column:
+        kind = _column(index, dataset.id, dataset.snapshot_date_column)
+        _require(
+            kind is None
+            or kind
+            in {
+                ValueKind.DATE,
+                ValueKind.DATETIME,
+                ValueKind.STRING,
+                ValueKind.INTEGER,
+            },
+            "快照日期列必须是日期类，或可按日期排序的文本/整数列",
+        )
+
+
+def _metric(draft, index, metrics, metric):
+    if isinstance(metric, RatioMetric):
+        components = [
+            metrics.get(metric.numerator_id),
+            metrics.get(metric.denominator_id),
+        ]
+        _require(
+            all(isinstance(m, SimpleMetric) for m in components),
+            "比率分量必须是 simple 指标",
+        )
+        _require(
+            components[0].dataset_id == components[1].dataset_id,
+            "比率分量必须属于同一数据集",
+        )
+        _require(
+            all(
+                metric_value_kind(draft, m, index) in {*NUMERIC_KINDS, None}
+                for m in components
+            ),
+            "比率分量必须是数值型",
+        )
+        return
+    _require(metric.dataset_id in index.datasets, "指标数据集不存在")
+    if metric.time_field:
+        kind = _column(index, metric.dataset_id, metric.time_field.column)
+        _require(
+            kind is None or kind in {ValueKind.DATE, ValueKind.DATETIME},
+            "指标时间字段必须是日期类",
+        )
+    if isinstance(metric, ExpressionMetric):
+        resolve_metric_expression(draft, metric)
+    else:
+        if metric.measure:
+            kind = _column(index, metric.dataset_id, metric.measure.column)
+            if metric.aggregation in {
+                Aggregation.SUM,
+                Aggregation.AVG,
+                Aggregation.MEDIAN,
+            }:
+                _require(kind is None or kind in NUMERIC_KINDS, "该聚合要求数值列")
+            if metric.aggregation in {Aggregation.MIN, Aggregation.MAX}:
+                _require(kind != ValueKind.BOOLEAN, "min/max 不接受布尔列")
+        for condition in metric.filters:
+            kind = _column(index, metric.dataset_id, condition.column.column)
+            _condition(condition.operator, condition.values, kind)
+
+
 def validate_core_graph(draft: CoreDraft) -> CoreDraft:
     """Raise on known invalid structure; missing physical metadata stays valid."""
     ids = [
@@ -403,6 +485,7 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
             link.source_type_id in index.objects and link.target_type_id in index.objects,
             "关系端点不存在",
         )
+    problems = _Problems()
     for obj in draft.object_types:
         props = index.effective_properties(obj.id)
         _names([*props, *index.outgoing_links(obj.id)], "属性与关系共享命名空间")
@@ -419,92 +502,22 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
                 not any(p.identifier and p.owner_type_id == obj.id for p in props),
                 "子对象不能增加已有父标识",
             )
-        for branch in obj.derived_by:
-            if isinstance(branch, DerivedExpression):
-                resolve_derived_expression(draft, obj.extends, branch.expression)
-            else:
-                for condition in branch.conditions:
-                    resolve_path(
-                        index,
-                        obj.extends,
-                        [(s.link_type_id, s.direction) for s in condition.path.links],
-                        condition.path.property_id,
-                    )
-                    _condition(
-                        condition.operator,
-                        condition.values,
-                        index.properties[condition.path.property_id].value_kind,
-                    )
+        if obj.derived_by:
+            problems.check(f"对象 {obj.name} 的派生条件", _derived, draft, index, obj)
     rule_keys = set()
     for rule in draft.rules:
         key = (rule.owner_kind, rule.owner_id, rule.name.casefold())
         _require(key not in rule_keys, "同一归属下规则英文标识重复")
         rule_keys.add(key)
-        resolve_rule_expression(draft, rule)
-    problems = _Problems()
+        problems.check(f"规则 {rule.name}", resolve_rule_expression, draft, rule)
     _mappings(draft, index, problems)
     for link in draft.link_types:
         if link.data_join is not None:
             problems.check(f"关系 {link.name}", _join, draft, index, link, link.data_join)
-    problems.raise_any()
     for dataset in draft.datasets:
-        if dataset.snapshot_date_column:
-            kind = _column(index, dataset.id, dataset.snapshot_date_column)
-            _require(
-                kind is None
-                or kind
-                in {
-                    ValueKind.DATE,
-                    ValueKind.DATETIME,
-                    ValueKind.STRING,
-                    ValueKind.INTEGER,
-                },
-                "快照日期列必须是日期类，或可按日期排序的文本/整数列",
-            )
+        problems.check(f"数据集 {dataset.name}", _dataset, index, dataset)
     metrics = {metric.id: metric for metric in draft.metrics}
     for metric in draft.metrics:
-        if isinstance(metric, RatioMetric):
-            components = [
-                metrics.get(metric.numerator_id),
-                metrics.get(metric.denominator_id),
-            ]
-            _require(
-                all(isinstance(m, SimpleMetric) for m in components),
-                "比率分量必须是 simple 指标",
-            )
-            _require(
-                components[0].dataset_id == components[1].dataset_id,
-                "比率分量必须属于同一数据集",
-            )
-            _require(
-                all(
-                    metric_value_kind(draft, m, index) in {*NUMERIC_KINDS, None}
-                    for m in components
-                ),
-                "比率分量必须是数值型",
-            )
-            continue
-        _require(metric.dataset_id in index.datasets, "指标数据集不存在")
-        if metric.time_field:
-            kind = _column(index, metric.dataset_id, metric.time_field.column)
-            _require(
-                kind is None or kind in {ValueKind.DATE, ValueKind.DATETIME},
-                "指标时间字段必须是日期类",
-            )
-        if isinstance(metric, ExpressionMetric):
-            resolve_metric_expression(draft, metric)
-        else:
-            if metric.measure:
-                kind = _column(index, metric.dataset_id, metric.measure.column)
-                if metric.aggregation in {
-                    Aggregation.SUM,
-                    Aggregation.AVG,
-                    Aggregation.MEDIAN,
-                }:
-                    _require(kind is None or kind in NUMERIC_KINDS, "该聚合要求数值列")
-                if metric.aggregation in {Aggregation.MIN, Aggregation.MAX}:
-                    _require(kind != ValueKind.BOOLEAN, "min/max 不接受布尔列")
-            for condition in metric.filters:
-                kind = _column(index, metric.dataset_id, condition.column.column)
-                _condition(condition.operator, condition.values, kind)
+        problems.check(f"指标 {metric.name}", _metric, draft, index, metrics, metric)
+    problems.raise_any()
     return draft

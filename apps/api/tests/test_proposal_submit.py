@@ -406,7 +406,7 @@ def test_every_broken_item_is_reported_in_one_submission(client):
     assert report["repair_used"] == 0
 
 
-def test_every_broken_link_is_named_in_one_graph_error():
+def test_every_broken_element_is_named_in_one_graph_error():
     from uuid import uuid4
 
     from ontofoundry_api.domain.snapshot import empty_snapshot
@@ -432,9 +432,17 @@ def test_every_broken_link_is_named_in_one_graph_error():
             "multiplicity": multiplicity,
             "data_join": join,
         }))
+    items.append(create("bad_rule", "rule", {
+        "name": "source_code_check",
+        "owner_kind": "object_type",
+        "owner_id": {"client_ref": "source"},
+        "rule_kind": "constraint",
+        "expression": "fictional_source.code IS (",
+    }))
     with pytest.raises(ProposalContractError) as caught:
         parse(contract_result(ctx, items), ctx)
     message = str(caught.value)
+    assert "规则 source_code_check：" in message
     assert "关系 belongs_to：直接关联目标必须是唯一属性或完整标识" in message
     assert "关系 shares_with：多对多关系必须使用映射表" in message
     assert "show_example" not in message and "逐个修正" in message
