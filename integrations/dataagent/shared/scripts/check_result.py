@@ -1,7 +1,6 @@
 """Check the supplied schema, operation shapes, references and pinned context."""
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -410,51 +409,12 @@ def validate_file(
         result_bytes = Path(result_path).read_bytes()
         schema = json.loads(Path(schema_path).read_bytes())
         context = json.loads(Path(context_path).read_bytes()) if context_path else None
-        execution = (context or {}).get("execution")
-        if execution:
-            budget_path = Path(execution["budget_file"])
-            minimum = execution["repair_used"]
-            ledger = (
-                json.loads(budget_path.read_bytes()) if budget_path.exists() else None
-            )
-            if ledger is not None and (
-                ledger["run_token"] != context["run"]["run_token"]
-                or type(ledger["used"]) is not int
-                or ledger["used"] < minimum
-            ):
-                raise ValueError("修正计数不属于本轮或小于平台已用次数")
-            used = ledger["used"] if ledger is not None else minimum
-            changed = (
-                ledger is not None
-                and ledger.get("result_sha256")
-                != hashlib.sha256(result_bytes).hexdigest()
-            )
-            # A changed candidate after a previous check is a correction even
-            # when the caller forgets --repair. Rechecking identical bytes is free.
-            used += int(bool(repair or changed))
-            if used > 2:
-                errors.append(
-                    diagnostic(
-                        "/execution/repair_used",
-                        "REPAIR_BUDGET_EXHAUSTED",
-                        "修正预算最多 2 轮，停止生成",
-                        used,
-                    )
-                )
-            atomic_write(
-                budget_path,
-                encode(
-                    {
-                        "run_token": context["run"]["run_token"],
-                        "used": used,
-                        "result_sha256": hashlib.sha256(result_bytes).hexdigest(),
-                    }
-                ),
-            )
+        # Repair rounds are counted by the platform on rejected submissions
+        # (SC-06); a local check is free however often it runs.
         result = json.loads(result_bytes)
         errors.extend(check_result(result, schema, context))
     except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
-        where = getattr(exc, "filename", None) or "候选结果、Schema、固定上下文或修正计数"
+        where = getattr(exc, "filename", None) or "候选结果、Schema 或固定上下文"
         reason = f"第 {exc.lineno} 行第 {exc.colno} 列 {exc.msg}" if isinstance(exc, json.JSONDecodeError) else str(exc)[:200] or type(exc).__name__
         errors.append(
             diagnostic(

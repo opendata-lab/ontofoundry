@@ -1047,4 +1047,6 @@ export type ProposalSubmitResponse = {
   warnings: { code: string; message: string }[];
   reviewable_count: number;
   batch_id: UUID | null;
+  repair_used: number;
+  repair_limit: number;
 };

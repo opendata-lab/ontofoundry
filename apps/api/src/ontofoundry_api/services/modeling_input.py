@@ -49,11 +49,11 @@ def material_index(material: dict, content: bytes, path: str) -> dict:
 
 
 def execution_input(run_token: str, repair_used: int = 0) -> dict:
-    return {
-        "repair_limit": 2,
-        "repair_used": repair_used,
-        "budget_file": f"output/ontofoundry-budget-{run_token}.json",
-    }
+    """Informational: the platform counts repair rounds on rejected submissions."""
+    return {"repair_limit": REPAIR_LIMIT, "repair_used": repair_used}
+
+
+REPAIR_LIMIT = 2
 
 
 def build_work_pack(

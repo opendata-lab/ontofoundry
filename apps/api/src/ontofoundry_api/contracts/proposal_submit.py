@@ -18,3 +18,5 @@ class ProposalSubmitResponse(Strict):
     warnings: list[ProposalSubmitIssue] = Field(default_factory=list)
     reviewable_count: int = Field(ge=0)
     batch_id: str | None = None
+    repair_used: int = Field(default=0, ge=0)
+    repair_limit: int = Field(default=2, ge=0)

@@ -309,6 +309,8 @@ def platform_submit(pack, candidate, retry_command):
         print(f"平台检查通过并已入库：{report['reviewable_count']} 条待审。")
         return True
     print(f"平台检查未通过，未入库。最终文件未替换。完整报告：{relative(report_path)}")
+    if isinstance(report.get("repair_used"), int) and isinstance(report.get("repair_limit"), int):
+        print(f"修正轮次：已用 {report['repair_used']}/{report['repair_limit']}（平台计数，本地检查不计）")
     for problem in report["errors"]:
         print(problem["message"])
     print("下一步：修正片段后重试 " + retry_command)

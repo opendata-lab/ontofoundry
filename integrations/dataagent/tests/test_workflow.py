@@ -175,28 +175,23 @@ def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
     assert len(capsys.readouterr().out.encode()) <= 4096
 
 
-def test_automatic_local_budget_never_publishes(tmp_path, monkeypatch, capsys):
+def test_local_checks_never_count_repair_rounds(tmp_path, monkeypatch, capsys):
+    # SC-06: the platform counts rounds on rejected submissions; local checks are free.
     monkeypatch.chdir(tmp_path)
     ctx = pinned(SKILL / "references/examples/facts.json")
-    ctx["execution"] = {"repair_used": 0, "budget_file": "output/budget.json"}
+    ctx["execution"] = {"repair_limit": 2, "repair_used": 0}
     context = tmp_path / "context.json"
     context.write_text(json.dumps(ctx))
     batch = prepare.assemble(
         ctx, [json.loads((SKILL / "references/examples/facts.json").read_bytes())]
     )
     result = tmp_path / "candidate.json"
-    final = tmp_path / "final.json"
     for used in range(4):
         batch["items"][0]["after"]["description"] = str(used)
         result.write_text(json.dumps(batch))
-        assert checker.validate_file(
-            result, SCHEMA_PATH, context
-        ) == int(used > 2)
-        ledger = json.loads((tmp_path / "output/budget.json").read_bytes())
-        assert ledger["used"] == used
-        assert not final.exists()
-    assert not list(tmp_path.glob("**/.pending-*"))
-    assert "REPAIR_BUDGET_EXHAUSTED" in capsys.readouterr().out
+        assert checker.validate_file(result, SCHEMA_PATH, context) == 0
+    assert not list(tmp_path.glob("**/*budget*"))
+    assert "REPAIR_BUDGET_EXHAUSTED" not in capsys.readouterr().out
 
 
 def test_prepare_does_not_replace_final_on_bad_fragment(tmp_path, monkeypatch):
@@ -293,21 +288,6 @@ def test_skill_reference_paths_exist():
                     document,
                     target,
                 )
-
-
-def test_invalid_ledger_is_not_reset(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    context = pinned(SKILL / "references/examples/facts.json")
-    context["execution"] = {"repair_used": 0, "budget_file": "budget.json"}
-    (tmp_path / "context.json").write_text(json.dumps(context))
-    (tmp_path / "budget.json").write_text("{}")
-    result = prepare.assemble(
-        context, [json.loads((SKILL / "references/examples/facts.json").read_bytes())]
-    )
-    (tmp_path / "result.json").write_text(json.dumps(result))
-    assert checker.validate_file("result.json", SCHEMA_PATH, "context.json") == 1
-    assert (tmp_path / "budget.json").read_text() == "{}"
-    assert "INPUT_KEYERROR" in capsys.readouterr().out
 
 
 def test_catalog_discovers_all_examples_and_core_topics():

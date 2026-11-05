@@ -96,6 +96,12 @@ class InteractionRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+def _submission_state(db, session_id) -> dict[str, Any]:
+    current = db.get(ModelingSessionRecord, session_id)
+    manifest = (current.run_manifest_json or {}) if current is not None else {}
+    return {k: manifest[k] for k in ("repair_used", "last_failed_sha256") if k in manifest}
+
+
 def run_mcp_access(
     request, workspace_id, session_id, run_token, item, user_id
 ) -> dict[str, Any]:
@@ -603,6 +609,8 @@ async def send_message(
                     uploaded_material_ids=sorted(uploaded_ids | set(newly_uploaded)),
                     run_manifest_json={
                         **manifest,
+                        # An agent may submit before its task is registered.
+                        **_submission_state(success_db, item.id),
                         "materials": [m for m in material_indices],
                     },
                     updated_at=utc_now(),

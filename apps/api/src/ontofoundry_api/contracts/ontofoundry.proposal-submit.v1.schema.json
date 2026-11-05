@@ -57,6 +57,18 @@
       ],
       "default": null,
       "title": "Batch Id"
+    },
+    "repair_used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Repair Used",
+      "type": "integer"
+    },
+    "repair_limit": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Repair Limit",
+      "type": "integer"
     }
   },
   "required": [

@@ -117,6 +117,34 @@ def test_stopping_after_submit_keeps_the_batch(client):
     assert len(stored(client, session["id"])[1]) == len(payload["items"])
 
 
+def test_platform_counts_repair_rounds_on_rejected_submissions(client):
+    session, manifest, url, headers = running_submit(client)
+    bad = result(manifest, mixed_items(session["draft"]))
+
+    def post(payload):
+        return client.post(url, json=payload, headers=headers).json()
+
+    first = post(bad)
+    assert not first["passed"] and first["repair_used"] == 0 and first["repair_limit"] == 2
+    assert post(bad)["repair_used"] == 0  # the same content again is not a repair
+    for expected in (1, 2):
+        bad["items"][0]["reason"] = f"fictional repair {expected}"
+        assert post(bad)["repair_used"] == expected
+    bad["items"][0]["reason"] = "fictional repair 3"
+    exhausted = post(bad)
+    assert exhausted["errors"][0]["code"] == "REPAIR_BUDGET_EXHAUSTED"
+    assert exhausted["repair_used"] == 2
+    assert stored(client, session["id"])[0] == []
+
+
+def test_a_passing_submission_after_repairs_is_stored(client):
+    session, manifest, url, headers = running_submit(client)
+    assert not client.post(url, json=result(manifest, mixed_items(session["draft"])), headers=headers).json()["passed"]
+    report = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
+    assert report["passed"] and report["repair_used"] == 0
+    assert len(stored(client, session["id"])[0]) == 1
+
+
 def test_submit_contract_errors_then_pass(client):
     session, manifest, url, headers = running_submit(client)
     payload = result(manifest, some_items(session["draft"]))
