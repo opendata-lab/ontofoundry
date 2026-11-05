@@ -404,3 +404,37 @@ def test_every_broken_item_is_reported_in_one_submission(client):
     assert "/items/1" in report["errors"][0]["message"] and "/items/2" in report["errors"][1]["message"]
     # One round is counted for the whole rejected submission.
     assert report["repair_used"] == 0
+
+
+def test_every_broken_link_is_named_in_one_graph_error():
+    from uuid import uuid4
+
+    from ontofoundry_api.domain.snapshot import empty_snapshot
+
+    ctx = context(empty_snapshot(uuid4()))
+    key = {"value_kind": "string"}
+    items = [
+        create("source", "object_type", {"name": "fictional_source"}),
+        create("target", "object_type", {"name": "fictional_target"}),
+        create("source_key", "property", {"name": "code", "owner_type_id": {"client_ref": "source"}, **key}),
+        create("target_key", "property", {"name": "code", "owner_type_id": {"client_ref": "target"}, **key}),
+    ]
+    for ref, name, multiplicity in [("a", "belongs_to", "many_to_one"), ("b", "shares_with", "many_to_many")]:
+        join = {
+            "kind": "direct",
+            "source_property_ids": [{"client_ref": "source_key"}],
+            "target_property_ids": [{"client_ref": "target_key"}],
+        }
+        items.append(create(ref, "link_type", {
+            "name": name,
+            "source_type_id": {"client_ref": "source"},
+            "target_type_id": {"client_ref": "target"},
+            "multiplicity": multiplicity,
+            "data_join": join,
+        }))
+    with pytest.raises(ProposalContractError) as caught:
+        parse(contract_result(ctx, items), ctx)
+    message = str(caught.value)
+    assert "关系 belongs_to：直接关联目标必须是唯一属性或完整标识" in message
+    assert "关系 shares_with：多对多关系必须使用映射表" in message
+    assert "show_example" not in message and "逐个修正" in message

@@ -420,7 +420,9 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
     with pytest.raises(ProposalContractError) as caught:
         server_parse(batch, ctx)
     assert "期望" in str(caught.value) and "实际" in str(caught.value)
-    assert "show_example.py" in str(caught.value) and "/" in str(caught.value)
+    message = str(caught.value)
+    # Item errors point at an example; whole-graph errors name each broken element.
+    assert "/" in message and ("show_example.py" in message or "逐个修正" in message)
 
 
 

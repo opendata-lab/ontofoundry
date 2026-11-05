@@ -12,7 +12,13 @@ def short(value):
     )
 
 
-def diagnostic(pointer, message, expected, actual, item=None):
+def diagnostic(pointer, message, expected, actual, item=None, *, graph=False):
+    if graph:
+        # Whole-graph checks name the elements in `actual`; no single example fits.
+        return (
+            f"{pointer} [\"-\"] {message}；期望 {short(expected)}；实际 {actual}；"
+            "下一步：按“实际”中列出的对象、关系逐个修正对应片段，全部改完后整批重提"
+        )
     item = item if isinstance(item, dict) else {}
     kind = item.get("target_kind", "object_type")
     if kind not in {

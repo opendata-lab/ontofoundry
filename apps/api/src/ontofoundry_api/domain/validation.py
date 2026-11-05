@@ -247,7 +247,30 @@ def _join(draft, index, link, join: DataJoin, *, source_type_id=None):
                 )
 
 
-def _mappings(draft: CoreDraft, index: DraftIndex):
+class _Problems:
+    """Collect independent per-element errors so one check reports them all."""
+
+    LIMIT = 20
+
+    def __init__(self) -> None:
+        self.found: list[str] = []
+
+    def check(self, label: str, check, *args, **kwargs) -> None:
+        try:
+            check(*args, **kwargs)
+        except ValueError as exc:
+            self.found.append(f"{label}：{exc}")
+
+    def raise_any(self) -> None:
+        if self.found:
+            shown = self.found[: self.LIMIT]
+            more = len(self.found) - len(shown)
+            raise GraphValidationError(
+                "；".join(shown) + (f"；另有 {more} 处" if more else "")
+            )
+
+
+def _mappings(draft: CoreDraft, index: DraftIndex, problems: _Problems):
     by_type: dict[UUID, DataMapping] = {}
     for mapping in draft.mappings:
         _require(mapping.type_id in index.objects, "映射对象不存在")
@@ -255,62 +278,66 @@ def _mappings(draft: CoreDraft, index: DraftIndex):
         by_type[mapping.type_id] = mapping
     for mapping in draft.mappings:
         obj = index.objects[mapping.type_id]
-        bound_ancestors = [oid for oid in index.ancestors(obj.id) if oid in by_type]
+        problems.check(f"对象 {obj.name} 的映射", _mapping, draft, index, by_type, mapping, obj)
+
+
+def _mapping(draft, index, by_type, mapping, obj):
+    bound_ancestors = [oid for oid in index.ancestors(obj.id) if oid in by_type]
+    if bound_ancestors:
+        _require(
+            mapping.binding_mode == BindingMode.SHARED_PARENT,
+            "父对象有绑定时子对象只能共用父绑定",
+        )
+    else:
+        _require(
+            mapping.binding_mode == BindingMode.INDEPENDENT,
+            "共用父绑定必须有已绑定祖先",
+        )
+    parent_binding = resolve_binding(draft, obj.extends) if obj.extends else None
+    if parent_binding and parent_binding.mappings:
+        _require(
+            not ({s.id for s in mapping.sources} & parent_binding.sources.keys()),
+            "本地来源 id 不能遮蔽祖先来源",
+        )
+    effective = resolve_binding(draft, obj.id)
+    main = effective.main
+    for source in mapping.sources:
+        _require(source.dataset_id in index.datasets, "映射来源数据集不存在")
+        _require(
+            len(source.key_columns) == len(set(source.key_columns)),
+            "来源逻辑键不能有重复列",
+        )
+        for column in source.key_columns:
+            _column(index, source.dataset_id, column)
+        if main and main.key_columns and source.key_columns:
+            _require(
+                len(main.key_columns) == len(source.key_columns),
+                "附来源逻辑键宽必须与主来源一致",
+            )
+    props = {p.name: p for p in index.effective_properties(obj.id)}
+    for name, binding in mapping.fields.items():
+        _require(name in props, f"映射引用了无效属性 {name}")
         if bound_ancestors:
             _require(
-                mapping.binding_mode == BindingMode.SHARED_PARENT,
-                "父对象有绑定时子对象只能共用父绑定",
+                props[name].owner_type_id == obj.id, "不能覆盖有绑定祖先的继承属性"
             )
+        if isinstance(binding, ColumnBinding):
+            source = effective.sources.get(binding.source_id)
+            _require(source is not None, "属性绑定来源不存在")
+            _column(index, source.dataset_id, binding.column)
         else:
-            _require(
-                mapping.binding_mode == BindingMode.INDEPENDENT,
-                "共用父绑定必须有已绑定祖先",
-            )
-        parent_binding = resolve_binding(draft, obj.extends) if obj.extends else None
-        if parent_binding and parent_binding.mappings:
-            _require(
-                not ({s.id for s in mapping.sources} & parent_binding.sources.keys()),
-                "本地来源 id 不能遮蔽祖先来源",
-            )
-        effective = resolve_binding(draft, obj.id)
-        main = effective.main
-        for source in mapping.sources:
-            _require(source.dataset_id in index.datasets, "映射来源数据集不存在")
-            _require(
-                len(source.key_columns) == len(set(source.key_columns)),
-                "来源逻辑键不能有重复列",
-            )
-            for column in source.key_columns:
-                _column(index, source.dataset_id, column)
-            if main and main.key_columns and source.key_columns:
-                _require(
-                    len(main.key_columns) == len(source.key_columns),
-                    "附来源逻辑键宽必须与主来源一致",
-                )
-        props = {p.name: p for p in index.effective_properties(obj.id)}
-        for name, binding in mapping.fields.items():
-            _require(name in props, f"映射引用了无效属性 {name}")
-            if bound_ancestors:
-                _require(
-                    props[name].owner_type_id == obj.id, "不能覆盖有绑定祖先的继承属性"
-                )
-            if isinstance(binding, ColumnBinding):
-                source = effective.sources.get(binding.source_id)
-                _require(source is not None, "属性绑定来源不存在")
-                _column(index, source.dataset_id, binding.column)
-            else:
-                resolve_field_expression(draft, mapping, binding.expression)
-        for link_id, join in mapping.inherited_link_bindings.items():
-            link = index.links.get(link_id)
-            _require(
-                not bound_ancestors and obj.extends is not None,
-                "只有虚拟父的具体子对象能绑定继承关系",
-            )
-            _require(
-                link is not None and link.source_type_id in index.ancestors(obj.id),
-                "只能绑定从虚拟祖先继承的关系",
-            )
-            _join(draft, index, link, join, source_type_id=obj.id)
+            resolve_field_expression(draft, mapping, binding.expression)
+    for link_id, join in mapping.inherited_link_bindings.items():
+        link = index.links.get(link_id)
+        _require(
+            not bound_ancestors and obj.extends is not None,
+            "只有虚拟父的具体子对象能绑定继承关系",
+        )
+        _require(
+            link is not None and link.source_type_id in index.ancestors(obj.id),
+            "只能绑定从虚拟祖先继承的关系",
+        )
+        _join(draft, index, link, join, source_type_id=obj.id)
 
 
 def _value_types(draft: CoreDraft, index: DraftIndex) -> None:
@@ -414,10 +441,12 @@ def validate_core_graph(draft: CoreDraft) -> CoreDraft:
         _require(key not in rule_keys, "同一归属下规则英文标识重复")
         rule_keys.add(key)
         resolve_rule_expression(draft, rule)
-    _mappings(draft, index)
+    problems = _Problems()
+    _mappings(draft, index, problems)
     for link in draft.link_types:
         if link.data_join is not None:
-            _join(draft, index, link, link.data_join)
+            problems.check(f"关系 {link.name}", _join, draft, index, link, link.data_join)
+    problems.raise_any()
     for dataset in draft.datasets:
         if dataset.snapshot_date_column:
             kind = _column(index, dataset.id, dataset.snapshot_date_column)
