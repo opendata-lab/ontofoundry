@@ -148,15 +148,15 @@ def test_platform_counts_repair_rounds_on_rejected_submissions(client):
         return client.post(url, json=payload, headers=headers).json()
 
     first = post(bad)
-    assert not first["passed"] and first["repair_used"] == 0 and first["repair_limit"] == 2
+    assert not first["passed"] and first["repair_used"] == 0 and first["repair_limit"] == 3
     assert post(bad)["repair_used"] == 0  # the same content again is not a repair
-    for expected in (1, 2):
+    for expected in (1, 2, 3):
         bad["items"][0]["reason"] = f"fictional repair {expected}"
         assert post(bad)["repair_used"] == expected
-    bad["items"][0]["reason"] = "fictional repair 3"
+    bad["items"][0]["reason"] = "fictional repair 4"
     exhausted = post(bad)
     assert exhausted["errors"][0]["code"] == "REPAIR_BUDGET_EXHAUSTED"
-    assert exhausted["repair_used"] == 2
+    assert exhausted["repair_used"] == 3
     assert stored(client, session["id"])[0] == []
 
 

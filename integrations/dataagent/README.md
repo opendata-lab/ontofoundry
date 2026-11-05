@@ -53,7 +53,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 工作包 `proposal_context.instance_baseline` 固定 active 与本会话 staged 实例（不含其他会话 staged／deleted）；`draft` 和 `element_hashes` 只含定义。更新／删除按 target_kind+target_id 定位，before 复制 element，expected_target_hash 复制含 revision 的 hash；不存在或不一致分别报 TARGET_NOT_FOUND、BEFORE_MISMATCH、TARGET_HASH_MISMATCH。输出仍为 ontofoundry.proposals/v1，不增加头字段。
 
-实例抽取沿用 material_object／material_link 契约，界面说明称“文档实例”“关系实例”。同运行定义与实例片段共享 modeling/ 和 execution，由 prepare_result.py 合为一个结果文件，最多两轮修正，平台拒收后保留累计计数。平台只引用已有 Agent，不新建、不修改其配置。
+实例抽取沿用 material_object／material_link 契约，界面说明称“文档实例”“关系实例”。同运行定义与实例片段共享 modeling/ 和 execution，由 prepare_result.py 合为一个结果文件，最多三轮修正，由平台计数。平台只引用已有 Agent，不新建、不修改其配置。
 
 当前未调用实体消歧服务；专门实例抽取入口、问数结构化结果自动入运行记录与真实模型验收仍需后续联验。详见 [迁移说明](迁移说明.md) 与仓库 `docs/design/2026-10-21-semantic-grounding-skills.md`。更新 shared、skills 或 agents 后都须重新打包，并由管理员复制至 SKILLS_ROOT_DIR、同步后台并发布。
 

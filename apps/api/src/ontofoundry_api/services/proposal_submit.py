@@ -24,7 +24,7 @@ from ontofoundry_api.services.session_gate import has_pending, lock_session
 logger = logging.getLogger(__name__)
 
 # Rejected submissions after the first that a run may repair (CO-02).
-REPAIR_LIMIT = 2
+REPAIR_LIMIT = 3
 
 
 def context_from_manifest(manifest):
