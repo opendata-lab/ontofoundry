@@ -31,22 +31,16 @@ def context(draft=None):
 
 
 def result(ctx, items):
-    return {
-        "schema_version": "ontofoundry.proposals/v1",
-        **{
-            k: getattr(ctx, k)
-            for k in (
-                "workspace_id",
-                "session_id",
-                "run_token",
-                "base_version_id",
-                "base_version_sha256",
-                "source_session_revision",
-                "source_draft_sha256",
-            )
-        },
-        "items": items,
-    }
+    return {"items": items_only(items)}
+
+
+# SC-08: a result carries only items; before and target hashes are the
+# platform's. Fixtures may still describe them, so drop them here.
+PLATFORM_FIELDS = ("before", "expected_target_hash")
+
+
+def items_only(items):
+    return [{k: v for k, v in item.items() if k not in PLATFORM_FIELDS} for item in items]
 
 
 def create(ref, kind, after):
@@ -326,3 +320,19 @@ def test_import_id_rewrite_preserves_reference_named_mapping_fields():
     assert (
         str(rewritten.mappings[0].sources[0].dataset_id) == ids[str(draft.datasets[0].id)]
     )
+
+
+def test_platform_fills_the_material_hash_of_evidence():
+    # SC-08: evidence names a material by id; the hash comes from the platform.
+    ctx = context()
+    lines = ["虚构书架登记"]
+    lookup = lambda mid: ("a" * 64, lines) if mid == "fictional-material" else None  # noqa: E731
+    evidence = {"kind": "material", "material_id": "fictional-material",
+                "locator": {"line_start": 1, "line_end": 1}, "quote": "书架"}
+    item = create("shelf", "object_type", {"name": "fictional_shelf", "evidence": [evidence]})
+    parsed = parse(result(ctx, [item]), ctx, lookup)
+    assert parsed.items[0].after["evidence"][0]["material_sha256"] == "a" * 64
+    # A stated hash that does not match is still refused.
+    item["after"]["evidence"][0]["material_sha256"] = "b" * 64
+    with pytest.raises(ProposalContractError, match="哈希"):
+        parse(result(ctx, [item]), ctx, lookup)

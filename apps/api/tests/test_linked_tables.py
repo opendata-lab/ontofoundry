@@ -157,12 +157,10 @@ def test_a_large_linked_table_catalog_is_paged_not_rejected():
         PACK_LIMIT,
         build_work_pack,
         encode,
-        execution_input,
     )
 
     context = {
         "run": {"run_token": "fiction", "workspace_id": str(uuid4())},
-        "execution": execution_input("fiction"),
         "draft": {"object_types": []},
     }
     tables = [

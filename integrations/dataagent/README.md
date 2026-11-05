@@ -46,7 +46,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 1. 按 [迁移说明](迁移说明.md) 核对平台能力、停止旧运行并备份技能与后台 Agent 配置。本次拆分不清库、不执行历史 core-1 数据迁移。
 2. 解压统一插件包，执行 `SKILLS_ROOT_DIR=<技能根目录> sh install.sh`；或在后台分别上传三个独立技能 ZIP。脚本只复制技能并校验目录结构；DataAgent 暂不支持整包原生加载。
-3. 管理员按 plugin.json 完成 OntoFoundry MCP 登记与授权。当前登记五个已上线工具（四个读取工具与 resolve_entity），问数统计依赖 DataAgent 自有 mysql.query／doris.query。业务数据源只读，不接入 Portal MCP。建模使用工作包提供的运行级 MCP 凭据。
+3. 管理员按 plugin.json 完成 OntoFoundry MCP 登记与授权。当前登记五个已上线工具（四个读取工具与 resolve_entity），问数统计通过 OpenDataWorks MCP（`/api/mcp/`，服务账号 Token，只授只读角色）：本体用 OntoFoundry MCP，元数据和只读查询用 OpenDataWorks MCP（2026-11-05 用户决定，取代“不接入 Portal MCP”）。DataAgent 对未标记只读的 MCP 工具会暂停并请用户授权，写入类工具不会被自动执行。建模使用工作包提供的运行级 MCP 凭据。
 4. 已有 [建模 Agent](agents/agent_ontofoundry.md) 挂载 ontology-discovery、entity-extraction，max_turns=40，动态选择和组合；已有 [问数 Agent](agents/agent_ontofoundry_qa.md) 挂载 semantic-grounding。同步“系统提示词：”后的正文并发布。问数正文已瘦身，检索顺序和查询语义在技能里，必须成套部署。
 5. 停用并备份移走旧 ontofoundry-modeling，由运维重启 DataAgent，检查三技能 capabilities。自动测试和安装脚本不操作后台、不重启外部系统。
 6. 获授权后在新会话做真实建模与问数验收，DeepSeek 预算先确认。检查证据、完整结果、歧义追问、授权边界、真实 U/C/O 及压缩缓存；离线 bytes/3 不是实际 usage。
@@ -64,7 +64,7 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 ## 2026-10-23 平台提案预检
 
-`prepare_result.py` 本地检查通过后，读取工作包 `mcp_config_file` 中本轮 MCP 地址与 Authorization，调用同空间、同运行的只读 `proposal-check`。整批校验错误直接进入工具输出；未通过时保留候选和报告，不替换最终结果。平台不可达或配置缺失时直接报错，不写最终结果。最多修正两轮，仍未通过则不交付结果并说明原因。`check_result.py` 仅检查候选，最终结果只能由合并脚本在平台检查通过后写入。最终文件保存不表示提案已接受或本体已发布。
+`prepare_result.py` 本地检查通过后，读取工作包 `platform_check_file` 中的 `submit_url` 与 Authorization，把结果提交到同空间、同运行的 `runs/{run_token}/proposals`。平台在同一事务里检查并入库：通过即成为待审提案，未通过不入库，全部错误直接进入工具输出，当场修正后重新提交。平台不可达或配置缺失时直接报错。最多修正两轮，仍未通过则不交付结果并说明原因。运行结束后平台不再下载结果文件；结果文件只作留档。入库不表示提案已接受或本体已发布。
 
 部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。
 

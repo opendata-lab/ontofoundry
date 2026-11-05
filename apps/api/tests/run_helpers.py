@@ -22,24 +22,34 @@ def row(client, session_id: str) -> ModelingSessionRecord:
         return item
 
 
-def install_download(monkeypatch, values) -> list[str]:
-    queue = list(values)
+def install_download(monkeypatch) -> list[str]:
+    """Stub DataAgent downloads: a run that submitted nothing leaves only
+    (absent) workflow files to fetch. Returns the paths asked for."""
     paths: list[str] = []
 
     async def download(self, topic_id: str, rel_path: str):
         paths.append(rel_path)
-        # Legacy cases have no intermediate artifacts in the agent workspace.
-        if rel_path.startswith("modeling/"):
-            raise DataAgentError("missing workflow file", status_code=404)
-        value = queue.pop(0)
-        if isinstance(value, BaseException):
-            raise value
-        if isinstance(value, bytes):
-            return value, "application/json"
-        return json.dumps(value, ensure_ascii=False).encode(), "application/json"
+        raise DataAgentError("missing workflow file", status_code=404)
 
     monkeypatch.setattr(DataAgentClient, "download", download)
     return paths
+
+
+def submit(client, session_id: str, value):
+    """Submit `value` as the running agent would, keeping the task status."""
+    from ontofoundry_api.services.proposal_submit import submit_result
+
+    raw = value if isinstance(value, bytes) else json.dumps(value, ensure_ascii=False).encode()
+    with client.app.state.session_factory() as db:
+        item = db.get(ModelingSessionRecord, session_id)
+        status, workspace_id, run_token = item.task_status, item.workspace_id, item.dataagent_run_token
+        item.task_status = "running"
+        db.commit()
+        report = submit_result(db, client.app.state.settings, workspace_id, session_id, run_token, raw)
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session_id).task_status = status
+        db.commit()
+    return report
 
 
 def reconcile(client, session_id: str, task_id: str = TASK_ID) -> str:

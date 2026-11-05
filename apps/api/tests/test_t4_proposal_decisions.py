@@ -9,8 +9,9 @@ from uuid import uuid4
 from dataset_binding import bind_datasets
 from sqlalchemy import select
 from test_modeling import ROOT, create_session, save
+from test_t1_proposal_contract import items_only
 
-from ontofoundry_api.contracts.proposals import SCHEMA_VERSION, RunContext, parse_result
+from ontofoundry_api.contracts.proposals import RunContext, parse_result
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
     OntologyElementIdentityRecord,
@@ -42,11 +43,7 @@ def seed_batch(
     with client.app.state.session_factory() as db:
         instances = baseline(db, session["workspace_id"], session["id"])
     context = RunContext(**{k: manifest[k] for k in list(manifest)[:7]}, draft=draft, instance_baseline=instances)
-    result = {
-        "schema_version": SCHEMA_VERSION,
-        **{k: manifest[k] for k in list(manifest)[:7]},
-        "items": items,
-    }
+    result = {"items": items_only(items)}
     with client.app.state.session_factory() as db:
         parsed = parse_result(
             json.dumps(result).encode(),
@@ -61,7 +58,6 @@ def seed_batch(
             task_id=None,
             manifest=manifest,
             parsed=parsed,
-            settings=client.app.state.settings,
         )
         db.commit()
     return client.get(

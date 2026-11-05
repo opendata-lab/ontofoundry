@@ -80,3 +80,40 @@ def test_unregistered_table_is_reported_with_its_location(client):
             resolve_dataset(db, wid, facts(bound))
         assert exc.value.code == "SOURCE_NOT_REGISTERED"
         assert exc.value.details["table_name"] == "fictional_facts"
+
+
+def test_mysql_query_dataset_names_its_library_in_the_sql(client):
+    # A query dataset may not carry schema_name; on MySQL without a configured
+    # scope the synced snapshot is the gate (2026-11-05 end-to-end finding).
+    from ontofoundry_api.db_models import MetadataSnapshotRecord
+
+    wid = str(DEMO_WORKSPACE_ID)
+    with client.app.state.session_factory() as db:
+        bound = connection(db, wid)
+        record = db.get(ConnectionRecord, bound)
+        record.kind = "mysql"
+        db.add(MetadataSnapshotRecord(
+            connection_id=bound, schema_name="fictional_ops",
+            snapshot_json={"tables": [{"name": "fictional_jobs", "columns": [{"name": "id", "type": "bigint"}]}]},
+        ))
+        db.commit()
+
+        def query(sql):
+            return Dataset(id=uuid4(), name="jobs", dialect="mysql", source_kind="query",
+                           query_sql=sql, connection_id=bound)
+
+        source = resolve_dataset(db, wid, query("SELECT * FROM fictional_ops.fictional_jobs WHERE deleted = 0"))
+        assert source.connection.id == bound
+        for sql, code in (
+            ("SELECT * FROM fictional_ops.fictional_missing", "SOURCE_NOT_REGISTERED"),
+            ("SELECT * FROM mysql.user", "SOURCE_NOT_REGISTERED"),
+        ):
+            with pytest.raises(ServiceError) as exc:
+                resolve_dataset(db, wid, query(sql))
+            assert exc.value.code == code
+        # An explicit connection scope still applies to query datasets.
+        record.config_json = {**record.config_json, "schemas": ["fictional_other"]}
+        db.commit()
+        with pytest.raises(ServiceError) as exc:
+            resolve_dataset(db, wid, query("SELECT * FROM fictional_ops.fictional_jobs"))
+        assert exc.value.code == "SOURCE_NOT_REGISTERED"

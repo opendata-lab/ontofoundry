@@ -161,13 +161,11 @@ def byte_report():
     from ontofoundry_api.services.modeling_input import (
         build_work_pack,
         encode,
-        execution_input,
         material_index,
     )
     from read_input import render_lines, render_tables
 
     context = json.loads(resource("tests/fixtures/budget-context.json").read_bytes())
-    context["execution"] = execution_input(context["run"]["run_token"])
     materials = []
     for index in (1, 2):
         content = resource(f"tests/fixtures/budget-material-{index}.md").read_bytes()
@@ -200,10 +198,6 @@ def byte_report():
         run_token=context["run"]["run_token"],
         proposal_prompt=proposal_instructions(
             run_token=context["run"]["run_token"],
-            header=context["run"],
-            materials=materials,
-            schema_file="inputs/schema.json",
-            mcp=None,
             work_pack_file="inputs/work-pack.json",
         ),
     )
@@ -355,8 +349,7 @@ def byte_report():
         context_bytes=len(encode(extract_context)), material_files=[],
         run_token=extract_context["run"]["run_token"],
         proposal_prompt=proposal_instructions(
-            run_token=extract_context["run"]["run_token"], header=extract_context["run"],
-            materials=extract_materials, schema_file="inputs/schema.json", mcp=None,
+            run_token=extract_context["run"]["run_token"],
             work_pack_file="inputs/work-pack.json",
         ),
     )
@@ -407,8 +400,7 @@ def byte_report():
         context_bytes=len(encode(incremental_context)), material_files=[],
         run_token=incremental_context["run"]["run_token"],
         proposal_prompt=proposal_instructions(
-            run_token=incremental_context["run"]["run_token"], header=incremental_context["run"],
-            materials=extract_materials, schema_file="inputs/schema.json", mcp=None,
+            run_token=incremental_context["run"]["run_token"],
             work_pack_file="inputs/work-pack.json",
         ),
     )
@@ -458,7 +450,6 @@ def byte_report():
     combined_context["draft"] = empty_snapshot(combined_context["run"]["workspace_id"])
     combined_context["element_hashes"] = {}
     combined_context["run"]["source_draft_sha256"] = snapshot_sha256(combined_context["draft"])
-    combined_context["execution"] = execution_input(combined_context["run"]["run_token"])
     combined_material = resource("tests/fixtures/material.md").read_bytes()
     combined_materials = [material_index(
         {"id": "11111111-1111-4111-8111-111111111111", "sha256": hashlib.sha256(combined_material).hexdigest()},
@@ -477,8 +468,7 @@ def byte_report():
         context_bytes=len(encode(combined_context)), material_files=[],
         run_token=combined_context["run"]["run_token"],
         proposal_prompt=proposal_instructions(
-            run_token=combined_context["run"]["run_token"], header=combined_context["run"],
-            materials=combined_materials, schema_file="inputs/schema.json", mcp=None,
+            run_token=combined_context["run"]["run_token"],
             work_pack_file="inputs/work-pack.json",
         ),
     )

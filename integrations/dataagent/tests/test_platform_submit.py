@@ -1,4 +1,4 @@
-"""The merge tool calls the run endpoint with real HTTP and bounded credentials."""
+"""The merge tool submits to the run endpoint with real HTTP and bounded credentials."""
 
 import json
 import sys
@@ -19,8 +19,10 @@ def platform():
         status = 200
         report: ClassVar[dict] = {
             "passed": True,
-            "contract_errors": [],
+            "errors": [],
+            "warnings": [],
             "reviewable_count": 1,
+            "batch_id": "22222222-2222-4222-8222-222222222222",
         }
         requests: ClassVar[list] = []
 
@@ -64,11 +66,13 @@ def inputs(tmp_path, monkeypatch, origin):
             {
                 "url": origin
                 + f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/mcp",
+                "submit_url": origin
+                + f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/runs/fictional-run/proposals",
                 "headers": {"Authorization": "Bearer ofrun.fictional-secret"},
             }
         )
     )
-    return {"mcp_config_file": "mcp.json"}, batch, candidate
+    return {"platform_check_file": "mcp.json"}, batch, candidate
 
 
 def test_platform_success_uses_pinned_url_headers_and_exact_result(
@@ -76,21 +80,20 @@ def test_platform_success_uses_pinned_url_headers_and_exact_result(
 ):
     origin, handler = platform
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
-    assert prepare.platform_check(
+    assert prepare.platform_submit(
         pack,
-        batch,
         candidate,
         '"$DATAAGENT_PYTHON_BIN" prepare_result.py --work-pack pack.json',
     )
     assert handler.requests == [
         (
-            f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/runs/fictional-run/proposal-check",
+            f"/prefix/api/v1/ontology/workspaces/{batch['workspace_id']}/runs/fictional-run/proposals",
             "Bearer ofrun.fictional-secret",
             batch,
         )
     ]
     output = capsys.readouterr().out
-    assert "平台检查通过" in output and "ofrun." not in output
+    assert "平台检查通过并已入库" in output and "ofrun." not in output
 
 
 def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, platform):
@@ -98,7 +101,8 @@ def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, pla
     handler.report = {
         "passed": False,
         "reviewable_count": 1,
-        "contract_errors": [
+        "warnings": [{"code": "SOURCE_COLUMNS_UNCHECKED", "message": "来源列未核对：虚构连接不可达"}],
+        "errors": [
             {
                 "code": "RESULT_CONTEXT_MISMATCH",
                 "message": "错误 [RESULT_CONTEXT_MISMATCH]：固定上下文不一致。下一步：修正片段。",
@@ -106,16 +110,16 @@ def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, pla
         ],
     }
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
-    assert not prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
+    assert not prepare.platform_submit(pack, candidate, "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "错误 [RESULT_CONTEXT_MISMATCH]" in output
+    assert "错误 [RESULT_CONTEXT_MISMATCH]" in output and "来源列未核对" in output
     assert "copyable-retry-command" in output and "平台检查通过" not in output
-    assert Path("candidate.platform-check.json").is_file()
+    assert Path("candidate.platform-submit.json").is_file()
 
 
 @pytest.mark.parametrize(
     "status,allowed,code",
-    [(401, False, "PLATFORM_CHECK_REJECTED"), (503, False, "PLATFORM_CHECK_UNAVAILABLE")],
+    [(401, False, "PLATFORM_SUBMIT_REJECTED"), (503, False, "PLATFORM_SUBMIT_UNAVAILABLE")],
 )
 def test_platform_http_errors_are_explicit(
     tmp_path, monkeypatch, capsys, platform, status, allowed, code
@@ -124,7 +128,7 @@ def test_platform_http_errors_are_explicit(
     handler.status = status
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
     assert (
-        prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
+        prepare.platform_submit(pack, candidate, "copyable-retry-command")
         == allowed
     )
     output = capsys.readouterr().out
@@ -133,9 +137,9 @@ def test_platform_http_errors_are_explicit(
 
 def test_missing_config_fails_without_claiming_success(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    assert not prepare.platform_check({}, {}, Path("unused.json"), "copyable-retry-command")
+    assert not prepare.platform_submit({}, Path("unused.json"), "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "PLATFORM_CHECK_CONFIG_MISSING" in output and "平台检查通过" not in output
+    assert "PLATFORM_SUBMIT_CONFIG_MISSING" in output and "平台检查通过" not in output
 
 
 def test_main_preserves_final_result_when_platform_rejects(
@@ -148,7 +152,7 @@ def test_main_preserves_final_result_when_platform_rejects(
     )
     Path("final.json").write_text("previous-result")
     monkeypatch.setattr(prepare, "validate_file", lambda *_args, **_kwargs: 0)
-    monkeypatch.setattr(prepare, "platform_check", lambda *_args: False)
+    monkeypatch.setattr(prepare, "platform_submit", lambda *_args: False)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -175,7 +179,7 @@ def test_main_preserves_final_result_when_platform_rejects(
         {"passed": True},
         {
             "passed": True,
-            "contract_errors": [{"message": "候选图错误"}],
+            "errors": [{"message": "候选图错误"}],
             "reviewable_count": 1,
         },
     ],
@@ -187,17 +191,28 @@ def test_invalid_platform_reply_never_claims_a_pass(
     origin, handler = platform
     handler.report = report
     pack, batch, candidate = inputs(tmp_path, monkeypatch, origin)
-    assert not prepare.platform_check(pack, batch, candidate, "copyable-retry-command")
+    assert not prepare.platform_submit(pack, candidate, "copyable-retry-command")
     output = capsys.readouterr().out
-    assert "错误 [PLATFORM_CHECK_UNAVAILABLE]" in output and "平台检查通过" not in output
+    assert "错误 [PLATFORM_SUBMIT_UNAVAILABLE]" in output and "平台检查通过" not in output
+
+
+def test_a_config_without_submit_url_is_not_used(tmp_path, monkeypatch, capsys, platform):
+    # A 0.2.6 credential file has no submit_url; it is not rewritten from the MCP url.
+    origin, handler = platform
+    pack, _, candidate = inputs(tmp_path, monkeypatch, origin)
+    config = json.loads(Path("mcp.json").read_text())
+    config.pop("submit_url")
+    Path("mcp.json").write_text(json.dumps(config))
+    assert not prepare.platform_submit(pack, candidate, "retry")
+    assert not handler.requests and "PLATFORM_SUBMIT_UNAVAILABLE" in capsys.readouterr().out
 
 
 def test_the_platform_check_file_alone_is_enough(tmp_path, monkeypatch, capsys, platform):
     # A first run has no published ontology, hence no MCP config, only the run credential.
     origin, handler = platform
     _, batch, candidate = inputs(tmp_path, monkeypatch, origin)
-    assert prepare.platform_check({"platform_check_file": "mcp.json"}, batch, candidate, "retry")
-    assert handler.requests and "平台检查通过" in capsys.readouterr().out
+    assert prepare.platform_submit({"platform_check_file": "mcp.json"}, candidate, "retry")
+    assert handler.requests and "平台检查通过并已入库" in capsys.readouterr().out
 
 
 

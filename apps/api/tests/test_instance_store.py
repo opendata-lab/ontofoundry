@@ -17,8 +17,6 @@ from test_t4_proposal_decisions import create, decide, seed_batch
 
 from ontofoundry_api.contracts.instances import InstanceBaseline
 from ontofoundry_api.contracts.proposals import (
-    ParsedBatch,
-    ProposalContractError,
     RunContext,
     parse_result,
 )
@@ -32,7 +30,7 @@ from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.instances import instance_hash
 from ontofoundry_api.services import instance_store
 from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.proposals import proposal_context, store_batch
+from ontofoundry_api.services.proposals import proposal_context
 from ontofoundry_api.services.workspaces import DEV_USER_ID
 
 
@@ -539,25 +537,9 @@ def test_direct_store_rejects_stale_revision_and_preserves_manual_evidence(clien
         assert error.value.code == "MANUAL_EVIDENCE_IMMUTABLE"
 
 
-def test_invalidated_run_cannot_store_results(client):
-    session = create_session(client)
-    with client.app.state.session_factory() as db:
-        with pytest.raises(ServiceError) as error:
-            store_batch(
-                db,
-                workspace_id=session["workspace_id"],
-                session_id=session["id"],
-                task_id="old-run",
-                manifest={"invalidated": "INSTANCE_STORE_CUTOVER"},
-                parsed=ParsedBatch(str(uuid4()), "a" * 64, []),
-                settings=client.app.state.settings,
-            )
-        assert error.value.code == "RUN_CONTEXT_INVALIDATED"
-
-
-def test_baseline_context_and_parser_enforce_revision_hash(client):
-    from ontofoundry_api.services.proposals import proposal_header
-
+def test_baseline_context_and_parser_supply_the_revision_hash(client):
+    # SC-08: the agent no longer copies before or the target hash; the
+    # platform takes both from the pinned instance baseline.
     session = create_session(client)
     b = baseline(client, session)
     manifest = {
@@ -571,25 +553,20 @@ def test_baseline_context_and_parser_enforce_revision_hash(client):
         "instance_baseline": b,
     }
     context = proposal_context(manifest, session["draft"])
-    assert context["instance_baseline"] == b
-    assert b["items"][0]["target_id"] not in context["element_hashes"]
+    assert context["instance_baseline"] == b and "element_hashes" not in context
     run = RunContext(
-        **{k: v for k, v in context["run"].items() if k != "schema_version"},
+        **{k: manifest[k] for k in ("workspace_id", "session_id", "run_token", "base_version_id",
+                                    "base_version_sha256", "source_session_revision", "source_draft_sha256")},
         draft=session["draft"],
         instance_baseline=b,
     )
-    payload = {
-        **proposal_header(manifest),
-        "items": [instance_update(b["items"][0], values={"label": "解析更新"})],
-    }
-    parsed = parse_result(json.dumps(payload).encode(), run, lambda _: None)
-    assert parsed.items[0].expected_instance_revision == b["items"][0]["revision"]
-    payload["items"][0]["expected_target_hash"] = instance_hash(
-        b["items"][0]["element"], b["items"][0]["revision"] + 1
-    )
-    with pytest.raises(ProposalContractError) as error:
-        parse_result(json.dumps(payload).encode(), run, lambda _: None)
-    assert error.value.code == "TARGET_HASH_MISMATCH"
+    item = {k: v for k, v in instance_update(b["items"][0], values={"label": "解析更新"}).items()
+            if k not in ("before", "expected_target_hash")}
+    parsed = parse_result(json.dumps({"items": [item]}).encode(), run, lambda _: None)
+    entry = b["items"][0]
+    assert parsed.items[0].expected_instance_revision == entry["revision"]
+    assert parsed.items[0].expected_target_hash == instance_hash(entry["element"], entry["revision"])
+    assert parsed.items[0].before == entry["element"]
 
 
 def test_run_credentials_have_all_fixed_read_scopes(client):

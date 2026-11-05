@@ -128,7 +128,6 @@ def test_final_graph_and_evidence_still_reject(mutation):
                 "operation": "create",
                 "target_kind": "dataset",
                 "client_ref": "other",
-                "before": None,
                 "after": {"name": "yunfan_refunds", "display_name": "云帆退款", "table_name": "demo_other"},
             }
         )
@@ -175,28 +174,23 @@ def test_discriminator_error_is_short_and_report_is_complete(tmp_path, capsys):
     assert len(capsys.readouterr().out.encode()) <= 4096
 
 
-def test_automatic_local_budget_never_publishes(tmp_path, monkeypatch, capsys):
+def test_local_checks_never_count_repair_rounds(tmp_path, monkeypatch, capsys):
+    # SC-06: the platform counts rounds on rejected submissions; local checks are free.
     monkeypatch.chdir(tmp_path)
     ctx = pinned(SKILL / "references/examples/facts.json")
-    ctx["execution"] = {"repair_used": 0, "budget_file": "output/budget.json"}
+    ctx["execution"] = {"repair_limit": 2, "repair_used": 0}
     context = tmp_path / "context.json"
     context.write_text(json.dumps(ctx))
     batch = prepare.assemble(
         ctx, [json.loads((SKILL / "references/examples/facts.json").read_bytes())]
     )
     result = tmp_path / "candidate.json"
-    final = tmp_path / "final.json"
     for used in range(4):
         batch["items"][0]["after"]["description"] = str(used)
         result.write_text(json.dumps(batch))
-        assert checker.validate_file(
-            result, SCHEMA_PATH, context
-        ) == int(used > 2)
-        ledger = json.loads((tmp_path / "output/budget.json").read_bytes())
-        assert ledger["used"] == used
-        assert not final.exists()
-    assert not list(tmp_path.glob("**/.pending-*"))
-    assert "REPAIR_BUDGET_EXHAUSTED" in capsys.readouterr().out
+        assert checker.validate_file(result, SCHEMA_PATH, context) == 0
+    assert not list(tmp_path.glob("**/*budget*"))
+    assert "REPAIR_BUDGET_EXHAUSTED" not in capsys.readouterr().out
 
 
 def test_prepare_does_not_replace_final_on_bad_fragment(tmp_path, monkeypatch):
@@ -293,21 +287,6 @@ def test_skill_reference_paths_exist():
                     document,
                     target,
                 )
-
-
-def test_invalid_ledger_is_not_reset(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    context = pinned(SKILL / "references/examples/facts.json")
-    context["execution"] = {"repair_used": 0, "budget_file": "budget.json"}
-    (tmp_path / "context.json").write_text(json.dumps(context))
-    (tmp_path / "budget.json").write_text("{}")
-    result = prepare.assemble(
-        context, [json.loads((SKILL / "references/examples/facts.json").read_bytes())]
-    )
-    (tmp_path / "result.json").write_text(json.dumps(result))
-    assert checker.validate_file("result.json", SCHEMA_PATH, "context.json") == 1
-    assert (tmp_path / "budget.json").read_text() == "{}"
-    assert "INPUT_KEYERROR" in capsys.readouterr().out
 
 
 def test_catalog_discovers_all_examples_and_core_topics():
@@ -418,7 +397,7 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
     elif mutation == "token":
         batch["run_token"] = "stale"
     elif mutation == "before":
-        item["before"]["description"] = "stale"
+        item["before"] = {"description": "stale"}  # the platform's to supply (SC-08)
     elif mutation == "hash":
         item["expected_target_hash"] = "0" * 64
     else:
@@ -426,7 +405,7 @@ def test_errors_have_location_expectation_actual_and_executable_lookup(mutation)
     errors = checker.check_result(batch, SCHEMA, ctx)
     assert errors
     for error in errors:
-        assert re.match(r"错误 \[[A-Z_]+\]：/", error)
+        assert re.match(r"错误 \[[A-Z_]+\]：(/|文档根)", error)
         assert "期望" in error and "实际" in error and "下一步：" in error
         step = error.split("下一步：", 1)[1]
         if "show_example.py" not in step:
@@ -451,16 +430,11 @@ def test_prepare_reports_exact_fragment_location_and_preserves_output(
     monkeypatch.chdir(tmp_path)
     context = pinned(SKILL / "references/examples/operations.json")
     item = json.loads((SKILL / "references/examples/operations.json").read_bytes())[0]
-    item["before"]["description"] = "错误旧值"
+    del item["operation"]
     with pytest.raises(prepare.PrepareInputError) as caught:
         prepare.assemble(context, [[item]])
     message = str(caught.value)
-    assert "/items/0/before" in message and "期望" in message and "实际" in message
-    # A stale before is fixed by reading the pinned value, not by an example.
-    assert "show_element.py --work-pack" in message and "33333333-3333-4333-8333-333333333333" in message
-    item["target_id"] = "absent"
-    with pytest.raises(prepare.PrepareInputError, match="/items/0/target_id"):
-        prepare.assemble(context, [[item]])
+    assert "/items/0/operation" in message and "期望" in message and "实际" in message
     (tmp_path / "items.json").write_text(json.dumps([item]))
     (tmp_path / "final.json").write_text("previous")
     monkeypatch.setattr(
@@ -555,12 +529,3 @@ def test_examples_never_show_material_hashes():
         assert b"material_sha256" not in completed.stdout and b'"material_id"' in completed.stdout
 
 
-def test_hashes_of_earlier_materials_come_from_recorded_evidence():
-    # Definitions are shown without hashes; an update copied from one still merges.
-    ctx = {"draft": {"object_types": [{"evidence": [
-        {"kind": "material", "material_id": "m-old", "material_sha256": "a" * 64}]}]}}
-    pack = {"materials": [{"id": "m-new", "sha256": "b" * 64}]}
-    assert prepare.material_hashes(pack, ctx) == {"m-old": "a" * 64, "m-new": "b" * 64}
-    item = {"after": {"evidence": [{"kind": "material", "material_id": "m-old", "quote": "q"}]}}
-    prepare.fill_material_hashes(item, prepare.material_hashes(pack, ctx))
-    assert item["after"]["evidence"][0]["material_sha256"] == "a" * 64

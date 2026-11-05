@@ -25,7 +25,12 @@ from ontofoundry_api.api.modeling import (
 )
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import MaterialRecord, ModelingSessionRecord, utc_now
+from ontofoundry_api.db_models import (
+    MaterialRecord,
+    ModelingSessionRecord,
+    ProposalBatchRecord,
+    utc_now,
+)
 from ontofoundry_api.domain.snapshot import draft_sha256
 from ontofoundry_api.services.dataagent import (
     ACTIVE_TASK_STATUSES,
@@ -43,14 +48,13 @@ from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
     encode,
-    execution_input,
     material_index,
     scenario_facts,
     store_linked_tables_receipt,
     upload_work_pack,
 )
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
-from ontofoundry_api.services.proposals import proposal_context, proposal_header
+from ontofoundry_api.services.proposals import proposal_context
 from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import RunGrant
 from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
@@ -91,6 +95,12 @@ class InteractionRequest(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
+def _submission_state(db, session_id) -> dict[str, Any]:
+    current = db.get(ModelingSessionRecord, session_id)
+    manifest = (current.run_manifest_json or {}) if current is not None else {}
+    return {k: manifest[k] for k in ("repair_used", "last_failed_sha256") if k in manifest}
+
+
 def run_mcp_access(
     request, workspace_id, session_id, run_token, item, user_id
 ) -> dict[str, Any]:
@@ -98,6 +108,7 @@ def run_mcp_access(
     base = (settings.public_base_url or str(request.base_url)).rstrip("/")
     return {
         "url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/mcp",
+        "submit_url": f"{base}/api/v1/ontology/workspaces/{workspace_id}/runs/{run_token}/proposals",
         "version_id": item.base_version_id,
         "credential": issue_run_credential(
             settings.session_secret,
@@ -446,7 +457,6 @@ async def send_message(
         proposal_prompt = None
         if proposals:
             fixed_context = proposal_context(manifest, draft)
-            fixed_context["execution"] = execution_input(run_token)
             context_body = encode(fixed_context)
             context = await dataagent.upload(
                 topic_id,
@@ -510,10 +520,6 @@ async def send_message(
             proposal_prompt = proposal_instructions(
                 work_pack_file=manifest["input_files"]["work_pack"],
                 run_token=run_token,
-                header=proposal_header(manifest),
-                materials=material_indices,
-                schema_file=str(schema.get("rel_path") or ""),
-                mcp=mcp,
             )
         else:
             context_body = json.dumps(draft, ensure_ascii=False, indent=2).encode()
@@ -597,11 +603,24 @@ async def send_message(
                     uploaded_material_ids=sorted(uploaded_ids | set(newly_uploaded)),
                     run_manifest_json={
                         **manifest,
+                        # An agent may submit before its task is registered.
+                        **_submission_state(success_db, item.id),
                         "materials": [m for m in material_indices],
                     },
                     updated_at=utc_now(),
                 )
             )
+            if claimed.rowcount == 1:
+                # A fast agent can submit before its task id is recorded.
+                success_db.execute(
+                    update(ProposalBatchRecord)
+                    .where(
+                        ProposalBatchRecord.session_id == item.id,
+                        ProposalBatchRecord.run_token == run_token,
+                        ProposalBatchRecord.dataagent_task_id.is_(None),
+                    )
+                    .values(dataagent_task_id=task_id)
+                )
             success_db.commit()
         if claimed.rowcount != 1:
             # Another turn owns the session now. The task we just created is

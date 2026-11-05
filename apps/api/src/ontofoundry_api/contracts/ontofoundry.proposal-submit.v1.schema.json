@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "ProposalSubmitIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ProposalSubmitIssue",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ProposalSubmitIssue"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/ProposalSubmitIssue"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "reviewable_count": {
+      "minimum": 0,
+      "title": "Reviewable Count",
+      "type": "integer"
+    },
+    "batch_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Batch Id"
+    },
+    "repair_used": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Repair Used",
+      "type": "integer"
+    },
+    "repair_limit": {
+      "default": 2,
+      "minimum": 0,
+      "title": "Repair Limit",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "passed",
+    "errors",
+    "reviewable_count"
+  ],
+  "title": "ProposalSubmitResponse",
+  "type": "object"
+}

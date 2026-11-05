@@ -51,15 +51,13 @@ def archive_previous_parts(pack):
 
     The DataAgent topic keeps its workspace across turns, so a new request
     (e.g. an incremental change) found the last run's 01–05 fragments and the
-    default merge would have resubmitted them. A repair round is the same run
-    under a new token and keeps its fragments, so only a fresh run (no repair
-    used yet) moves them.
+    default merge would have resubmitted them. Repairs happen inside the same
+    run (same token), so its own fragments stay.
     """
     token = run_token(pack)
     previous = RUN_MARK.read_text().strip() if RUN_MARK.exists() else ""
-    repair_used = int((pack.get("execution") or {}).get("repair_used") or 0)
     fragments = sorted((ROOT / "parts").glob("*.json")) if (ROOT / "parts").is_dir() else []
-    if not fragments or previous == token or repair_used:
+    if not fragments or previous == token:
         return None
     target = PREVIOUS / (previous or "unknown")
     for folder in ("parts", "checks"):

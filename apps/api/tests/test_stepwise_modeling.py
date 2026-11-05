@@ -8,7 +8,7 @@ import pytest
 from run_helpers import RUN_TOKEN, reconcile, row
 from test_materials import upload as upload_material
 from test_modeling import ROOT, create_session
-from test_t3_proposal_results import proposals_run, result
+from test_t3_proposal_results import proposals_run
 
 from ontofoundry_api.api import agent_conversation
 from ontofoundry_api.db_models import ModelingSessionRecord
@@ -211,10 +211,9 @@ def test_scenario_facts_compare_full_table_identity_and_do_not_guess_scenario():
     assert scenario_facts(draft, {}, {}, tables) == {"draft_empty": False}
 
 
-@pytest.mark.parametrize("failure", ["missing_result", "rejected_result"])
-def test_permanent_failure_records_only_workflow_excerpts_and_sizes(
-    client, monkeypatch, failure
-):
+def test_permanent_failure_records_only_workflow_excerpts_and_sizes(client, monkeypatch):
+    # A rejected result never reaches this point since SC-05: the agent saw
+    # the rejection when it submitted, so the run simply has no batch.
     session, manifest = proposals_run(client)
     manifest["repair_used"] = 2
     set_row(client, session["id"], run_manifest_json=manifest)
@@ -225,10 +224,6 @@ def test_permanent_failure_records_only_workflow_excerpts_and_sizes(
         for name in ("01-types", "02-links", "03-datasets", "04-metrics-rules", "05-facts")
     }
     files = {"modeling/plan.md": plan, "modeling/notes.md": notes, **parts}
-    if failure == "rejected_result":
-        bad = result(manifest, [])
-        bad["run_token"] = "wrong"
-        files[f"output/ontofoundry-result-{RUN_TOKEN}.json"] = bad
     paths = downloads(monkeypatch, files)
 
     async def forbidden(*args, **kwargs):
@@ -256,9 +251,5 @@ def test_permanent_failure_records_only_workflow_excerpts_and_sizes(
     assert paths[-7:] == list(files)[:7]
     assert current.task_status == "finished"
     assert current.result_state == "failed_permanent"
-    assert (
-        "没有产出提案" in current.task_detail
-        if failure == "missing_result"
-        else "被拒收" in current.task_detail
-    )
+    assert "没有产出提案" in current.task_detail
     assert current.draft_json == session["draft"]

@@ -44,7 +44,11 @@ def registered_tables(db, dataset, source):
     for ref in refs:
         schema = ref.schema or source.schema or ""
         config = source.connection.config_json
-        allowed = config.get("schemas") or ([source.schema] if source.connection.kind != "postgresql" else None)
+        # A query dataset names its library inside the SQL, not in schema_name:
+        # without an explicit scope the synced snapshot below is the gate.
+        allowed = config.get("schemas") or (
+            [source.schema] if source.schema and source.connection.kind != "postgresql" else None
+        )
         if ref.catalog and ref.catalog != source.database:
             raise DatasetSourceError("数据集不能跨连接或数据库引用", code="SOURCE_NOT_REGISTERED")
         if schema.lower() in {"information_schema", "pg_catalog", "mysql", "sys", "performance_schema"} or (allowed and schema not in allowed):

@@ -6,11 +6,11 @@ import json
 from urllib.parse import urlsplit
 
 import pytest
-from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row
+from run_helpers import RUN_TOKEN, TASK_ID, install_download, reconcile, row, submit
 from sqlalchemy import select, update
 from test_modeling import ROOT, create_session, save
+from test_t1_proposal_contract import items_only
 
-from ontofoundry_api.contracts.proposals import SCHEMA_VERSION
 from ontofoundry_api.db_models import (
     ModelingSessionRecord,
     ProposalBatchRecord,
@@ -18,7 +18,7 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
 )
 from ontofoundry_api.domain.canonical import element_sha256, snapshot_sha256
-from ontofoundry_api.services.dataagent import DataAgentClient, DataAgentError
+from ontofoundry_api.services.dataagent import DataAgentClient
 
 
 def proposals_run(client) -> tuple[dict, dict]:
@@ -60,22 +60,7 @@ def proposals_run(client) -> tuple[dict, dict]:
 
 
 def result(manifest: dict, items: list[dict]) -> dict:
-    return {
-        "schema_version": SCHEMA_VERSION,
-        **{
-            key: manifest[key]
-            for key in (
-                "run_token",
-                "workspace_id",
-                "session_id",
-                "base_version_id",
-                "base_version_sha256",
-                "source_session_revision",
-                "source_draft_sha256",
-            )
-        },
-        "items": items,
-    }
+    return {"items": items_only(items)}
 
 
 def some_items(draft: dict) -> list[dict]:
@@ -141,7 +126,8 @@ def stored(client, session_id):
 def test_result_is_stored_as_a_batch_and_the_draft_is_untouched(client, monkeypatch):
     session, manifest = proposals_run(client)
     before = row(client, session["id"])
-    install_download(monkeypatch, [result(manifest, some_items(session["draft"]))])
+    install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, some_items(session["draft"])))
 
     assert reconcile(client, session["id"]) == "done"
 
@@ -159,7 +145,9 @@ def test_result_is_stored_as_a_batch_and_the_draft_is_untouched(client, monkeypa
 def test_consuming_the_same_result_twice_changes_nothing(client, monkeypatch):
     session, manifest = proposals_run(client)
     payload = result(manifest, some_items(session["draft"]))
-    install_download(monkeypatch, [payload, payload])
+    install_download(monkeypatch)
+    submit(client, session["id"], payload)
+    submit(client, session["id"], payload)
     assert reconcile(client, session["id"]) == "done"
     assert reconcile(client, session["id"]) == "done"
     batches, items, _ = stored(client, session["id"])
@@ -179,7 +167,8 @@ def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["items"][2]["expected_target_hash"] = "0" * 64
-    install_download(monkeypatch, [bad])
+    install_download(monkeypatch)
+    submit(client, session["id"], bad)
 
     async def forbidden(self, **kwargs):
         pytest.fail("入库拒收不再发起修复运行")
@@ -189,7 +178,8 @@ def test_a_rejected_result_ends_the_run_without_a_repair_run(client, monkeypatch
     assert reconcile(client, session["id"]) == "failed_permanent"
     after = row(client, session["id"])
     assert after.dataagent_task_id == TASK_ID and after.dataagent_run_token == RUN_TOKEN
-    assert "TARGET_HASH_MISMATCH" in after.task_detail or "提案结果被拒收" in after.task_detail
+    # The agent saw the rejection when it submitted; the run reports no batch.
+    assert "本轮没有提交通过检查的结果" in after.task_detail
     batches, items, _ = stored(client, session["id"])
     assert batches == [] and items == []
 
@@ -198,7 +188,8 @@ def test_a_rejected_result_creates_no_batch(client, monkeypatch):
     session, manifest = proposals_run(client)
     bad = result(manifest, some_items(session["draft"]))
     bad["run_token"] = "wrong"
-    install_download(monkeypatch, [bad])
+    install_download(monkeypatch)
+    submit(client, session["id"], bad)
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     batches, items, _ = stored(client, session["id"])
@@ -206,7 +197,7 @@ def test_a_rejected_result_creates_no_batch(client, monkeypatch):
     assert row(client, session["id"]).draft_json == session["draft"]
 
 
-def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypatch):
+def test_proposals_prompt_carries_the_run_and_pinned_mcp(client, monkeypatch):
     from ontofoundry_api.api import agent_conversation
 
     uploads: dict[str, bytes] = {}
@@ -243,17 +234,15 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     context = json.loads(
         next(v for k, v in uploads.items() if k.startswith("ontofoundry-context-"))
     )
-    assert context["run"] == {k: v for k, v in result(manifest, []).items() if k != "items"}
-    first = session["draft"]["object_types"][0]
-    assert context["element_hashes"][first["id"]] == element_sha256(
-        first, collection="object_types"
-    )
+    assert context["run"] == {k: manifest[k] for k in ("run_token", "workspace_id", "session_id")}
+    # SC-08: hashes and before-images are the platform's, not in the context.
+    assert "element_hashes" not in context
     pack = json.loads(
         next(v for k, v in uploads.items() if k.startswith("ontofoundry-work-pack-"))
     )
     assert pack["context_file"].startswith("inputs/ontofoundry-context-")
     assert pack["run"] == context["run"]
-    assert pack["execution"]["repair_used"] == 0
+    assert "execution" not in pack
     assert pack["elements"] and len(json.dumps(pack, ensure_ascii=False).encode()) < 8192
     assert "repair_budget_required" not in manifest and "repair_used" not in manifest
     assert "ontofoundry.proposals.v1.schema.json" in uploads
@@ -264,7 +253,7 @@ def test_proposals_prompt_carries_header_hashes_and_pinned_mcp(client, monkeypat
     assert "needs_input_file" not in pack and "待确认" not in prompt
     assert pack["result_file"] in prompt
     assert "questions" not in prompt and "结果头" not in prompt
-    assert session["base_version_id"] == pack["run"]["base_version_id"]
+    assert pack["run"] == context["run"]  # the pinned version reaches the agent via the MCP config below
     assert "ofrun." not in prompt
     access_name = f"ontofoundry-mcp-{manifest['run_token']}.json"
     assert pack["mcp_config_file"] == "inputs/" + access_name
@@ -351,7 +340,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     # without a result file produced nothing and nothing is waiting.
     session, _ = proposals_run(client)
     before = row(client, session["id"])
-    paths = install_download(monkeypatch, [DataAgentError("missing", status_code=404)])
+    paths = install_download(monkeypatch)
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     current = row(client, session["id"])
@@ -360,7 +349,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
     assert current.task_status == "finished"
     assert (
         current.task_detail
-        == "建模没有产出提案：智能体结束时没有写入结果文件，请重试或换个说法描述需求"
+        == "建模没有产出提案：本轮没有提交通过检查的结果，请重试或换个说法描述需求"
     )
     assert current.draft_json == before.draft_json
     assert current.candidates_json == before.candidates_json
@@ -369,7 +358,7 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
 
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert not any("needs-input" in path for path in paths)
-    assert paths[1:] == [
+    assert paths == [  # only workflow files, no result download
         "modeling/plan.md",
         "modeling/notes.md",
         "modeling/parts/01-types.json",
@@ -381,10 +370,11 @@ def test_proposals_run_without_result_fails_permanently(client, monkeypatch):
 
 
 def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
-    from ontofoundry_api.services import model_result
+
+    from ontofoundry_api.services import proposal_submit
 
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, [])])
+    install_download(monkeypatch)
 
     def broken(*args, **kwargs):
         raise KeyError("client_ref")
@@ -392,13 +382,15 @@ def test_unexpected_parse_failure_uses_standard_rejection(client, monkeypatch):
     async def forbidden(self, **kwargs):
         pytest.fail("入库拒收不再发起修复运行")
 
-    monkeypatch.setattr(model_result, "parse_agent", broken)
+    monkeypatch.setattr(proposal_submit, "parse_agent", broken)
     monkeypatch.setattr(DataAgentClient, "deliver", forbidden)
+    report = submit(client, session["id"], result(manifest, []))
+    assert not report.passed and "校验异常" in report.errors[0].message
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert row(client, session["id"]).draft_json == session["draft"]
     batches, items, _ = stored(client, session["id"])
     assert items == []
     assert batches == []
-    assert "校验异常" in row(client, session["id"]).task_detail
+    assert "本轮没有提交通过检查的结果" in row(client, session["id"]).task_detail
 
 

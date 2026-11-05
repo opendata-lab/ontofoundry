@@ -393,6 +393,9 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
         lookup=material_lookup(db, settings, workspace_id),
         evidence_by_target=source_evidence(record, settings, batch_id=batch_id, db=db),
     )
+    # store_batch no longer validates (SC-04); imports run the same trial.
+    from ontofoundry_api.services.proposal_apply import trial_apply
+    parsed.items = trial_apply(db, workspace_id, session, parsed.items, settings).items
     store_batch(
         db,
         workspace_id=workspace_id,
@@ -414,7 +417,6 @@ def confirm_import(db, settings, workspace_id, actor_id, adapter_id, import_id, 
             },
         },
         parsed=parsed,
-        settings=settings,
     )
     record.session_id, record.batch_id, record.confirmation_sha256 = (
         session.id,

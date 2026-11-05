@@ -1,17 +1,17 @@
-"""Whole-batch checks and ingestion share the same validation rules."""
+"""Submitting a run's result checks and stores it in one step (SC-05)."""
 
 import json
 from pathlib import Path
 
 import pytest
-from run_helpers import install_download, reconcile
+from run_helpers import install_download, reconcile, submit
 from sqlalchemy import select
 from test_modeling import ROOT
 from test_t1_proposal_contract import context, create, parse
 from test_t1_proposal_contract import result as contract_result
 from test_t3_proposal_results import proposals_run, result, some_items, stored
 
-from ontofoundry_api.contracts.proposal_checks import ProposalCheckResponse
+from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.proposals import ProposalContractError
 from ontofoundry_api.db_models import ModelingSessionRecord, ProposalBatchRecord
 from ontofoundry_api.services.run_credentials import RunGrant, issue
@@ -33,13 +33,14 @@ def test_invalid_group_rejects_the_entire_batch():
 
 def test_invalid_batch_creates_no_proposals(client, monkeypatch):
     session, manifest = proposals_run(client)
-    install_download(monkeypatch, [result(manifest, mixed_items(session["draft"]))])
+    install_download(monkeypatch)
+    submit(client, session["id"], result(manifest, mixed_items(session["draft"])))
     assert reconcile(client, session["id"]) == "failed_permanent"
     batches, items, _ = stored(client, session["id"])
     assert batches == [] and items == []
 
 
-def running_check(client):
+def running_submit(client):
     session, manifest = proposals_run(client)
     with client.app.state.session_factory() as db:
         row = db.get(ModelingSessionRecord, session["id"])
@@ -55,50 +56,159 @@ def running_check(client):
             ),
         )
         db.commit()
-    url = f"/api/v1/ontology/workspaces/{session['workspace_id']}/runs/{manifest['run_token']}/proposal-check"
+    url = f"/api/v1/ontology/workspaces/{session['workspace_id']}/runs/{manifest['run_token']}/proposals"
     return session, manifest, url, {"Authorization": "Bearer " + credential}
 
 
-def test_check_is_read_only_and_rejects_the_same_batch_as_ingestion(client, monkeypatch):
-    session, manifest, url, headers = running_check(client)
+def finish(client, session_id, status="finished"):
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session_id).task_status = status
+        db.commit()
+
+
+def test_failed_submit_stores_nothing_and_the_run_settles_without_a_batch(client, monkeypatch):
+    session, manifest, url, headers = running_submit(client)
     payload = result(manifest, mixed_items(session["draft"]))
     response = client.post(url, json=payload, headers=headers)
     assert response.status_code == 200, response.text
-    report = ProposalCheckResponse.model_validate(response.json())
-    assert not report.passed and report.contract_errors and report.reviewable_count == 0
+    report = ProposalSubmitResponse.model_validate(response.json())
+    assert not report.passed and report.errors and report.reviewable_count == 0
     with client.app.state.session_factory() as db:
         assert not list(db.scalars(select(ProposalBatchRecord)))
-        row = db.get(ModelingSessionRecord, session["id"])
-        assert row.draft_json == session["draft"]
-        row.task_status = "finished"
-        db.commit()
-    install_download(monkeypatch, [payload])
+        assert db.get(ModelingSessionRecord, session["id"]).draft_json == session["draft"]
+    finish(client, session["id"])
+    install_download(monkeypatch)
     assert reconcile(client, session["id"]) == "failed_permanent"
     assert stored(client, session["id"])[0] == []
 
 
-def test_check_contract_errors_and_pass(client):
-    session, manifest, url, headers = running_check(client)
+def test_passed_submit_is_stored_and_the_run_settles_done(client, monkeypatch):
+    session, manifest, url, headers = running_submit(client)
+    payload = result(manifest, some_items(session["draft"]))
+    report = client.post(url, json=payload, headers=headers).json()
+    count = len(payload["items"])
+    assert report["passed"] and report["batch_id"] and report["reviewable_count"] == count
+    batches, items, _ = stored(client, session["id"])
+    assert len(batches) == 1 and len(items) == count
+    finish(client, session["id"])
+    install_download(monkeypatch)
+    assert reconcile(client, session["id"]) == "done"
+    # A retry after a lost response gets the receipt, even once the run ended.
+    again = client.post(url, json=payload, headers=headers).json()
+    assert again["passed"] and again["batch_id"] == report["batch_id"]
+    payload["items"] = payload["items"][:1]
+    other = client.post(url, json=payload, headers=headers).json()
+    assert not other["passed"] and other["errors"][0]["code"] == "RUN_ALREADY_SUBMITTED"
+
+
+def test_a_submitted_run_finishing_keeps_its_result_and_detail(client):
+    from ontofoundry_api.services.modeling_runs import _persist_task_projection
+
+    session, manifest, url, headers = running_submit(client)
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).dataagent_task_id = "task-model-1"
+        db.commit()
+    payload = result(manifest, some_items(session["draft"]))
+    report = client.post(url, json=payload, headers=headers).json()
+    _persist_task_projection(
+        client.app.state.session_factory, session["id"],
+        task_id="task-model-1", upstream_status="finished", detail="任务已完成",
+    )
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert row.task_status == "finished" and row.result_state == "done"
+        assert row.task_detail == f"已生成 {report['reviewable_count']} 条提案，请在“提案”中审阅"
+        assert row.last_result_task_id == "task-model-1"
+    # Settled at submit: settling the finished run changes nothing.
+    assert reconcile(client, session["id"]) == "done"
+
+
+def test_stopping_after_submit_keeps_the_batch(client):
+    from ontofoundry_api.services.modeling_runs import _persist_task_projection
+
+    session, manifest, url, headers = running_submit(client)
     payload = result(manifest, some_items(session["draft"]))
     assert client.post(url, json=payload, headers=headers).json()["passed"]
-    payload["run_token"] = "different-run"
-    report = client.post(url, json=payload, headers=headers).json()
-    assert not report["passed"] and report["reviewable_count"] == 0
-    assert report["contract_errors"][0]["code"] == "RESULT_CONTEXT_MISMATCH"
-    assert report["contract_errors"][0]["message"].startswith(
-        "错误 [RESULT_CONTEXT_MISMATCH]"
+    _persist_task_projection(
+        client.app.state.session_factory, session["id"],
+        task_id="task-model-1", upstream_status="suspended", detail="已停止",
     )
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert row.task_status == "cancelled" and row.result_state == "done"
+        assert not (row.run_manifest_json or {}).get("invalidated")
+    assert len(stored(client, session["id"])[1]) == len(payload["items"])
+
+
+def test_platform_counts_repair_rounds_on_rejected_submissions(client):
+    session, manifest, url, headers = running_submit(client)
+    bad = result(manifest, mixed_items(session["draft"]))
+
+    def post(payload):
+        return client.post(url, json=payload, headers=headers).json()
+
+    first = post(bad)
+    assert not first["passed"] and first["repair_used"] == 0 and first["repair_limit"] == 2
+    assert post(bad)["repair_used"] == 0  # the same content again is not a repair
+    for expected in (1, 2):
+        bad["items"][0]["reason"] = f"fictional repair {expected}"
+        assert post(bad)["repair_used"] == expected
+    bad["items"][0]["reason"] = "fictional repair 3"
+    exhausted = post(bad)
+    assert exhausted["errors"][0]["code"] == "REPAIR_BUDGET_EXHAUSTED"
+    assert exhausted["repair_used"] == 2
+    assert stored(client, session["id"])[0] == []
+
+
+def test_a_passing_submission_after_repairs_is_stored(client):
+    session, manifest, url, headers = running_submit(client)
+    assert not client.post(url, json=result(manifest, mixed_items(session["draft"])), headers=headers).json()["passed"]
+    report = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
+    assert report["passed"] and report["repair_used"] == 0
+    assert len(stored(client, session["id"])[0]) == 1
+
+
+def test_rejection_carries_the_structured_diagnostics():
+    from ontofoundry_api.services.errors import DatasetSourceError
+    from ontofoundry_api.services.proposal_submit import _reason
+
+    exc = DatasetSourceError("数据集来源未就绪", details={"diagnostics": [
+        {"code": "SOURCE_NOT_REGISTERED", "path": "/query_sql", "message": "来源不在连接允许的业务范围"}]})
+    assert _reason(exc) == "数据集来源未就绪；[SOURCE_NOT_REGISTERED] /query_sql 来源不在连接允许的业务范围"
+
+
+def test_an_invalidated_run_cannot_submit(client):
+    session, manifest, url, headers = running_submit(client)
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        row.run_manifest_json = {**row.run_manifest_json, "invalidated": True}
+        db.commit()
+    report = client.post(url, json=result(manifest, some_items(session["draft"])), headers=headers).json()
+    assert report["errors"][0]["code"] == "RUN_CONTEXT_INVALIDATED"
+    assert stored(client, session["id"])[0] == []
+
+
+def test_submit_contract_errors_then_pass(client):
+    session, manifest, url, headers = running_submit(client)
+    payload = result(manifest, some_items(session["draft"]))
+    mismatched = {**payload, "run_token": "different-run"}
+    report = client.post(url, json=mismatched, headers=headers).json()
+    assert not report["passed"] and report["reviewable_count"] == 0
+    # SC-08: the run identity is not part of the result; extra fields are refused.
+    assert report["errors"][0]["code"] == "RESULT_SCHEMA_INVALID"
+    assert report["errors"][0]["message"].startswith("错误 [RESULT_SCHEMA_INVALID]")
     assert (
-        client.post(url, content=b"{", headers=headers).json()["contract_errors"][0]["code"]
+        client.post(url, content=b"{", headers=headers).json()["errors"][0]["code"]
         == "RESULT_JSON_INVALID"
     )
+    assert client.post(url, json=payload, headers=headers).json()["passed"]
 
 
 @pytest.mark.parametrize("uses_current_value", [False, True])
-def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
+def test_value_type_expression_submit_outcome(
     client, monkeypatch, uses_current_value
 ):
-    session, manifest, url, headers = running_check(client)
+    session, manifest, url, headers = running_submit(client)
     variable = "member_level" if uses_current_value else "level"
     payload = result(manifest, [
         create("level_type", "value_type", {"name": "member_level", "value_kind": "string"}),
@@ -113,11 +223,9 @@ def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
     report = response.json()
     assert report["passed"] is uses_current_value
     if not uses_current_value:
-        assert "值类型约束必须引用当前值 member_level" in report["contract_errors"][0]["message"]
-    with client.app.state.session_factory() as db:
-        db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
-        db.commit()
-    install_download(monkeypatch, [payload])
+        assert "值类型约束必须引用当前值 member_level" in report["errors"][0]["message"]
+    finish(client, session["id"])
+    install_download(monkeypatch)
     assert reconcile(client, session["id"]) == ("done" if uses_current_value else "failed_permanent")
     batches, items, _ = stored(client, session["id"])
     assert len(batches) == int(uses_current_value)
@@ -127,24 +235,25 @@ def test_value_type_expression_has_the_same_preflight_and_ingestion_outcome(
 @pytest.mark.parametrize(
     "scope", ["different-run", "different-space", "expired", "no-token"]
 )
-def test_check_honors_run_mcp_authorization(client, scope):
-    session, manifest, url, headers = running_check(client)
+def test_submit_honors_run_authorization(client, scope):
+    session, manifest, url, headers = running_submit(client)
     if scope == "different-run":
         url = url.replace(manifest["run_token"], "other")
     elif scope == "different-space":
         url = url.replace(session["workspace_id"], "00000000-0000-4000-8000-000000000000")
     elif scope == "expired":
-        with client.app.state.session_factory() as db:
-            db.get(ModelingSessionRecord, session["id"]).task_status = "finished"
-            db.commit()
+        finish(client, session["id"])
+        report = client.post(url, json=result(manifest, []), headers=headers).json()
+        assert report["errors"][0]["code"] == "RUN_NOT_ACTIVE"
+        return
     else:
         headers = {}
     assert client.post(url, json=result(manifest, []), headers=headers).status_code == 401
 
 
-def test_check_schemas_are_generated_from_models():
+def test_submit_schema_is_generated_from_model():
     root = Path(__file__).resolve().parents[1] / "src/ontofoundry_api/contracts"
-    for model, name in [(ProposalCheckResponse, "proposal-check")]:
+    for model, name in [(ProposalSubmitResponse, "proposal-submit")]:
         schema = json.loads((root / f"ontofoundry.{name}.v1.schema.json").read_text())
         schema.pop("$schema")
         assert schema == model.model_json_schema()
@@ -278,3 +387,20 @@ def test_failed_run_is_reported_by_its_status_not_a_notice(client):
     detail = client.get(ROOT + f"/sessions/{session['id']}").json()
     assert "proposal_notice" not in detail
     assert detail["task_status"] == "failed" and detail["task_detail"] == "本轮没有写出结果文件"
+
+
+def test_every_broken_item_is_reported_in_one_submission(client):
+    # SC-06: two independent mistakes cost one repair round, not two.
+    session, manifest, url, headers = running_submit(client)
+    items = some_items(session["draft"])
+    missing = "00000000-0000-4000-8000-00000000abcd"
+    broken = [
+        {**items[1], "target_id": missing},
+        {**items[2], "target_id": "00000000-0000-4000-8000-00000000abce"},
+    ]
+    report = client.post(url, json=result(manifest, [items[0], *broken]), headers=headers).json()
+    assert not report["passed"]
+    assert len(report["errors"]) == 2, report["errors"]
+    assert "/items/1" in report["errors"][0]["message"] and "/items/2" in report["errors"][1]["message"]
+    # One round is counted for the whole rejected submission.
+    assert report["repair_used"] == 0

@@ -48,12 +48,7 @@ def material_index(material: dict, content: bytes, path: str) -> dict:
     }
 
 
-def execution_input(run_token: str, repair_used: int = 0) -> dict:
-    return {
-        "repair_limit": 2,
-        "repair_used": repair_used,
-        "budget_file": f"output/ontofoundry-budget-{run_token}.json",
-    }
+
 
 
 def build_work_pack(
@@ -105,7 +100,6 @@ def build_work_pack(
             )
     pack = {
         "run": context["run"],
-        "execution": context["execution"],
         "result_file": f"output/ontofoundry-result-{context['run']['run_token']}.json",
         "context_file": context_file,
         "schema_file": schema_file,

@@ -14,7 +14,6 @@ from ontofoundry_api.services.dataagent import (
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
     encode,
-    execution_input,
     material_index,
 )
 
@@ -26,7 +25,6 @@ FIXTURES = (
 
 def context():
     result = json.loads((FIXTURES / "budget-context.json").read_bytes())
-    result["execution"] = execution_input(result["run"]["run_token"])
     return result
 
 
@@ -117,10 +115,6 @@ def test_model_prompt_contains_only_dynamic_facts():
     for token in ["round-one", "round-two"]:
         entry = proposal_instructions(
             run_token=token,
-            header={"secret_header": "absent"},
-            materials=[],
-            schema_file="schema.json",
-            mcp=None,
             work_pack_file=f"inputs/pack-{token}.json",
         )
         rendered = build_turn_prompt(

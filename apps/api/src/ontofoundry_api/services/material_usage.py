@@ -19,7 +19,7 @@ from ontofoundry_api.services.session_gate import occupied
 
 # A run that is still being produced may yet cite its uploaded materials; once
 # it settles, its generated batch carries the manifest that matters.
-UNSETTLED_RESULT_STATES = {"processing", "failed_retriable"}
+UNSETTLED_RESULT_STATES = {"processing"}
 
 COLLECTIONS = {
     "object_types": "object_type", "link_types": "link_type",

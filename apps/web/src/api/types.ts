@@ -1041,8 +1041,12 @@ export type CatalogPage = VersionEnvelope & { items: CatalogItem[]; counts: Reco
 /** This target closure is incomplete and must never be submitted as a save baseline. */
 export type ElementProjection = VersionEnvelope & { representation: "element-1"; complete: false; model: Omit<Draft, "material_objects" | "material_links"> };
 export type DocumentContext = VersionEnvelope & Pick<Draft, "material_objects" | "material_links">;
-export type ProposalCheckResponse = {
+export type ProposalSubmitResponse = {
   passed: boolean;
-  contract_errors: { code: string; message: string }[];
+  errors: { code: string; message: string }[];
+  warnings: { code: string; message: string }[];
   reviewable_count: number;
+  batch_id: UUID | null;
+  repair_used: number;
+  repair_limit: number;
 };

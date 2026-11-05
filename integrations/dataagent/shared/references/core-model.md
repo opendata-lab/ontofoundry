@@ -28,7 +28,7 @@ Rule 归具体对象、属性、关系或值类型；值类型只拥有 constrai
 
 ## 实例
 
-实例不属于 core-1：draft/element_hashes 只含定义，实例由 instance_baseline 固定。更新／删除复制其 element/hash（含 revision），不重算旧集合哈希。文档对象的 values 按属性 name；0/false 有值，缺编号可保存。关系实例两端引用对象实例。相同编号不合并 UUID；更新须明确目标，保留人工证据及其 UUID。材料 hash、原行号、quote 可核对，但不证明文字蕴含所提含义。
+实例不属于 core-1：draft 只含定义，实例由 instance_baseline 固定。更新／删除只写 target_kind+target_id，before 与 hash 由平台补齐。文档对象的 values 按属性 name；0/false 有值，缺编号可保存。关系实例两端引用对象实例。相同编号不合并 UUID；更新须明确目标，保留人工证据及其 UUID。材料 hash、原行号、quote 可核对，但不证明文字蕴含所提含义。
 
 ## 正例索引
 

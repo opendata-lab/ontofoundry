@@ -2,7 +2,6 @@
 
 import importlib.util
 import json
-from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,21 +22,13 @@ SCHEMA = json.loads(
 
 
 def payload():
+    # SC-08: a result carries only items.
     return {
-        "schema_version": "ontofoundry.proposals/v1",
-        "run_token": "round",
-        "workspace_id": str(uuid4()),
-        "session_id": str(uuid4()),
-        "base_version_id": None,
-        "base_version_sha256": "a" * 64,
-        "source_session_revision": 1,
-        "source_draft_sha256": "b" * 64,
         "items": [
             {
                 "operation": "create",
                 "target_kind": "object_type",
                 "client_ref": "staff",
-                "before": None,
                 "after": {"display_name": "星港员工", "name": "starport_staff"},
             }
         ],
@@ -47,16 +38,15 @@ def payload():
 def test_references_and_context():
     result = payload()
     result["items"][0]["after"]["extends"] = {"client_ref": "missing"}
-    errors = checker.check_result(result, SCHEMA, {"run_token": "other"})
+    errors = checker.check_result(result, SCHEMA)
     assert any("未闭合" in e for e in errors)
-    assert any("上下文" in e for e in errors)
 
 
 def test_duplicates_and_schema():
     result = payload()
     result["items"] *= 2
     assert any("重复" in e for e in checker.check_result(result, SCHEMA))
-    del result["run_token"]
+    result["run_token"] = "round"  # the run is the platform's, not the result's
     assert checker.check_result(result, SCHEMA)
 
 
@@ -67,7 +57,6 @@ def test_closed_batch_and_literal_values():
             "operation": "create",
             "target_kind": "material_object",
             "client_ref": "lan",
-            "before": None,
             "after": {
                 "type_id": {"client_ref": "staff"},
                 "values": {"source_id": "main", "type_id": "literal"},
@@ -102,48 +91,29 @@ def test_invalid_create_shape(field, value):
 
 def update_payload(operation="update"):
     result = payload()
-    target = str(uuid4())
-    before = {"id": target, "display_name": "星港员工", "name": "starport_staff"}
-    after = (
-        {k: v for k, v in before.items() if k != "id"}
-        if operation == "update"
-        else None
-    )
+    after = {"display_name": "星港员工", "name": "starport_staff"} if operation == "update" else None
     result["items"] = [
-        {
-            "operation": operation,
-            "target_kind": "object_type",
-            "target_id": target,
-            "before": before,
-            "after": after,
-            "expected_target_hash": "c" * 64,
-        }
+        {"operation": operation, "target_kind": "object_type", "target_id": str(uuid4()), "after": after}
     ]
-    context = {
-        "run": {k: v for k, v in result.items() if k != "items"},
-        "draft": {"object_types": [deepcopy(before)]},
-        "element_hashes": {target: "c" * 64},
-    }
-    return result, context
+    return result
 
 
 @pytest.mark.parametrize("operation", ["update", "delete"])
-def test_valid_update_delete_with_pinned_context(operation):
-    result, context = update_payload(operation)
-    assert checker.check_result(result, SCHEMA, context) == []
+def test_valid_update_delete_need_no_pinned_copies(operation):
+    # before and the target hash are filled and checked by the platform.
+    assert checker.check_result(update_payload(operation), SCHEMA) == []
 
 
 @pytest.mark.parametrize("operation", ["update", "delete"])
-@pytest.mark.parametrize("field", ["before", "target_id", "expected_target_hash"])
-def test_update_delete_need_before_target_and_hash(operation, field):
-    result, _ = update_payload(operation)
-    result["items"][0][field] = None
+def test_update_delete_need_a_target(operation):
+    result = update_payload(operation)
+    result["items"][0]["target_id"] = None
     assert checker.check_result(result, SCHEMA)
 
 
 @pytest.mark.parametrize("operation", ["update", "delete"])
 def test_update_delete_after_shape(operation):
-    result, _ = update_payload(operation)
+    result = update_payload(operation)
     result["items"][0]["after"] = (
         None
         if operation == "update"
@@ -152,29 +122,10 @@ def test_update_delete_after_shape(operation):
     assert checker.check_result(result, SCHEMA)
 
 
-@pytest.mark.parametrize("field", checker.HEADER_FIELDS)
-def test_all_header_fields_match_pinned_context(field):
-    result = payload()
-    context = {"run": {k: v for k, v in result.items() if k != "items"}}
-    context["run"][field] = "different"
-    assert any(field in e for e in checker.check_result(result, SCHEMA, context))
-
-
-@pytest.mark.parametrize("mutation", ["before", "hash", "kind", "target", "duplicate"])
-def test_pinned_target_consistency(mutation):
-    result, context = update_payload()
-    item = result["items"][0]
-    if mutation == "before":
-        item["before"]["name"] = "错误姓名"
-    elif mutation == "hash":
-        item["expected_target_hash"] = "d" * 64
-    elif mutation == "kind":
-        context["draft"] = {"properties": context["draft"]["object_types"]}
-    elif mutation == "target":
-        item["target_id"] = str(uuid4())
-    else:
-        result["items"] *= 2
-    assert checker.check_result(result, SCHEMA, context)
+def test_one_batch_cannot_change_a_target_twice():
+    result = update_payload()
+    result["items"] *= 2
+    assert checker.check_result(result, SCHEMA)
 
 
 @pytest.mark.parametrize(
@@ -194,7 +145,6 @@ def test_relationship_schema_rules(name, readings):
             "operation": "create",
             "target_kind": "link_type",
             "client_ref": "reports",
-            "before": None,
             "after": {
                 "name": name,
                 "source_type_id": {"client_ref": "staff"},
@@ -222,7 +172,6 @@ def test_relationship_schema_accepts_complete_readings(readings):
             "operation": "create",
             "target_kind": "link_type",
             "client_ref": "reports",
-            "before": None,
             "after": {
                 "name": "reports_to",
                 "source_type_id": {"client_ref": "staff"},
@@ -240,8 +189,6 @@ def test_document_fact_reference_example_is_checkable():
     result["items"] = json.loads(
         (Path(__file__).parents[1] / "shared/references/examples/facts.json").read_bytes()
     )
-    for item in result["items"]:
-        item.setdefault("before", None)
     assert checker.check_result(result, SCHEMA) == []
 
 
