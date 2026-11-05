@@ -142,8 +142,14 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
         db.rollback()
         used = _record_rejection(db, workspace_id, session_id, digest)
         return _rejected("RESULT_CHECK_FAILED", "建模结果校验异常，请按本轮契约重新生成", used)
+    receipt = _receipt(db, batch)
     session.result_state = "done"
     session.result_warnings = []
+    session.task_detail = f"已生成 {receipt.reviewable_count} 条提案，请在“提案”中审阅"
+    # Settled here, so reconcile_run has nothing left to claim for this task;
+    # it only covers a submission made before the task id was registered.
+    if session.dataagent_task_id:
+        session.last_result_task_id = session.dataagent_task_id
     session.updated_at = utc_now()
     db.commit()
-    return _receipt(db, batch)
+    return receipt

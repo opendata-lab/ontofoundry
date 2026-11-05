@@ -109,6 +109,9 @@ def _persist_task_projection(
         submitted = current is not None and submitted_batch(
             db, current.workspace_id, session_id, current.dataagent_run_token
         ) is not None
+        if submitted and status == "finished":
+            # Keep the submit's "已生成 N 条提案" detail; nothing else to report.
+            values.pop("task_detail")
         if status in {"failed", "cancelled"} and not submitted:
             values.update(result_state="failed_permanent", last_result_task_id=task_id)
             if status == "cancelled" and current is not None:

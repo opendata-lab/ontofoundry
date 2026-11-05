@@ -101,6 +101,28 @@ def test_passed_submit_is_stored_and_the_run_settles_done(client, monkeypatch):
     assert not other["passed"] and other["errors"][0]["code"] == "RUN_ALREADY_SUBMITTED"
 
 
+def test_a_submitted_run_finishing_keeps_its_result_and_detail(client):
+    from ontofoundry_api.services.modeling_runs import _persist_task_projection
+
+    session, manifest, url, headers = running_submit(client)
+    with client.app.state.session_factory() as db:
+        db.get(ModelingSessionRecord, session["id"]).dataagent_task_id = "task-model-1"
+        db.commit()
+    payload = result(manifest, some_items(session["draft"]))
+    report = client.post(url, json=payload, headers=headers).json()
+    _persist_task_projection(
+        client.app.state.session_factory, session["id"],
+        task_id="task-model-1", upstream_status="finished", detail="任务已完成",
+    )
+    with client.app.state.session_factory() as db:
+        row = db.get(ModelingSessionRecord, session["id"])
+        assert row.task_status == "finished" and row.result_state == "done"
+        assert row.task_detail == f"已生成 {report['reviewable_count']} 条提案，请在“提案”中审阅"
+        assert row.last_result_task_id == "task-model-1"
+    # Settled at submit: settling the finished run changes nothing.
+    assert reconcile(client, session["id"]) == "done"
+
+
 def test_stopping_after_submit_keeps_the_batch(client):
     from ontofoundry_api.services.modeling_runs import _persist_task_projection
 
