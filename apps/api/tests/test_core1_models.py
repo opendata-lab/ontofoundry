@@ -405,3 +405,21 @@ def test_known_unknown_physical_type_stays_incomplete():
         m for m in draft.mappings if m.sources[0].dataset_id == draft.datasets[0].id
     )
     assert binding_readiness(draft, mapping.type_id).status == "unbound"
+
+
+def test_only_columns_the_binding_reads_need_a_known_type():
+    # An unused json/blob column must not make the object unqueryable
+    # (2026-11-05: one ENUM column unbound four published object types).
+    from ontofoundry_api.domain.core import DatasetColumn
+
+    draft = example_draft("01-basic-sales")
+    mapping = draft.mappings[0]
+    assert binding_readiness(draft, mapping.type_id).status == "bound"
+    ds = next(d for d in draft.datasets if d.id == mapping.sources[0].dataset_id)
+    ds.columns = [*ds.columns, DatasetColumn(name="fictional_extra", physical_type="geometry")]
+    assert binding_readiness(draft, mapping.type_id).status == "bound"
+    # Binding a property to that column makes its unknown type matter again.
+    name, binding = next((n, b) for n, b in mapping.fields.items() if b.kind == "column")
+    mapping.fields[name] = binding.model_copy(update={"column": "fictional_extra"})
+    ready = binding_readiness(draft, mapping.type_id)
+    assert ready.status == "unbound" and "来源列元数据待补全" in ready.reasons

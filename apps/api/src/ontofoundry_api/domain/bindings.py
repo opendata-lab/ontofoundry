@@ -95,6 +95,31 @@ def binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
     return index._memo[key]
 
 
+def _used_columns(draft: CoreDraft, binding: ResolvedBinding) -> tuple[dict[str, set[str]], bool]:
+    """Columns read per source: logical keys, column bindings and the
+    `source.column` references of expression bindings. True when an
+    expression cannot be resolved, so the caller stays conservative."""
+    from ontofoundry_api.domain.core import ColumnBinding
+    from ontofoundry_api.domain.expressions import resolve_field_expression
+
+    used = {source_id: set(source.key_columns) for source_id, source in binding.sources.items()}
+    unresolved = False
+    for name, field_binding in binding.fields.items():
+        if isinstance(field_binding, ColumnBinding):
+            used.setdefault(field_binding.source_id, set()).add(field_binding.column)
+            continue
+        mapping = next((m for m in binding.mappings if name in m.fields), None)
+        try:
+            references = resolve_field_expression(draft, mapping, field_binding.expression).references
+        except ValueError:
+            unresolved = True
+            continue
+        for reference in references:
+            if reference.source_id and reference.column:
+                used.setdefault(reference.source_id, set()).add(reference.column)
+    return used, unresolved
+
+
 def _binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
     """Static readiness only. Connection/authorization checks belong to services."""
     from ontofoundry_api.domain.validation import physical_value_kind
@@ -124,16 +149,15 @@ def _binding_readiness(draft: CoreDraft, type_id: UUID) -> BindingReadiness:
         return BindingReadiness("unbound", tuple(reasons))
     if any(p.name not in binding.fields for p in index.effective_properties(type_id)):
         reasons.append("属性绑定待补全")
-    for source in binding.sources.values():
+    # Only the columns this binding reads need a known type: an unused blob or
+    # json column elsewhere in the table does not make the object unqueryable.
+    used, unresolved = _used_columns(draft, binding)
+    if unresolved:
+        reasons.append("来源列元数据待补全")
+    for source_id, source in binding.sources.items():
         dataset = index.datasets.get(source.dataset_id)
-        if (
-            dataset is None
-            or not dataset.columns
-            or any(
-                physical_value_kind(column.physical_type) is None
-                for column in dataset.columns
-            )
-        ):
+        kinds = {c.name: physical_value_kind(c.physical_type) for c in ((dataset.columns if dataset else None) or [])}
+        if not kinds or any(kinds.get(column) is None for column in used.get(source_id, ())):
             reasons.append("来源列元数据待补全")
     if reasons:
         return BindingReadiness("unbound", tuple(dict.fromkeys(reasons)))
