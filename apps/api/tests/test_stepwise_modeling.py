@@ -154,11 +154,11 @@ def test_scenario_facts_first_then_added_material_and_table_are_in_pack(
     )
     second = send(client, session["id"])
     receipt_ids = [m["id"] for m in second["materials"] if m["id"] != material["id"]]
-    assert len(receipt_ids) == 1
+    assert receipt_ids == []
     expected = {
         "draft_empty": True,
         "new_material_ids": [material["id"], *receipt_ids],
-        "new_table_keys": ["t1"],
+        "new_table_count": 1,
     }
     assert second["input_files"]["scenario_facts"] == expected
     assert work_pack(uploads, second)["scenario_facts"] == expected
@@ -167,7 +167,7 @@ def test_scenario_facts_first_then_added_material_and_table_are_in_pack(
     assert work_pack(uploads, third)["scenario_facts"] == {
         "draft_empty": True,
         "new_material_ids": [],
-        "new_table_keys": [],
+        "new_table_count": 0,
     }
 
 
@@ -186,7 +186,7 @@ def test_scenario_facts_compare_full_table_identity_and_do_not_guess_scenario():
     before = deepcopy((draft, previous, tables))
     assert scenario_facts(
         draft, {"materials": [{"id": "old"}, {"id": "new"}]}, previous, tables
-    ) == {"draft_empty": False, "new_material_ids": ["new"], "new_table_keys": ["t4"]}
+    ) == {"draft_empty": False, "new_material_ids": ["new"], "new_table_count": 1}
     assert (draft, previous, tables) == before
     assert scenario_facts(draft, {}, {}, tables) == {"draft_empty": False}
 

@@ -163,7 +163,7 @@ def byte_report():
         encode,
         material_index,
     )
-    from read_input import render_lines, render_tables
+    from read_input import render_lines, render_tables, search_tables
 
     context = json.loads(resource("tests/fixtures/budget-context.json").read_bytes())
     materials = []
@@ -179,11 +179,14 @@ def byte_report():
                 f"inputs/material-{index}.md",
             )
         )
+    search_body = resource("tests/fixtures/extract-retail/tables-supplemented.json").read_text()
+    search_output = search_tables(search_body)
     pack, pages = build_work_pack(
         context,
         materials,
         context_file="inputs/context.json",
         schema_file="inputs/schema.json",
+        tables=json.loads(search_body)["tables"], tables_file="inputs/tables.json",
     )
     if pages:
         raise ValueError("同规模预算样本不应分页")
@@ -240,6 +243,7 @@ def byte_report():
             for label, path in common.items()
         },
         "工作包": measure(encode(pack)),
+        "表检索": measure(search_output),
         "选中示例": measure(selected),
         "方法决策段": measure(method_bytes),
         "带原行号材料": measure(
@@ -315,7 +319,8 @@ def byte_report():
             fixed
             + components["技能入口"]["bytes"]
             + components["计划步骤"]["bytes"]
-            + components["带原行号材料"]["bytes"],
+            + components["带原行号材料"]["bytes"]
+            + components["表检索"]["bytes"],
             PLAN_ROUTE_LIMIT,
         ),
     }
@@ -324,7 +329,7 @@ def byte_report():
             "bytes": size,
             "limit": limit,
             "pass": size <= limit,
-            "scope": "计划轮首阶段完整材料与协议入口，表目录由工作包给出",
+            "scope": "计划轮首阶段完整材料与协议入口，表范围摘要与一次六表检索计入",
         }
     fixture = resource("tests/fixtures/extract-retail")
     extract_context = json.loads((fixture / "context.json").read_bytes())

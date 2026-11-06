@@ -267,14 +267,13 @@ def test_read_input_boundaries_and_original_lines(tmp_path):
     completed = subprocess.run(
         [*command, "--start", "2", "--end", "2"], capture_output=True, check=False
     )
-    result = json.loads(completed.stdout)
-    assert result["original_range"] == [2, 2] and result["unread_ranges"] == [
-        [1, 1],
-        [3, 3],
-    ]
+    result = completed.stdout.decode()
+    assert "2→原证据" in result and "未读范围：1–1、3–3" in result
+    assert "--start 3" in result
     path.write_text("大" * 10000)
     completed = subprocess.run(command, capture_output=True, check=False)
-    assert completed.returncode == 1 and len(completed.stdout) < 8192
+    assert completed.returncode == 0 and len(completed.stdout) < 8192
+    assert "超长内容已截断" in completed.stdout.decode()
 
 
 def test_skill_reference_paths_exist():

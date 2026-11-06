@@ -193,16 +193,12 @@ def test_origin_read_contract_and_cited_receipt_usage_archive_and_delete_protect
         check_material_evidence(evidence(material, text), material_lookup(db, client.app.state.settings, WORKSPACE), "虚构属性")
 
 
-def test_run_manifest_and_tables_file_share_receipt_bytes_and_survive_background_sync(client, monkeypatch):
+def test_run_file_is_pinned_without_a_material_and_survives_background_sync(client, monkeypatch):
     connection_id = register(client, ["fiction_orders"])
-    uploaded_document = client.post(ROOT + "/materials", params={"name": "虚构说明.md"}, content="虚构订单说明").json()
-    session = create_session(client)
-    saved = save_links(client, session, [link(connection_id, "fiction_orders")])
-    assert saved.status_code == 200, saved.text
-    session = saved.json()
+    document = client.post(ROOT + "/materials", params={"name": "虚构说明.md"}, content="虚构订单说明").json()
+    session = save_links(client, create_session(client), [link(connection_id, "fiction_orders")]).json()
     with client.app.state.session_factory() as db:
-        row = db.get(ModelingSessionRecord, session["id"])
-        row.material_ids = [uploaded_document["id"]]
+        db.get(ModelingSessionRecord, session["id"]).material_ids = [document["id"]]
         db.commit()
     uploads, packs = {}, []
 
@@ -215,12 +211,10 @@ def test_run_manifest_and_tables_file_share_receipt_bytes_and_survive_background
             uploads[path] = data
             if name.startswith("ontofoundry-tables-"):
                 assert media_type == "application/json"
-                # Receipt is protected before the first remote upload finishes.
                 with client.app.state.session_factory() as db:
                     row = db.get(ModelingSessionRecord, session["id"])
-                    assert row.task_status == "submitting"
-                    material = db.scalar(select(MaterialRecord).where(MaterialRecord.sha256 == hashlib.sha256(data).hexdigest()))
-                    assert material.id in {m["id"] for m in row.run_manifest_json["materials"]}
+                    assert row.run_manifest_json["table_snapshot"] == json.loads(data)
+                    assert db.scalar(select(MaterialRecord).where(MaterialRecord.origin == "table_receipt")) is None
                 change_column(client, connection_id)
             if name.startswith("ontofoundry-work-pack-"):
                 packs.append(json.loads(data))
@@ -238,39 +232,15 @@ def test_run_manifest_and_tables_file_share_receipt_bytes_and_survive_background
     pack = packs[-1]
     with client.app.state.session_factory() as db:
         row = db.get(ModelingSessionRecord, session["id"])
-        material = db.scalar(select(MaterialRecord).where(MaterialRecord.origin == "table_receipt"))
-        entry = next(m for m in row.run_manifest_json["materials"] if m["id"] == material.id)
-        assert {m["id"] for m in pack["materials"]} == {material.id, uploaded_document["id"]}
-        assert entry in pack["materials"] and entry in row.run_manifest_json["input_files"]["materials"]
-        assert pack["tables_file"] == row.run_manifest_json["input_files"]["tables_file"] == entry["path"]
-        body = uploads[entry["path"]]
-        assert body == source(client, material).read_bytes()
-        assert entry["sha256"] == hashlib.sha256(body).hexdigest()
-        assert entry["original_range"] == [1, len(body.decode().splitlines())]
-        assert entry["bytes"] == len(body) and entry["lines"] > 1
+        files = row.run_manifest_json["input_files"]
+        assert {m["id"] for m in pack["materials"]} == {document["id"]}
+        assert "tables" not in pack and pack["table_scope"]["total"] == 1
+        assert pack["tables_file"] == files["tables_file"]
+        body = uploads[files["tables_file"]]
+        assert files["tables_sha256"] == hashlib.sha256(body).hexdigest()
+        assert json.loads(body) == row.run_manifest_json["table_snapshot"]
         assert json.loads(body)["tables"][0]["columns"][1]["type"] == "DECIMAL(12,2)"
-        assert material_lookup(db, client.app.state.settings, WORKSPACE)(material.id)[1] == body.decode().splitlines()
-    usage = {m["id"]: m for m in client.get(ROOT + "/materials/overview").json()["items"]}[material.id]["usage"]
-    assert usage["can_delete"] is False and "运行清单" in usage["references"]
-    assert client.delete(ROOT + f"/materials/{material.id}").status_code == 409
-    original_id = material.id
-    for _ in range(2):
-        with client.app.state.session_factory() as db:
-            row = db.get(ModelingSessionRecord, session["id"])
-            row.task_status, row.result_state = "finished", "done"
-            db.commit()
-        again = client.post(ROOT + f"/sessions/{session['id']}/agent-conversation/messages", json={
-            "content": "继续虚构建模", "metadata": {"mode": "model"},
-        })
-        assert again.status_code == 202, again.text
-    with client.app.state.session_factory() as db:
-        receipts = db.scalars(select(MaterialRecord).where(MaterialRecord.origin == "table_receipt")).all()
-        assert len(receipts) == 2
-        latest = next(item for item in receipts if item.id != original_id)
-        assert next(m for m in packs[-1]["materials"] if m["id"] == latest.id)["sha256"] == latest.sha256
-        assert original_id not in {m["id"] for m in packs[-1]["materials"]}
-        assert sum(path.startswith("inputs/ontofoundry-tables-") for path in uploads) == 2
-        check_material_evidence(evidence(material, body.decode()), material_lookup(db, client.app.state.settings, WORKSPACE), "虚构历史属性")
+        assert db.scalar(select(MaterialRecord).where(MaterialRecord.origin == "table_receipt")) is None
 
 
 def test_material_origin_alembic_upgrade_backfills_existing_and_defaults_new_rows(client, monkeypatch):

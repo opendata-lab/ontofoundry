@@ -171,5 +171,6 @@ def test_a_large_linked_table_catalog_is_paged_not_rejected():
     pack, pages = build_work_pack(context, [], context_file="c.json", schema_file="s.json", tables=tables, tables_file="t.json")
     assert len(encode(pack)) <= PACK_LIMIT
     assert pack["tables_file"] == "t.json" and "tables" not in pack
-    paged = [row["table"]["table"] for page in pages for row in json.loads(page) if "table" in row]
-    assert paged == [t["table"] for t in tables]
+    assert pages == []
+    assert pack["table_scope"] == {"mode": "selected", "total": 200,
+                                  "connections": [{"name": "虚构零售库", "count": 200}], "skipped": 0}

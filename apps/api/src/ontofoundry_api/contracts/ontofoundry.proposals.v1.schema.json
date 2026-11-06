@@ -390,7 +390,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -400,6 +401,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -954,7 +958,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -964,6 +969,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -1094,7 +1102,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -1104,6 +1113,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -1171,6 +1183,36 @@
         "aggregation"
       ],
       "title": "SimpleMetric",
+      "type": "object"
+    },
+    "AfterTableEvidenceInput": {
+      "additionalProperties": false,
+      "description": "Submission-only shorthand; persisted evidence is always MaterialEvidence.",
+      "properties": {
+        "kind": {
+          "const": "table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "quote": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "ref": {
+          "maxLength": 500,
+          "pattern": "^t[1-9][0-9]*(?:\\..+)?$",
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "ref",
+        "quote"
+      ],
+      "title": "TableEvidenceInput",
       "type": "object"
     },
     "AfterValueKind": {
@@ -1519,7 +1561,14 @@
         },
         "evidence": {
           "items": {
-            "$ref": "#/$defs/AfterMaterialEvidence"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/AfterMaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
+              }
+            ]
           },
           "maxItems": 50,
           "type": "array"
@@ -1638,7 +1687,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -1648,6 +1698,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -1914,7 +1967,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -1924,6 +1978,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -2012,7 +2069,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -2022,6 +2080,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -2142,7 +2203,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -2152,6 +2214,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -2280,7 +2345,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -2290,6 +2356,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -2419,7 +2488,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -2429,6 +2499,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },
@@ -2515,7 +2588,8 @@
             "discriminator": {
               "mapping": {
                 "manual": "#/$defs/AfterManualEvidence",
-                "material": "#/$defs/AfterMaterialEvidence"
+                "material": "#/$defs/AfterMaterialEvidence",
+                "table": "#/$defs/AfterTableEvidenceInput"
               },
               "propertyName": "kind"
             },
@@ -2525,6 +2599,9 @@
               },
               {
                 "$ref": "#/$defs/AfterManualEvidence"
+              },
+              {
+                "$ref": "#/$defs/AfterTableEvidenceInput"
               }
             ]
           },

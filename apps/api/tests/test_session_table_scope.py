@@ -158,7 +158,7 @@ def test_run_resolves_current_tables_and_records_skipped_selections(client, monk
     receipts = [json.loads(data)["tables"] for name, data in uploads.items() if name.startswith("ontofoundry-tables-")]
     expected = initial_tables | {"retail.fiction_orders", "retail.fiction_new"} if scope == "all" else {"retail.fiction_orders"}
     if scope == "document_only":
-        assert receipts == [] and catalog == []
+        assert receipts == [[]] and catalog == []
     else:
         assert len(receipts) == 1
         assert {t["table_name"] for t in receipts[0]} == {name.split(".")[1] for name in expected}

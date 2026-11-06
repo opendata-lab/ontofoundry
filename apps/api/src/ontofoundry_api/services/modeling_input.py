@@ -51,6 +51,16 @@ def material_index(material: dict, content: bytes, path: str) -> dict:
 
 
 
+def table_scope_summary(tables, mode="selected", skipped=0):
+    counts = {}
+    for table in tables:
+        name = table["connection"]
+        counts[name] = counts.get(name, 0) + 1
+    return {"mode": mode, "total": len(tables),
+            "connections": [{"name": name, "count": count} for name, count in sorted(counts.items())],
+            "skipped": skipped}
+
+
 def build_work_pack(
     context: dict,
     materials: list[dict],
@@ -62,6 +72,7 @@ def build_work_pack(
     tables: list[dict] | None = None,
     tables_file: str | None = None,
     scenario_facts: dict | None = None,
+    table_scope: dict | None = None,
 ) -> tuple[dict, list[bytes]]:
     """Keep all index entries, spilling oversized indices to bounded pages."""
     if any(not m.get("path") or "lines" not in m for m in materials):
@@ -116,25 +127,23 @@ def build_work_pack(
     pack["workflow_dir"] = "modeling/"
     if scenario_facts:
         pack["scenario_facts"] = scenario_facts
-    if tables:
-        # Linked registered tables: a catalog only; columns live in tables_file.
-        pack["tables"] = tables
+    pack["table_scope"] = table_scope or table_scope_summary(tables or [])
+    if tables_file:
         pack["tables_file"] = tables_file
     if len(encode(pack)) <= PACK_LIMIT:
         return pack, []
     # No index entries disappear: the page list replaces the inline index.
-    # Elements spill first; materials and tables stay inline while they fit,
+    # Elements spill first; materials stay inline while they fit,
     # since every run reads their paths and hashes (a paged material sent the
     # agent through the index pages just to cite it).
     spilled = {"elements": pack.pop("elements")}
-    for key in ("tables", "materials"):
+    for key in ("materials",):
         if len(encode(pack)) + INDEX_LINK_ROOM <= PACK_LIMIT:
             break
         if key in pack:
             spilled[key] = pack.pop(key)
     rows = (
         [{"material": m} for m in spilled.get("materials", [])]
-        + [{"table": t} for t in spilled.get("tables", [])]
         + [{"element": e} for e in spilled["elements"]]
     )
     pages, page = [], []
@@ -147,9 +156,6 @@ def build_work_pack(
                     "element": {k: entry[k] for k in ("collection", "pointer", "id")},
                     "read_full_at_pointer": True,
                 }
-            elif "table" in row:
-                # The full comment stays in tables_file.
-                row = {"table": {**row["table"], "comment": row["table"]["comment"][:200]}}
             else:
                 raise DataAgentError("材料索引单项过大", status_code=422)
         if len(encode([*page, row])) > 6000:
@@ -238,9 +244,9 @@ def scenario_facts(
     before = {m["id"] for m in previous.get("materials") or []}
     facts["new_material_ids"] = [m["id"] for m in manifest.get("materials") or [] if m["id"] not in before]
     seen = {(t.get("connection"), t.get("table")) for t in previous["input_files"].get("tables") or []}
-    facts["new_table_keys"] = [
-        t["key"] for t in tables or [] if (t.get("connection"), t.get("table")) not in seen
-    ]
+    facts["new_table_count"] = sum(
+        (t.get("connection"), t.get("table")) not in seen for t in tables or []
+    )
     return facts
 
 
