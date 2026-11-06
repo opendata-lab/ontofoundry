@@ -8,8 +8,7 @@ import { TableMaterialPicker } from "./TableMaterialPicker";
 
 vi.mock("../api/client", () => ({ datasetApi: { registeredTables: vi.fn() } }));
 
-// The first antd modal render is slow on CI runners; the waits below need more
-// than vitest's 5 s per-test default.
+// Antd modal render can be slower in CI environments.
 vi.setConfig({ testTimeout: 20_000 });
 
 beforeEach(() => vi.resetAllMocks());
@@ -18,67 +17,183 @@ afterEach(cleanup);
 const table = (name: string, patch: Partial<RegisteredTable> = {}): RegisteredTable => ({
   connection_id: "c1",
   connection_name: "星港只读库",
-  observed_at: null,
   schema_name: "dw",
   table_name: name,
   kind: "table",
   comment: "",
   column_count: 4,
   datasets: [],
+  observed_at: "2026-11-05T12:00:00Z",
   ...patch,
 });
 
-function renderPicker(linked: LinkedTable[] = [], onLink = vi.fn().mockResolvedValue(undefined)) {
+function renderPicker({
+  tableScope,
+  linked = [],
+  onSave = vi.fn().mockResolvedValue(undefined),
+}: {
+  tableScope?: "all" | "selected";
+  linked?: LinkedTable[];
+  onSave?: ReturnType<typeof vi.fn>;
+} = {}) {
   renderWithProviders(
     <MemoryRouter>
-      <TableMaterialPicker workspaceId="w1" sessionId="s1" linked={linked} disabled={false} onLink={onLink} />
+      <TableMaterialPicker
+        workspaceId="w1"
+        sessionId="s1"
+        tableScope={tableScope}
+        linked={linked}
+        disabled={false}
+        onSave={onSave}
+      />
     </MemoryRouter>,
   );
   fireEvent.click(screen.getByRole("button", { name: "选择数据表…" }));
-  return onLink;
+  return onSave;
 }
 
-it("links the chosen registered tables to the session", async () => {
+it("defaults to all tables selected when scope is all", async () => {
   vi.mocked(datasetApi.registeredTables).mockResolvedValue({
-    items: [table("orders", { comment: "订单" }), table("stores", { kind: "view" })],
+    items: [
+      table("fiction_orders", { comment: "订单表" }),
+      table("fiction_stores", { kind: "view" }),
+      table("fiction_customers"),
+    ],
   });
-  const onLink = renderPicker();
-  // Wait until the loaded list has settled before choosing.
-  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled(), { timeout: 5000 });
-  // On slow CI runners the list can re-render after it is found, so a click may land
-  // on a detached node; re-query each attempt and click until the box is checked.
-  await waitFor(() => {
-    const box = screen.getByRole("checkbox", { name: /dw\.orders/ });
-    if (!(box as HTMLInputElement).checked) fireEvent.click(box);
-    expect(box).toBeChecked();
-  }, { timeout: 10_000 });
+  const onSave = renderPicker({ tableScope: "all" });
+
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
+  expect(await screen.findByText(/匹配 3 张 · 已选 3 \/ 共 3 张/)).toBeInTheDocument();
+
+  // Header checkbox is checked
+  const headerCheckbox = screen.getByRole("checkbox", { name: "全选" });
+  expect(headerCheckbox).toBeChecked();
+
+  // Row checkboxes are checked
+  expect(screen.getByRole("checkbox", { name: "dw.fiction_orders" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "dw.fiction_stores" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "dw.fiction_customers" })).toBeChecked();
+
+  // Saving without changes saves table_scope all
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
-  await waitFor(() =>
-    expect(onLink).toHaveBeenCalledWith([{ connection_id: "c1", schema_name: "dw", table_name: "orders" }]),
-  );
+  await waitFor(() => {
+    expect(onSave).toHaveBeenCalledWith({ table_scope: "all", linked_tables: [] });
+  });
   expect(datasetApi.registeredTables).toHaveBeenCalledWith("w1", "s1");
 });
 
-it("starts from the tables already linked and shows existing datasets", async () => {
-  vi.mocked(datasetApi.registeredTables).mockResolvedValue({
-    items: [table("orders", { datasets: [{ id: "d1", name: "orders", display_name: "订单" }] }), table("stores")],
+it("filter then header-select selects only matching rows across pages", async () => {
+  // Create 25 tables to test across pagination (page size is 20):
+  // 22 fiction_order_* tables and 3 fiction_store_* tables.
+  const orderTables = Array.from({ length: 22 }, (_, i) =>
+    table(`fiction_order_${i + 1}`, { comment: `Order table ${i + 1}` }),
+  );
+  const storeTables = Array.from({ length: 3 }, (_, i) =>
+    table(`fiction_store_${i + 1}`, { comment: `Store table ${i + 1}` }),
+  );
+  const allTables = [...orderTables, ...storeTables];
+
+  vi.mocked(datasetApi.registeredTables).mockResolvedValue({ items: allTables });
+  const onSave = renderPicker({ tableScope: "selected", linked: [] });
+
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
+  expect(await screen.findByText(/匹配 25 张 · 已选 0 \/ 共 25 张/)).toBeInTheDocument();
+
+  // Filter by query "fiction_order"
+  fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据表" }), {
+    target: { value: "fiction_order" },
   });
-  const onLink = renderPicker([{ connection_id: "c1", schema_name: "dw", table_name: "orders" }]);
-  expect(await screen.findByRole("checkbox", { name: /已有数据集 订单/ })).toBeChecked();
-  fireEvent.click(await screen.findByRole("checkbox", { name: /dw\.orders/ }));
+  expect(await screen.findByText(/匹配 22 张 · 已选 0 \/ 共 25 张/)).toBeInTheDocument();
+
+  // Header select selects all 22 matching rows across pages
+  const headerCheckbox = screen.getByRole("checkbox", { name: "全选" });
+  expect(headerCheckbox).not.toBeChecked();
+  fireEvent.click(headerCheckbox);
+
+  expect(await screen.findByText(/匹配 22 张 · 已选 22 \/ 共 25 张/)).toBeInTheDocument();
+  expect(headerCheckbox).toBeChecked();
+
+  // Save verifies only the 22 matching rows across pages are saved
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
-  await waitFor(() => expect(onLink).toHaveBeenCalledWith([]));
+  await waitFor(() => {
+    expect(onSave).toHaveBeenCalledWith({
+      table_scope: "selected",
+      linked_tables: orderTables.map((t) => ({
+        connection_id: t.connection_id,
+        schema_name: t.schema_name,
+        table_name: t.table_name,
+      })),
+    });
+  });
 });
 
-it("filters by table, connection or comment", async () => {
+it("saves table_scope all when 全选全部 is clicked", async () => {
   vi.mocked(datasetApi.registeredTables).mockResolvedValue({
-    items: [table("orders", { comment: "订单" }), table("stores", { comment: "门店" })],
+    items: [table("fiction_orders"), table("fiction_stores"), table("fiction_customers")],
   });
-  renderPicker();
-  await screen.findByRole("checkbox", { name: /dw\.orders/ });
-  fireEvent.change(screen.getByRole("searchbox", { name: "搜索数据表" }), { target: { value: "门店" } });
-  expect(screen.queryByRole("checkbox", { name: /dw\.orders/ })).toBeNull();
-  expect(screen.getByRole("checkbox", { name: /dw\.stores/ })).toBeInTheDocument();
+  const onSave = renderPicker({
+    tableScope: "selected",
+    linked: [{ connection_id: "c1", schema_name: "dw", table_name: "fiction_orders" }],
+  });
+
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
+  expect(await screen.findByText(/匹配 3 张 · 已选 1 \/ 共 3 张/)).toBeInTheDocument();
+
+  // Click "全选全部"
+  fireEvent.click(screen.getByRole("button", { name: "全选全部" }));
+  expect(await screen.findByText(/匹配 3 张 · 已选 3 \/ 共 3 张/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
+  await waitFor(() => {
+    expect(onSave).toHaveBeenCalledWith({ table_scope: "all", linked_tables: [] });
+  });
+});
+
+it("saves table_scope selected with N-1 tables when deselecting one table", async () => {
+  vi.mocked(datasetApi.registeredTables).mockResolvedValue({
+    items: [table("fiction_orders"), table("fiction_stores"), table("fiction_customers")],
+  });
+  const onSave = renderPicker({ tableScope: "all" });
+
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
+  expect(await screen.findByText(/匹配 3 张 · 已选 3 \/ 共 3 张/)).toBeInTheDocument();
+
+  // Deselect fiction_orders
+  const ordersBox = screen.getByRole("checkbox", { name: "dw.fiction_orders" });
+  expect(ordersBox).toBeChecked();
+  fireEvent.click(ordersBox);
+
+  expect(await screen.findByText(/匹配 3 张 · 已选 2 \/ 共 3 张/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
+  await waitFor(() => {
+    expect(onSave).toHaveBeenCalledWith({
+      table_scope: "selected",
+      linked_tables: [
+        { connection_id: "c1", schema_name: "dw", table_name: "fiction_stores" },
+        { connection_id: "c1", schema_name: "dw", table_name: "fiction_customers" },
+      ],
+    });
+  });
+});
+
+it("saves table_scope selected with empty array when 清空 is clicked", async () => {
+  vi.mocked(datasetApi.registeredTables).mockResolvedValue({
+    items: [table("fiction_orders"), table("fiction_stores"), table("fiction_customers")],
+  });
+  const onSave = renderPicker({ tableScope: "all" });
+
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
+  expect(await screen.findByText(/匹配 3 张 · 已选 3 \/ 共 3 张/)).toBeInTheDocument();
+
+  // Click "清空"
+  fireEvent.click(screen.getByRole("button", { name: "清空" }));
+  expect(await screen.findByText(/匹配 3 张 · 已选 0 \/ 共 3 张/)).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
+  await waitFor(() => {
+    expect(onSave).toHaveBeenCalledWith({ table_scope: "selected", linked_tables: [] });
+  });
 });
 
 it("points to data management when nothing is synced yet", async () => {
@@ -89,10 +204,14 @@ it("points to data management when nothing is synced yet", async () => {
 });
 
 it("keeps the dialog open and shows why linking failed", async () => {
-  vi.mocked(datasetApi.registeredTables).mockResolvedValue({ items: [table("orders")] });
-  const onLink = renderPicker([], vi.fn().mockRejectedValue(new Error("关联的数据表尚未同步或已不存在")));
-  fireEvent.click(await screen.findByRole("checkbox", { name: /dw\.orders/ }));
+  vi.mocked(datasetApi.registeredTables).mockResolvedValue({ items: [table("fiction_orders")] });
+  const onSave = renderPicker({
+    tableScope: "selected",
+    linked: [{ connection_id: "c1", schema_name: "dw", table_name: "fiction_orders" }],
+    onSave: vi.fn().mockRejectedValue(new Error("关联的数据表尚未同步或已不存在")),
+  });
+  await waitFor(() => expect(screen.getByRole("button", { name: "关联到会话" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
   expect(await screen.findByText("关联的数据表尚未同步或已不存在")).toBeInTheDocument();
-  expect(onLink).toHaveBeenCalled();
+  expect(onSave).toHaveBeenCalled();
 });
