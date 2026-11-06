@@ -5,6 +5,7 @@ so there is no earlier plan to restore.
 """
 
 import json
+import os
 from pathlib import Path
 
 from read_input import table_batches
@@ -80,6 +81,11 @@ def main():
     created, step = [], f"读取工作包 {args.work_pack}"
     try:
         pack = json.loads(Path(args.work_pack).read_bytes())
+        # The work pack lives in <workspace>/uploads/; work there even when
+        # started from the read-only skill folder.
+        uploads = Path(args.work_pack).resolve().parent
+        if uploads.name == "uploads":
+            os.chdir(uploads.parent)
         step = "创建 modeling/ 与输出目录"
         # Output filenames are supplied by the platform; never infer them.
         if pack.get("result_file"):
@@ -140,7 +146,11 @@ def run_paths(work_pack, pack):
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
     for material in pack.get("materials") or []:
         if material.get("path"):
-            lines.append(f"- 材料：{material['path']}")
+            lines.append(f"- 材料：{material['path']}（id {material.get('id', '?')}，{material.get('lines', '?')} 行）")
+    for table in pack.get("tables") or []:
+        if isinstance(table, dict) and table.get("key"):
+            lines.append(f"- 表 {table['key']}：{table.get('table', '')} {table.get('comment') or ''}".rstrip())
+    lines.append("- 本轮只用以上材料与表结构，没有业务库查询通道；MCP 访问文件只供 prepare_result 使用，不打开、不打印")
     for label, key in (("表结构", "tables_file"), ("结果", "result_file")):
         if pack.get(key):
             lines.append(f"- {label}：{pack[key]}")

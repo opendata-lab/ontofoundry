@@ -6,7 +6,7 @@ description: 从文档、表结构发现实体类型、属性、关系、数据�
 
 先定范围：新概念经用户批准后，再按清单展开属性、关系、实例。
 
-先用 `"$DATAAGENT_PYTHON_BIN"` 运行本技能目录下的 `scripts/init_workflow.py --work-pack <工作包>`，照抄它打印的路径、模板和命令，不必列目录或读源码。
+先在工作区（/mnt/workspace）用 `"$DATAAGENT_PYTHON_BIN"` 运行本技能的 `scripts/init_workflow.py --work-pack <工作包>`，照抄它打印的路径、模板和命令，不必列目录或读源码。
 
 再只读当前一个步骤文件：
 - 会新增概念：[计划](references/steps/plan.md)，获批准后同一运行接着读[抽取](references/steps/extract.md)。

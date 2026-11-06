@@ -81,6 +81,24 @@ def test_init_prints_this_runs_paths_and_commands(tmp_path, monkeypatch, capsys)
     assert pack.is_file()
 
 
+def test_init_works_from_another_folder_and_lists_inputs(tmp_path, monkeypatch, capsys):
+    workspace, skill = tmp_path / "workspace", tmp_path / "skill"
+    (workspace / "uploads").mkdir(parents=True)
+    skill.mkdir()
+    write_json(workspace / "uploads/pack.json", {
+        "result_file": "output/result.json",
+        "materials": [{"id": "m-1", "path": "uploads/fictional.md", "lines": 21}],
+        "tables": [{"key": "t1", "table": "fictional.orders", "comment": "订单"}],
+    })
+    monkeypatch.chdir(skill)  # e.g. the read-only skill folder
+    assert invoke(monkeypatch, init_workflow, "--work-pack", str(workspace / "uploads/pack.json")) == 0
+    out = capsys.readouterr().out
+    assert (workspace / "modeling/parts").is_dir() and not (skill / "modeling").exists()
+    for text in ("uploads/fictional.md（id m-1，21 行）", "表 t1：fictional.orders 订单"):
+        assert text in out, text
+    assert "MCP 访问文件只供 prepare_result 使用" in out
+
+
 def test_prepare_takes_the_work_pack_short_names_and_default_parts(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     ctx, items = mapping_example()
