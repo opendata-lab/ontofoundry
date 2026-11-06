@@ -2,7 +2,7 @@
 
 ## 决策
 
-先确认每行含义、表列、时点和有序键。工作包 tables 是表目录（每张表一个 key）；抽取轮按 SKILL 批量用 `read_input.py <tables_file> --tables t1,t3` 读列，不重复 raw 与渲染读取；基于表的 Dataset 填该表的 connection_id、schema_name、table_name，name 用英文标识、display_name 用中文。复用已有 Dataset。材料明确的未同步表可提议 Dataset，审阅显示“表未同步”，Agent 不执行同步。跨表口径提议基于表达式的 Dataset：单连接一条只读 SELECT，只引用已登记表；多个事实表用 UNION ALL 各带业务日期，或先聚合后连接，只向“一”端查维度。未同步且没有物理列信息时，只提有依据的实体、属性、关系与基于表的数据集（空 columns）；不猜列，不构造依赖未知列的映射、SQL 或指标。最终列为未交付并提示“先在数据管理同步该表，再发起补齐”；同步后一次小改动／增量补齐。
+先确认每行含义、表列、时点和有序键。工作包 tables 是表目录（每张表一个 key）；抽取轮按 SKILL 批量用 `read_input.py <tables_file> --tables t1,t3` 读列，不重复 raw 与渲染读取；基于表的 Dataset 填该表的 connection_id、schema_name、table_name，name 用英文标识、display_name 用中文。复用已有 Dataset。未同步的表不提 Dataset（平台拒收），Agent 不执行同步。跨表口径提议基于表达式的 Dataset：单连接一条只读 SELECT，只引用已登记表；多个事实表用 UNION ALL 各带业务日期，或先聚合后连接，只向“一”端查维度。未同步的表只提有依据的实体、属性、关系，不提数据集；不猜列，不构造依赖未知列的映射、SQL 或指标。最终列为未交付并提示“先在数据管理同步该表，再发起补齐”；同步后一次小改动／增量补齐。
 
 坑：主表C01/C02，附表只C01，LEFT JOIN 仍2客户，不能变1；附表另有C03也不能变3。两表各覆盖一半成员不能伪装主附表。每映射的 main／aux 是局部来源，不跨映射借用；属性名、列名、SQL、引文中的相似字符串不是元素引用。抽取写法用 `show_example.py --part 03`；不另开 core-model／methodology 回读路线。
 
