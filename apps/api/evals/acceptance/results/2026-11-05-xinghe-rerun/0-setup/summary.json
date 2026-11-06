@@ -1,0 +1,54 @@
+{
+  "items": [
+    {
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "connection_name": "星河零售只读库",
+      "schema_name": "xinghe_retail",
+      "table_name": "members",
+      "kind": "table",
+      "comment": "会员",
+      "column_count": 6,
+      "datasets": []
+    },
+    {
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "connection_name": "星河零售只读库",
+      "schema_name": "xinghe_retail",
+      "table_name": "order_items",
+      "kind": "table",
+      "comment": "订单明细",
+      "column_count": 5,
+      "datasets": []
+    },
+    {
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "connection_name": "星河零售只读库",
+      "schema_name": "xinghe_retail",
+      "table_name": "orders",
+      "kind": "table",
+      "comment": "订单",
+      "column_count": 6,
+      "datasets": []
+    },
+    {
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "connection_name": "星河零售只读库",
+      "schema_name": "xinghe_retail",
+      "table_name": "products",
+      "kind": "table",
+      "comment": "商品",
+      "column_count": 4,
+      "datasets": []
+    },
+    {
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "connection_name": "星河零售只读库",
+      "schema_name": "xinghe_retail",
+      "table_name": "stores",
+      "kind": "table",
+      "comment": "门店",
+      "column_count": 4,
+      "datasets": []
+    }
+  ]
+}

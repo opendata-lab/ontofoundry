@@ -1,0 +1,19 @@
+{
+  "health": {
+    "status": "ok",
+    "service": "ontofoundry-api"
+  },
+  "web_http_status": 200,
+  "original_database": "ontofoundry",
+  "repo": "[LOCAL_PATH]",
+  "pids": {
+    "api": 63137,
+    "web": 63138
+  },
+  "qa_mcp_restored": [
+    "opendataworks",
+    "qichuan-main4-ontology"
+  ],
+  "old_workspace_count": 5,
+  "eval_workspace_visible_in_original": false
+}

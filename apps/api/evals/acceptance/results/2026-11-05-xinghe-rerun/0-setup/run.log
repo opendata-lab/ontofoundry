@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "commit": "659fd37",
+  "empty_database_drop_create": true,
+  "mysql_seed_reapplied": true,
+  "mysql_gold": [
+    "257.20",
+    "174.60",
+    "237.10",
+    "668.90",
+    "317.10"
+  ],
+  "initial_synced_tables": 5,
+  "installed_skills_hash_match": true,
+  "published_prompts_match": true,
+  "ODW": "existing datasource and SELECT-only role reused",
+  "LAN": "192.168.0.105:5174 HTTP page rendered at 1440x900"
+}

@@ -1,0 +1,14 @@
+{
+  "status": "published",
+  "counts": {
+    "object_types": 6,
+    "properties": 30,
+    "link_types": 6,
+    "rules": 6,
+    "metrics": 7,
+    "datasets": 7,
+    "mappings": 6,
+    "value_types": 3
+  },
+  "total": 71
+}

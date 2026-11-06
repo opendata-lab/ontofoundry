@@ -1,0 +1,189 @@
+{
+  "actual_total": 10,
+  "expected_total": 7,
+  "expected_excluded_unsynced_datasets": 0,
+  "actual_counts": {
+    "property": 1,
+    "link_type": 1,
+    "dataset": 2,
+    "mapping": 1,
+    "metric": 4,
+    "rule": 1
+  },
+  "expected_counts": {
+    "dataset": 2,
+    "mapping": 1,
+    "metric": 4
+  },
+  "count_diffs": {
+    "link_type": 1,
+    "rule": 1,
+    "property": 1
+  },
+  "operations": [
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "order_no",
+      "display_name": "原订单号"
+    },
+    {
+      "kind": "link_type",
+      "operation": "update",
+      "name": "refund_order",
+      "display_name": "退款原订单"
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "refunds",
+      "display_name": "退款数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "refund_total",
+      "display_name": "退款金额"
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "sales_refund_daily",
+      "display_name": "销售与退款事件"
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "ledger_sales_amount",
+      "display_name": "事件口径销售额"
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "ledger_refund_total",
+      "display_name": "事件口径退款金额"
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "refund_rate",
+      "display_name": "退款率"
+    },
+    {
+      "kind": "rule",
+      "operation": "update",
+      "name": "refund_amount_limit",
+      "display_name": "退款金额不超原订单实付"
+    }
+  ],
+  "refund_datasets": [
+    {
+      "id": "9354336b-4152-54bf-9a38-d53f781215fa",
+      "name": "refunds",
+      "display_name": "退款数据",
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "source_kind": "table",
+      "dialect": "mysql",
+      "schema_name": "xinghe_retail",
+      "table_name": "refunds",
+      "query_sql": null,
+      "description": "",
+      "snapshot_date_column": null,
+      "columns": [
+        {
+          "name": "refund_no",
+          "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+          "comment": "退款单号"
+        },
+        {
+          "name": "order_no",
+          "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+          "comment": "原订单号"
+        },
+        {
+          "name": "refund_date",
+          "physical_type": "DATE",
+          "comment": "退款日期"
+        },
+        {
+          "name": "refund_amount",
+          "physical_type": "DECIMAL(12, 2)",
+          "comment": "退款金额"
+        },
+        {
+          "name": "reason",
+          "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+          "comment": "退款原因"
+        }
+      ]
+    },
+    {
+      "id": "369db78d-c2d9-5193-8d61-0ebb63cf2bd1",
+      "name": "sales_refund_daily",
+      "display_name": "销售与退款事件",
+      "connection_id": "8ae267d6-5a24-4fba-9874-6bed466d024d",
+      "source_kind": "query",
+      "dialect": "mysql",
+      "schema_name": null,
+      "table_name": null,
+      "query_sql": "SELECT o.order_date AS event_on, o.pay_amount AS sales_amount, 0 AS refund_amount FROM xinghe_retail.orders o WHERE o.status = '已完成' UNION ALL SELECT r.refund_date AS event_on, 0 AS sales_amount, r.refund_amount AS refund_amount FROM xinghe_retail.refunds r",
+      "description": "销售额与退款金额各自保留业务日期（下单日期、退款日期）后合并为事件，供跨表比率指标使用；列声明来自已同步表结构，不声称 SQL 已探测执行",
+      "snapshot_date_column": null,
+      "columns": [
+        {
+          "name": "event_on",
+          "physical_type": "DATE",
+          "comment": ""
+        },
+        {
+          "name": "sales_amount",
+          "physical_type": "DECIMAL(12, 2)",
+          "comment": ""
+        },
+        {
+          "name": "refund_amount",
+          "physical_type": "DECIMAL(12, 2)",
+          "comment": ""
+        }
+      ]
+    }
+  ],
+  "submits": [
+    {
+      "tool_id": "call_00_ET_U8Il0oqHK4sqhcS2HIwR5912",
+      "passed": true,
+      "output": "检查通过：10 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-1e8f342139ebe1345884fef2a2a6c503.pending.json.errors.json\n平台检查通过并已入库：10 条待审。\n按类型：metric 4、dataset 2、property 1、link_type 1、mapping 1、rule 1\n已完成：直接按收尾第 3 步作答；不必再读结果文件，也不补写 modeling/ 下的文件。\n已保存结果留档：output/ontofoundry-result-1e8f342139ebe1345884fef2a2a6c503.json；提案已入库，等待用户审核\n"
+    }
+  ],
+  "receipts": [
+    {
+      "passed": true,
+      "errors": [],
+      "warnings": [],
+      "reviewable_count": 10,
+      "batch_id": "95d72020-8a5e-5612-b008-5d41f424df40",
+      "repair_used": 0,
+      "repair_limit": 3
+    }
+  ],
+  "scope": "Counts by kind, operation list, and refund boundary; does not establish semantic equivalence.",
+  "verified_differences": [
+    "退款 Dataset 新增而非更新",
+    "新增退款原订单号属性",
+    "更新退款关系，补充 direct join",
+    "更新退款金额上限规则说明"
+  ],
+  "baseline": {
+    "turns": 11,
+    "submits": 1,
+    "repair_used": 0,
+    "repair_limit": 3,
+    "proposals": 8
+  }
+}
