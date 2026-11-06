@@ -1,0 +1,86 @@
+{
+  "expected_total": 63,
+  "actual_total": 64,
+  "actual_counts": {
+    "object_type": 6,
+    "property": 30,
+    "value_type": 3,
+    "rule": 6,
+    "link_type": 6,
+    "dataset": 5,
+    "mapping": 5,
+    "metric": 3
+  },
+  "expected_counts": {
+    "dataset": 6,
+    "mapping": 5,
+    "link_type": 6,
+    "object_type": 6,
+    "property": 30,
+    "value_type": 2,
+    "rule": 5,
+    "metric": 3
+  },
+  "count_diffs": {
+    "rule": 1,
+    "value_type": 1,
+    "dataset": -1
+  },
+  "extra_vs_expected": [
+    "品类值类型 product_category_type",
+    "品类规则 product_category_values"
+  ],
+  "missing_vs_expected": [
+    "未同步退款表的空列 Dataset refunds"
+  ],
+  "refund_mapping_count": 0,
+  "refund_dataset_count": 0,
+  "refund_metrics": [],
+  "reply_advises_sync_first": false,
+  "submits": [
+    {
+      "tool_id": "call_00_ET_wvSqvZbWmDGmqbAfpUPa6168",
+      "passed": false,
+      "errors": [
+        "ELEMENT_INVALID"
+      ],
+      "repair_report": [
+        "0/3"
+      ],
+      "output": "检查通过：65 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.json.errors.json\n平台检查未通过，未入库。最终文件未替换。完整报告：output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.platform-submit.json\n修正轮次：已用 0/3（平台计数，本地检查不计）\n错误 [ELEMENT_INVALID]：/items [\"-\"] 候选图校验未通过；期望 \"完整合法的候选图\"；实际 规则 member_level_values：值类型约束必须引用当前值 member_level_type；规则 product_category_values：值类型约束必须引用当前值 product_category_type；规则 order_status_values：值类型约束必须引用当前值 order_status_type；下一步：按“实际”中列出的对象、关系逐个修正对应片段，全部改完后整批重提。本次整批提交未通过，未入库。\n下一步：修正片段后重试 \"$DATAAGENT_PYTHON_BIN\" /opt/skills/ontology-discovery/scripts/prepare_result.py --work-pack uploads/ontofoundry-work-pack-6bbd4c3fce1d2b823ef40944b9e5400f.json\n"
+    },
+    {
+      "tool_id": "call_00_ET_owcQC5kkfrZOsXKRBmgT4219",
+      "passed": false,
+      "errors": [
+        "DATASET_SOURCE_INVALID"
+      ],
+      "repair_report": [
+        "1/3"
+      ],
+      "output": "检查通过：65 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.json.errors.json\n平台检查未通过，未入库。最终文件未替换。完整报告：output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.platform-submit.json\n修正轮次：已用 1/3（平台计数，本地检查不计）\n错误 [DATASET_SOURCE_INVALID]：数据集来源未就绪；[SOURCE_NOT_REGISTERED] /table_name 表未同步，请先同步指定表。本次整批提交未通过，未入库。\n下一步：修正片段后重试 \"$DATAAGENT_PYTHON_BIN\" /opt/skills/ontology-discovery/scripts/prepare_result.py --work-pack uploads/ontofoundry-work-pack-6bbd4c3fce1d2b823ef40944b9e5400f.json\n"
+    },
+    {
+      "tool_id": "call_00_ET_V0yJOh9DuxhjKwmlDBBD4731",
+      "passed": false,
+      "errors": [
+        "ELEMENT_INVALID"
+      ],
+      "repair_report": [
+        "2/3"
+      ],
+      "output": "检查通过：65 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.json.errors.json\n平台检查未通过，未入库。最终文件未替换。完整报告：output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.platform-submit.json\n修正轮次：已用 2/3（平台计数，本地检查不计）\n错误 [ELEMENT_INVALID]：/items/58/after [\"ds_refunds\"] 1 validation error for Dataset\n  Value error, 表来源必须指定表名，不能同时填写 SQL [type=value_error, input_value={'name': 'refunds', 'disp...5a8f-8620-e65f860b3f9b'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error；期望 \"有效元素与真实材料证据\"；实际 \"1 validation error for Dataset\\n  Value error, 表来源必须指定表名，不能同时填写 SQL [type=value_error, input_value={'name': 'refunds', 'disp...5a8f-8620-…；下一步：用建模技能的 scripts/show_example.py 查正确写法：dataset --operation create。本次整批提交未通过，未入库。\n下一步：修正片段后重试 \"$DATAAGENT_PYTHON_BIN\" /opt/skills/ontology-discovery/scripts/prepare_result.py --work-pack uploads/ontofoundry-work-pack-6bbd4c3fce1d2b823ef40944b9e5400f.json\n"
+    },
+    {
+      "tool_id": "call_00_0wjUUqlpQrF9wvOTfgM71310",
+      "passed": true,
+      "errors": [],
+      "repair_report": [],
+      "output": "10\n检查通过：64 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.pending.json.errors.json\n平台检查通过并已入库：64 条待审。\n按类型：property 30、object_type 6、rule 6、link_type 6、dataset 5、mapping 5、value_type 3、metric 3\n已完成：直接按收尾第 3 步作答；不必再读结果文件，也不补写 modeling/ 下的文件。\n已保存结果留档：output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.json；提案已入库，等待用户审核\n"
+    }
+  ],
+  "repair_used": 3,
+  "repair_limit": 3,
+  "exact_fixture_match": false,
+  "comparison_scope": "Counts by kind and refund delivery boundary; not a claim of field-for-field graph equivalence. Identifiers, relation directions, and labels differ."
+}

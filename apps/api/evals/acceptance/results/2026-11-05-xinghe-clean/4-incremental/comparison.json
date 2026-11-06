@@ -1,0 +1,173 @@
+{
+  "increment_expected": 7,
+  "increment_actual": 8,
+  "increment_actual_counts": {
+    "dataset": 2,
+    "mapping": 1,
+    "link_type": 1,
+    "metric": 4
+  },
+  "increment_expected_counts": {
+    "dataset": 2,
+    "mapping": 1,
+    "metric": 4
+  },
+  "operations": [
+    {
+      "operation": "create",
+      "kind": "dataset",
+      "name": "refunds",
+      "display_name": "退款数据",
+      "target_id": "8a2c6023-a707-598a-b1ff-f6c9d160a13d"
+    },
+    {
+      "operation": "create",
+      "kind": "mapping",
+      "name": null,
+      "display_name": null,
+      "target_id": "0a98b50a-718f-5724-8961-5680b5ccd6ea"
+    },
+    {
+      "operation": "update",
+      "kind": "link_type",
+      "name": "refund_for_order",
+      "display_name": "退款订单",
+      "target_id": "e16cb688-e015-5ba9-90a8-8942e74a8b6c"
+    },
+    {
+      "operation": "create",
+      "kind": "metric",
+      "name": "refund_amount",
+      "display_name": "退款金额",
+      "target_id": "b30e3f8a-6d6e-5dee-8933-1e4941aa71dc"
+    },
+    {
+      "operation": "create",
+      "kind": "dataset",
+      "name": "refund_sales_ledger",
+      "display_name": "销售与退款事件",
+      "target_id": "f23f0ddc-f267-5a55-aff6-734127181a47"
+    },
+    {
+      "operation": "create",
+      "kind": "metric",
+      "name": "ledger_sales_amount",
+      "display_name": "事件销售额",
+      "target_id": "015c4b0c-4946-5d68-857f-7fe81b7a5cc8"
+    },
+    {
+      "operation": "create",
+      "kind": "metric",
+      "name": "ledger_refund_amount",
+      "display_name": "事件退款金额",
+      "target_id": "4ac034f2-ceaf-54b5-8d38-f4d84229b565"
+    },
+    {
+      "operation": "create",
+      "kind": "metric",
+      "name": "refund_rate",
+      "display_name": "退款率",
+      "target_id": "22d99e9f-8ff5-5b9c-bcee-5237d5e64d50"
+    }
+  ],
+  "increment_differences": [
+    "refunds Dataset is create instead of update because v1 omitted it",
+    "extra update to refund_for_order relation to add direct join and remove unsynced note"
+  ],
+  "v2_expected_total": 69,
+  "v2_actual_total": 71,
+  "v2_expected_counts": {
+    "dataset": 7,
+    "mapping": 6,
+    "link_type": 6,
+    "object_type": 6,
+    "property": 30,
+    "value_type": 2,
+    "rule": 5,
+    "metric": 7
+  },
+  "v2_actual_counts": {
+    "object_type": 6,
+    "property": 30,
+    "link_type": 6,
+    "rule": 6,
+    "metric": 7,
+    "dataset": 7,
+    "mapping": 6,
+    "value_type": 3
+  },
+  "v2_count_diffs": {
+    "value_type": 1,
+    "rule": 1
+  },
+  "v2_metrics": [
+    {
+      "name": "sales_amount",
+      "display_name": "销售额",
+      "kind": "simple"
+    },
+    {
+      "name": "completed_order_count",
+      "display_name": "成交订单数",
+      "kind": "simple"
+    },
+    {
+      "name": "avg_order_value",
+      "display_name": "客单价",
+      "kind": "ratio"
+    },
+    {
+      "name": "refund_amount",
+      "display_name": "退款金额",
+      "kind": "simple"
+    },
+    {
+      "name": "ledger_sales_amount",
+      "display_name": "事件销售额",
+      "kind": "simple"
+    },
+    {
+      "name": "ledger_refund_amount",
+      "display_name": "事件退款金额",
+      "kind": "simple"
+    },
+    {
+      "name": "refund_rate",
+      "display_name": "退款率",
+      "kind": "ratio"
+    }
+  ],
+  "query_datasets": [
+    {
+      "id": "f23f0ddc-f267-5a55-aff6-734127181a47",
+      "name": "refund_sales_ledger",
+      "display_name": "销售与退款事件",
+      "connection_id": "9280e560-f60b-4fcb-8674-d5e5356c3918",
+      "source_kind": "query",
+      "dialect": "mysql",
+      "schema_name": null,
+      "table_name": null,
+      "query_sql": "SELECT o.order_date AS event_on, o.pay_amount AS sales_amount, 0 AS refund_amount FROM xinghe_retail.orders o WHERE o.status = '已完成' UNION ALL SELECT r.refund_date AS event_on, 0 AS sales_amount, r.refund_amount FROM xinghe_retail.refunds r",
+      "description": "销售额按下单日期、退款按下退款日期各自保留一行，避免退款重复累计销售额；列由查询离线声明",
+      "snapshot_date_column": null,
+      "columns": [
+        {
+          "name": "event_on",
+          "physical_type": "date",
+          "comment": ""
+        },
+        {
+          "name": "sales_amount",
+          "physical_type": "decimal",
+          "comment": ""
+        },
+        {
+          "name": "refund_amount",
+          "physical_type": "decimal",
+          "comment": ""
+        }
+      ]
+    }
+  ],
+  "exact_fixture_match": false
+}
