@@ -292,7 +292,7 @@ export const modelingApi = {
     workspaceRequest<ModelingSession>(id, "/sessions", { title, mode }).then(withSessionInstances),
   get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid).then(withSessionInstances),
   /** Saves the whole session draft; it does not publish. */
-  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[]; mode?: SessionMode } = {}) =>
+  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[]; mode?: SessionMode; table_scope?: "all" | "selected" } = {}) =>
     request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft: definitionsOnly(draft), ...extra })).then(withSessionInstances),
   /** Abandons a session: drops its staged instances; published content is untouched. */
   abandon: (s: Pick<ModelingSession, "id" | "workspace_id">) =>

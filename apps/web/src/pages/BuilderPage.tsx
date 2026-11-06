@@ -1,8 +1,8 @@
 import { ArrowUp, Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Alert, Button, Checkbox, Dropdown, Input, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { modelingApi } from "../api/client";
-import type { Capabilities, Material, SessionMode } from "../api/types";
+import { datasetApi, modelingApi } from "../api/client";
+import type { Capabilities, Material, RegisteredTable, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import type { AgentConversationElement, CompleteDetail, ErrorDetail, PlanOpenDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
@@ -53,6 +53,7 @@ export function BuilderPage() {
   const { session, sessionId, setSession, error, setError } = model;
   useErrorMessage(error);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [registeredTables, setRegisteredTables] = useState<RegisteredTable[]>();
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [scenario, setScenario] = useState("");
   const [collapsed, setCollapsed] = useState(false);
@@ -113,6 +114,14 @@ export function BuilderPage() {
       })
       .catch((e: Error) => setError(e.message));
   }, [workspace.id, setError]);
+  useEffect(() => {
+    let live = true;
+    // Only for the summary count; without it the summary omits the number.
+    datasetApi.registeredTables(workspace.id, sessionId ?? undefined)
+      .then((res) => { if (live) setRegisteredTables(res.items); })
+      .catch(() => { if (live) setRegisteredTables(undefined); });
+    return () => { live = false; };
+  }, [workspace.id, sessionId]);
   const act = async (fn: () => Promise<void>) => {
     setError("");
     setBusy(true);
@@ -387,41 +396,93 @@ export function BuilderPage() {
                 </section>
                 <section className="flex shrink-0 flex-col gap-3">
                   <SectionTitle title="业务数据" />
-                  {!!session?.linked_tables?.length && (
-                    <div className="flex flex-col gap-1">
-                      {session.linked_tables.map((t) => (
-                        <Checkbox
-                          key={tableKey(t)}
-                          checked
-                          disabled={busy || running}
-                          onChange={() =>
-                            act(async () => {
-                              const s = await model.ensure();
-                              setSession(
-                                await modelingApi.save(s, s.draft, {
-                                  linked_tables: (s.linked_tables ?? []).filter((x) => tableKey(x) !== tableKey(t)),
-                                }),
-                              );
-                            })
-                          }
-                        >
-                          <span className="inline-flex min-w-0 items-center gap-2 text-sm">
-                            <Database size={14} className="flex-none" />
-                            <span className="truncate" title={tableLabel(t)}>{tableLabel(t)}</span>
-                          </span>
-                        </Checkbox>
-                      ))}
-                    </div>
-                  )}
+                  {(() => {
+                    const tableScope = session?.table_scope ?? "all";
+                    const linked = session?.linked_tables ?? [];
+
+                    if (tableScope === "all") {
+                      return (
+                        <div className="flex items-center gap-2 text-sm text-ink-2">
+                          <Database size={14} className="flex-none text-muted" />
+                          <span>{registeredTables !== undefined ? `全部已同步数据表（${registeredTables.length} 张）` : "全部已同步数据表"}</span>
+                        </div>
+                      );
+                    }
+
+                    if (linked.length === 0) {
+                      return (
+                        <Typography.Text type="secondary" className="text-sm">
+                          未关联数据表（仅从文档建模）
+                        </Typography.Text>
+                      );
+                    }
+
+                    if (linked.length <= 5) {
+                      return (
+                        <div className="flex flex-col gap-1">
+                          {linked.map((t) => (
+                            <Checkbox
+                              key={tableKey(t)}
+                              checked
+                              disabled={busy || running}
+                              onChange={() =>
+                                act(async () => {
+                                  const s = await model.ensure();
+                                  setSession(
+                                    await modelingApi.save(s, s.draft, {
+                                      table_scope: "selected",
+                                      linked_tables: (s.linked_tables ?? []).filter((x) => tableKey(x) !== tableKey(t)),
+                                    }),
+                                  );
+                                })
+                              }
+                            >
+                              <span className="inline-flex min-w-0 items-center gap-2 text-sm">
+                                <Database size={14} className="flex-none" />
+                                <span className="truncate" title={tableLabel(t)}>{tableLabel(t)}</span>
+                              </span>
+                            </Checkbox>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    const connectionCounts = new Map<string, number>();
+                    for (const t of linked) {
+                      connectionCounts.set(t.connection_id, (connectionCounts.get(t.connection_id) ?? 0) + 1);
+                    }
+                    const connectionNameMap = new Map<string, string>();
+                    for (const r of registeredTables ?? []) {
+                      if (r.connection_id && r.connection_name) {
+                        connectionNameMap.set(r.connection_id, r.connection_name);
+                      }
+                    }
+                    const groupSummaries = Array.from(connectionCounts.entries()).map(([cid, count]) => {
+                      const name = connectionNameMap.get(cid) || cid;
+                      return `${name} ${count}`;
+                    });
+                    const multipleSummary = `已选 ${linked.length} 张（${groupSummaries.join("、")}）`;
+
+                    return (
+                      <div className="flex items-center gap-2 text-sm text-ink-2">
+                        <Database size={14} className="flex-none text-muted" />
+                        <span className="truncate" title={multipleSummary}>{multipleSummary}</span>
+                      </div>
+                    );
+                  })()}
                   <TableMaterialPicker
                     workspaceId={workspace.id}
                     sessionId={session?.id}
+                    tableScope={session?.table_scope ?? "all"}
                     linked={session?.linked_tables ?? []}
                     disabled={busy || running}
-                    onLink={(tables) => act(async () => {
-                      const current = await model.ensure();
-                      setSession(await modelingApi.save(current, current.draft, { linked_tables: tables }));
-                    })}
+                    onTablesLoaded={setRegisteredTables}
+                    onSave={(patch) =>
+                      act(async () => {
+                        const current = await model.ensure();
+                        setSession(await modelingApi.save(current, current.draft, patch));
+                      })
+                    }
                   />
                 </section>
                 <section className="flex shrink-0 flex-col gap-3">

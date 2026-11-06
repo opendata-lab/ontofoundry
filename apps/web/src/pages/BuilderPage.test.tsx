@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { modelingApi } from "../api/client";
+import { datasetApi, modelingApi } from "../api/client";
 import type { Material, ModelingSession, Workspace } from "../api/types";
 import { modelingSession, workspace } from "../test/apiRecords";
 import { renderWithProviders } from "../test/renderWithProviders";
@@ -42,6 +42,9 @@ vi.mock("../api/client", () => ({
     connections: vi.fn().mockResolvedValue({ items: [] }),
     tables: vi.fn().mockResolvedValue({ items: [] }),
     tableMaterial: vi.fn(),
+  },
+  datasetApi: {
+    registeredTables: vi.fn().mockResolvedValue({ items: [] }),
   },
   proposalsApi: {
     batches: vi.fn().mockResolvedValue({ items: [], next_cursor: null }),
@@ -261,4 +264,91 @@ it("fixes the mode once the conversation has started", () => {
   expect(screen.getByText("日常模式 · 模式已固定")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "选择会话模式" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "构建配置" })).toBeNull();
+});
+
+it("shows 全部已同步数据表 summary when table_scope is all", async () => {
+  vi.mocked(datasetApi.registeredTables).mockResolvedValue({
+    items: [
+      { connection_id: "c1", connection_name: "连接A", schema_name: "s", table_name: "t1", kind: "table", comment: "", column_count: 3, datasets: [], observed_at: null },
+      { connection_id: "c1", connection_name: "连接A", schema_name: "s", table_name: "t2", kind: "table", comment: "", column_count: 5, datasets: [], observed_at: null },
+    ],
+  });
+  context.model.session = { ...session(), table_scope: "all", linked_tables: [] };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("全部已同步数据表（2 张）")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "选择数据表…" })).toBeInTheDocument();
+});
+
+it("shows secondary text when selected scope has 0 tables", () => {
+  context.model.session = { ...session(), table_scope: "selected", linked_tables: [] };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("未关联数据表（仅从文档建模）")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "选择数据表…" })).toBeInTheDocument();
+});
+
+it("lists removable tables when 1 to 5 tables are selected", async () => {
+  const currentSession = {
+    ...session(),
+    table_scope: "selected" as const,
+    linked_tables: [
+      { connection_id: "c1", schema_name: "dw", table_name: "orders" },
+      { connection_id: "c1", schema_name: "dw", table_name: "customers" },
+    ],
+  };
+  context.model.session = currentSession;
+  context.model.ensure = vi.fn().mockResolvedValue(currentSession);
+  vi.mocked(modelingApi.save).mockResolvedValue({
+    ...currentSession,
+    linked_tables: [{ connection_id: "c1", schema_name: "dw", table_name: "customers" }],
+  });
+
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  const ordersBox = screen.getByRole("checkbox", { name: "dw.orders" });
+  expect(ordersBox).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "dw.customers" })).toBeChecked();
+
+  fireEvent.click(ordersBox);
+  await waitFor(() => {
+    expect(modelingApi.save).toHaveBeenCalledWith(
+      currentSession,
+      currentSession.draft,
+      {
+        table_scope: "selected",
+        linked_tables: [{ connection_id: "c1", schema_name: "dw", table_name: "customers" }],
+      },
+    );
+  });
+});
+
+it("shows grouped count summary when more than 5 tables are selected", () => {
+  context.model.session = {
+    ...session(),
+    table_scope: "selected" as const,
+    linked_tables: [
+      { connection_id: "c1", schema_name: "dw", table_name: "t1" },
+      { connection_id: "c1", schema_name: "dw", table_name: "t2" },
+      { connection_id: "c1", schema_name: "dw", table_name: "t3" },
+      { connection_id: "c1", schema_name: "dw", table_name: "t4" },
+      { connection_id: "c2", schema_name: "dw", table_name: "t5" },
+      { connection_id: "c2", schema_name: "dw", table_name: "t6" },
+    ],
+  };
+  renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("已选 6 张（c1 4、c2 2）")).toBeInTheDocument();
 });

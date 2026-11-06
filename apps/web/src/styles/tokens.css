@@ -476,6 +476,8 @@
   --data-tables-detail-height: 480px;
   --data-tables-detail-label-width: 96px;
   --data-tables-dialog-width: 960px;
+  /* Table list inside the session table picker; keeps the dialog footer on screen at 900px. */
+  --table-picker-list-height: 40vh;
   --data-tables-step-height: 420px;
 }
 /* Table detail: tabs over a fixed scrolling body; key-value labels share one width. */

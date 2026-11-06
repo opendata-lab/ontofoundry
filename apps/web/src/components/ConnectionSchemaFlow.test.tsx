@@ -179,18 +179,22 @@ it("preserves PostgreSQL's default schema when editing a dataset without an expl
 });
 
 it("links same-named tables from two databases through the builder's registered-table catalog", async () => {
-  const onLink = vi.fn().mockResolvedValue(undefined);
-  renderPage(<TableMaterialPicker workspaceId="fiction" linked={[]} disabled={false} onLink={onLink} />);
+  const onSave = vi.fn().mockResolvedValue(undefined);
+  renderPage(<TableMaterialPicker workspaceId="fiction" tableScope="selected" linked={[]} disabled={false} onSave={onSave} />);
   fireEvent.click(screen.getByRole("button", { name: "选择数据表…" }));
-  await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
-  await act(async () => { await Promise.resolve(); });
+  // Same table name in two databases stays two separately selectable rows.
   for (const schema of schemas) {
-    const checkbox = screen.getByRole("checkbox", { name: new RegExp(`${schema}.fiction_orders`) });
-    fireEvent.click(checkbox);
-    await waitFor(() => expect(checkbox).toBeChecked());
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: new RegExp(`${schema}.fiction_orders`) })).toBeInTheDocument());
   }
+  await act(async () => { await Promise.resolve(); });
+  const first = screen.getByRole("checkbox", { name: new RegExp(`${schemas[0]}.fiction_orders`) });
+  fireEvent.click(first);
+  await waitFor(() => expect(first).toBeChecked());
   fireEvent.click(screen.getByRole("button", { name: "关联到会话" }));
-  await waitFor(() => expect(onLink).toHaveBeenCalledWith(schemas.map((schema) => ({ connection_id: "c", schema_name: schema, table_name: "fiction_orders" }))));
+  await waitFor(() => expect(onSave).toHaveBeenCalledWith({
+    table_scope: "selected",
+    linked_tables: [{ connection_id: "c", schema_name: schemas[0], table_name: "fiction_orders" }],
+  }));
   expect(calls.some((c) => c.path.endsWith("/registered-tables"))).toBe(true);
   expect(calls.some((c) => c.path.endsWith("/assets") || c.path.endsWith("/table-material"))).toBe(false);
 });
