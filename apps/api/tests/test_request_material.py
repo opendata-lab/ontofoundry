@@ -6,7 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
-from test_modeling import ROOT, create_session
+from test_modeling import ROOT
+from test_modeling import create_session as create_modeling_session
 from test_stepwise_modeling import fake_agent, set_row, work_pack
 
 from ontofoundry_api.api import agent_conversation
@@ -18,6 +19,17 @@ from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.material_source import material_source_path
 
 REQUEST = "  # 云杉维修站\r\n工单 WX-101 已由小岚接单，预计明日完工。\r\n"
+
+
+def create_session(client):
+    # These cases exercise document-only inputs, excluding table receipts.
+    session = create_modeling_session(client)
+    response = client.put(ROOT + f"/sessions/{session['id']}", json={
+        "revision": session["revision"], "draft": session["draft"],
+        "table_scope": "selected", "linked_tables": [],
+    })
+    assert response.status_code == 200, response.text
+    return response.json()
 
 
 def send(client, session_id, content=REQUEST, mode="model"):

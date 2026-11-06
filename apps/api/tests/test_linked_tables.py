@@ -90,6 +90,7 @@ def test_session_links_registered_tables_and_rejects_unsynced_or_foreign_ones(cl
     saved = save_links(client, session, [link(connection_id, "orders")])
     assert saved.status_code == 200, saved.text
     session = saved.json()
+    assert session["table_scope"] == "selected"
     assert session["linked_tables"] == [link(connection_id, "orders")]
     unsynced = save_links(client, session, [link(connection_id, "refunds")])
     assert unsynced.status_code == 422 and unsynced.json()["error"]["code"] == "SOURCE_NOT_REGISTERED"

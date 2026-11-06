@@ -388,7 +388,8 @@ export type ModelingSession = {
   base_diff: ElementChange[];
   graph: Omit<TypeGraph, "version_id"> & { version_id: UUID | "" };
   material_ids: string[];
-  /** Registered tables linked to the session; the agent proposes datasets on them. */
+  table_scope: "all" | "selected";
+  /** Registered tables selected when table_scope is selected. */
   linked_tables?: LinkedTable[];
   /** Fixed once the conversation starts (dataagent_topic_id set). */
   mode: SessionMode;
@@ -1014,6 +1015,7 @@ export type SyncJob = { id: string; connection_id: string; schema_name: string; 
 /** A synced table in data management that a modeling session may use. */
 export type LinkedTable = { connection_id: string; schema_name: string; table_name: string };
 export type RegisteredTable = LinkedTable & {
+  observed_at: string | null;
   connection_name: string;
   kind: string;
   comment: string;

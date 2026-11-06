@@ -308,6 +308,8 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
             "revision": session["revision"],
             "draft": session["draft"],
             "material_ids": [material["id"]],
+            "table_scope": "selected",
+            "linked_tables": [],
         },
     ).json()
 

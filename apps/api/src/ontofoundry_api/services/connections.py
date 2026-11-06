@@ -44,7 +44,7 @@ def connection_references(db, workspace_id, connection_id):
             datasets(version.snapshot_json, "已发布版本")
             published = {d.get("id") for d in version.snapshot_json.get("datasets", [])}
 
-    # Abandoned sessions no longer use their drafts or linked tables.
+    # Abandoned sessions no longer use their drafts.
     sessions = db.scalars(select(ModelingSessionRecord).where(
         ModelingSessionRecord.workspace_id == workspace_id,
         ModelingSessionRecord.abandoned_at.is_(None),
@@ -54,10 +54,6 @@ def connection_references(db, workspace_id, connection_id):
         # Drafts carry the whole model; published datasets are reported once above,
         # so a session only adds what it introduced and has not published.
         datasets(session.draft_json, session.title, published)
-        for table in session.linked_tables or []:
-            if table.get("connection_id") == connection_id:
-                name = ".".join(filter(None, [table.get("schema_name"), table["table_name"]]))
-                references.append(ConnectionReference(type="linked_table", name=name, location=session.title))
 
     for proposal in db.scalars(select(ProposalItemRecord).where(
         ProposalItemRecord.workspace_id == workspace_id,

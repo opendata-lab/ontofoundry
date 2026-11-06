@@ -2,7 +2,6 @@
 
 import json
 from copy import deepcopy
-from types import SimpleNamespace
 
 import pytest
 from run_helpers import RUN_TOKEN, reconcile, row
@@ -133,44 +132,25 @@ def test_unknown_permission_mode_is_rejected(client, fake_agent):
 
 
 def test_scenario_facts_first_then_added_material_and_table_are_in_pack(
-    client, monkeypatch, fake_agent
+    client, fake_agent
 ):
-    from ontofoundry_api.services import dataset_sources
+    from test_linked_tables import link, register
 
     session = create_session(client)
-    set_row(client, session["id"], draft_json=empty_snapshot(session["workspace_id"]))
+    set_row(client, session["id"], draft_json=empty_snapshot(session["workspace_id"]), table_scope="selected")
     uploads, _ = fake_agent
     first = send(client, session["id"])
     assert first["input_files"]["scenario_facts"] == {"draft_empty": True}
     assert work_pack(uploads, first)["scenario_facts"] == {"draft_empty": True}
     material = upload_material(client, "虚构新增范围.md")
-    connection = SimpleNamespace(
-        id="fictional-connection", name="云帆资料库", kind="postgres"
-    )
-    monkeypatch.setattr(
-        dataset_sources,
-        "linked_table_details",
-        lambda *_: [
-            {
-                "connection": connection,
-                "schema_name": "fictional",
-                "table": {"name": "orders", "columns": [{"name": "id", "type": "text"}]},
-            }
-        ],
-    )
+    connection = register(client, ["fiction_orders"])
     set_row(
         client,
         session["id"],
         task_status="finished",
         result_state="done",
         material_ids=[material["id"]],
-        linked_tables=[
-            {
-                "connection_id": connection.id,
-                "schema_name": "fictional",
-                "table_name": "orders",
-            }
-        ],
+        linked_tables=[link(connection, "fiction_orders")],
     )
     second = send(client, session["id"])
     receipt_ids = [m["id"] for m in second["materials"] if m["id"] != material["id"]]
