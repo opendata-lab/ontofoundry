@@ -110,10 +110,12 @@ def test_a_submitted_run_finishing_keeps_its_result_and_detail(client):
         db.commit()
     payload = result(manifest, some_items(session["draft"]))
     report = client.post(url, json=payload, headers=headers).json()
-    _persist_task_projection(
-        client.app.state.session_factory, session["id"],
-        task_id="task-model-1", upstream_status="finished", detail="任务已完成",
-    )
+    # The agent writes its answer after storing: running refreshes come first.
+    for upstream, detail in (("running", "DataAgent 正在处理"), ("finished", "任务已完成")):
+        _persist_task_projection(
+            client.app.state.session_factory, session["id"],
+            task_id="task-model-1", upstream_status=upstream, detail=detail,
+        )
     with client.app.state.session_factory() as db:
         row = db.get(ModelingSessionRecord, session["id"])
         assert row.task_status == "finished" and row.result_state == "done"
