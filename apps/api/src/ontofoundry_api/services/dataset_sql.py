@@ -23,7 +23,7 @@ QUERY_NODES = {
     "Trim", "Length", "Abs", "Round", "Ceil", "Floor", "Count", "Sum", "Avg",
     "Min", "Max", "Stddev", "StddevPop", "StddevSamp", "Variance", "VariancePop",
     "Date", "DateTrunc", "TimestampTrunc", "Extract", "Var", "Interval",
-    "DateAdd", "DateSub", "TsOrDsToDate", "TimeToStr", "StrToDate", "CurrentDate",
+    "DateAdd", "DateSub", "DateDiff", "TimestampDiff", "DatetimeDiff", "TsOrDsToDate", "TimeToStr", "StrToDate", "CurrentDate",
     "CurrentTimestamp", "Window", "WindowSpec", "RowNumber", "Rank", "DenseRank",
     "Lag", "Lead", "FirstValue", "LastValue", "Filter", "NullSafeEQ",
 }
@@ -56,8 +56,12 @@ def parse_query(sql, dialect=None):
         if isinstance(node, exp.With) and node.args.get("recursive"):
             fail("首版不支持递归 CTE")
         if type(node).__name__ not in QUERY_NODES:
-            fail("SQL 包含非只读或未支持构造：" + type(node).__name__, "SQL_NOT_READ_ONLY")
-        if isinstance(node, exp.Var) and not isinstance(node.parent, (exp.Extract, exp.Interval, exp.DateTrunc, exp.TimestampTrunc)):
+            # Writes are refused as such; anything else is a read the checker does
+            # not know yet, so say so rather than calling it a write.
+            if isinstance(node, (exp.Insert, exp.Update, exp.Delete, exp.Merge, exp.Create, exp.Drop, exp.Alter, exp.Command)):
+                fail("SQL 包含写入或结构变更：" + type(node).__name__, "SQL_NOT_READ_ONLY")
+            fail("SQL 使用了暂不支持的函数或构造：" + type(node).__name__ + "；请改用已支持的写法", "SQL_UNSUPPORTED")
+        if isinstance(node, exp.Var) and not isinstance(node.parent, (exp.Extract, exp.Interval, exp.DateTrunc, exp.TimestampTrunc, exp.DateDiff, exp.TimestampDiff, exp.DatetimeDiff)):
             fail("SQL 包含不支持的变量")
         if isinstance(node, exp.Table) and not isinstance(node.this, exp.Identifier):
             fail("不支持表函数或动态来源")
