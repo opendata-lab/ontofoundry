@@ -147,9 +147,31 @@ def run_paths(work_pack, pack):
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
-    if pack.get("tables_file"):
-        lines.append("  检索表：" + command("read_input.py", pack["tables_file"], "--search-tables"))
+    lines += ["  " + line for line in reading_commands(pack)]
     return "\n".join(lines)
+
+
+def reading_commands(pack):
+    """Exact reader commands for this run's tables and structured materials.
+
+    Opening these files with python, cat or grep loads every table or the whole
+    material into context and loses the refs and line numbers evidence needs.
+    """
+    lines = []
+    tables = pack.get("tables_file")
+    if tables:
+        total = (pack.get("table_scope") or {}).get("total")
+        lines.append("检索表（用需求和材料里的业务词；表超过 30 张时必须给词）：" + command("read_input.py", tables, "--search-tables", "业务词1 业务词2"))
+        lines.append("看候选表的列（只看计划要用的表）：" + command("read_input.py", tables, "--describe-tables", "t1,t3"))
+        if total:
+            lines.append(f"本轮表范围共 {total} 张；不要全部列出或全部读列")
+    for number, material in enumerate(pack.get("materials") or [], 1):
+        path = material.get("path") or ""
+        if path.lower().endswith((".json", ".csv")):
+            lines.append(f"材料 m{number} 先看结构：" + command("read_input.py", path, "--outline", "--ref", f"m{number}"))
+    if lines:
+        lines.append("表结构文件和材料只用 read_input.py 读：它按需返回片段并带 ref／原行号供引证；用 python、cat、grep 直接打开会把无关内容塞进上下文，也拿不到可引证的位置")
+    return lines
 
 
 if __name__ == "__main__":

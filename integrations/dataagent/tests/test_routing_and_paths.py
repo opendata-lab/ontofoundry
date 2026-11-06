@@ -155,7 +155,37 @@ def test_init_prints_search_instead_of_reading_all_tables(tmp_path, monkeypatch,
     write_json(tmp_path / "uploads/pack.json", {"tables_file": "uploads/tables.json", "result_file": "output/r.json"})
     assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
     out = capsys.readouterr().out
-    assert "--search-tables" in out and "--tables " not in out and "--describe-tables" not in out
+    assert "--search-tables" in out and "--tables " not in out
+    # Only one example describe for planned candidates, never a batch over every table.
+    describes = [line for line in out.splitlines() if "--describe-tables" in line]
+    assert len(describes) == 1 and "t1,t3" in describes[0] and "t90" not in out
+    assert "python、cat、grep" in out
+
+
+def test_empty_table_search_over_many_tables_asks_for_keywords(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_json(tmp_path / "tables.json", fictional_tables(31, columns=2))
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables") == 1
+    out = capsys.readouterr().out
+    assert "KEYWORDS_NEEDED" in out and "31 张" in out and "[ref: t" not in out
+    # Filters or a small table set still browse without keywords.
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables", "--schema", "ledger") == 0
+    write_json(tmp_path / "few.json", fictional_tables(30, columns=2))
+    assert invoke(monkeypatch, read_input, "few.json", "--search-tables") == 0
+
+
+def test_init_prints_outline_commands_for_structured_materials(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    (tmp_path / "uploads/a.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "uploads/b.csv").write_text("x\n1\n", encoding="utf-8")
+    (tmp_path / "uploads/c.md").write_text("# t\n", encoding="utf-8")
+    materials = [{"id": "x", "path": "uploads/a.json"}, {"id": "y", "path": "uploads/b.csv"}, {"id": "z", "path": "uploads/c.md"}]
+    write_json(tmp_path / "uploads/pack.json", {"materials": materials, "result_file": "output/r.json"})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
+    out = capsys.readouterr().out
+    assert "uploads/a.json --outline --ref m1" in out and "uploads/b.csv --outline --ref m2" in out
+    assert "c.md --outline" not in out
 
 
 def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):

@@ -207,6 +207,10 @@ def paged(units, page, per_page, limit, next_command):
     return "\n".join([*output, footer])
 
 
+# Above this many tables an unfiltered listing costs more than it helps.
+BROWSE_LIMIT = 30
+
+
 def search_tables(
     text,
     words="",
@@ -606,6 +610,27 @@ def main():
         text = "" if path.suffix.lower() == ".csv" else path.read_text(encoding="utf-8")
         ref = args.ref or path.stem
         if args.search_tables is not None:
+            total = len(json.loads(text)["tables"])
+            if (
+                not args.search_tables.strip()
+                and args.connection is None
+                and args.schema is None
+                and total > BROWSE_LIMIT
+            ):
+                # Listing every table floods the context with tables the scenario
+                # never needs; business words from the request narrow it first.
+                print(
+                    error(
+                        "KEYWORDS_NEEDED",
+                        f"表结构共 {total} 张，不带关键词会列出全部表",
+                        "未读取内容",
+                        "用需求和材料里的业务词检索："
+                        + command("read_input.py", path, "--search-tables", "业务词1 业务词2")
+                        + "；或加 --schema／--connection 只看一部分。挑出候选后再对候选 --describe-tables 看列",
+                        retry=False,
+                    )
+                )
+                return 1
             output = search_tables(
                 text,
                 args.search_tables,
