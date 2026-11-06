@@ -1,9 +1,9 @@
 {
   "name": "ontofoundry-dataagent",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
-  "minimum_platform_version": "0.2.6",
-  "platform_baseline": "2026-10-27 core-1：运行级平台预检必须通过后才写结果，预检、入库与接受共用试应用；建模串行化与整批原子化，数据库迁移 20261026_000001；工作包、实例库与 resolve_entity",
+  "minimum_platform_version": "0.2.7",
+  "platform_baseline": "2026-11-05 core-1：合并脚本把结果提交到 runs/{run_token}/proposals，平台检查通过即入库（每次运行最多修正 3 轮），结果只含 items；无新数据库迁移（仍为 20261026_000001）；工作包、实例库与 resolve_entity",
   "installation": "manual-admin",
   "skills": [
     {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
@@ -20,7 +20,7 @@
     }
   ],
   "agents": [
-    {"name": "agent_ontofoundry", "config": "agents/agent_ontofoundry.md", "skills": ["ontology-discovery", "entity-extraction"], "max_turns": 40},
+    {"name": "agent_ontofoundry", "config": "agents/agent_ontofoundry.md", "skills": ["ontology-discovery", "entity-extraction"], "max_turns": 80},
     {"name": "agent_ontofoundry_qa", "config": "agents/agent_ontofoundry_qa.md", "skills": ["semantic-grounding"]}
   ],
   "limitations": ["DataAgent 暂不支持整包原生加载", "问数结构化结果持久化待平台接入", "现有 Agent 由管理员配置发布，平台不新建或修改 Agent"]
