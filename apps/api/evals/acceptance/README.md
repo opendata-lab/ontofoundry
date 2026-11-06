@@ -5,5 +5,6 @@
 | 目录 | 内容 |
 |---|---|
 | `results/2026-10-22-xinghe-retail-4` | 星河零售：计划、抽取 64 条提案、发布，三轮问数（最终两题全对） |
+| `results/2026-11-05-xinghe-clean` | 星河零售干净环境基线：全量 40 轮 64 条、增量 11 轮 8 条、两题问数全对，¥0.41；步骤见 `xinghe-retail/README.md` |
 
 概念范围评测的存档在 `../concept_scope/results/`。

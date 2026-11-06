@@ -1,0 +1,10 @@
+{
+  "status": "waiting_permission",
+  "detail": "DataAgent 正在等待用户确认",
+  "result_state": "",
+  "pending": 0,
+  "task_id": "task_3ed9c08954d44c0180bbb754",
+  "turns": 9,
+  "prepare_calls_in_conversation": 0,
+  "batch_id": null
+}
