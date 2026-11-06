@@ -167,7 +167,8 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
                 assert "r.assessed_on AS event_on" in after["query_sql"]
                 shapes.add("UNION各带日期")
             else:
-                shapes.add("表列" if after["columns"] else "未同步无列")
+                assert after["columns"], "table datasets only for synced tables"
+                shapes.add("表列")
         if kind == "mapping":
             shapes.add("复合键映射" if len(after["sources"][0]["key_columns"]) > 1 else "普通映射")
         if kind == "metric":
@@ -194,7 +195,7 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
     shapes.add("空实例")
     assert shapes == {
         "单标识", "复合标识", "值类型引用属性", "规则/value_type", "规则/property", "规则/link_type",
-        "跨关系约束", "direct与正反读法", "表列", "未同步无列", "UNION各带日期", "普通映射", "复合键映射",
+        "跨关系约束", "direct与正反读法", "表列", "UNION各带日期", "普通映射", "复合键映射",
         "指标/simple", "指标/ratio", "sum", "count", "过滤与时间", "材料证据", "空实例",
     }
     covered = set().union(*(atoms(i) for i in items))
