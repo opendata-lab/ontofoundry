@@ -40,7 +40,7 @@ done
 cat <<'STEPS'
 管理员后续步骤（脚本不连接后台、不重启、不删除旧技能）：
 1. 按 plugin.json 登记 OntoFoundry MCP 与授权凭据，核对五个已上线工具（含 resolve_entity）。
-2. 已有 agent_ontofoundry 挂载 ontology-discovery、entity-extraction，max_turns=40；已有 agent_ontofoundry_qa 挂载 semantic-grounding。
+2. 已有 agent_ontofoundry 挂载 ontology-discovery、entity-extraction，max_turns=80；已有 agent_ontofoundry_qa 挂载 semantic-grounding。
 3. 从 agents/*.md 复制“系统提示词：”后的正文，同步并发布两个已有 Agent。不要把配置说明粘入系统正文。
 4. 停止旧运行后停用并移走旧 ontofoundry-modeling 目录，安排重启并检查三技能能力目录。
 5. 按迁移说明.md 在新会话验收；真实 DeepSeek 运行前另行确认预算。
