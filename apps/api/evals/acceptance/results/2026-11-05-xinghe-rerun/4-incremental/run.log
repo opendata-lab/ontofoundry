@@ -1,0 +1,15 @@
+{
+  "status": "finished",
+  "detail": "已生成 10 条提案，请在“提案”中审阅",
+  "result_state": "done",
+  "pending": 10,
+  "task_id": "task_7c6e5a1fc24349de9f7c6713",
+  "turns": 10,
+  "prepare_calls_in_conversation": 1,
+  "batch_id": "95d72020-8a5e-5612-b008-5d41f424df40",
+  "submits_passed": 1,
+  "submits_failed": 0,
+  "repair_used": 0,
+  "repair_limit": 3,
+  "rule_rejections": []
+}

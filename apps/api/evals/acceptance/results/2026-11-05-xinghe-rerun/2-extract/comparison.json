@@ -1,0 +1,449 @@
+{
+  "actual_total": 63,
+  "expected_total": 62,
+  "expected_excluded_unsynced_datasets": 1,
+  "actual_counts": {
+    "object_type": 6,
+    "property": 29,
+    "value_type": 3,
+    "link_type": 6,
+    "dataset": 5,
+    "mapping": 5,
+    "metric": 3,
+    "rule": 6
+  },
+  "expected_counts": {
+    "dataset": 5,
+    "mapping": 5,
+    "link_type": 6,
+    "object_type": 6,
+    "property": 30,
+    "value_type": 2,
+    "rule": 5,
+    "metric": 3
+  },
+  "count_diffs": {
+    "rule": 1,
+    "property": -1,
+    "value_type": 1
+  },
+  "operations": [
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "store",
+      "display_name": "门店"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "store_id",
+      "display_name": "门店编号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "store_name",
+      "display_name": "门店名称"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "city",
+      "display_name": "所在城市"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "opened_on",
+      "display_name": "开业日期"
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "member",
+      "display_name": "会员"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "member_id",
+      "display_name": "会员编号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "member_name",
+      "display_name": "会员姓名"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "member_level",
+      "display_name": "会员等级"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "city",
+      "display_name": "常住城市"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "joined_on",
+      "display_name": "入会日期"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "home_store_id",
+      "display_name": "开卡门店"
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "product_sku",
+      "display_name": "商品 SKU"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "sku",
+      "display_name": "商品编码"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "product_name",
+      "display_name": "商品名称"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "category",
+      "display_name": "品类"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "list_price",
+      "display_name": "标价"
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "order",
+      "display_name": "订单"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "order_no",
+      "display_name": "订单号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "member_id",
+      "display_name": "下单会员"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "store_id",
+      "display_name": "成交门店"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "order_date",
+      "display_name": "下单日期"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "status",
+      "display_name": "订单状态"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "pay_amount",
+      "display_name": "实付金额"
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "order_item",
+      "display_name": "订单明细"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "order_no",
+      "display_name": "订单号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "line_no",
+      "display_name": "行号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "sku",
+      "display_name": "商品编码"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "qty",
+      "display_name": "数量"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "unit_price",
+      "display_name": "成交单价"
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "name": "refund",
+      "display_name": "退款"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "refund_no",
+      "display_name": "退款单号"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "refund_date",
+      "display_name": "退款日期"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "refund_amount",
+      "display_name": "退款金额"
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "name": "refund_reason",
+      "display_name": "退款原因"
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "name": "order_status",
+      "display_name": "订单状态"
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "name": "member_level",
+      "display_name": "会员等级"
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "name": "product_category",
+      "display_name": "商品品类"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "member_home_store",
+      "display_name": "开卡门店"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "order_member",
+      "display_name": "下单会员"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "order_store",
+      "display_name": "成交门店"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "item_order",
+      "display_name": "所属订单"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "item_sku",
+      "display_name": "购买商品"
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "name": "refund_order",
+      "display_name": "退款原订单"
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "stores",
+      "display_name": "门店数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "members",
+      "display_name": "会员数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "products",
+      "display_name": "商品数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "orders",
+      "display_name": "订单数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "name": "order_items",
+      "display_name": "订单明细数据"
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "name": null,
+      "display_name": null
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "sales_amount",
+      "display_name": "销售额"
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "order_count",
+      "display_name": "成交订单数"
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "name": "avg_order_value",
+      "display_name": "客单价"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "order_status_values",
+      "display_name": "订单状态取值"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "member_level_values",
+      "display_name": "会员等级取值"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "product_category_values",
+      "display_name": "商品品类取值"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "pay_amount_nonnegative",
+      "display_name": "实付金额非负"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "qty_nonnegative",
+      "display_name": "明细数量非负"
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "name": "refund_amount_limit",
+      "display_name": "退款金额不超原订单实付"
+    }
+  ],
+  "refund_datasets": [],
+  "submits": [
+    {
+      "tool_id": "call_00_ET_k4Prp4ICzwwoS6zVO6Zp3633",
+      "passed": false,
+      "output": "检查通过：63 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-764e1ac66a3a28f9e1cac37a5afbddc5.pending.json.errors.json\n平台检查未通过，未入库。最终文件未替换。完整报告：output/ontofoundry-result-764e1ac66a3a28f9e1cac37a5afbddc5.pending.platform-submit.json\n修正轮次：已用 0/3（平台计数，本地检查不计）\n错误 [ELEMENT_INVALID]：/items/30/after [\"refund\"] evidence：引用原文与材料第 6–6 行不符；期望 \"有效元素与真实材料证据\"；实际 \"evidence：引用原文与材料第 6–6 行不符\"；下一步：用建模技能的 scripts/show_example.py 查正确写法：object_type --operation create。本次整批提交未通过，未入库。\n下一步：修正片段后重试 \"$DATAAGENT_PYTHON_BIN\" /opt/skills/ontology-discovery/scripts/prepare_result.py --work-pack uploads/ontofoundry-work-pack-764e1ac66a3a28f9e1cac37a5afbddc5.json\n"
+    },
+    {
+      "tool_id": "call_00_ET_WPt6YOuvqWuuuWzgS1OK5918",
+      "passed": true,
+      "output": "检查通过：63 条提案。完整报告：/mnt/workspace/output/ontofoundry-result-764e1ac66a3a28f9e1cac37a5afbddc5.pending.json.errors.json\n平台检查通过并已入库：63 条待审。\n按类型：property 29、object_type 6、link_type 6、rule 6、dataset 5、mapping 5、value_type 3、metric 3\n已完成：直接按收尾第 3 步作答；不必再读结果文件，也不补写 modeling/ 下的文件。\n已保存结果留档：output/ontofoundry-result-764e1ac66a3a28f9e1cac37a5afbddc5.json；提案已入库，等待用户审核\n"
+    }
+  ],
+  "receipts": [
+    {
+      "passed": true,
+      "errors": [],
+      "warnings": [],
+      "reviewable_count": 63,
+      "batch_id": "1b7a02ab-9554-5d34-92e1-bf09af15248e",
+      "repair_used": 1,
+      "repair_limit": 3
+    }
+  ],
+  "scope": "Counts by kind, operation list, and refund boundary; does not establish semantic equivalence.",
+  "verified_differences": [
+    "品类值类型与规则各多1",
+    "缺退款原订单号属性；增量计划将新增该属性",
+    "无退款数据集、映射、SQL、指标；最终回答提示先同步 refunds"
+  ],
+  "refund_dataset_proposed_in_any_submit": false,
+  "rule_rejections": [],
+  "baseline": {
+    "turns": 40,
+    "submits": 4,
+    "repair_used": 3,
+    "repair_limit": 3,
+    "proposals": 64
+  }
+}
