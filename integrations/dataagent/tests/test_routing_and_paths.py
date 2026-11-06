@@ -315,3 +315,23 @@ def test_a_new_run_moves_the_last_runs_fragments_but_the_same_run_keeps_them(tmp
     assert (tmp_path / "modeling/previous/first/parts/01-types.json").exists()
 
 
+
+
+def test_table_search_matches_any_word_and_ranks_by_matches(tmp_path, monkeypatch, capsys):
+    # A request lists many business words; no table holds them all (seen in a real run).
+    tables = {"tables": [
+        {"key": "t1", "table": "dw.story_stage", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "story_stage", "kind": "table", "comment": "需求阶段时长",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "dept_id", "type": "varchar", "nullable": True, "comment": "部门"}]},
+        {"key": "t2", "table": "dw.org_user", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "org_user", "kind": "table", "comment": "用户",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "user_id", "type": "varchar", "nullable": True, "comment": ""}]},
+        {"key": "t3", "table": "dw.ext_source", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "ext_source", "kind": "table", "comment": "",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "payload", "type": "string", "nullable": True, "comment": ""}]},
+    ]}
+    write_json(tmp_path / "tables.json", tables)
+    monkeypatch.chdir(tmp_path)
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables", "需求 阶段 部门 用户 人员") == 0
+    out = capsys.readouterr().out
+    assert out.index("[ref: t1]") < out.index("[ref: t2]") and "[ref: t3]" not in out

@@ -239,7 +239,10 @@ def search_tables(
                 *[c["name"] + " " + (c.get("comment") or "") for c in columns],
             ]
         ).casefold()
-        if not all(w in body for w in words):
+        # Any word counts: a request lists many business words and no single
+        # table holds them all; tables matching more words come first.
+        hits = sum(1 for w in dict.fromkeys(words) if w in body)
+        if words and not hits:
             continue
         matched = [
             c
@@ -250,8 +253,7 @@ def search_tables(
                 for w in words
             )
         ]
-        units.append(
-            clip(table_header(table), 650)
+        units.append((-hits, len(units), clip(table_header(table), 650)
             + (
                 "｜匹配列 "
                 + clip(
@@ -263,7 +265,7 @@ def search_tables(
                 if matched
                 else ""
             )
-        )
+        ))
 
     def next_cmd(n):
         args = ["--search-tables", " ".join(words), "--page", str(n)]
@@ -276,6 +278,7 @@ def search_tables(
                 args += [flag, value]
         return command("read_input.py", path, *args)
 
+    units = [text for _, _, text in sorted(units)]
     return paged(units, page, 30, SEARCH_LIMIT, next_cmd)
 
 
