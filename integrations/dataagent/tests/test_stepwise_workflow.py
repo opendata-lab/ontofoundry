@@ -41,7 +41,7 @@ def test_init_template_is_idempotent_and_preserves_all_existing_files(
             "scenario_facts": {
                 "draft_empty": True,
                 "new_material_ids": ["fictional-material"],
-                "new_table_keys": ["t2"],
+                "new_table_count": 1,
             }
         },
     )
@@ -51,7 +51,7 @@ def test_init_template_is_idempotent_and_preserves_all_existing_files(
     template = (root / "plan.md").read_text()
     assert all(
         text in template
-        for text in (str(pack), "本体为空：是", "fictional-material", "t2", "⑥输出")
+        for text in (str(pack), "本体为空：是", "fictional-material", "新增关联表：1 张", "⑥输出")
     )
     for name in (
         "plan.md",

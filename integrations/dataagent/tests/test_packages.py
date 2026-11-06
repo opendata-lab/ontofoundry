@@ -67,6 +67,14 @@ def test_each_archive_runs_in_isolation(name, packages, tmp_path, platform):
     (tmp_path / "schema.json").write_text(json.dumps(SCHEMA))
     run(scripts / "init_workflow.py", tmp_path, "--work-pack", _pack(tmp_path))
     run(scripts / "read_input.py", tmp_path, "context.json", "--start", "1", "--end", "1")
+    (tmp_path / "material.csv").write_text('code,note\na,"第一行\n第二行"\n')
+    csv_out = run(scripts / "read_input.py", tmp_path, "material.csv", "--ref", "m1").decode()
+    assert "[ref: m1#row:1 · L2–3]" in csv_out
+    fixture = BASE / "tests/fixtures/extract-retail/tables.json"
+    (tmp_path / "tables.json").write_bytes(fixture.read_bytes())
+    table_out = run(scripts / "read_input.py", tmp_path, "tables.json", "--search-tables").decode()
+    assert "[ref: t1]" in table_out
+    assert "[ref: t1." in run(scripts / "read_input.py", tmp_path, "tables.json", "--describe-tables", "t1").decode()
     run(scripts / "check_part.py", tmp_path, "--work-pack", "work-pack.json", *sorted(parts.glob("*.json")))
     run(scripts / "prepare_result.py", tmp_path, "--work-pack", "work-pack.json", "parts")
     batch = json.loads((tmp_path / "result.json").read_bytes())
@@ -239,3 +247,18 @@ def _configure_check(tmp_path, origin):
         "submit_url": f"{origin}/api/v1/ontology/workspaces/{wid}/runs/{context['run']['run_token']}/proposals",
         "headers": {"Authorization": "Bearer ofrun.fictional"},
     }))
+
+
+@pytest.mark.parametrize("name", SKILLS)
+def test_packaged_readers_run_without_network(name, packages, tmp_path):
+    with ZipFile(packages / f"{name}.zip") as archive:
+        archive.extractall(tmp_path)
+    scripts = tmp_path / name / "scripts"
+    (tmp_path / "material.csv").write_text('code,note\na,"第一行\n第二行"\n')
+    output = run(scripts / "read_input.py", tmp_path, "material.csv", "--ref", "m1").decode()
+    assert "[ref: m1#row:1 · L2–3]" in output
+    (tmp_path / "tables.json").write_bytes((BASE / "tests/fixtures/extract-retail/tables.json").read_bytes())
+    assert "[ref: t1]" in run(scripts / "read_input.py", tmp_path, "tables.json", "--search-tables").decode()
+    assert "[ref: t1." in run(scripts / "read_input.py", tmp_path, "tables.json", "--describe-tables", "t1").decode()
+    (tmp_path / "material.json").write_text('{"items": [1, 2, 3]}')
+    assert "数组 3 项" in run(scripts / "read_input.py", tmp_path, "material.json", "--outline").decode()

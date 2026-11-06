@@ -73,3 +73,11 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 ## 对话需求材料与实例方法路径（2026-10-25）
 
 平台将符合门槛的建模消息保存为“对话需求”材料并放入当前工作包，Agent 仍按材料 id、SHA256 和原行号引用，不新增证据类型。本次修正 ontology-discovery 抽取步骤与 entity-extraction 实例步骤，明确 `extract-facts.md` 位于 entity-extraction；平台工作包示例索引也注明归属。重新打包并安装技能到当前 DataAgent 的 `SKILLS_ROOT_DIR` 后重启；没有修改 Agent 提示词或配置，不需要重新发布 Agent。
+
+## AI 可读输入（2026-11-06）
+
+工作包只含 table_scope（模式、总数、连接计数、略过数）与 tables_file。运行文件保存完整固定表快照，修正轮复用，不在开始时生成材料收据。先 `read_input.py <tables_file> --search-tables [关键词]`（--connection／--schema／--kind，--page 翻页，每次≤4 KB），把候选 t# 记入计划；再 `--describe-tables t1,t3`（≤10 表、≤8 KB，可 --col-query；宽表按提示列范围续读）。表证据提交 `{"kind":"table","ref":"t1.col","quote":"描述行原文"}`，平台转换为实际用表的收据材料证据。
+
+文本输出“行号→内容”，按下一页命令续读，长行有截断标记。JSON 大文件默认 --outline；可 --pointer /items/0-4 或 --query 'key=value'／'关键词'。CSV 默认 --outline（最多扫描 10000 行，统计注明扫描范围）；可 --rows 1-20 --cols a,b 或 --query 'col=value'／'关键词'。结构化材料可加 --ref m1，引用同时标记原物理行号；材料证据仍填原材料 id、locator 行号与原文，不能把渲染标签当引文。不用 jq。table_format.py 由平台纯格式化模块自动生成，确保读取描述与收据逐行一致。
+
+重新打包安装并重启 DataAgent 后生效；本次离线任务不连接后台或真实模型。

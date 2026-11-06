@@ -1,271 +1,673 @@
-"""Bounded source reads with original line ranges or exact JSON pointers."""
+"""Bounded, readable source views with stable refs and physical source lines."""
 
+import bisect
+import csv
+import io
 import json
-import shlex
+import re
 from pathlib import Path
 
 from runpaths import HintParser, command, error, existing
+from table_format import clean, column_line, table_header, table_lines
 
 LIMIT = 8000
+SEARCH_LIMIT = 4000
+SCAN_ROWS = 10000
+
+
+def clip(value, limit=900):
+    text = str(value)
+    if len(text.encode()) <= limit:
+        return text
+    return text.encode()[:limit].decode("utf-8", "ignore") + "…[超长内容已截断]"
+
+
+def fit_lines(lines, limit=LIMIT):
+    """Bound a non-pageable summary without emitting partial references."""
+    output = []
+    for line in lines:
+        line = clip(line, 1500)
+        if len(("\n".join([*output, line]) + "\n").encode()) > limit - 120:
+            output.append("…概览已截断；请按路径、列或关键词定点读取")
+            break
+        output.append(line)
+    return "\n".join(output)
 
 
 def render_lines(text, start=1, end=None):
     lines = text.splitlines()
-    end = end or len(lines)
-    if start < 1 or end < start or end > len(lines):
+    if not lines:
+        return "空文件"
+    end = len(lines) if end is None else end
+    if not 1 <= start <= end <= len(lines):
         raise ValueError("原行号范围不合法")
-    return json.dumps(
-        {
-            "original_range": [start, end],
-            "total_lines": len(lines),
-            "unread_ranges": [
-                [a, b] for a, b in ((1, start - 1), (end + 1, len(lines))) if a <= b
-            ],
-            "lines": [[i + 1, lines[i]] for i in range(start - 1, end)],
-        },
-        ensure_ascii=False,
-    )
+    return "\n".join(f"{i}→{clip(lines[i - 1])}" for i in range(start, end + 1))
+
+
+def text_page(path, text, start=1, end=None):
+    lines = text.splitlines()
+    if not lines:
+        return "空文件"
+    end = len(lines) if end is None else end
+    if not 1 <= start <= end <= len(lines):
+        raise ValueError(f"原行号范围不合法；共 {len(lines)} 行")
+    output, last = [], start - 1
+    reserve = len(command("read_input.py", path, "--start", str(end)).encode()) + 250
+    for i in range(start, end + 1):
+        line = f"{i}→{clip(lines[i - 1])}"
+        if len("\n".join([*output, line]).encode()) > LIMIT - reserve:
+            break
+        output.append(line)
+        last = i
+    unread = [f"{a}–{b}" for a, b in ((1, start - 1), (last + 1, len(lines))) if a <= b]
+    output.append("未读范围：" + ("、".join(unread) or "无"))
+    if last < len(lines):
+        output.append(
+            "下一页：" + command("read_input.py", path, "--start", str(last + 1))
+        )
+    return "\n".join(output)
 
 
 def table_keys(names):
-    """Keys as given: "t1,t3", "t1 t3" or a mix, in order."""
     names = [names] if isinstance(names, str) else names
     return [k for n in names for k in n.replace(",", " ").split()]
 
 
-def receipt_lines(text):
-    """Original line ranges of each table header and column object in the
-    receipt (fixed indent=2 layout, TE-02), so evidence can cite them as is."""
-    found, key, start = {}, None, None
-    for number, line in enumerate(text.splitlines(), 1):
-        indent = len(line) - len(line.lstrip(" "))
-        body = line.strip()
-        if indent == 6 and body.startswith('"key": '):
-            key = json.loads(body[len('"key": '):].rstrip(","))
-            found[key] = {"table": [number, number], "columns": {}}
-        elif key and indent == 6 and body.startswith('"comment": '):
-            found[key]["table"][1] = number
-        elif key and indent == 8 and body == "{":
-            start = number
-        elif key and indent == 10 and body.startswith('"name": ') and start:
-            name = json.loads(body[len('"name": '):].rstrip(","))
-        elif key and indent == 8 and body in ("}", "},") and start:
-            found[key]["columns"][name] = [start, number]
-            start = None
-    return found
-
-
-def _span(found):
-    return f"（收据第 {found[0]}–{found[1]} 行）" if found else ""
-
-
-def render_tables(text, names):
-    """Compact column listing for several linked tables in one bounded read."""
+def render_tables(text, names, col_query=None, path="<tables_file>"):
     tables = {t["key"]: t for t in json.loads(text)["tables"]}
-    positions = receipt_lines(text)
-    chosen = []
-    for spec in table_keys(names):
-        # "t1:41-80" reads columns 41–80 of a table too wide for one read.
+    specs = table_keys(names)
+    if len(specs) > 10:
+        raise ValueError("一次最多描述 10 张表")
+    lines = []
+    for spec in specs:
         key, _, span = spec.partition(":")
         if key not in tables:
-            options = "、".join(f"{k}={t['connection']}:{t['table']}" for k, t in tables.items())
-            raise ValueError(f"没有编号为 {key} 的关联表；请用工作包 tables 里的 key：{options}")
+            raise ValueError(f"未知引用 {key}；请先 --search-tables 检索有效引用")
         table = tables[key]
+        columns = table["columns"]
+        total = len(columns)
+        start, end = 1, min(total, 60)
         if span:
-            start, _, end = span.partition("-")
-            if not (start.isdigit() and end.isdigit() and 1 <= int(start) <= int(end) <= len(table["columns"])):
-                ranges = "、".join(table_specs(text, table))
-                raise ValueError(f"列范围 {spec} 无效：{key} 共 {len(table['columns'])} 列；可读范围：{ranges}")
-            table = {**table, "columns": table["columns"][int(start) - 1:int(end)]}
-        chosen.append(table)
-    lines = []
-    for table in chosen:
-        where = positions.get(table["key"], {})
-        lines.append(
-            f"## {table['key']} {table['table']}（{table['kind']}，连接 {table['connection']}，方言 {table['dialect']}）{table['comment']}"
-            + _span(where.get("table"))
-        )
-        lines.append(
-            f"数据集来源：connection_id={table['connection_id']} schema_name={table['schema_name'] or '默认'} table_name={table['table_name']}"
-        )
-        lines.append("主键：" + (", ".join(table["primary_key"]) or "未声明"))
-        for fk in table["foreign_keys"]:
-            lines.append(
-                f"外键：{', '.join(fk['constrained_columns'] or [])} → {fk['referred_table']}({', '.join(fk['referred_columns'] or [])})"
+            match = re.fullmatch(r"(\d+)-(\d+)", span)
+            if not match or not 1 <= int(match[1]) <= int(match[2]) <= total:
+                raise ValueError(f"无效列范围 {spec}；共 {total} 列")
+            start, end = int(match[1]), int(match[2])
+        elif total > 60:
+            # Stable priority order is used by every page, including explicit ranges.
+            foreign = {
+                c
+                for fk in table.get("foreign_keys") or []
+                for c in fk.get("constrained_columns") or []
+            }
+            primary = set(table.get("primary_key") or [])
+            columns = sorted(
+                columns,
+                key=lambda c: (
+                    0
+                    if c["name"] in primary
+                    else 1
+                    if c["name"] in foreign
+                    else 2
+                    if c.get("comment")
+                    else 3
+                ),
             )
-        for column in table["columns"]:
-            nullable = "可空" if column["nullable"] else "非空" if column["nullable"] is False else "可空性未知"
-            lines.append(f"- {column['name']} {column['type'] or '类型未知'} {nullable} {column['comment']}".rstrip()
-                         + _span(where.get("columns", {}).get(column["name"])))
+        if span and total > 60:
+            foreign = {
+                c
+                for fk in table.get("foreign_keys") or []
+                for c in fk.get("constrained_columns") or []
+            }
+            primary = set(table.get("primary_key") or [])
+            columns = sorted(
+                columns,
+                key=lambda c: (
+                    0
+                    if c["name"] in primary
+                    else 1
+                    if c["name"] in foreign
+                    else 2
+                    if c.get("comment")
+                    else 3
+                ),
+            )
+        if col_query:
+            columns = [
+                c
+                for c in columns
+                if all(
+                    w.casefold() in (c["name"] + " " + c.get("comment", "")).casefold()
+                    for w in col_query.split()
+                )
+            ]
+            total = len(columns)
+            if not span:
+                end = min(total, 60)
+        header = table_lines(table, [])
+        if len("\n".join([*lines, *header]).encode()) > LIMIT - 1000:
+            rest = specs[specs.index(spec) :]
+            lines.append(
+                "其余表："
+                + command("read_input.py", path, "--describe-tables", ",".join(rest))
+            )
+            break
+        lines.extend(header)
+        last = start - 1
+        # Reserve space for exact continuation commands and later table headers.
+        reserve = 500 + len(
+            command("read_input.py", path, "--describe-tables", key).encode()
+        )
+        for i in range(start, min(end, total) + 1):
+            line = clip(column_line(table, columns[i - 1]), 1600)
+            if len("\n".join([*lines, line]).encode()) > LIMIT - reserve:
+                break
+            lines.append(line)
+            last = i
+        if last < total:
+            args = ["--describe-tables", f"{key}:{last + 1}-{min(last + 60, total)}"]
+            if col_query:
+                args += ["--col-query", col_query]
+            lines.append(
+                "列按主键、外键、注释优先；续读："
+                + command("read_input.py", path, *args)
+            )
+        if len("\n".join(lines).encode()) > LIMIT - 600:
+            rest = specs[specs.index(spec) + 1 :]
+            if rest:
+                lines.append(
+                    "其余表："
+                    + command(
+                        "read_input.py", path, "--describe-tables", ",".join(rest)
+                    )
+                )
+            break
     return "\n".join(lines)
 
 
-def table_specs(text, table, key=None):
-    """The table whole, or column ranges ("t1:1-80") when it alone exceeds one read.
-
-    With key, table is a column slice of that table and ranges count from 1 in
-    the slice; the caller shifts them back.
-    """
-    whole = key is None
-    key = key or table["key"]
-    total = len(table["columns"])
-    columns = {t["key"]: t for t in json.loads(text)["tables"]}
-    doc = text if whole else json.dumps({"tables": [{**columns[key], "columns": table["columns"]}]}, ensure_ascii=False)
-    if whole and (len(render_tables(text, [key]).encode()) <= LIMIT or total <= 1):
-        return [key]
-    specs, start = [], 1
-    while start <= total:
-        end = start
-        while end < total and len(render_tables(doc, [f"{key}:{start}-{end + 1}"]).encode()) <= LIMIT:
-            end += 1
-        specs.append(f"{key}:{start}-{end}")
-        start = end + 1
-    return specs
-
-
-def shift(spec, offset):
-    key, _, span = spec.partition(":")
-    start, _, end = span.partition("-")
-    return f"{key}:{int(start) + offset}-{int(end) + offset}"
+def paged(units, page, per_page, limit, next_command):
+    if page < 1:
+        raise ValueError("页码必须从 1 开始")
+    pages, current = [], []
+    for unit in units:
+        unit = clip(unit, min(limit // 2, 2000))
+        if current and (
+            len(current) >= per_page
+            or len("\n".join([*current, unit]).encode()) > limit - 600
+        ):
+            pages.append(current)
+            current = []
+        current.append(unit)
+    pages.append(current)
+    if page > len(pages):
+        raise ValueError(f"页码超出范围；共 {len(pages)} 页")
+    output = pages[page - 1] or ["无匹配结果"]
+    footer = f"第 {page}/{len(pages)} 页 · 共 {len(units)} 项"
+    if page < len(pages):
+        footer += "\n下一页：" + next_command(page + 1)
+    return "\n".join([*output, footer])
 
 
-def table_batches(text):
-    """Table keys grouped so each group's listing fits one read."""
-    batches, current, size = [], [], 0
+def search_tables(
+    text,
+    words="",
+    connection=None,
+    schema=None,
+    kind=None,
+    page=1,
+    path="<tables_file>",
+):
+    units = []
+    words = words.casefold().split()
     for table in json.loads(text)["tables"]:
-        for spec in table_specs(text, table):
-            cost = len(render_tables(text, [spec]).encode()) + 1
-            if current and size + cost > LIMIT:
-                batches.append(current)
-                current, size = [], 0
-            current.append(spec)
-            size += cost
-    return batches + ([current] if current else [])
+        if (
+            (connection is not None and table["connection"] != connection)
+            or (schema is not None and (table.get("schema_name") or "") != schema)
+            or (kind and table.get("kind") != kind)
+        ):
+            continue
+        columns = table["columns"]
+        body = " ".join(
+            [
+                table["table"],
+                table["connection"],
+                table.get("schema_name") or "",
+                table.get("comment") or "",
+                *[c["name"] + " " + (c.get("comment") or "") for c in columns],
+            ]
+        ).casefold()
+        if not all(w in body for w in words):
+            continue
+        matched = [
+            c
+            for c in columns
+            if words
+            and any(
+                w in (c["name"] + " " + (c.get("comment") or "")).casefold()
+                for w in words
+            )
+        ]
+        units.append(
+            clip(table_header(table), 650)
+            + (
+                "｜匹配列 "
+                + clip(
+                    "、".join(
+                        f"{c['name']}({clean(c.get('comment'))})" for c in matched
+                    ),
+                    350,
+                )
+                if matched
+                else ""
+            )
+        )
 
+    def next_cmd(n):
+        args = ["--search-tables", " ".join(words), "--page", str(n)]
+        for flag, value in (
+            ("--connection", connection),
+            ("--schema", schema),
+            ("--kind", kind),
+        ):
+            if value is not None:
+                args += [flag, value]
+        return command("read_input.py", path, *args)
 
-def fitting_end(text, start):
-    """The last line from start whose range still fits one read."""
-    total = len(text.splitlines())
-    end = start
-    while end < total and len(render_lines(text, start, end + 1).encode()) <= LIMIT:
-        end += 1
-    return end
-
-
-def table_commands(path, text, names):
-    """Ready reads for the requested tables, each batch within one read."""
-    tables = {t["key"]: t for t in json.loads(text)["tables"]}
-    specs = []
-    for spec in table_keys(names):
-        key, _, span = spec.partition(":")
-        if span and len(render_tables(text, [spec]).encode()) > LIMIT:
-            start, _, end = span.partition("-")
-            narrowed = {**tables[key], "columns": tables[key]["columns"][int(start) - 1:int(end)]}
-            specs += [shift(s, int(start) - 1) for s in table_specs(text, narrowed, key)]
-        else:
-            specs += [spec] if span else table_specs(text, tables[key])
-    batches, current, size = [], [], 0
-    for spec in specs:
-        cost = len(render_tables(text, [spec]).encode()) + 1
-        if current and size + cost > LIMIT:
-            batches.append(current)
-            current, size = [], 0
-        current.append(spec)
-        size += cost
-    batches += [current] if current else []
-    return [command("read_input.py", path, "--tables", ",".join(b)) for b in batches]
+    return paged(units, page, 30, SEARCH_LIMIT, next_cmd)
 
 
 class PointerMiss(LookupError):
-    """A JSON Pointer step that does not exist; the message names what does."""
+    """A JSON Pointer step does not exist."""
+
+
+class JsonSource:
+    """Parse positions alongside values; repeated text never aliases source spans."""
+
+    def __init__(self, text):
+        self.text = text
+        self.value = json.loads(text)
+        self.nodes = {}
+        self.newlines = [i for i, c in enumerate(text) if c == "\n"]
+        self._scan(0, "")
+
+    def _scan(self, offset, pointer):
+        text = self.text
+        offset = re.compile(r"\s*").match(text, offset).end()
+        start = offset
+        value, end = json.JSONDecoder().raw_decode(text, offset)
+        self.nodes[pointer] = (value, start, end)
+        if isinstance(value, (dict, list)):
+            offset += 1
+            index = 0
+            while True:
+                offset = re.compile(r"\s*").match(text, offset).end()
+                if text[offset] in "}]":
+                    break
+                if isinstance(value, dict):
+                    key, offset = json.JSONDecoder().raw_decode(text, offset)
+                    offset = re.compile(r"\s*:\s*").match(text, offset).end()
+                else:
+                    key = index
+                escaped = str(key).replace("~", "~0").replace("/", "~1")
+                offset = self._scan(offset, pointer + "/" + escaped)
+                offset = re.compile(r"\s*,?\s*").match(text, offset).end()
+                index += 1
+        return end
+
+    def tag(self, pointer, ref):
+        _, start, end = self.nodes[pointer]
+        a = bisect.bisect_left(self.newlines, start) + 1
+        b = bisect.bisect_left(self.newlines, max(start, end - 1)) + 1
+        return f"[ref: {ref}#{pointer} · L{a}–{b}]"
+
+    def select(self, pointer):
+        if pointer in self.nodes:
+            return [pointer]
+        parent, _, tail = pointer.rpartition("/")
+        match = re.fullmatch(r"(\d+)-(\d+)", tail)
+        node = self.nodes.get(parent, (None,))[0]
+        if (
+            match
+            and isinstance(node, list)
+            and 0 <= int(match[1]) <= int(match[2]) < len(node)
+        ):
+            return [
+                parent + "/" + str(i) for i in range(int(match[1]), int(match[2]) + 1)
+            ]
+        raise PointerMiss(f"JSON Pointer {pointer} 不存在；请 --outline 查看有效路径")
 
 
 def resolve_pointer(path, text, pointer):
-    """The value at a JSON Pointer, or an error naming what does exist there."""
-    value = json.loads(text)
-    walked = ""
-    for raw in pointer.strip("/").split("/") if pointer else []:
-        key = raw.replace("~1", "/").replace("~0", "~")
-        if isinstance(value, list):
-            if not (key.isdigit() and int(key) < len(value)):
-                raise PointerMiss(f"JSON Pointer {pointer} 在 {walked or '文档根'} 处无效：这里是 {len(value)} 项的数组，有效下标 0–{len(value) - 1}")
-            value = value[int(key)]
-        elif isinstance(value, dict):
-            if key not in value:
-                keys = "、".join(list(value)[:15]) + ("…" if len(value) > 15 else "")
-                raise PointerMiss(f"JSON Pointer {pointer} 在 {walked or '文档根'} 处没有键 {key}；现有键：{keys}")
-            value = value[key]
+    source = JsonSource(text)
+    found = source.select(pointer)
+    return (
+        source.nodes[found[0]][0]
+        if len(found) == 1
+        else [source.nodes[p][0] for p in found]
+    )
+
+
+def value_type(value):
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, dict):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    return "number" if isinstance(value, (int, float)) else "string"
+
+
+def summary(value):
+    if isinstance(value, dict):
+        return "对象；键：" + "、".join(value)
+    if isinstance(value, list):
+        result = f"数组 {len(value)} 项"
+        if value and all(isinstance(v, dict) for v in value):
+            fields = {tuple(sorted(v)) for v in value}
+            if len(fields) == 1:
+                result += "；字段：" + "、".join(
+                    k + ":" + "/".join(sorted({value_type(v[k]) for v in value}))
+                    for k in value[0]
+                )
+        if value:
+            sample = value[0]
+            if isinstance(sample, dict):
+                result += "；示例：" + "；".join(
+                    k + "=" + clean(v) for k, v in sample.items()
+                )
+            else:
+                result += "；示例：" + clean(sample)
+        return result
+    return value_type(value) + " · " + clean(value)
+
+
+def json_view(path, text, ref, outline=False, pointer=None, query=None, page=1):
+    source = JsonSource(text)
+    if query is not None:
+        key, sep, expected = query.partition("=")
+        if sep:
+            found = [
+                p
+                for p, (v, _, _) in source.nodes.items()
+                if isinstance(v, dict)
+                and key in v
+                and (
+                    json.dumps(v[key])
+                    if v[key] is None or isinstance(v[key], bool)
+                    else str(v[key])
+                )
+                == expected
+            ]
         else:
-            raise PointerMiss(f"JSON Pointer {pointer} 在 {walked} 处已是标量，不能再往下取")
-        walked += "/" + raw
-    return value
+            found = [
+                p
+                for p, (v, _, _) in source.nodes.items()
+                if not isinstance(v, (dict, list))
+                and query.casefold() in (p + " " + str(v)).casefold()
+            ]
+    elif pointer is not None:
+        found = source.select(pointer)
+    else:
+        found = []
+
+        def visit(p):
+            found.append(p)
+            value = source.nodes[p][0]
+            if isinstance(value, dict):
+                for key in value:
+                    visit(p + "/" + key.replace("~", "~0").replace("/", "~1"))
+            elif isinstance(value, list) and value:
+                visit(p + "/0")
+
+        visit("")
+    units = []
+    for p in found:
+        value, start, end = source.nodes[p]
+        if outline or query is not None or pointer is None:
+            units.append(source.tag(p, ref) + " " + clip(summary(value), 1300))
+        else:
+            # Source text retains exact values, indentation and real physical lines.
+            fragment = text[start:end].splitlines()
+            first = bisect.bisect_left(source.newlines, start) + 1
+            chunk = [source.tag(p, ref)]
+            for i, line in enumerate(fragment):
+                numbered = f"{first + i}→{clip(line)}"
+                if (
+                    len("\n".join([*chunk, numbered]).encode()) > 1800
+                    and len(chunk) > 1
+                ):
+                    units.append("\n".join(chunk))
+                    chunk = [source.tag(p, ref)]
+                chunk.append(numbered)
+            units.append("\n".join(chunk))
+    args = (
+        ["--query", query]
+        if query is not None
+        else ["--pointer", pointer]
+        if pointer is not None
+        else ["--outline"]
+    )
+    return paged(
+        units,
+        page,
+        20 if query is not None else 100000,
+        LIMIT,
+        lambda n: command("read_input.py", path, *args, "--ref", ref, "--page", str(n)),
+    )
+
+
+def csv_source(text):
+    reader = csv.reader(
+        io.StringIO(text, newline="") if isinstance(text, str) else text
+    )
+    header = next(reader, [])
+    records = []
+    previous = reader.line_num
+    for number, row in enumerate(reader, 1):
+        records.append((number, previous + 1, reader.line_num, row))
+        previous = reader.line_num
+        if number >= SCAN_ROWS:
+            # Look ahead without consuming the rest of an enormous file.
+            return header, records, next(reader, None) is not None
+    return header, records, False
+
+
+def cell_type(value):
+    if value.casefold() in {"true", "false"}:
+        return "boolean"
+    try:
+        float(value)
+        return "number"
+    except ValueError:
+        return "string"
+
+
+def csv_view(path, text, ref, rows=None, cols=None, query=None, page=1):
+    header, records, capped = csv_source(text)
+    chosen = header if not cols else cols.split(",")
+    if any(c not in header for c in chosen):
+        raise ValueError("未知列；有效列：" + "、".join(header))
+
+    def row_line(record):
+        number, start, end, values = record
+        location = f"L{start}" + (f"–{end}" if end != start else "")
+        cells = [
+            (c, values[i] if i < len(values) else "")
+            for i, c in enumerate(header)
+            if c in chosen
+        ]
+        return f"[ref: {ref}#row:{number} · {location}] " + " · ".join(
+            f"{c}={clip(clean(v), 300)}" for c, v in cells
+        )
+
+    note = (
+        f"扫描上限 {SCAN_ROWS} 行；后续行未扫描，统计为扫描范围"
+        if capped
+        else f"数据共 {len(records)} 行"
+    )
+    if rows is None and query is None:
+        lines = ["CSV 表头（L1）：" + "、".join(header), note]
+        for index, col in enumerate(header):
+            values = [
+                r[3][index] for r in records if index < len(r[3]) and r[3][index] != ""
+            ]
+            distinct = set()
+            for value in values:
+                distinct.add(value)
+                if len(distinct) > 1000:
+                    break
+            lines.append(
+                f"列 {col} · {'/'.join(sorted({cell_type(v) for v in values})) or '未知'} · 非空 {len(values)} · 不同值 {'≥1001（封顶）' if len(distinct) > 1000 else len(distinct)} · 示例 "
+                + "、".join(
+                    clip(clean(v), 100) for v in dict.fromkeys(values[:20]) if v
+                )[:300]
+            )
+        lines += [row_line(r) for r in records[:3]]
+        lines.append("读取：" + command("read_input.py", path, "--rows", "1-20"))
+        return paged(
+            lines,
+            page,
+            100000,
+            LIMIT,
+            lambda n: command(
+                "read_input.py", path, "--outline", "--ref", ref, "--page", str(n)
+            ),
+        )
+    if rows:
+        match = re.fullmatch(r"(\d+)-(\d+)", rows)
+        if not match or not 1 <= int(match[1]) <= int(match[2]):
+            raise ValueError("行范围须为 1-20 形式")
+        records = [r for r in records if int(match[1]) <= r[0] <= int(match[2])]
+    if query is not None:
+        key, sep, value = query.partition("=")
+        if sep and key not in header:
+            raise ValueError("未知查询列；有效列：" + "、".join(header))
+        if sep:
+            records = [
+                r
+                for r in records
+                if len(r[3]) > header.index(key) and r[3][header.index(key)] == value
+            ]
+        else:
+            records = [
+                r for r in records if query.casefold() in " ".join(r[3]).casefold()
+            ]
+    args = ["--query", query] if query is not None else ["--rows", rows]
+    if cols:
+        args += ["--cols", cols]
+    return (
+        note
+        + "\n"
+        + paged(
+            [row_line(r) for r in records],
+            page,
+            20,
+            LIMIT - len(note.encode()) - 1,
+            lambda n: command(
+                "read_input.py", path, *args, "--ref", ref, "--page", str(n)
+            ),
+        )
+    )
 
 
 def main():
-    parser = HintParser(description="按原行号读材料、按 JSON Pointer 读片段，或用 --tables 读关联表的列")
+    parser = HintParser(description="按原行号、表引用、JSON 路径或 CSV 行列有界读取")
     parser.add_argument("path")
-    parser.add_argument("--pointer")
+    parser.add_argument("--ref", help="材料引用编号，如 m1；默认取文件名")
     parser.add_argument("--start", type=int, default=1)
     parser.add_argument("--end", type=int)
-    parser.add_argument("--tables", nargs="+", help="关联表 key，逗号或空格分隔（如 t1,t3）；过宽的表按列范围读（如 t1:1-80）")
+    parser.add_argument("--page", type=int, default=1)
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--search-tables", nargs="?", const="")
+    modes.add_argument("--describe-tables", "--tables", nargs="+")
+    modes.add_argument("--outline", action="store_true")
+    modes.add_argument("--pointer")
+    modes.add_argument("--rows")
+    modes.add_argument("--query")
+    parser.add_argument("--col-query")
+    parser.add_argument("--cols")
+    parser.add_argument("--connection")
+    parser.add_argument("--schema")
+    parser.add_argument("--kind", choices=["table", "view"])
     args = parser.parse_args()
-    path = args.path
-    if not Path(path).is_file():
-        folder = Path(path).parent
-        print(error("FILE_NOT_FOUND", f"工作区文件 {path} 不存在", f"{folder}/ 现有：{existing(folder)}",
-                    "路径照 init_workflow 打印的本轮路径或工作包复制"))
+    path = Path(args.path)
+    if not path.is_file():
+        print(
+            error(
+                "FILE_NOT_FOUND",
+                f"工作区文件 {path} 不存在",
+                "未读取内容",
+                f"现有文件：{existing(path.parent)}",
+            )
+        )
         return 1
     try:
-        text = Path(path).read_text()
-    except (OSError, UnicodeDecodeError) as exc:
-        print(error("READ_FAILED", f"无法读取 {path}：{type(exc).__name__}", "未读取任何内容", retry=False))
-        return 1
-    try:
-        if args.tables:
-            output = render_tables(text, args.tables)
-        elif args.pointer is not None:
-            output = json.dumps(resolve_pointer(path, text, args.pointer), ensure_ascii=False, separators=(",", ":"))
+        text = "" if path.suffix.lower() == ".csv" else path.read_text(encoding="utf-8")
+        ref = args.ref or path.stem
+        if args.search_tables is not None:
+            output = search_tables(
+                text,
+                args.search_tables,
+                args.connection,
+                args.schema,
+                args.kind,
+                args.page,
+                str(path),
+            )
+        elif args.describe_tables:
+            output = render_tables(
+                text, args.describe_tables, args.col_query, str(path)
+            )
+        elif path.suffix.lower() == ".csv":
+            with path.open(encoding="utf-8", newline="") as source:
+                output = csv_view(
+                    str(path), source, ref, args.rows, args.cols, args.query, args.page
+                )
+        elif (
+            args.outline
+            or args.pointer is not None
+            or args.query is not None
+            or (
+                path.suffix.lower() == ".json"
+                and len(text.encode()) > LIMIT
+                and args.start == 1
+                and args.end is None
+            )
+        ):
+            output = json_view(
+                str(path), text, ref, args.outline, args.pointer, args.query, args.page
+            )
         else:
-            total = len(text.splitlines())
-            end = args.end or total
-            if not 1 <= args.start <= end <= total:
-                fixed = command("read_input.py", path, "--start", str(min(max(args.start, 1), total)), "--end", str(total))
-                print(error("INVALID_ARGUMENT", f"行范围 {args.start}–{end} 无效，{path} 共 {total} 行", "未读取任何内容", fixed))
-                return 1
-            output = render_lines(text, args.start, end)
+            output = text_page(str(path), text, args.start, args.end)
+        if len(output.encode()) > LIMIT:
+            raise ValueError("输出超限；请缩小路径、表或列范围")
     except json.JSONDecodeError as exc:
-        print(error("JSON_INVALID", f"{path} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}", "未读取任何内容",
-                    f"不带 --pointer/--tables 按行读原文：{command('read_input.py', path, '--start', str(max(exc.lineno - 2, 1)), '--end', str(min(exc.lineno + 2, len(text.splitlines()))))}"))
+        print(
+            error(
+                "JSON_INVALID",
+                f"{path} 第 {exc.lineno} 行第 {exc.colno} 列：{exc.msg}",
+                "未回显内容",
+                command(
+                    "read_input.py",
+                    str(path),
+                    "--start",
+                    str(max(1, exc.lineno - 2)),
+                    "--end",
+                    str(min(len(text.splitlines()), exc.lineno + 2)),
+                ),
+            )
+        )
         return 1
-    except LookupError as exc:
-        print(error("INVALID_ARGUMENT", str(exc), "未读取任何内容", "按上面列出的键或下标改正 --pointer"))
-        return 1
-    except ValueError as exc:
-        print(error("INVALID_ARGUMENT", str(exc), "未读取任何内容", "按上面列出的 key 或列范围改正 --tables"))
-        return 1
-    size = len(output.encode())
-    if size > LIMIT:
-        reason = f"输出 {size} 字节，超过单次 {LIMIT} 字节上限"
-        state = f"未回显内容，{path} 未改动"
-        if args.tables:
-            commands = table_commands(path, text, args.tables)
-            step = f"分 {len(commands)} 批读，每批一次：" + "；".join(commands)
-        elif args.pointer is not None:
-            step = f"改读更小的子路径，例如 {command('read_input.py', path, '--pointer', args.pointer.rstrip('/') + '/0')}（数组）或其中一个键"
-        else:
-            first = render_lines(text, args.start, args.start)
-            if len(first.encode()) > LIMIT:
-                line = text.splitlines()[args.start - 1]
-                cut = 2500  # characters; at 3 bytes each a piece stays under the limit
-                pieces = (len(line) + cut - 1) // cut
-                step = (f"第 {args.start} 行单行就有 {len(line.encode())} 字节，按字符分 {pieces} 段读："
-                        f"sed -n '{args.start}p' {shlex.quote(path)} | cut -c 1-{cut}，下一段 cut -c {cut + 1}-{2 * cut}，依此类推")
-            else:
-                last = fitting_end(text, args.start)
-                step = command("read_input.py", path, "--start", str(args.start), "--end", str(last))
-                if last < (args.end or len(text.splitlines())):
-                    step += f"，之后从 --start {last + 1} 接着读"
-        print(error("OUTPUT_TOO_LARGE", reason, state, step))
+    except (ValueError, LookupError, OSError, csv.Error, RecursionError) as exc:
+        print(
+            error(
+                "INVALID_ARGUMENT",
+                clip(str(exc), 1000),
+                "未回显内容",
+                "按有效引用、路径或范围重读",
+            )
+        )
         return 1
     print(output)
     return 0

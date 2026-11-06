@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import hashlib
 import json
 import logging
 import re
@@ -48,9 +49,10 @@ from ontofoundry_api.services.material_types import material_media_type
 from ontofoundry_api.services.modeling_input import (
     build_work_pack,
     encode,
+    linked_tables_payload,
     material_index,
     scenario_facts,
-    store_linked_tables_receipt,
+    table_scope_summary,
     upload_work_pack,
 )
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
@@ -338,19 +340,20 @@ async def send_message(
         from ontofoundry_api.services.instance_store import baseline
         manifest["instance_baseline"] = baseline(db, workspace_id, session_id)
 
-    table_catalog, table_receipt = None, None
+    table_catalog, tables_body = [], None
     if proposals:
-        from ontofoundry_api.services.dataset_sources import resolve_session_table_scope
+        from ontofoundry_api.services.dataset_sources import (
+            linked_table_details,
+            resolve_session_table_scope,
+        )
 
         linked, skipped = resolve_session_table_scope(db, workspace_id, item)
         manifest["skipped_tables"] = skipped
-        if linked:
-            table_catalog, table_receipt = store_linked_tables_receipt(
-                db, request.app.state.settings, workspace_id, linked
-            )
-            if all(material.id != table_receipt.id for material in materials):
-                materials.append(table_receipt)
-            manifest["materials"] = [{"id": m.id, "sha256": m.sha256} for m in materials]
+        table_catalog, tables_body = linked_tables_payload(linked_table_details(db, workspace_id, linked))
+        # Keep the server-side snapshot in the same immutable run manifest as its
+        # uploaded path and digest; submissions never consult fresh metadata.
+        manifest["table_snapshot"] = json.loads(tables_body)
+        manifest["table_scope"] = table_scope_summary(table_catalog, item.table_scope, len(skipped))
 
     changed = db.execute(
         update(ModelingSessionRecord)
@@ -440,13 +443,9 @@ async def send_message(
             else:
                 uploaded = await dataagent.upload(
                     topic_id,
-                    f"ontofoundry-tables-{run_token}.json"
-                    if table_receipt is not None and material.id == table_receipt.id
-                    else f"{material.id}-{material.name}",
+                    f"{material.id}-{material.name}",
                     source_bytes,
-                    "application/json"
-                    if table_receipt is not None and material.id == table_receipt.id
-                    else material_media_type(material.name),
+                    material_media_type(material.name),
                 )
                 path_in_topic = str(uploaded.get("rel_path") or material.name)
                 material_paths.append({"path": path_in_topic, "bytes": material.byte_size})
@@ -476,8 +475,7 @@ async def send_message(
                 "application/json",
             )
             # Every run gets its credential: the merge script's platform check
-            # needs it even before anything is published. The MCP config (which
-            # reads the published ontology) is only offered once a version exists.
+            # needs it even before anything is published.
             access = run_mcp_access(
                 request, workspace_id, session_id, run_token, item, user.id
             )
@@ -488,12 +486,11 @@ async def send_message(
                 "application/json",
             )
             access_path = str(uploaded_access.get("rel_path") or "")
-            mcp = (
-                {"url": access["url"], "version_id": access["version_id"], "file": access_path}
-                if item.base_version_id
-                else None
+            mcp = {"url": access["url"], "version_id": access["version_id"], "file": access_path}
+            uploaded_tables = await dataagent.upload(
+                topic_id, f"ontofoundry-tables-{run_token}.json", tables_body, "application/json"
             )
-            tables_file = material_path_by_id[table_receipt.id] if table_receipt is not None else None
+            tables_file = str(uploaded_tables["rel_path"])
             facts = scenario_facts(draft, manifest, previous_manifest, table_catalog)
             pack, pages = build_work_pack(
                 fixed_context,
@@ -504,6 +501,7 @@ async def send_message(
                 platform_check_file=access_path,
                 tables=table_catalog,
                 tables_file=tables_file,
+                table_scope=manifest["table_scope"],
                 scenario_facts=facts,
             )
             work_pack_file = await upload_work_pack(
@@ -520,6 +518,7 @@ async def send_message(
                 # Fixed for the run: the repair round reuses the same table structure.
                 "tables": table_catalog,
                 "tables_file": tables_file,
+                "tables_sha256": hashlib.sha256(tables_body).hexdigest(),
                 "scenario_facts": facts,
             }
             proposal_prompt = proposal_instructions(

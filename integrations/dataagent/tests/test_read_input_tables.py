@@ -24,7 +24,7 @@ def read(tmp_path, wanted):
 
 def test_tables_are_selected_by_key_only(tmp_path):
     result = read(tmp_path, "public.sales")
-    assert result.returncode == 1 and "t2=雾岭退款库:public.sales" in result.stdout
+    assert result.returncode == 1 and "--search-tables" in result.stdout
 
 
 def test_key_read_names_the_binding_of_same_named_tables(tmp_path):
@@ -37,49 +37,31 @@ def test_key_read_names_the_binding_of_same_named_tables(tmp_path):
 def test_batch_tables_keeps_requested_order_and_full_columns(tmp_path):
     result = read(tmp_path, "t2,t1")
     assert result.returncode == 0
-    assert result.stdout.index("## t2") < result.stdout.index("## t1")
-    assert "amount_a DECIMAL" in result.stdout and "amount_b DECIMAL" in result.stdout
+    assert result.stdout.index("[ref: t2]") < result.stdout.index("[ref: t1]")
+    assert "amount_a · DECIMAL" in result.stdout and "amount_b · DECIMAL" in result.stdout
     assert len(result.stdout.encode()) <= 8192
 
 
-def test_oversize_batch_can_be_read_in_separate_bounded_batches(tmp_path):
+def test_bounded_descriptions_keep_exact_continuation_commands(tmp_path):
     tables = [table("t1", "c1", "云帆资料库", "amount_a"), table("t2", "c2", "雾岭资料库", "amount_b")]
     for entry in tables:
-        entry["columns"] = [{"name": f"column_{i}", "type": "TEXT", "nullable": True, "comment": "虚构列说明" * 8} for i in range(30)]
+        entry["columns"] = [{"name": f"column_{i}", "type": "TEXT", "nullable": True, "comment": "虚构列说明" * 8} for i in range(60)]
     path = tmp_path / "tables.json"
     original = json.dumps({"tables": tables}, ensure_ascii=False)
     path.write_text(original)
-    command = [sys.executable, str(SCRIPT), str(path), "--tables"]
-    combined = subprocess.run([*command, "t1,t2"], capture_output=True, text=True, check=False)
-    assert combined.returncode == 1 and "OUTPUT_TOO_LARGE" in combined.stdout and "分 2 批" in combined.stdout
-    assert "column_0" not in combined.stdout
-    for key in ("t1", "t2"):
-        part = subprocess.run([*command, key], capture_output=True, text=True, check=False)
-        assert part.returncode == 0 and len(part.stdout.encode()) <= 8192
-        assert all(f"- column_{i} TEXT" in part.stdout for i in range(30))
+    combined = subprocess.run([sys.executable, str(SCRIPT), str(path), "--describe-tables", "t1,t2"], capture_output=True, text=True)
+    assert combined.returncode == 0 and len(combined.stdout.encode()) <= 8000
+    assert "续读：" in combined.stdout and "--describe-tables" in combined.stdout
     assert path.read_text() == original
 
 
-def test_printed_receipt_lines_pass_the_platform_evidence_check(tmp_path):
-    import re
-
-    from ontofoundry_api.domain.evidence import check_material_evidence
+def test_reader_and_platform_receipt_lines_are_identical(tmp_path):
+    from ontofoundry_api.domain.table_reading import table_lines
 
     one = table("t1", "c1", "雾岭订单库", "amount_a")
     one["comment"] = "订单"
     one["columns"].append({"name": "status", "type": "ENUM", "nullable": False, "comment": "状态(open/closed)"})
-    # Same serialization as the platform's receipt (TE-02).
-    text = json.dumps({"tables": [one]}, indent=2, ensure_ascii=False)
     path = tmp_path / "tables.json"
-    path.write_text(text)
-    out = subprocess.run([sys.executable, str(SCRIPT), str(path), "--tables", "t1"],
-                         capture_output=True, text=True, check=True).stdout
-    spans = {"table" if line.startswith("##") else line.split()[1]: tuple(map(int, m.groups()))
-             for line in out.splitlines() if (m := re.search(r"收据第 (\d+)–(\d+) 行", line))}
-    lines = text.splitlines()
-    lookup = lambda _id: ("sha", lines)
-    for name, quote in (("table", '"table": "public.sales"'), ("status", "状态(open/closed)"),
-                        ("amount_a", '"name": "amount_a"')):
-        start, end = spans[name]
-        check_material_evidence({"material_id": "m", "material_sha256": "sha",
-                                 "locator": {"line_start": start, "line_end": end}, "quote": quote}, lookup, name)
+    path.write_text(json.dumps({"tables": [one]}, ensure_ascii=False))
+    out = subprocess.run([sys.executable, str(SCRIPT), str(path), "--describe-tables", "t1"], capture_output=True, text=True, check=True).stdout
+    assert out.splitlines() == table_lines(one)

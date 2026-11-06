@@ -50,7 +50,7 @@ def test_scope_is_confirmed_before_any_proposal_on_every_path():
     assert "获批准" in discovery and "ExitPlanMode" in plan and "AskUserQuestion" in plan
     # Named things are instances shown as examples, never their own types.
     assert "具名的具体事物" in plan and "例子" in plan
-    assert "不定标识、对应表、关系、属性" in plan and "第 3 轮前定稿" in plan
+    assert "不定关系、属性" in plan and "第 3 轮前定稿" in plan
     assert "获批准前不写定义或实例" in extraction
     assert "新概念先交计划，批准后写提案" in agent
 
@@ -148,17 +148,14 @@ def fictional_tables(count, columns=40):
     return {"tables": [table(n) for n in range(1, count + 1)]}
 
 
-def test_init_prints_table_reads_that_each_fit_one_read(tmp_path, monkeypatch, capsys):
+def test_init_prints_search_instead_of_reading_all_tables(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "uploads").mkdir()
-    tables = write_json(tmp_path / "uploads/tables.json", fictional_tables(9))
+    write_json(tmp_path / "uploads/tables.json", fictional_tables(90))
     write_json(tmp_path / "uploads/pack.json", {"tables_file": "uploads/tables.json", "result_file": "output/r.json"})
     assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
-    commands = [line.split("--tables ")[1] for line in capsys.readouterr().out.splitlines() if "--tables " in line]
-    assert len(commands) > 1
-    assert [k for c in commands for k in c.split(",")] == [f"t{n}" for n in range(1, 10)]
-    for keys in commands:
-        assert len(read_input.render_tables(tables.read_text(), [keys]).encode()) <= read_input.LIMIT
+    out = capsys.readouterr().out
+    assert "--search-tables" in out and "--tables " not in out and "--describe-tables" not in out
 
 
 def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):
@@ -166,7 +163,7 @@ def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):
     write_json(tmp_path / "tables.json", fictional_tables(3, columns=2))
     assert invoke(monkeypatch, read_input, "tables.json", "--tables", "t1", "t2,t3") == 0
     out = capsys.readouterr().out
-    assert all(f"## t{n} " in out for n in (1, 2, 3))
+    assert all(f"[ref: t{n}]" in out for n in (1, 2, 3))
 
 
 def test_check_part_reports_refs_another_fragment_already_defines(tmp_path, monkeypatch, capsys):
@@ -184,17 +181,18 @@ def test_check_part_reports_refs_another_fragment_already_defines(tmp_path, monk
     assert f"client_ref {items[0]['client_ref']} 与 01-types.json 重复" in capsys.readouterr().out
 
 
-def test_a_table_too_wide_for_one_read_is_split_by_column_ranges(tmp_path, monkeypatch, capsys):
+def test_a_table_too_wide_for_one_read_has_exact_continuation(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    tables = write_json(tmp_path / "tables.json", fictional_tables(1, columns=200))
-    text = tables.read_text()
-    specs = [spec for batch in read_input.table_batches(text) for spec in batch]
-    assert len(specs) > 1 and all(spec.startswith("t1:") for spec in specs)
-    covered = [n for spec in specs for n in range(int(spec[3:].split("-")[0]), int(spec.split("-")[1]) + 1)]
-    assert covered == list(range(1, 201))
-    for spec in specs:
-        assert invoke(monkeypatch, read_input, "tables.json", "--tables", spec) == 0
-        assert len(capsys.readouterr().out.encode()) <= read_input.LIMIT + 1
+    write_json(tmp_path / "tables.json", fictional_tables(1, columns=200))
+    args, seen = ["tables.json", "--describe-tables", "t1"], []
+    while args:
+        assert invoke(monkeypatch, read_input, *args) == 0
+        out = capsys.readouterr().out
+        assert len(out.encode()) <= read_input.LIMIT
+        seen += re.findall(r"\[ref: t1\.(col_\d+)\]", out)
+        commands = [line.split("续读：", 1)[1] for line in out.splitlines() if "续读：" in line]
+        args = shlex.split(commands[0])[2:] if commands else None
+    assert seen == [f"col_{n}" for n in range(200)]
 
 
 def test_check_part_counts_generated_refs_and_ignores_replacements_elsewhere(tmp_path, monkeypatch, capsys):
@@ -224,30 +222,17 @@ def test_show_example_points_field_names_at_their_kind(capsys, monkeypatch):
     assert "属于 link_type" in out and "--variant mapping_table" in out
 
 
-def test_errors_say_why_what_happened_and_what_to_run(tmp_path, monkeypatch, capsys):
+def test_errors_say_why_and_name_valid_pointer_paths(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    material = tmp_path / "notes.md"
-    material.write_text("\n".join("澄页图书馆的借阅规则说明" * 30 for _ in range(40)))
-    # Too large: actual size, limit, nothing changed, and the exact range that fits.
-    assert invoke(monkeypatch, read_input, "notes.md") == 1
-    out = capsys.readouterr().out
-    assert out.startswith("错误 [OUTPUT_TOO_LARGE]：输出 ") and "超过单次 8000 字节上限" in out and "notes.md 未改动" in out
-    step = out.split("下一步：", 1)[1].split("，", 1)[0]
-    args = shlex.split(step)[2:]
-    assert invoke(monkeypatch, read_input, *args) == 0
-    capsys.readouterr()
-    # Bad range: the file's real length and a corrected command.
-    assert invoke(monkeypatch, read_input, "notes.md", "--start", "50", "--end", "60") == 1
-    out = capsys.readouterr().out
-    assert "错误 [INVALID_ARGUMENT]：行范围 50–60 无效，notes.md 共 40 行" in out and "--end 40" in out
-    # Broken JSON: line and column.
+    (tmp_path / "notes.md").write_text("首行\n末行")
+    assert invoke(monkeypatch, read_input, "notes.md", "--start", "50") == 1
+    assert "共 2 行" in capsys.readouterr().out
     (tmp_path / "bad.json").write_text('{"a": 1,\n "b": }')
     assert invoke(monkeypatch, read_input, "bad.json", "--pointer", "/a") == 1
     assert "错误 [JSON_INVALID]：bad.json 第 2 行" in capsys.readouterr().out
-    # Missing pointer: what does exist there.
     (tmp_path / "ok.json").write_text('{"items": [1, 2, 3]}')
     assert invoke(monkeypatch, read_input, "ok.json", "--pointer", "/items/7") == 1
-    assert "3 项的数组，有效下标 0–2" in capsys.readouterr().out
+    assert "--outline" in capsys.readouterr().out
 
 
 def test_commands_name_scripts_without_climbing_out_of_the_workspace(tmp_path, monkeypatch):
@@ -262,24 +247,12 @@ def test_commands_name_scripts_without_climbing_out_of_the_workspace(tmp_path, m
     assert runpaths.command("show_element.py", "--work-pack", "<工作包>", "x").endswith(" --work-pack uploads/pack.json x")
 
 
-def test_reads_that_cannot_shrink_by_lines_or_ranges_still_get_a_way_out(tmp_path, monkeypatch, capsys):
+def test_long_lines_are_bounded_and_broken_json_suggests_valid_source_range(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
-    write_json(tmp_path / "tables.json", fictional_tables(1, columns=400))
-    # An explicit range that is still too wide is split further, never repeated.
-    assert invoke(monkeypatch, read_input, "tables.json", "--tables", "t1:1-300") == 1
-    out = capsys.readouterr().out
-    specs = [c.split("--tables ")[1].split("；")[0].split("，")[0].strip() for c in out.split("下一步：", 1)[1].split("；") if "--tables" in c]
-    assert len(specs) > 1 and "t1:1-300" not in specs
-    assert specs[0].startswith("t1:1-") and specs[-1].endswith("-300")
-    for spec in specs:
-        assert invoke(monkeypatch, read_input, "tables.json", "--tables", spec) == 0
-        capsys.readouterr()
-    # One line longer than a read: cut by characters, not the same line again.
     (tmp_path / "one.md").write_text("澄页" * 4000)
-    assert invoke(monkeypatch, read_input, "one.md") == 1
+    assert invoke(monkeypatch, read_input, "one.md") == 0
     out = capsys.readouterr().out
-    assert "单行就有" in out and "cut -c 1-2500" in out
-    # A broken JSON's suggested lines stay inside the file.
+    assert "超长内容已截断" in out and len(out.encode()) <= read_input.LIMIT
     (tmp_path / "bad.json").write_text('{"a":\n}')
     assert invoke(monkeypatch, read_input, "bad.json", "--pointer", "/a") == 1
     assert "--end 2" in capsys.readouterr().out

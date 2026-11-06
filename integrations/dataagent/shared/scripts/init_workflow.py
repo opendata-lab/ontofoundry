@@ -8,7 +8,6 @@ import json
 import os
 from pathlib import Path
 
-from read_input import table_batches
 from runpaths import HintParser, command, error, notice, relative, usage
 
 ROOT = Path("modeling")
@@ -101,7 +100,7 @@ def main():
             work_pack=args.work_pack,
             draft_empty="是" if facts.get("draft_empty") else "否" if "draft_empty" in facts else "未知",
             new_materials="、".join(facts.get("new_material_ids", [])) or "无",
-            new_tables="、".join(facts.get("new_table_keys", [])) or "无",
+            new_tables=str(facts.get("new_table_count", 0)) + " 张",
         )
         step = "写入 modeling/plan.md 与 notes.md"
         if write_new(ROOT / "plan.md", plan):
@@ -127,20 +126,6 @@ def main():
     return 0
 
 
-def table_commands(tables_file):
-    """Ready batches for the linked tables' columns: read each once, nothing re-read."""
-    try:
-        batches = table_batches(Path(tables_file).read_text()) if tables_file else []
-    except (OSError, ValueError, KeyError, TypeError) as exc:
-        return ["  " + notice("TABLES_UNREADABLE", f"表结构 {tables_file} 无法读取（{type(exc).__name__}），未生成读表命令",
-                              command("read_input.py", tables_file, "--start", "1", "--end", "40"))]
-    if not batches:
-        return []
-    lines = [f"  读表结构（共 {len(batches)} 批，每批读一次，写 03 时不重读）："]
-    lines += ["    " + command("read_input.py", tables_file, "--tables", ",".join(b)) for b in batches]
-    return lines
-
-
 def run_paths(work_pack, pack):
     """This run's files and commands; copy them rather than composing paths."""
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
@@ -162,7 +147,8 @@ def run_paths(work_pack, pack):
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
-    lines += table_commands(pack.get("tables_file"))
+    if pack.get("tables_file"):
+        lines.append("  检索表：" + command("read_input.py", pack["tables_file"], "--search-tables"))
     return "\n".join(lines)
 
 

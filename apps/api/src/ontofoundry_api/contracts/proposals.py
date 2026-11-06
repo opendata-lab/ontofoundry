@@ -6,11 +6,11 @@ import hashlib
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, uuid5
 
 from jsonschema import Draft202012Validator
-from pydantic import TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from ontofoundry_api.contracts.proposal_diagnostics import diagnostic, schema_diagnostic
 from ontofoundry_api.domain.canonical import canonical, domain_sha256, element_sha256
@@ -53,6 +53,15 @@ _CLIENT_REF = {
     "additionalProperties": False,
 }
 _REF = {"anyOf": [_UUID, _CLIENT_REF]}
+
+
+class TableEvidenceInput(BaseModel):
+    """Submission-only shorthand; persisted evidence is always MaterialEvidence."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["table"]
+    ref: str = Field(pattern=r"^t[1-9][0-9]*(?:\..+)?$", max_length=500)
+    quote: str = Field(min_length=1, max_length=2000)
 
 
 class ProposalContractError(ValueError):
@@ -128,6 +137,23 @@ def _after_schema(kind):
         for name in ("id", "material_sha256"):
             if name in defs["MaterialEvidence"]["required"]:
                 defs["MaterialEvidence"]["required"].remove(name)
+    if "MaterialEvidence" in defs:
+        defs["TableEvidenceInput"] = TableEvidenceInput.model_json_schema()
+
+        def add_table_variant(node):
+            if isinstance(node, dict):
+                if node.get("discriminator", {}).get("propertyName") == "kind" and "material" in node["discriminator"].get("mapping", {}):
+                    node["discriminator"]["mapping"]["table"] = "#/$defs/TableEvidenceInput"
+                    node["oneOf"].append({"$ref": "#/$defs/TableEvidenceInput"})
+                for child in list(node.values()):
+                    add_table_variant(child)
+            elif isinstance(node, list):
+                for child in node:
+                    add_table_variant(child)
+
+        add_table_variant(schema)
+        for definition in defs.values():
+            add_table_variant(definition)
     renamed = json.loads(
         json.dumps({"schema": schema, "defs": defs}).replace("#/$defs/", "#/$defs/After")
     )
@@ -174,7 +200,7 @@ def result_schema():
             "evidence": {
                 "type": "array",
                 "maxItems": 50,
-                "items": {"$ref": "#/$defs/AfterMaterialEvidence"},
+                "items": {"oneOf": [{"$ref": "#/$defs/AfterMaterialEvidence"}, {"$ref": "#/$defs/AfterTableEvidenceInput"}]},
             },
             "depends_on": {
                 "type": "array",

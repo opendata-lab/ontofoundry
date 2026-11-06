@@ -11,6 +11,7 @@ from ontofoundry_api.contracts.proposals import (
     apply_items,
     group_items,
     parse_result,
+    result_digest,
 )
 from ontofoundry_api.db_models import (
     InstanceEvidenceRecord,
@@ -211,8 +212,12 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
 
 
 def parse_agent(db, settings, session, raw, context):
+    from ontofoundry_api.services.table_submission import prepare_table_submission
+
     try:
-        parsed = parse_result(raw, context, material_lookup(db, settings, context.workspace_id))
+        normalized = prepare_table_submission(db, settings, session, raw)
+        parsed = parse_result(normalized, context, material_lookup(db, settings, context.workspace_id))
+        parsed.result_sha256 = result_digest(context.run_token, raw)
     except ProposalContractError as exc:
         problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
         raise ServiceError(str(exc), code=exc.code, status_code=422,
