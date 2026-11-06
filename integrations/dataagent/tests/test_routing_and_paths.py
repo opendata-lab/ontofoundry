@@ -155,7 +155,37 @@ def test_init_prints_search_instead_of_reading_all_tables(tmp_path, monkeypatch,
     write_json(tmp_path / "uploads/pack.json", {"tables_file": "uploads/tables.json", "result_file": "output/r.json"})
     assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
     out = capsys.readouterr().out
-    assert "--search-tables" in out and "--tables " not in out and "--describe-tables" not in out
+    assert "--search-tables" in out and "--tables " not in out
+    # Only one example describe for planned candidates, never a batch over every table.
+    describes = [line for line in out.splitlines() if "--describe-tables" in line]
+    assert len(describes) == 1 and "t1,t3" in describes[0] and "t90" not in out
+    assert "python、cat、grep" in out
+
+
+def test_empty_table_search_over_many_tables_asks_for_keywords(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    write_json(tmp_path / "tables.json", fictional_tables(31, columns=2))
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables") == 1
+    out = capsys.readouterr().out
+    assert "KEYWORDS_NEEDED" in out and "31 张" in out and "[ref: t" not in out
+    # Filters or a small table set still browse without keywords.
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables", "--schema", "ledger") == 0
+    write_json(tmp_path / "few.json", fictional_tables(30, columns=2))
+    assert invoke(monkeypatch, read_input, "few.json", "--search-tables") == 0
+
+
+def test_init_prints_outline_commands_for_structured_materials(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    (tmp_path / "uploads/a.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "uploads/b.csv").write_text("x\n1\n", encoding="utf-8")
+    (tmp_path / "uploads/c.md").write_text("# t\n", encoding="utf-8")
+    materials = [{"id": "x", "path": "uploads/a.json"}, {"id": "y", "path": "uploads/b.csv"}, {"id": "z", "path": "uploads/c.md"}]
+    write_json(tmp_path / "uploads/pack.json", {"materials": materials, "result_file": "output/r.json"})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
+    out = capsys.readouterr().out
+    assert "uploads/a.json --outline --ref m1" in out and "uploads/b.csv --outline --ref m2" in out
+    assert "c.md --outline" not in out
 
 
 def test_table_keys_accept_commas_or_spaces(tmp_path, monkeypatch, capsys):
@@ -285,3 +315,23 @@ def test_a_new_run_moves_the_last_runs_fragments_but_the_same_run_keeps_them(tmp
     assert (tmp_path / "modeling/previous/first/parts/01-types.json").exists()
 
 
+
+
+def test_table_search_matches_any_word_and_ranks_by_matches(tmp_path, monkeypatch, capsys):
+    # A request lists many business words; no table holds them all (seen in a real run).
+    tables = {"tables": [
+        {"key": "t1", "table": "dw.story_stage", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "story_stage", "kind": "table", "comment": "需求阶段时长",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "dept_id", "type": "varchar", "nullable": True, "comment": "部门"}]},
+        {"key": "t2", "table": "dw.org_user", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "org_user", "kind": "table", "comment": "用户",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "user_id", "type": "varchar", "nullable": True, "comment": ""}]},
+        {"key": "t3", "table": "dw.ext_source", "connection": "c", "connection_id": "c1", "dialect": "mysql",
+         "schema_name": "dw", "table_name": "ext_source", "kind": "table", "comment": "",
+         "primary_key": [], "foreign_keys": [], "columns": [{"name": "payload", "type": "string", "nullable": True, "comment": ""}]},
+    ]}
+    write_json(tmp_path / "tables.json", tables)
+    monkeypatch.chdir(tmp_path)
+    assert invoke(monkeypatch, read_input, "tables.json", "--search-tables", "需求 阶段 部门 用户 人员") == 0
+    out = capsys.readouterr().out
+    assert out.index("[ref: t1]") < out.index("[ref: t2]") and "[ref: t3]" not in out
