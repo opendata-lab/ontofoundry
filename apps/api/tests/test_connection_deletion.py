@@ -174,11 +174,11 @@ def test_pending_dataset_proposal_blocks_deletion(client, connection, operation)
     assert_in_use(client, connection, [{"type": "dataset_proposal", "name": "虚构订单", "location": "虚构青禾建模"}])
 
 
-def test_linked_table_blocks_deletion(client, connection):
+def test_linked_table_does_not_block_deletion(client, connection):
     with client.app.state.session_factory() as db:
         add_session(db, tables=[{"connection_id": connection, "schema_name": "fiction_sales", "table_name": "fiction_orders"}])
         db.commit()
-    assert_in_use(client, connection, [{"type": "linked_table", "name": "fiction_sales.fiction_orders", "location": "虚构青禾建模"}])
+    assert client.delete(ROOT + f"/connections/{connection}").status_code == 204
 
 
 def test_all_reference_categories_are_returned_together_and_metadata_is_untouched(client, connection):
@@ -195,7 +195,6 @@ def test_all_reference_categories_are_returned_together_and_metadata_is_untouche
     assert_in_use(client, connection, [
         {"type": "dataset", "name": "虚构订单", "location": "已发布版本"},
         {"type": "dataset", "name": "虚构订单", "location": "虚构青禾建模"},
-        {"type": "linked_table", "name": "fiction_sales.fiction_orders", "location": "虚构青禾建模"},
         {"type": "dataset_proposal", "name": "虚构订单", "location": "虚构青禾建模"},
     ])
     with client.app.state.session_factory() as db:

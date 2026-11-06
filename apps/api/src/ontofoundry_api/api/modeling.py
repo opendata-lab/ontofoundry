@@ -349,6 +349,7 @@ def session_data(item):
         "draft_sha256": item.draft_sha256 or draft_sha256(draft),
         "draft": draft,
         "material_ids": item.material_ids,
+        "table_scope": item.table_scope,
         "linked_tables": item.linked_tables or [],
         "mode": item.mode,
         "task_status": item.task_status,
@@ -447,7 +448,8 @@ class DraftSave(Strict):
     draft: dict
     title: str | None = Field(default=None, min_length=1, max_length=240)
     material_ids: list[str] | None = None
-    linked_tables: list[LinkedTable] | None = Field(default=None, max_length=200)
+    table_scope: Literal["all", "selected"] | None = None
+    linked_tables: list[LinkedTable] | None = None
     mode: SessionMode | None = None
 
 
@@ -771,12 +773,19 @@ def save_session(
                 raise HTTPException(422, "材料不属于当前空间")
         values["material_ids"] = body.material_ids
         values.update(revised_material_bookkeeping(item, body.material_ids))
-    if body.linked_tables is not None:
+    if body.table_scope is not None or body.linked_tables is not None:
         from ontofoundry_api.services.dataset_sources import linked_table_details
 
-        linked = [t.model_dump() for t in body.linked_tables]
-        linked_table_details(db, workspace_id, linked)
-        values["linked_tables"] = linked
+        scope = body.table_scope or "selected"
+        linked = (
+            [t.model_dump() for t in body.linked_tables]
+            if body.linked_tables is not None else item.linked_tables or []
+        )
+        if scope == "all":
+            linked = []
+        else:
+            linked_table_details(db, workspace_id, linked)
+        values.update(table_scope=scope, linked_tables=linked)
     result = revise(db, item, body.revision, **values)
     result["validation"] = validate_draft(draft, get_workspace(db, workspace_id))
     return result

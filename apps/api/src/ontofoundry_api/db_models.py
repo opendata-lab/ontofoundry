@@ -118,7 +118,8 @@ class ModelingSessionRecord(Base):
     run_manifest_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     candidates_json: Mapped[list] = mapped_column(JSON, default=list)
     material_ids: Mapped[list] = mapped_column(JSON, default=list)
-    # Registered tables linked in the builder; the agent proposes datasets on them.
+    # Resolve all registered tables at run start, or retain an explicit selection.
+    table_scope: Mapped[str] = mapped_column(String(16), nullable=False, server_default="all")
     linked_tables: Mapped[list] = mapped_column(JSON, nullable=False, server_default="[]")
     # model: builds and refines the ontology; chat: asks about it. Fixed once
     # the conversation starts.

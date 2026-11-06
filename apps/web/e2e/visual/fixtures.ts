@@ -417,6 +417,7 @@ const REVIEW_SESSION: ModelingSession = {
   workspace_id: WORKSPACE_ID,
   title: "供应商范围修订",
   mode: "model",
+  table_scope: "all",
   base_version_id: "ver-visual-demo-2",
   revision: 7,
   draft: REVIEW_DRAFT,

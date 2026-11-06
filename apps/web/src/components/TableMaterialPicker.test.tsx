@@ -18,6 +18,7 @@ afterEach(cleanup);
 const table = (name: string, patch: Partial<RegisteredTable> = {}): RegisteredTable => ({
   connection_id: "c1",
   connection_name: "星港只读库",
+  observed_at: null,
   schema_name: "dw",
   table_name: name,
   kind: "table",

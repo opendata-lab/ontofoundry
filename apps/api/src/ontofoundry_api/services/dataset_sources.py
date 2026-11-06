@@ -151,6 +151,9 @@ def registered_table_catalog(db, workspace_id, draft=None):
         for table in snapshot.snapshot_json.get("tables", []):
             if table.get("missing"):
                 continue
+            observed_at = table.get("observed_at") or snapshot.observed_at
+            if observed_at is not None and not isinstance(observed_at, str):
+                observed_at = observed_at.isoformat()
             key = (connection.id, snapshot.schema_name, table["name"])
             items.append({
                 "connection_id": connection.id,
@@ -160,6 +163,7 @@ def registered_table_catalog(db, workspace_id, draft=None):
                 "kind": table.get("kind", "table"),
                 "comment": table.get("comment") or "",
                 "column_count": len(table.get("columns", [])),
+                "observed_at": observed_at,
                 "datasets": used.get(key, []),
             })
     items.sort(key=lambda i: (i["connection_name"], i["schema_name"], i["table_name"]))
@@ -183,3 +187,23 @@ def linked_table_details(db, workspace_id, linked):
             raise DatasetSourceError("关联的数据表尚未同步或已不存在，请先在数据管理同步", code="SOURCE_NOT_REGISTERED", details={"schema_name": key[1], "table_name": key[2]})
         details.append({"connection": connection, "schema_name": key[1], "table": table})
     return details
+
+
+def resolve_session_table_scope(db, workspace_id, session):
+    """Resolve current usable links, retaining unavailable selections for the run log."""
+    catalog = registered_table_catalog(db, workspace_id)
+    fields = ("connection_id", "schema_name", "table_name")
+    registered = {tuple(row[field] for field in fields): row for row in catalog}
+    if session.table_scope == "all":
+        return [{field: row[field] for field in fields} for row in catalog], []
+    linked, skipped, seen = [], [], set()
+    for entry in session.linked_tables or []:
+        key = (entry["connection_id"], entry.get("schema_name") or "", entry["table_name"])
+        if key in seen:
+            continue
+        seen.add(key)
+        if key in registered:
+            linked.append(dict(zip(fields, key, strict=True)))
+        else:
+            skipped.append(entry)
+    return linked, skipped

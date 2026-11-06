@@ -339,13 +339,18 @@ async def send_message(
         manifest["instance_baseline"] = baseline(db, workspace_id, session_id)
 
     table_catalog, table_receipt = None, None
-    if proposals and item.linked_tables:
-        table_catalog, table_receipt = store_linked_tables_receipt(
-            db, request.app.state.settings, workspace_id, item.linked_tables
-        )
-        if all(material.id != table_receipt.id for material in materials):
-            materials.append(table_receipt)
-        manifest["materials"] = [{"id": m.id, "sha256": m.sha256} for m in materials]
+    if proposals:
+        from ontofoundry_api.services.dataset_sources import resolve_session_table_scope
+
+        linked, skipped = resolve_session_table_scope(db, workspace_id, item)
+        manifest["skipped_tables"] = skipped
+        if linked:
+            table_catalog, table_receipt = store_linked_tables_receipt(
+                db, request.app.state.settings, workspace_id, linked
+            )
+            if all(material.id != table_receipt.id for material in materials):
+                materials.append(table_receipt)
+            manifest["materials"] = [{"id": m.id, "sha256": m.sha256} for m in materials]
 
     changed = db.execute(
         update(ModelingSessionRecord)
