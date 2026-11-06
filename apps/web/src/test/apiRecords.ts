@@ -31,6 +31,7 @@ export function modelingSession(
       edges: [],
     },
     material_ids: [],
+    table_scope: "all",
     task_status: "idle",
     task_detail: "",
     dataagent_topic_id: null,
