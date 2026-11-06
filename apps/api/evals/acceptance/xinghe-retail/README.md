@@ -8,7 +8,7 @@
 |---|---|
 | 材料 | `integrations/dataagent/tests/fixtures/extract-retail/material.md` |
 | 业务数据 | `seed-mysql.sql`：`xinghe_retail` 六张表（refunds 有物理表，但首轮不在平台同步） |
-| 预期提案 | 同目录夹具：全量 `conservative/`，增量 `v1-increment.json`，增量后完整图 `supplemented/` |
+| 预期提案 | 同目录夹具：全量 `conservative/`，增量 `v1-increment.json`，增量后完整图 `supplemented/`。夹具早于“未同步表不提数据集”：全量预期为 conservative 去掉退款空列数据集（62 条），增量里退款数据集为新增而非更新 |
 
 ## 环境（每次从空开始）
 
