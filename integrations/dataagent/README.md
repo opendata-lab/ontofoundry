@@ -68,6 +68,8 @@ make 打包前自动运行 generate_output_schemas.py，源为 `apps/api/src/ont
 
 部署时需先升级平台、执行迁移，再重新打包技能并按上述步骤复制到 `SKILLS_ROOT_DIR`、重启 DataAgent；本次未修改 Agent 提示词。仓库验证不替代后台安装和真实运行验收。
 
+排障：`PLATFORM_SUBMIT_UNAVAILABLE` 表示提交未完成，结果未入库，最终文件未替换。连接失败时输出底层原因（如 `Connection refused`、`Name or service not known`、`timed out`）及目标 `scheme://host:port`，不显示路径、查询参数或凭据。检查 DataAgent 沙箱网络是否开启，以及 `ONTOFOUNDRY_PUBLIC_BASE_URL` 是否为沙箱可达地址；修复后使用输出中的原重试命令重新提交。HTTP 5xx 表示平台服务暂时不可用，按输出稍后重试。
+
 ## 对话需求材料与实例方法路径（2026-10-25）
 
 平台将符合门槛的建模消息保存为“对话需求”材料并放入当前工作包，Agent 仍按材料 id、SHA256 和原行号引用，不新增证据类型。本次修正 ontology-discovery 抽取步骤与 entity-extraction 实例步骤，明确 `extract-facts.md` 位于 entity-extraction；平台工作包示例索引也注明归属。重新打包并安装技能到当前 DataAgent 的 `SKILLS_ROOT_DIR` 后重启；没有修改 Agent 提示词或配置，不需要重新发布 Agent。

@@ -184,6 +184,43 @@ class InputProblem(Exception):
         )
 
 
+def submit_failure_detail(exc, url, authorization):
+    """Keep transport diagnostics bounded and strip credentials and URL details."""
+    import re
+    from urllib.error import URLError
+    from urllib.parse import parse_qsl, urlsplit
+
+    target = "未确定"
+    secrets = [authorization] if isinstance(authorization, str) else []
+    if secrets:
+        secrets.extend(authorization.split())
+    try:
+        parts = urlsplit(url)
+        if parts.scheme in {"http", "https"} and parts.hostname:
+            host = parts.hostname
+            if ":" in host:
+                host = f"[{host}]"
+            target = f"{parts.scheme}://{host}:{parts.port or (443 if parts.scheme == 'https' else 80)}"
+        secrets.extend([url, parts.path, parts.query, parts.fragment,
+                        parts.username, parts.password])
+        secrets.extend(parts.path.split("/"))
+        secrets.extend(value for _, value in parse_qsl(parts.query))
+    except (ValueError, TypeError):
+        pass
+    reason = exc.reason if isinstance(exc, URLError) else exc
+    if isinstance(reason, OSError):
+        reason = reason.strerror or str(reason)
+    elif not isinstance(exc, URLError):
+        reason = type(exc).__name__
+    reason = re.sub(r"https?://\S+", "[地址已隐藏]", str(reason))
+    for secret in sorted({s for s in secrets if s}, key=len, reverse=True):
+        reason = reason.replace(secret, "[已隐藏]")
+    reason = " ".join(reason.split())
+    if len(reason) > 200:
+        reason = reason[:197] + "..."
+    return f"{type(exc).__name__}: {reason}；目标 {target}"
+
+
 def platform_submit(pack, candidate, retry_command):
     """Submit to the platform, which checks and stores in one step (SC-05).
     Never duplicate graph rules here: the platform's verdict is the only one."""
@@ -199,18 +236,20 @@ def platform_submit(pack, candidate, retry_command):
     if not submit_file:
         print(error("PLATFORM_SUBMIT_CONFIG_MISSING", "工作包没有平台提交配置", "未提交，最终文件未替换", "重新发起建模以获取提交配置", retry=False))
         return False
+    url, authorization = "", None
     try:
         config = json.loads(Path(submit_file).read_bytes())
         url = config["submit_url"]
         parts = urlsplit(url)
         if parts.scheme not in {"http", "https"} or not parts.netloc:
             raise ValueError("提交地址无效")
+        authorization = config["headers"]["Authorization"]
         request = Request(
             url,
             data=candidate.read_bytes(),
             method="POST",
             headers={
-                "Authorization": config["headers"]["Authorization"],
+                "Authorization": authorization,
                 "Content-Type": "application/json",
                 "Accept": "application/json",
             },
@@ -236,10 +275,14 @@ def platform_submit(pack, candidate, retry_command):
         if exc.code < 500:
             print(error("PLATFORM_SUBMIT_REJECTED", f"平台提交请求被拒绝（HTTP {exc.code}）", "未提交，最终文件未替换", "重新发起建模以获取有效运行凭据", retry=False))
             return False
-        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台暂时不可达（HTTP {exc.code}），未完成提交", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
+        detail = submit_failure_detail(exc, url, authorization)
+        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台暂时不可达（HTTP {exc.code}；{detail}），未完成提交", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
         return False
     except (OSError, ValueError, KeyError, TypeError, URLError) as exc:
-        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台提交未执行或未完成（{type(exc).__name__}），结果未入库", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
+        detail = submit_failure_detail(exc, url, authorization)
+        print(error("PLATFORM_SUBMIT_UNAVAILABLE", f"平台提交未执行或未完成（{detail}），结果未入库", "最终文件未替换", f"稍后重试 {retry_command}；仍不可达时不交结果，在回答中说明是平台不可用"))
+        if isinstance(exc, (URLError, ConnectionError, TimeoutError)):
+            print("沙箱可能无法访问平台：检查 DataAgent 沙箱网络是否开启，以及 OntoFoundry 的 ONTOFOUNDRY_PUBLIC_BASE_URL 是否为沙箱可达地址")
         return False
     report_path = candidate.with_suffix(".platform-submit.json")
     atomic_write(report_path, encode(report))
