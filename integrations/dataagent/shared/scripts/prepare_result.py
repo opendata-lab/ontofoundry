@@ -1,6 +1,7 @@
 """Assemble a pinned proposal batch without inferring business content."""
 
 import json
+from collections import Counter
 from copy import deepcopy
 from pathlib import Path
 
@@ -246,6 +247,12 @@ def platform_submit(pack, candidate, retry_command):
         print("提示：" + warning["message"])
     if report["passed"]:
         print(f"平台检查通过并已入库：{report['reviewable_count']} 条待审。")
+        try:
+            kinds = Counter(item.get("target_kind") for item in json.loads(candidate.read_bytes())["items"])
+            print("按类型：" + "、".join(f"{kind} {count}" for kind, count in kinds.most_common()))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            pass
+        print("已完成：直接按收尾第 3 步作答；不必再读结果文件，也不补写 modeling/ 下的文件。")
         return True
     print(f"平台检查未通过，未入库。最终文件未替换。完整报告：{relative(report_path)}")
     if isinstance(report.get("repair_used"), int) and isinstance(report.get("repair_limit"), int):

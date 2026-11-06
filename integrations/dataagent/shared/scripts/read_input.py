@@ -33,9 +33,36 @@ def table_keys(names):
     return [k for n in names for k in n.replace(",", " ").split()]
 
 
+def receipt_lines(text):
+    """Original line ranges of each table header and column object in the
+    receipt (fixed indent=2 layout, TE-02), so evidence can cite them as is."""
+    found, key, start = {}, None, None
+    for number, line in enumerate(text.splitlines(), 1):
+        indent = len(line) - len(line.lstrip(" "))
+        body = line.strip()
+        if indent == 6 and body.startswith('"key": '):
+            key = json.loads(body[len('"key": '):].rstrip(","))
+            found[key] = {"table": [number, number], "columns": {}}
+        elif key and indent == 6 and body.startswith('"comment": '):
+            found[key]["table"][1] = number
+        elif key and indent == 8 and body == "{":
+            start = number
+        elif key and indent == 10 and body.startswith('"name": ') and start:
+            name = json.loads(body[len('"name": '):].rstrip(","))
+        elif key and indent == 8 and body in ("}", "},") and start:
+            found[key]["columns"][name] = [start, number]
+            start = None
+    return found
+
+
+def _span(found):
+    return f"（收据第 {found[0]}–{found[1]} 行）" if found else ""
+
+
 def render_tables(text, names):
     """Compact column listing for several linked tables in one bounded read."""
     tables = {t["key"]: t for t in json.loads(text)["tables"]}
+    positions = receipt_lines(text)
     chosen = []
     for spec in table_keys(names):
         # "t1:41-80" reads columns 41–80 of a table too wide for one read.
@@ -53,8 +80,10 @@ def render_tables(text, names):
         chosen.append(table)
     lines = []
     for table in chosen:
+        where = positions.get(table["key"], {})
         lines.append(
             f"## {table['key']} {table['table']}（{table['kind']}，连接 {table['connection']}，方言 {table['dialect']}）{table['comment']}"
+            + _span(where.get("table"))
         )
         lines.append(
             f"数据集来源：connection_id={table['connection_id']} schema_name={table['schema_name'] or '默认'} table_name={table['table_name']}"
@@ -66,7 +95,8 @@ def render_tables(text, names):
             )
         for column in table["columns"]:
             nullable = "可空" if column["nullable"] else "非空" if column["nullable"] is False else "可空性未知"
-            lines.append(f"- {column['name']} {column['type'] or '类型未知'} {nullable} {column['comment']}".rstrip())
+            lines.append(f"- {column['name']} {column['type'] or '类型未知'} {nullable} {column['comment']}".rstrip()
+                         + _span(where.get("columns", {}).get(column["name"])))
     return "\n".join(lines)
 
 

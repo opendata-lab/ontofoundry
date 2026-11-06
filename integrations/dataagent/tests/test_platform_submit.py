@@ -94,6 +94,7 @@ def test_platform_success_uses_pinned_url_headers_and_exact_result(
     ]
     output = capsys.readouterr().out
     assert "平台检查通过并已入库" in output and "ofrun." not in output
+    assert "按类型：" in output and "已完成：直接按收尾第 3 步作答" in output
 
 
 def test_platform_diagnostics_are_tool_output(tmp_path, monkeypatch, capsys, platform):
