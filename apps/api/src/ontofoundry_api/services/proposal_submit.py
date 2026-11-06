@@ -112,7 +112,8 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
     existing = submitted_batch(db, workspace_id, session_id, run_token)
     if existing is not None:
         if existing.result_sha256 == digest:
-            return _receipt(db, existing)
+            used = int((session.run_manifest_json or {}).get("repair_used") or 0)
+            return _receipt(db, existing, used)
         return _rejected("RUN_ALREADY_SUBMITTED", "本轮已提交过不同内容的结果，不能再次提交")
     if session.task_status not in ACTIVE_RUN_STATUSES:
         return _rejected("RUN_NOT_ACTIVE", "本轮运行已结束，不能再提交结果")
@@ -142,7 +143,10 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
         db.rollback()
         used = _record_rejection(db, workspace_id, session_id, digest)
         return _rejected("RESULT_CHECK_FAILED", "建模结果校验异常，请按本轮契约重新生成", used)
-    receipt = _receipt(db, batch)
+    # A passing submission after a rejection is the repair that fixed it.
+    used = _round(manifest, digest)
+    session.run_manifest_json = {**manifest, "repair_used": used}
+    receipt = _receipt(db, batch, used)
     session.result_state = "done"
     session.result_warnings = []
     session.task_detail = f"已生成 {receipt.reviewable_count} 条提案，请在“提案”中审阅"
