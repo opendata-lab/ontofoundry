@@ -1,9 +1,9 @@
 {
   "name": "ontofoundry-dataagent",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "OntoFoundry 三个语义技能与已有 Agent 配置，管理员安装包",
-  "minimum_platform_version": "0.2.7",
-  "platform_baseline": "2026-11-05 core-1：合并脚本把结果提交到 runs/{run_token}/proposals，平台检查通过即入库（每次运行最多修正 3 轮），结果只含 items；无新数据库迁移（仍为 20261026_000001）；工作包、实例库与 resolve_entity",
+  "minimum_platform_version": "0.2.8",
+  "platform_baseline": "2026-11-10 core-1：工作包只带表范围摘要，表结构为运行文件，技能用 read_input.py 检索与按需读列；表证据 {kind: table, ref} 在提交时转为材料证据；数据库迁移 20261106_000001（会话表范围）；结果提交到 runs/{run_token}/proposals，每次运行最多修正 3 轮",
   "installation": "manual-admin",
   "skills": [
     {"name": "ontology-discovery", "path": "skills/ontology-discovery"},
