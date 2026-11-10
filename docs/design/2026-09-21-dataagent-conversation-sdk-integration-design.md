@@ -166,15 +166,15 @@ data: {"task_id":"t-1","status":"finished","detail":"...","metadata":{"mode":"mo
 ### 6.4 身份与隔离
 
 ```
-X-ODW-Client: widget
-X-ODW-Website-Id: {ONTOFOUNDRY_DATAAGENT_WEBSITE_ID}
-X-ODW-User-Id: ontofoundry:{workspace_id}:{session_id}
-X-ODW-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
+X-DataAgent-Client: widget
+X-DataAgent-Website-Id: {ONTOFOUNDRY_DATAAGENT_WEBSITE_ID}
+X-DataAgent-User-Id: ontofoundry:{workspace_id}:{session_id}
+X-DataAgent-Access-Key: {ONTOFOUNDRY_DATAAGENT_ACCESS_KEY}
 ```
 
-`X-ODW-User-Id` 用**建模会话**而非终端用户作标识，这是必须的：DataAgent 的可见性过滤是 `source='widget' AND website_id=? AND external_user_id=?`（`topic_task_store.py:446`）。填真实用户 ID，同一建模会话就无法被空间内第二个成员打开。真正的权限判断在 BFF 的 `require_member`。
+`X-DataAgent-User-Id` 用**建模会话**而非终端用户作标识，这是必须的：DataAgent 的可见性过滤是 `source='widget' AND website_id=? AND external_user_id=?`（`topic_task_store.py:446`）。填真实用户 ID，同一建模会话就无法被空间内第二个成员打开。真正的权限判断在 BFF 的 `require_member`。
 
-`X-ODW-Access-Key` 依赖上游新增的站点服务端接入能力。没有它，任何能连到 DataAgent 的进程只要知道 `website_id` 就能创建会话——`_origin_allowed` 对空 `Origin` 无条件放行，而服务端调用恰好不带 `Origin`。
+`X-DataAgent-Access-Key` 依赖上游新增的站点服务端接入能力。没有它，任何能连到 DataAgent 的进程只要知道 `website_id` 就能创建会话——`_origin_allowed` 对空 `Origin` 无条件放行，而服务端调用恰好不带 `Origin`。
 
 ### 6.5 会话与任务生命周期
 
@@ -682,7 +682,7 @@ integrations/dataagent/
 **BFF 契约**
 - 非空间成员访问六个端点全部 403；会话不属于该空间 → 404。
 - 首次 `GET ""` 不创建 topic；首次 `POST /messages` 创建且只创建一次；第二次发送复用同一 topic。
-- 请求头四项完整且 `X-ODW-User-Id == ontofoundry:{ws}:{sid}`。
+- 请求头四项完整且 `X-DataAgent-User-Id == ontofoundry:{ws}:{sid}`。
 - 历史消息**分页取全**：DataAgent 返回 3 页时，`GET ""` 返回全部消息。
 - 材料上传幂等：同一材料第二轮不重复上传。
 - **并发控制**：两个并发 `POST /messages`，其中一个 409，且**远端只收到一次 deliver**（关键——验证 CAS 在远端副作用之前）。
@@ -769,5 +769,5 @@ integrations/dataagent/
 | 暂停候选与合并主流程 | 先验证完整建模与版本发布闭环 | 暂不支持逐项接受；数据库兼容字段保留，后续另行设计 |
 | 不迁移旧聊天记录 | 旧 topic 在即将删除的本地表里 | 升级后用户看到空会话，发布说明中告知 |
 | v1 不做 launch token | 浏览器不直连 DataAgent，BFF 已是可信边界 | DataAgent 必须只暴露在可信内网 |
-| `X-ODW-User-Id` 用会话 ID | DataAgent 按 `external_user_id` 过滤可见性，用真实用户 ID 会破坏多人协作 | 管理端呈现为"每会话一个伪用户"，已接受 |
+| `X-DataAgent-User-Id` 用会话 ID | DataAgent 按 `external_user_id` 过滤可见性，用真实用户 ID 会破坏多人协作 | 管理端呈现为"每会话一个伪用户"，已接受 |
 | 保留 API prefix 配置 | 上游前缀历史上变更过 | Agent 查询端点前缀不同，已单独标注 |
