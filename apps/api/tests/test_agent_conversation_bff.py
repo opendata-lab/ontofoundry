@@ -234,6 +234,12 @@ def test_dataagent_identity_headers_are_complete(client, monkeypatch):
     assert response.status_code == 202, response.text
     assert seen
     for headers in seen:
+        assert headers["X-DataAgent-Client"] == "widget"
+        assert headers["X-DataAgent-Website-Id"] == "ontofoundry"
+        assert headers["X-DataAgent-User-Id"] == (
+            f"ontofoundry:{DEMO_WORKSPACE_ID}:{session['id']}"
+        )
+        assert headers["X-DataAgent-Access-Key"] == "server-secret"
         assert headers["X-ODW-Client"] == "widget"
         assert headers["X-ODW-Website-Id"] == "ontofoundry"
         assert headers["X-ODW-User-Id"] == (

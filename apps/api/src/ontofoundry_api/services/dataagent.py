@@ -66,11 +66,15 @@ class DataAgentClient:
     @property
     def headers(self) -> dict[str, str]:
         headers = {
+            "X-DataAgent-Client": "widget",
+            "X-DataAgent-Website-Id": self.website_id,
+            "X-DataAgent-User-Id": self.session_ref,
             "X-ODW-Client": "widget",
             "X-ODW-Website-Id": self.website_id,
             "X-ODW-User-Id": self.session_ref,
         }
         if self.access_key:
+            headers["X-DataAgent-Access-Key"] = self.access_key
             headers["X-ODW-Access-Key"] = self.access_key
         return headers
 

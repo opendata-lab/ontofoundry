@@ -24,12 +24,17 @@ def _client(monkeypatch, handler, *, access_key: str = "secret") -> DataAgentCli
 
 
 def _assert_auth_headers(request: httpx.Request, *, access_key: bool = True) -> None:
+    assert request.headers["X-DataAgent-Client"] == "widget"
+    assert request.headers["X-DataAgent-Website-Id"] == "website-1"
+    assert request.headers["X-DataAgent-User-Id"] == "ontofoundry:workspace-1:session-1"
     assert request.headers["X-ODW-Client"] == "widget"
     assert request.headers["X-ODW-Website-Id"] == "website-1"
     assert request.headers["X-ODW-User-Id"] == "ontofoundry:workspace-1:session-1"
     if access_key:
+        assert request.headers["X-DataAgent-Access-Key"] == "secret"
         assert request.headers["X-ODW-Access-Key"] == "secret"
     else:
+        assert "X-DataAgent-Access-Key" not in request.headers
         assert "X-ODW-Access-Key" not in request.headers
 
 
