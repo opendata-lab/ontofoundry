@@ -143,10 +143,10 @@ T1 必须最先（迁移链在即将删除的目录里）。**T11 必须最后**
 
 ```python
 {
-    "X-ODW-Client": "widget",
-    "X-ODW-Website-Id": self.website_id,
-    "X-ODW-User-Id": self.session_ref,          # "ontofoundry:{workspace_id}:{session_id}"
-    **({"X-ODW-Access-Key": self.access_key} if self.access_key else {}),
+    "X-DataAgent-Client": "widget",
+    "X-DataAgent-Website-Id": self.website_id,
+    "X-DataAgent-User-Id": self.session_ref,          # "ontofoundry:{workspace_id}:{session_id}"
+    **({"X-DataAgent-Access-Key": self.access_key} if self.access_key else {}),
 }
 ```
 

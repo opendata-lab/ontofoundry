@@ -240,12 +240,6 @@ def test_dataagent_identity_headers_are_complete(client, monkeypatch):
             f"ontofoundry:{DEMO_WORKSPACE_ID}:{session['id']}"
         )
         assert headers["X-DataAgent-Access-Key"] == "server-secret"
-        assert headers["X-ODW-Client"] == "widget"
-        assert headers["X-ODW-Website-Id"] == "ontofoundry"
-        assert headers["X-ODW-User-Id"] == (
-            f"ontofoundry:{DEMO_WORKSPACE_ID}:{session['id']}"
-        )
-        assert headers["X-ODW-Access-Key"] == "server-secret"
 
 
 def test_get_fetches_all_history_pages(client, monkeypatch):
