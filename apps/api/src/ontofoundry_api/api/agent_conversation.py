@@ -136,8 +136,36 @@ def redact_credentials(text: str) -> str:
     return _RUN_CREDENTIAL.sub("ofrun.***", text)
 
 
+def _extract_user_content(content: str) -> str:
+    if USER_MESSAGE_MARK in content:
+        return content.split(USER_MESSAGE_MARK, 1)[1]
+    if "[用户消息]\r\n" in content:
+        return content.split("[用户消息]\r\n", 1)[1]
+    if "[用户消息]" in content:
+        return content.split("[用户消息]", 1)[1].lstrip("\r\n")
+    return content
+
+
 def present_messages(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return json.loads(redact_credentials(json.dumps(messages, ensure_ascii=False)))
+    shown = []
+    for message in messages:
+        if not isinstance(message, dict):
+            shown.append(message)
+            continue
+        sender = message.get("sender_type") or message.get("role")
+        content = message.get("content")
+        if (sender == "user" or sender is None) and isinstance(content, str) and "[用户消息]" in content:
+            message = {**message, "content": _extract_user_content(content)}
+        if sender == "user" and isinstance(message.get("blocks"), list):
+            new_blocks = []
+            for block in message["blocks"]:
+                if isinstance(block, dict) and isinstance(block.get("text"), str) and "[用户消息]" in block["text"]:
+                    new_blocks.append({**block, "text": _extract_user_content(block["text"])})
+                else:
+                    new_blocks.append(block)
+            message = {**message, "blocks": new_blocks}
+        shown.append(json.loads(redact_credentials(json.dumps(message, ensure_ascii=False))))
+    return shown
 
 
 def _client(request: Request, workspace_id: str, session_id: str) -> DataAgentClient:
