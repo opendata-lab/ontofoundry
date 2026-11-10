@@ -309,9 +309,51 @@ def test_history_shows_the_users_words_and_never_a_run_credential(client, monkey
 
     assert response.status_code == 200, response.text
     user, assistant = response.json()["messages"]
-    assert user["content"] == prompt.replace(credential, "ofrun.***")
+    assert user["content"] == "补充采购员"
     assert "ofrun..eJ" not in response.text
     assert assistant["blocks"][0]["input"]["command"] == 'TOKEN="ofrun.***" curl …'
+
+
+def test_history_shows_only_user_words_after_modeling(client, monkeypatch):
+    _configure(client)
+    session = _create_session(client)
+    _set_session(client, session["id"], dataagent_topic_id="topic-1")
+    modeling_prompt = (
+        "模式：建模\n工作包：uploads/ontofoundry-work-pack-6bbd4c3fce1d2b823ef40944b9e5400f.json\n"
+        "run_token：6bbd4c3fce1d2b823ef40944b9e5400f\n"
+        "结果：output/ontofoundry-result-6bbd4c3fce1d2b823ef40944b9e5400f.json\n"
+        "工作流：modeling/\n先加载建模技能并按其入口运行初始化；不必先列目录，也不必读上下文或 Schema 全文。\n\n"
+        "[用户消息]\n根据材料和关联的表建立星河零售的本体。"
+    )
+    items = [
+        {
+            "message_id": "m1",
+            "topic_id": "topic-1",
+            "sender_type": "user",
+            "type": "text",
+            "content": modeling_prompt,
+            "seq_id": 1,
+        },
+        {
+            "message_id": "m2",
+            "topic_id": "topic-1",
+            "sender_type": "assistant",
+            "type": "text",
+            "content": "已完成建模，生成 12 条提案。",
+            "seq_id": 2,
+        },
+    ]
+    _install_transport(monkeypatch, lambda _r: _messages_response(items, page=1, total=2))
+
+    response = client.get(_endpoint(session["id"]))
+
+    assert response.status_code == 200, response.text
+    user, assistant = response.json()["messages"]
+    assert user["content"] == "根据材料和关联的表建立星河零售的本体。"
+    assert "模式：建模" not in user["content"]
+    assert "工作包" not in user["content"]
+    assert "run_token" not in user["content"]
+    assert assistant["content"] == "已完成建模，生成 12 条提案。"
 
 
 def test_material_upload_is_idempotent(client, monkeypatch, tmp_path):
