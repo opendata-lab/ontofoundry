@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:17-alpine
+    security_opt:
+      - seccomp:unconfined
     environment:
       POSTGRES_DB: ontofoundry
       POSTGRES_USER: ontofoundry
@@ -43,7 +45,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8900:8900"
+      - "127.0.0.1:8910:8900"
     volumes:
       - ontofoundry-data:/var/lib/ontofoundry/files
     healthcheck:
@@ -62,7 +64,7 @@ services:
       of-backend:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8010:80"
 
 volumes:
   ontofoundry-postgres:

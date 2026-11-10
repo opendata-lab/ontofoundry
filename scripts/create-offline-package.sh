@@ -64,7 +64,7 @@ OF_BACKEND_IMAGE=of-backend:local
 OF_FRONTEND_IMAGE=of-frontend:local
 
 # 前端对外端口，浏览器访问 http://<服务器IP>:<端口>。
-OF_HTTP_PORT=8080
+OF_HTTP_PORT=8010
 
 # ---- DataAgent（建模/问数 Agent）。不填则平台可用，只是 Agent 功能不可用。----
 # DataAgent 后端地址：只写 协议://主机:端口，不带路径。这是从 of-backend 容器里
@@ -80,13 +80,13 @@ ONTOFOUNDRY_DATAAGENT_API_PREFIX=/api/v1/nl2sql
 # DataAgent 读取本体用的固定 MCP 令牌（至少 24 个字符）。默认值开箱即用，但它是公开的，
 # 正式环境请改成自己的值（可用 openssl rand -hex 24 生成）；设为空则关闭外部 MCP 访问。
 # 在 DataAgent 的 OntoFoundry MCP 配置里填鉴权头 Authorization: Bearer <同一个值>，
-# MCP 地址为 http://<服务器IP>:8080/api/v1/ontology/workspaces/<工作空间ID>/mcp。
+# MCP 地址为 http://<服务器IP>:8010/api/v1/ontology/workspaces/<工作空间ID>/mcp。
 # 只读：可读定义、数据绑定和实例。
 ONTOFOUNDRY_MCP_TOKEN=ontofoundry-mcp-default-token
 
 # DataAgent 回调本平台 MCP 用的地址。留空即用浏览器访问的地址
-# （http://<服务器IP>:8080），DataAgent 能访问到它就不用填。
-# ONTOFOUNDRY_PUBLIC_BASE_URL=http://<服务器IP>:8080
+# （http://<服务器IP>:8010），DataAgent 能访问到它就不用填。
+# ONTOFOUNDRY_PUBLIC_BASE_URL=http://<服务器IP>:8010
 
 # 一般不用填：直接用 IP / 域名访问上面的端口都是同源，后端自动放行。
 # 只有外层再套一层反代 / HTTPS 终止，浏览器地址与前端容器看到的不一致时，
@@ -113,7 +113,7 @@ echo "==> 启动"
 "$DOCKER" compose --env-file "$HERE/.env" -f "$HERE/compose.yaml" up -d
 
 PORT="$(sed -n 's/^OF_HTTP_PORT=//p' "$HERE/.env" | tail -1)"
-echo "前端: http://<服务器IP>:${PORT:-8080}"
+echo "前端: http://<服务器IP>:${PORT:-8010}"
 INSTALL
 chmod +x "$OUT_DIR/install.sh"
 

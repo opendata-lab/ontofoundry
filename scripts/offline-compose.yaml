@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:17-alpine
+    security_opt:
+      - seccomp:unconfined
     environment:
       POSTGRES_DB: ontofoundry
       POSTGRES_USER: ontofoundry
@@ -31,7 +33,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8900:8900"
+      - "127.0.0.1:8910:8900"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/healthz').read()"]
       interval: 10s
@@ -44,8 +46,8 @@ services:
       of-backend:
         condition: service_healthy
     ports:
-      # 对外只开放前端：浏览器通过 http://<服务器IP>:8080 访问，API 走同源 /api 反代。
-      - "${OF_HTTP_PORT:-8080}:80"
+      # 对外只开放前端：浏览器通过 http://<服务器IP>:8010 访问，API 走同源 /api 反代。
+      - "${OF_HTTP_PORT:-8010}:80"
 
 volumes:
   ontofoundry-postgres:
