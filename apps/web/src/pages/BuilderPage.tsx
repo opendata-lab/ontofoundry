@@ -258,7 +258,7 @@ export function BuilderPage() {
           // The session's mode decides, whichever path sent the message.
           const mode = current.mode;
           const context = current.scenario.trim();
-          const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== context
+          const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== "继续" && input.content.trim() !== context
             ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
           const run = await transport.sendMessage({ ...input, content, metadata: { ...input.metadata, mode } });
           if (mode === "model") setScenario((value) => value === current.scenario ? "" : value);
@@ -278,13 +278,14 @@ export function BuilderPage() {
     el.showAttachments = false;
     el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current(sendState.current.mode)).id}/agent-conversation`;
   }, [workspace.id]);
-  // Modeling plans before it writes: the plan switch starts on. Daily mode
-  // only asks questions, so it has no switch.
+  // Modeling plans before it writes: the plan switch starts on for an unexecuted
+  // session. Daily mode only asks questions, so it has no switch.
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
-    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: true } } : {};
-  }, [mode]);
+    const unexecuted = !session?.dataagent_topic_id;
+    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: unexecuted } } : {};
+  }, [mode, session?.dataagent_topic_id]);
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;

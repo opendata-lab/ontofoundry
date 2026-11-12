@@ -186,6 +186,13 @@ it("turns the plan switch on for modeling and leaves it out of daily mode", asyn
   expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
   unmount();
 
+  context.model.session = { ...session(), mode: "model", dataagent_topic_id: "topic-1" };
+  const executed = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const executedEl = executed.container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(executedEl.composerConfig).toEqual({ planMode: { enabled: true, default: false } });
+  executed.unmount();
+
   context.model.session = { ...session(), mode: "chat" };
   const daily = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
@@ -237,6 +244,34 @@ it("adds no platform message or retry button for a failed run", async () => {
   expect(container.querySelector('[slot="composer-overlay"]')).toBeNull();
   expect(screen.queryByText("平台消息")).toBeNull();
   expect(screen.queryByRole("button", { name: "重试" })).toBeNull();
+});
+
+it("forwards 继续 without prepending scenario context", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ task_id: "t-1", status: "running" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+    const conversation = container.querySelector("dataagent-conversation") as AgentConversationElement;
+    expect(conversation.transportFactory).toBeTypeOf("function");
+    const transport = conversation.transportFactory!("/api/v1/workspaces/w1/sessions/s1/agent-conversation");
+
+    fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), {
+      target: { value: "星河零售" },
+    });
+
+    await transport.sendMessage({ content: "继续" });
+    const lastCall = fetchMock.mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const body = JSON.parse(lastCall![1].body as string);
+    expect(body.content).toBe("继续");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 it("switches an unstarted session's mode and shows chat without builder side panels", async () => {
