@@ -18,17 +18,15 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 ---
 
----
-
 ## 2. 行业调研与同类产品对标分析
 
-随着现代数据栈与大模型智能体生态的演进，独立语义层（Headless Semantic Layer）与业务本体（Operational Ontology）正在经历代际变革。通过对全球开源与商业产品的系统性调研，当前业界主要分为四大派系：
+随着现代数据栈与大模型智能体生态的演进，独立语义层（Headless Semantic Layer）与业务本体（Operational Ontology）正在快速演进。以下为调研摘要，产品描述未逐条附来源，引用前需核对官方文档。业界大致可分为四类：
 
-### 2.1 业界四大派系盘点
+### 2.1 业界四类产品
 
-#### 1. 工业级本体与操作中枢派（最接近 OntoFoundry 愿景的标杆）
-* **Palantir Foundry (AIP Logic & Foundry Actions & Ontology MCP)**：全球工业级企业本体的绝对标杆。
-  * **现实路线**：Palantir 在大型企业中极少能直连生产数据库，主要依靠 **Data Connectors + External Webhooks + TypeScript Functions**。
+#### 1. 工业级本体与操作中枢派
+* **Palantir Foundry (AIP Logic & Foundry Actions & Ontology MCP)**：工业级企业本体的代表产品。
+  * **现实路线**：Palantir 在企业中常通过 **Data Connectors + External Webhooks + TypeScript Functions** 接入业务系统（未核实来源）。
   * **状态与动作**：实体属性支持由外部 REST API 实时填充（Hydration），实体上绑定的业务动作（Actions，如退款、封控）直接映射为业务系统的 API/Webhook。近期推出 **Ontology MCP Hub**，外部服务可通过 MCP 直接挂接为本体能力。
 * **C3.ai (C3 Type System - 模型驱动架构)**：企业级 AI 软件独角兽。
   * **核心技术**：C3 Type System 将业务类型（如 `Customer`、`SmartMeter`）彻底与底层存储解耦。属性可以声明来自关系数据库、时序库、或者业务系统的 REST API。由平台联邦执行引擎自动分发调度。
@@ -47,7 +45,7 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 * **核心局限**：偏向纯程序员视角的 API 编排网关，**没有业务指标（Metrics）定义、没有本体知识事实、缺乏面向大模型的 MCP 语义支持**。
 
 #### 4. 面向 Agent 的工具路由派（Agent-Native Tool & Action Hub）
-* **Composio (composio.dev)**：当前海外 Agent 生态中极火的平台，封装了 250+ SaaS 系统的 API 并转为 Agent Tool / MCP Server。
+* **Composio (composio.dev)**：Agent 工具集成平台，封装了 250+ SaaS 系统的 API 并转为 Agent Tool / MCP Server。
 * **核心局限**：**空有四肢、缺乏大脑**。Composio 只有离散的工具（`create_jira_issue`、`get_salesforce_contact`），但缺乏“业务概念拓扑与实体关系（Ontology）”，智能体无法理解深层业务上下文和跨系统关联。
 
 ### 2.2 核心现实：长期来看 API / MCP 是更常态化的场景
@@ -57,7 +55,7 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 2. **安全与合规审计**：直连数据库直接绕过应用层的动态脱敏、行级权限控制与审计日志，且存在大查询锁表（Deadlock）打垮生产事务的致命风险；
 3. **接口契约稳定性**：底层表结构随时重构，但官方对外暴露的 API / MCP 具备严格的语义版本控制（SemVer）。
 
-因此，**OntoFoundry 必须确立“API 与 MCP 工具为一等公民、数仓表为大吞吐后备”的混合架构基调（SL-14）**。
+据此提出 SL-14：以 API 与 MCP 工具为常态来源、数仓表为大吞吐后备。该方向待评审，并与决定 #37（删除业务动作）及“执行细节不进入模型”的产品原则相关，需单独设计。
 
 ### 2.3 横向对比矩阵
 
@@ -71,10 +69,10 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 ### 2.4 OntoFoundry 的差异化破局点
 
-比起传统纯指标工具或离散工具平台，OntoFoundry 具备三大代际级护城河：
+比起传统纯指标工具或离散工具平台，OntoFoundry 的目标差异点有三项：
 1. **全域业务认知大脑（Ontology Brain）**：不同于 Composio 的离散工具堆砌，我们提供统一的实体概念网络、关系图谱与计算指标，赋予 Agent 结构化的业务认知；
 2. **多模态混合源绑定（Hybrid Hydration）**：解耦底层物理细节，同一个实体，基础属性可走数仓表，实时状态可走业务 API/MCP；
-3. **“查、修、馈、环”自愈闭环**：不仅对 Agent 开放只读查询，更通过结构化变更提案（修）与业务争议提报（馈），结合原子化校验与指纹刷新，实现本体资产的持续演进沉淀。
+3. **“查、修、馈、环”自愈闭环**：不仅对 Agent 开放只读查询，更通过结构化变更提案（修）与业务争议提报（馈），结合原子化校验与版本发布，实现本体资产的持续演进沉淀。
 
 ---
 
@@ -84,12 +82,19 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 |---|---|---|
 | SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议继续有效。首版新增 `/api/v1/ontology/mcp`，提供空间目录、跨空间语义检索和定义读取。两个入口共用现有本体读取服务。 | 首版能力及工具契约见第 7.1 节 |
 | SL-02 | **个人访问令牌（PAT）**：网关使用绑定用户的个人令牌，每次调用按当前空间成员关系和令牌权限范围授权。`ontology:read` 用于读取语义，返回物理映射还需 `mappings:read`。试点用户可只加入一个工作空间。首版建议复用现有登录会话签发、查看元数据和撤销。来源为现有本体读权限与常见个人访问令牌机制，属于接入鉴权。 | 个人令牌及读权限边界已确认，管理界面细节待评审 |
+
+### 3.1 待评审提案
+
+以下提案尚未确认，不在首版实施范围。按 AGENTS.md，新增字段或模式（如 SL-07 的废弃字段、SL-13/SL-14 的接口来源与业务动作）在评审时需说明来源、属于语义还是执行优化、删掉会失去什么，以及已有结构能否表达。SL-13、SL-14 涉及业务动作，与决定 #37 冲突。
+
+| 编号 | 提案 | 状态 |
+|---|---|---|
 | SL-03 | **网关调用归因**：建议记录用户 ID、令牌 ID、涉及的工作空间、工具名、结果和请求 ID。后续反馈与变更提案以服务端解析的调用者为提交人。 | 待评审 |
 | SL-04 | **两阶段知识回流（反馈闭环）**：智能体通过 MCP 工具 `submit_ontology_feedback` 提交轻量业务反馈或争议，在平台生成“待审反馈/工单”，由空间管理员或建模人员在 Web 控制台确认合并；严禁外部 Agent 直接非受控覆盖生产本体。 | 待评审 |
-| SL-05 | **空间语义指纹与版本化（Semantic Hash / SemVer）**：每个空间维护唯一的 `ontology_version` 与 `version_hash`。空间内任何实体、属性、度量或绑定的增删改均使 Hash 变化。MCP 响应统一附带元数据 `_meta: { space_id, ontology_version, version_hash }`。 | 待评审 |
+| SL-05 | **空间语义版本标识**：沿用已发布版本记录的 `version_id` 与递增的 `version_number`，每次发布产生新版本，不另建语义版本号或指纹。MCP 响应统一附带元数据 `_meta: { workspace_id, version_id, version_number }`。 | 待评审 |
 | SL-06 | **条件查询与缓存失效（ETag 协议）**：MCP 核心探查工具支持 `if_version_matches`。未变化返回轻量 `NOT_MODIFIED` 节省上下文 Token；已变化返回最新子图与变更摘要，强制智能体刷新认知。 | 待评审 |
 | SL-07 | **软废弃元数据与迁移警示（Deprecation Metadata）**：实体与指标支持 `deprecated`、`deprecation_reason`、`superseded_by`。对已废弃对象的调用正常响应但附带警告，Skill 强制 Agent 主动提示用户迁移至新口径。 | 待评审 |
-| SL-08 | **接口增量演进与自愈错误契约**：MCP 工具采用向后兼容的增量变更；发生语义漂移或不兼容变更时，后端返回带 `ERR_SEMANTIC_VERSION_DRIFT` 的业务错误，内嵌 `suggested_action` 指引 Agent 自主重新拉取最新图谱自愈。 | 待评审 |
+| SL-08 | **接口增量演进与自愈错误契约**：MCP 工具采用向后兼容的增量变更；发生语义漂移或不兼容变更时，后端返回带 `SEMANTIC_VERSION_DRIFT` 的业务错误，内嵌 `suggested_action` 指引 Agent 自主重新拉取最新图谱自愈。 | 待评审 |
 | SL-09 | **标准插件封装（OntoFoundry Plugin for Agents）**：将 MCP 服务声明、Semantic Grounding 核心 Skill 与 Rules 打包为通用 Plugin 规范（支持 zcode、Cursor、Claude Code 等），固化“先查本体 -> 消歧对齐 -> 构造查询 -> 异常反馈”的行为规约。 | 待评审 |
 | SL-10 | **语义交接与业务数据执行**：首版建议由网关提供已发布的语义与授权可见的物理映射，Agent 将确认后的口径交给已有查询平台执行。查询平台独立校验调用者的数据权限。查询编译与委派接口按后续需求评审。 | 待评审 |
 | SL-11 | **预置插件斜杠命令（Slash Commands）**：在 Plugin 中预置 `/onto-search`、`/onto-metric`、`/onto-sync`、`/onto-propose`、`/onto-feedback`、`/onto-spaces` 等快捷命令，降低用户认知成本，提供高频、确定性的交互通道。 | 待评审 |
@@ -136,24 +141,24 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 ## 5. 语义版本化与防漂移协议（SL-05、SL-06、SL-07、SL-08）
 
-### 4.1 语义版本指纹（Semantic Version Fingerprint）
+### 5.1 语义版本标识
 
-每个空间维护由核心定义内容计算得出的 SHA-256 摘要前缀（`version_hash`）及语义版本号：
-* 变更触发源：实体（Object Type）、属性（Property）、关系（Link Type）、规则（Rule）、独立指标（Metric）、数据集绑定（Dataset Binding）的任何发布与修改。
+沿用已发布版本记录的 `version_id` 与递增的 `version_number`（见 `OntologyVersionRecord`），不另建语义版本号或指纹：
+* 变更触发源：发布。实体、属性、关系、规则、指标或数据集绑定的修改在发布后才产生新版本。
 * 元数据注入：所有 MCP 工具返回的数据均外覆 `_meta` 对象：
   ```json
   {
     "_meta": {
-      "space_id": "fiction_procure_space",
-      "ontology_version": "v1.3.0",
-      "version_hash": "e3b0c44",
+      "workspace_id": "ws_demo_procure",
+      "version_id": "ver_demo_013",
+      "version_number": 13,
       "updated_at": "2026-11-11T10:30:00Z"
     },
     "result": { ... }
   }
   ```
 
-### 4.2 条件查询与 ETag 协议（SL-06）
+### 5.2 条件查询与 ETag 协议（SL-06）
 
 为解决 Agent 长时间运行上下文缓存陈旧、频繁拉取整图浪费 Token 的问题：
 
@@ -162,23 +167,23 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
   {
     "tool": "get_entity_subgraph",
     "parameters": {
-      "space_id": "fiction_procure_space",
+      "workspace_id": "ws_demo_procure",
       "entity_name": "PurchaseOrder",
-      "if_version_matches": "e3b0c44"
+      "if_version_matches": "ver_demo_013"
     }
   }
   ```
 * **响应情况 A：未发生变更（304 Not Modified）**：
   ```json
   {
-    "_meta": { "space_id": "fiction_procure_space", "version_hash": "e3b0c44", "status": "NOT_MODIFIED" },
+    "_meta": { "workspace_id": "ws_demo_procure", "version_id": "ver_demo_013", "status": "NOT_MODIFIED" },
     "message": "本体语义无变化，可继续沿用本地上下文"
   }
   ```
 * **响应情况 B：已发生变更（强制刷新）**：
   ```json
   {
-    "_meta": { "space_id": "fiction_procure_space", "version_hash": "7f8a9b1", "status": "UPDATED" },
+    "_meta": { "workspace_id": "ws_demo_procure", "version_id": "ver_demo_014", "status": "UPDATED" },
     "changelog_since_last": [
       "Property [tax_amount] added to [PurchaseOrder]",
       "Metric [net_procure_amount] formula updated"
@@ -187,7 +192,7 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
   }
   ```
 
-### 4.3 软废弃元数据（SL-07）
+### 5.3 软废弃元数据（SL-07）
 
 指标和属性支持软废弃，定义结构如下：
 
@@ -205,17 +210,17 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 当 Agent 请求涉及此度量时，MCP 返回并在响应中注入警告 `warnings: [{ code: "DEPRECATED_METRIC", ... }]`，Skill 指引 Agent 主动告知用户。
 
-### 4.4 自愈错误契约（SL-08）
+### 5.4 自愈错误契约（SL-08）
 
-当 Agent 发起的操作引用的实体、属性或关系已不存在或口径发生冲突时，后端返回符合 `ServiceError` 约定的结构化自愈响应：
+当 Agent 发起的操作引用的实体、属性或关系已不存在或口径发生冲突时，后端返回 `ServiceError`（英文 `code`、中文 `message`）。`workspace_id`、`current_version_id`、`suggested_action`、`can_self_heal` 为新增的错误详情字段，需随契约一起评审：
 
 ```json
 {
   "error": {
-    "code": "ERR_SEMANTIC_VERSION_DRIFT",
-    "message": "属性 [PurchaseOrder.status_code] 已在 v1.3.0 中迁移至 [PurchaseOrder.order_status]",
-    "space_id": "fiction_procure_space",
-    "current_version": "v1.3.0",
+    "code": "SEMANTIC_VERSION_DRIFT",
+    "message": "属性 [PurchaseOrder.status_code] 已在第 14 版中迁移至 [PurchaseOrder.order_status]",
+    "workspace_id": "ws_demo_procure",
+    "current_version_id": "ver_demo_014",
     "suggested_action": "调用 get_entity_subgraph('PurchaseOrder') 重新同步最新定义并重新生成查询",
     "can_self_heal": true
   }
@@ -228,7 +233,7 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 要实现“持续沉淀、修正语义”，系统必须打通**“语义能查（知）”、“语义能修（改）”、“能提交反馈（馈）”、“持续自愈演进（环）”**四大支柱，形成完整的资产演进生命周期。
 
-### 5.1 闭环全景流程
+### 6.1 闭环全景流程
 
 ```mermaid
 flowchart TD
@@ -247,33 +252,33 @@ flowchart TD
         RevGov --> PB
         PB --> WebRev[Web 控制台审阅看板: 变更 Diff 与冲突比对]
         WebRev -->|管理员核准合并| Merge[发布新版本 & 写入生产本体]
-        Merge --> Bump[4. 环: 更新 version_hash & 发布事件]
+        Merge --> Bump[4. 环: 生成新的发布版本 version_id]
     end
 
-    Bump -.->|下一次请求带最新指纹 / ETag 失效| Q
+    Bump -.->|下一次请求带最新 version_id / ETag 失效| Q
     Bump -.->|/onto-sync 强制刷新| Q
 ```
 
 ---
 
-### 5.2 语义能查（知）：语义服务与按需探查
+### 6.2 语义能查（知）：语义服务与按需探查
 
 * **核心目标**：提供只读的语义基座服务，消除物理表与业务术语之间的鸿沟，防止外部 Agent 臆造库表字段。
 * **工具支持**：
-  * `list_spaces`：按当前 PAT 用户权限展示空间目录与各空间最新指纹。
+  * `list_spaces`：按当前 PAT 用户权限展示空间目录与各空间当前 `version_id`。
   * `search_ontology`：基于 BM25 / 向量的多空间概念全文检索。
   * `get_entity_subgraph`：获取指定实体及其 1 度/2 度关系子图，带绑定物理表投影，支持 `if_version_matches` 条件 ETag。
   * `resolve_metric`：精确解析指标口径公式、默认过滤条件、聚合基数与物理列映射。
 
 ---
 
-### 5.3 语义能修（改）：结构化语义变更提案（SL-12）
+### 6.3 语义能修（改）：结构化语义变更提案（SL-12）
 
 当开发者在 zcode 中编写业务逻辑，发现“采购订单实体缺少 `tax_rate` 属性”，或“净采购额指标公式需要更新”时，**具备空间编辑权限的 Agent 可以直接调用结构化修改工具**：
 
 * **工具定义：`propose_ontology_mutation`**
   * **入参**：
-    * `space_id`: 目标空间；
+    * `workspace_id`: 目标空间；
     * `action`: `create` | `update` | `deprecate` | `delete`；
     * `target_kind`: `object_type` | `property` | `link_type` | `metric` | `dataset_binding`；
     * `target_name`: 概念英文标识（如 `net_procure_amount`）；
@@ -282,17 +287,17 @@ flowchart TD
   * **后端处理机制**：
     1. 后端直接复用平台现有的**提案检查与原子化校验引擎（`parse_agent` / `trial_apply`）**，当场检查语法、类型兼容性、来源物理列是否存在。
     2. 校验通过后，在空间内生成一个待合并的提案批次（Proposal Batch），附带提交人 `created_by=user_id` 与客户端来源 `source=zcode`。
-    3. 若该用户本身是空间的 Space Admin，可支持配置 `auto_merge_if_admin=true` 直接生效，否则进入待审池。
+    3. 提案一律进入待审池，空间管理员提交的提案同样经平台审阅后合并，不绕过审阅。
 
 ---
 
-### 5.4 能提交反馈（馈）：轻量业务反馈与争议上报（SL-04）
+### 6.4 能提交反馈（馈）：轻量业务反馈与争议上报（SL-04）
 
 面向普通业务分析师或只读用户，当其不具备建模权限，或仅发现“计算出来的结果不对、退款没有扣除”但不知道底层表结构如何修改时：
 
 * **工具定义：`submit_ontology_feedback`**
   * **入参**：
-    * `space_id`: 涉及空间；
+    * `workspace_id`: 涉及空间；
     * `target_concept`: 存疑的概念或指标（如 `GMV`）；
     * `issue_category`: `formula_dispute`（口径争议） | `missing_concept`（缺少概念） | `definition_unclear`（定义不清）；
     * `description`: 用户自然语言描述（“财务口径要求从本月起排除未付款订单”）；
@@ -303,12 +308,12 @@ flowchart TD
 
 ---
 
-### 5.5 持续沉淀与自愈闭环（环）
+### 6.5 持续沉淀与自愈闭环（环）
 
-1. **版本递增与指纹刷新**：无论是通过“修（提案）”还是“馈（反馈转提案）”，一旦管理员在平台审阅通过并合并，空间的 `ontology_version` 自动递增，规范化 `version_hash` 立即重新计算。
+1. **发布新版本**：无论是通过“修（提案）”还是“馈（反馈转提案）”，一旦管理员在平台审阅通过并合并，发布产生新的 `version_id`，`version_number` 递增。
 2. **外部感知与即时自愈**：
-   * **隐式自愈**：外部智能体下次发起查询时，若传入了旧的 `if_version_matches`，平台返回 `UPDATED` 及最新变更摘要，Agent 静默刷新上下文；若调用了已删除/废弃的概念，平台返回 `ERR_SEMANTIC_VERSION_DRIFT` 指引 Agent 自愈重新拉图。
-   * **显式刷新**：用户在 zcode 敲 `/onto-sync`，立即强制拉取空间最新语义指纹与变更记录。
+   * **隐式自愈**：外部智能体下次发起查询时，若传入了旧的 `if_version_matches`，平台返回 `UPDATED` 及最新变更摘要，Agent 静默刷新上下文；若调用了已删除/废弃的概念，平台返回 `SEMANTIC_VERSION_DRIFT` 指引 Agent 自愈重新拉图。
+   * **显式刷新**：用户在 zcode 敲 `/onto-sync`，立即强制拉取空间最新发布版本与变更记录。
 3. **资产持续沉淀**：
    * 外部 Agent 不再是一个单纯的“消费者”，而是成为了语义建设的**“触角与输入源”**。每一次编码纠错、每一次问数争议，都在丰富和纠正平台的全局本体，越用越准。
 
@@ -334,11 +339,11 @@ flowchart TD
 
 | 工具名称 | 职责分类 | 核心参数 | 返回关键内容 |
 |---|---|---|---|
-| `check_space_version` | **查（知）** | `space_id`, `current_hash` | 是否变化、当前版本号、变更摘要 |
-| `get_entity_subgraph` | **查（知）** | `space_id`, `entity_name`, `depth` (默认 1), `if_version_matches?` | 实体定义、属性清单、业务标识、直连关系、引用的数据集投影 |
-| `resolve_semantic_query` | **查（知）** | `space_id`, `metrics`, `dimensions`, `filters` | 编译后生成的安全 SQL、维度对齐路径、口径确认信息 |
-| `propose_ontology_mutation` | **修（改）** | `space_id`, `action`, `target_kind`, `target_name`, `payload`, `rationale` | 提案批次 ID (`batch_id`)、原子校验状态、审阅链接、是否已直合（Admin 模式） |
-| `submit_ontology_feedback` | **馈（馈）** | `space_id`, `target_concept`, `issue_category`, `description`, `dialogue_context` | 反馈工单 ID (`feedback_id`)、审阅链接、状态 (`PENDING_REVIEW`) |
+| `check_space_version` | **查（知）** | `workspace_id`, `current_version_id` | 是否变化、当前版本号、变更摘要 |
+| `get_entity_subgraph` | **查（知）** | `workspace_id`, `entity_name`, `depth` (默认 1), `if_version_matches?` | 实体定义、属性清单、业务标识、直连关系、引用的数据集投影 |
+| `resolve_semantic_query` | **查（知）** | `workspace_id`, `metrics`, `dimensions`, `filters` | 编译后生成的安全 SQL、维度对齐路径、口径确认信息 |
+| `propose_ontology_mutation` | **修（改）** | `workspace_id`, `action`, `target_kind`, `target_name`, `payload`, `rationale` | 提案批次 ID (`batch_id`)、原子校验状态、审阅链接 |
+| `submit_ontology_feedback` | **馈（馈）** | `workspace_id`, `target_concept`, `issue_category`, `description`, `dialogue_context` | 反馈工单 ID (`feedback_id`)、审阅链接、状态 (`PENDING_REVIEW`) |
 
 ---
 
@@ -354,8 +359,8 @@ flowchart TD
    * 禁止在未检索本体的情况下臆造物理库表名或字段名。
    * 查询前必须先调用 `search_ontology` 或 `get_entity_subgraph` 确认概念已发布。
 2. **版本防漂移规则（Version Freshness）**：
-   * 在涉及复杂指标计算的对话中，若本地上下文中的本体知识超过 30 分钟未更新，必须调用 `check_space_version` 校验指纹。
-   * 遇到 `ERR_SEMANTIC_VERSION_DRIFT` 时，禁止机械重试，严格按照返回的 `suggested_action` 重新拉取新子图。
+   * 在涉及复杂指标计算的对话中，若本地上下文中的本体知识超过 30 分钟未更新，必须调用 `check_space_version` 核对版本。
+   * 遇到 `SEMANTIC_VERSION_DRIFT` 时，禁止机械重试，严格按照返回的 `suggested_action` 重新拉取新子图。
 3. **闭环修改与纠偏策略（Mutate & Feedback Strategy）**：
    * **修（Propose）**：开发者明确要求新增或变更概念且具备权限时，调用 `propose_ontology_mutation` 提交结构化提案。
    * **馈（Feedback）**：业务用户提出口径分歧但未指定修改方案时，调用 `submit_ontology_feedback` 提交工单。
@@ -366,10 +371,10 @@ flowchart TD
 |---|---|---|
 | `/onto-search [词]` | **查** | 快速探查实体或指标的官方权威定义卡片（如 `/onto-search 采购订单`） |
 | `/onto-metric [指标]` | **查** | 穿透查看指标的底层计算公式、过滤条件与物理表绑定（如 `/onto-metric 净采购额`） |
-| `/onto-sync [空间]` | **环** | 强制刷新本地语义缓存，校验 `version_hash` 并展示最新变更日志 |
+| `/onto-sync [空间]` | **环** | 强制刷新本地语义缓存，核对 `version_id` 并展示最新变更日志 |
 | `/onto-propose` | **修** | 引导式发起结构化变更提案（支持在 IDE 中交互补齐属性/公式并提交审核） |
 | `/onto-feedback [描述]` | **馈** | 一键将当前会话中的口径争议与 SQL 片段打包上报平台工单库 |
-| `/onto-spaces` | **查** | 列出当前用户有权访问的所有空间、所属角色与当前版本指纹 |
+| `/onto-spaces` | **查** | 列出当前用户有权访问的所有空间、所属角色与当前版本 |
 
 ---
 
@@ -400,15 +405,15 @@ flowchart TD
 
 我们对本体语义层的定位不仅是“分析型数仓表上的 SQL 翻译器”，而是**全域业务语义中枢（Enterprise Semantic Hub）**。
 
-### 10.1 数据源的双模态：从 Table 到 API / 外部 MCP
+### 11.1 数据源的双模态：从 Table 到 API / 外部 MCP
 * **物理表来源（Table-backed）**：适合大规模、批处理与 OLAP 分析型数据（如历史订单表、账单表）。
 * **接口/工具来源（API/MCP-backed）**：业务应用（如 CRM、ERP、工单系统）通过自身的 OpenAPI 或 MCP 接口接入平台。
   * 实体属性既可以绑定物理表列，也可以绑定实时 API 的输出字段（例如：`Customer.live_credit_score` 绑定调用风控系统的 MCP 接口实时获取最新分值）。
   * 平台将数据集绑定扩展支持 `source_kind: api` 或 `source_kind: mcp_tool`。
 
-### 10.2 读写完整生命周期：状态（State）与动作（Action）
+### 11.2 读写完整生命周期：状态（State）与动作（Action）
 * **读语义（State）**：实体属性、关系图谱与聚合指标。
 * **操作语义（Action）**：业务应用暴露的 MCP 操作工具（如 `approve_refund(order_id)`、`lock_account(user_id)`）。
   * 平台管理“什么实体支持什么动作、动作的参数约束与前置规则（Rules）”。
   * 智能体不仅能查询“这个客户有哪些逾期订单”，还能在本体规则校验通过后，调用绑定的业务应用 MCP 工具发起操作。
-* **定位升维**：这一特性让平台与 Cube、dbt 等传统 SQL 语义层产生代差级跃迁，直接具备了对标 Palantir Foundry 核心操作中枢（Operational Ontology）的能力。
+* **定位升维**：这一特性让平台与 Cube、dbt 等传统 SQL 语义层拉开差异，接近 Palantir Foundry 操作型本体（Operational Ontology）的定位。该方向待评审，与决定 #37 冲突，需单独设计。
