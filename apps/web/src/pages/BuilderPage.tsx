@@ -258,10 +258,13 @@ export function BuilderPage() {
           // The session's mode decides, whichever path sent the message.
           const mode = current.mode;
           const context = current.scenario.trim();
-          const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== "继续" && input.content.trim() !== context
+          // A retry or continue resumes the run as is: it carries no scenario,
+          // so the scenario box keeps its text for the next real request.
+          const resume = ["重试", "继续"].includes(input.content.trim());
+          const content = mode === "model" && context && !resume && input.content.trim() !== context
             ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
           const run = await transport.sendMessage({ ...input, content, metadata: { ...input.metadata, mode } });
-          if (mode === "model") setScenario((value) => value === current.scenario ? "" : value);
+          if (mode === "model" && !resume) setScenario((value) => value === current.scenario ? "" : value);
           return run;
         },
       };
@@ -280,12 +283,21 @@ export function BuilderPage() {
   }, [workspace.id]);
   // Modeling plans before it writes: the plan switch starts on for an unexecuted
   // session. Daily mode only asks questions, so it has no switch.
+  // The SDK resets the switch whenever `default` changes, so the default is
+  // fixed when a session is loaded: the topic id a session gains on its first
+  // send must not turn the switch off mid-conversation.
+  const planDefault = useRef<{ id: string | null; on: boolean }>({ id: null, on: true });
+  const sessionKey = session?.id ?? null;
+  const executed = !!session?.dataagent_topic_id;
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
-    const unexecuted = !session?.dataagent_topic_id;
-    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: unexecuted } } : {};
-  }, [mode, session?.dataagent_topic_id]);
+    if (planDefault.current.id !== sessionKey) planDefault.current = { id: sessionKey, on: !executed };
+    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: planDefault.current.on } } : {};
+    // `executed` is read only when the session changes; a later change must not
+    // reassign the config.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, sessionKey]);
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;

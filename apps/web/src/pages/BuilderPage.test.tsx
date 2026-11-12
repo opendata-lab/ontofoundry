@@ -200,6 +200,20 @@ it("turns the plan switch on for modeling and leaves it out of daily mode", asyn
   expect(chat.composerConfig).toEqual({});
 });
 
+it("keeps the plan default when the session's first send creates its topic", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const before = el.composerConfig;
+
+  context.model.session = { ...session(), mode: "model", dataagent_topic_id: "topic-1" };
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  expect(el.composerConfig).toBe(before);
+  expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
+});
+
 it("opens an expanded plan in the results column and closes back", async () => {
   context.model.session = { ...session(), mode: "model" };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
@@ -264,11 +278,13 @@ it("forwards 继续 without prepending scenario context", async () => {
       target: { value: "星河零售" },
     });
 
-    await transport.sendMessage({ content: "继续" });
+    await act(async () => { await transport.sendMessage({ content: "继续" }); });
     const lastCall = fetchMock.mock.calls.at(-1);
     expect(lastCall).toBeDefined();
     const body = JSON.parse(lastCall![1].body as string);
     expect(body.content).toBe("继续");
+    // The scenario was not sent, so it stays for the next request.
+    expect(screen.getByRole("textbox", { name: "业务场景描述" })).toHaveValue("星河零售");
   } finally {
     vi.unstubAllGlobals();
   }
