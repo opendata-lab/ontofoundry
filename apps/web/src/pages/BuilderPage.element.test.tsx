@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defineAgentConversation } from "@opendataworks/agent-conversation";
+import { defineAgentConversation } from "@opendataagent/agent-conversation";
 
 /**
  * The conversation area is a custom element, so it only works if something

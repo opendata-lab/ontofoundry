@@ -4,7 +4,7 @@ import "./styles/index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { defineAgentConversation } from "@opendataworks/agent-conversation";
+import { defineAgentConversation } from "@opendataagent/agent-conversation";
 import { App } from "./App";
 import { UiProvider } from "./theme/UiProvider";
 
