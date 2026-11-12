@@ -2,6 +2,8 @@
 
 日期：2026-11-11。状态：草案待审。来源：针对外部编程与分析智能体（zcode、Cursor、Claude Code 等）消费本体语义、反馈纠偏、多空间路由与语义/接口版本演进的需求整理。
 
+2026-11-12 已确认首版要求：兼容已有单空间 MCP 配置，提供个人访问令牌、工作空间目录和跨空间语义查询。试点用户可先通过现有成员管理获授一个空间。其余细节按决定表状态执行。
+
 ## 1. 背景与核心问题
 
 OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除数据孤岛与理解分歧。目前平台已具备内部建模与问数能力（通过 DataAgent 与单空间固定令牌 MCP）。随着业务发展，用户提出在外部通用编码与分析智能体（如 zcode、Cursor 等）中直接消费 OntoFoundry 本体语义的需求。
@@ -80,16 +82,16 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 | 编号 | 决定 | 状态 |
 |---|---|---|
-| SL-01 | **单网关 MCP（Gateway Pattern）**：提供平台级统一网关 MCP 端点 `/api/v1/ontology/mcp`，取代按空间拆分的多个 MCP 端点。智能体只需配置一次，通过参数指定空间或由后端自动在用户有权空间内检索。来源：MCP 最佳实践与微服务网关模式；执行优化，不改变底层空间隔离模型。 | 待评审 |
-| SL-02 | **平台级个人访问令牌（PAT）**：用户在平台个人设置生成唯一的 PAT（`ont_pat_xxx`），绑定全局用户身份。MCP 自动识别调用者 `user_id` 并根据空间的 RBAC 权限做动态裁剪；彻底消除“为每个空间单独申请令牌”的认知负担。 | 待评审 |
-| SL-03 | **全链路调用与反馈归因**：MCP 所有工具调用在服务端记录 `user_id`、`client: zcode`、`workspace_id` 与工具参数；智能体提交的反馈与变更提案自动绑定当前用户，无需客户端传递身份信息。 | 待评审 |
+| SL-01 | **兼容单空间 MCP，新增用户网关**：现有单空间地址、凭据、工具契约和协议兼容继续有效。首版新增 `/api/v1/ontology/mcp`，提供空间目录和跨空间语义查询。两个入口共用现有本体读取服务。 | 首版能力已确认，契约细节见实施计划 |
+| SL-02 | **个人访问令牌（PAT）**：网关使用绑定用户的个人令牌，每次调用按当前空间成员关系和令牌操作范围授权。试点用户可只加入一个工作空间。首版建议复用现有登录会话签发、查看元数据和撤销。来源为常见个人访问令牌机制，属于接入鉴权。 | 个人令牌已确认，管理界面细节待评审 |
+| SL-03 | **网关调用归因**：建议记录用户 ID、令牌 ID、涉及的工作空间、工具名、结果和请求 ID。后续反馈与变更提案以服务端解析的调用者为提交人。 | 待评审 |
 | SL-04 | **两阶段知识回流（反馈闭环）**：智能体通过 MCP 工具 `submit_ontology_feedback` 提交轻量业务反馈或争议，在平台生成“待审反馈/工单”，由空间管理员或建模人员在 Web 控制台确认合并；严禁外部 Agent 直接非受控覆盖生产本体。 | 待评审 |
 | SL-05 | **空间语义指纹与版本化（Semantic Hash / SemVer）**：每个空间维护唯一的 `ontology_version` 与 `version_hash`。空间内任何实体、属性、度量或绑定的增删改均使 Hash 变化。MCP 响应统一附带元数据 `_meta: { space_id, ontology_version, version_hash }`。 | 待评审 |
 | SL-06 | **条件查询与缓存失效（ETag 协议）**：MCP 核心探查工具支持 `if_version_matches`。未变化返回轻量 `NOT_MODIFIED` 节省上下文 Token；已变化返回最新子图与变更摘要，强制智能体刷新认知。 | 待评审 |
 | SL-07 | **软废弃元数据与迁移警示（Deprecation Metadata）**：实体与指标支持 `deprecated`、`deprecation_reason`、`superseded_by`。对已废弃对象的调用正常响应但附带警告，Skill 强制 Agent 主动提示用户迁移至新口径。 | 待评审 |
 | SL-08 | **接口增量演进与自愈错误契约**：MCP 工具采用向后兼容的增量变更；发生语义漂移或不兼容变更时，后端返回带 `ERR_SEMANTIC_VERSION_DRIFT` 的业务错误，内嵌 `suggested_action` 指引 Agent 自主重新拉取最新图谱自愈。 | 待评审 |
 | SL-09 | **标准插件封装（OntoFoundry Plugin for Agents）**：将 MCP 服务声明、Semantic Grounding 核心 Skill 与 Rules 打包为通用 Plugin 规范（支持 zcode、Cursor、Claude Code 等），固化“先查本体 -> 消歧对齐 -> 构造查询 -> 异常反馈”的行为规约。 | 待评审 |
-| SL-10 | **双模态语义输出与执行解耦**：第一期坚守“纯语义与元数据提供者”，物理 SQL 执行交由 opendataworks 插件；第二期演进支持 Agent-as-a-Tool 委派模式（A2A），保持运行时无关。 | 待评审 |
+| SL-10 | **语义交接与业务数据执行**：首版建议由网关提供已发布的语义与授权可见的物理映射，Agent 将确认后的口径交给已有查询平台执行。查询平台独立校验调用者的数据权限。查询编译与委派接口按后续需求评审。 | 待评审 |
 | SL-11 | **预置插件斜杠命令（Slash Commands）**：在 Plugin 中预置 `/onto-search`、`/onto-metric`、`/onto-sync`、`/onto-propose`、`/onto-feedback`、`/onto-spaces` 等快捷命令，降低用户认知成本，提供高频、确定性的交互通道。 | 待评审 |
 | SL-12 | **结构化语义修改提案（Propose Semantic Mutations）**：面向有权限的开发与建模智能体，开放结构化变更工具 `propose_ontology_mutation`，支持直接提交实体、属性、度量或绑定的创建与修改，复用平台已有的提案原子化检查（`parse_agent` / `trial_apply`），实现“语义能修”。 | 待评审 |
 | SL-13 | **多源语义绑定与业务应用 MCP 桥接（Data & API & Action）**：本体底层不局限于只读数仓表，预留支持业务应用通过 API / MCP 接入作为数据与动作来源。实体属性既可绑定数据表列，也可绑定实时 API/MCP 工具返回值；未来进一步映射业务动作（Action Types），成为全域业务语义中枢。 | 待评审 |
@@ -99,19 +101,20 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 ## 4. 多空间接入与认证架构（SL-01、SL-02、SL-03）
 
-### 3.1 接入对比
+### 4.1 接入与兼容
 
-* **改前（单空间独立 MCP，见 `2026-10-22-fixed-mcp-token.md`）**：
-  * 地址：`/api/v1/ontology/workspaces/{workspace_id}/mcp`
-  * 鉴权：部署固定的静态环境变量令牌（代表最早加入的管理员身份，只读，无法识别真实调用人）。
-  * 体验：用户在 zcode 中若要使用 `fiction_retail_space` 与 `fiction_crm_space`，必须在配置中维护两个不同的 MCP Server。
+| 入口 | 地址 | 凭据 | 适用场景 |
+|---|---|---|---|
+| 已有单空间 MCP | `/api/v1/ontology/workspaces/{workspace_id}/mcp` | 沿用固定令牌、建模运行凭据及现有会话鉴权 | DataAgent、建模运行、已有客户端配置 |
+| 新增用户 MCP 网关 | `/api/v1/ontology/mcp` | `Authorization: Bearer <个人访问令牌>` | zcode、Claude Code 等用户接入 |
 
-* **改后（统一 MCP 网关 + PAT，SL-01、SL-02）**：
-  * 地址：`/api/v1/ontology/mcp`
-  * 鉴权头：`Authorization: Bearer <ONTOLOGY_PAT>`
-  * 交互体验：配置一次，终身受益；后端根据 PAT 解析用户身份，自动列出并操作该用户有权的所有空间。
+已有客户端继续使用原配置。新用户配置一次网关，可通过 `list_spaces` 列出成员空间。调用 `search_ontology` 时可检索全部成员空间或指定 `workspace_ids`，结果按空间分组并注明各自的发布版本。调用 `get_ontology` 时用命中的 `workspace_id` 和元素 ID 读取定义。
 
-### 3.2 zcode MCP 配置示例
+例如用户起初只加入虚构星港采购空间，目录和跨空间搜索只返回采购空间；加入虚构星港销售空间后，原令牌和地址可同时查两个空间。网关每次按当前成员关系授权，对显式请求的未授权空间返回统一的空间不可访问错误。
+
+新网关只接受 PAT，旧入口的固定令牌和建模运行凭据继续使用原有鉴权。PAT 首版只用于网关，由现有平台登录身份管理生命周期。
+
+### 4.2 HTTP MCP 配置示例
 
 ```json
 {
@@ -120,36 +123,11 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
       "type": "http",
       "url": "https://ontofoundry.example.com/api/v1/ontology/mcp",
       "headers": {
-        "Authorization": "Bearer ont_pat_9a8b7c6d5e4f3a2b1c0d"
+        "Authorization": "Bearer <个人访问令牌>"
       }
     }
   }
 }
-```
-
-### 3.3 认证与审计流转
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as 用户 (Alice)
-    participant Agent as zcode Agent
-    participant Gateway as OntoFoundry MCP Gateway
-    participant Auth as 认证与权限服务
-    participant Audit as 审计日志服务
-    participant Onto as 本体核心服务
-
-    Note over User,Gateway: 一次性配置 PAT (ont_pat_xxx)
-    User->>Agent: "分析虚构采购空间的近期异常订单"
-    Agent->>Gateway: POST /mcp (tool: search_ontology, PAT)
-    Gateway->>Auth: 校验 PAT 有效性与用户身份
-    Auth-->>Gateway: Principal(user_id="u_alice", tenant_id="t_1")
-    Gateway->>Auth: 获取 u_alice 有权空间及权限级别
-    Auth-->>Gateway: ["fiction_procure_space": read, "fiction_retail_space": admin]
-    Gateway->>Audit: 异步记录调用日志 (user_id, client="zcode", tool="search_ontology", args)
-    Gateway->>Onto: 执行带空间与权限过滤的语义检索
-    Onto-->>Gateway: 返回本体子图与版本指纹
-    Gateway-->>Agent: JSON-RPC Result (_meta 携带 version_hash)
 ```
 
 ---
@@ -383,33 +361,24 @@ flowchart TD
 
 ## 9. 与现有架构的关系与迁移
 
-1. **与 `2026-10-22-fixed-mcp-token.md` 的关系**：
-   * 现有固定令牌 `ONTOFOUNDRY_MCP_TOKEN` 保留，用于内网无用户界面的 DataAgent 容器间服务级通信；
-   * 新增的 PAT 机制用于面向终端用户的通用智能体（zcode、IDE 插件），互不干扰。
-2. **与 `2026-10-21-semantic-grounding-skills.md` 的关系**：
-   * 沿用其关于“检索、候选召回、判级、校验在平台 Python 服务中完成，Skill 只写执行策略”的定式（SG-08）；
-   * 将原先仅适配 DataAgent 的三个内部技能进一步抽象为开放的通用 Agent 规范。
-3. **与平台提案校验体系（`single-proposal-check.md`）的关系**：
-   * `propose_ontology_mutation` 完全复用平台统一的 `parse_agent` 检查逻辑，不另起炉灶。
+| 层次 | 首版影响 |
+|---|---|
+| MCP 与认证 | 同一个 API 应用新增网关、PAT 鉴权和令牌管理接口。两个入口复用本体读取服务，各自注册工具和鉴权依赖。 |
+| 平台数据库 | 通过 Alembic 新增个人令牌表，引用现有用户。工作空间、成员、核心模型和发布记录沿用现有结构。 |
+| DataAgent 与查询 | DataAgent 自动生成的 MCP 地址及建模运行的版本固定机制继续走单空间入口。外部 Agent 可结合已有查询平台执行实际取数。 |
+| 部署 | 同一应用和数据库升级。若反向代理按路径放行，增加新地址并回归旧地址。已有客户端无需更新配置。 |
+
+固定令牌设计的 MT-03 继续适用于原有单空间入口。新增网关可以独立扩展工具及认证方式。需要更改已有工具行为时，通过新增工具或接口版本由客户端选择接入。后续若支持 MCP OAuth，可沿用网关地址和工具契约，兼容现有 PAT。结构化写入另行设计权限与建模会话上下文，复用提案试应用、人工审阅与发布流程。
 
 ---
 
 ## 10. 后续实施阶段划分
 
-* **阶段 1：PAT 鉴权与 MCP 网关支持（P0）**
-  * 后端增加用户 PAT 签发与解析机制；
-  * 新增无 `workspace_id` 路径的统一 MCP 路由 `/api/v1/ontology/mcp`，支持基于用户权限的空间动态过滤。
-* **阶段 2：版本指纹与 ETag 条件查询（P0）**
-  * 空间实体与指标增加 `version_hash` 计算逻辑；
-  * 核心 MCP 工具集成 `_meta` 指纹与 `if_version_matches` 条件判断；
-  * 支持 `deprecated` 元数据与自愈错误码 `ERR_SEMANTIC_VERSION_DRIFT`。
-* **阶段 3：语义闭环——修改提案与反馈工单（P0）**
-  * 实现 `propose_ontology_mutation`（修）工具并对接提案检查入库引擎；
-  * 实现 `submit_ontology_feedback`（馈）工具与待审看板；
-  * OntoFoundry Web 端增加“外部智能体提案/反馈”审阅视图，支持一键采纳并合并。
-* **阶段 4：zcode 插件规范打包与端到端验收（P1）**
-  * 编写面向 zcode / Cursor 的 Plugin 安装包、Skill 模板与 5 个核心斜杠命令；
-  * 在真实业务空间（如 `fiction_procure_space`）中验证“查、修、馈、环”完整闭环。
+1. 在隔离环境验证现有单空间 MCP 和外部 Skill 的语义交接。
+2. 首版交付 PAT、空间目录、跨空间语义检索和定义读取，沿用已发布 `version_id`。同时按原配置回归 DataAgent 和现有客户端。
+3. 按试点需求排定 OAuth、客户端插件、跨空间排序、条件读取和版本差异。反馈与提案另行接入治理流程。
+
+第 5 至第 8 节的扩展工具和协议属于后续评审范围。首版工具契约及验收以[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)为准。
 
 ---
 
