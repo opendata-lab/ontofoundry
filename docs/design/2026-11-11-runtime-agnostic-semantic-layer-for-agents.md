@@ -82,8 +82,8 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 | 编号 | 决定 | 状态 |
 |---|---|---|
-| SL-01 | **兼容单空间 MCP，新增用户网关**：现有单空间地址、凭据、工具契约和协议兼容继续有效。首版新增 `/api/v1/ontology/mcp`，提供空间目录和跨空间语义查询。两个入口共用现有本体读取服务。 | 首版能力已确认，契约细节见实施计划 |
-| SL-02 | **个人访问令牌（PAT）**：网关使用绑定用户的个人令牌，每次调用按当前空间成员关系和令牌操作范围授权。试点用户可只加入一个工作空间。首版建议复用现有登录会话签发、查看元数据和撤销。来源为常见个人访问令牌机制，属于接入鉴权。 | 个人令牌已确认，管理界面细节待评审 |
+| SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议继续有效。首版新增 `/api/v1/ontology/mcp`，提供空间目录、跨空间语义检索和定义读取。两个入口共用现有本体读取服务。 | 首版能力及工具契约见第 7.1 节 |
+| SL-02 | **个人访问令牌（PAT）**：网关使用绑定用户的个人令牌，每次调用按当前空间成员关系和令牌权限范围授权。`ontology:read` 用于读取语义，返回物理映射还需 `mappings:read`。试点用户可只加入一个工作空间。首版建议复用现有登录会话签发、查看元数据和撤销。来源为现有本体读权限与常见个人访问令牌机制，属于接入鉴权。 | 个人令牌及读权限边界已确认，管理界面细节待评审 |
 | SL-03 | **网关调用归因**：建议记录用户 ID、令牌 ID、涉及的工作空间、工具名、结果和请求 ID。后续反馈与变更提案以服务端解析的调用者为提交人。 | 待评审 |
 | SL-04 | **两阶段知识回流（反馈闭环）**：智能体通过 MCP 工具 `submit_ontology_feedback` 提交轻量业务反馈或争议，在平台生成“待审反馈/工单”，由空间管理员或建模人员在 Web 控制台确认合并；严禁外部 Agent 直接非受控覆盖生产本体。 | 待评审 |
 | SL-05 | **空间语义指纹与版本化（Semantic Hash / SemVer）**：每个空间维护唯一的 `ontology_version` 与 `version_hash`。空间内任何实体、属性、度量或绑定的增删改均使 Hash 变化。MCP 响应统一附带元数据 `_meta: { space_id, ontology_version, version_hash }`。 | 待评审 |
@@ -105,10 +105,12 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
 
 | 入口 | 地址 | 凭据 | 适用场景 |
 |---|---|---|---|
-| 已有单空间 MCP | `/api/v1/ontology/workspaces/{workspace_id}/mcp` | 沿用固定令牌、建模运行凭据及现有会话鉴权 | DataAgent、建模运行、已有客户端配置 |
+| 已有单空间 MCP | `/api/v1/ontology/workspaces/{workspace_id}/mcp`，每个工作空间各有一个地址 | 沿用固定令牌、建模运行凭据及现有会话鉴权 | DataAgent、建模运行、已有客户端配置 |
 | 新增用户 MCP 网关 | `/api/v1/ontology/mcp` | `Authorization: Bearer <个人访问令牌>` | zcode、Claude Code 等用户接入 |
 
-已有客户端继续使用原配置。新用户配置一次网关，可通过 `list_spaces` 列出成员空间。调用 `search_ontology` 时可检索全部成员空间或指定 `workspace_ids`，结果按空间分组并注明各自的发布版本。调用 `get_ontology` 时用命中的 `workspace_id` 和元素 ID 读取定义。
+两个入口都使用现有的 HTTP API 版本前缀 `/api/v1`。MCP 协议版本由客户端与服务端协商，本体发布版本由响应中的 `version_id` 标识。
+
+已有客户端继续使用原配置。新用户配置一次网关，可通过 `list_spaces` 列出成员空间，再按第 7.1 节检索和读取定义。
 
 例如用户起初只加入虚构星港采购空间，目录和跨空间搜索只返回采购空间；加入虚构星港销售空间后，原令牌和地址可同时查两个空间。网关每次按当前成员关系授权，对显式请求的未授权空间返回统一的空间不可访问错误。
 
@@ -312,15 +314,27 @@ flowchart TD
 
 ---
 
-## 7. MCP 工具契约（Gateway 统一接口）
+## 7. 用户 MCP 网关工具契约
 
-网关 MCP 提供以下核心工具，覆盖查（探查与编译）、修（结构化提案）、馈（问题反馈）：
+### 7.1 首版只读工具
+
+网关校验 PAT 的有效性和 `ontology:read`，并在每次检索、读取和翻页时检查目标空间的当前成员关系。鉴权上下文向读取服务和游标校验传递用户 ID、令牌 ID 和权限范围。`search_ontology` 和 `get_ontology` 都按 `mappings:read` 裁剪物理投影。只有 `ontology:read` 的令牌可获取语义定义，物理表列映射和 SQL 参考随投影省略。业务取数由已有查询平台按调用者的数据权限执行。
+
+| 工具 | 首版入参 | 首版行为 |
+|---|---|---|
+| `list_spaces` | 无 | 列出调用者当前加入的空间，返回 `workspace_id`、名称、角色和当前 `version_id`。空间尚未发布时 `version_id` 为 `null`。 |
+| `search_ontology` | `query`、可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor` | 省略 `workspace_ids` 时搜索全部成员空间，可显式选择一个或多个。显式列表中有无权或不存在的空间时，整次返回统一的空间不可访问错误。成功时按空间分组，每组带 `workspace_id`、`version_id` 和现有单空间检索结果，沿用组内排序。`limit` 按组应用。续页时保留原检索条件和 `limit`，传入该组游标和仅含该组空间 ID 的 `workspace_ids`。 |
+| `get_ontology` | `workspace_id`、`ids`、可选 `include`、`limit`、`cursor` | 按空间和元素 ID 读取已发布定义和有权限的投影。响应带 `workspace_id` 和 `version_id`，沿用现有分页和字段分段。 |
+
+目标空间数或汇总响应大小超出网关预算时，`search_ontology` 整次返回工具错误 `search_limit_exceeded`，并以 `reason` 区分 `workspace_count` 和 `response_size`。Agent 可调用 `list_spaces` 缩小空间范围，或在响应过大时降低每组 `limit` 后重试。错误响应不携带部分命中。该错误属于网关调用契约，用于指引重试，现有单空间游标仍用于浏览各组结果。
+
+### 7.2 后续待评审工具
+
+以下工具及字段为扩展提案。第 5、6、8 节中的版本协议和插件调用示例也属于待评审范围。首版 `list_spaces`、`search_ontology` 和 `get_ontology` 的契约以第 7.1 节为准。
 
 | 工具名称 | 职责分类 | 核心参数 | 返回关键内容 |
 |---|---|---|---|
-| `list_spaces` | **查（知）** | 无 | 空间列表、空间名称、用户角色（admin/member/viewer）、当前 `version_hash` |
 | `check_space_version` | **查（知）** | `space_id`, `current_hash` | 是否变化、当前版本号、变更摘要 |
-| `search_ontology` | **查（知）** | `query`, `space_ids?`, `kinds?`, `limit` | 召回的实体、属性、指标候选列表，按相关度排序，带消歧标记 |
 | `get_entity_subgraph` | **查（知）** | `space_id`, `entity_name`, `depth` (默认 1), `if_version_matches?` | 实体定义、属性清单、业务标识、直连关系、引用的数据集投影 |
 | `resolve_semantic_query` | **查（知）** | `space_id`, `metrics`, `dimensions`, `filters` | 编译后生成的安全 SQL、维度对齐路径、口径确认信息 |
 | `propose_ontology_mutation` | **修（改）** | `space_id`, `action`, `target_kind`, `target_name`, `payload`, `rationale` | 提案批次 ID (`batch_id`)、原子校验状态、审阅链接、是否已直合（Admin 模式） |
@@ -378,7 +392,7 @@ flowchart TD
 2. 首版交付 PAT、空间目录、跨空间语义检索和定义读取，沿用已发布 `version_id`。同时按原配置回归 DataAgent 和现有客户端。
 3. 按试点需求排定 OAuth、客户端插件、跨空间排序、条件读取和版本差异。反馈与提案另行接入治理流程。
 
-第 5 至第 8 节的扩展工具和协议属于后续评审范围。首版工具契约及验收以[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)为准。
+首版工具契约见第 7.1 节，交付步骤和验收见[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)。
 
 ---
 
