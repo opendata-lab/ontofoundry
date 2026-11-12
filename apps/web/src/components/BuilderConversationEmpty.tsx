@@ -16,7 +16,7 @@ export function BuilderConversationEmpty({ mode }: { mode: SessionMode }) {
       </p>
       <p className="m-0 mt-5 text-xs leading-base text-muted">
         {mode === "model"
-          ? "在左侧配置材料和业务场景，在下方输入需求并发送。"
+          ? "在左侧选择业务知识和数据表，在下方输入需求并发送。"
           : "日常模式只回答问题，不生成提案。"}
         发出第一条消息后，会话模式不能再修改。
       </p>

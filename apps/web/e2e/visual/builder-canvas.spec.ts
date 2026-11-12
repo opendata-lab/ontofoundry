@@ -19,9 +19,9 @@ test("builder empty session aligns configuration, guidance and results", async (
   await expect(page).toHaveScreenshot("builder-empty-session.png", { fullPage: true });
 
   await page.getByRole("button", { name: "收起构建配置", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "业务场景描述", exact: true })).toHaveCount(0);
+  await expect(page.getByText("点击或拖拽文件至此上传", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "展开构建配置", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "业务场景描述", exact: true })).toBeVisible();
+  await expect(page.getByText("点击或拖拽文件至此上传", { exact: true })).toBeVisible();
 });
 
 test("builder proposals retain session and material controls", async ({ page }) => {
