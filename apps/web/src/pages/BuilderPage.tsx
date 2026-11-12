@@ -30,6 +30,13 @@ const CONVERSATION = [
   "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 
+// DataAgent's permission modes, sent as `settings.permission_mode`.
+const PERMISSION_MODES = [
+  { value: "plan", label: "计划", desc: "先给出计划，确认后再写入" },
+  { value: "default", label: "执行", desc: "直接执行，每次写入前确认" },
+  { value: "acceptEdits", label: "自动接受编辑", desc: "只在高风险操作前确认" },
+  { value: "bypassPermissions", label: "跳过所有确认", desc: "不再询问任何确认" },
+];
 const SETTLED_RUN = ["finished", "failed", "cancelled", "suspended"];
 const SETTLED_RESULTS = ["done", "failed_permanent"];
 
@@ -281,19 +288,26 @@ export function BuilderPage() {
     el.showAttachments = false;
     el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current(sendState.current.mode)).id}/agent-conversation`;
   }, [workspace.id]);
-  // Modeling plans before it writes: the plan switch starts on for an unexecuted
-  // session. Daily mode only asks questions, so it has no switch.
-  // The SDK resets the switch whenever `default` changes, so the default is
-  // fixed when a session is loaded: the topic id a session gains on its first
-  // send must not turn the switch off mid-conversation.
-  const planDefault = useRef<{ id: string | null; on: boolean }>({ id: null, on: true });
+  // Modeling offers DataAgent's permission modes in the composer picker. A
+  // session that has not run starts in plan; one that has run starts in
+  // default. Daily mode only asks questions, so it has no picker.
+  // The SDK resets the picker whenever the config is reassigned, so it is
+  // assigned only when the mode or the shown session changes. The id a new
+  // session gains on its first send is the same session: the user's pick stays.
+  const composer = useRef<{ mode?: SessionMode; id: string | null }>({ id: null });
   const sessionKey = session?.id ?? null;
   const executed = !!session?.dataagent_topic_id;
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
-    if (planDefault.current.id !== sessionKey) planDefault.current = { id: sessionKey, on: !executed };
-    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: planDefault.current.on } } : {};
+    const shown = composer.current;
+    const created = shown.mode !== undefined && shown.id === null && sessionKey !== null && !executed;
+    const changed = shown.mode !== mode || (shown.id !== sessionKey && !created);
+    composer.current = { mode, id: sessionKey };
+    if (!changed) return;
+    el.composerConfig = mode === "model"
+      ? { permissionModes: PERMISSION_MODES, permissionMode: executed ? "default" : "plan" }
+      : {};
     // `executed` is read only when the session changes; a later change must not
     // reassign the config.
     // eslint-disable-next-line react-hooks/exhaustive-deps

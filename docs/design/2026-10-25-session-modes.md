@@ -17,9 +17,10 @@
 |---|---|---|
 | SM-01 | 模式属于会话，不属于单条消息。<br>· 建模模式：构建和完善本体模型；<br>· 日常模式：基于本体模型提问。<br>新会话发出第一条消息前可以切换，之后固定。去掉输入框里的“+”场景下拉。 | 已实现 |
 | SM-02 | 日常模式不产生提案。界面只保留对话区，隐藏左侧构建配置和右侧提案面板。 | 已实现 |
-| SM-03 | 问题卡片、计划卡片和计划开关都是通用的 Agent 交互，由 DataAgent 和对话组件提供，界面按用户给的参考图实现。<br>计划开关在建模模式下默认打开；等待超时后按推荐继续。<br>OntoFoundry 只负责配置开关，并在右侧栏显示展开的计划。需求见 opendataworks 仓库 `docs/design/2026-10-25-dataagent-plan-and-question-cards-design.md`。 | 实施中 |
+| SM-03 | 问题卡片、计划卡片和计划开关都是通用的 Agent 交互，由 DataAgent 和对话组件提供，界面按用户给的参考图实现。<br>建模模式的权限模式选择见 SM-04；等待超时后按推荐继续。<br>OntoFoundry 只负责配置选择器，并在右侧栏显示展开的计划。需求见 opendataworks 仓库 `docs/design/2026-10-25-dataagent-plan-and-question-cards-design.md`。 | 实施中 |
+| SM-04 | 建模模式的输入框用权限模式选择器替代计划开关，选项与 DataAgent 的权限模式一致：计划（`plan`）、执行（`default`）、自动接受编辑（`acceptEdits`）、跳过所有确认（`bypassPermissions`）。<br>未运行过的会话默认“计划”，已运行过的会话默认“执行”。新会话首次发送后保持用户所选，切换到其他会话时按该会话重新取默认。<br>所选模式随每条消息的 `settings.permission_mode` 经 BFF 原样转给 DataAgent。2026-11-12 用户确认。 | 已实现 |
 
-来源：SM-01～03 是对话交互协议，不进入本体模型。会话级的模式字段替代每条消息的 `metadata.mode`。
+来源：SM-01～04 是对话交互协议，不进入本体模型。会话级的模式字段替代每条消息的 `metadata.mode`。
 
 ## 3. 数据与接口
 
@@ -40,6 +41,6 @@
 ## 5. SM-03 接入
 
 1. 技能改为通过问题卡片提问、通过 `ExitPlanMode` 提交计划，批准后在同一运行里继续抽取。删除“待确认”文件、`prior_plan` 的上传与恢复，以及 `awaiting_reply` 状态；没有结果文件的运行按“没有产出提案”失败。
-2. 构建页在建模模式打开对话组件的计划开关（默认开），消息的 `settings.permission_mode` 经 BFF 转给 DataAgent，BFF 只接受 `plan` 和 `default`。展开的计划显示在右侧栏。
+2. 构建页在建模模式打开对话组件的权限模式选择器（SM-04），消息的 `settings.permission_mode` 经 BFF 转给 DataAgent，BFF 只接受 `plan`、`default`、`acceptEdits` 和 `bypassPermissions`。展开的计划显示在右侧栏。
 3. 计划不会自动批准：建模 Agent 的“计划等待超时后”保持“继续等待用户确认”（2026-10-26 用户确认）。问题卡片超时仍按推荐项作答。
 4. 后续：日常模式改用问数 Agent（话题创建时绑定），建模模式继续用建模 Agent。

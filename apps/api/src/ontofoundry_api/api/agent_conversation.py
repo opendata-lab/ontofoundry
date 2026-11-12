@@ -75,9 +75,10 @@ router = APIRouter(
 
 
 class ConversationSettings(BaseModel):
-    # The composer's plan switch. Other composer settings (model, provider)
-    # are DataAgent's to choose and are ignored here.
-    permission_mode: Literal["plan", "default"] | None = None
+    # The composer's permission-mode picker, passed to DataAgent as is. Other
+    # composer settings (model, provider) are DataAgent's to choose and are
+    # ignored here.
+    permission_mode: Literal["plan", "default", "acceptEdits", "bypassPermissions"] | None = None
 
 
 class ConversationMessageRequest(BaseModel):

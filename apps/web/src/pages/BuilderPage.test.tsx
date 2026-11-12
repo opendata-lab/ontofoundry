@@ -178,19 +178,20 @@ it("uploads business knowledge files through Upload.Dragger and switches to the 
   expect(await screen.findByText("采购制度.md")).toBeInTheDocument();
 });
 
-it("turns the plan switch on for modeling and leaves it out of daily mode", async () => {
+it("offers permission modes for modeling and leaves them out of daily mode", async () => {
   context.model.session = { ...session(), mode: "model" };
   const { container, unmount } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
   const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
-  expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+  expect(el.composerConfig?.permissionModes?.map((m) => m.value)).toEqual(["plan", "default", "acceptEdits", "bypassPermissions"]);
   unmount();
 
   context.model.session = { ...session(), mode: "model", dataagent_topic_id: "topic-1" };
   const executed = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
   const executedEl = executed.container.querySelector("dataagent-conversation") as AgentConversationElement;
-  expect(executedEl.composerConfig).toEqual({ planMode: { enabled: true, default: false } });
+  expect(executedEl.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "default" });
   executed.unmount();
 
   context.model.session = { ...session(), mode: "chat" };
@@ -200,7 +201,7 @@ it("turns the plan switch on for modeling and leaves it out of daily mode", asyn
   expect(chat.composerConfig).toEqual({});
 });
 
-it("keeps the plan default when the session's first send creates its topic", async () => {
+it("keeps the user's pick when the first send creates the session and its topic", async () => {
   context.model.session = { ...session(), mode: "model" };
   const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
@@ -211,7 +212,36 @@ it("keeps the plan default when the session's first send creates its topic", asy
   rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
   await screen.findByRole("button", { name: "发送" });
   expect(el.composerConfig).toBe(before);
-  expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+});
+
+it("keeps the picker when a new session is created by its first send", async () => {
+  context.model.session = null;
+  context.model.sessionId = null;
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const before = el.composerConfig;
+  expect(before).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+
+  context.model.session = { ...session(), mode: "model" };
+  context.model.sessionId = "s1";
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  expect(el.composerConfig).toBe(before);
+});
+
+it("resets the picker when another session is opened", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+
+  context.model.session = { ...session(), id: "s2", mode: "model", dataagent_topic_id: "topic-2" };
+  context.model.sessionId = "s2";
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await screen.findByRole("button", { name: "发送" });
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "default" });
 });
 
 it("opens an expanded plan in the results column and closes back", async () => {
