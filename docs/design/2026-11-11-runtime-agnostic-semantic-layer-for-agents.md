@@ -48,7 +48,9 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 协议处理与单空间入口相同（MCP 2026-07-28 请求级 HTTP JSON，兼容旧版 `initialize`），两者共用一个 JSON-RPC 处理层，各自注册工具和鉴权依赖。
 
-客户端配置示例：
+令牌只写在客户端的 MCP 配置里，由客户端作为 `Authorization` 请求头发送，不在对话中输入，模型看不到令牌。配置中通过环境变量或插件的敏感设置引用令牌，不直接写入明文。
+
+客户端配置示例（Claude Code，令牌放在环境变量 `ONTOFOUNDRY_TOKEN`）：
 
 ```json
 {
@@ -56,7 +58,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
     "ontofoundry": {
       "type": "http",
       "url": "https://ontofoundry.example.com/api/v1/ontology/mcp",
-      "headers": { "Authorization": "Bearer ofpat.<随机串>" }
+      "headers": { "Authorization": "Bearer ${ONTOFOUNDRY_TOKEN}" }
     }
   }
 }
