@@ -3,6 +3,7 @@ import {
   Box,
   Database,
   Info,
+  MessageSquareText,
   Network,
   Search,
   Settings,
@@ -35,24 +36,42 @@ import { PlatformFrame } from "./PlatformFrame";
 import { UserMenu } from "./UserMenu";
 import { ApplicationFrame, DirectoryFrame } from "./layout";
 
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof Network;
+  manageOnly?: boolean;
+};
+
+type NavEntry =
+  | { kind: "group"; group: string; items: NavItem[] }
+  | { kind: "item"; item: NavItem };
+
 // Follow the workflow: inspect, build and publish; connect data before mapping.
-const navigation = [
+const navigation: NavEntry[] = [
   {
+    kind: "group",
     group: "本体管理",
     items: [
       { to: "view", label: "本体视图", icon: Network },
       { to: "objects", label: "本体对象", icon: Box },
       { to: "builder", label: "本体构建", icon: Sparkles },
+      { to: "feedback", label: "用户反馈", icon: MessageSquareText, manageOnly: true },
     ],
   },
   {
+    kind: "group",
     group: "数据管理",
     items: [
       { to: "connections", label: "数据连接", icon: Plug },
       { to: "mappings", label: "数据管理", icon: Database },
     ],
   },
-  { group: "空间设置", items: [{ to: "settings", label: "空间设置", icon: Settings }] },
+  // Single-page entry sits directly after grouped sections with no group heading (2026-11-13 rule).
+  {
+    kind: "item",
+    item: { to: "settings", label: "空间设置", icon: Settings, manageOnly: true },
+  },
 ];
 
 export function AppShell() {
@@ -138,6 +157,19 @@ export function AppShell() {
   if (!workspace || workspace.id !== workspaceId || !user)
     return <LoadingSurface label="正在读取工作空间…" />;
   const permissions = getWorkspacePermissions(workspace, user);
+  const renderNavLink = ({ to, label, icon: Icon }: NavItem) => (
+    <NavLink
+      key={to}
+      to={`/workspaces/${workspaceId}/${to}`}
+      title={collapsed ? label : undefined}
+      className={({ isActive }) =>
+        `app-nav-link flex min-h-10 items-center gap-3 rounded-sm px-3 text-sm ${isActive ? "bg-accent-soft font-semibold text-accent hover:text-accent" : "text-ink-2 hover:bg-surface-soft hover:text-ink"}`
+      }
+    >
+      <Icon className="size-icon flex-none" />
+      {!collapsed && <span>{label}</span>}
+    </NavLink>
+  );
   return (
     <ApplicationFrame
       collapsed={collapsed}
@@ -162,34 +194,35 @@ export function AppShell() {
       sidebar={
         <>
           <nav aria-label="工作空间导航" className="flex flex-col gap-4">
-            {navigation.map(({ group, items }) => {
-              const visible = items.filter((n) =>
-                n.to === "settings" ? permissions.canManage : true,
+            {navigation.map((entry) => {
+              if (entry.kind === "item") {
+                if (entry.item.manageOnly && !permissions.canManage) return null;
+                return (
+                  <div
+                    className="flex flex-col gap-1 [&+&]:border-t [&+&]:border-rule-soft [&+&]:pt-3"
+                    key={entry.item.to}
+                  >
+                    {renderNavLink(entry.item)}
+                  </div>
+                );
+              }
+              const visible = entry.items.filter((n) =>
+                n.manageOnly ? permissions.canManage : true,
               );
               if (!visible.length) return null;
-              // A group of one item needs no heading: the item names itself.
-              const heading = visible.length > 1 || visible[0].label !== group;
               return (
                 <div
                   className="flex flex-col gap-1 [&+&]:border-t [&+&]:border-rule-soft [&+&]:pt-3"
-                  key={group}
+                  key={entry.group}
                   role="group"
-                  aria-label={group}
+                  aria-label={entry.group}
                 >
-                  {heading && !collapsed && <h2 className="m-0 px-3 pb-1 text-xs font-medium text-muted">{group}</h2>}
-                  {visible.map(({ to, label, icon: Icon }) => (
-                    <NavLink
-                      key={to}
-                      to={`/workspaces/${workspaceId}/${to}`}
-                      title={collapsed ? label : undefined}
-                      className={({ isActive }) =>
-                        `app-nav-link flex min-h-10 items-center gap-3 rounded-sm px-3 text-sm ${isActive ? "bg-accent-soft font-semibold text-accent hover:text-accent" : "text-ink-2 hover:bg-surface-soft hover:text-ink"}`
-                      }
-                    >
-                      <Icon className="size-icon flex-none" />
-                      {!collapsed && <span>{label}</span>}
-                    </NavLink>
-                  ))}
+                  {!collapsed && (
+                    <h2 className="m-0 px-3 pb-1 text-xs font-medium text-muted">
+                      {entry.group}
+                    </h2>
+                  )}
+                  {visible.map(renderNavLink)}
                 </div>
               );
             })}

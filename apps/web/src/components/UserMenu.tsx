@@ -1,6 +1,6 @@
 import { App, Avatar, Button, Dropdown } from "antd";
 import type { MenuProps } from "antd";
-import { ChevronDown, LogOut, User as UserIcon, Users } from "lucide-react";
+import { ChevronDown, LogOut, ScrollText, User as UserIcon, Users } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api/client";
@@ -32,7 +32,10 @@ export function UserMenu({ user }: { user: User }) {
   const items: MenuProps["items"] = [
     { key: "me", label: "个人中心", icon: <UserIcon className="size-icon-sm" /> },
     ...(user.is_platform_admin
-      ? [{ key: "admin-users", label: "用户管理", icon: <Users className="size-icon-sm" /> }]
+      ? [
+          { key: "admin-users", label: "用户管理", icon: <Users className="size-icon-sm" /> },
+          { key: "admin-audit", label: "用户审计", icon: <ScrollText className="size-icon-sm" /> },
+        ]
       : []),
     { type: "divider" },
     { key: "logout", label: "退出登录", icon: <LogOut className="size-icon-sm" /> },
@@ -48,6 +51,7 @@ export function UserMenu({ user }: { user: User }) {
         onClick: ({ key }) => {
           if (key === "me") navigate("/me");
           else if (key === "admin-users") navigate("/admin/users");
+          else if (key === "admin-audit") navigate("/admin/audit");
           else if (key === "logout") void handleLogout();
         },
       }}

@@ -33,6 +33,7 @@ export function tabTitle(href: string) {
       objects: "本体对象",
       relations: "本体对象",
       builder: "本体构建",
+      feedback: "用户反馈",
       mappings: "数据管理",
       delivery: "本体发布",
       settings: "空间设置",

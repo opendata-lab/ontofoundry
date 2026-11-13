@@ -24,6 +24,7 @@ function show() {
     { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
     { path: "/me", element: <p>个人中心页</p> },
     { path: "/admin/users", element: <p>用户管理页</p> },
+    { path: "/admin/audit", element: <p>用户审计页</p> },
     { path: "/login", element: <p>登录页</p> },
     { path: "/", element: <p>目录页</p> },
   ], { initialEntries: ["/workspaces/ws-shell-demo/mappings"] });
@@ -59,7 +60,37 @@ describe("应用框架", () => {
     expect(within(nav).getByRole("link", { name: "数据管理" })).toBeVisible();
   });
 
-  it("可查看成员与公开非成员看到全部阅读导航和对应只读提示，并隐藏空间设置", async () => {
+  it("管理员看到本体管理末尾的用户反馈，以及不带分组标题的一级空间设置", async () => {
+    show();
+    const nav = await screen.findByRole("navigation", { name: "工作空间导航" });
+    const ontologyGroup = within(nav).getByRole("group", { name: "本体管理" });
+    const ontologyLinks = within(ontologyGroup).getAllByRole("link");
+    expect(ontologyLinks.map((el) => el.textContent?.trim())).toEqual([
+      "本体视图",
+      "本体对象",
+      "本体构建",
+      "用户反馈",
+    ]);
+    expect(within(ontologyGroup).getByRole("link", { name: "用户反馈" })).toHaveAttribute(
+      "href",
+      "/workspaces/ws-shell-demo/feedback",
+    );
+
+    const settingsLink = within(nav).getByRole("link", { name: "空间设置" });
+    expect(settingsLink).toHaveAttribute("href", "/workspaces/ws-shell-demo/settings");
+    expect(within(nav).queryByRole("heading", { name: "空间设置" })).toBeNull();
+    expect(within(nav).queryByRole("group", { name: "空间设置" })).toBeNull();
+  });
+
+  it("可编辑成员、可查看成员与公开非成员隐藏用户反馈和空间设置", async () => {
+    vi.mocked(api.workspace).mockResolvedValueOnce({ ...workspace, role: "member" });
+    show();
+    const memberNav = await screen.findByRole("navigation", { name: "工作空间导航" });
+    expect(within(memberNav).getAllByRole("link")).toHaveLength(5);
+    expect(within(memberNav).queryByRole("link", { name: "用户反馈" })).toBeNull();
+    expect(within(memberNav).queryByRole("link", { name: "空间设置" })).toBeNull();
+
+    cleanup();
     vi.mocked(api.workspace).mockResolvedValueOnce({ ...workspace, role: "viewer" });
     const first = show();
     const viewerNav = await screen.findByRole("navigation", { name: "工作空间导航" });
@@ -67,6 +98,7 @@ describe("应用框架", () => {
     expect(within(viewerNav).getByRole("link", { name: "本体构建" })).toBeInTheDocument();
     expect(within(viewerNav).getByRole("link", { name: "数据连接" })).toBeInTheDocument();
     expect(within(viewerNav).getByRole("link", { name: "数据管理" })).toBeInTheDocument();
+    expect(within(viewerNav).queryByRole("link", { name: "用户反馈" })).toBeNull();
     expect(within(viewerNav).queryByRole("link", { name: "空间设置" })).toBeNull();
     expect(screen.getByText("你是本空间的可查看成员，只能查看")).toBeInTheDocument();
     expect(first.state.location.pathname).toBe("/workspaces/ws-shell-demo/mappings");
@@ -78,8 +110,17 @@ describe("应用框架", () => {
     show();
     const publicNav = await screen.findByRole("navigation", { name: "工作空间导航" });
     expect(within(publicNav).getAllByRole("link")).toHaveLength(5);
+    expect(within(publicNav).queryByRole("link", { name: "用户反馈" })).toBeNull();
     expect(within(publicNav).queryByRole("link", { name: "空间设置" })).toBeNull();
     expect(screen.getByText("你不是本空间成员，只能阅读")).toBeInTheDocument();
+
+    cleanup();
+    vi.mocked(api.workspace).mockResolvedValueOnce({ ...workspace, role: null, is_public: true, visibility: "public" });
+    vi.mocked(api.me).mockResolvedValueOnce({ ...user, is_platform_admin: true });
+    show();
+    const platformAdminNav = await screen.findByRole("navigation", { name: "工作空间导航" });
+    expect(within(platformAdminNav).getByRole("link", { name: "用户反馈" })).toBeInTheDocument();
+    expect(within(platformAdminNav).getByRole("link", { name: "空间设置" })).toBeInTheDocument();
   });
 
   it("私有非成员收到 403 时展示无权限结果并保留平台导航", async () => {
@@ -135,16 +176,21 @@ describe("应用框架", () => {
     });
   });
 
-  it("平台管理员菜单展示用户管理并可跳转到个人中心与用户管理", async () => {
+  it("平台管理员菜单展示用户管理与用户审计并可跳转到对应页面", async () => {
     vi.mocked(api.me).mockResolvedValue({ ...user, is_platform_admin: true });
     const router = show();
     fireEvent.click(await screen.findByRole("button", { name: /林晓/ }));
 
     const menu = await screen.findByRole("menu");
     const items = within(menu).getAllByRole("menuitem");
-    expect(items.map((item) => item.textContent?.trim())).toEqual(["个人中心", "用户管理", "退出登录"]);
+    expect(items.map((item) => item.textContent?.trim())).toEqual([
+      "个人中心",
+      "用户管理",
+      "用户审计",
+      "退出登录",
+    ]);
 
-    fireEvent.click(within(menu).getByRole("menuitem", { name: /用户管理/ }));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/users"));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /用户审计/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/audit"));
   });
 });

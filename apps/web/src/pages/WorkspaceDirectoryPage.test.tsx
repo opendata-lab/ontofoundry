@@ -45,6 +45,7 @@ const show = () => {
     { path: "/workspaces/:id/view", element: <p>本体视图</p> },
     { path: "/me", element: <p>个人中心</p> },
     { path: "/admin/users", element: <p>用户管理</p> },
+    { path: "/admin/audit", element: <p>用户审计</p> },
   ]);
   renderWithProviders(<RouterProvider router={router} />);
   return router;
@@ -63,9 +64,10 @@ it("keeps workspace links, publication states, public tags and reader access", a
   const menu = await screen.findByRole("menu");
   expect(within(menu).getByRole("menuitem", { name: /个人中心/ })).toBeInTheDocument();
   expect(within(menu).queryByRole("menuitem", { name: /用户管理/ })).toBeNull();
+  expect(within(menu).queryByRole("menuitem", { name: /用户审计/ })).toBeNull();
 });
 
-it("shows 用户管理 in directory header menu for platform admins", async () => {
+it("shows 用户管理 and 用户审计 in directory header menu for platform admins", async () => {
   vi.mocked(api.me).mockResolvedValue({
     id: "u1",
     username: "admin",
@@ -78,6 +80,7 @@ it("shows 用户管理 in directory header menu for platform admins", async () =
   fireEvent.click(await screen.findByRole("button", { name: /管理员/ }));
   const menu = await screen.findByRole("menu");
   expect(within(menu).getByRole("menuitem", { name: /用户管理/ })).toBeInTheDocument();
+  expect(within(menu).getByRole("menuitem", { name: /用户审计/ })).toBeInTheDocument();
 });
 
 it("creates a workspace and enters its ontology view", async () => {

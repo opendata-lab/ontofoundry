@@ -23,6 +23,11 @@ const AdminUsersPage = lazy(() =>
     default: m.AdminUsersPage,
   })),
 );
+const AdminAuditPage = lazy(() =>
+  import("./pages/AdminAuditPage").then((m) => ({
+    default: m.AdminAuditPage,
+  })),
+);
 const router = createBrowserRouter([
   {
     errorElement: <RouteErrorSurface />,
@@ -44,10 +49,26 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "/me/tokens",
+        element: (
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <MePage />
+          </Suspense>
+        ),
+      },
+      {
         path: "/admin/users",
         element: (
           <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
             <AdminUsersPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/admin/audit",
+        element: (
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <AdminAuditPage />
           </Suspense>
         ),
       },
