@@ -37,7 +37,7 @@
 
 ### 步骤二　交付用户网关，预计 4 至 5 个工作日
 
-前置：[OAuth 登录用户信息钩子](2026-11-12-oauth-login-hook-plan.md) 已实施，现场用户能登录并签发令牌。
+前置：[平台登录](2026-11-12-platform-login-plan.md) 已实施，现场用户能登录并签发令牌。
 
 1. **个人令牌、调用记录与反馈表**：按设计第 4.4 节在 `db_models.py` 新增三张表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 按设计第 4.5 节新增 `/api/v1/auth/tokens` 的签发、列表、修改、撤销接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
 2. **网关**：从 `api/mcp.py` 抽出 JSON-RPC 处理（协议协商、请求头校验、工具结果与错误封装），单空间入口改为调用它且行为不变；新增 `api/ontology_gateway.py` 注册 `/api/v1/ontology/mcp` 与三个工具。工具入参模型放在 `services/ontology_gateway.py`，`tools/list` 由模型生成 JSON Schema。
