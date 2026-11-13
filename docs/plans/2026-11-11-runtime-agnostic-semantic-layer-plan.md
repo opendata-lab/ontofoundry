@@ -35,18 +35,20 @@
 
 固定令牌持有者可读任一已知空间并取得管理员投影，本步骤只在隔离环境进行。结果写入试点记录；协议或客户端有缺口时先更新设计再进入步骤二。
 
-### 步骤二　交付用户网关，预计 3 至 4 个工作日
+### 步骤二　交付用户网关，预计 4 至 5 个工作日
 
 前置：[OAuth 登录用户信息钩子](2026-11-12-oauth-login-hook-plan.md) 已实施，现场用户能登录并签发令牌。
 
-1. **个人令牌与调用记录表**：`db_models.py` 新增令牌表和调用记录表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 新增 `/api/v1/auth/tokens` 三个接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
+1. **个人令牌、调用记录与反馈表**：`db_models.py` 新增令牌表、调用记录表和反馈表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 新增 `/api/v1/auth/tokens` 三个接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
 2. **网关**：从 `api/mcp.py` 抽出 JSON-RPC 处理（协议协商、请求头校验、工具结果与错误封装），单空间入口改为调用它且行为不变；新增 `api/ontology_gateway.py` 注册 `/api/v1/ontology/mcp` 与三个工具。工具入参模型放在 `services/ontology_gateway.py`，`tools/list` 由模型生成 JSON Schema。
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
 4. **调用记录**：按设计第 6 节，鉴权后执行工具前插入 `started` 行并单独提交，返回后更新同一行；记录写入失败只记错误日志，不影响工具返回。
-5. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`，覆盖第 4 节验收中可自动化的场景；新增 `tests/test_plugin_package.py` 检查插件包（插件目录整体随安装分发，测试不放在插件目录内）：`plugin.json` 与 `marketplace.json` 可解析且 `name` 合法，`.mcp.json` 中没有明文令牌，`skills/` 下每个 Skill 是一层目录、`SKILL.md` 含 `name` 和 `description`、`name` 与目录名一致、`description` 不超过 1024 字符；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
-6. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
+5. **版本元数据**：按设计 SL-05 在每个工具结果的 `_meta` 加入 `io.github.opendata-lab.ontofoundry/versions`，与 `io.modelcontextprotocol/serverInfo` 并列；按协议版本的 `schema.ts` 核对旧版响应也允许 `_meta`。
+6. **反馈**：按设计第 7 节实现 `submit_feedback`（成员检查、元素归属与长度校验、服务端填写 `version_id`），新增 `GET /api/v1/workspaces/{workspace_id}/feedback`（登录会话、空间管理员、游标分页）；前端在 `SettingsPage` 为管理员增加“外部反馈”列表（Ant Design `Table`，布局用 `components/layout/`），接口调用走 `api/client.ts` 并补充前端类型；Skill 写入第 7.2 节规则。
+7. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`、`tests/test_feedback.py`，覆盖第 4 节验收中可自动化的场景；新增 `tests/test_plugin_package.py` 检查插件包（插件目录整体随安装分发，测试不放在插件目录内）：`plugin.json` 与 `marketplace.json` 可解析且 `name` 合法，`.mcp.json` 中没有明文令牌，`skills/` 下每个 Skill 是一层目录、`SKILL.md` 含 `name` 和 `description`、`name` 与目录名一致、`description` 不超过 1024 字符；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
+8. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
-首版不改前端：令牌通过接口签发，个人设置页面按试点反馈排期。
+前端只增加“外部反馈”列表：令牌通过接口签发，个人设置页面按试点反馈排期。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖管理员可见、成员不可见。
 
 ## 4. 验收
 
@@ -60,6 +62,10 @@
 | 移出空间 | 该空间从目录和默认检索消失；旧游标返回 `cursor_invalid` | 是 |
 | 检索超限 | 11 个空间返回 `workspace_count`；合计超过预算返回 `response_size`；均无部分结果 | 是 |
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
+| 版本元数据 | 每个工具结果的 `_meta` 含 `io.github.opendata-lab.ontofoundry/versions`，与正文中的 `version_id` 一致 | 是 |
+| 提交反馈 | 成员提交后记录原话、说明、相关元素和服务端填写的版本；非成员、跨空间元素、空文本或超长被拒绝 | 是 |
+| 查看反馈 | 空间管理员在“空间设置”看到时间倒序的反馈列表；成员和其他空间管理员看不到 | 是 |
+| Skill 提交反馈 | 用户纠正口径时，智能体提交一次反馈，`user_text` 为用户原话 | 联验 |
 | 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、错误码和消息齐全；完整返回与客户端收到的一致；工具执行中抛出未处理异常时该行停在 `started`；鉴权失败不写入；不含令牌和游标原文 | 是 |
 | 单空间入口与 DataAgent | 现有测试通过；DataAgent 原配置联通，建模运行版本固定不变 | 测试 + 联验 |
 | 插件包结构 | 清单可解析，`.mcp.json` 无明文令牌，每个 SKILL.md 含 `name`、`description` 且描述不超过 1024 字符；任一不满足时 CI 失败 | 是 |
