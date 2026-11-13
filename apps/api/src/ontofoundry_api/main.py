@@ -23,6 +23,7 @@ from ontofoundry_api.api import (
     metrics,
     modeling,
     ontology,
+    ontology_gateway,
     proposals,
     workspaces,
 )
@@ -123,9 +124,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         with session_factory() as sync_db:
             interrupt_jobs(sync_db)
+        from ontofoundry_api.services.gateway_call_log import GatewayCallRecorder
+
+        application.state.gateway_recorder = GatewayCallRecorder(session_factory)
+        application.state.gateway_recorder.start()
         try:
             yield
         finally:
+            application.state.gateway_recorder.stop()
             engine.dispose()
 
     app = FastAPI(
@@ -218,6 +224,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(instances.router)
     app.include_router(settings_api.router)
     app.include_router(mcp.router)
+    app.include_router(ontology_gateway.router)
+    app.include_router(ontology_gateway.history_router)
     from ontofoundry_api.api import proposal_submit
     app.include_router(proposal_submit.router)
     if app_settings.web_dist:

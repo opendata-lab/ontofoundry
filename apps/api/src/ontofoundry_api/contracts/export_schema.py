@@ -9,6 +9,7 @@ from ontofoundry_api.contracts.connections import ConnectionInUseResponse
 from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
 from ontofoundry_api.contracts.exports import exports_schema
+from ontofoundry_api.contracts.gateway import gateway_schema
 from ontofoundry_api.contracts.imports import imports_schema
 from ontofoundry_api.contracts.instances import instances_schema
 from ontofoundry_api.contracts.materials import MaterialOverview
@@ -23,6 +24,13 @@ MATERIAL_TARGET = Path(__file__).with_name("ontofoundry.materials.v1.schema.json
 
 
 def export(*, check=False):
+    gateway_target = Path(__file__).with_name("ontofoundry.gateway.v1.schema.json")
+    gateway_payload = json.dumps(gateway_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if check:
+        if not gateway_target.exists() or gateway_target.read_text() != gateway_payload:
+            raise SystemExit("网关接口 schema 与模型不一致，请重新生成")
+    else:
+        gateway_target.write_text(gateway_payload)
     users_target = Path(__file__).with_name("ontofoundry.users.v1.schema.json")
     users_payload = json.dumps(users_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if check:

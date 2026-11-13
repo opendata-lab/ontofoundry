@@ -71,7 +71,7 @@ READS = [
     ("POST", W + "/element-saves/preview"), ("POST", S + "/validate"),
     ("POST", S + "/preview"),
 ]
-MANAGE = [("GET", W + "/members"), ("GET", W + "/users/search"),
+MANAGE = [("GET", W + "/feedback"), ("GET", W + "/members"), ("GET", W + "/users/search"),
           ("GET", W + "/settings/dataagent-health"), ("PATCH", W),
           ("POST", W + "/members"), ("PATCH", W + "/members/{member_id}"),
           ("DELETE", W + "/members/{member_id}")]
