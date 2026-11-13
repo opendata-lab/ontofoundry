@@ -19,9 +19,10 @@ import {
   useParams,
   Link,
   useLocation,
+  useNavigate,
   Navigate,
 } from "react-router-dom";
-import { Button, Tooltip } from "antd";
+import { Button, Dropdown, Tag, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "../api/client";
 import type { User, Workspace } from "../api/types";
@@ -182,17 +183,13 @@ export function AppShell() {
             <Tooltip title="搜索本体 ⌘K">
               <Button type="text" aria-label="搜索本体" icon={<Search className="size-icon" />} onClick={openSearch} />
             </Tooltip>
-            <Link to="/" className="flex items-center gap-2 text-inherit">
-              <Globe className="size-icon text-accent" />
-              {workspace.name}
-              <ChevronDown className="size-icon" />
-            </Link>
             <UserMenu user={user} />
           </div>
         </>
       }
       sidebar={
         <>
+          <WorkspaceSwitcher workspace={workspace} collapsed={collapsed} />
           <nav aria-label="工作空间导航" className="flex flex-col gap-4">
             {navigation.map((entry) => {
               if (entry.kind === "item") {
@@ -260,5 +257,57 @@ export function AppShell() {
       </WorkspaceContextProvider.Provider>
       <OntologySearchDialog workspaceId={workspaceId} open={searching} onClose={() => setSearching(false)} />
     </ApplicationFrame>
+  );
+}
+
+/** Sidebar-top switcher: lists the workspaces this user can read, loaded on open. */
+function WorkspaceSwitcher({ workspace, collapsed }: { workspace: Workspace; collapsed: boolean }) {
+  const navigate = useNavigate();
+  const [items, setItems] = useState<Workspace[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const load = (open: boolean) => {
+    if (!open || items) return;
+    setFailed(false);
+    api.workspaces().then((r) => setItems(r.items)).catch(() => setFailed(true));
+  };
+  const menuItems = [
+    ...(items ?? []).map((w) => ({
+      key: w.id,
+      label: (
+        <span className="flex items-center gap-2">
+          <span className={w.id === workspace.id ? "font-semibold text-accent" : undefined}>{w.name}</span>
+          {w.is_public && <Tag className="m-0 border-0 bg-accent-soft text-accent">公开</Tag>}
+        </span>
+      ),
+    })),
+    ...(items === null ? [{ key: "__loading", label: failed ? "读取失败，请重试" : "正在读取…", disabled: true }] : []),
+    { type: "divider" as const },
+    { key: "__all", label: "全部工作空间" },
+  ];
+  const trigger = (
+    <Button
+      type="text"
+      aria-label={`切换工作空间（当前：${workspace.name}）`}
+      className={`flex h-10 w-full items-center gap-2 px-3 text-sm text-ink ${collapsed ? "justify-center" : "justify-start"}`}
+    >
+      <Globe className="size-icon flex-none text-accent" />
+      {!collapsed && <span className="min-w-0 flex-1 truncate text-left font-semibold">{workspace.name}</span>}
+      {!collapsed && <ChevronDown className="size-icon flex-none text-muted" />}
+    </Button>
+  );
+  return (
+    <div className="mb-3 border-b border-rule-soft pb-3">
+      <Dropdown
+        trigger={["click"]}
+        onOpenChange={load}
+        menu={{
+          items: menuItems,
+          selectedKeys: [workspace.id],
+          onClick: ({ key }) => navigate(key === "__all" ? "/" : `/workspaces/${key}/view`),
+        }}
+      >
+        {collapsed ? <Tooltip title={workspace.name} placement="right">{trigger}</Tooltip> : trigger}
+      </Dropdown>
+    </div>
   );
 }
