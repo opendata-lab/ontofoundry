@@ -19,7 +19,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | 编号 | 决定 | 状态 |
 |---|---|---|
 | SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议不变。新增 `/api/v1/ontology/mcp`，提供 `list_spaces`、`search_ontology`、`get_ontology` 三个只读工具（支持跨空间检索），以及只写入反馈记录的 `submit_feedback`（SL-04）。网关不执行业务数据查询，不提供实例与文档事实工具。两个入口共用现有本体读取服务。来源：现有 MCP；属于接入方式，不进入本体模型。 | 2026-11-12 用户确认 |
-| SL-02 | **个人访问令牌（PAT）**：网关只接受绑定用户的个人令牌，每次调用按该用户当前的空间成员关系和令牌权限范围授权。范围必含 `ontology:read`，可选 `mappings:read`（返回物理映射和 SQL 参考）。令牌不过期，用户可随时撤销。用户用现有登录会话签发、查看和撤销，首版只提供接口；登录对接各类统一认证的方式见 [OAuth 登录用户信息钩子](2026-11-12-oauth-login-hook.md)。来源：常见个人访问令牌机制；属于接入鉴权。 | 2026-11-12 用户确认；不过期 2026-11-12 用户确认 |
+| SL-02 | **个人访问令牌（PAT）**：网关只接受绑定用户的个人令牌，每次调用按该用户当前的空间成员关系和令牌权限授权。权限必含 `ontology:read`，可选 `mappings:read`（返回物理映射和 SQL 参考），签发后可增减可选权限。令牌不过期，用户可随时撤销。用户登录后在“个人令牌”页面签发、查看、修改权限和撤销；登录对接各类统一认证的方式见 [OAuth 登录用户信息钩子](2026-11-12-oauth-login-hook.md)。来源：常见个人访问令牌机制；属于接入鉴权。 | 2026-11-12 用户确认；不过期 2026-11-12 用户确认 |
 | SL-03 | **网关调用记录**：每次工具调用在数据库存一条记录：调用者、令牌、工具、读取的空间及其版本、调用参数、完整返回内容、结果状态与错误、耗时，另有扩展字段；只原样记录请求和返回，服务端不另行加工统计。不存令牌。用于审计、改进工具，并为日后把外部提问转成建模输入（第 11 节 SL-15）保留素材。来源：固定令牌无法追溯调用者的缺口；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认；入库、字段及保存完整返回 2026-11-12 用户确认 |
 | SL-04 | **反馈记录**：用户在外部智能体中纠正错误或提出建议时，智能体按 Skill 调用 `submit_feedback`，记录用户原话和智能体生成的说明，归属到相关空间。首版只记录，不做状态流转、不改本体、不生成提案；该空间管理员在左侧菜单“管理中心 → 用户反馈”查看。来源：外部使用中发现的口径问题需要回到建模者手中；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-05 | **结果附带版本元数据**：每个工具结果的 `_meta` 中加入 `io.github.opendata-lab.ontofoundry/versions`，列出本次涉及的每个空间的 `workspace_id`、`version_id`、`version_number`。结果正文仍保留 `workspace_id`、`version_id`，因为 MCP 规范没有规定客户端是否把 `_meta` 交给模型。来源：MCP 规范的 `_meta` 字段（键名按反向域名前缀）；属于接口元数据，不进入本体模型。 | 2026-11-12 用户确认 |
@@ -32,7 +32,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 | 包含 | 不包含（见第 11 节） |
 |---|---|
-| 个人令牌的签发、列表、撤销接口 | 个人设置页面、MCP 客户端浏览器授权（SL-16，首版之后实施） |
+| 个人令牌页面与接口（签发、列表、修改权限、撤销） | MCP 客户端浏览器授权（SL-16，首版之后实施） |
 | 网关的三个只读工具，跨空间检索 | 实例、文档事实、实体解析工具；业务数据查询 |
 | 调用记录表 | 调用记录的查询界面、清理策略、转为建模会话 |
 | 反馈工具、反馈表、空间管理员查看反馈 | 反馈的状态、回复、通知，转为提案或建模会话 |
@@ -73,26 +73,101 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | 项 | 规定 |
 |---|---|
 | 格式 | `ofpat.` 加 32 字节随机数的 base64url 编码，签发响应中只出现一次 |
-| 存储 | 新表保存令牌 ID、所属用户、名称、范围、令牌的 SHA-256 摘要、创建时间、最近使用时间、撤销时间；不保存明文 |
-| 范围 | `ontology:read` 必选，`mappings:read` 可选；`instances:read` 不提供，网关没有实例工具 |
+| 存储 | 见第 4.4 节；只保存令牌的 SHA-256 摘要，不保存明文 |
+| 权限 | `ontology:read`（读取语义）必选且不可去掉，`mappings:read`（读取映射）可选，签发后可增减；`instances:read` 不提供，网关没有实例工具。修改在下一次调用生效，旧游标随之失效 |
 | 有效期 | 不过期；撤销后立即失效 |
-| 接口 | `POST /api/v1/auth/tokens`（名称、范围）签发；`GET /api/v1/auth/tokens` 列出本人令牌的元数据；`DELETE /api/v1/auth/tokens/{token_id}` 撤销。均要求登录会话，只能管理本人令牌 |
+| 接口与页面 | 见第 4.4、4.5 节；均要求登录会话，只能管理本人令牌 |
 | 校验 | 按摘要查找未撤销的令牌，更新最近使用时间，生成该用户的身份 |
 
-网关身份沿用现有 `Principal`：用户为令牌所属用户，`service_token_id` 为 `pat:<令牌 ID>`，`scopes` 为令牌范围，不绑定空间。现有读取服务据此裁剪物理投影（`can_read_mappings` 对带 `service_token_id` 的身份检查 `mappings:read`），游标的授权指纹也包含令牌 ID 和范围，所以不同令牌的游标不能混用。
+网关身份沿用现有 `Principal`：用户为令牌所属用户，`service_token_id` 为 `pat:<令牌 ID>`，`scopes` 为令牌权限，不绑定空间。现有读取服务据此裁剪物理投影（`can_read_mappings` 对带 `service_token_id` 的身份检查 `mappings:read`），游标的授权指纹也包含令牌 ID 和范围，所以不同令牌的游标不能混用。
 
 ### 4.3 成员检查
 
 现有单空间读取对非成员也返回已发布的语义定义（`get_ontology`、`search_ontology` 本身不要求成员身份）。网关不沿用这一点：每次调用、每次翻页前，网关先确认用户当前是目标空间成员，再调用读取服务。用户被移出空间后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
 
+### 4.4 数据表
+
+三张新表在同一个 Alembic 迁移中创建，均不修改已有表。类型沿用现有表的写法：ID 为 `String(36)`，时间为 `DateTime(timezone=True)`，结构化内容为 `JSON`。
+
+`personal_access_tokens`
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `id` | `String(36)` 主键 | 令牌 ID（UUID） |
+| `user_id` | `String(36)` 外键 `users.id`，索引 | 所属用户 |
+| `name` | `String(100)` | 用户填写的名称，同一用户内不要求唯一 |
+| `permissions` | `JSON` | 权限数组，必含 `ontology:read` |
+| `token_sha256` | `String(64)` 唯一 | 令牌摘要 |
+| `created_at`、`updated_at` | 带时区时间 | 创建与最近修改权限的时间 |
+| `last_used_at` | 带时区时间，可空 | 最近一次通过网关鉴权的时间 |
+| `revoked_at` | 带时区时间，可空 | 撤销时间；非空即失效 |
+
+`ontology_gateway_calls`（字段含义见第 6 节）
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `id` | `String(36)` 主键 | 记录 ID |
+| `user_id`、`token_id` | `String(36)` 外键 | 调用者与令牌 |
+| `request_id` | `String(100)` | JSON-RPC 请求 ID 的字符串形式 |
+| `tool` | `String(64)` | 工具名 |
+| `workspaces`、`arguments`、`response`、`extra` | `JSON`（与现有表一致），`response`、`extra` 可空 | 见第 6 节 |
+| `outcome` | `String(16)` | `started`、`ok`、`error` |
+| `error_code` | `String(64)`，可空 | 工具错误码 |
+| `error_message` | `Text`，可空 | 错误消息 |
+| `duration_ms` | `Integer`，可空 | 耗时 |
+| `created_at` | 带时区时间 | 开始时间 |
+
+索引：`(user_id, created_at)`、`(created_at)`。
+
+`ontology_feedback`（字段含义见第 7 节）
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `id` | `String(36)` 主键 | 反馈 ID |
+| `workspace_id` | `String(36)` 外键 `workspaces.id` | 所属空间 |
+| `user_id`、`token_id` | `String(36)` 外键 | 提交者与令牌 |
+| `kind` | `String(16)` | `correction`、`suggestion` |
+| `user_text`、`agent_text` | `Text` | 用户原话、智能体说明，各不超过 4,000 字 |
+| `element_ids` | `JSON` | 相关元素 ID 数组，最多 20 个，可为空数组 |
+| `version_id` | `String(36)`，可空 | 提交时的发布版本；空间未发布时为空 |
+| `extra` | `JSON`，可空 | 扩展字段 |
+| `created_at` | 带时区时间 | 提交时间 |
+
+索引：`(workspace_id, created_at)`。
+
+### 4.5 管理接口
+
+| 接口 | 请求 | 响应 | 错误 |
+|---|---|---|---|
+| `POST /api/v1/auth/tokens` | `{"name": "办公电脑", "permissions": ["ontology:read", "mappings:read"]}` | `201`，`{"id", "name", "permissions", "created_at", "token"}`；`token` 只在此处出现 | 名称为空或超过 100 字、权限缺 `ontology:read` 或含未知值：`422` |
+| `GET /api/v1/auth/tokens` | 无 | `{"items": [{"id", "name", "permissions", "created_at", "updated_at", "last_used_at"}]}`，只列未撤销令牌，按创建时间倒序 | — |
+| `PATCH /api/v1/auth/tokens/{token_id}` | `{"permissions": [...]}` 或 `{"name": "..."}` | 更新后的令牌元数据 | 不存在、已撤销或不属于本人：`404`；权限不合法：`422` |
+| `DELETE /api/v1/auth/tokens/{token_id}` | 无 | `204` | 不存在或不属于本人：`404` |
+| `GET /api/v1/workspaces/{workspace_id}/feedback` | `cursor`、`limit`（默认 20，最多 100） | `{"items": [{"id", "created_at", "user": {"id", "display_name"}, "kind", "user_text", "agent_text", "elements": [{"id", "name", "display_name"}], "version_number"}], "next_cursor"}`；元素名按当前发布版本解析，已不存在的元素只有 `id` | 非该空间管理员：`403` |
+
+错误体沿用现有 `ServiceError` 约定（英文 `code`、中文 `message`）。
+
+### 4.6 个人令牌页面
+
+点击页头的用户名打开菜单，选“个人令牌”进入 `/tokens`（不属于任何工作空间）。页面用现有列表页布局：
+
+| 列 | 内容 |
+|---|---|
+| 名称 | 可行内修改 |
+| 权限 | 用 Ant Design `Tag` 显示：“读取语义”（固定）、“读取映射”；点击编辑后可增减“读取映射” |
+| 创建时间、最近使用 | 未使用过显示“—” |
+| 操作 | 撤销（二次确认） |
+
+“新建令牌”弹窗填写名称、勾选是否包含“读取映射”；创建成功后弹窗只显示一次完整令牌和复制按钮，并提示把它写入客户端 MCP 配置（环境变量或插件设置），关闭后无法再次查看。
+
 ## 5. 网关工具契约
 
 | 工具 | 入参 | 行为 |
 |---|---|---|
-| `list_spaces` | 无 | 列出用户当前加入的空间：`workspace_id`、名称、角色、`version_id`、`version_number`。未发布的空间两个版本字段为 `null`。 |
+| `list_spaces` | 无 | 列出用户当前加入的空间：`workspace_id`、名称、角色、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
 | `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索全部成员空间。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
 | `get_ontology` | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
-| `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids` | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
+| `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
 
 前三个工具在 `tools/list` 中标注只读；`submit_feedback` 标注非只读、非破坏性（`readOnlyHint: false`、`destructiveHint: false`）。
 
@@ -190,6 +265,8 @@ plugins/
 
 插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。 这些约束由后端测试在 CI 中检查（见计划步骤二），超限时测试失败，不会发布出被客户端忽略的 Skill。
 
+无法访问 GitHub 的现场使用离线包：离线包附带 `plugins/ontofoundry` 和 `.claude-plugin/marketplace.json`，Claude Code 用本地目录添加插件目录（`/plugin marketplace add <本地目录>`），ZCode 用“添加插件目录 → 本地目录”，opencode 按 README 指向本地 Skill 目录。
+
 以下两点官方文档未写明，在实施步骤一中联验：ZCode 是否读取 `.claude-plugin/marketplace.json`（其文档只写“仓库根目录的 `marketplace.json`”）；ZCode 敏感 `userConfig` 暂不能在界面填写时，令牌如何提供。联验不通过时按结果调整本节，再进入步骤二。
 
 ## 9. 版本一致性
@@ -227,7 +304,7 @@ plugins/
 
 例如用户上午问“净采购额”，智能体检索并读取后缓存到采购空间第 13 版目录；下午再问，`list_spaces` 显示仍是第 13 版，智能体直接用缓存回答，只调用一次 `list_spaces`。管理员发布第 14 版后，下一个问题核对到版本变化，智能体重新读取并清掉第 13 版缓存。
 
-缓存内容是该用户有权看到的定义，含 `mappings:read` 时还包括物理映射和 SQL 参考；同一用户换用权限更小的令牌时，Skill 清空缓存后重新读取。缓存效果可在调用记录（第 6 节）中按用户统计调用次数核实。
+缓存内容是该用户有权看到的定义，含 `mappings:read` 时还包括物理映射和 SQL 参考。缓存同时记下写入时 `list_spaces` 返回的 `permissions`；权限变化（如去掉“读取映射”或换用另一个令牌）时，Skill 清空全部缓存后重新读取。缓存效果可在调用记录（第 6 节）中按用户统计调用次数核实。
 
 ## 10. 与现有架构的关系
 
@@ -236,7 +313,7 @@ plugins/
 | MCP 与鉴权 | 新增网关路由、个人令牌鉴权依赖和令牌管理接口；单空间入口的路由、鉴权和工具不变。 |
 | 读取服务 | 复用 `mcp_ontology` 与 `ontology_search`，不改其授权规则；跨空间检索由网关逐个空间调用单空间检索后分组。 |
 | 数据库 | Alembic 新增个人令牌表、网关调用记录表和反馈表，引用用户表和空间表；其他表不变，无需迁移数据。 |
-| 平台界面 | 左侧菜单“空间设置”分组改名“管理中心”，含“空间设置”和“用户反馈”，整组只对空间管理员可见；成员不再能打开空间设置页。其他页面不变。 |
+| 平台界面 | 页头用户名新增菜单“个人令牌”（`/tokens`，第 4.6 节）。左侧菜单“空间设置”分组改名“管理中心”，含“空间设置”和“用户反馈”，整组只对空间管理员可见；成员不再能打开空间设置页。其他页面不变。 |
 | DataAgent | 继续使用单空间入口、固定令牌和建模运行凭据，配置不变。 |
 | 部署 | 同一应用升级。随附的 nginx 已整体转发 `/api/`；自建反向代理若按路径放行，需加入 `/api/v1/ontology/mcp`。 |
 
