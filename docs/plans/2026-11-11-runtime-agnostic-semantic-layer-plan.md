@@ -1,6 +1,6 @@
 # 外部智能体接入本体语义层实施计划
 
-日期：2026-11-12。设计见[外部智能体接入本体语义层设计](../design/2026-11-11-runtime-agnostic-semantic-layer-for-agents.md)，首版范围按其第 2、3 节（SL-01～SL-03）。工期按一人估算。
+日期：2026-11-12。设计见[外部智能体接入本体语义层设计](../design/2026-11-11-runtime-agnostic-semantic-layer-for-agents.md)，首版范围按其第 2、3 节（SL-01～SL-03、SL-09）。工期按一人估算。
 
 ## 1. 职责划分
 
@@ -22,15 +22,16 @@
 | 授权 | `services/access.py`：带 `service_token_id` 的身份按 `scopes` 判断映射与实例读取；授权指纹含令牌 ID 与范围 | 个人令牌身份设 `service_token_id="pat:<id>"`，无需改动 |
 | 空间目录 | `services/workspaces.py` 的 `list_accessible_workspaces` 返回成员空间、角色、`version_id`、`current_version` | `list_spaces` 直接取用 |
 | 令牌与调用记录存储 | 无（MT-03 已删除服务令牌表；没有审计表） | 新增个人令牌表和网关调用记录表 |
-| Skill | `integrations/dataagent/skills/semantic-grounding/`：先检索再精读、歧义追问、保留指标固定过滤 | 改写为外部客户端 Skill，原 DataAgent Skill 不变 |
+| Skill 与插件 | `integrations/dataagent/skills/semantic-grounding/`：先检索再精读、歧义追问、保留指标固定过滤；仓库没有面向外部客户端的插件 | 新建 `plugins/ontofoundry/`（设计第 7 节），原 DataAgent 套件不变 |
 
 ## 3. 交付顺序
 
 ### 步骤一　验证语义交接，预计半天
 
 1. 在隔离环境准备一个带指标、维度和数据集绑定的虚构空间，用自定义固定令牌把单空间 MCP 配到 Claude Code，确认 `initialize`、`tools/list`、`search_ontology`、`get_ontology` 可用；zcode 用同一地址和 Bearer 头，记录配置方式和协议协商结果。
-2. 把 `semantic-grounding` 的检索、精读、过滤和缺项处理改写成外部 Skill，放在新建的 `integrations/agents/skills/ontology-grounding/`，写明版本规则（设计第 7 节）和“由客户端自己的查询工具取数”的约定。
+2. 把 `semantic-grounding` 的检索、精读、过滤和缺项处理改写成外部 Skill，放在 `plugins/ontofoundry/skills/ontology-grounding/`，写明版本规则（设计第 8 节）和“由客户端自己的查询工具取数”的约定；同时建好插件清单、`.mcp.json` 和仓库根目录的 `.claude-plugin/marketplace.json`（设计第 7 节）。本步骤的 `.mcp.json` 临时指向单空间入口和固定令牌，步骤二改为网关和个人令牌。
 3. 用同一个指标跑两条路径：只配 MCP 时返回定义、版本和映射；再挂已有查询工具，由查询平台执行并返回结果与证据。现有投影不含查询平台的连接 ID，试点用查询平台已有的授权连接配置对齐。
+4. 验证三种客户端的安装：Claude Code 和 ZCode 按仓库名添加插件目录并安装，opencode 按 README 配置 Skill 路径和 `opencode.json`。重点确认设计第 7 节列出的两个未写明事项：ZCode 是否读取 `.claude-plugin/marketplace.json`，以及 ZCode 中令牌的提供方式。
 
 固定令牌持有者可读任一已知空间并取得管理员投影，本步骤只在隔离环境进行。结果写入试点记录；协议或客户端有缺口时先更新设计再进入步骤二。
 
@@ -41,7 +42,7 @@
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
 4. **调用记录**：按设计第 6 节在 `tools/call` 结束后写一行记录，写入失败只记错误日志，不影响工具返回。
 5. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`，覆盖第 4 节验收中可自动化的场景；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
-6. **文档**：新建 `integrations/agents/README.md`，写明令牌签发、客户端配置示例和 Skill 安装方式；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
+6. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
 首版不改前端：令牌通过接口签发，个人设置页面按试点反馈排期。
 
@@ -59,7 +60,8 @@
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
 | 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、摘要、错误码和消息齐全；完整返回与客户端收到的一致；不含令牌和游标原文 | 是 |
 | 单空间入口与 DataAgent | 现有测试通过；DataAgent 原配置联通，建模运行版本固定不变 | 测试 + 联验 |
-| 只装 MCP 和 Skill | Claude Code 能查到净销售额定义、固定条件、映射和版本，回答区分口径与数值 | 联验 |
+| 插件安装 | Claude Code、ZCode 按仓库名安装插件后可调用网关；opencode 按 README 配置后可用同一 Skill | 联验 |
+| 只装插件（MCP 和 Skill） | 能查到净销售额定义、固定条件、映射和版本，回答区分口径与数值 | 联验 |
 | 挂已有查询工具 | 口径一致，虚构数据返回 80 元，查询平台有执行记录；无权表时拒绝执行 | 联验 |
 
 ## 5. 发布与回退
@@ -69,4 +71,4 @@
 
 ## 6. 后续顺序
 
-多人试点后，按使用情况排定个人设置页、浏览器授权、跨空间统一排序和客户端插件包。反馈回流、条件读取、废弃标记、结构化提案等见设计第 9 节，各自先写设计。
+多人试点后，按使用情况排定个人设置页、浏览器授权、跨空间统一排序和插件内的斜杠命令。反馈回流、条件读取、废弃标记、结构化提案等见设计第 10 节，各自先写设计。

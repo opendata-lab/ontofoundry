@@ -1,6 +1,6 @@
 # 外部智能体接入本体语义层设计
 
-日期：2026-11-11，2026-11-12 修订。状态：首版已确认（SL-01～SL-03），第 9 节为未确认的后续方向。来源：外部编程与分析智能体（Claude Code、zcode 等）读取 OntoFoundry 本体语义的需求。
+日期：2026-11-11，2026-11-12 修订。状态：首版已确认（SL-01～SL-03、SL-09），第 10 节为未确认的后续方向。来源：外部编程与分析智能体（Claude Code、zcode 等）读取 OntoFoundry 本体语义的需求。
 
 实施步骤和验收见[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)。
 
@@ -20,18 +20,19 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 |---|---|---|
 | SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议不变。新增 `/api/v1/ontology/mcp`，只提供 `list_spaces`、`search_ontology`、`get_ontology` 三个只读工具，支持跨空间检索。网关不执行业务数据查询，不提供实例与文档事实工具。两个入口共用现有本体读取服务。来源：现有 MCP；属于接入方式，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-02 | **个人访问令牌（PAT）**：网关只接受绑定用户的个人令牌，每次调用按该用户当前的空间成员关系和令牌权限范围授权。范围必含 `ontology:read`，可选 `mappings:read`（返回物理映射和 SQL 参考）。令牌不过期，用户可随时撤销。用户用现有登录会话签发、查看和撤销，首版只提供接口。来源：常见个人访问令牌机制；属于接入鉴权。 | 2026-11-12 用户确认；不过期 2026-11-12 用户确认 |
-| SL-03 | **网关调用记录**：每次工具调用在数据库存一条记录：调用者、令牌、工具、读取的空间及其版本、调用参数、完整返回内容、结果摘要、结果状态与错误、耗时，另有扩展字段。不存令牌。用于审计、改进工具，并为日后把外部提问转成建模输入（第 9 节 SL-15）保留素材。来源：固定令牌无法追溯调用者的缺口；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认；入库、字段及保存完整返回 2026-11-12 用户确认 |
+| SL-03 | **网关调用记录**：每次工具调用在数据库存一条记录：调用者、令牌、工具、读取的空间及其版本、调用参数、完整返回内容、结果摘要、结果状态与错误、耗时，另有扩展字段。不存令牌。用于审计、改进工具，并为日后把外部提问转成建模输入（第 10 节 SL-15）保留素材。来源：固定令牌无法追溯调用者的缺口；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认；入库、字段及保存完整返回 2026-11-12 用户确认 |
+| SL-09 | **客户端插件**：仓库根目录新建 `plugins/ontofoundry/`，采用 Claude Code 插件格式（ZCode 兼容读取），包含网关 MCP 配置和外部 Skill；仓库根目录的 `.claude-plugin/marketplace.json` 列出该插件，用户按仓库名添加。opencode 没有插件包格式，直接使用同一个 Skill 目录并按说明配置 MCP。`integrations/dataagent` 保持不变。来源：Claude Code 与 ZCode 的插件规范、Agent Skills 格式；属于客户端分发，不进入本体模型。 | 2026-11-12 用户确认 |
 
 **与固定令牌设计的关系**：[MT-03](2026-10-22-fixed-mcp-token.md) 规定外部访问只用固定令牌，并删除了按空间签发的服务令牌。SL-02 修订这一点：用户网关使用个人令牌。两者用途不同：固定令牌和建模运行凭据供 DataAgent 在单空间入口使用；个人令牌绑定一个用户，只用于网关，权限不超过该用户的成员身份。单空间入口仍只接受固定令牌、建模运行凭据和登录会话。
 
 ## 3. 首版范围
 
-| 包含 | 不包含（见第 9 节） |
+| 包含 | 不包含（见第 10 节） |
 |---|---|
 | 个人令牌的签发、列表、撤销接口 | 个人设置页面、浏览器授权（OAuth） |
 | 网关的三个只读工具，跨空间检索 | 实例、文档事实、实体解析工具；业务数据查询 |
 | 调用记录表 | 调用记录的查询界面、清理策略、转为建模会话 |
-| 外部客户端可用的 Skill | 客户端插件包、斜杠命令 |
+| 客户端插件（Claude Code、ZCode）及外部 Skill（opencode 直接使用） | 斜杠命令、命令与子智能体 |
 | 沿用已发布版本的 `version_id` | 条件读取、版本差异、废弃标记、反馈与变更提案 |
 
 ## 4. 接入与鉴权
@@ -123,7 +124,30 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 令牌只存其 ID。完整返回可能含物理映射和 SQL 参考（调用者有权看到的内容），每行最多约 110,000 字节，PostgreSQL 会压缩大字段，但表随调用量增长；首版没有查询界面和自动清理，只能由有数据库权限的运维查看，查看权限与清理策略随 SL-15 设计。查询平台的执行记录由查询平台自己保存。
 
-## 7. 版本一致性
+## 7. 客户端插件（SL-09）
+
+```text
+.claude-plugin/marketplace.json        仓库插件目录，列出 ./plugins/ontofoundry
+plugins/
+  ontofoundry/
+    .claude-plugin/plugin.json         插件清单（name、version、description、userConfig）
+    .mcp.json                          网关地址与 Authorization 头
+    skills/
+      ontology-grounding/SKILL.md      外部 Skill：检索、精读、过滤、缺项处理与第 8 节版本规则
+    README.md                          令牌签发和三种客户端的安装、配置说明
+```
+
+| 客户端 | 读取方式 | 依据 |
+|---|---|---|
+| Claude Code | 添加 `opendata-lab/ontofoundry` 插件目录后安装；令牌通过插件 `userConfig` 的敏感项填入，`.mcp.json` 中引用为 `Bearer ${user_config.ontofoundry_token}` | [插件](https://code.claude.com/docs/en/plugins)、[插件参考](https://code.claude.com/docs/en/plugins-reference) |
+| ZCode | 清单查找顺序为 `.zcode-plugin/plugin.json`、`.claude-plugin/plugin.json`，因此只维护一份清单；从 GitHub 仓库添加插件目录后安装 | [ZCode 插件](https://zcode.z.ai/en/docs/plugin) |
+| opencode | 插件是 JS/TS 模块，不读插件包；Skill 放入或指向 `.opencode/skills`、`.claude/skills`、`.agents/skills` 之一，MCP 写入 `opencode.json` 的 `mcp.servers`（`"type": "remote"`、`"oauth": false`、`"Authorization": "Bearer {env:ONTOFOUNDRY_TOKEN}"`） | [Skills](https://opencode.ai/docs/skills)、[MCP](https://opencode.ai/docs/mcp-servers) |
+
+插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。
+
+以下两点官方文档未写明，在实施步骤一中联验：ZCode 是否读取 `.claude-plugin/marketplace.json`（其文档只写“仓库根目录的 `marketplace.json`”）；ZCode 敏感 `userConfig` 暂不能在界面填写时，令牌如何提供。联验不通过时按结果调整本节，再进入步骤二。
+
+## 8. 版本一致性
 
 首版不新增版本协议。每个检索结果组和 `get_ontology` 响应都带 `version_id`，`list_spaces` 带当前 `version_id`。外部 Skill 规定：
 
@@ -131,7 +155,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 - 回答中注明采用的空间和版本；跨空间的命中分别说明口径，不合并。
 - 生成查询前可用 `list_spaces` 复核相关空间的当前版本。
 
-## 8. 与现有架构的关系
+## 9. 与现有架构的关系
 
 | 层次 | 首版影响 |
 |---|---|
@@ -141,7 +165,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | DataAgent | 继续使用单空间入口、固定令牌和建模运行凭据，配置不变。 |
 | 部署 | 同一应用升级。随附的 nginx 已整体转发 `/api/`；自建反向代理若按路径放行，需加入 `/api/v1/ontology/mcp`。 |
 
-## 9. 后续方向（未确认）
+## 10. 后续方向（未确认）
 
 以下方向未确认，不在首版范围；开工前各自按 AGENTS.md 说明来源、语义还是执行、删掉会失去什么，并写设计和计划。详细记录见 [TODO](../TODO.md)“本体 MCP”。
 
@@ -152,15 +176,14 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | SL-06 | 条件读取 | 按 `version_id` 判断未变化时返回轻量结果，变化时返回差异摘要 |
 | SL-07 | 废弃标记 | 元素增加废弃状态和替代项；需说明来源，Ossie 与现有模型能否表达 |
 | SL-08 | 语义漂移错误 | 引用的元素已不存在或改名时返回可指导重读的错误 |
-| SL-09 | 客户端插件包 | 打包 MCP 配置与 Skill，覆盖 Claude Code、zcode 等 |
 | SL-10 | 查询委派 | 网关把确认后的口径交给查询平台执行；首版由 Agent 自行调用查询工具 |
-| SL-11 | 斜杠命令 | 插件内预置检索、指标、空间等命令 |
+| SL-11 | 斜杠命令 | 在 SL-09 的插件内预置检索、指标、空间等命令 |
 | SL-12 | 结构化变更提案 | 外部提交复用 `parse_agent`、`trial_apply`、`store_batch`，需合法的会话与基线上下文，一律经人工审阅 |
 | SL-13 | 接口来源绑定 | 属性绑定业务 API 或 MCP 工具的返回值；与“执行细节不进入模型”的原则相关 |
 | SL-14 | 业务动作 | 实体绑定业务系统的操作工具；与决定 #37（删除业务动作）冲突 |
 | SL-15 | 调用记录转建模输入 | 从调用记录（检索词、未匹配用语、零命中）筛选后生成建模会话或待处理事项，并设计记录的查看与清理 |
 
-## 10. 参考
+## 11. 参考
 
 - [Palantir Ontology MCP 概览](https://palantir.com/docs/foundry/ontology-mcp/overview/)、[鉴权与授权](https://palantir.com/docs/foundry/ontology-mcp/authentication-and-authorization/)：一个 MCP 服务器对应一个本体，令牌权限取用户权限、应用限制和操作范围的交集。
 - [Claude Code MCP 配置](https://code.claude.com/docs/en/mcp)、[Claude Code Skill 配置](https://code.claude.com/docs/en/skills)
