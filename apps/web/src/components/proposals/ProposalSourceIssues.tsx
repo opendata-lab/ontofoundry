@@ -20,10 +20,11 @@ const fieldOf = (path: string) => path.replace(/^\//, "").split("/")[0] ?? "";
  * Source problems placed next to the field they concern. After a sync or a
  * revision the proposals reload and the mark disappears where it was shown.
  */
-export function useSourceIssues({ item, workspaceId, busy, fields, onReviseDataset }: {
+export function useSourceIssues({ item, workspaceId, busy, canEdit = true, fields, onReviseDataset }: {
   item: ProposalItem;
   workspaceId: string;
   busy: boolean;
+  canEdit?: boolean;
   /** Fields the diff shows; problems elsewhere stay in a note above it. */
   fields: ReadonlySet<string>;
   onReviseDataset: (dataset: Dataset) => Promise<boolean>;
@@ -36,7 +37,7 @@ export function useSourceIssues({ item, workspaceId, busy, fields, onReviseDatas
   const mark = (issue: (typeof issues)[number]) => (
     <span key={`${issue.code}:${issue.path}`} className="inline-flex flex-wrap items-center gap-2">
       <StatusMark state="error" label={TITLE[issue.code] ?? "来源未就绪"} title={issue.message} />
-      {issue.code === "SOURCE_NOT_REGISTERED" && issue.details?.connection_id && (
+      {canEdit && issue.code === "SOURCE_NOT_REGISTERED" && issue.details?.connection_id && (
         <Button
           type="link"
           size="small"
@@ -47,7 +48,7 @@ export function useSourceIssues({ item, workspaceId, busy, fields, onReviseDatas
           去同步
         </Button>
       )}
-      {dataset && (
+      {canEdit && dataset && (
         <Button type="link" size="small" className="h-auto p-0" disabled={busy} onClick={() => setEditing({ ...dataset })}>
           修改连接和表
         </Button>

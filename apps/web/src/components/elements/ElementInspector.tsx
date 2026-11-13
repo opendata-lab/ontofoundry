@@ -19,6 +19,7 @@ import {
 } from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
 import { useWorkspaceContext } from "../../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../../hooks/useWorkspacePermissions";
 import { useErrorMessage } from "../../hooks/useErrorMessage";
 import { emptyDraft, byId, effectiveProperties, mappingFor, upsert } from "../../lib/coreModel";
 import { branchProblem } from "../../lib/derivedEditing";
@@ -297,6 +298,7 @@ export function ElementView({
   onClose,
 }: ViewProps) {
   const { workspace, refresh } = useWorkspaceContext();
+  const { canRead, canEdit } = useWorkspacePermissions();
   const detail = useElementDetail();
   const active = usePageActive();
   const page = useContext(PageTabContext);
@@ -313,7 +315,7 @@ export function ElementView({
   const propertyBindings = useRef<PropertyBindingEdits>(new Map());
   draftRef.current = draft;
   const [editing, setEditing] = useState(
-    !previewHash && (creating || startEditing) && !!workspace.role,
+    !previewHash && (creating || startEditing) && canEdit,
   );
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -349,7 +351,7 @@ export function ElementView({
     setVersionChanged(false);
     const load = async () => {
       if (!KINDS.has(requestedKind)) throw new Error("不支持的元素类型");
-      if (sessionId && !workspace.role) throw new Error("没有权限查看此内容");
+      if (sessionId && !canRead) throw new Error("没有权限查看此内容");
       const current = await api.workspace(workspace.id);
       let source: Loaded;
       if (sessionId) {
@@ -365,14 +367,14 @@ export function ElementView({
         if (!fixed && !creating) throw new Error("还没有发布内容");
         const complete = creating || startEditing || requestedKind === "material_object" || requestedKind === "material_link";
         const model = !fixed ? emptyDraft(workspace.id) : complete
-          ? workspace.role ? await modelingApi.snapshot(workspace.id, fixed) : (await api.presentation(workspace.id, fixed)).model
+          ? canRead ? await modelingApi.snapshot(workspace.id, fixed) : (await api.presentation(workspace.id, fixed)).model
           : { ...(await api.elementPresentation(workspace.id, requestedKind as TargetKind, id, fixed)).model, material_objects: [], material_links: [] };
         source = { draft: model, session: null, versionId: fixed, complete };
 
       }
       let value = startEditing || creating ? structuredClone(source.draft) : source.draft;
       if (creating) {
-        if (!workspace.role) throw new Error("没有权限新建");
+        if (!canEdit) throw new Error("没有权限新建");
         if (!NEW_KINDS.includes(requestedKind as InspectKind)) throw new Error("请从所属对象或关系中新增");
         const kind = requestedKind as InspectKind;
         value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
@@ -388,7 +390,7 @@ export function ElementView({
     return () => {
       live = false;
     };
-  }, [workspace.id, workspace.role, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt, requestedVersionId]);
+  }, [workspace.id, canRead, canEdit, requestedKind, creating, effectiveId, sessionId, previewHash, owner, attempt, requestedVersionId]);
   useEffect(() => {
     if (!modal || (!dirty && !busy)) return;
     const warn = (e: BeforeUnloadEvent) => {
@@ -407,7 +409,7 @@ export function ElementView({
   const properties = draft && object ? effectiveProperties(draft, object.id) : [];
   const relations = draft && object ? relationsFor(draft, object) : [];
   const rules = draft && (object || link) ? rulesFor(draft, (object ?? link)!) : [];
-  const member = !!workspace.role;
+  const member = canRead;
   const tabs: { key: ElementTab; label: string; count?: number }[] = object
     ? [
         { key: "basic", label: "概览" },
@@ -665,7 +667,7 @@ export function ElementView({
   };
   const panel: PanelProps | null =
     draft && (object || link)
-      ? { draft, type: (object ?? link)!, editing, canEdit: member && !previewHash, sessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
+      ? { draft, type: (object ?? link)!, editing, canEdit: canEdit && !previewHash, sessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
       : null;
   const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
   const record = draft && object ? objectMapping(draft, object) : null;
@@ -768,7 +770,7 @@ export function ElementView({
       {!modal && status}
       {versionChanged && <Button size={control} disabled={editing || busy} onClick={() => void refreshPublished()}>版本已更新，刷新</Button>}
       {notice && <StatusMark state="mapped" label={notice} className="font-normal" role="status" />}
-      {!editing && member && !previewHash && element && (
+      {!editing && canEdit && !previewHash && element && (
         <Button size={control} onClick={() => void beginEdit()} disabled={!loaded || busy}>
           编辑
         </Button>

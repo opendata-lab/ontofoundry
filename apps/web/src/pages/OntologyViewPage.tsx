@@ -9,10 +9,12 @@ import { SemanticView } from "../components/SemanticView";
 import { ElementModal } from "../components/elements/ElementInspector";
 import { useElementDetail } from "../hooks/useElementDetail";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { ONTOLOGY_SAVED, type ElementRequest, type OntologySaved } from "../lib/elementInspector";
 
 export function OntologyViewPage() {
   const { workspace } = useWorkspaceContext();
+  const { canEdit } = useWorkspacePermissions();
   const [overview, setOverview] = useState<WorkspaceOverview | null>(null);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -50,7 +52,7 @@ export function OntologyViewPage() {
   useEffect(() => {
     let active = true;
     setDraftSession(null);
-    if (!workspace.role) return;
+    if (!canEdit) return;
     modelingApi
       .sessions(workspace.id)
       .then(({ items }) => active && setDraftSession(items.find((item) => item.has_unpublished_changes)?.id ?? null))
@@ -58,7 +60,7 @@ export function OntologyViewPage() {
     return () => {
       active = false;
     };
-  }, [workspace.id, workspace.role, workspace.current_version]);
+  }, [workspace.id, canEdit, workspace.current_version]);
   useEffect(() => {
     let live = true;
     setModel(null);
@@ -71,7 +73,7 @@ export function OntologyViewPage() {
     return () => {
       live = false;
     };
-  }, [workspace.id, workspace.role, overview]);
+  }, [workspace.id, overview]);
   const openModal = useCallback((request: ElementRequest) => setInspected({ ...request, versionId: overview?.version?.version_id }), [overview?.version?.version_id]);
   const openFixedPage = useCallback((request: ElementRequest) => openPage({ ...request, versionId: overview?.version?.version_id }), [openPage, overview?.version?.version_id]);
   if (error) return <ErrorSurface message={error} retry={load} />;
@@ -88,7 +90,7 @@ export function OntologyViewPage() {
         <Panel fill>
           {draftSession && <PanelToolbar><Link to={"../delivery?session=" + draftSession}>有未发布的草稿修改 · 去发布</Link></PanelToolbar>}
           <div className="min-h-0 flex-1">
-            {graph ? <SemanticView graph={graph} model={model} onOpen={openModal} onOpenPage={openFixedPage} resourceError={resourceError} canCreate={!!workspace.role} /> : <EmptyModel text="工作空间还没有已发布本体" />}
+            {graph ? <SemanticView graph={graph} model={model} onOpen={openModal} onOpenPage={openFixedPage} resourceError={resourceError} canCreate={canEdit} /> : <EmptyModel text="工作空间还没有已发布本体" />}
           </div>
         </Panel>
       </PageBody>

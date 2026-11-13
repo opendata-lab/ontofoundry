@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
-import type { Draft, Workspace } from "../api/types";
+import type { Draft, User, Workspace } from "../api/types";
 import { emptyDraft } from "../lib/coreModel";
 import { usePageActive } from "./usePageTab";
+import { getWorkspacePermissions } from "./useWorkspacePermissions";
 import { ONTOLOGY_SAVED, type OntologySaved } from "../lib/elementInspector";
 
 /**
  * The core-1 draft a page reads: the session draft when ?session= is set, the
- * published snapshot for members, or the authorised presentation of the
+ * published snapshot for readers, or the authorised presentation of the
  * current version for visitors. All three are the same Draft shape.
  */
-export function useSnapshot(workspace: Workspace) {
+export function useSnapshot(workspace: Workspace, user?: User | null) {
+  const { canRead } = getWorkspacePermissions(workspace, user);
   const active = usePageActive();
   const [params] = useSearchParams();
   const sid = params.get("session");
@@ -31,19 +33,19 @@ export function useSnapshot(workspace: Workspace) {
     const fail = (error: Error) => {
       if (revision === request.current) setError(error.message);
     };
-    if (sid && workspace.role)
+    if (sid && canRead)
       modelingApi
         .get(workspace.id, sid)
         .then((s) => accept(s.draft))
         .catch(fail);
-    else if (workspace.role) modelingApi.snapshot(workspace.id, workspace.version_id).then(accept).catch(fail);
+    else if (canRead) modelingApi.snapshot(workspace.id, workspace.version_id).then(accept).catch(fail);
     else if (!workspace.version_id) accept(emptyDraft(workspace.id));
     else
       api
         .presentation(workspace.id, workspace.version_id)
         .then((r) => accept(r.model))
         .catch(fail);
-  }, [workspace.id, workspace.role, workspace.version_id, sid]);
+  }, [workspace.id, canRead, workspace.version_id, sid]);
   useEffect(() => {
     if (active) load();
     return invalidate;

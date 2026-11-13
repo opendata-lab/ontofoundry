@@ -5,12 +5,20 @@ import { modelingApi } from "../api/client";
 import type { ManagedMaterial, Workspace } from "../api/types";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { usePageActive } from "../hooks/usePageTab";
+import { getWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { PageToolbar, Panel, StatusMark } from "./layout";
 
 const sizeText = (size: number) => size < 1024 ? `${size} B` : size < 1024 * 1024
   ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
 
-export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
+export function DocumentMaterials({ workspace, canEdit: canEditProp, canManage: canManageProp }: {
+  workspace: Workspace;
+  canEdit?: boolean;
+  canManage?: boolean;
+}) {
+  const perms = getWorkspacePermissions(workspace);
+  const canEdit = canEditProp ?? perms.canEdit;
+  const canManage = canManageProp ?? perms.canManage;
   const { message } = App.useApp();
   const active = usePageActive();
   const [materials, setMaterials] = useState<ManagedMaterial[]>([]);
@@ -98,10 +106,12 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
       <Input type="search" allowClear prefix={<Search size={14} />} className="w-60" aria-label="搜索文档" placeholder="搜索文档名称" value={query} onChange={(e) => setQuery(e.target.value)} />
       <Tooltip title="刷新文档"><Button aria-label="刷新文档" disabled={busy} icon={<RefreshCw size={14} />} onClick={() => void load()} /></Tooltip>
     </>}>
-      <Upload accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv" multiple showUploadList={false} disabled={busy}
-        beforeUpload={(file, files) => { if (file === files[0]) void upload(files); return false; }}>
-        <Button type="primary" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
-      </Upload>
+      {canEdit && (
+        <Upload accept=".md,.markdown,.txt,.json,.yaml,.yml,.csv" multiple showUploadList={false} disabled={busy}
+          beforeUpload={(file, files) => { if (file === files[0]) void upload(files); return false; }}>
+          <Button type="primary" icon={<UploadIcon size={14} />} loading={busy}>上传文档</Button>
+        </Upload>
+      )}
       <Typography.Text type="secondary" className="text-xs">{materials.filter((m) => (m.origin ?? "upload") === origin).length} 个文档</Typography.Text>
     </PageToolbar>
     <Panel>
@@ -125,9 +135,9 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
         </Tooltip> },
         { title: "大小", key: "size", render: (_, material) => sizeText(material.byte_size) },
         { title: "上传时间", key: "created", render: (_, material) => material.created_at ? new Date(material.created_at).toLocaleString("zh-CN", { hour12: false }) : "—" },
-        { title: "操作", key: "actions", render: (_, material) => {
-          const reason = workspace.role !== "admin" ? "仅空间管理员可删除文档" : !material.usage.can_delete ? `被${material.usage.references.join("、")}引用，不能删除` : "删除文档";
-          const disabled = busy || workspace.role !== "admin" || !material.usage.can_delete;
+        ...(canEdit ? [{ title: "操作", key: "actions", render: (_: unknown, material: ManagedMaterial) => {
+          const reason = !canManage ? "仅空间管理员可删除文档" : !material.usage.can_delete ? `被${material.usage.references.join("、")}引用，不能删除` : "删除文档";
+          const disabled = busy || !canManage || !material.usage.can_delete;
           return <div className="flex items-center gap-1">
             <Tooltip title="下载文档"><Button size="small" type="text" aria-label={`下载 ${material.name}`} icon={<Download size={14} />} href={modelingApi.materialDownloadUrl(workspace.id, material.id)} /></Tooltip>
             {material.archived_at
@@ -137,7 +147,7 @@ export function DocumentMaterials({ workspace }: { workspace: Workspace }) {
               <Tooltip title={reason}><span><Button size="small" type="text" danger aria-label={`删除 ${material.name}`} disabled={disabled} icon={<Trash2 size={14} />} /></span></Tooltip>
             </Popconfirm>
           </div>;
-        } },
+        } }] : []),
       ]} />
     </Panel>
   </>;

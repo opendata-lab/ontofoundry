@@ -5,6 +5,7 @@ import { ApiError, catalogApi, workspaceRequest } from "../api/client";
 import type { ConnectionReference, DataConnection } from "../api/types";
 import { Panel, StatusMark } from "./layout";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 
 const PORTS: Record<DataConnection["kind"], number> = { postgresql: 5432, mysql: 3306, doris: 9030 };
 const REFERENCE_LABELS: Record<ConnectionReference["type"], string> = {
@@ -24,6 +25,7 @@ type ConnectionForm = {
 /** Owns the connection form and exposes its opener to the page header. */
 export function DataConnections({ onReady }: { onReady?: (open: () => void) => void }) {
   const { workspace } = useWorkspaceContext();
+  const { canEdit, canManage } = useWorkspacePermissions();
   const [connections, setConnections] = useState<DataConnection[]>([]);
   const [error, setError] = useState("");
   const [references, setReferences] = useState<ConnectionReference[]>([]);
@@ -147,10 +149,10 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
                 </code>
               ),
             },
-            {
+            ...(canEdit ? [{
               title: "操作",
               key: "action",
-              render: (_, c) => (
+              render: (_: unknown, c: DataConnection) => (
                 <span className="inline-flex gap-2">
                   <Button
                     size="small"
@@ -166,7 +168,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
                   >
                     测试
                   </Button>
-                  {workspace.role === "admin" && (
+                  {canManage && (
                     <>
                       <Button size="small" icon={<Pencil size={14} />} aria-label={`编辑 ${c.name}`} onClick={() => edit(c)}>
                         编辑
@@ -187,7 +189,7 @@ export function DataConnections({ onReady }: { onReady?: (open: () => void) => v
                   )}
                 </span>
               ),
-            },
+            }] : []),
           ]}
         />
       </Panel>

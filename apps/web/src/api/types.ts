@@ -152,10 +152,14 @@ export type ValidationReport = {
 
 export type User = {
   id: UUID;
-  subject: string;
+  username: string;
   display_name: string;
   email: string | null;
+  is_platform_admin: boolean;
+  local_account: boolean;
 };
+
+export type WorkspaceRole = "admin" | "member" | "viewer";
 
 export type AuthOptions = {
   local_login: boolean;
@@ -172,14 +176,21 @@ export type Workspace = {
   slug: string;
   name: string;
   description: string;
-  role: "admin" | "member" | null;
-  visibility: "member" | "published_only";
+  is_public: boolean;
+  role: WorkspaceRole | null;
+  visibility: "member" | "public";
   current_version: number | null;
   version_id: UUID | null;
   version_sha256: SHA256 | null;
   object_type_count: number;
   link_type_count: number;
   updated_at: ISOTime;
+};
+
+export type UpdateWorkspaceRequest = {
+  name?: string;
+  description?: string;
+  is_public?: boolean;
 };
 
 export type Counts = {
@@ -813,9 +824,63 @@ export type DataAgentHealth = {
 export type Member = {
   id: number;
   user_id: UUID;
+  username: string;
+  display_name: string;
+  role: WorkspaceRole;
+  last_login_at: ISOTime | null;
+};
+
+export type AddMemberRequest = {
+  user_id: UUID;
+  role: WorkspaceRole;
+};
+
+export type WorkspaceUserSearchItem = {
+  id: UUID;
+  username: string;
+  display_name: string;
+  last_login_at: ISOTime | null;
+};
+
+export type MeWorkspace = {
+  id: UUID;
   name: string;
-  subject: string;
-  role: "admin" | "member";
+  role: WorkspaceRole;
+  is_public: boolean;
+};
+
+export type AdminUserWorkspace = {
+  id: UUID;
+  name: string;
+  role: WorkspaceRole;
+};
+
+export type AdminUser = {
+  id: UUID;
+  username: string;
+  display_name: string;
+  email: string | null;
+  local_account: boolean;
+  platform_admin: boolean;
+  last_login_at: ISOTime | null;
+  workspaces: AdminUserWorkspace[];
+};
+
+export type CreateAdminUserRequest = {
+  username: string;
+  display_name: string;
+  email?: string | null;
+};
+
+export type AdminWorkspace = {
+  id: UUID;
+  name: string;
+  is_public: boolean;
+};
+
+export type UpsertUserWorkspaceResponse = {
+  workspace_id: UUID;
+  role: WorkspaceRole;
 };
 
 // --- MCP read projection --------------------------------------------------

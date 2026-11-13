@@ -410,3 +410,35 @@ it("shows grouped count summary when more than 5 tables are selected", () => {
   );
   expect(screen.getByText("已选 6 张（c1 4、c2 2）")).toBeInTheDocument();
 });
+
+it.each([
+  ["viewer member", { role: "viewer" as const, is_public: false, visibility: "member" as const }],
+  ["public non-member", { role: null, is_public: true, visibility: "public" as const }],
+])("disables editing and conversation sending for %s", async (_label, patch) => {
+  context.workspace = workspace(patch);
+  vi.mocked(modelingApi.materials).mockResolvedValue({
+    items: [{ id: "m1", name: "制度.md", byte_size: 120, chunk_count: 2, sha256: "a".repeat(64) } as Material],
+  });
+  const currentSession = { ...session(), material_ids: ["m1"] };
+  context.model.session = currentSession;
+
+  const { container } = renderWithProviders(
+    <MemoryRouter>
+      <BuilderPage />
+    </MemoryRouter>,
+  );
+  await ready();
+
+  expect(await screen.findByText("制度.md")).toBeInTheDocument();
+  expect(screen.getByRole("checkbox")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "新建会话" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "选择会话模式" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "放弃会话" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "选择数据表…" })).toBeNull();
+  expect(screen.queryByText("点击或拖拽文件至此上传")).toBeNull();
+
+  const conversation = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(conversation).toHaveAttribute("disabled");
+  expect(conversation).toHaveAttribute("placeholder", "只读模式下不可发送消息");
+  expect(conversation.beforeSend?.({ text: "hello" } as never)).toBe(false);
+});

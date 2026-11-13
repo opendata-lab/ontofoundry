@@ -85,6 +85,7 @@ export function ProposalDetail({
   draft,
   technical,
   busy,
+  canEdit = true,
   error,
   actions,
   onRevise,
@@ -98,6 +99,7 @@ export function ProposalDetail({
   draft: Draft;
   technical: string;
   busy: boolean;
+  canEdit?: boolean;
   error?: string;
   actions: CardActions;
   onRevise: (candidate: DuplicateCandidate, after: MaterialObject) => Promise<boolean>;
@@ -111,7 +113,7 @@ export function ProposalDetail({
   const deps = requiredIds(item);
   const changes = reviewChanges(item);
   const connectionNames = useConnectionNames(workspaceId);
-  const source = useSourceIssues({ item, workspaceId, busy, fields: new Set(changes.map((c) => c.path)), onReviseDataset });
+  const source = useSourceIssues({ item, workspaceId, busy, canEdit, fields: new Set(changes.map((c) => c.path)), onReviseDataset });
   // A declared rule the synced source column does not hold, beside that field (AR-03).
   const physicalMarks = Object.fromEntries((item.physical_differences ?? []).map((d) => [
     d.path,
@@ -121,7 +123,7 @@ export function ProposalDetail({
   const reason = item.reason.trim();
   const blocked = acceptanceBlock(item, byIdMap);
   const canRevise =
-    item.status === "pending" && item.operation === "create" && item.target_kind === "material_object" && item.duplicate_candidates.length > 0;
+    canEdit && item.status === "pending" && item.operation === "create" && item.target_kind === "material_object" && item.duplicate_candidates.length > 0;
   return (
     <Modal
       open
@@ -138,16 +140,22 @@ export function ProposalDetail({
         </div>
       }
       footer={
-        <div className="flex items-center gap-3">
-          <Text type="secondary" className="mr-auto text-left text-xs">
-            {item.status === "accepted"
-              ? "已接受。拒绝将撤销此项修改。"
-              : item.status === "rejected"
-                ? "恢复后回到待审，并重新校验整个批次。"
-                : blocked || "接受后将更新本体草稿。"}
-          </Text>
-          <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} size="middle" />
-        </div>
+        canEdit ? (
+          <div className="flex items-center gap-3">
+            <Text type="secondary" className="mr-auto text-left text-xs">
+              {item.status === "accepted"
+                ? "已接受。拒绝将撤销此项修改。"
+                : item.status === "rejected"
+                  ? "恢复后回到待审，并重新校验整个批次。"
+                  : blocked || "接受后将更新本体草稿。"}
+            </Text>
+            <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} size="middle" />
+          </div>
+        ) : (
+          <div className="flex items-center justify-end">
+            <Button onClick={onClose}>关闭</Button>
+          </div>
+        )
       }
     >
       <div className="flex max-h-review-detail flex-col gap-4 overflow-auto">
@@ -190,7 +198,7 @@ export function ProposalDetail({
             annotations={{ ...source.marks, ...physicalMarks }}
             editDisabled={busy}
             onEdit={
-              item.status === "pending" && (item.operation === "create" || item.operation === "update") && item.after
+              canEdit && item.status === "pending" && (item.operation === "create" || item.operation === "update") && item.after
                 ? (path, value) => onReviseContent({ [path]: value })
                 : undefined
             }

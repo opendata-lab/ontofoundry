@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { modelingApi } from "../api/client";
 import type { AffectedItem, Draft, Rule, ValueKind, ValueType, Workspace } from "../api/types";
 import { useElementDetail } from "../hooks/useElementDetail";
+import { getWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { VALUE_KINDS } from "../lib/coreModel";
 import { newId } from "../lib/id";
 import { valueTypeRules, valueTypeUsages } from "../lib/valueTypes";
@@ -25,6 +26,7 @@ export function ValueTypeCatalog({ workspace, draft, sessionId, query, createReq
   onSaved: (draft: Draft) => void;
 }) {
   const detail = useElementDetail();
+  const { canEdit } = getWorkspacePermissions(workspace);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [affected, setAffected] = useState<(AffectedItem & { reason: string })[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -141,7 +143,7 @@ export function ValueTypeCatalog({ workspace, draft, sessionId, query, createReq
         locale={{ emptyText: <Empty description={(draft.value_types ?? []).length ? "没有匹配的值类型" : "还没有值类型定义"} /> }}
         columns={[
           {
-            title: "名称", key: "name", render: (_, v) => workspace.role
+            title: "名称", key: "name", render: (_, v) => canEdit
               ? <Button type="link" className="h-auto p-0 font-medium" onClick={() => open(v)}>{v.display_name || v.name}</Button>
               : <span className="font-medium">{v.display_name || v.name}</span>,
           },

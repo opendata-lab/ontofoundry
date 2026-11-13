@@ -180,3 +180,16 @@ it("requires a PostgreSQL database before submitting", async () => {
   expect(await screen.findByText("PostgreSQL 连接需要填写数据库名称")).toBeInTheDocument();
   expect(workspaceRequest).not.toHaveBeenCalled();
 });
+
+it.each([
+  ["viewer member", { role: "viewer" as const, is_public: false, visibility: "member" as const }],
+  ["public non-member", { role: null, is_public: true, visibility: "public" as const }],
+])("hides add, test, edit and delete actions for %s", async (_label, patch) => {
+  context.workspace = workspace(patch);
+  renderWithProviders(<ConnectionsPage />);
+  expect(await screen.findByRole("cell", { name: "星河只读库" })).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "添加连接" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "测试" })).toBeNull();
+  expect(screen.queryByRole("button", { name: `编辑 ${connection.name}` })).toBeNull();
+  expect(screen.queryByRole("button", { name: `删除 ${connection.name}` })).toBeNull();
+});

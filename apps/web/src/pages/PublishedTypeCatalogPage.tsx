@@ -13,6 +13,7 @@ import { useElementDetail } from "../hooks/useElementDetail";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY } from "../lib/coreModel";
 import { isForwardReading } from "../lib/linkReadings";
 import { METRIC_KINDS } from "../lib/metricEditing";
@@ -26,6 +27,7 @@ const { Text } = Typography;
 /** Published directories never acquire a complete editable definition baseline. */
 export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object_type" | "link_type" }) {
   const { workspace, refresh } = useWorkspaceContext();
+  const { canEdit } = useWorkspacePermissions();
   const [params, setParams] = useSearchParams();
   const key = params.get("catalogTab");
   const tab: Exclude<Tab, "values"> = key === "relations" || key === "metrics" || key === "datasets" ? key : initialKind === "link_type" ? "relations" : "entities";
@@ -60,11 +62,11 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
     return () => { live = false; window.clearTimeout(timer); };
   }, [active, workspace.id, versionId, kind, query, tag, page, cursors, attempt]);
   useEffect(() => {
-    if (!active || !importOpen || !workspace.role) return;
+    if (!active || !importOpen || !canEdit) return;
     let live = true;
     modelingApi.capabilities(workspace.id).then(value => { if (live) setMaxFileMb(value.max_file_mb); }).catch(() => undefined);
     return () => { live = false; };
-  }, [active, importOpen, workspace.id, workspace.role]);
+  }, [active, importOpen, workspace.id, canEdit]);
   const reset = () => { setPage(1); setCursors([undefined]); };
   const reload = async () => {
     try { const current = await api.workspace(workspace.id); setVersionId(current.version_id); reset(); setAttempt(n => n + 1); refresh(); }
@@ -110,13 +112,13 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
   return <div className="flex h-full min-h-0 flex-col bg-canvas">
     <PageTabs title="本体对象" actions={<>
       <Button icon={<RefreshCw className="size-icon-sm" />} onClick={() => void reload()}>刷新</Button>
-      {workspace.role && <><Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button><Button icon={<Download className="size-icon-sm" />} disabled={!versionId} loading={exporting} onClick={() => void openExport()}>导出</Button><Link to="../delivery"><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link></>}
+      {canEdit && <><Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button><Button icon={<Download className="size-icon-sm" />} disabled={!versionId} loading={exporting} onClick={() => void openExport()}>导出</Button><Link to="../delivery"><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link></>}
     </>} activeKey={tab} onChange={next => { setQuery(""); setTag(undefined); reset(); setParams(current => { const value = new URLSearchParams(current); value.set("catalogTab", next); return value; }, { replace: true }); }} items={(Object.keys(LABELS) as Tab[]).map(key => ({ key, label: `${LABELS[key]} ${result?.counts[COUNT[key]] ?? 0}`, children: key !== tab ? null : <PageBody>
       <PageToolbar extra={<>{(tab === "entities" || tab === "relations") && <Select aria-label="标签筛选" allowClear placeholder="按标签筛选" className="w-40" value={tag} options={(result?.tags ?? []).map(label => ({ value: label, label }))} onChange={value => { setTag(value); reset(); }} />}<Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={event => { setQuery(event.target.value); reset(); }} /></>}>
-        {workspace.role && <Button type="primary" icon={<Plus size={15} />} onClick={() => detail.open({ kind, id: "new", mode: "edit", sessionId: null })}>新建{LABELS[tab]}</Button>}
+        {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => detail.open({ kind, id: "new", mode: "edit", sessionId: null })}>新建{LABELS[tab]}</Button>}
       </PageToolbar>
-      <Panel><Table<CatalogItem> size="middle" rowKey="id" columns={columns} dataSource={items} onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={(result?.total ?? 0) > 20 ? { simple: { readOnly: true }, current: page, pageSize: 20, total: result?.total, showSizeChanger: false, showQuickJumper: false, onChange: next => { if (next === page + 1 && result?.next_cursor) { setCursors(value => [...value.slice(0, page), result.next_cursor!]); setPage(next); } else if (cursors[next - 1] !== undefined || next === 1) setPage(next); } } : false} locale={{ emptyText: <Empty description={query || tag ? "没有匹配的定义" : workspace.role ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} /></Panel>
+      <Panel><Table<CatalogItem> size="middle" rowKey="id" columns={columns} dataSource={items} onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={(result?.total ?? 0) > 20 ? { simple: { readOnly: true }, current: page, pageSize: 20, total: result?.total, showSizeChanger: false, showQuickJumper: false, onChange: next => { if (next === page + 1 && result?.next_cursor) { setCursors(value => [...value.slice(0, page), result.next_cursor!]); setPage(next); } else if (cursors[next - 1] !== undefined || next === 1) setPage(next); } } : false} locale={{ emptyText: <Empty description={query || tag ? "没有匹配的定义" : canEdit ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} /></Panel>
     </PageBody> }))} />
-    {workspace.role && <><ImportDialog open={active && importOpen} workspaceId={workspace.id} maxFileMb={maxFileMb} onClose={() => setImportOpen(false)} onConfirmed={value => { setImportOpen(false); navigate(`../builder?session=${value.session_id}&panel=proposals`); }} /><ExportDialog open={active && exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={versionId ?? undefined} onClose={() => setExportOpen(false)} /></>}
+    {canEdit && <><ImportDialog open={active && importOpen} workspaceId={workspace.id} maxFileMb={maxFileMb} onClose={() => setImportOpen(false)} onConfirmed={value => { setImportOpen(false); navigate(`../builder?session=${value.session_id}&panel=proposals`); }} /><ExportDialog open={active && exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={versionId ?? undefined} onClose={() => setExportOpen(false)} /></>}
   </div>;
 }

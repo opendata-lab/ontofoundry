@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/client";
+import { ApiError, api } from "../api/client";
 import type { User, Workspace } from "../api/types";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { AppShell } from "./AppShell";
@@ -10,16 +10,22 @@ vi.mock("./WorkspaceTabs", () => ({ WorkspaceTabs: () => <div>页面区域</div>
 
 const workspace: Workspace = {
   id: "ws-shell-demo", name: "星河示例空间", slug: "xinghe-demo", description: "虚构示例",
-  current_version: 1, version_id: "version-demo", role: "admin",
+  current_version: 1, version_id: "version-demo", is_public: false, role: "admin",
   visibility: "member", version_sha256: "demo-sha", object_type_count: 0, link_type_count: 0,
   updated_at: "2026-10-17T00:00:00Z",
 };
-const user: User = { id: "user-demo", subject: "demo:user", display_name: "林晓", email: null };
+const user: User = {
+  id: "user-demo", username: "linxiao", display_name: "林晓", email: null,
+  is_platform_admin: false, local_account: true,
+};
 
 function show() {
   const router = createMemoryRouter([
     { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
+    { path: "/me", element: <p>个人中心页</p> },
+    { path: "/admin/users", element: <p>用户管理页</p> },
     { path: "/login", element: <p>登录页</p> },
+    { path: "/", element: <p>目录页</p> },
   ], { initialEntries: ["/workspaces/ws-shell-demo/mappings"] });
   renderWithProviders(<RouterProvider router={router} />);
   return router;
@@ -53,16 +59,35 @@ describe("应用框架", () => {
     expect(within(nav).getByRole("link", { name: "数据管理" })).toBeVisible();
   });
 
-  it("访客只能看到已发布本体和发布页面", async () => {
-    vi.mocked(api.workspace).mockResolvedValue({ ...workspace, role: null });
+  it("可查看成员与公开非成员看到全部阅读导航和对应只读提示，并隐藏空间设置", async () => {
+    vi.mocked(api.workspace).mockResolvedValueOnce({ ...workspace, role: "viewer" });
+    const first = show();
+    const viewerNav = await screen.findByRole("navigation", { name: "工作空间导航" });
+    expect(within(viewerNav).getAllByRole("link")).toHaveLength(5);
+    expect(within(viewerNav).getByRole("link", { name: "本体构建" })).toBeInTheDocument();
+    expect(within(viewerNav).getByRole("link", { name: "数据连接" })).toBeInTheDocument();
+    expect(within(viewerNav).getByRole("link", { name: "数据管理" })).toBeInTheDocument();
+    expect(within(viewerNav).queryByRole("link", { name: "空间设置" })).toBeNull();
+    expect(screen.getByText("你是本空间的可查看成员，只能查看")).toBeInTheDocument();
+    expect(first.state.location.pathname).toBe("/workspaces/ws-shell-demo/mappings");
+
+    cleanup();
+    vi.mocked(api.workspace).mockResolvedValueOnce({
+      ...workspace, role: null, is_public: true, visibility: "public",
+    });
     show();
-    const nav = await screen.findByRole("navigation", { name: "工作空间导航" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(2);
-    expect(within(nav).getByRole("link", { name: "本体视图" })).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: "本体对象" })).toBeInTheDocument();
-    expect(within(nav).queryByRole("link", { name: "本体构建" })).toBeNull();
-    expect(within(nav).queryByRole("link", { name: "数据管理" })).toBeNull();
-    expect(within(nav).queryByRole("link", { name: "空间设置" })).toBeNull();
+    const publicNav = await screen.findByRole("navigation", { name: "工作空间导航" });
+    expect(within(publicNav).getAllByRole("link")).toHaveLength(5);
+    expect(within(publicNav).queryByRole("link", { name: "空间设置" })).toBeNull();
+    expect(screen.getByText("你不是本空间成员，只能阅读")).toBeInTheDocument();
+  });
+
+  it("私有非成员收到 403 时展示无权限结果并保留平台导航", async () => {
+    vi.mocked(api.workspace).mockRejectedValueOnce(new ApiError("无权限", 403));
+    show();
+    expect(await screen.findByText("无权访问")).toBeInTheDocument();
+    expect(screen.getByText("该工作空间不存在，或你不是该私有空间的成员。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回工作空间目录" })).toBeInTheDocument();
   });
 
   it("快捷键和顶栏搜索均可打开搜索，按问题检索并说明命中原因，关闭后清空", async () => {
@@ -94,20 +119,32 @@ describe("应用框架", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("顶栏用户菜单仅包含退出登录，点击后调用 logout 并跳转到登录页", async () => {
+  it("普通用户菜单展示个人中心与退出登录，不展示用户管理，点击退出后跳转登录页", async () => {
     const router = show();
-    const userButton = await screen.findByRole("button", { name: "林晓" });
+    const userButton = await screen.findByRole("button", { name: /林晓/ });
     fireEvent.click(userButton);
 
     const menu = await screen.findByRole("menu");
     const items = within(menu).getAllByRole("menuitem");
-    expect(items).toHaveLength(1);
-    expect(items[0]).toHaveTextContent("退出登录");
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["个人中心", "退出登录"]);
 
-    fireEvent.click(items[0]);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /退出登录/ }));
     await waitFor(() => {
       expect(api.logout).toHaveBeenCalledTimes(1);
       expect(router.state.location.pathname).toBe("/login");
     });
+  });
+
+  it("平台管理员菜单展示用户管理并可跳转到个人中心与用户管理", async () => {
+    vi.mocked(api.me).mockResolvedValue({ ...user, is_platform_admin: true });
+    const router = show();
+    fireEvent.click(await screen.findByRole("button", { name: /林晓/ }));
+
+    const menu = await screen.findByRole("menu");
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((item) => item.textContent?.trim())).toEqual(["个人中心", "用户管理", "退出登录"]);
+
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /用户管理/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/admin/users"));
   });
 });

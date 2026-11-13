@@ -65,7 +65,8 @@ test("directory shows published, unpublished and reader workspaces", async ({ pa
     `/workspaces/${WORKSPACE_ID}/view`,
   );
   await expect(page.getByText("尚未发布", { exact: true })).toBeVisible();
-  await expect(page.getByText("仅本体可见", { exact: true })).toBeVisible();
+  await expect(page.getByText("公开", { exact: true })).toBeVisible();
+  await expect(page.getByText("只读访问", { exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page).toHaveScreenshot("workspace-directory.png", { fullPage: true });
 });

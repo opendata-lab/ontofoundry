@@ -13,6 +13,16 @@ const WorkspaceDirectoryPage = lazy(() =>
     default: m.WorkspaceDirectoryPage,
   })),
 );
+const MePage = lazy(() =>
+  import("./pages/MePage").then((m) => ({
+    default: m.MePage,
+  })),
+);
+const AdminUsersPage = lazy(() =>
+  import("./pages/AdminUsersPage").then((m) => ({
+    default: m.AdminUsersPage,
+  })),
+);
 const router = createBrowserRouter([
   {
     errorElement: <RouteErrorSurface />,
@@ -22,6 +32,22 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
             <WorkspaceDirectoryPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/me",
+        element: (
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <MePage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/admin/users",
+        element: (
+          <Suspense fallback={<LoadingSurface label="正在打开页面…" />}>
+            <AdminUsersPage />
           </Suspense>
         ),
       },

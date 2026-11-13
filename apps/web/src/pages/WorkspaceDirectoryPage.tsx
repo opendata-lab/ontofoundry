@@ -1,19 +1,19 @@
-import { Alert, Avatar, Button, Empty, Form, Input, Modal, Table, Typography } from "antd";
-import { ArrowRight, LockKeyhole, Plus } from "lucide-react";
+import { Alert, Avatar, Button, Empty, Form, Input, Modal, Table, Tag, Typography } from "antd";
+import { ArrowRight, Eye, LockKeyhole, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type { User, Workspace } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
-import { Brand } from "../components/Brand";
+import { PlatformFrame } from "../components/PlatformFrame";
 import {
-  DirectoryFrame,
   PageBody,
   PageHeader,
   Panel,
   PageToolbar,
   StatusMark,
 } from "../components/layout";
+import { ROLE_LABELS } from "../hooks/useWorkspacePermissions";
 
 const { Text } = Typography;
 
@@ -54,19 +54,7 @@ export function WorkspaceDirectoryPage() {
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (!user) return <LoadingSurface label="正在读取工作空间目录…" />;
   return (
-    <DirectoryFrame
-      header={
-        <>
-          <Brand />
-          <span className="flex items-center gap-2 text-xs">
-            <Avatar size="small" className="bg-accent text-xs">
-              {user.display_name.slice(0, 1).toUpperCase() || "A"}
-            </Avatar>
-            {user.display_name}
-          </span>
-        </>
-      }
-    >
+    <PlatformFrame user={user}>
       <PageHeader title="工作空间" note="每个工作空间维护一张独立本体图和一个当前发布版本。" />
       <PageBody>
         <PageToolbar extra={<Text type="secondary" className="text-xs">{workspaces.length} 个工作空间</Text>}>
@@ -100,7 +88,12 @@ export function WorkspaceDirectoryPage() {
                       {workspace.name.slice(0, 1)}
                     </Avatar>
                     <span className="flex min-w-0 flex-col gap-1">
-                      <strong className="text-ink">{workspace.name}</strong>
+                      <span className="inline-flex items-center gap-2">
+                        <strong className="text-ink">{workspace.name}</strong>
+                        {workspace.is_public && (
+                          <Tag className="m-0 border-0 bg-accent-soft text-accent">公开</Tag>
+                        )}
+                      </span>
                       <Text type="secondary" className="text-xs">
                         {workspace.description || "尚未填写空间说明"}
                       </Text>
@@ -125,12 +118,16 @@ export function WorkspaceDirectoryPage() {
                 key: "access",
                 render: (_, workspace) => (
                   <span className="inline-flex items-center gap-2 text-xs text-muted">
-                    {workspace.visibility === "published_only" && <LockKeyhole size={14} aria-label="仅本体可见" />}
+                    {!workspace.role ? (
+                      <Eye size={14} aria-label="只读访问" />
+                    ) : !workspace.is_public ? (
+                      <LockKeyhole size={14} aria-label="私有空间" />
+                    ) : null}
                     {workspace.role === "admin"
                       ? "空间管理员"
-                      : workspace.role === "member"
-                        ? "空间成员"
-                        : "仅本体可见"}
+                      : workspace.role
+                        ? ROLE_LABELS[workspace.role]
+                        : "只读访问"}
                   </span>
                 ),
               },
@@ -185,6 +182,6 @@ export function WorkspaceDirectoryPage() {
           {formError && <Alert type="error" showIcon message={formError} />}
         </Form>
       </Modal>
-    </DirectoryFrame>
+    </PlatformFrame>
   );
 }

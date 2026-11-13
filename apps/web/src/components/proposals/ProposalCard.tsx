@@ -79,6 +79,7 @@ export function ProposalCard({
   technical,
   error,
   busy,
+  canEdit = true,
   actions,
   blocked,
   selected,
@@ -89,6 +90,7 @@ export function ProposalCard({
   technical: string;
   error?: string;
   busy: boolean;
+  canEdit?: boolean;
   actions: CardActions;
   blocked: string;
   selected: boolean;
@@ -116,7 +118,7 @@ export function ProposalCard({
         }
       }}
     >
-      <Checkbox checked={selected} aria-label={`选择 ${item.display_name}`} onChange={(e) => onSelect(e.target.checked)} />
+      {canEdit && <Checkbox checked={selected} aria-label={`选择 ${item.display_name}`} onChange={(e) => onSelect(e.target.checked)} />}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
           <Tag className="m-0">
@@ -181,9 +183,11 @@ export function ProposalCard({
           </Text>
         )}
       </div>
-      <div className="flex shrink-0 gap-1">
-        <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} />
-      </div>
+      {canEdit && (
+        <div className="flex shrink-0 gap-1">
+          <ProposalActions item={item} busy={busy} blocked={blocked} actions={actions} />
+        </div>
+      )}
     </article>
   );
 }
