@@ -194,3 +194,27 @@ describe("应用框架", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/admin/audit"));
   });
 });
+
+describe("侧栏顶部的工作空间切换", () => {
+  it("列出可读空间并切换，另可回到全部工作空间", async () => {
+    const other: Workspace = { ...workspace, id: "ws-other-demo", name: "北辰示例空间", is_public: true, role: null, visibility: "public" };
+    const list = vi.spyOn(api, "workspaces").mockResolvedValue({ items: [workspace, other] });
+    const router = show();
+    const switcher = await screen.findByRole("button", { name: "切换工作空间（当前：星河示例空间）" });
+    expect(screen.queryByRole("link", { name: /星河示例空间/ })).toBeNull();
+    fireEvent.click(switcher);
+    expect(await screen.findByText("北辰示例空间")).toBeVisible();
+    expect(screen.getByText("公开")).toBeVisible();
+    expect(list).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("北辰示例空间"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/workspaces/ws-other-demo/view"));
+  });
+
+  it("“全部工作空间”回到目录", async () => {
+    vi.spyOn(api, "workspaces").mockResolvedValue({ items: [workspace] });
+    const router = show();
+    fireEvent.click(await screen.findByRole("button", { name: "切换工作空间（当前：星河示例空间）" }));
+    fireEvent.click(await screen.findByText("全部工作空间"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+});
