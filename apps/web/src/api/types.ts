@@ -1127,3 +1127,112 @@ export type ProposalSubmitResponse = {
   repair_used: number;
   repair_limit: number;
 };
+
+// --- external-agent gateway: tokens, feedback, audit ----------------------
+
+export type TokenPermission = "ontology:read" | "mappings:read";
+
+export type PersonalToken = {
+  id: UUID;
+  name: string;
+  permissions: TokenPermission[];
+  created_at: ISOTime;
+  updated_at: ISOTime;
+  last_used_at: ISOTime | null;
+};
+
+export type CreateTokenRequest = {
+  name: string;
+  permissions: TokenPermission[];
+};
+
+export type CreatedPersonalToken = {
+  id: UUID;
+  name: string;
+  permissions: TokenPermission[];
+  created_at: ISOTime;
+  token: string;
+};
+
+export type UpdateTokenRequest =
+  | { name: string; permissions?: never }
+  | { permissions: TokenPermission[]; name?: never };
+
+export type FeedbackKind = "correction" | "suggestion";
+
+export type FeedbackElement = {
+  id: UUID;
+  name?: string | null;
+  display_name?: string | null;
+};
+
+export type FeedbackItem = {
+  id: UUID;
+  created_at: ISOTime;
+  user: { id: UUID; display_name: string };
+  kind: FeedbackKind;
+  user_text: string;
+  agent_text: string;
+  elements: FeedbackElement[];
+  version_number: number | null;
+};
+
+export type FeedbackPage = {
+  items: FeedbackItem[];
+  next_cursor: string | null;
+};
+
+export type GatewayOutcome = "started" | "ok" | "error";
+
+export type GatewayCallWorkspace = {
+  id: UUID;
+  name: string | null;
+  version_number: number | null;
+};
+
+export type GatewayCallWorkspaceDetail = GatewayCallWorkspace & {
+  version_id: UUID | null;
+};
+
+export type GatewayCallSummary = {
+  id: UUID;
+  created_at: ISOTime;
+  user: { id: UUID; display_name: string };
+  tool: string;
+  workspaces: GatewayCallWorkspace[];
+  summary: string;
+  outcome: GatewayOutcome;
+  error_code: string | null;
+  duration_ms: number | null;
+};
+
+export type GatewayCallPage = {
+  items: GatewayCallSummary[];
+  next_cursor: string | null;
+};
+
+export type GatewayCallsQuery = {
+  user_id?: UUID;
+  workspace_id?: UUID;
+  tool?: string;
+  outcome?: GatewayOutcome;
+  from?: ISOTime;
+  to?: ISOTime;
+  cursor?: string;
+  limit?: number;
+};
+
+export type GatewayCallDetail = {
+  id: UUID;
+  created_at: ISOTime;
+  user: { id: UUID; display_name: string };
+  tool: string;
+  request_id: string;
+  workspaces: GatewayCallWorkspaceDetail[];
+  arguments: Json;
+  response: Json;
+  outcome: GatewayOutcome;
+  error_code: string | null;
+  error_message: string | null;
+  duration_ms: number | null;
+};

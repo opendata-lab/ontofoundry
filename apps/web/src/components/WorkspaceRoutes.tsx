@@ -48,6 +48,11 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+const FeedbackPage = lazy(() =>
+  pageLoaders.FeedbackPage().then((module) => ({
+    default: module.FeedbackPage,
+  })),
+);
 
 function RelationCatalogRedirect() {
   const [params] = useSearchParams();
@@ -82,6 +87,7 @@ export function WorkspaceRoutes({ href }: { href: string }) {
       <Route path="connections" element={<ConnectionsPage />} />
       <Route path="mappings" element={<MappingsPage />} />
       <Route path="delivery" element={<DeliveryPage />} />
+      <Route path="feedback" element={<FeedbackPage />} />
       <Route path="settings" element={<SettingsPage />} />
       <Route path="elements/:kind/:id" element={<ElementDetailPage />} />
 

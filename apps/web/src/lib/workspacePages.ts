@@ -12,6 +12,7 @@ export const pageLoaders = {
   MappingsPage: () => import("../pages/MappingsPage"),
   InstancesPage: () => import("../pages/InstancesPage"),
   DeliveryPage: () => import("../pages/DeliveryPage"),
+  FeedbackPage: () => import("../pages/FeedbackPage"),
   SettingsPage: () => import("../pages/SettingsPage"),
   ElementDetailPage: () => import("../pages/ElementDetailPage"),
 };

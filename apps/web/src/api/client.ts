@@ -71,6 +71,14 @@ import type {
   VersionSummary,
   Workspace,
   WorkspaceOverview,
+  PersonalToken,
+  CreateTokenRequest,
+  CreatedPersonalToken,
+  UpdateTokenRequest,
+  FeedbackPage,
+  GatewayCallPage,
+  GatewayCallsQuery,
+  GatewayCallDetail,
 } from "./types";
 
 type ErrorBody = {
@@ -230,6 +238,13 @@ export const logout = async () => {
 export const api = {
   me: () => request<User>("/api/v1/auth/me"),
   meWorkspaces: () => request<Items<MeWorkspace>>("/api/v1/me/workspaces"),
+  tokens: () => request<Items<PersonalToken>>("/api/v1/auth/tokens"),
+  createToken: (body: CreateTokenRequest) =>
+    request<CreatedPersonalToken>("/api/v1/auth/tokens", json("POST", body)),
+  updateToken: (tokenId: string, body: UpdateTokenRequest) =>
+    request<PersonalToken>(`/api/v1/auth/tokens/${encodeURIComponent(tokenId)}`, json("PATCH", body)),
+  revokeToken: (tokenId: string) =>
+    request<void>(`/api/v1/auth/tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" }),
   authOptions,
   loginLocal,
   logout,
@@ -315,6 +330,10 @@ export const api = {
     request<Comparison>(
       `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),
     ),
+  feedback: (workspaceId: string, params?: { cursor?: string; limit?: number }) =>
+    request<FeedbackPage>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/feedback` + query({ ...params }),
+    ),
 };
 
 export const adminApi = {
@@ -332,6 +351,10 @@ export const adminApi = {
       `/api/v1/admin/users/${encodeURIComponent(userId)}/workspaces/${encodeURIComponent(workspaceId)}`,
       { method: "DELETE" },
     ),
+  gatewayCalls: (params?: GatewayCallsQuery) =>
+    request<GatewayCallPage>("/api/v1/admin/gateway-calls" + query({ ...params })),
+  gatewayCall: (callId: string) =>
+    request<GatewayCallDetail>(`/api/v1/admin/gateway-calls/${encodeURIComponent(callId)}`),
 };
 
 export function workspaceRequest<T>(id: string, suffix: string, body?: unknown, method?: string) {
