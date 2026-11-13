@@ -1,7 +1,7 @@
 import {
   createHttpTransport,
   type ConversationTransport,
-} from "@opendataworks/agent-conversation";
+} from "@opendataagent/agent-conversation";
 
 function fileUrl(endpoint: string, relPath: string): string {
   const base = endpoint.replace(/\/$/, "");

@@ -100,9 +100,15 @@ def work_pack(uploads, manifest):
 
 @pytest.mark.parametrize(
     ("settings", "expected"),
-    [({"permission_mode": "plan"}, "plan"), ({"permission_mode": "default"}, "default"), (None, "default")],
+    [
+        ({"permission_mode": "plan"}, "plan"),
+        ({"permission_mode": "default"}, "default"),
+        ({"permission_mode": "acceptEdits"}, "acceptEdits"),
+        ({"permission_mode": "bypassPermissions"}, "bypassPermissions"),
+        (None, "default"),
+    ],
 )
-def test_plan_switch_reaches_dataagent(client, fake_agent, settings, expected):
+def test_permission_mode_reaches_dataagent(client, fake_agent, settings, expected):
     session, _ = proposals_run(client)
     set_row(client, session["id"], task_status="finished", result_state="done")
     uploads, prompts = fake_agent
@@ -126,7 +132,7 @@ def test_unknown_permission_mode_is_rejected(client, fake_agent):
     set_row(client, session["id"], task_status="finished", result_state="done")
     response = client.post(
         ROOT + f"/sessions/{session['id']}/agent-conversation/messages",
-        json={"content": "确认虚构订单范围", "settings": {"permission_mode": "bypassPermissions"}},
+        json={"content": "确认虚构订单范围", "settings": {"permission_mode": "dontAsk"}},
     )
     assert response.status_code == 422
 

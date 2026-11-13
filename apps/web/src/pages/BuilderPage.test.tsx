@@ -77,6 +77,9 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
+// The page is ready once it has read the workspace's capabilities.
+const ready = () => waitFor(() => expect(modelingApi.capabilities).toHaveBeenCalled());
+
 it("reloads the session after an agent error advances the backend revision", async () => {
   const { container } = renderWithProviders(
     <MemoryRouter>
@@ -113,39 +116,45 @@ it("reloads the session after an agent error advances the backend revision", asy
   expect(screen.getByRole("heading", { name: "本体构建" })).toBeInTheDocument();
 });
 
-it("starts a modeling run from the composer 发送 action, tagged so the BFF expects proposals", async () => {
-  context.model.session = { ...session(), material_ids: ["m1"] };
-  const { container } = renderWithProviders(
-    <MemoryRouter>
-      <BuilderPage />
-    </MemoryRouter>,
+it("sends messages as typed, tagged with the session's mode", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ task_id: "t-1", status: "running" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }),
   );
-  const conversation = container.querySelector(
-    "dataagent-conversation",
-  ) as AgentConversationElement;
-  const sendMessage = vi.fn();
-  Object.defineProperty(conversation, "sendMessage", { value: sendMessage });
-  Object.defineProperty(conversation, "value", { value: "", configurable: true });
-  const start = await screen.findByRole("button", { name: "发送" });
-  await waitFor(() => expect(start).toBeEnabled());
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+    await ready();
+    const conversation = container.querySelector("dataagent-conversation") as AgentConversationElement;
+    const transport = conversation.transportFactory!("/api/v1/workspaces/w1/sessions/s1/agent-conversation");
 
-  fireEvent.change(screen.getByRole("textbox", { name: "业务场景描述" }), {
-    target: { value: "渠道销售" },
-  });
-  fireEvent.click(start);
-
-  expect(sendMessage).toHaveBeenCalledWith("渠道销售", {
-    metadata: { mode: "model" },
-  });
+    await act(async () => { await transport.sendMessage({ content: "只建采购订单" }); });
+    const body = JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string);
+    expect(body.content).toBe("只建采购订单");
+    expect(body.metadata).toEqual({ mode: "model" });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
-it("keeps 发送 disabled without material or a scenario", async () => {
-  renderWithProviders(
-    <MemoryRouter>
-      <BuilderPage />
-    </MemoryRouter>,
-  );
-  expect(await screen.findByRole("button", { name: "发送" })).toBeDisabled();
+it("blocks sending while proposals are pending and allows it otherwise", async () => {
+  const { container, unmount } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  await waitFor(() => expect(el.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(true));
+  expect(screen.queryByRole("status")).toBeNull();
+  unmount();
+
+  context.model.session = { ...session(), pending_proposal_count: 1 };
+  const pending = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const blocked = pending.container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(blocked.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(false);
+  // The reason is shown above the input, inside the composer.
+  const notice = await screen.findByText("请先处理完待审提案，或在提案上修订");
+  expect(notice.closest('[slot="composer-overlay"]')).not.toBeNull();
 });
 
 it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {
@@ -178,25 +187,76 @@ it("uploads business knowledge files through Upload.Dragger and switches to the 
   expect(await screen.findByText("采购制度.md")).toBeInTheDocument();
 });
 
-it("turns the plan switch on for modeling and leaves it out of daily mode", async () => {
+it("offers permission modes for modeling and leaves them out of daily mode", async () => {
   context.model.session = { ...session(), mode: "model" };
   const { container, unmount } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  await screen.findByRole("button", { name: "发送" });
+  await ready();
   const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
-  expect(el.composerConfig).toEqual({ planMode: { enabled: true, default: true } });
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+  expect(el.composerConfig?.permissionModes?.map((m) => m.value)).toEqual(["plan", "default", "acceptEdits", "bypassPermissions"]);
   unmount();
+
+  context.model.session = { ...session(), mode: "model", dataagent_topic_id: "topic-1" };
+  const executed = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const executedEl = executed.container.querySelector("dataagent-conversation") as AgentConversationElement;
+  expect(executedEl.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "default" });
+  executed.unmount();
 
   context.model.session = { ...session(), mode: "chat" };
   const daily = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  await screen.findByRole("button", { name: "发送" });
+  await ready();
   const chat = daily.container.querySelector("dataagent-conversation") as AgentConversationElement;
   expect(chat.composerConfig).toEqual({});
+});
+
+it("keeps the user's pick when the first send creates the session and its topic", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const before = el.composerConfig;
+
+  context.model.session = { ...session(), mode: "model", dataagent_topic_id: "topic-1" };
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  expect(el.composerConfig).toBe(before);
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+});
+
+it("keeps the picker when a new session is created by its first send", async () => {
+  context.model.session = null;
+  context.model.sessionId = null;
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+  const before = el.composerConfig;
+  expect(before).toEqual({ permissionModes: expect.any(Array), permissionMode: "plan" });
+
+  context.model.session = { ...session(), mode: "model" };
+  context.model.sessionId = "s1";
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  expect(el.composerConfig).toBe(before);
+});
+
+it("resets the picker when another session is opened", async () => {
+  context.model.session = { ...session(), mode: "model" };
+  const { container, rerender } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
+
+  context.model.session = { ...session(), id: "s2", mode: "model", dataagent_topic_id: "topic-2" };
+  context.model.sessionId = "s2";
+  rerender(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
+  expect(el.composerConfig).toEqual({ permissionModes: expect.any(Array), permissionMode: "default" });
 });
 
 it("opens an expanded plan in the results column and closes back", async () => {
   context.model.session = { ...session(), mode: "model" };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  await screen.findByRole("button", { name: "发送" });
+  await ready();
   const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
   const event = new CustomEvent("dataagent-plan-open", {
     cancelable: true,
@@ -219,21 +279,19 @@ it("opens an expanded plan in the results column and closes back", async () => {
 });
 
 
-it("preserves a scenario while toggling the configuration panel", async () => {
-  renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  const input = await screen.findByRole("textbox", { name: "业务场景描述" });
-  fireEvent.change(input, { target: { value: "星河采购协同" } });
-  fireEvent.click(screen.getByRole("button", { name: "收起构建配置" }));
+it("uses the SDK composer alone, without a scenario box or a page send button", async () => {
+  const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
+  await ready();
   expect(screen.queryByRole("textbox", { name: "业务场景描述" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "展开构建配置" }));
-  expect(screen.getByRole("textbox", { name: "业务场景描述" })).toHaveValue("星河采购协同");
-  await waitFor(() => expect(screen.getByRole("button", { name: "发送" })).toBeEnabled());
+  expect(screen.queryByRole("button", { name: "发送" })).toBeNull();
+  expect(container.querySelector('[slot="composer-actions"]')).toBeNull();
+  expect(container.querySelector("dataagent-conversation")!.className).not.toContain("send-button");
 });
 
 it("adds no platform message or retry button for a failed run", async () => {
   context.model.session = { ...session(), task_status: "failed", task_detail: "提案结果被拒收：目标连接列不是唯一属性" };
   const { container } = renderWithProviders(<MemoryRouter><BuilderPage /></MemoryRouter>);
-  await screen.findByRole("button", { name: "发送" });
+  await ready();
   expect(container.querySelector('[slot="composer-overlay"]')).toBeNull();
   expect(screen.queryByText("平台消息")).toBeNull();
   expect(screen.queryByRole("button", { name: "重试" })).toBeNull();

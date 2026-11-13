@@ -1,6 +1,6 @@
-import { ArrowUp, Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Alert, Button, Checkbox, Dropdown, Input, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Ban, ChevronDown, Database, FileText, Upload as UploadIcon, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Alert, Button, Checkbox, Dropdown, Popconfirm, Segmented, Tooltip, Typography, Upload } from "antd";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { datasetApi, modelingApi } from "../api/client";
 import type { Capabilities, Material, RegisteredTable, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
@@ -27,9 +27,15 @@ const CONVERSATION = [
   "[--dac-primary:var(--color-accent)] [--dac-primary-dark:var(--color-accent-hover)] [--dac-primary-hover:var(--color-accent-hover)] [--dac-primary-color:var(--color-accent)] [--dac-accent:var(--color-accent)] [--dac-user-bubble-bg:var(--color-accent-soft)]",
   "[--dac-user-bubble-color:var(--color-ink-2)] [--dac-bubble-radius:var(--radius-md)] [--dac-input-radius:var(--radius-sm)] [--dac-button-radius:var(--radius-sm)]",
   "[&::part(run-detail)]:hidden [&::part(root)]:justify-start [&::part(messages)]:flex-1 [&::part(messages)]:overflow-auto",
-  "[&::part(actions)]:flex-1 [&::part(send-button)]:hidden",
 ].join(" ");
 
+// DataAgent's permission modes, sent as `settings.permission_mode`.
+const PERMISSION_MODES = [
+  { value: "plan", label: "计划", desc: "先给出计划，确认后再写入" },
+  { value: "default", label: "执行", desc: "直接执行，每次写入前确认" },
+  { value: "acceptEdits", label: "自动接受编辑", desc: "只在高风险操作前确认" },
+  { value: "bypassPermissions", label: "跳过所有确认", desc: "不再询问任何确认" },
+];
 const SETTLED_RUN = ["finished", "failed", "cancelled", "suspended"];
 const SETTLED_RESULTS = ["done", "failed_permanent"];
 
@@ -55,7 +61,6 @@ export function BuilderPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [registeredTables, setRegisteredTables] = useState<RegisteredTable[]>();
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
-  const [scenario, setScenario] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -70,11 +75,10 @@ export function BuilderPage() {
   // until it is closed.
   const [openPlan, setOpenPlan] = useState<OpenPlan | null>(null);
   useEffect(() => setOpenPlan(null), [sessionId]);
-  const scenarioId = useId();
   const conversation = useRef<AgentConversationElement>(null);
   usePageTab({
     title: session ? `构建 · ${session.title}` : undefined,
-    dirty: !!scenario.trim(),
+    dirty: !!composerDraft.trim(),
     busy: busy || uploading,
   });
   // Run state comes from the element, not from a status column the page
@@ -133,25 +137,25 @@ export function BuilderPage() {
       setBusy(false);
     }
   };
-  const send = () => {
-    const el = conversation.current;
-    if (!el) return;
-    void el.sendMessage(el.value.trim() || (mode === "model" ? scenario.trim() || "基于已选材料开始建模" : ""), {
-      metadata: { mode },
-    });
-  };
   const changeMode = (next: SessionMode) => {
     setNewMode(next);
     if (session && session.mode !== next)
       void act(async () => setSession(await modelingApi.save(session, session.draft, { mode: next })));
   };
+  // Sending waits for DataAgent to be configured, the previous run and its
+  // result, pending proposals and uploads. The SDK itself requires some text.
   const blocked = !capabilities?.agent_configured || running || resultPending || !!session?.pending_proposal_count || busy || uploading;
-  const canSend = !blocked && (mode === "model"
-    ? !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length || !!scenario.trim() || !!composerDraft.trim()
-    : !!composerDraft.trim());
-  const sendState = useRef({ mode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length });
+  // Why sending is refused, shown above the input. A live run needs no note:
+  // the composer shows its stop button.
+  const blockedReason = running ? ""
+    : capabilities && !capabilities.agent_configured ? "请先在空间设置中配置 DataAgent"
+    : resultPending ? "上一轮结果还在处理，请稍候"
+    : session?.pending_proposal_count ? "请先处理完待审提案，或在提案上修订"
+    : uploading ? "正在上传材料"
+    : busy ? "操作处理中" : "";
+  const sendState = useRef({ mode, blocked });
   useLayoutEffect(() => {
-    sendState.current = { mode, scenario, blocked, hasMaterials: !!session?.material_ids.length || !!session?.linked_tables?.length || !!session?.draft.datasets.length };
+    sendState.current = { mode, blocked };
   });
   const attach = async (material: Material) => {
     const current = await model.ensure();
@@ -248,43 +252,45 @@ export function BuilderPage() {
     // Install the factory before the conversation key: useEndpoint builds a
     // transport when endpoint changes and intentionally does not rebuild one
     // merely because a late factory assignment arrived.
-    // Both the host button and the SDK submit path use the selected scene.
     el.transportFactory = (endpoint) => {
       const transport = createOntoFoundryConversationTransport(endpoint);
       return {
         ...transport,
-        async sendMessage(input) {
-          const current = sendState.current;
-          // The session's mode decides, whichever path sent the message.
-          const mode = current.mode;
-          const context = current.scenario.trim();
-          const content = mode === "model" && context && input.content.trim() !== "重试" && input.content.trim() !== context
-            ? `业务场景：${context}\n本次需求：${input.content}` : input.content;
-          const run = await transport.sendMessage({ ...input, content, metadata: { ...input.metadata, mode } });
-          if (mode === "model") setScenario((value) => value === current.scenario ? "" : value);
-          return run;
-        },
+        // Messages are sent as typed; the session's mode travels with each.
+        sendMessage: (input) => transport.sendMessage({ ...input, metadata: { ...input.metadata, mode: sendState.current.mode } }),
       };
     };
-    el.beforeSend = ({ content }) => {
-      const current = sendState.current;
-      return !current.blocked && (current.mode === "model"
-        ? current.hasMaterials || !!current.scenario.trim() || !!content.trim()
-        : !!content.trim());
-    };
+    el.beforeSend = () => !sendState.current.blocked;
     // A modeling run's deliverable is the draft, which the results panel to the
     // right already renders. The raw JSON behind it is not something to hand
     // the user as a file.
     el.showAttachments = false;
     el.endpointResolver = async () => `/api/v1/workspaces/${workspace.id}/sessions/${(await ensure.current(sendState.current.mode)).id}/agent-conversation`;
   }, [workspace.id]);
-  // Modeling plans before it writes: the plan switch starts on. Daily mode
-  // only asks questions, so it has no switch.
+  // Modeling offers DataAgent's permission modes in the composer picker. A
+  // session that has not run starts in plan; one that has run starts in
+  // default. Daily mode only asks questions, so it has no picker.
+  // The SDK resets the picker whenever the config is reassigned, so it is
+  // assigned only when the mode or the shown session changes. The id a new
+  // session gains on its first send is the same session: the user's pick stays.
+  const composer = useRef<{ mode?: SessionMode; id: string | null }>({ id: null });
+  const sessionKey = session?.id ?? null;
+  const executed = !!session?.dataagent_topic_id;
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
-    el.composerConfig = mode === "model" ? { planMode: { enabled: true, default: true } } : {};
-  }, [mode]);
+    const shown = composer.current;
+    const created = shown.mode !== undefined && shown.id === null && sessionKey !== null && !executed;
+    const changed = shown.mode !== mode || (shown.id !== sessionKey && !created);
+    composer.current = { mode, id: sessionKey };
+    if (!changed) return;
+    el.composerConfig = mode === "model"
+      ? { permissionModes: PERMISSION_MODES, permissionMode: executed ? "default" : "plan" }
+      : {};
+    // `executed` is read only when the session changes; a later change must not
+    // reassign the config.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, sessionKey]);
   useLayoutEffect(() => {
     const el = conversation.current;
     if (!el) return;
@@ -485,17 +491,6 @@ export function BuilderPage() {
                     }
                   />
                 </section>
-                <section className="flex shrink-0 flex-col gap-3">
-                  <SectionTitle title={<label htmlFor={scenarioId}>业务场景描述</label>} />
-                  <Input.TextArea
-                    id={scenarioId}
-                    aria-label="业务场景描述"
-                    rows={6}
-                    placeholder="描述你希望构建的业务本体，例如采购协同中的供应商、物料和供货关系。"
-                    value={scenario}
-                    onChange={(e) => setScenario(e.target.value)}
-                  />
-                </section>
               </div>
             )}
           </Panel>}
@@ -545,12 +540,11 @@ export function BuilderPage() {
               element would clear itself and reload for no reason. */}
             <dataagent-conversation ref={conversation} placeholder={mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
               <BuilderConversationEmpty mode={mode} />
-              <div slot="composer-actions" className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="min-w-0 flex-1" />
-                {!running && <Tooltip title={!capabilities?.agent_configured ? "请先在空间设置中配置 DataAgent" : resultPending ? "上一轮结果还在处理，请稍候" : session?.pending_proposal_count ? "请先处理完待审提案，或在提案上修订" : uploading ? "正在上传材料" : busy ? "操作处理中" : "发送"}>
-                  <Button size="small" type="primary" aria-label="发送" icon={<ArrowUp size={15} />} disabled={!canSend} onClick={send} />
-                </Tooltip>}
-              </div>
+              {blockedReason && (
+                <div slot="composer-overlay" className="px-1 pb-1">
+                  <Typography.Text type="secondary" className="text-xs" role="status">{blockedReason}</Typography.Text>
+                </div>
+              )}
             </dataagent-conversation>
           </Panel>
           {mode === "model" && (
