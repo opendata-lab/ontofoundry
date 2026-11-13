@@ -144,6 +144,7 @@ it("blocks sending while proposals are pending and allows it otherwise", async (
   await ready();
   const el = container.querySelector("dataagent-conversation") as AgentConversationElement;
   await waitFor(() => expect(el.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(true));
+  expect(screen.queryByRole("status")).toBeNull();
   unmount();
 
   context.model.session = { ...session(), pending_proposal_count: 1 };
@@ -151,6 +152,9 @@ it("blocks sending while proposals are pending and allows it otherwise", async (
   await ready();
   const blocked = pending.container.querySelector("dataagent-conversation") as AgentConversationElement;
   expect(blocked.beforeSend!({ content: "建模", settings: {}, attachments: [] })).toBe(false);
+  // The reason is shown above the input, inside the composer.
+  const notice = await screen.findByText("请先处理完待审提案，或在提案上修订");
+  expect(notice.closest('[slot="composer-overlay"]')).not.toBeNull();
 });
 
 it("uploads business knowledge files through Upload.Dragger and switches to the material library", async () => {

@@ -145,6 +145,14 @@ export function BuilderPage() {
   // Sending waits for DataAgent to be configured, the previous run and its
   // result, pending proposals and uploads. The SDK itself requires some text.
   const blocked = !capabilities?.agent_configured || running || resultPending || !!session?.pending_proposal_count || busy || uploading;
+  // Why sending is refused, shown above the input. A live run needs no note:
+  // the composer shows its stop button.
+  const blockedReason = running ? ""
+    : capabilities && !capabilities.agent_configured ? "请先在空间设置中配置 DataAgent"
+    : resultPending ? "上一轮结果还在处理，请稍候"
+    : session?.pending_proposal_count ? "请先处理完待审提案，或在提案上修订"
+    : uploading ? "正在上传材料"
+    : busy ? "操作处理中" : "";
   const sendState = useRef({ mode, blocked });
   useLayoutEffect(() => {
     sendState.current = { mode, blocked };
@@ -532,6 +540,11 @@ export function BuilderPage() {
               element would clear itself and reload for no reason. */}
             <dataagent-conversation ref={conversation} placeholder={mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
               <BuilderConversationEmpty mode={mode} />
+              {blockedReason && (
+                <div slot="composer-overlay" className="px-1 pb-1">
+                  <Typography.Text type="secondary" className="text-xs" role="status">{blockedReason}</Typography.Text>
+                </div>
+              )}
             </dataagent-conversation>
           </Panel>
           {mode === "model" && (
