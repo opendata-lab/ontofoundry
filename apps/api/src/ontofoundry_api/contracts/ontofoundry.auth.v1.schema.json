@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "AuthOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "local_login": {
+          "title": "Local Login",
+          "type": "boolean"
+        },
+        "oauth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthOption"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "local_login",
+        "oauth"
+      ],
+      "title": "AuthOptions",
+      "type": "object"
+    },
+    "LocalLoginRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "password": {
+          "title": "Password",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "password"
+      ],
+      "title": "LocalLoginRequest",
+      "type": "object"
+    },
+    "OAuthOption": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "OAuthOption",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.auth.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/AuthOptions"
+    },
+    {
+      "$ref": "#/$defs/LocalLoginRequest"
+    }
+  ]
+}

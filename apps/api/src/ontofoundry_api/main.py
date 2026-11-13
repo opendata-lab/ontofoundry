@@ -35,6 +35,7 @@ from ontofoundry_api.db_models import (
     WorkspaceRecord,
 )
 from ontofoundry_api.domain.models import WorkspaceCreate
+from ontofoundry_api.services.auth_config import load_auth_config
 from ontofoundry_api.services.dataagent import DataAgentError
 from ontofoundry_api.services.demo import (
     DEMO_CONNECTION_ID,
@@ -57,7 +58,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     session_factory = build_session_factory(engine)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        application.state.auth_config = load_auth_config(app_settings)
         if app_settings.auto_create_schema:
             Base.metadata.create_all(engine)
         app_settings.data_dir.mkdir(parents=True, exist_ok=True)

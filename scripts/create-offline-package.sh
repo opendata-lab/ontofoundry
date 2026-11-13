@@ -56,6 +56,11 @@ echo "==> 导出镜像"
 
 echo "==> 复制部署文件"
 cp "$REPO_ROOT/scripts/offline-compose.yaml" "$OUT_DIR/compose.yaml"
+mkdir -p "$OUT_DIR/deploy/docker/ontofoundry"
+# Copy only shipped defaults and examples, never local credentials or hooks.
+for config_file in ontofoundry_config.py ontofoundry_config_docker.py.example custom_sso_user_info.py.example .gitignore; do
+  cp "$REPO_ROOT/deploy/docker/ontofoundry/$config_file" "$OUT_DIR/deploy/docker/ontofoundry/"
+done
 
 cat > "$OUT_DIR/.env.example" <<'ENV'
 # 离线包内的镜像标签。load 之后名字就是这两个，不要改成带 registry 前缀的形式，
@@ -65,6 +70,15 @@ OF_FRONTEND_IMAGE=of-frontend:local
 
 # 前端对外端口，浏览器访问 http://<服务器IP>:<端口>。
 OF_HTTP_PORT=8010
+
+# ---- 平台登录：dev 不登录，login 读取 deploy/docker/ontofoundry/ 的配置。----
+ONTOFOUNDRY_ENVIRONMENT=development
+ONTOFOUNDRY_AUTH_MODE=login
+ONTOFOUNDRY_SESSION_SECRET=development-only-replace-before-production
+ONTOFOUNDRY_COOKIE_SECURE=false
+ONTOFOUNDRY_SEED_DEMO=false
+# 默认账号 admin / admin123。复制 ontofoundry_config_docker.py.example 为
+# ontofoundry_config_docker.py 并修改密码；配置可选 SSO 后重启后端。
 
 # ---- DataAgent（建模/问数 Agent）。不填则平台可用，只是 Agent 功能不可用。----
 # DataAgent 后端地址：只写 协议://主机:端口，不带路径。这是从 of-backend 容器里
@@ -127,6 +141,7 @@ cat > "$OUT_DIR/README.md" <<'DOC'
 | `images/ontofoundry.tar` | of-backend、of-frontend |
 | `images/infra.tar` | postgres:17-alpine |
 | `compose.yaml` | 部署编排 |
+| `deploy/docker/ontofoundry/` | 登录基础配置、现场覆盖示例、SSO 钩子示例 |
 
 nginx、node、python 已经烘在自有镜像的层里，不需要单独提供。
 
@@ -136,6 +151,19 @@ nginx、node、python 已经烘在自有镜像的层里，不需要单独提供�
 cp .env.example .env    # 默认值即可直接启动
 ./install.sh
 ```
+
+默认启用登录，账号为 `admin` / `admin123`。部署前复制
+`deploy/docker/ontofoundry/ontofoundry_config_docker.py.example` 为同目录
+`ontofoundry_config_docker.py` 并修改密码。配置目录只读挂载，覆盖文件不入库。
+SSO 配置使用覆盖示例中的 `OAUTH_PROVIDERS` 和 `OAUTH_USER_INFO`；钩子示例
+与 DataAgent 同契约。修改后重启后端。
+
+生产环境设置 `ONTOFOUNDRY_ENVIRONMENT=production`、`ONTOFOUNDRY_AUTH_MODE=login`、
+至少 32 字符的随机会话密钥、`ONTOFOUNDRY_COOKIE_SECURE=true` 和
+`ONTOFOUNDRY_SEED_DEMO=false`，并使用 HTTPS 入口。
+
+旧 OAuth 部署需移除全部 `ONTOFOUNDRY_OAUTH_*`，把配置迁入覆盖文件；认证名称
+必须与原 provider（默认 `internal`）一致，钩子的 `sub` 必须保持原值，保留原成员身份。
 
 DOC
 

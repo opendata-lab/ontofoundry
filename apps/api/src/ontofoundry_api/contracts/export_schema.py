@@ -4,14 +4,15 @@ import argparse
 import json
 from pathlib import Path
 
+from ontofoundry_api.contracts.auth import auth_schema
 from ontofoundry_api.contracts.connections import ConnectionInUseResponse
-from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.export_core_schema import TARGET as CORE_TARGET
 from ontofoundry_api.contracts.export_core_schema import schema_text
 from ontofoundry_api.contracts.exports import exports_schema
 from ontofoundry_api.contracts.imports import imports_schema
 from ontofoundry_api.contracts.instances import instances_schema
 from ontofoundry_api.contracts.materials import MaterialOverview
+from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.contracts.read_models import read_models_schema
 
@@ -21,6 +22,13 @@ MATERIAL_TARGET = Path(__file__).with_name("ontofoundry.materials.v1.schema.json
 
 
 def export(*, check=False):
+    auth_target = Path(__file__).with_name("ontofoundry.auth.v1.schema.json")
+    auth_payload = json.dumps(auth_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if check:
+        if not auth_target.exists() or auth_target.read_text() != auth_payload:
+            raise SystemExit("认证接口 schema 与模型不一致，请重新生成")
+    else:
+        auth_target.write_text(auth_payload)
     instance_target = Path(__file__).with_name("ontofoundry.instances.v1.schema.json")
     instance_payload = json.dumps(instances_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if check:
