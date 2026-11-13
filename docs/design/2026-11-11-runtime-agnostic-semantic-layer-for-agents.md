@@ -149,7 +149,7 @@ plugins/
 | ZCode | 清单查找顺序为 `.zcode-plugin/plugin.json`、`.claude-plugin/plugin.json`，因此只维护一份清单；从 GitHub 仓库添加插件目录后安装 | [ZCode 插件](https://zcode.z.ai/en/docs/plugin) |
 | opencode | 插件是 JS/TS 模块，不读插件包；Skill 放入或指向 `.opencode/skills`、`.claude/skills`、`.agents/skills` 之一，MCP 写入 `opencode.json` 的 `mcp.servers`（`"type": "remote"`、`"oauth": false`、`"Authorization": "Bearer {env:ONTOFOUNDRY_TOKEN}"`） | [Skills](https://opencode.ai/docs/skills)、[MCP](https://opencode.ai/docs/mcp-servers) |
 
-插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。
+插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。 这些约束由后端测试在 CI 中检查（见计划步骤二），超限时测试失败，不会发布出被客户端忽略的 Skill。
 
 以下两点官方文档未写明，在实施步骤一中联验：ZCode 是否读取 `.claude-plugin/marketplace.json`（其文档只写“仓库根目录的 `marketplace.json`”）；ZCode 敏感 `userConfig` 暂不能在界面填写时，令牌如何提供。联验不通过时按结果调整本节，再进入步骤二。
 
