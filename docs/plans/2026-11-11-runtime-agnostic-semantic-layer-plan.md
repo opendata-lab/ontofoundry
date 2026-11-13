@@ -39,7 +39,7 @@
 
 前置：[平台登录](2026-11-12-platform-login-plan.md) 已实施，现场用户能登录并签发令牌。
 
-1. **个人令牌、调用记录与反馈表**：按设计第 4.4 节在 `db_models.py` 新增三张表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 按设计第 4.5 节新增 `/api/v1/auth/tokens` 的签发、列表、修改、撤销接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
+1. **个人令牌、调用记录与反馈表**：按设计第 4.4 节在 `db_models.py` 新增四张表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 按设计第 4.5 节新增 `/api/v1/auth/tokens` 的签发、列表、修改、撤销接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
 2. **网关**：从 `api/mcp.py` 抽出 JSON-RPC 处理（协议协商、请求头校验、工具结果与错误封装），单空间入口改为调用它且行为不变；新增 `api/ontology_gateway.py` 注册 `/api/v1/ontology/mcp` 与三个工具。工具入参模型放在 `services/ontology_gateway.py`，`tools/list` 由模型生成 JSON Schema。
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
 4. **调用记录**：按设计第 6 节新增 `services/gateway_call_log.py`：进程内有界队列（10,000 个事件）、`put_nowait` 入队、后台线程以独立会话批量写入开始与结束事件，并更新令牌最近使用时间；应用启动时启动线程，停止时最多等待 5 秒；入队与写入的所有异常在模块内处理并记日志，不传给工具调用。
@@ -49,7 +49,7 @@
 8. **离线包**：`scripts/create-offline-package.sh` 附带 `plugins/ontofoundry` 和 `.claude-plugin/marketplace.json`，CI 的离线包任务检查其存在。
 9. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
-前端调整导航分组，新增“用户反馈”页面和“个人中心”（设计第 4.6 节：页头用户名菜单、`/me` 与 `/me/tokens` 路由、个人信息只读、权限用 `Tag` 显示并可行内修改、令牌只显示一次）；个人信息读取现有 `GET /api/v1/auth/me`，需补充登录方式字段。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖管理员可见“管理中心”及两个页面，成员和只读访问者看不到该分组、直接访问两个地址均显示无权限。
+后端按设计第 6.1 节新增 `gateway-calls` 列表与详情接口，详情按工具只返回本空间部分；前端调整导航分组，新增“用户反馈”“用户审计”页面和“个人中心”（设计第 4.6 节：页头用户名菜单、`/me` 与 `/me/tokens` 路由、个人信息只读、权限用 `Tag` 显示并可行内修改、令牌只显示一次）；个人信息读取现有 `GET /api/v1/auth/me`，需补充登录方式字段。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖管理员可见“管理中心”及两个页面，成员和只读访问者看不到该分组、直接访问两个地址均显示无权限。
 
 ## 4. 验收
 
@@ -66,7 +66,8 @@
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
 | 版本元数据 | 每个工具结果的 `_meta` 含 `io.github.opendata-lab.ontofoundry/versions`，与正文中的 `version_id` 一致 | 是 |
 | 提交反馈 | 成员提交后记录原话、说明、相关元素和服务端填写的版本；非成员、跨空间元素、空文本或超长被拒绝 | 是 |
-| 管理中心 | 空间管理员看到“管理中心”（空间设置、用户反馈）；成员和只读访问者看不到该分组，直接访问显示无权限 | 是 |
+| 管理中心 | 空间管理员看到“管理中心”（空间设置、用户反馈、用户审计）；成员和只读访问者看不到该分组，直接访问显示无权限 | 是 |
+| 用户审计 | 空间管理员只看到涉及本空间的调用，可按用户、工具、结果、时间筛选；跨空间检索的详情只显示本空间结果组，`list_spaces` 只显示本空间一项；非管理员 `403`，不涉及本空间的调用详情 `404` | 是 |
 | 查看反馈 | 空间管理员在“管理中心 → 用户反馈”看到时间倒序的反馈列表；成员、只读访问者和其他空间管理员看不到菜单，接口返回 403 | 是 |
 | Skill 提交反馈 | 用户纠正口径时，智能体提交一次反馈，`user_text` 为用户原话 | 联验 |
 | Skill 本地缓存 | 版本未变时第二次问同一定义只调用一次 `list_spaces`；发布新版本后下一个问题重新读取并删除旧版本缓存；被移出空间后该空间缓存被删除。调用记录中的调用次数与预期一致 | 联验 |
