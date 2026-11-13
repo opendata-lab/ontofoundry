@@ -19,7 +19,7 @@
 | PL-03 | **登录页**：未登录时显示登录页，含本地登录表单和“通过 <认证名称> 登录”按钮，二者按配置显示。 | 2026-11-12 用户确认 |
 | PL-04 | **用户信息钩子**：配置了 `OAUTH_PROVIDERS` 时必须提供 `OAUTH_USER_INFO(provider, token_response, oauth_remotes)`，契约与 DataAgent 相同，同一个 `custom_sso_user_info.py` 两边通用。 | 2026-11-12 用户确认 |
 
-不沿用 DataAgent 的 `ADMIN_USERS` 和角色字段：OntoFoundry 的权限来自工作空间成员关系，登录不授予平台角色。会话密钥、Cookie 名称与安全属性仍用现有环境变量（`ONTOFOUNDRY_SESSION_SECRET` 等），不搬进配置文件。
+不沿用 DataAgent 的角色字段（`ADMIN_USERS` 后由[用户管理](2026-11-12-user-management.md) UM-02 引入，只用于用户管理）：OntoFoundry 的权限来自工作空间成员关系，登录不授予平台角色。会话密钥、Cookie 名称与安全属性仍用现有环境变量（`ONTOFOUNDRY_SESSION_SECRET` 等），不搬进配置文件。
 
 ## 3. 配置文件
 
@@ -74,6 +74,8 @@ OAUTH_USER_INFO = oauth_user_info
 钩子在线程中执行。抛异常、超时、返回非字典或缺 `sub` 时本次登录失败，服务继续运行；日志不记录 `token_response` 和任何令牌。
 
 ## 5. 用户与会话
+
+> 本节的用户主体规则已由[用户管理](2026-11-12-user-management.md) UM-01 替代：用户按用户名识别，本地账号与 SSO 同名即同一用户。下表保留为实施前的记录。
 
 | 登录方式 | 用户主体（`users.subject`） | 显示名 |
 |---|---|---|
