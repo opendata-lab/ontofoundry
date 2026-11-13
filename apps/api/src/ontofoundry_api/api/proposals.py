@@ -11,11 +11,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import (
-    get_modeling_session,
-    require_member,
-    session_draft,
-)
+from ontofoundry_api.api.modeling import get_modeling_session, session_draft
 from ontofoundry_api.contracts.proposal_reviews import ProposalBatchSummary
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
@@ -26,13 +22,14 @@ from ontofoundry_api.db_models import (
     ProposalItemRecord,
 )
 from ontofoundry_api.domain.core import MaterialObject, Strict
-from ontofoundry_api.domain.models import (
-    PROPOSAL_COLLECTIONS,
-)
+from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS
 from ontofoundry_api.services import instance_store
+from ontofoundry_api.services.access import require_edit, require_read
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
 from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.proposals import batch_items as _batch_items
+from ontofoundry_api.services.proposals import (
+    batch_items as _batch_items,
+)
 from ontofoundry_api.services.proposals import (
     dependency_group,
     dependency_map,
@@ -167,7 +164,7 @@ def list_batches(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     session = get_modeling_session(db, workspace_id, session_id)
     query = (
         select(ProposalBatchRecord)
@@ -222,7 +219,7 @@ def read_batch(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     session = get_modeling_session(db, workspace_id, session_id)
     batch = db.get(ProposalBatchRecord, batch_id)
     if (
@@ -282,9 +279,9 @@ def decide(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.proposal_decisions import decide as decide_proposals
 
-    require_member(db, workspace_id, user.id)
     get_modeling_session(db, workspace_id, session_id)
     return decide_proposals(
         db, workspace_id, session_id, body, user.id, request.app.state.settings
@@ -299,7 +296,7 @@ def proposal_metrics(
 ):
     """What T8 watches before legacy code can go: legacy runs still active,
     batch outcomes, how often proposals go stale, and what users decide."""
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
 
     sessions = db.scalars(
         select(ModelingSessionRecord).where(
@@ -399,9 +396,9 @@ def revise_fact_proposal(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.fact_revision import revise_fact
 
-    require_member(db, workspace_id, user.id)
     batch_id = revise_fact(
         db, workspace_id, session_id, proposal_id, body, user, request.app.state.settings
     )
@@ -425,7 +422,7 @@ def revise_proposal_content(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.proposal_revision import revise_proposal
 
     return revise_proposal(
@@ -454,7 +451,7 @@ def revise_dataset_source(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.dataset_proposals import revise_dataset
 
     return revise_dataset(

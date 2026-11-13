@@ -90,7 +90,7 @@ def _session_row(client, session_id: str) -> ModelingSessionRecord:
         return item
 
 
-def test_all_six_endpoints_require_membership_and_reject_cross_workspace_session(client):
+def test_all_six_endpoints_enforce_private_workspace_permissions(client):
     session = _create_session(client)
     base = _endpoint(session["id"])
     calls = [
@@ -119,15 +119,18 @@ def test_all_six_endpoints_require_membership_and_reject_cross_workspace_session
         )
         db.commit()
 
+    from ontofoundry_api.api.auth import Principal, current_principal
+
+    client.app.dependency_overrides[current_principal] = lambda: Principal(str(uuid4()), "fiction-visitor", "虚构访客", None)
     for method, path, payload in calls:
         response = client.request(method, path, json=payload)
-        assert response.status_code == 403, (method, path, response.text)
+        assert response.status_code == (404 if method == "GET" else 403), (method, path, response.text)
 
     # Membership is checked before the workspace/session ownership lookup.
     for method, path, payload in calls:
         other_path = path.replace(str(DEMO_WORKSPACE_ID), OTHER_WORKSPACE_ID)
         response = client.request(method, other_path, json=payload)
-        assert response.status_code == 403, (method, other_path, response.text)
+        assert response.status_code == (404 if method == "GET" else 403), (method, other_path, response.text)
 
 
 def test_topic_is_lazy_created_then_reused_across_refresh_and_second_send(

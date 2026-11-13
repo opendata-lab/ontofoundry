@@ -5,6 +5,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+ADMIN_USERS = ["admin"]
+
 LOCAL_USERS = [{"username": "admin", "password": "admin123"}]
 OAUTH_PROVIDERS = []
 OAUTH_USER_INFO = None

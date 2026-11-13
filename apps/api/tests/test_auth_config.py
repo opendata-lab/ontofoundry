@@ -50,7 +50,7 @@ def test_default_config_warns_without_logging_password(tmp_path, caplog):
 
 def test_changed_default_password_does_not_warn(tmp_path, caplog):
     load_auth_config(write_config(tmp_path, DEFAULT_CONFIG.replace("admin123", "星港密码")))
-    assert not caplog.records
+    assert "默认密码" not in caplog.text
 
 
 @pytest.mark.parametrize("raw, message", [
@@ -297,3 +297,23 @@ def test_auth_contract_schema_matches_artifact():
     validator.validate({"local_login": True, "oauth": {"name": "SSO"}})
     validator.validate({"local_login": False, "oauth": None})
     validator.validate({"username": "admin", "password": "example"})
+
+
+@pytest.mark.parametrize("raw", [None, {}, (), [""], [" "], [7]])
+def test_invalid_admin_users(tmp_path, raw):
+    with pytest.raises(AuthConfigError, match="ADMIN_USERS"):
+        load_auth_config(write_config(tmp_path, DEFAULT_CONFIG + f"ADMIN_USERS = {raw!r}\n"))
+
+
+def test_admin_users_empty_warns_and_unknown_user_is_valid(tmp_path, caplog):
+    config = load_auth_config(write_config(tmp_path, DEFAULT_CONFIG + 'ADMIN_USERS = ["precreated-admin"]\n'))
+    assert config.admin_users == ("precreated-admin",)
+    assert "ADMIN_USERS 为空" not in caplog.text
+    load_auth_config(write_config(tmp_path, DEFAULT_CONFIG + "ADMIN_USERS = []\n"))
+    assert "ADMIN_USERS 为空" in caplog.text
+
+
+def test_local_username_uniqueness_is_case_insensitive(tmp_path):
+    source = "LOCAL_USERS = [{'username': 'Fiction', 'password': 'one'}, {'username': 'fiction', 'password': 'two'}]"
+    with pytest.raises(AuthConfigError, match="唯一"):
+        load_auth_config(write_config(tmp_path, source))

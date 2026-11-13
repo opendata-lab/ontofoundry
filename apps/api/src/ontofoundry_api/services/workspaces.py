@@ -30,9 +30,10 @@ def ensure_dev_user(session: Session) -> UserRecord:
     if user is None:
         user = UserRecord(
             id=DEV_USER_ID,
-            subject="dev:admin",
+            username="dev",
             display_name="admin",
             email=None,
+            last_login_at=datetime.now(UTC),
         )
         session.add(user)
         session.commit()
@@ -42,23 +43,37 @@ def ensure_dev_user(session: Session) -> UserRecord:
 def upsert_oauth_user(
     session: Session,
     *,
-    subject: str,
+    username: str,
+    update_profile: bool = True,
     display_name: str,
     email: str | None,
 ) -> UserRecord:
-    user = session.scalar(select(UserRecord).where(UserRecord.subject == subject))
+    user = session.scalar(select(UserRecord).where(func.lower(UserRecord.username) == username.lower()))
     if user is None:
         user = UserRecord(
             id=str(uuid4()),
-            subject=subject,
+            username=username,
             display_name=display_name,
             email=email,
         )
         session.add(user)
-    else:
+    elif update_profile:
         user.display_name = display_name
         user.email = email
-    session.commit()
+    user.last_login_at = datetime.now(UTC)
+    try:
+        session.commit()
+    except IntegrityError:
+        # A simultaneous local/SSO login or pre-creation may win the insert.
+        session.rollback()
+        user = session.scalar(select(UserRecord).where(func.lower(UserRecord.username) == username.lower()))
+        if user is None:
+            raise
+        if update_profile:
+            user.display_name = display_name
+            user.email = email
+        user.last_login_at = datetime.now(UTC)
+        session.commit()
     return user
 
 
@@ -103,7 +118,7 @@ def create_workspace(
 def get_workspace(session: Session, workspace_id: str) -> WorkspaceRecord:
     workspace = session.get(WorkspaceRecord, workspace_id)
     if workspace is None:
-        raise NotFoundError("没有找到该工作空间")
+        raise NotFoundError("没有找到该工作空间", code="WORKSPACE_NOT_FOUND")
     return workspace
 
 
@@ -122,18 +137,21 @@ def workspace_summary(session: Session, workspace: WorkspaceRecord, user_id: str
         if workspace.current_version_id
         else None
     )
+    from ontofoundry_api.services.access import platform_admin
     from ontofoundry_api.services.ontology_query import read_context
 
+    role = membership_role(session, workspace.id, user_id)
+    if role is None and platform_admin(session, user_id):
+        role = "admin"
     draft = read_context(version).snapshot if version else {}
     return {
         "id": workspace.id,
         "slug": workspace.slug,
         "name": workspace.name,
         "description": workspace.description,
-        "role": membership_role(session, workspace.id, user_id),
-        "visibility": "member"
-        if membership_role(session, workspace.id, user_id)
-        else "published_only",
+        "role": role,
+        "visibility": "member" if role else "public",
+        "is_public": workspace.is_public,
         "current_version": version.version_number if version else None,
         "version_id": version.id if version else None,
         "version_sha256": version.sha256 if version else None,
@@ -147,24 +165,15 @@ def list_workspaces(session: Session, user_id: str) -> list[dict]:
     workspaces = session.scalars(
         select(WorkspaceRecord).order_by(WorkspaceRecord.updated_at.desc())
     ).all()
-    return [workspace_summary(session, item, user_id) for item in workspaces]
+    from ontofoundry_api.services.access import can_read_workspace
+
+    return [workspace_summary(session, item, user_id) for item in workspaces if can_read_workspace(session, item.id, user_id)]
 
 
 def list_accessible_workspaces(
     session: Session, user_id: str, *, workspace_id: str | None = None
 ) -> list[dict]:
-    query = (
-        select(WorkspaceRecord)
-        .join(
-            WorkspaceMemberRecord,
-            WorkspaceMemberRecord.workspace_id == WorkspaceRecord.id,
-        )
-        .where(WorkspaceMemberRecord.user_id == user_id)
-        .order_by(WorkspaceRecord.updated_at.desc())
-    )
-    if workspace_id is not None:
-        query = query.where(WorkspaceRecord.id == workspace_id)
-    return [workspace_summary(session, item, user_id) for item in session.scalars(query)]
+    return [item for item in list_workspaces(session, user_id) if workspace_id is None or item["id"] == workspace_id]
 
 
 def publish_draft(
@@ -204,8 +213,9 @@ def publish_draft(
                 "warnings": [],
             },
         )
-    if membership_role(session, workspace_id, user_id) is None:
-        raise NotFoundError("没有找到可发布的工作空间")
+    from ontofoundry_api.services.access import require_edit
+
+    require_edit(session, workspace_id, user_id)
 
     report = validation_report(draft.model_dump(mode="json"))
     if not report["publishable"]:

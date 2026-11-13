@@ -26,13 +26,14 @@ OAUTH_TIMEOUT_SECONDS = 15
 def login_local(
     session: Session, config: AuthConfig, *, username: str, password: str
 ) -> UserRecord:
+    username = next((name for name in config.local_users if name.lower() == username.lower()), username)
     expected = config.local_users.get(username)
     matches = hmac.compare_digest(password.encode("utf-8"), (expected or "").encode("utf-8"))
     if expected is None or not matches:
         logger.warning("Local login failed username=%r", username)
         raise InvalidCredentialsError("用户名或密码错误")
     return upsert_oauth_user(
-        session, subject=f"local:{username}", display_name=username, email=None
+        session, username=username, display_name=username, email=None, update_profile=False
     )
 
 
@@ -102,6 +103,9 @@ async def login_oauth(
     subject = profile.get("sub")
     if not _valid_text(subject, limit=255 - len(provider) - 1):
         raise OAuthUserInfoError("认证服务用户信息缺少有效的 sub")
+    username = profile.get("username", subject)
+    if "username" in profile and not _valid_text(username, limit=120):
+        raise OAuthUserInfoError("认证服务用户信息的用户名无效")
     display_name = subject
     for claim in ("display_name", "preferred_username", "name", "email"):
         candidate = profile.get(claim)
@@ -116,5 +120,5 @@ async def login_oauth(
         raise OAuthUserInfoError("认证服务用户信息的名称或邮箱无效")
     # Workspace membership, never profile.role, determines authorization.
     return upsert_oauth_user(
-        session, subject=f"{provider}:{subject}", display_name=display_name, email=email
+        session, username=username, display_name=display_name, email=email
     )

@@ -25,6 +25,52 @@
       "title": "AuthOptions",
       "type": "object"
     },
+    "CurrentUser": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Email"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_platform_admin": {
+          "title": "Is Platform Admin",
+          "type": "boolean"
+        },
+        "local_account": {
+          "title": "Local Account",
+          "type": "boolean"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "display_name",
+        "email",
+        "is_platform_admin",
+        "local_account"
+      ],
+      "title": "CurrentUser",
+      "type": "object"
+    },
     "LocalLoginRequest": {
       "additionalProperties": false,
       "properties": {
@@ -67,6 +113,9 @@
     },
     {
       "$ref": "#/$defs/LocalLoginRequest"
+    },
+    {
+      "$ref": "#/$defs/CurrentUser"
     }
   ]
 }

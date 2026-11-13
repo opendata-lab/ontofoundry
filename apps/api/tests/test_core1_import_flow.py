@@ -555,10 +555,10 @@ def test_nonmember_cannot_preview_read_or_confirm(client, space):
 
     p = preview(client, space, (EXAMPLES_DIR / "01-basic-sales.json").read_bytes())
     client.app.dependency_overrides[current_principal] = lambda: Principal(
-        id=str(uuid4()), subject="fictional-outsider", display_name="虚构访客", email=None
+        id=str(uuid4()), username="fictional-outsider", display_name="虚构访客", email=None
     )
     try:
-        assert client.get(import_root(space) + "/" + p["import_id"]).status_code == 403
+        assert client.get(import_root(space) + "/" + p["import_id"]).status_code == 404
         assert confirm(client, space, p).status_code == 403
         assert (
             client.post(

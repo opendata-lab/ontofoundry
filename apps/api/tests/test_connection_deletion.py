@@ -218,17 +218,20 @@ def test_active_sync_in_any_schema_blocks_deletion(client, connection, state):
         assert db.get(MetadataSnapshotRecord, (connection, "fiction_archive")) is not None
 
 
-@pytest.mark.parametrize("role", ["member", "reader"])
-def test_non_admin_cannot_delete(client, connection, role):
+@pytest.mark.parametrize("role, expected", [("admin", 204), ("member", 403), ("viewer", 403)])
+def test_connection_deletion_requires_manage_permission(client, connection, role, expected):
     with client.app.state.session_factory() as db:
         member = db.scalar(select(WorkspaceMemberRecord).where(
             WorkspaceMemberRecord.workspace_id == WID, WorkspaceMemberRecord.user_id == DEV_USER_ID,
         ))
         member.role = role
         db.commit()
-    assert client.delete(ROOT + f"/connections/{connection}").status_code == 403
+    from ontofoundry_api.api.auth import Principal, current_principal
+
+    client.app.dependency_overrides[current_principal] = lambda: Principal(DEV_USER_ID, "dev", "虚构用户", None)
+    assert client.delete(ROOT + f"/connections/{connection}").status_code == expected
     with client.app.state.session_factory() as db:
-        assert db.get(ConnectionRecord, connection) is not None
+        assert (db.get(ConnectionRecord, connection) is not None) == (expected == 403)
 
 
 def test_historical_versions_and_decided_proposals_do_not_block_deletion(client, connection):

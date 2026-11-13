@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.contracts.imports import (
     ImportCompletionRequest,
     ImportConfirm,
@@ -14,6 +13,7 @@ from ontofoundry_api.contracts.imports import (
     ImportPreview,
 )
 from ontofoundry_api.database import get_db
+from ontofoundry_api.services.access import require_edit, require_read
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.import_completion import complete_import
 from ontofoundry_api.services.imports import (
@@ -38,7 +38,7 @@ async def preview(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, str(workspace_id), user.id)
+    require_edit(db, str(workspace_id), user)
     if set(request.query_params) - {"name"}:
         raise ServiceError(
             "预览不接受替换或直接发布等附加选项",
@@ -71,7 +71,7 @@ def read(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, str(workspace_id), user.id)
+    require_read(db, str(workspace_id), user)
     return import_view(db, get_import(db, str(workspace_id), adapter_id, str(import_id)))
 
 
@@ -85,7 +85,7 @@ def confirm(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, str(workspace_id), user.id)
+    require_edit(db, str(workspace_id), user)
     return confirm_import(
         db,
         request.app.state.settings,
@@ -107,7 +107,7 @@ def complete(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, str(workspace_id), user.id)
+    require_edit(db, str(workspace_id), user)
     return complete_import(
         db,
         request.app.state.settings,

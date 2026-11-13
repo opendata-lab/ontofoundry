@@ -7,22 +7,20 @@ from ontofoundry_api.domain.canonical import domain_sha256
 from ontofoundry_api.domain.core import CoreDraft, RatioMetric
 from ontofoundry_api.domain.snapshot import empty_snapshot
 from ontofoundry_api.domain.validation import validate_core_graph
-from ontofoundry_api.services.access import can_read_instances, can_read_mappings
-from ontofoundry_api.services.errors import ServiceError
-from ontofoundry_api.services.metric_query import (
-    execute_metric_preview,
-    value_kind,
+from ontofoundry_api.services.access import (
+    can_read_instances,
+    can_read_mappings,
+    require_read,
 )
+from ontofoundry_api.services.errors import ServiceError
+from ontofoundry_api.services.metric_query import execute_metric_preview, value_kind
 from ontofoundry_api.services.ontology_query import current_version, snapshot_of
-from ontofoundry_api.services.workspaces import get_workspace, membership_role
+from ontofoundry_api.services.workspaces import get_workspace
 
 
 def preview_metric(db, workspace_id, user, body, settings):
     space = get_workspace(db, workspace_id)
-    if not membership_role(db, workspace_id, user.id):
-        raise ServiceError(
-            "仅空间成员可预览指标", code="MAPPINGS_FORBIDDEN", status_code=403
-        )
+    require_read(db, workspace_id, user)
     if (
         "expected_current_version_id" in body.model_fields_set
         and body.expected_current_version_id != space.current_version_id

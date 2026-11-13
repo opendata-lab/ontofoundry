@@ -3,18 +3,14 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, StringConstraints, model_validator
-from sqlalchemy import (
-    func,
-    select,
-    text,
-)
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ConnectionRecord
 from ontofoundry_api.domain.models import DataMapping
+from ontofoundry_api.services.access import require_edit, require_manage, require_read
 from ontofoundry_api.services.connections import delete_connection
 from ontofoundry_api.services.readonly import connect_readonly
 
@@ -84,7 +80,7 @@ def connections(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     return {
         "items": [
             public_connection(c)
@@ -105,7 +101,7 @@ def create_connection(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id, admin=True)
+    require_manage(db, str(workspace_id), user)
     # Mappings name their data source, so the name has to identify one connection.
     if _name_taken(db, workspace_id, body.name):
         raise HTTPException(409, "本空间已有同名数据连接，请换一个名称")
@@ -133,7 +129,7 @@ def update_connection(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id, admin=True)
+    require_manage(db, str(workspace_id), user)
     item = get_connection(db, workspace_id, connection_id)
     changes = body.model_dump(exclude_unset=True)
     if "name" in changes and _name_taken(db, workspace_id, changes["name"], except_id=item.id):
@@ -163,7 +159,7 @@ def remove_connection(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id, admin=True)
+    require_manage(db, str(workspace_id), user)
     delete_connection(db, workspace_id, connection_id)
     return Response(status_code=204)
 
@@ -176,7 +172,7 @@ def test_connection(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     with connect_readonly(
         get_connection(db, workspace_id, connection_id), request.app.state.settings
     ) as conn:
@@ -194,7 +190,7 @@ def tables(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.metadata_catalog import list_tables, require_schema
     from ontofoundry_api.services.metadata_sync import normalize_schema, read_table
 
@@ -227,7 +223,7 @@ def table_material(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     get_connection(db, workspace_id, connection_id)
     from ontofoundry_api.services.errors import DatasetSourceError
     raise DatasetSourceError("请在本体目录创建数据集，并在构建页直接关联到会话；不再生成重复表结构材料", code="DATASET_ASSOCIATION_REQUIRED")
@@ -288,6 +284,7 @@ def preview(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.access import require_instances, require_mappings
 
     require_instances(db, workspace_id, user)

@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
+from ontofoundry_api.contracts.users import WorkspaceItem, WorkspaceList
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.models import WorkspaceCreate
-from ontofoundry_api.services.ontology_query import (
-    current_version,
-    workspace_overview,
-)
+from ontofoundry_api.services.access import require_read
+from ontofoundry_api.services.ontology_query import current_version, workspace_overview
 from ontofoundry_api.services.workspaces import (
     create_workspace,
     get_workspace,
@@ -18,7 +17,7 @@ from ontofoundry_api.services.workspaces import (
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
 
 
-@router.get("")
+@router.get("", response_model=WorkspaceList)
 def list_all(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
@@ -26,7 +25,7 @@ def list_all(
     return {"items": list_workspaces(session, principal.id)}
 
 
-@router.post("", status_code=201)
+@router.post("", status_code=201, response_model=WorkspaceItem)
 def create(
     payload: WorkspaceCreate,
     session: Session = Depends(get_db),
@@ -36,7 +35,7 @@ def create(
     return workspace_summary(session, workspace, principal.id)
 
 
-@router.get("/{workspace_id}")
+@router.get("/{workspace_id}", response_model=WorkspaceItem)
 def get_one(
     workspace_id: str,
     request: Request,
@@ -44,6 +43,7 @@ def get_one(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.access import authorization_fingerprint
     from ontofoundry_api.services.http_reads import conditional, validator
 
@@ -74,6 +74,7 @@ def overview(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.access import can_read_instances, can_read_mappings
 
     workspace = get_workspace(session, workspace_id)

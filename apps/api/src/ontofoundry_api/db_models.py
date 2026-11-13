@@ -4,15 +4,19 @@ from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Index,
     Integer,
     PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
+    false,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,7 +31,9 @@ class UserRecord(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    subject: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    username: Mapped[str] = mapped_column(String(255))
+    __table_args__ = (Index("ix_users_username_lower", func.lower(username), unique=True),)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     display_name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -42,6 +48,7 @@ class WorkspaceRecord(Base):
     slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120), unique=True)
     description: Mapped[str] = mapped_column(Text, default="")
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     instance_change_sequence: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     current_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

@@ -16,10 +16,7 @@ from test_modeling import ONTOLOGY, ROOT, create_session, preview, publish, save
 from test_t4_proposal_decisions import create, decide, seed_batch
 
 from ontofoundry_api.contracts.instances import InstanceBaseline
-from ontofoundry_api.contracts.proposals import (
-    RunContext,
-    parse_result,
-)
+from ontofoundry_api.contracts.proposals import RunContext, parse_result
 from ontofoundry_api.db_models import (
     DocumentInstanceRecord,
     InstanceHistoryRecord,
@@ -414,7 +411,7 @@ def test_fixed_version_filters_new_values_and_relations(client):
     from ontofoundry_api.api.auth import Principal
     from ontofoundry_api.services.mcp_ontology import invoke
 
-    principal = Principal(DEV_USER_ID, "dev:admin", "admin", None)
+    principal = Principal(DEV_USER_ID, "dev", "admin", None, is_platform_admin=True)
     with client.app.state.session_factory() as db:
         result = invoke(
             db,

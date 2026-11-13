@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Depends, Query, Request, Response
 from sqlalchemy.orm import Session
 
-from ontofoundry_api.api.auth import Principal, ontology_directory_principal
-from ontofoundry_api.api.auth import ontology_principal as current_principal
+from ontofoundry_api.api.auth import (
+    Principal,
+    ontology_directory_principal,
+)
+from ontofoundry_api.api.auth import (
+    ontology_principal as current_principal,
+)
 from ontofoundry_api.contracts.read_models import (
     CatalogPageRead,
     DocumentContextRead,
@@ -17,6 +22,7 @@ from ontofoundry_api.services.access import (
     can_read_mappings,
     require_instances,
     require_mappings,
+    require_read,
 )
 from ontofoundry_api.services.instance_query import (
     ObjectSearch,
@@ -71,6 +77,7 @@ def search(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     return search_ontology(
         session, workspace_id, principal, options, request.app.state.settings
     )
@@ -85,6 +92,7 @@ def resolve(
     principal: Principal = Depends(current_principal),
 ):
     """Same service as the resolve_entity MCP tool, over the current published version."""
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.domain.core import CoreDraft
     from ontofoundry_api.services.entity_resolution import resolve_entity
     from ontofoundry_api.services.ontology_query import snapshot_of
@@ -113,6 +121,7 @@ def objects(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     require_instances(session, workspace_id, principal)
     if options.source == "database":
         require_mappings(session, workspace_id, principal)
@@ -135,6 +144,7 @@ def object_detail(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     require_instances(session, workspace_id, principal)
     if ref.startswith("db."):
         require_mappings(session, workspace_id, principal)
@@ -158,6 +168,7 @@ def object_graph(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     require_instances(session, workspace_id, principal)
     if ref.startswith("db."):
         require_mappings(session, workspace_id, principal)
@@ -180,6 +191,7 @@ def version(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.http_reads import conditional, validator
     from ontofoundry_api.services.ontology_query import version_read_key
 
@@ -209,6 +221,7 @@ def types(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), principal)
     return search_types(
         current_version(session, workspace_id, version_id),
         query=q,
@@ -227,6 +240,7 @@ def type_detail(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), principal)
     return get_type(
         current_version(session, workspace_id, version_id),
         type_id,
@@ -245,6 +259,7 @@ def neighborhood(
     session: Session = Depends(get_db),
     _: Principal = Depends(current_principal),
 ) -> dict:
+    require_read(session, str(workspace_id), _)
     return type_graph(
         current_version(session, workspace_id, version_id), focus_id=focus_id, depth=depth
     )
@@ -269,6 +284,7 @@ def catalog(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.catalog_reads import catalog_page
 
     return catalog_page(
@@ -295,6 +311,7 @@ def element_presentation(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.catalog_reads import element_projection
 
     return element_projection(
@@ -317,6 +334,7 @@ def element_documents(
     session: Session = Depends(get_db),
     principal: Principal = Depends(current_principal),
 ):
+    require_read(session, str(workspace_id), principal)
     from ontofoundry_api.services.catalog_reads import document_context
 
     require_instances(session, workspace_id, principal)

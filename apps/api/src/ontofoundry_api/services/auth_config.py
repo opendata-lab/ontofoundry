@@ -38,6 +38,7 @@ class OAuthProvider:
 @dataclass(frozen=True)
 class AuthConfig:
     local_users: dict[str, str] = field(default_factory=dict, repr=False)
+    admin_users: tuple[str, ...] = ()
     oauth: OAuthProvider | None = None
     oauth_user_info: Callable | None = None
 
@@ -56,7 +57,7 @@ def _local_users(raw: object) -> dict[str, str]:
             raise AuthConfigError("LOCAL_USERS.username 不能含控制字符，且不能超过 120 字符")
         if not isinstance(password, str) or not password:
             raise AuthConfigError("LOCAL_USERS.password 必须是非空明文字符串")
-        if username in users:
+        if username.lower() in {name.lower() for name in users}:
             raise AuthConfigError("LOCAL_USERS.username 必须唯一")
         users[username] = password
     return users
@@ -122,6 +123,11 @@ def _oauth_provider(raw: object) -> OAuthProvider | None:
 
 def _build_config(module: ModuleType) -> AuthConfig:
     users = _local_users(getattr(module, "LOCAL_USERS", []))
+    admins = getattr(module, "ADMIN_USERS", [])
+    if not isinstance(admins, list) or any(not isinstance(name, str) or not name.strip() for name in admins):
+        raise AuthConfigError("ADMIN_USERS 必须是非空字符串组成的列表")
+    if not admins:
+        logger.warning("ADMIN_USERS 为空，没有用户能进入用户管理")
     oauth = _oauth_provider(getattr(module, "OAUTH_PROVIDERS", []))
     hook = getattr(module, "OAUTH_USER_INFO", None)
     if hook is not None:
@@ -143,7 +149,7 @@ def _build_config(module: ModuleType) -> AuthConfig:
         raise AuthConfigError("login 模式至少配置一种登录方式：LOCAL_USERS 或 OAUTH_PROVIDERS")
     if users.get("admin") == "admin123":
         logger.warning("本地账号 admin 仍使用默认密码，请在现场覆盖配置中修改密码")
-    return AuthConfig(local_users=users, oauth=oauth, oauth_user_info=hook)
+    return AuthConfig(local_users=users, admin_users=tuple(admins), oauth=oauth, oauth_user_info=hook)
 
 
 def load_auth_config(settings: Settings) -> AuthConfig:
@@ -169,3 +175,11 @@ def load_auth_config(settings: Settings) -> AuthConfig:
         # Configuration exceptions can contain client secrets; log only their type.
         raise AuthConfigError(f"认证配置导入失败：{path}（{type(exc).__name__}）") from None
     return _build_config(module)
+
+
+def is_platform_admin(username: str, config: AuthConfig, *, dev_mode: bool = False) -> bool:
+    return (dev_mode and username.lower() == "dev") or username.lower() in {name.lower() for name in config.admin_users}
+
+
+def is_local_account(username: str, config: AuthConfig) -> bool:
+    return username.lower() in {name.lower() for name in config.local_users}

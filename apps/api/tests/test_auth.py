@@ -9,12 +9,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
-from ontofoundry_api.api.auth import (
-    NONCE_COOKIE,
-    build_state,
-    parse_state,
-    safe_return_to,
-)
+from ontofoundry_api.api.auth import NONCE_COOKIE, build_state, parse_state, safe_return_to
 from ontofoundry_api.config import Settings
 from ontofoundry_api.db_models import UserRecord, WorkspaceMemberRecord
 from ontofoundry_api.main import create_app
@@ -25,6 +20,7 @@ from ontofoundry_api.services.workspaces import create_workspace, upsert_oauth_u
 def login_client(tmp_path):
     config = tmp_path / "auth.py"
     config.write_text('''
+ADMIN_USERS = ["admin"]
 LOCAL_USERS = [
     {"username": "admin", "password": "admin123"},
     {"username": "星港用户", "password": "星港密码"},
@@ -137,14 +133,14 @@ def test_each_login_option_can_be_disabled(login_client):
 
 
 @pytest.mark.parametrize("username, password", [("admin", "admin123"), ("星港用户", "星港密码")])
-def test_local_login_session_subject_and_logout(login_client, username, password):
+def test_local_login_session_username_and_logout(login_client, username, password):
     response = login_client.post("/api/v1/auth/login/local", json={"username": username, "password": password})
     assert response.status_code == 204
     assert response.content == b""
     cookie = response.headers["set-cookie"]
     assert "httponly" in cookie.lower() and "samesite=lax" in cookie.lower()
     principal = login_client.get("/api/v1/auth/me").json()
-    assert principal["subject"] == f"local:{username}"
+    assert principal["username"] == username
     assert principal["display_name"] == username
     assert principal["email"] is None
     with login_client.app.state.session_factory() as session:
@@ -224,7 +220,7 @@ def test_provider_callback_uses_hook_bound_client_and_full_token(login_client, o
     assert user_request.headers["authorization"] == "Bearer secret-access-token"
     assert all(value == 15 for value in user_request.extensions["timeout"].values())
     principal = login_client.get("/api/v1/auth/me").json()
-    assert principal["subject"] == "internal:user-7"
+    assert principal["username"] == "user-7"
     assert principal["display_name"] == "星港用户"
     assert principal["email"] == "user@example.com"
     with login_client.app.state.session_factory() as session:
@@ -244,11 +240,11 @@ def test_provider_display_name_fallback_and_role_ignored(login_client, oauth_htt
     assert login_client.get("/api/v1/auth/me").json()["display_name"] == expected_name
 
 
-def test_migrated_oauth_subject_preserves_user_and_membership(login_client, oauth_http):
+def test_existing_username_preserves_user_and_membership(login_client, oauth_http):
     from ontofoundry_api.domain.models import WorkspaceCreate
 
     with login_client.app.state.session_factory() as session:
-        existing = upsert_oauth_user(session, subject="internal:user-7", display_name="旧名称", email=None)
+        existing = upsert_oauth_user(session, username="user-7", display_name="旧名称", email=None)
         existing_id = existing.id
         workspace_id = create_workspace(
             session, payload=WorkspaceCreate(name="星港空间", slug="starlane"), user_id=existing_id,
@@ -292,7 +288,7 @@ def test_hook_failure_does_not_break_later_logins(login_client, oauth_http, capl
     login_client.post("/api/v1/auth/logout")
     login_client.app.state.auth_config = original
     assert complete_oauth(login_client, start_oauth(login_client)).headers["location"] == "/workspaces/example"
-    assert login_client.get("/api/v1/auth/me").json()["subject"] == "internal:user-7"
+    assert login_client.get("/api/v1/auth/me").json()["username"] == "user-7"
 
 
 @pytest.mark.parametrize("token", [[], {}, {"access_token": ""}, {"access_token": 42}, {"access_token": "a\nb"}, {"access_token": "token", "token_type": "MAC"}])
@@ -353,7 +349,7 @@ def test_removed_routes_are_not_registered(login_client):
 
 def test_dev_mode_identity_logout_and_redirect_unchanged(client):
     principal = client.get("/api/v1/auth/me").json()
-    assert principal["subject"] == "dev:admin" and principal["display_name"] == "admin"
+    assert principal["username"] == "dev" and principal["display_name"] == "admin"
     assert client.get("/api/v1/auth/options").json() == {"local_login": False, "oauth": None}
     assert client.post("/api/v1/auth/logout").status_code == 204
     assert client.get("/api/v1/auth/me").json() == principal

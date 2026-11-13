@@ -13,7 +13,12 @@ from ontofoundry_api.contracts.instances import AbandonSessionRead, InstanceBase
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.core import Strict
 from ontofoundry_api.domain.snapshot import read_snapshot
-from ontofoundry_api.services.access import require_instances, require_mappings
+from ontofoundry_api.services.access import (
+    require_edit,
+    require_instances,
+    require_mappings,
+    require_read,
+)
 from ontofoundry_api.services.instance_neighborhood import database_neighborhood
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["instances"])
@@ -35,6 +40,7 @@ def neighborhood(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_read(db, str(workspace_id), user)
     require_instances(db, workspace_id, user)
     require_mappings(db, workspace_id, user)
     raw = (
@@ -54,10 +60,9 @@ def active_instances(
     user: Principal = Depends(current_principal),
 ):
     """Active document instances of the workspace, for views outside a session."""
-    from ontofoundry_api.api.modeling import require_member
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.instance_store import baseline
 
-    require_member(db, workspace_id, user.id)
     require_instances(db, workspace_id, user)
     return baseline(db, workspace_id, None)
 
@@ -69,10 +74,9 @@ def staged_instances(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    from ontofoundry_api.api.modeling import require_member
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.instance_store import baseline
 
-    require_member(db, workspace_id, user.id)
     require_instances(db, workspace_id, user)
     get_modeling_session(db, workspace_id, session_id)
     result = baseline(db, workspace_id, session_id)
@@ -87,10 +91,9 @@ def session_instance_baseline(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    from ontofoundry_api.api.modeling import require_member
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.instance_store import baseline
 
-    require_member(db, workspace_id, user.id)
     require_instances(db, workspace_id, user)
     get_modeling_session(db, workspace_id, session_id)
     return baseline(db, workspace_id, session_id)
@@ -103,10 +106,9 @@ def abandon_session(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    from ontofoundry_api.api.modeling import require_member
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.instance_store import abandon
 
-    require_member(db, workspace_id, user.id)
     result = abandon(db, workspace_id, session_id, user.id)
     db.commit()
     return result
@@ -121,11 +123,10 @@ def instance_history(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    from ontofoundry_api.api.modeling import require_member
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.contracts.instances import InstanceHistoryRead
     from ontofoundry_api.services.instance_store import history
 
-    require_member(db, workspace_id, user.id)
     require_instances(db, workspace_id, user)
     if session_id:
         get_modeling_session(db, workspace_id, session_id)

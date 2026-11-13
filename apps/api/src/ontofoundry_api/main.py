@@ -26,7 +26,9 @@ from ontofoundry_api.api import (
     proposals,
     workspaces,
 )
-from ontofoundry_api.api import settings as settings_api
+from ontofoundry_api.api import (
+    settings as settings_api,
+)
 from ontofoundry_api.config import Settings, get_settings
 from ontofoundry_api.database import Base, build_engine, build_session_factory
 from ontofoundry_api.db_models import (
@@ -60,6 +62,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.auth_config = load_auth_config(app_settings)
+        session_factory.configure(info={"auth_config": application.state.auth_config, "dev_mode": app_settings.auth_mode == "dev"})
         if app_settings.auto_create_schema:
             Base.metadata.create_all(engine)
         app_settings.data_dir.mkdir(parents=True, exist_ok=True)
@@ -196,6 +199,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def health() -> dict:
         return {"status": "ok", "service": "ontofoundry-api"}
 
+    from ontofoundry_api.api import users
+
+    app.include_router(users.router)
+    app.include_router(users.me_router)
     app.include_router(auth.router)
     app.include_router(workspaces.router)
     app.include_router(ontology.router)

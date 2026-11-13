@@ -180,6 +180,8 @@ def test_cutover_cleans_every_content_table_and_preserves_configuration():
                     value = {"technical_name": "legacy_identifier", "name": "旧名称"}
                 elif isinstance(column.type, sa.DateTime):
                     value = datetime(2026, 10, 20, tzinfo=UTC)
+                elif isinstance(column.type, sa.Boolean):
+                    value = False
                 elif isinstance(column.type, sa.Integer):
                     value = 1
                 else:

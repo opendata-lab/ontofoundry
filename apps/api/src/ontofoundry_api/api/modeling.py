@@ -23,10 +23,8 @@ from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.core import CoreDraft
 from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.domain.models import OntologyDraft, Strict
-from ontofoundry_api.domain.snapshot import (
-    draft_sha256,
-    empty_snapshot,
-)
+from ontofoundry_api.domain.snapshot import draft_sha256, empty_snapshot
+from ontofoundry_api.services.access import require_edit, require_read
 from ontofoundry_api.services.element_diff import element_changes
 from ontofoundry_api.services.element_save import (
     calculate_element_save,
@@ -51,11 +49,7 @@ from ontofoundry_api.services.read_cache import session_reads, version_snapshots
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 from ontofoundry_api.services.session_gate import lock_session, require_draft_edit
 from ontofoundry_api.services.version_diff import compare_snapshots
-from ontofoundry_api.services.workspaces import (
-    get_workspace,
-    membership_role,
-    publish_draft,
-)
+from ontofoundry_api.services.workspaces import get_workspace, publish_draft
 
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["modeling"])
 
@@ -80,7 +74,7 @@ def preview_element(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     return preview_element_save(db, workspace_id, body)
 
 
@@ -93,7 +87,7 @@ def save_element(
     user: Principal = Depends(current_principal),
 ):
     """One Save action validates and commits an immutable, immediately active version."""
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     space = db.scalar(
         select(WorkspaceRecord).where(WorkspaceRecord.id == workspace_id).with_for_update()
     )
@@ -236,10 +230,6 @@ def save_element(
     }
 
 
-def require_member(db: Session, workspace_id: str, user_id: str, admin=False):
-    role = membership_role(db, workspace_id, user_id)
-    if not role or (admin and role != "admin"):
-        raise HTTPException(403, "需要空间管理员权限" if admin else "仅空间成员可访问")
 
 
 def get_modeling_session(db: Session, workspace_id: str, session_id: str):
@@ -554,7 +544,7 @@ def resolve_merge(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     space = get_workspace(db, workspace_id)
     item = lock_session(db, workspace_id, session_id)
     require_draft_edit(db, item)
@@ -621,7 +611,7 @@ def sessions(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     # Polled while a run is live: never load the drafts.
     rows = db.scalars(
         select(ModelingSessionRecord)
@@ -672,7 +662,7 @@ def create_session(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     space = get_workspace(db, workspace_id)
     version = (
         db.get(OntologyVersionRecord, space.current_version_id)
@@ -707,9 +697,9 @@ async def read_session(
     """The session as it stands now: a run that has finished gets its result
     settled before the answer, so the page reading it after the conversation
     ends sees the new proposals."""
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.modeling_runs import needs_run_sync, settle_session_run
 
-    require_member(db, workspace_id, user.id)
     item = get_modeling_session(db, workspace_id, session_id)
     if needs_run_sync(request.app, item):
         await settle_session_run(request.app, workspace_id, session_id)
@@ -727,7 +717,7 @@ def save_session(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     # revise() waits for the run and the review only when the draft changes.
     item = lock_session(db, workspace_id, session_id)
     if body.draft.get("workspace_id") != workspace_id:
@@ -798,7 +788,7 @@ def validate_session(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     return validate_draft(item.draft_json, get_workspace(db, workspace_id))
 
@@ -812,7 +802,7 @@ def publish_session(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     space = db.scalar(
         select(WorkspaceRecord).where(WorkspaceRecord.id == workspace_id).with_for_update()
     )
@@ -953,6 +943,7 @@ def versions(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.access import can_read_instances, can_read_mappings
 
     return {
@@ -978,7 +969,7 @@ def published_snapshot(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     space = get_workspace(db, workspace_id)
     version = (
         db.get(OntologyVersionRecord, space.current_version_id)
@@ -995,7 +986,7 @@ def capabilities(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     config = request.app.state.settings
     configured = bool(config.dataagent_base_url)
     return {
@@ -1016,6 +1007,7 @@ def presentation(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.access import (
         authorization_fingerprint,
         can_read_instances,
@@ -1058,9 +1050,9 @@ def preview_definition(
 ):
     """Exactly what publishing now would produce: the B/L/D merge of base,
     latest and draft, validated and compiled, with the values publish checks."""
+    require_read(db, str(workspace_id), user)
     from ontofoundry_api.services.join_validation import dataset_checks
 
-    require_member(db, workspace_id, user.id)
     item = lock_session(db, workspace_id, session_id)
     require_draft_edit(db, item)
     if item.revision != body.session_revision:
@@ -1142,7 +1134,7 @@ def compare_versions(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     left = current_version(db, workspace_id, left_id) if left_id else None
     right = current_version(db, workspace_id, right_id)
     if left and left.id == right.id:

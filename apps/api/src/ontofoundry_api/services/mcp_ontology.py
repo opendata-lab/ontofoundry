@@ -18,6 +18,7 @@ from ontofoundry_api.services.access import (
     can_read_instances,
     can_read_mappings,
     require_instances,
+    require_read,
 )
 from ontofoundry_api.services.cursors import decode_cursor, encode_cursor
 from ontofoundry_api.services.errors import ServiceError
@@ -91,6 +92,7 @@ def size(value):
 
 
 def _invoke(db, workspace_id, principal, name, arguments, settings):
+    require_read(db, workspace_id, principal)
     args = INPUTS[name].model_validate(arguments)
     space = get_workspace(db, workspace_id)
     version_id = (
@@ -519,6 +521,7 @@ def _invoke(db, workspace_id, principal, name, arguments, settings):
 
 
 def invoke(db, workspace_id, principal, name, arguments, settings):
+    require_read(db, workspace_id, principal)
     args = INPUTS[name].model_validate(arguments)
     if name == "search_ontology":
         return search_ontology(

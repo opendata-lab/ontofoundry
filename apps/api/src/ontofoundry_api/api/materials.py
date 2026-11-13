@@ -10,14 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.api.modeling import require_member
 from ontofoundry_api.contracts.materials import MaterialOverview
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import (
-    MaterialChunkRecord,
-    MaterialRecord,
-    utc_now,
-)
+from ontofoundry_api.db_models import MaterialChunkRecord, MaterialRecord, utc_now
+from ontofoundry_api.services.access import require_edit, require_manage, require_read
 from ontofoundry_api.services.errors import ConflictError
 from ontofoundry_api.services.material_source import (
     MaterialSourceMissing,
@@ -57,7 +53,7 @@ def list_materials(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     query = select(MaterialRecord).where(MaterialRecord.workspace_id == workspace_id)
     if not include_archived:
         # Archived material stays readable as evidence but is not offered for
@@ -77,7 +73,7 @@ def overview(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     materials = db.scalars(select(MaterialRecord).where(
         MaterialRecord.workspace_id == workspace_id
     ).order_by(MaterialRecord.created_at.desc())).all()
@@ -93,7 +89,7 @@ async def upload(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     if not is_material_name(name):
         raise HTTPException(422, "仅支持 UTF-8 文本材料：Markdown、TXT、JSON、YAML、CSV")
     root = request.app.state.settings.data_dir.resolve()
@@ -174,7 +170,7 @@ def download(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     item = db.get(MaterialRecord, material_id)
     if not item or item.workspace_id != workspace_id:
         raise HTTPException(404, "材料不存在")
@@ -201,7 +197,7 @@ def archive(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     item = _material(db, workspace_id, material_id)
     if item.archived_at is None:
         item.archived_at, item.archived_by = utc_now(), user.id
@@ -216,7 +212,7 @@ def restore(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     item = _material(db, workspace_id, material_id)
     item.archived_at, item.archived_by = None, None
     db.commit()
@@ -232,7 +228,7 @@ def delete_material(
     user: Principal = Depends(current_principal),
 ):
     """Physically remove material that nothing cites; cited material is archived."""
-    require_member(db, workspace_id, user.id, admin=True)
+    require_manage(db, str(workspace_id), user)
     item = _material(db, workspace_id, material_id)
     references = material_references(db, workspace_id, material_id)
     if references:

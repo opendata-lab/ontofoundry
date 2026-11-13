@@ -1,5 +1,7 @@
 """复制为 ontofoundry_config_docker.py，修改后重启后端。"""
 
+ADMIN_USERS = ["admin"]
+
 LOCAL_USERS = [{"username": "admin", "password": "换成现场自己的密码"}]
 
 # Set LOCAL_USERS = [] to disable local login after configuring SSO.
