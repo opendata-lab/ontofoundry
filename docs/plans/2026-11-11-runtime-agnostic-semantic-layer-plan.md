@@ -44,12 +44,12 @@
 3. **读取权限与跨空间检索**：每次调用和翻页前用 `services/access.py` 的 `can_read_workspace` 检查（成员、公开空间或平台管理员），失败返回 `workspace_unavailable`；`list_spaces` 列出全部可阅读空间；`search_ontology` 先解析目标空间（显式列表，或用户有成员角色的全部空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
 4. **调用记录**：按设计第 6 节新增 `services/gateway_call_log.py`：进程内有界队列（10,000 个事件）、`put_nowait` 入队、后台线程以独立会话批量写入开始与结束事件，并更新令牌最近使用时间；应用启动时启动线程，停止时最多等待 5 秒；入队与写入的所有异常在模块内处理并记日志，不传给工具调用。
 5. **版本元数据**：按设计 SL-05 在每个工具结果的 `_meta` 加入 `io.github.opendata-lab.ontofoundry/versions`，与 `io.modelcontextprotocol/serverInfo` 并列；按协议版本的 `schema.ts` 核对旧版响应也允许 `_meta`。
-6. **反馈**：按设计第 7 节实现 `submit_feedback`（`can_read_workspace` 检查、元素归属与长度校验、服务端填写 `version_id`），新增 `GET /api/v1/workspaces/{workspace_id}/feedback`（登录会话、`can_manage_workspace`、游标分页）；前端新增 `pages/FeedbackPage.tsx` 和路由 `feedback`，在 `components/AppShell.tsx` 把“空间设置”分组改名为“管理中心”，其下为“空间设置”和“用户反馈”两个二级菜单，整组仅空间管理员和平台管理员可见（用 `useWorkspacePermissions` 的 `canManage`），`settings` 与 `feedback` 路由对无管理权限者显示无权限；同步更新 `AppShell.test.tsx` 和受影响的导航截图基准；页面用 `PageHeader`、`Panel` 和 Ant Design `Table`，沿用列表页布局，不新增布局模式，接口调用走 `api/client.ts` 并补充前端类型；Skill 写入第 7.2 节反馈规则和第 9.1 节缓存规则。
+6. **反馈**：按设计第 7 节实现 `submit_feedback`（`can_read_workspace` 检查、元素归属与长度校验、服务端填写 `version_id`），新增 `GET /api/v1/workspaces/{workspace_id}/feedback`（登录会话、`can_manage_workspace`、游标分页）；前端新增 `pages/FeedbackPage.tsx` 和路由 `feedback`，在 `components/AppShell.tsx` 把“空间设置”分组改名为“空间管理”，其下为“空间设置”和“用户反馈”两个二级菜单，整组仅空间管理员和平台管理员可见（用 `useWorkspacePermissions` 的 `canManage`），`settings` 与 `feedback` 路由对无管理权限者显示无权限；同步更新 `AppShell.test.tsx` 和受影响的导航截图基准；页面用 `PageHeader`、`Panel` 和 Ant Design `Table`，沿用列表页布局，不新增布局模式，接口调用走 `api/client.ts` 并补充前端类型；Skill 写入第 7.2 节反馈规则和第 9.1 节缓存规则。
 7. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`、`tests/test_feedback.py`，覆盖第 4 节验收中可自动化的场景；新增 `tests/test_plugin_package.py` 检查插件包（插件目录整体随安装分发，测试不放在插件目录内）：`plugin.json` 与 `marketplace.json` 可解析且 `name` 合法，`.mcp.json` 中没有明文令牌，`skills/` 下每个 Skill 是一层目录、`SKILL.md` 含 `name` 和 `description`、`name` 与目录名一致、`description` 不超过 1024 字符；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
 8. **离线包**：`scripts/create-offline-package.sh` 附带 `plugins/ontofoundry` 和 `.claude-plugin/marketplace.json`，CI 的离线包任务检查其存在。
 9. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
-后端按设计第 6.1 节新增 `/api/v1/admin/gateway-calls` 列表与详情接口（仅平台管理员，返回完整内容）；前端调整导航分组，新增“用户反馈”页面和页头菜单中的“用户审计”页面（`/admin/audit`），并在已上线的“个人中心”启用“个人令牌”页签（设计第 4.6 节：`/me/tokens` 路由、权限用 `Tag` 显示并可行内修改、令牌只显示一次）；“管理中心”显示条件沿用 `useWorkspacePermissions` 的 `canManage`。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖空间管理员和平台管理员可见“管理中心”及两个页面，可编辑、可查看成员和公开空间非成员看不到该分组、直接访问均显示无权限。
+后端按设计第 6.1 节新增 `/api/v1/admin/gateway-calls` 列表与详情接口（仅平台管理员，返回完整内容）；前端调整导航分组，新增“用户反馈”页面和页头菜单中的“用户审计”页面（`/admin/audit`），并在已上线的“个人中心”启用“个人令牌”页签（设计第 4.6 节：`/me/tokens` 路由、权限用 `Tag` 显示并可行内修改、令牌只显示一次）；“空间管理”显示条件沿用 `useWorkspacePermissions` 的 `canManage`。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖空间管理员和平台管理员可见“空间管理”及两个页面，可编辑、可查看成员和公开空间非成员看不到该分组、直接访问均显示无权限。
 
 ## 4. 验收
 
@@ -66,9 +66,9 @@
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
 | 版本元数据 | 每个工具结果的 `_meta` 含 `io.github.opendata-lab.ontofoundry/versions`，与正文中的 `version_id` 一致 | 是 |
 | 提交反馈 | 成员提交后记录原话、说明、相关元素和服务端填写的版本；非成员、跨空间元素、空文本或超长被拒绝 | 是 |
-| 管理中心 | 空间管理员和平台管理员看到“管理中心”（空间设置、用户反馈）；可编辑、可查看成员和公开空间非成员看不到该分组，直接访问显示无权限 | 是 |
+| 空间管理 | 空间管理员和平台管理员看到“空间管理”（空间设置、用户反馈）；可编辑、可查看成员和公开空间非成员看不到该分组，直接访问显示无权限 | 是 |
 | 用户审计 | 平台管理员在页头菜单“用户审计”看到全部网关调用，可按用户、空间、工具、结果、时间筛选，详情显示完整请求和返回；其他用户看不到菜单，接口 `403` | 是 |
-| 查看反馈 | 空间管理员和平台管理员在“管理中心 → 用户反馈”看到时间倒序的反馈列表；其他角色和其他空间的管理员看不到菜单，接口返回 403 | 是 |
+| 查看反馈 | 空间管理员和平台管理员在“空间管理 → 用户反馈”看到时间倒序的反馈列表；其他角色和其他空间的管理员看不到菜单，接口返回 403 | 是 |
 | Skill 提交反馈 | 用户纠正口径时，智能体提交一次反馈，`user_text` 为用户原话 | 联验 |
 | Skill 本地缓存 | 版本未变时第二次问同一定义只调用一次 `list_spaces`；发布新版本后下一个问题重新读取并删除旧版本缓存；被移出空间后该空间缓存被删除。调用记录中的调用次数与预期一致 | 联验 |
 | 调用记录不影响用户 | 记录数据库不可用、写入抛错或队列已满时，工具结果与无记录时一致，延迟不增加（测试中让写入阻塞或抛错并断言工具照常返回） | 是 |
