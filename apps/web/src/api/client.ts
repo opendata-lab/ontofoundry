@@ -54,6 +54,8 @@ import type {
   TypeGraph,
   TypeList,
   User,
+  AuthOptions,
+  LocalLoginRequest,
   ValidationIssue,
   ValidationReport,
   VersionSummary,
@@ -110,6 +112,25 @@ export class ApiError extends Error {
 
 import { definitionReads } from "./definitionReads";
 
+const AUTH_NO_REDIRECT_PATHS = new Set([
+  "/api/v1/auth/options",
+  "/api/v1/auth/login/local",
+]);
+
+/** Wrapped so browser navigation uses window.location.assign and tests can spy in jsdom. */
+export const navigation = {
+  assign: (url: string) => window.location.assign(url),
+};
+
+function currentPath(): string {
+  return `${window.location.pathname}${window.location.search}${window.location.hash}` || "/";
+}
+
+export function redirectToLogin() {
+  if (window.location.pathname.replace(/\/$/, "") === "/login") return;
+  navigation.assign(`/login${query({ return_to: currentPath() })}`);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     credentials: "include",
@@ -130,6 +151,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       detailMessage(body.detail) ??
       "请求失败（HTTP " + response.status + "）";
     if (response.status === 401 || response.status === 403) definitionReads.clear();
+    if (response.status === 401 && !AUTH_NO_REDIRECT_PATHS.has(path.split("?")[0])) {
+      redirectToLogin();
+    }
     throw new ApiError(
       body.hint ? message + "\n" + body.hint : message,
       response.status,
@@ -185,8 +209,21 @@ const ontologyPath = (workspaceId: string) => "/api/v1/ontology/workspaces/" + w
 const sessionPath = (s: Pick<ModelingSession, "id" | "workspace_id">) =>
   `/api/v1/workspaces/${s.workspace_id}/sessions/${s.id}`;
 
+export const authOptions = () => request<AuthOptions>("/api/v1/auth/options");
+export const loginLocal = (payload: LocalLoginRequest) =>
+  request<void>("/api/v1/auth/login/local", json("POST", payload));
+export const logout = async () => {
+  await request<void>("/api/v1/auth/logout", { method: "POST" });
+  definitionReads.clear();
+};
+
 export const api = {
   me: () => request<User>("/api/v1/auth/me"),
+  authOptions,
+  loginLocal,
+  logout,
+  oauthLoginUrl: (provider: string, returnTo = "/") =>
+    `/api/v1/auth/login/${encodeURIComponent(provider)}${query({ return_to: returnTo })}`,
   workspaces: () => request<Items<Workspace>>("/api/v1/workspaces"),
   createWorkspace: (payload: { name: string; slug: string; description: string }) =>
     request<Workspace>("/api/v1/workspaces", json("POST", payload)),

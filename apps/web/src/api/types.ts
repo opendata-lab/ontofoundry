@@ -157,6 +157,16 @@ export type User = {
   email: string | null;
 };
 
+export type AuthOptions = {
+  local_login: boolean;
+  oauth: { name: string } | null;
+};
+
+export type LocalLoginRequest = {
+  username: string;
+  password: string;
+};
+
 export type Workspace = {
   id: UUID;
   slug: string;
