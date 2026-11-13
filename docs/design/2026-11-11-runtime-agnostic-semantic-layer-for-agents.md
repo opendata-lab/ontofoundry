@@ -83,7 +83,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 ### 4.3 成员检查
 
-现有单空间读取对非成员也返回已发布的语义定义（`get_ontology`、`search_ontology` 本身不要求成员身份）。网关不沿用这一点：每次调用、每次翻页前，网关先确认用户当前是目标空间成员，再调用读取服务。用户被移出空间后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
+每次调用、每次翻页前，网关先确认用户当前可阅读目标空间（成员，或空间公开，见[用户管理与空间公开](2026-11-12-user-management.md) UM-07），再调用读取服务。用户被移出空间或空间改为私有后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
 
 ### 4.4 数据表
 
@@ -149,9 +149,9 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 ### 4.6 个人中心
 
-点击页头的用户名打开菜单（“个人中心”“退出登录”），选“个人中心”进入 `/me`。个人中心属于用户本人，不属于任何工作空间，在任意空间中都能进入，含两个页签：
+点击页头的用户名打开菜单（“个人中心”“用户管理”（仅平台管理员，见[用户管理](2026-11-12-user-management.md)）“退出登录”），选“个人中心”进入 `/me`。个人中心属于用户本人，不属于任何工作空间，在任意空间中都能进入，含两个页签：
 
-- **个人信息**：只读显示显示名、账号（用户主体）、登录方式（本地账号或认证服务名称）和邮箱。
+- **个人信息**：只读显示用户名、显示名、邮箱、是否本地账号、所在空间及角色（[用户管理](2026-11-12-user-management.md)第 5 节）。
 - **个人令牌**（`/me/tokens`）：用户自行签发和管理自己的令牌，用现有列表页布局：
 
 | 列 | 内容 |
@@ -167,7 +167,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 | 工具 | 入参 | 行为 |
 |---|---|---|
-| `list_spaces` | 无 | 列出用户当前加入的空间：`workspace_id`、名称、角色、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
+| `list_spaces` | 无 | 列出用户当前可阅读的空间（成员空间和公开空间）：`workspace_id`、名称、角色（非成员的公开空间为 `public`）、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
 | `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索全部成员空间。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
 | `get_ontology` | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
 | `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
