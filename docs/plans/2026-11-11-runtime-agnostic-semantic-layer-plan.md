@@ -21,7 +21,7 @@
 | 读取服务 | `services/mcp_ontology.py` 的 `invoke` 和 `services/ontology_search.py` 的 `search_ontology`；不要求成员身份；游标绑定空间、版本、工具、参数和授权指纹 | 网关先做成员检查再调用；跨空间检索逐个调用 `search_ontology`，传入不含 `workspace_ids` 的单空间参数 |
 | 授权 | `services/access.py`：带 `service_token_id` 的身份按 `scopes` 判断映射与实例读取；授权指纹含令牌 ID 与范围 | 个人令牌身份设 `service_token_id="pat:<id>"`，无需改动 |
 | 空间目录 | `services/workspaces.py` 的 `list_accessible_workspaces` 返回成员空间、角色、`version_id`、`current_version` | `list_spaces` 直接取用 |
-| 令牌存储 | 无（MT-03 已删除服务令牌表） | 新增个人令牌表 |
+| 令牌与调用记录存储 | 无（MT-03 已删除服务令牌表；没有审计表） | 新增个人令牌表和网关调用记录表 |
 | Skill | `integrations/dataagent/skills/semantic-grounding/`：先检索再精读、歧义追问、保留指标固定过滤 | 改写为外部客户端 Skill，原 DataAgent Skill 不变 |
 
 ## 3. 交付顺序
@@ -36,10 +36,10 @@
 
 ### 步骤二　交付用户网关，预计 3 至 4 个工作日
 
-1. **个人令牌**：`db_models.py` 新增令牌表及 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 新增 `/api/v1/auth/tokens` 三个接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
+1. **个人令牌与调用记录表**：`db_models.py` 新增令牌表和调用记录表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 新增 `/api/v1/auth/tokens` 三个接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
 2. **网关**：从 `api/mcp.py` 抽出 JSON-RPC 处理（协议协商、请求头校验、工具结果与错误封装），单空间入口改为调用它且行为不变；新增 `api/ontology_gateway.py` 注册 `/api/v1/ontology/mcp` 与三个工具。工具入参模型放在 `services/ontology_gateway.py`，`tools/list` 由模型生成 JSON Schema。
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
-4. **调用记录**：按设计第 6 节在 `tools/call` 结束后写结构化日志。
+4. **调用记录**：按设计第 6 节在 `tools/call` 结束后写一行记录，写入失败只记错误日志，不影响工具返回。
 5. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`，覆盖第 4 节验收中可自动化的场景；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
 6. **文档**：新建 `integrations/agents/README.md`，写明令牌签发、客户端配置示例和 Skill 安装方式；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
@@ -57,15 +57,15 @@
 | 移出空间 | 该空间从目录和默认检索消失；旧游标返回 `cursor_invalid` | 是 |
 | 检索超限 | 11 个空间返回 `workspace_count`；合计超过预算返回 `response_size`；均无部分结果 | 是 |
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
-| 调用记录 | 每次调用一条日志，字段齐全，不含令牌和检索词 | 是 |
+| 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、摘要、错误码和消息齐全；完整返回与客户端收到的一致；不含令牌和游标原文 | 是 |
 | 单空间入口与 DataAgent | 现有测试通过；DataAgent 原配置联通，建模运行版本固定不变 | 测试 + 联验 |
 | 只装 MCP 和 Skill | Claude Code 能查到净销售额定义、固定条件、映射和版本，回答区分口径与数值 | 联验 |
 | 挂已有查询工具 | 口径一致，虚构数据返回 80 元，查询平台有执行记录；无权表时拒绝执行 | 联验 |
 
 ## 5. 发布与回退
 
-- 发布：同一应用和数据库升级，迁移只新增令牌表；DataAgent 和已有客户端无需改配置。
-- 回退：停用网关路由即可，令牌表保留不影响单空间入口；需要彻底回退时执行迁移降级删除令牌表。
+- 发布：同一应用和数据库升级，迁移只新增令牌表和调用记录表；DataAgent 和已有客户端无需改配置。
+- 回退：停用网关路由即可，两张新表保留不影响单空间入口；需要彻底回退时执行迁移降级删除两张表。
 
 ## 6. 后续顺序
 
