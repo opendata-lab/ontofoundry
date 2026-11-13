@@ -81,12 +81,50 @@ make serve
 | `ONTOFOUNDRY_DATABASE_URL` | 平台 PostgreSQL 连接地址 |
 | `ONTOFOUNDRY_DATA_DIR` | 上传材料的本地存储目录 |
 | `ONTOFOUNDRY_SEED_DEMO` | 是否初始化示例，正式部署设为 `false` |
-| `ONTOFOUNDRY_AUTH_MODE` | 本地开发使用 `dev`，正式部署使用 `oauth` |
+| `ONTOFOUNDRY_AUTH_MODE` | `dev` 不登录；`login` 启用本地账号与可选 SSO，生产环境必须使用 `login` |
+| `ONTOFOUNDRY_AUTH_CONFIG` | `login` 模式必填，外置 Python 配置文件路径；`dev` 模式不读取 |
 | `ONTOFOUNDRY_SESSION_SECRET` | 会话签名密钥 |
 | `ONTOFOUNDRY_COOKIE_SECURE` | 是否只通过 HTTPS 发送会话 Cookie |
 | `ONTOFOUNDRY_PUBLIC_BASE_URL` | 外部 Agent 访问本平台 MCP 时使用的可达地址 |
 
 数据连接只需填写业务数据库的地址、账号和密码，密码按原样保存在平台数据库中。业务数据库请使用只读账号。
+
+### 平台登录
+
+Compose 默认使用 `login`（`apps/api/.env` 中显式设置的 `dev` 仍优先），只读挂载
+[`deploy/docker/ontofoundry/`](deploy/docker/ontofoundry/) 并指定基础配置入口。
+源码运行时，将 `ONTOFOUNDRY_AUTH_MODE` 改为 `login`，保留模板中的配置路径即可。
+默认本地账号为 `admin`／`admin123`，启动日志会提醒修改默认密码。
+
+现场配置方法：
+
+1. 将 `ontofoundry_config_docker.py.example` 复制为同目录的 `ontofoundry_config_docker.py`，修改 `LOCAL_USERS` 中的用户名、明文密码。基础配置不要直接修改，升级会覆盖它。
+2. 需要 SSO 时，将 `custom_sso_user_info.py.example` 复制为 `custom_sso_user_info.py`，按实际返回结构映射用户信息，然后启用覆盖文件中的 `OAUTH_PROVIDERS` 和 `OAUTH_USER_INFO`。只支持一个授权码认证服务；`name` 为 1～64 位字母、数字、下划线或连字符，不能为 `local`。
+3. `remote_app` 填写 `client_id`、`client_secret`、`authorize_url`、`access_token_url`、以 `/` 结尾的 `api_base_url` 和回调地址 `https://<平台域名>/api/v1/auth/callback/<name>`；`client_kwargs.scope` 缺省为 `openid profile`。将 `LOCAL_USERS` 设为空列表可关闭本地登录，但必须保留一种登录方式。
+4. 限制覆盖文件和钩子文件的权限，只允许后端运行用户读取；它们已被 Git 忽略，包含的密码和客户端密钥按同等要求保管。修改后重启后端，配置不可读、导入失败或格式非法都会阻止启动。
+
+钩子必须是同步的 `oauth_user_info(provider, token_response, oauth_remotes)`，与 DataAgent
+同契约，现有钩子文件可直接复用。客户端 `oauth_remotes[provider]` 已绑定基址、Bearer
+访问令牌和单次请求 15 秒超时；钩子在线程中运行，不应记录令牌。返回字典必须有稳定的非空
+`sub`，名称依次取 `display_name`、`preferred_username`、`name`、`email`、`sub`；可含
+`email`，`role` 被忽略。异常、超时或非法返回仅使本次登录失败。
+本地用户主体为 `local:<username>`，SSO 用户为 `<name>:<sub>`；新用户没有空间成员身份，
+需由空间管理员添加。
+
+**旧 OAuth 部署迁移**：将模式从 `oauth` 改为 `login`，删除全部 `ONTOFOUNDRY_OAUTH_*`
+环境变量（包括 `.env` 中的空值），改用 `ONTOFOUNDRY_AUTH_CONFIG`。旧字段对应如下：
+
+| 旧变量后缀（前缀均为 `ONTOFOUNDRY_OAUTH_`） | 外置配置 |
+| --- | --- |
+| `PROVIDER` | `OAUTH_PROVIDERS[0]["name"]` |
+| `AUTHORIZE_URL`、`TOKEN_URL` | `remote_app.authorize_url`、`remote_app.access_token_url` |
+| `CLIENT_ID`、`CLIENT_SECRET` | `remote_app.client_id`、`remote_app.client_secret` |
+| `REDIRECT_URI` | `remote_app.redirect_uri`，路径增加 `/<name>` |
+| `USER_INFO_URL` | 在钩子中请求该地址；也可拆成 `api_base_url` 和相对路径 |
+
+认证名称必须保持原 `PROVIDER`（默认 `internal`），钩子返回的 `sub` 必须与旧实现从 `sub`
+或 `id` 解析出的标识相同，否则会创建新用户，无法保留原空间成员身份。会话密钥与 Cookie
+配置继续用环境变量。本次不改数据库结构；回退时恢复旧镜像和原 OAuth 环境变量。
 
 ### 接入 DataAgent
 
@@ -107,11 +145,11 @@ Agent ID 使用 DataAgent 创建接口实际返回的值。模型供应商、Ski
 
 ### 正式部署
 
-仓库提供的 Compose 是本地部署参考。正式部署需为后端显式注入生产配置；Compose 当前只映射其中的数据库、DataAgent 和连接密钥变量，不能仅靠修改 `apps/api/.env` 启用所有生产设置。
+仓库提供的 Compose 是本地部署参考，已映射认证模式、会话密钥、安全 Cookie、运行环境和示例开关；正式部署需在 `apps/api/.env` 中显式配置这些值，并提供 HTTPS 入口。外置认证路径由 Compose 固定为挂载目录内的基础配置。
 
 生产配置要求：
 
-- `ONTOFOUNDRY_ENVIRONMENT=production`，`ONTOFOUNDRY_AUTH_MODE=oauth`，并填写模板中的 OAuth 地址及客户端配置。
+- `ONTOFOUNDRY_ENVIRONMENT=production`，`ONTOFOUNDRY_AUTH_MODE=login`，按上节配置本地账号和可选 SSO。
 - 使用至少 32 字符的随机会话密钥，设置 `ONTOFOUNDRY_COOKIE_SECURE=true`、`ONTOFOUNDRY_SEED_DEMO=false`，由 HTTPS 入口提供访问。
 - 升级前备份 PostgreSQL、上传材料和连接加密密钥，按 Alembic 迁移链升级数据库。
 

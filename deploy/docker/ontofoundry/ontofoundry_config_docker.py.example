@@ -1,0 +1,20 @@
+"""复制为 ontofoundry_config_docker.py，修改后重启后端。"""
+
+LOCAL_USERS = [{"username": "admin", "password": "换成现场自己的密码"}]
+
+# Set LOCAL_USERS = [] to disable local login after configuring SSO.
+# Uncomment the provider and hook together once SSO is available.
+# OAUTH_PROVIDERS = [{
+#     "name": "SSO",
+#     "remote_app": {
+#         "client_id": "your-client-id",
+#         "client_secret": "your-client-secret",
+#         "authorize_url": "https://sso.example.com/oauth/authorize",
+#         "access_token_url": "https://sso.example.com/oauth/token",
+#         "api_base_url": "https://sso.example.com/oauth/",
+#         "client_kwargs": {"scope": "openid profile"},
+#         "redirect_uri": "https://ontofoundry.example.com/api/v1/auth/callback/SSO",
+#     },
+# }]
+# from custom_sso_user_info import oauth_user_info
+# OAUTH_USER_INFO = oauth_user_info

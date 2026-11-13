@@ -1,0 +1,28 @@
+"""用户信息钩子示例，与 DataAgent 的钩子文件使用同一契约。
+
+复制为 custom_sso_user_info.py，在 ontofoundry_config_docker.py 中设置：
+    from custom_sso_user_info import oauth_user_info
+    OAUTH_USER_INFO = oauth_user_info
+
+oauth_remotes[provider] 是同步 httpx.Client，已绑定 api_base_url、Bearer
+访问令牌与单次请求 15 秒超时。token_response 是令牌端点的完整 JSON。
+返回字典必须含稳定的非空 sub；名称依次取 display_name、preferred_username、
+name、email、sub。可含 email；OntoFoundry 忽略 role，权限来自空间成员关系。
+钩子在线程中执行，可能并发调用；不要使用未加锁的共享状态，不要记录令牌。
+异常、超时或非法返回只会使本次登录失败。
+"""
+
+
+def oauth_user_info(provider: str, token_response: dict, oauth_remotes: dict) -> dict:
+    """示例：自研认证返回 {"code": 0, "data": {"uid": ..., "nickname": ...}}。"""
+    if provider != "SSO":
+        raise ValueError(f"unsupported OAuth provider: {provider}")
+    response = oauth_remotes[provider].get("userinfo")
+    response.raise_for_status()
+    raw = response.json()
+    payload = raw.get("data") or raw
+    return {
+        # Use an immutable ID, never an email address or nickname.
+        "sub": str(payload.get("uid") or payload.get("sub") or ""),
+        "display_name": str(payload.get("nickname") or payload.get("preferred_username") or ""),
+    }

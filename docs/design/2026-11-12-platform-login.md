@@ -59,7 +59,7 @@ OAUTH_USER_INFO = oauth_user_info
 | 项 | 规则 |
 |---|---|
 | `LOCAL_USERS` | 列表，每项 `username`（非空，唯一）和 `password`（非空明文）。基础配置含 `admin`／`admin123`；置为空列表即关闭本地登录。覆盖文件含明文密码和 `client_secret`，只读挂载、不入库，文件权限限制为后端运行用户可读 |
-| `OAUTH_PROVIDERS` | 0 或 1 项。`name` 为 1～64 位字母、数字、下划线或连字符，不能为 `local`；`remote_app` 必须有 `client_id`、`client_secret`、`authorize_url`、`access_token_url`、`redirect_uri`；只支持授权码模式 |
+| `OAUTH_PROVIDERS` | 0 或 1 项。`name` 为 1～64 位字母、数字、下划线或连字符，不能为 `local`；`remote_app` 必须有 `client_id`、`client_secret`、`authorize_url`、`access_token_url`、`api_base_url`（以 `/` 结尾，钩子客户端的基址）、`redirect_uri`（路径必须是 `/api/v1/auth/callback/<name>`）；只支持授权码模式 |
 | `OAUTH_USER_INFO` | 配置了认证服务时必填；同步函数，接受 `(provider, token_response, oauth_remotes)` |
 
 ## 4. 钩子契约
@@ -102,7 +102,7 @@ OAUTH_USER_INFO = oauth_user_info
 | `GET /api/v1/auth/options` | 登录页所需信息：`{"local_login": true, "oauth": {"name": "SSO"} 或 null}`，不需登录 |
 | `POST /api/v1/auth/login/local` | `{"username", "password"}`，密码用常数时间比较；成功建立会话返回 `204`；失败返回 `401`“用户名或密码错误”，不区分用户是否存在，日志记录用户名 |
 | `GET /api/v1/auth/login/{provider}` | 跳转到认证服务（沿用现有 state 与 nonce 校验） |
-| `GET /api/v1/auth/callback/{provider}` | 换取令牌、调用钩子、建立会话后回到原页面 |
+| `GET /api/v1/auth/callback/{provider}` | 换取令牌、调用钩子、建立会话后回到原页面；state 校验通过后失败时跳转 `/login?error=oauth_denied`、`oauth_exchange_failed` 或 `oauth_user_info_failed`，登录页显示对应提示（同 DataAgent） |
 | `POST /api/v1/auth/logout` | 不变 |
 
 登录页 `/login`：标题“OntoFoundry”，按 `options` 显示用户名密码表单和“通过 SSO 登录”按钮（两者都有时中间用“或”分隔），使用 Ant Design 表单和现有设计变量。前端收到 `401` 时跳转登录页，登录后回到原页面。页头用户名菜单增加“退出登录”。

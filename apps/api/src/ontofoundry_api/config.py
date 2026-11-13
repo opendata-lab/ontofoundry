@@ -1,3 +1,5 @@
+import os
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -23,19 +25,13 @@ class Settings(BaseSettings):
     # Test-only escape hatch. Deployed schemas are owned by the unified Alembic chain.
     auto_create_schema: bool = False
     seed_demo: bool = True
-    auth_mode: Literal["dev", "oauth"] = "dev"
+    auth_mode: Literal["dev", "login"] = "dev"
+    auth_config: Path | None = None
     session_secret: str = "development-only-session-secret-change-me"
     session_cookie_name: str = "ontofoundry_session"
     cookie_secure: bool = False
     cors_origins: str = "http://localhost:5174,http://127.0.0.1:5174"
 
-    oauth_provider: str = "internal"
-    oauth_authorize_url: str = ""
-    oauth_token_url: str = ""
-    oauth_user_info_url: str = ""
-    oauth_client_id: str = ""
-    oauth_client_secret: str = ""
-    oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/callback"
     # Complete agent execution lives in an external OpenDataWorks DataAgent.
     dataagent_base_url: str = ""
     dataagent_api_prefix: str = "/api/v1/nl2sql"
@@ -55,33 +51,57 @@ class Settings(BaseSettings):
     metric_query_timeout_seconds: int = Field(default=15, ge=1, le=300)
     max_file_mb: int = 256
 
+    @classmethod
+    def settings_customise_sources(
+        cls, settings_cls, init_settings, env_settings, dotenv_settings, file_secret_settings
+    ):
+        def checked_dotenv():
+            values = dotenv_settings()
+            # DotEnvSettingsSource omits empty extras. Keep removed keys so the
+            # migration validator can reject them even when their value is empty.
+            for name in dotenv_settings.env_vars:
+                if name.upper().startswith("ONTOFOUNDRY_OAUTH_"):
+                    values[name] = ""
+            return values
+
+        return init_settings, env_settings, checked_dotenv, file_secret_settings
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_legacy_oauth_settings(cls, values):
+        # BaseSettings includes dotenv extras here, even for removed fields.
+        supplied = values if isinstance(values, Mapping) else {}
+        legacy = sorted({
+            key for key in (*os.environ, *supplied)
+            if key.upper().startswith("ONTOFOUNDRY_OAUTH_")
+            or key.lower().startswith("oauth_")
+        })
+        if legacy or supplied.get("auth_mode") == "oauth" or os.getenv("ONTOFOUNDRY_AUTH_MODE") == "oauth":
+            names = ", ".join(legacy) if legacy else "ONTOFOUNDRY_AUTH_MODE=oauth"
+            raise ValueError(
+                f"旧 OAuth 配置已移除（{names}）；请迁移到 ONTOFOUNDRY_AUTH_MODE=login，"
+                "通过 ONTOFOUNDRY_AUTH_CONFIG 指定 Python 配置文件，"
+                "使用 OAUTH_PROVIDERS 和 OAUTH_USER_INFO"
+            )
+        return values
 
     @model_validator(mode="after")
     def reject_insecure_production_settings(self) -> "Settings":
         if self.mcp_token and len(self.mcp_token) < 24:
             raise ValueError("ONTOFOUNDRY_MCP_TOKEN must be at least 24 characters")
         if self.environment == "production":
-            if self.auth_mode != "oauth":
-                raise ValueError("production requires ONTOFOUNDRY_AUTH_MODE=oauth")
+            if self.auth_mode != "login":
+                raise ValueError("production requires ONTOFOUNDRY_AUTH_MODE=login")
             if len(self.session_secret) < 32 or self.session_secret.startswith(
                 "development-only"
             ):
                 raise ValueError("production session secret must be at least 32 characters")
             if not self.cookie_secure or self.seed_demo:
                 raise ValueError("production requires secure cookies and seed_demo=false")
-            required = {
-                "oauth_authorize_url": self.oauth_authorize_url,
-                "oauth_token_url": self.oauth_token_url,
-                "oauth_user_info_url": self.oauth_user_info_url,
-                "oauth_client_id": self.oauth_client_id,
-                "oauth_client_secret": self.oauth_client_secret,
-            }
-            missing = [name for name, value in required.items() if not value]
-            if missing:
-                raise ValueError("production OAuth settings missing: " + ", ".join(missing))
         return self
 
 

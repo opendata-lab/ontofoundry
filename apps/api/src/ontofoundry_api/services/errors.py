@@ -30,6 +30,20 @@ class NotFoundError(ServiceError):
     code = "NOT_FOUND"
 
 
+class InvalidCredentialsError(ServiceError):
+    status_code = 401
+    code = "INVALID_CREDENTIALS"
+
+
+class OAuthLoginError(ServiceError):
+    status_code = 502
+    code = "OAUTH_EXCHANGE_FAILED"
+
+
+class OAuthUserInfoError(OAuthLoginError):
+    code = "OAUTH_USER_INFO_FAILED"
+
+
 class ConflictError(ServiceError):
     status_code = 409
     code = "CONFLICT"

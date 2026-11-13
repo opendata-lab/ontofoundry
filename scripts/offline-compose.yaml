@@ -20,6 +20,12 @@ services:
   of-backend:
     image: ${OF_BACKEND_IMAGE:-of-backend:local}
     environment:
+      ONTOFOUNDRY_ENVIRONMENT: ${ONTOFOUNDRY_ENVIRONMENT:-development}
+      ONTOFOUNDRY_AUTH_MODE: ${ONTOFOUNDRY_AUTH_MODE:-login}
+      ONTOFOUNDRY_AUTH_CONFIG: /opt/ontofoundry-api/docker/ontofoundry/ontofoundry_config.py
+      ONTOFOUNDRY_SESSION_SECRET: ${ONTOFOUNDRY_SESSION_SECRET:-development-only-session-secret-change-me}
+      ONTOFOUNDRY_COOKIE_SECURE: ${ONTOFOUNDRY_COOKIE_SECURE:-false}
+      ONTOFOUNDRY_SEED_DEMO: ${ONTOFOUNDRY_SEED_DEMO:-false}
       ONTOFOUNDRY_DATABASE_URL: postgresql+psycopg://ontofoundry:ontofoundry@postgres:5432/ontofoundry
       ONTOFOUNDRY_CORS_ORIGINS: ${ONTOFOUNDRY_CORS_ORIGINS:-}
       ONTOFOUNDRY_PUBLIC_BASE_URL: ${ONTOFOUNDRY_PUBLIC_BASE_URL:-}
@@ -34,6 +40,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:8910:8900"
+    volumes:
+      - ./deploy/docker/ontofoundry:/opt/ontofoundry-api/docker/ontofoundry:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8900/healthz').read()"]
       interval: 10s

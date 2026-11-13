@@ -9,22 +9,22 @@ import time
 from dataclasses import dataclass, replace
 from urllib.parse import urlencode
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.config import Settings
+from ontofoundry_api.contracts.auth import AuthOptions, LocalLoginRequest, OAuthOption
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     UserRecord,
     WorkspaceMemberRecord,
 )
-from ontofoundry_api.services.workspaces import (
-    ensure_dev_user,
-    upsert_oauth_user,
-)
+from ontofoundry_api.services.auth import login_local, login_oauth, require_provider
+from ontofoundry_api.services.auth_config import AuthConfig
+from ontofoundry_api.services.errors import OAuthLoginError
+from ontofoundry_api.services.workspaces import ensure_dev_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 NONCE_COOKIE = "ontofoundry_oauth_nonce"
@@ -47,6 +47,10 @@ class Principal:
 
 def _settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def _auth_config(request: Request) -> AuthConfig:
+    return request.app.state.auth_config
 
 
 def _principal(user: UserRecord) -> Principal:
@@ -84,12 +88,14 @@ def _b64decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
-def build_state(*, nonce: str, return_to: str, secret: str) -> str:
+def build_state(*, nonce: str, return_to: str, secret: str, provider: str | None = None) -> str:
     payload = {
         "nonce": nonce,
         "return_to": return_to,
         "expires_at": int(time.time()) + STATE_TTL_SECONDS,
     }
+    if provider is not None:
+        payload["provider"] = provider
     encoded = _b64encode(
         json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
     )
@@ -110,11 +116,14 @@ def parse_state(*, state: str, nonce: str, secret: str) -> dict:
         if not hmac.compare_digest(signature, expected):
             raise ValueError("signature mismatch")
         payload = json.loads(_b64decode(encoded))
-    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        if not isinstance(payload, dict):
+            raise ValueError("invalid state payload")
+        expires_at = int(payload.get("expires_at", 0))
+    except (ValueError, TypeError) as exc:
         raise HTTPException(status_code=400, detail="OAuth state 无效") from exc
-    if not hmac.compare_digest(str(payload.get("nonce", "")), nonce):
+    if not hmac.compare_digest(str(payload.get("nonce", "")).encode(), nonce.encode()):
         raise HTTPException(status_code=400, detail="OAuth nonce 无效")
-    if int(payload.get("expires_at", 0)) < int(time.time()):
+    if expires_at < int(time.time()):
         raise HTTPException(status_code=400, detail="OAuth state 已过期")
     return payload
 
@@ -246,26 +255,54 @@ def me(principal: Principal = Depends(current_principal)) -> dict:
     }
 
 
-@router.get("/login")
-def login(request: Request, return_to: str = "/") -> Response:
+@router.get("/options", response_model=AuthOptions)
+def options(request: Request) -> AuthOptions:
+    config = _auth_config(request)
+    return AuthOptions(
+        local_login=bool(config.local_users),
+        oauth=OAuthOption(name=config.oauth.name) if config.oauth else None,
+    )
+
+
+@router.post("/login/local", status_code=204)
+def local_login(
+    payload: LocalLoginRequest,
+    request: Request,
+    session: Session = Depends(get_db),
+) -> Response:
+    if _settings(request).auth_mode != "login":
+        raise HTTPException(status_code=404, detail="未启用登录")
+    user = login_local(
+        session, _auth_config(request), username=payload.username, password=payload.password
+    )
+    request.session.clear()
+    request.session["user_id"] = user.id
+    return Response(status_code=204)
+
+
+@router.get("/login/{provider}")
+def login(provider: str, request: Request, return_to: str = "/") -> Response:
     settings = _settings(request)
     if settings.auth_mode == "dev":
         return RedirectResponse(safe_return_to(return_to), status_code=302)
+    oauth = require_provider(_auth_config(request), provider)
     nonce = secrets.token_urlsafe(24)
     state = build_state(
         nonce=nonce,
         return_to=safe_return_to(return_to),
         secret=settings.session_secret,
+        provider=provider,
     )
     params = {
         "response_type": "code",
-        "client_id": settings.oauth_client_id,
-        "redirect_uri": settings.oauth_redirect_uri,
+        "client_id": oauth.client_id,
+        "redirect_uri": oauth.redirect_uri,
         "state": state,
-        "scope": "openid profile email",
+        "scope": oauth.scope,
     }
+    separator = "&" if "?" in oauth.authorize_url else "?"
     response = RedirectResponse(
-        f"{settings.oauth_authorize_url}?{urlencode(params)}", status_code=302
+        f"{oauth.authorize_url}{separator}{urlencode(params)}", status_code=302
     )
     response.set_cookie(
         NONCE_COOKIE,
@@ -279,61 +316,40 @@ def login(request: Request, return_to: str = "/") -> Response:
     return response
 
 
-@router.get("/callback")
+def _terminal_oauth_redirect(error: str) -> Response:
+    response = RedirectResponse(f"/login?error={error}", status_code=302)
+    response.delete_cookie(NONCE_COOKIE, path="/api/v1/auth")
+    return response
+
+
+@router.get("/callback/{provider}")
 async def callback(
+    provider: str,
     request: Request,
-    code: str,
-    state: str,
+    code: str = "",
+    state: str = "",
+    error: str = "",
     session: Session = Depends(get_db),
 ) -> Response:
     settings = _settings(request)
+    require_provider(_auth_config(request), provider)
     nonce = request.cookies.get(NONCE_COOKIE)
     if not nonce:
         raise HTTPException(status_code=400, detail="OAuth nonce Cookie 缺失")
     payload = parse_state(state=state, nonce=nonce, secret=settings.session_secret)
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        token_response = await client.post(
-            settings.oauth_token_url,
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": settings.oauth_redirect_uri,
-                "client_id": settings.oauth_client_id,
-                "client_secret": settings.oauth_client_secret,
-            },
-        )
-        token_response.raise_for_status()
-        access_token = token_response.json().get("access_token")
-        if not access_token:
-            raise HTTPException(
-                status_code=502, detail="OAuth Provider 未返回 access_token"
-            )
-        user_response = await client.get(
-            settings.oauth_user_info_url,
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        user_response.raise_for_status()
-        profile = user_response.json()
-
-    provider_subject = profile.get("sub") or profile.get("id")
-    if not provider_subject:
-        raise HTTPException(status_code=502, detail="OAuth 用户信息缺少 sub")
-    display_name = (
-        profile.get("name")
-        or profile.get("preferred_username")
-        or profile.get("email")
-        or str(provider_subject)
-    )
-    user = upsert_oauth_user(
-        session,
-        subject=f"{settings.oauth_provider}:{provider_subject}",
-        display_name=str(display_name),
-        email=profile.get("email"),
-    )
+    if payload.get("provider") != provider:
+        raise HTTPException(status_code=400, detail="OAuth state 认证服务不匹配")
+    if error:
+        return _terminal_oauth_redirect("oauth_denied")
+    if not code:
+        return _terminal_oauth_redirect("oauth_exchange_failed")
+    try:
+        user = await login_oauth(session, _auth_config(request), provider=provider, code=code)
+    except OAuthLoginError as exc:
+        return _terminal_oauth_redirect(exc.code.lower())
     request.session.clear()
     request.session["user_id"] = user.id
-    response = RedirectResponse(safe_return_to(payload["return_to"]), status_code=302)
+    response = RedirectResponse(safe_return_to(payload.get("return_to", "/")), status_code=302)
     response.delete_cookie(NONCE_COOKIE, path="/api/v1/auth")
     return response
 
