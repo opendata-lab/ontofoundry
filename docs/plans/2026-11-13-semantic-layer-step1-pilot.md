@@ -11,6 +11,7 @@
 | 2. 外部 Skill 与插件 | 已建 `plugins/ontofoundry/`（清单、`.mcp.json`、`skills/ontology-grounding/SKILL.md`、README）和根目录 `.claude-plugin/marketplace.json`；`claude plugin validate` 对插件和插件目录均通过（目录展示类提示如图标、隐私链接不影响加载）。 |
 | 3. 只配 MCP 的路径 | 问“销售额怎么定义，按客户统计的 SQL”：先调用 Skill，原句检索，只读取 5 个相关元素（含 `physical`），回答给出空间、版本、物理表和参考 SQL；本体中客户没有数据绑定、`buyer` 关系没有关联字段，智能体说明缺项并追问，没有编造 JOIN。6 轮，约 22 秒。 |
 | 3. 挂查询工具的路径 | 未做：本机没有可用的查询平台。留到现场或步骤二联调。 |
+| 4. Codex（2026-11-13 补充，codex-cli 0.166.0） | Skill 复制到临时项目的 `.agents/skills/` 后被自动发现并读取；MCP 用 `-c mcp_servers.ontofoundry.url=…` 和 `bearer_token_env_var` 接入，未改动本机 `config.toml`。同一问题下调用 `search_ontology`（原句）和 `get_ontology`（4 个元素），回答给出空间、版本和定义，同样说明客户关联缺失、不猜 JOIN。 |
 | 4. 三种客户端安装 | Claude Code 只验证了 `--plugin-dir` 加载，未在真实配置中执行 `/plugin marketplace add`（会改动本机用户配置）。ZCode、opencode 未验证，需要装有客户端的人按 README 操作；ZCode 是否读取 `.claude-plugin/marketplace.json`、ZCode 中令牌如何提供仍是待验证项。 |
 
 ## 发现与对步骤二的影响

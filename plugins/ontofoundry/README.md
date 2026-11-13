@@ -1,6 +1,6 @@
 # OntoFoundry 插件
 
-让外部智能体（Claude Code、ZCode、opencode）在回答业务数据问题前读取 OntoFoundry 已发布的本体定义，并把用户对口径的纠正记录回平台。插件不含本地工具代码，工具全部来自 OntoFoundry 的 MCP 接口；业务取数仍用客户端自己的查询工具。
+让外部智能体（Claude Code、ZCode、opencode、Codex）在回答业务数据问题前读取 OntoFoundry 已发布的本体定义，并把用户对口径的纠正记录回平台。插件不含本地工具代码，工具全部来自 OntoFoundry 的 MCP 接口；业务取数仍用客户端自己的查询工具。
 
 内容：
 
@@ -49,6 +49,19 @@ opencode 不读取插件包，分别配置 Skill 和 MCP：
 ```
 
 然后在环境变量 `ONTOFOUNDRY_TOKEN` 中设置令牌。
+
+## Codex
+
+Codex 不读取插件包，分别配置 Skill 和 MCP：
+
+1. 把 `skills/ontology-grounding` 复制或链接到项目的 `.agents/skills/`（Codex 从当前目录向上到仓库根目录查找）；个人全局使用时放在 `~/.agents/skills/`。
+2. 在 `~/.codex/config.toml` 中加入，并在环境变量 `ONTOFOUNDRY_TOKEN` 中设置令牌：
+
+```toml
+[mcp_servers.ontofoundry]
+url = "https://<平台域名>/api/v1/ontology/mcp"
+bearer_token_env_var = "ONTOFOUNDRY_TOKEN"
+```
 
 ## 更新
 
