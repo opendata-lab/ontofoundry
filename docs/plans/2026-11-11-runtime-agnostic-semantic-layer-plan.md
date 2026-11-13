@@ -42,7 +42,7 @@
 1. **个人令牌与调用记录表**：`db_models.py` 新增令牌表和调用记录表，同一个 Alembic 迁移；`services/personal_tokens.py` 负责签发（生成 `ofpat.` 令牌、保存 SHA-256 摘要）、列表、撤销和校验；`api/auth.py` 新增 `/api/v1/auth/tokens` 三个接口（`current_principal`）和网关鉴权依赖 `gateway_principal`；`contracts/` 新增令牌请求与响应模型。
 2. **网关**：从 `api/mcp.py` 抽出 JSON-RPC 处理（协议协商、请求头校验、工具结果与错误封装），单空间入口改为调用它且行为不变；新增 `api/ontology_gateway.py` 注册 `/api/v1/ontology/mcp` 与三个工具。工具入参模型放在 `services/ontology_gateway.py`，`tools/list` 由模型生成 JSON Schema。
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
-4. **调用记录**：按设计第 6 节在 `tools/call` 结束后写一行记录，写入失败只记错误日志，不影响工具返回。
+4. **调用记录**：按设计第 6 节，鉴权后执行工具前插入 `started` 行并单独提交，返回后更新同一行；记录写入失败只记错误日志，不影响工具返回。
 5. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`，覆盖第 4 节验收中可自动化的场景；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
 6. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
@@ -60,7 +60,7 @@
 | 移出空间 | 该空间从目录和默认检索消失；旧游标返回 `cursor_invalid` | 是 |
 | 检索超限 | 11 个空间返回 `workspace_count`；合计超过预算返回 `response_size`；均无部分结果 | 是 |
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
-| 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、错误码和消息齐全；完整返回与客户端收到的一致；不含令牌和游标原文 | 是 |
+| 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、错误码和消息齐全；完整返回与客户端收到的一致；工具执行中抛出未处理异常时该行停在 `started`；鉴权失败不写入；不含令牌和游标原文 | 是 |
 | 单空间入口与 DataAgent | 现有测试通过；DataAgent 原配置联通，建模运行版本固定不变 | 测试 + 联验 |
 | 插件安装 | Claude Code、ZCode 按仓库名安装插件后可调用网关；opencode 按 README 配置后可用同一 Skill | 联验 |
 | 只装插件（MCP 和 Skill） | 能查到净销售额定义、固定条件、映射和版本，回答区分口径与数值 | 联验 |
