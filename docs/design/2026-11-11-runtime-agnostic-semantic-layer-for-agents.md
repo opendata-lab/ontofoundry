@@ -1,127 +1,60 @@
-# 面向外部智能体（zcode 等）的运行时无关本体语义层设计
+# 外部智能体接入本体语义层设计
 
-日期：2026-11-11。状态：草案待审。来源：针对外部编程与分析智能体（zcode、Cursor、Claude Code 等）消费本体语义、反馈纠偏、多空间路由与语义/接口版本演进的需求整理。
+日期：2026-11-11，2026-11-12 修订。状态：首版已确认（SL-01～SL-06、SL-09），第 11 节为未确认的后续方向。来源：外部编程与分析智能体（Claude Code、zcode 等）读取 OntoFoundry 本体语义的需求。
 
-2026-11-12 已确认首版要求：兼容已有单空间 MCP 配置，提供个人访问令牌、工作空间目录和跨空间语义查询。试点用户可先通过现有成员管理获授一个空间。其余细节按决定表状态执行。
+实施步骤和验收见[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)。
 
-## 1. 背景与核心问题
+## 1. 背景
 
-OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除数据孤岛与理解分歧。目前平台已具备内部建模与问数能力（通过 DataAgent 与单空间固定令牌 MCP）。随着业务发展，用户提出在外部通用编码与分析智能体（如 zcode、Cursor 等）中直接消费 OntoFoundry 本体语义的需求。
+DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部署时配置的固定令牌（[固定 MCP 令牌](2026-10-22-fixed-mcp-token.md)）。外部智能体直接沿用这套方式有三个问题：
 
-在将平台打造为**运行时无关（Runtime-Agnostic）的通用本体语义层**时，面临以下 5 个核心问题：
+1. **配置随空间增加**：每个空间一个地址，用户跨采购、销售等多个空间提问时要为每个空间配置一个 MCP 服务。
+2. **调用者身份不可追溯**：固定令牌以空间最早加入的管理员身份读取，所有调用方共用一个身份，也拿到管理员可见的映射。
+3. **固定令牌不能给个人**：它是部署级凭据，持有者可读任一已知空间。
 
-1. **多空间与跨领域接入**：平台按工作空间（Workspace）进行业务隔离。若用户需要跨财务、采购、销售多个领域知识，如果采用“每空间配一个 MCP 服务”，会导致外部智能体配置爆炸、工具列表污染，且无法进行跨领域概念关联。
-2. **使用指引与插件化封装（MCP + Skill）**：外部智能体仅有 MCP 裸工具容易产生幻觉或凭直觉构造非法查询；需要通过 Skill/Plugin 提供标准化语义对齐（Semantic Grounding）工作流与调用规约。
-3. **知识闭环与纠偏回流**：用户在智能体对话中纠正的指标口径与实体定义，不能直接原地修改生产本体（避免企业全局 Single Source of Truth 遭到污染），但又必须有自动化回流机制，形成“使用-发现问题-反馈-审阅-合并”的闭环。
-4. **身份认证、权限归因与认知负荷**：平台支持 OAuth 登录。现有外部固定 MCP 令牌（`fixed-mcp-token.md`）是以空间最早管理员身份代读，无法归因调用者；若要求用户为每个空间分别申请并配置独立的 Bearer Token，用户认知负担过重。
-5. **接口演进与语义版本防漂移（重点）**：平台的 MCP 契约与各空间的本体语义、指标口径会持续迭代更新。代码接口报错尚可 Fast-fail，但**语义口径更新若未及时同步，会导致智能体“一本正经地算出错误口径的业务数据”**。必须具备完备的版本标识、废弃提示、缓存失效与错误自愈协议。
+首版解决读取和反馈：外部智能体用个人身份查到已发布的语义定义和授权可见的映射，业务取数仍由已有查询平台按调用者权限执行；用户指出错误或提出建议时，智能体把用户原话和自己整理的说明记录到平台，空间管理员在平台查看。
 
----
-
-## 2. 行业调研与同类产品对标分析
-
-随着现代数据栈与大模型智能体生态的演进，独立语义层（Headless Semantic Layer）与业务本体（Operational Ontology）正在快速演进。以下为调研摘要，产品描述未逐条附来源，引用前需核对官方文档。业界大致可分为四类：
-
-### 2.1 业界四类产品
-
-#### 1. 工业级本体与操作中枢派
-* **Palantir Foundry (AIP Logic & Foundry Actions & Ontology MCP)**：工业级企业本体的代表产品。
-  * **现实路线**：Palantir 在企业中常通过 **Data Connectors + External Webhooks + TypeScript Functions** 接入业务系统（未核实来源）。
-  * **状态与动作**：实体属性支持由外部 REST API 实时填充（Hydration），实体上绑定的业务动作（Actions，如退款、封控）直接映射为业务系统的 API/Webhook。近期推出 **Ontology MCP Hub**，外部服务可通过 MCP 直接挂接为本体能力。
-* **C3.ai (C3 Type System - 模型驱动架构)**：企业级 AI 软件独角兽。
-  * **核心技术**：C3 Type System 将业务类型（如 `Customer`、`SmartMeter`）彻底与底层存储解耦。属性可以声明来自关系数据库、时序库、或者业务系统的 REST API。由平台联邦执行引擎自动分发调度。
-* **Celonis (Process Intelligence Graph - 业务流程本体)**：全球流程挖掘与业务治理龙头。
-  * 业务系统（SAP、Salesforce）不提供数据库直连。Celonis 纯靠 API 抽取业务事件与对象，构建统一业务流程本体，并在其上触发跨系统业务操作（Action Engine）。
-
-#### 2. 指标驱动型现代语义层（Metric-Centric / Headless BI）
-* **Cube (Cube.js)**：开源界最成熟的通用独立语义层。以多维模型（Cubes/Dimensions/Measures）为核心，提供统一的 SQL API / REST API / GraphQL，近期也在发力向 LLM 提供上下文。
-* **dbt Semantic Layer (MetricFlow)**：指标即代码（Metrics-as-Code），支持编译多表关联为目标 SQL 方言下推。
-* **Kyligence Zen**：国内团队出品的指标平台，主打指标目录与 AI Copilot 问数。
-* **核心局限**：**纯 SQL 与纯数仓思维**。假设所有数据都已存在于数据表中；一旦业务系统不开放数据库权限，便无法处理。缺乏实体关系图谱与定性文档事实。
-
-#### 3. API 联邦与统一数据网格派（技术驱动的统一数据层）
-* **Hasura DDN (Data Delivery Network / Native Data Connector)**：突破了早年只连 Postgres 的限制，通过 NDC 连接器允许把数据库与**业务微服务的 REST API / Python 服务**同时注册为数据源，在毫秒内跨库跨 API 拼装返回。
-* **Apollo Federation (GraphQL Supergraph)**：硅谷大厂（Netflix、Expedia）解决微服务 API 割裂的标准架构。以 Entity 为核心将各子系统 API 拼成超级图谱。
-* **核心局限**：偏向纯程序员视角的 API 编排网关，**没有业务指标（Metrics）定义、没有本体知识事实、缺乏面向大模型的 MCP 语义支持**。
-
-#### 4. 面向 Agent 的工具路由派（Agent-Native Tool & Action Hub）
-* **Composio (composio.dev)**：Agent 工具集成平台，封装了 250+ SaaS 系统的 API 并转为 Agent Tool / MCP Server。
-* **核心局限**：**空有四肢、缺乏大脑**。Composio 只有离散的工具（`create_jira_issue`、`get_salesforce_contact`），但缺乏“业务概念拓扑与实体关系（Ontology）”，智能体无法理解深层业务上下文和跨系统关联。
-
-### 2.2 核心现实：长期来看 API / MCP 是更常态化的场景
-
-企业架构的客观现实决定了：**不会有业务系统愿意直接向外部 Agent 开放数据库**。
-1. **微服务封装原则（Database-per-Service）**：数据库属于系统私有实现细节，越权读库直接破坏微服务自治；
-2. **安全与合规审计**：直连数据库直接绕过应用层的动态脱敏、行级权限控制与审计日志，且存在大查询锁表（Deadlock）打垮生产事务的致命风险；
-3. **接口契约稳定性**：底层表结构随时重构，但官方对外暴露的 API / MCP 具备严格的语义版本控制（SemVer）。
-
-据此提出 SL-14：以 API 与 MCP 工具为常态来源、数仓表为大吞吐后备。该方向待评审，并与决定 #37（删除业务动作）及“执行细节不进入模型”的产品原则相关，需单独设计。
-
-### 2.3 横向对比矩阵
-
-| 产品 / 阵营 | 核心数据源 | 是否支持业务 API / MCP | 核心抽象维度 | 是否具备闭环修改能力 | 目标受众 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Cube / dbt** | 仅限数仓/数据库 | ❌ 极弱（只能处理库表） | 纯指标、维度、SQL | Git PR 手写代码 | 数据分析师 / BI |
-| **Composio** | 仅限 API / SaaS 接口 | ✅ 极强（主打 API 变 Tool） | 仅提供离散的函数工具 | ❌ 无模型，只有工具 | AI Agent 开发者 |
-| **Hasura DDN** | 数据库 + 微服务 API | ✅ 支持自定义 API | 实体关系图（GraphQL Schema） | 代码配置 | 后端架构师 / 全栈 |
-| **Palantir Foundry** | 数据库 + API + Webhook | ✅ 完善（Action + MCP） | **全域本体（实体/关系/指标/动作）** | 平台内分支审批流 | 顶级跨国企业 / 政府 |
-| **OntoFoundry (我们)** | **数仓表 + 业务 API / 外部 MCP** | **✅ 核心常态（API/MCP First）** | **业务本体语义 + 知识事实 + 指标** | **查/修/馈/环：自愈闭环** | **业务智能体 / 平台开发者** |
-
-### 2.4 OntoFoundry 的差异化破局点
-
-比起传统纯指标工具或离散工具平台，OntoFoundry 的目标差异点有三项：
-1. **全域业务认知大脑（Ontology Brain）**：不同于 Composio 的离散工具堆砌，我们提供统一的实体概念网络、关系图谱与计算指标，赋予 Agent 结构化的业务认知；
-2. **多模态混合源绑定（Hybrid Hydration）**：解耦底层物理细节，同一个实体，基础属性可走数仓表，实时状态可走业务 API/MCP；
-3. **“查、修、馈、环”自愈闭环**：不仅对 Agent 开放只读查询，更通过结构化变更提案（修）与业务争议提报（馈），结合原子化校验与版本发布，实现本体资产的持续演进沉淀。
-
----
-
-## 3. 已确认决定
+## 2. 已确认决定
 
 | 编号 | 决定 | 状态 |
 |---|---|---|
-| SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议继续有效。首版新增 `/api/v1/ontology/mcp`，提供空间目录、跨空间语义检索和定义读取。两个入口共用现有本体读取服务。 | 首版能力及工具契约见第 7.1 节 |
-| SL-02 | **个人访问令牌（PAT）**：网关使用绑定用户的个人令牌，每次调用按当前空间成员关系和令牌权限范围授权。`ontology:read` 用于读取语义，返回物理映射还需 `mappings:read`。试点用户可只加入一个工作空间。首版建议复用现有登录会话签发、查看元数据和撤销。来源为现有本体读权限与常见个人访问令牌机制，属于接入鉴权。 | 个人令牌及读权限边界已确认，管理界面细节待评审 |
+| SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议不变。新增 `/api/v1/ontology/mcp`，提供 `list_spaces`、`search_ontology`、`get_ontology` 三个只读工具（支持跨空间检索），以及只写入反馈记录的 `submit_feedback`（SL-04）。网关不执行业务数据查询，不提供实例与文档事实工具。两个入口共用现有本体读取服务。来源：现有 MCP；属于接入方式，不进入本体模型。 | 2026-11-12 用户确认 |
+| SL-02 | **个人访问令牌（PAT）**：网关只接受绑定用户的个人令牌，每次调用按该用户当前的空间成员关系和令牌权限授权。权限必含 `ontology:read`，可选 `mappings:read`（返回物理映射和 SQL 参考），签发后可增减可选权限。令牌不过期，用户可随时撤销。用户登录后在“个人中心 → 个人令牌”中自行签发、查看、修改权限和撤销；登录方式见[平台登录](2026-11-12-platform-login.md)。来源：常见个人访问令牌机制；属于接入鉴权。 | 2026-11-12 用户确认；不过期 2026-11-12 用户确认 |
+| SL-03 | **网关调用记录**：每次工具调用在数据库存一条记录：调用者、令牌、工具、读取的空间及其版本、调用参数、完整返回内容、结果状态与错误、耗时，另有扩展字段；只原样记录请求和返回，服务端不另行加工统计。不存令牌。用于审计、改进工具，并为日后把外部提问转成建模输入（第 11 节 SL-15）保留素材。来源：固定令牌无法追溯调用者的缺口；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认；入库、字段及保存完整返回 2026-11-12 用户确认 |
+| SL-04 | **反馈记录**：用户在外部智能体中纠正错误或提出建议时，智能体按 Skill 调用 `submit_feedback`，记录用户原话和智能体生成的说明，归属到相关空间。首版只记录，不做状态流转、不改本体、不生成提案；该空间管理员在左侧菜单“管理中心 → 用户反馈”查看。来源：外部使用中发现的口径问题需要回到建模者手中；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认 |
+| SL-05 | **结果附带版本元数据**：每个工具结果的 `_meta` 中加入 `io.github.opendata-lab.ontofoundry/versions`，列出本次涉及的每个空间的 `workspace_id`、`version_id`、`version_number`。结果正文仍保留 `workspace_id`、`version_id`，因为 MCP 规范没有规定客户端是否把 `_meta` 交给模型。来源：MCP 规范的 `_meta` 字段（键名按反向域名前缀）；属于接口元数据，不进入本体模型。 | 2026-11-12 用户确认 |
+| SL-06 | **Skill 本地缓存**：Skill 把读取到的定义按空间和 `version_id` 缓存在本地，每个问题开始时用一次 `list_spaces` 核对版本，未变化时直接用缓存，变化时才重新读取，减少调用次数。服务端不新增条件读取接口。来源：已发布版本不可变；属于客户端行为，不进入本体模型。 | 2026-11-12 用户确认 |
+| SL-09 | **客户端插件**：仓库根目录新建 `plugins/ontofoundry/`，采用 Claude Code 插件格式（ZCode 兼容读取），包含网关 MCP 配置和外部 Skill；仓库根目录的 `.claude-plugin/marketplace.json` 列出该插件，用户按仓库名添加。opencode 没有插件包格式，直接使用同一个 Skill 目录并按说明配置 MCP。`integrations/dataagent` 保持不变。来源：Claude Code 与 ZCode 的插件规范、Agent Skills 格式；属于客户端分发，不进入本体模型。 | 2026-11-12 用户确认 |
 
-### 3.1 待评审提案
+**与固定令牌设计的关系**：[MT-03](2026-10-22-fixed-mcp-token.md) 规定外部访问只用固定令牌，并删除了按空间签发的服务令牌。SL-02 修订这一点：用户网关使用个人令牌。两者用途不同：固定令牌和建模运行凭据供 DataAgent 在单空间入口使用；个人令牌绑定一个用户，只用于网关，权限不超过该用户的成员身份。单空间入口仍只接受固定令牌、建模运行凭据和登录会话。
 
-以下提案尚未确认，不在首版实施范围。按 AGENTS.md，新增字段或模式（如 SL-07 的废弃字段、SL-13/SL-14 的接口来源与业务动作）在评审时需说明来源、属于语义还是执行优化、删掉会失去什么，以及已有结构能否表达。SL-13、SL-14 涉及业务动作，与决定 #37 冲突。
+## 3. 首版范围
 
-| 编号 | 提案 | 状态 |
-|---|---|---|
-| SL-03 | **网关调用归因**：建议记录用户 ID、令牌 ID、涉及的工作空间、工具名、结果和请求 ID。后续反馈与变更提案以服务端解析的调用者为提交人。 | 待评审 |
-| SL-04 | **两阶段知识回流（反馈闭环）**：智能体通过 MCP 工具 `submit_ontology_feedback` 提交轻量业务反馈或争议，在平台生成“待审反馈/工单”，由空间管理员或建模人员在 Web 控制台确认合并；严禁外部 Agent 直接非受控覆盖生产本体。 | 待评审 |
-| SL-05 | **空间语义版本标识**：沿用已发布版本记录的 `version_id` 与递增的 `version_number`，每次发布产生新版本，不另建语义版本号或指纹。MCP 响应统一附带元数据 `_meta: { workspace_id, version_id, version_number }`。 | 待评审 |
-| SL-06 | **条件查询与缓存失效（ETag 协议）**：MCP 核心探查工具支持 `if_version_matches`。未变化返回轻量 `NOT_MODIFIED` 节省上下文 Token；已变化返回最新子图与变更摘要，强制智能体刷新认知。 | 待评审 |
-| SL-07 | **软废弃元数据与迁移警示（Deprecation Metadata）**：实体与指标支持 `deprecated`、`deprecation_reason`、`superseded_by`。对已废弃对象的调用正常响应但附带警告，Skill 强制 Agent 主动提示用户迁移至新口径。 | 待评审 |
-| SL-08 | **接口增量演进与自愈错误契约**：MCP 工具采用向后兼容的增量变更；发生语义漂移或不兼容变更时，后端返回带 `SEMANTIC_VERSION_DRIFT` 的业务错误，内嵌 `suggested_action` 指引 Agent 自主重新拉取最新图谱自愈。 | 待评审 |
-| SL-09 | **标准插件封装（OntoFoundry Plugin for Agents）**：将 MCP 服务声明、Semantic Grounding 核心 Skill 与 Rules 打包为通用 Plugin 规范（支持 zcode、Cursor、Claude Code 等），固化“先查本体 -> 消歧对齐 -> 构造查询 -> 异常反馈”的行为规约。 | 待评审 |
-| SL-10 | **语义交接与业务数据执行**：首版建议由网关提供已发布的语义与授权可见的物理映射，Agent 将确认后的口径交给已有查询平台执行。查询平台独立校验调用者的数据权限。查询编译与委派接口按后续需求评审。 | 待评审 |
-| SL-11 | **预置插件斜杠命令（Slash Commands）**：在 Plugin 中预置 `/onto-search`、`/onto-metric`、`/onto-sync`、`/onto-propose`、`/onto-feedback`、`/onto-spaces` 等快捷命令，降低用户认知成本，提供高频、确定性的交互通道。 | 待评审 |
-| SL-12 | **结构化语义修改提案（Propose Semantic Mutations）**：面向有权限的开发与建模智能体，开放结构化变更工具 `propose_ontology_mutation`，支持直接提交实体、属性、度量或绑定的创建与修改，复用平台已有的提案原子化检查（`parse_agent` / `trial_apply`），实现“语义能修”。 | 待评审 |
-| SL-13 | **多源语义绑定与业务应用 MCP 桥接（Data & API & Action）**：本体底层不局限于只读数仓表，预留支持业务应用通过 API / MCP 接入作为数据与动作来源。实体属性既可绑定数据表列，也可绑定实时 API/MCP 工具返回值；未来进一步映射业务动作（Action Types），成为全域业务语义中枢。 | 待评审 |
-| SL-14 | **API 与 MCP 工具作为常态化语义源（API-First Operational Grounding）**：确立“企业应用通过 API / MCP 接入作为主要常态、数仓宽表作为离线大吞吐支撑”的架构基调。实体属性与状态支持直接绑定接口返回值，彻底摆脱传统语义层“必须直连底层数据库”的硬性约束。 | 待评审 |
+| 包含 | 不包含（见第 11 节） |
+|---|---|
+| 个人中心（个人信息、个人令牌）与令牌接口（签发、列表、修改权限、撤销） | MCP 客户端浏览器授权（SL-16，首版之后实施） |
+| 网关的三个只读工具，跨空间检索 | 实例、文档事实、实体解析工具；业务数据查询 |
+| 调用记录表 | 调用记录的查询界面、清理策略、转为建模会话 |
+| 反馈工具、反馈表、空间管理员查看反馈 | 反馈的状态、回复、通知，转为提案或建模会话 |
+| 客户端插件（Claude Code、ZCode）及外部 Skill（opencode 直接使用） | 斜杠命令、命令与子智能体 |
+| 沿用已发布版本的 `version_id`；Skill 按版本本地缓存 | 服务端条件读取、版本差异摘要、变更提案 |
 
----
+## 4. 接入与鉴权
 
-## 4. 多空间接入与认证架构（SL-01、SL-02、SL-03）
+### 4.1 两个入口
 
-### 4.1 接入与兼容
-
-| 入口 | 地址 | 凭据 | 适用场景 |
+| 入口 | 地址 | 接受的凭据 | 用途 |
 |---|---|---|---|
-| 已有单空间 MCP | `/api/v1/ontology/workspaces/{workspace_id}/mcp`，每个工作空间各有一个地址 | 沿用固定令牌、建模运行凭据及现有会话鉴权 | DataAgent、建模运行、已有客户端配置 |
-| 新增用户 MCP 网关 | `/api/v1/ontology/mcp` | `Authorization: Bearer <个人访问令牌>` | zcode、Claude Code 等用户接入 |
+| 单空间 MCP（已有） | `/api/v1/ontology/workspaces/{workspace_id}/mcp` | 固定令牌、建模运行凭据（`ofrun.`）、登录会话 | DataAgent、建模运行、已有客户端 |
+| 用户网关（新增） | `/api/v1/ontology/mcp` | 个人令牌（`ofpat.`） | Claude Code、zcode 等个人客户端 |
 
-两个入口都使用现有的 HTTP API 版本前缀 `/api/v1`。MCP 协议版本由客户端与服务端协商，本体发布版本由响应中的 `version_id` 标识。
+凭据按入口隔离：单空间入口遇到个人令牌返回“本体令牌无效”（现有逻辑对未知令牌即如此）；网关拒绝固定令牌、建模运行凭据和登录会话；管理接口沿用现有规则，拒绝任何 `Authorization` 头，因此个人令牌不能用来签发令牌。
 
-已有客户端继续使用原配置。新用户配置一次网关，可通过 `list_spaces` 列出成员空间，再按第 7.1 节检索和读取定义。
+协议处理与单空间入口相同（MCP 2026-07-28 请求级 HTTP JSON，兼容旧版 `initialize`），两者共用一个 JSON-RPC 处理层，各自注册工具和鉴权依赖。
 
-例如用户起初只加入虚构星港采购空间，目录和跨空间搜索只返回采购空间；加入虚构星港销售空间后，原令牌和地址可同时查两个空间。网关每次按当前成员关系授权，对显式请求的未授权空间返回统一的空间不可访问错误。
+令牌只写在客户端的 MCP 配置里，由客户端作为 `Authorization` 请求头发送，不在对话中输入，模型看不到令牌。配置中通过环境变量或插件的敏感设置引用令牌，不直接写入明文。
 
-新网关只接受 PAT，旧入口的固定令牌和建模运行凭据继续使用原有鉴权。PAT 首版只用于网关，由现有平台登录身份管理生命周期。
-
-### 4.2 HTTP MCP 配置示例
+客户端配置示例（Claude Code，令牌放在环境变量 `ONTOFOUNDRY_TOKEN`）：
 
 ```json
 {
@@ -129,291 +62,284 @@ OntoFoundry 核心模型表达业务语义，通过统一的语义基座消除�
     "ontofoundry": {
       "type": "http",
       "url": "https://ontofoundry.example.com/api/v1/ontology/mcp",
-      "headers": {
-        "Authorization": "Bearer <个人访问令牌>"
-      }
+      "headers": { "Authorization": "Bearer ${ONTOFOUNDRY_TOKEN}" }
     }
   }
 }
 ```
 
----
+### 4.2 个人令牌
 
-## 5. 语义版本化与防漂移协议（SL-05、SL-06、SL-07、SL-08）
+| 项 | 规定 |
+|---|---|
+| 格式 | `ofpat.` 加 32 字节随机数的 base64url 编码，签发响应中只出现一次 |
+| 存储 | 见第 4.4 节；只保存令牌的 SHA-256 摘要，不保存明文 |
+| 权限 | `ontology:read`（读取语义）必选且不可去掉，`mappings:read`（读取映射）可选，签发后可增减；`instances:read` 不提供，网关没有实例工具。修改在下一次调用生效，旧游标随之失效 |
+| 有效期 | 不过期；撤销后立即失效 |
+| 接口与页面 | 见第 4.4、4.5 节；均要求登录会话，只能管理本人令牌 |
+| 校验 | 按摘要查找未撤销的令牌，更新最近使用时间，生成该用户的身份 |
 
-### 5.1 语义版本标识
+网关身份沿用现有 `Principal`：用户为令牌所属用户，`service_token_id` 为 `pat:<令牌 ID>`，`scopes` 为令牌权限，不绑定空间。现有读取服务据此裁剪物理投影（`can_read_mappings` 对带 `service_token_id` 的身份检查 `mappings:read`），游标的授权指纹也包含令牌 ID 和范围，所以不同令牌的游标不能混用。
 
-沿用已发布版本记录的 `version_id` 与递增的 `version_number`（见 `OntologyVersionRecord`），不另建语义版本号或指纹：
-* 变更触发源：发布。实体、属性、关系、规则、指标或数据集绑定的修改在发布后才产生新版本。
-* 元数据注入：所有 MCP 工具返回的数据均外覆 `_meta` 对象：
-  ```json
-  {
-    "_meta": {
-      "workspace_id": "ws_demo_procure",
-      "version_id": "ver_demo_013",
-      "version_number": 13,
-      "updated_at": "2026-11-11T10:30:00Z"
-    },
-    "result": { ... }
-  }
-  ```
+### 4.3 成员检查
 
-### 5.2 条件查询与 ETag 协议（SL-06）
+现有单空间读取对非成员也返回已发布的语义定义（`get_ontology`、`search_ontology` 本身不要求成员身份）。网关不沿用这一点：每次调用、每次翻页前，网关先确认用户当前是目标空间成员，再调用读取服务。用户被移出空间后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
 
-为解决 Agent 长时间运行上下文缓存陈旧、频繁拉取整图浪费 Token 的问题：
+### 4.4 数据表
 
-* **请求格式**：
-  ```json
-  {
-    "tool": "get_entity_subgraph",
-    "parameters": {
-      "workspace_id": "ws_demo_procure",
-      "entity_name": "PurchaseOrder",
-      "if_version_matches": "ver_demo_013"
-    }
-  }
-  ```
-* **响应情况 A：未发生变更（304 Not Modified）**：
-  ```json
-  {
-    "_meta": { "workspace_id": "ws_demo_procure", "version_id": "ver_demo_013", "status": "NOT_MODIFIED" },
-    "message": "本体语义无变化，可继续沿用本地上下文"
-  }
-  ```
-* **响应情况 B：已发生变更（强制刷新）**：
-  ```json
-  {
-    "_meta": { "workspace_id": "ws_demo_procure", "version_id": "ver_demo_014", "status": "UPDATED" },
-    "changelog_since_last": [
-      "Property [tax_amount] added to [PurchaseOrder]",
-      "Metric [net_procure_amount] formula updated"
-    ],
-    "subgraph": { ... }
-  }
-  ```
+三张新表在同一个 Alembic 迁移中创建，均不修改已有表。类型沿用现有表的写法：ID 为 `String(36)`，时间为 `DateTime(timezone=True)`，结构化内容为 `JSON`。
 
-### 5.3 软废弃元数据（SL-07）
+`personal_access_tokens`
 
-指标和属性支持软废弃，定义结构如下：
-
-```json
-{
-  "id": "metric_procure_gmv_legacy",
-  "name": "procure_gmv_legacy",
-  "display_name": "采购总额（旧口径）",
-  "deprecated": true,
-  "deprecation_reason": "未剔除折让与退款，口径已废弃",
-  "superseded_by": "net_procure_amount",
-  "sunset_date": "2026-12-31"
-}
-```
-
-当 Agent 请求涉及此度量时，MCP 返回并在响应中注入警告 `warnings: [{ code: "DEPRECATED_METRIC", ... }]`，Skill 指引 Agent 主动告知用户。
-
-### 5.4 自愈错误契约（SL-08）
-
-当 Agent 发起的操作引用的实体、属性或关系已不存在或口径发生冲突时，后端返回 `ServiceError`（英文 `code`、中文 `message`）。`workspace_id`、`current_version_id`、`suggested_action`、`can_self_heal` 为新增的错误详情字段，需随契约一起评审：
-
-```json
-{
-  "error": {
-    "code": "SEMANTIC_VERSION_DRIFT",
-    "message": "属性 [PurchaseOrder.status_code] 已在第 14 版中迁移至 [PurchaseOrder.order_status]",
-    "workspace_id": "ws_demo_procure",
-    "current_version_id": "ver_demo_014",
-    "suggested_action": "调用 get_entity_subgraph('PurchaseOrder') 重新同步最新定义并重新生成查询",
-    "can_self_heal": true
-  }
-}
-```
-
----
-
-## 6. 语义管理闭环架构：查、修、馈、环（SL-04、SL-12）
-
-要实现“持续沉淀、修正语义”，系统必须打通**“语义能查（知）”、“语义能修（改）”、“能提交反馈（馈）”、“持续自愈演进（环）”**四大支柱，形成完整的资产演进生命周期。
-
-### 6.1 闭环全景流程
-
-```mermaid
-flowchart TD
-    subgraph Client [外部智能体 / 开发者 IDE (zcode)]
-        U[用户提出业务需求 / 写代码 / 做分析] --> Q[1. 查: 检索权威本体概念与口径]
-        Q --> Dev[开发与查询执行]
-        Dev -->|发现缺少定义或口径过时| Decide{用户角色与诉求}
-        Decide -->|建模者/开发者: 明确结构变更| M[2. 修: 提交结构化语义修改提案]
-        Decide -->|业务分析师: 提出口径争议/疑问| F[3. 馈: 提交非结构化问题反馈]
-    end
-
-    subgraph Platform [OntoFoundry 语义治理平台]
-        M -->|原子化校验 pass| PB[生成空间待合并提案批次]
-        F --> FB[生成语义反馈待核实工单]
-        FB --> RevGov[建模师核实并转化为标准提案]
-        RevGov --> PB
-        PB --> WebRev[Web 控制台审阅看板: 变更 Diff 与冲突比对]
-        WebRev -->|管理员核准合并| Merge[发布新版本 & 写入生产本体]
-        Merge --> Bump[4. 环: 生成新的发布版本 version_id]
-    end
-
-    Bump -.->|下一次请求带最新 version_id / ETag 失效| Q
-    Bump -.->|/onto-sync 强制刷新| Q
-```
-
----
-
-### 6.2 语义能查（知）：语义服务与按需探查
-
-* **核心目标**：提供只读的语义基座服务，消除物理表与业务术语之间的鸿沟，防止外部 Agent 臆造库表字段。
-* **工具支持**：
-  * `list_spaces`：按当前 PAT 用户权限展示空间目录与各空间当前 `version_id`。
-  * `search_ontology`：基于 BM25 / 向量的多空间概念全文检索。
-  * `get_entity_subgraph`：获取指定实体及其 1 度/2 度关系子图，带绑定物理表投影，支持 `if_version_matches` 条件 ETag。
-  * `resolve_metric`：精确解析指标口径公式、默认过滤条件、聚合基数与物理列映射。
-
----
-
-### 6.3 语义能修（改）：结构化语义变更提案（SL-12）
-
-当开发者在 zcode 中编写业务逻辑，发现“采购订单实体缺少 `tax_rate` 属性”，或“净采购额指标公式需要更新”时，**具备空间编辑权限的 Agent 可以直接调用结构化修改工具**：
-
-* **工具定义：`propose_ontology_mutation`**
-  * **入参**：
-    * `workspace_id`: 目标空间；
-    * `action`: `create` | `update` | `deprecate` | `delete`；
-    * `target_kind`: `object_type` | `property` | `link_type` | `metric` | `dataset_binding`；
-    * `target_name`: 概念英文标识（如 `net_procure_amount`）；
-    * `payload`: 结构化定义（如指标的聚合表达式、属性的物理列映射）；
-    * `rationale`: 修改理由与业务依据。
-  * **后端处理机制**：
-    1. 后端直接复用平台现有的**提案检查与原子化校验引擎（`parse_agent` / `trial_apply`）**，当场检查语法、类型兼容性、来源物理列是否存在。
-    2. 校验通过后，在空间内生成一个待合并的提案批次（Proposal Batch），附带提交人 `created_by=user_id` 与客户端来源 `source=zcode`。
-    3. 提案一律进入待审池，空间管理员提交的提案同样经平台审阅后合并，不绕过审阅。
-
----
-
-### 6.4 能提交反馈（馈）：轻量业务反馈与争议上报（SL-04）
-
-面向普通业务分析师或只读用户，当其不具备建模权限，或仅发现“计算出来的结果不对、退款没有扣除”但不知道底层表结构如何修改时：
-
-* **工具定义：`submit_ontology_feedback`**
-  * **入参**：
-    * `workspace_id`: 涉及空间；
-    * `target_concept`: 存疑的概念或指标（如 `GMV`）；
-    * `issue_category`: `formula_dispute`（口径争议） | `missing_concept`（缺少概念） | `definition_unclear`（定义不清）；
-    * `description`: 用户自然语言描述（“财务口径要求从本月起排除未付款订单”）；
-    * `dialogue_context`: 产生争议时的上下文对话与数据证据。
-  * **后端处理机制**：
-    * 写入 `agent_feedbacks` 待办工单库。
-    * 平台在 Web 审阅看板中展示，空间管理人员核对后，可**一键将反馈转为标准修改提案（Proposal）**，进入合并流程。
-
----
-
-### 6.5 持续沉淀与自愈闭环（环）
-
-1. **发布新版本**：无论是通过“修（提案）”还是“馈（反馈转提案）”，一旦管理员在平台审阅通过并合并，发布产生新的 `version_id`，`version_number` 递增。
-2. **外部感知与即时自愈**：
-   * **隐式自愈**：外部智能体下次发起查询时，若传入了旧的 `if_version_matches`，平台返回 `UPDATED` 及最新变更摘要，Agent 静默刷新上下文；若调用了已删除/废弃的概念，平台返回 `SEMANTIC_VERSION_DRIFT` 指引 Agent 自愈重新拉图。
-   * **显式刷新**：用户在 zcode 敲 `/onto-sync`，立即强制拉取空间最新发布版本与变更记录。
-3. **资产持续沉淀**：
-   * 外部 Agent 不再是一个单纯的“消费者”，而是成为了语义建设的**“触角与输入源”**。每一次编码纠错、每一次问数争议，都在丰富和纠正平台的全局本体，越用越准。
-
----
-
-## 7. 用户 MCP 网关工具契约
-
-### 7.1 首版只读工具
-
-网关校验 PAT 的有效性和 `ontology:read`，并在每次检索、读取和翻页时检查目标空间的当前成员关系。鉴权上下文向读取服务和游标校验传递用户 ID、令牌 ID 和权限范围。`search_ontology` 和 `get_ontology` 都按 `mappings:read` 裁剪物理投影。只有 `ontology:read` 的令牌可获取语义定义，物理表列映射和 SQL 参考随投影省略。业务取数由已有查询平台按调用者的数据权限执行。
-
-| 工具 | 首版入参 | 首版行为 |
+| 列 | 类型 | 说明 |
 |---|---|---|
-| `list_spaces` | 无 | 列出调用者当前加入的空间，返回 `workspace_id`、名称、角色和当前 `version_id`。空间尚未发布时 `version_id` 为 `null`。 |
-| `search_ontology` | `query`、可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor` | 省略 `workspace_ids` 时搜索全部成员空间，可显式选择一个或多个。显式列表中有无权或不存在的空间时，整次返回统一的空间不可访问错误。成功时按空间分组，每组带 `workspace_id`、`version_id` 和现有单空间检索结果，沿用组内排序。`limit` 按组应用。续页时保留原检索条件和 `limit`，传入该组游标和仅含该组空间 ID 的 `workspace_ids`。 |
-| `get_ontology` | `workspace_id`、`ids`、可选 `include`、`limit`、`cursor` | 按空间和元素 ID 读取已发布定义和有权限的投影。响应带 `workspace_id` 和 `version_id`，沿用现有分页和字段分段。 |
+| `id` | `String(36)` 主键 | 令牌 ID（UUID） |
+| `user_id` | `String(36)` 外键 `users.id`，索引 | 所属用户 |
+| `name` | `String(100)` | 用户填写的名称，同一用户内不要求唯一 |
+| `permissions` | `JSON` | 权限数组，必含 `ontology:read` |
+| `token_sha256` | `String(64)` 唯一 | 令牌摘要 |
+| `created_at`、`updated_at` | 带时区时间 | 创建与最近修改权限的时间 |
+| `last_used_at` | 带时区时间，可空 | 最近一次通过网关鉴权的时间 |
+| `revoked_at` | 带时区时间，可空 | 撤销时间；非空即失效 |
 
-目标空间数或汇总响应大小超出网关预算时，`search_ontology` 整次返回工具错误 `search_limit_exceeded`，并以 `reason` 区分 `workspace_count` 和 `response_size`。Agent 可调用 `list_spaces` 缩小空间范围，或在响应过大时降低每组 `limit` 后重试。错误响应不携带部分命中。该错误属于网关调用契约，用于指引重试，现有单空间游标仍用于浏览各组结果。
+`ontology_gateway_calls`（字段含义见第 6 节）
 
-### 7.2 后续待评审工具
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `id` | `String(36)` 主键 | 记录 ID |
+| `user_id`、`token_id` | `String(36)` 外键 | 调用者与令牌 |
+| `request_id` | `String(100)` | JSON-RPC 请求 ID 的字符串形式 |
+| `tool` | `String(64)` | 工具名 |
+| `workspaces`、`arguments`、`response`、`extra` | `JSON`（与现有表一致），`response`、`extra` 可空 | 见第 6 节 |
+| `outcome` | `String(16)` | `started`、`ok`、`error` |
+| `error_code` | `String(64)`，可空 | 工具错误码 |
+| `error_message` | `Text`，可空 | 错误消息 |
+| `duration_ms` | `Integer`，可空 | 耗时 |
+| `created_at` | 带时区时间 | 开始时间 |
 
-以下工具及字段为扩展提案。第 5、6、8 节中的版本协议和插件调用示例也属于待评审范围。首版 `list_spaces`、`search_ontology` 和 `get_ontology` 的契约以第 7.1 节为准。
+索引：`(user_id, created_at)`、`(created_at)`。
 
-| 工具名称 | 职责分类 | 核心参数 | 返回关键内容 |
+`ontology_feedback`（字段含义见第 7 节）
+
+| 列 | 类型 | 说明 |
+|---|---|---|
+| `id` | `String(36)` 主键 | 反馈 ID |
+| `workspace_id` | `String(36)` 外键 `workspaces.id` | 所属空间 |
+| `user_id`、`token_id` | `String(36)` 外键 | 提交者与令牌 |
+| `kind` | `String(16)` | `correction`、`suggestion` |
+| `user_text`、`agent_text` | `Text` | 用户原话、智能体说明，各不超过 4,000 字 |
+| `element_ids` | `JSON` | 相关元素 ID 数组，最多 20 个，可为空数组 |
+| `version_id` | `String(36)`，可空 | 提交时的发布版本；空间未发布时为空 |
+| `extra` | `JSON`，可空 | 扩展字段 |
+| `created_at` | 带时区时间 | 提交时间 |
+
+索引：`(workspace_id, created_at)`。
+
+### 4.5 管理接口
+
+| 接口 | 请求 | 响应 | 错误 |
 |---|---|---|---|
-| `check_space_version` | **查（知）** | `workspace_id`, `current_version_id` | 是否变化、当前版本号、变更摘要 |
-| `get_entity_subgraph` | **查（知）** | `workspace_id`, `entity_name`, `depth` (默认 1), `if_version_matches?` | 实体定义、属性清单、业务标识、直连关系、引用的数据集投影 |
-| `resolve_semantic_query` | **查（知）** | `workspace_id`, `metrics`, `dimensions`, `filters` | 编译后生成的安全 SQL、维度对齐路径、口径确认信息 |
-| `propose_ontology_mutation` | **修（改）** | `workspace_id`, `action`, `target_kind`, `target_name`, `payload`, `rationale` | 提案批次 ID (`batch_id`)、原子校验状态、审阅链接 |
-| `submit_ontology_feedback` | **馈（馈）** | `workspace_id`, `target_concept`, `issue_category`, `description`, `dialogue_context` | 反馈工单 ID (`feedback_id`)、审阅链接、状态 (`PENDING_REVIEW`) |
+| `POST /api/v1/auth/tokens` | `{"name": "办公电脑", "permissions": ["ontology:read", "mappings:read"]}` | `201`，`{"id", "name", "permissions", "created_at", "token"}`；`token` 只在此处出现 | 名称为空或超过 100 字、权限缺 `ontology:read` 或含未知值：`422` |
+| `GET /api/v1/auth/tokens` | 无 | `{"items": [{"id", "name", "permissions", "created_at", "updated_at", "last_used_at"}]}`，只列未撤销令牌，按创建时间倒序 | — |
+| `PATCH /api/v1/auth/tokens/{token_id}` | `{"permissions": [...]}` 或 `{"name": "..."}` | 更新后的令牌元数据 | 不存在、已撤销或不属于本人：`404`；权限不合法：`422` |
+| `DELETE /api/v1/auth/tokens/{token_id}` | 无 | `204` | 不存在或不属于本人：`404` |
+| `GET /api/v1/workspaces/{workspace_id}/feedback` | `cursor`、`limit`（默认 20，最多 100） | `{"items": [{"id", "created_at", "user": {"id", "display_name"}, "kind", "user_text", "agent_text", "elements": [{"id", "name", "display_name"}], "version_number"}], "next_cursor"}`；元素名按当前发布版本解析，已不存在的元素只有 `id` | 非该空间管理员：`403` |
 
----
+错误体沿用现有 `ServiceError` 约定（英文 `code`、中文 `message`）。
 
-## 8. 智能体 Skill、Plugin 与斜杠命令规约（SL-09、SL-11）
+### 4.6 个人中心
 
-面向 zcode 等智能体的插件包包含：
-1. `plugin.json`：注册 MCP 服务地址、认证引导与能力描述。
-2. `skills/semantic-grounding/SKILL.md`：定义语义锚定与使用策略。
-3. `commands/`：预置便捷斜杠命令模板。
+点击页头的用户名打开菜单（“个人中心”“退出登录”），选“个人中心”进入 `/me`。个人中心属于用户本人，不属于任何工作空间，在任意空间中都能进入，含两个页签：
 
-### 8.1 Skill 核心指导原则（Prompt 注入规范）
-1. **语义优先（Ontology First）**：
-   * 禁止在未检索本体的情况下臆造物理库表名或字段名。
-   * 查询前必须先调用 `search_ontology` 或 `get_entity_subgraph` 确认概念已发布。
-2. **版本防漂移规则（Version Freshness）**：
-   * 在涉及复杂指标计算的对话中，若本地上下文中的本体知识超过 30 分钟未更新，必须调用 `check_space_version` 核对版本。
-   * 遇到 `SEMANTIC_VERSION_DRIFT` 时，禁止机械重试，严格按照返回的 `suggested_action` 重新拉取新子图。
-3. **闭环修改与纠偏策略（Mutate & Feedback Strategy）**：
-   * **修（Propose）**：开发者明确要求新增或变更概念且具备权限时，调用 `propose_ontology_mutation` 提交结构化提案。
-   * **馈（Feedback）**：业务用户提出口径分歧但未指定修改方案时，调用 `submit_ontology_feedback` 提交工单。
+- **个人信息**：只读显示显示名、账号（用户主体）、登录方式（本地账号或认证服务名称）和邮箱。
+- **个人令牌**（`/me/tokens`）：用户自行签发和管理自己的令牌，用现有列表页布局：
 
-### 8.2 预置插件斜杠命令（SL-11）
+| 列 | 内容 |
+|---|---|
+| 名称 | 可行内修改 |
+| 权限 | 用 Ant Design `Tag` 显示：“读取语义”（固定）、“读取映射”；点击编辑后可增减“读取映射” |
+| 创建时间、最近使用 | 未使用过显示“—” |
+| 操作 | 撤销（二次确认） |
 
-| 命令 | 对应分类 | 作用与交互示例 |
+“新建令牌”弹窗填写名称、勾选是否包含“读取映射”；创建成功后弹窗只显示一次完整令牌和复制按钮，并提示把它写入客户端 MCP 配置（环境变量或插件设置），关闭后无法再次查看。
+
+## 5. 网关工具契约
+
+| 工具 | 入参 | 行为 |
 |---|---|---|
-| `/onto-search [词]` | **查** | 快速探查实体或指标的官方权威定义卡片（如 `/onto-search 采购订单`） |
-| `/onto-metric [指标]` | **查** | 穿透查看指标的底层计算公式、过滤条件与物理表绑定（如 `/onto-metric 净采购额`） |
-| `/onto-sync [空间]` | **环** | 强制刷新本地语义缓存，核对 `version_id` 并展示最新变更日志 |
-| `/onto-propose` | **修** | 引导式发起结构化变更提案（支持在 IDE 中交互补齐属性/公式并提交审核） |
-| `/onto-feedback [描述]` | **馈** | 一键将当前会话中的口径争议与 SQL 片段打包上报平台工单库 |
-| `/onto-spaces` | **查** | 列出当前用户有权访问的所有空间、所属角色与当前版本 |
+| `list_spaces` | 无 | 列出用户当前加入的空间：`workspace_id`、名称、角色、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
+| `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索全部成员空间。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
+| `get_ontology` | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
+| `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
 
----
+前三个工具在 `tools/list` 中标注只读；`submit_feedback` 标注非只读、非破坏性（`readOnlyHint: false`、`destructiveHint: false`）。
 
-## 9. 与现有架构的关系与迁移
+错误：
+
+| 情况 | 工具错误 `code` |
+|---|---|
+| 显式请求的空间不存在或用户不是成员（含 `workspace_ids` 中任一个） | `workspace_unavailable` |
+| 检索涉及的空间超过 10 个 | `search_limit_exceeded`，`reason` 为 `workspace_count`，`limit` 为 10 |
+| 各组结果合计超过 110,000 字节（与现有工具的单次响应预算相同） | `search_limit_exceeded`，`reason` 为 `response_size` |
+| 游标无效或已失效（版本更新、成员或令牌变化） | `cursor_invalid`（沿用现有） |
+| 某个空间的单空间检索出错（如单页超过预算的 `response_too_large`） | 该错误的 `code`，整次失败 |
+
+超限或出错时整次返回错误，不返回部分结果。用户没有任何成员空间时，`list_spaces` 和默认检索返回空列表。Agent 可用 `list_spaces` 选出相关空间后显式传入 `workspace_ids`，或降低 `limit` 后重试。
+
+例如用户是虚构星港采购空间和星港销售空间的成员，检索“订单金额”返回两组结果，各自带空间和版本；Agent 按空间分别展示两个定义，由用户确认采用哪一个。
+
+## 6. 调用记录
+
+每次 `tools/call` 分两步记录，失败的调用也留痕：
+
+1. **开始**：通过鉴权、执行工具前插入一行，`outcome` 为 `started`，写入调用者、工具、参数和目标空间，并立即提交（独立于读取服务的数据库事务）。
+2. **结束**：工具返回后更新同一行，写入完整返回、`ok` 或 `error`、错误码与消息、耗时。
+
+进程崩溃、超时或连接中断导致没有返回时，该行停在 `started`，即为未完成的失败调用。记录写入失败不影响工具返回，只记应用错误日志。令牌无效、已撤销等鉴权失败没有可信的调用者，不写入本表，只记应用日志。
+
+| 字段 | 内容 |
+|---|---|
+| `id`、`created_at` | 记录标识和时间 |
+| `user_id`、`token_id` | 调用者和令牌 |
+| `request_id` | JSON-RPC 请求 ID |
+| `tool` | 工具名 |
+| `workspaces` | 本次读取的每个空间：`workspace_id`、`version_id`、`version_number` |
+| `arguments` | 校验后的调用参数（如 `query`、`workspace_ids`、`ids`、`kinds`、`limit`），不含 `cursor` 原文，只记是否翻页 |
+| `response` | 工具返回给客户端的完整结构化内容（成功时为结果，失败时为错误体），与客户端收到的一致 |
+| `outcome` | `started`（已开始未结束）、`ok` 或 `error` |
+| `error_code`、`error_message` | 失败时的工具错误码和中文消息 |
+| `duration_ms` | 耗时 |
+| `extra` | 扩展字段（JSON），首版为空，留给后续元数据 |
+
+例如用户检索“净采购额 含税”，记录 `arguments` 为该检索词，`workspaces` 为采购空间第 13 版和销售空间第 7 版，`response` 为客户端收到的两组结果（其中 `unmatched_terms` 含“含税”）。命中数、未匹配用语等统计日后从 `arguments` 和 `response` 读取，不在写入时计算。管理员日后可据此发现本体缺少“含税”口径。
+
+令牌只存其 ID。完整返回可能含物理映射和 SQL 参考（调用者有权看到的内容），每行最多约 110,000 字节，PostgreSQL 会压缩大字段，但表随调用量增长；首版没有查询界面和自动清理，只能由有数据库权限的运维查看，查看权限与清理策略随 SL-15 设计。查询平台的执行记录由查询平台自己保存。
+
+## 7. 反馈（SL-04）
+
+### 7.1 记录内容
+
+| 字段 | 内容 |
+|---|---|
+| `id`、`created_at` | 记录标识和时间 |
+| `workspace_id` | 反馈所属空间，提交者须是成员 |
+| `user_id`、`token_id` | 提交者和令牌 |
+| `kind` | `correction`（用户指出错误）或 `suggestion`（用户提出建议） |
+| `user_text` | 用户原话，逐字引用，不改写，最多 4,000 字 |
+| `agent_text` | 智能体生成的说明：当时依据的定义或回答、用户认为哪里不对或希望怎样，最多 4,000 字 |
+| `element_ids` | 可选，相关元素 ID（来自检索或读取结果），须属于该空间 |
+| `version_id` | 提交时该空间的当前发布版本，由服务端填写 |
+| `extra` | 扩展字段（JSON），首版为空 |
+
+例如在虚构星港销售空间，用户说“净销售额应该再扣掉运费，你算的不对”。智能体提交 `kind` 为 `correction`，`user_text` 为这句话原文，`agent_text` 为“回答采用的指标‘净销售额’（第 7 版）口径为已付款金额减退款金额，用户认为还应扣除运费”，`element_ids` 为该指标 ID。
+
+`workspace_id` 不存在、用户不是成员时返回 `workspace_unavailable`；`element_ids` 含不属于该空间的元素、文本为空或超长时返回 `invalid_arguments`。反馈调用与其他工具一样写入调用记录（第 6 节）。
+
+### 7.2 Skill 规则
+
+- **何时提交**：用户明确指出回答或口径有误（定义、指标公式、过滤条件、映射、命名），或提出新增、修改的建议时，每个独立问题提交一次。普通追问、澄清提问意图不提交。
+- **原话**：`user_text` 逐字摘录用户相关的话，不概括、不翻译。
+- **说明**：`agent_text` 写明当时依据的空间、元素和版本，以及对用户意见的理解；不粘贴查询结果数据行。
+- **归属**：选相关定义所在的空间；涉及多个空间时分别提交。
+- **对用户不可见**：在后台提交，不告知用户、不征求确认、不打断回答；回答照常继续。
+
+### 7.3 查看
+
+左侧菜单原“空间设置”分组改为“管理中心”，下设二级菜单“空间设置”（原页面）和“用户反馈”（`/workspaces/<id>/feedback`）。整个“管理中心”只对该空间管理员显示；成员和只读访问者看不到该分组，直接访问两个地址时显示无权限。成员因此不再能查看空间设置页上的只读内容（空间信息、成员列表、DataAgent 连通性），这些内容原本也只有管理员能修改（2026-11-12 用户决定）。页面沿用现有列表页布局（`PageHeader` 加 `Panel` 内的 Ant Design `Table`），时间倒序，显示时间、提交者、类型、用户原话、智能体说明、相关元素（按当前发布版本显示名称，元素已删除时显示 ID）和提交时版本号；分页，只读。接口 `GET /api/v1/workspaces/{workspace_id}/feedback`，要求登录会话和该空间管理员角色。
+
+## 8. 客户端插件（SL-09）
+
+```text
+.claude-plugin/marketplace.json        仓库插件目录，列出 ./plugins/ontofoundry
+plugins/
+  ontofoundry/
+    .claude-plugin/plugin.json         插件清单（name、version、description、userConfig）
+    .mcp.json                          网关地址与 Authorization 头
+    skills/
+      ontology-grounding/SKILL.md      外部 Skill：检索、精读、过滤、缺项处理、第 7 节反馈规则与第 9 节版本和缓存规则
+    README.md                          令牌签发和三种客户端的安装、配置说明
+```
+
+| 客户端 | 读取方式 | 依据 |
+|---|---|---|
+| Claude Code | 添加 `opendata-lab/ontofoundry` 插件目录后安装；令牌通过插件 `userConfig` 的敏感项填入，`.mcp.json` 中引用为 `Bearer ${user_config.ontofoundry_token}` | [插件](https://code.claude.com/docs/en/plugins)、[插件参考](https://code.claude.com/docs/en/plugins-reference) |
+| ZCode | 清单查找顺序为 `.zcode-plugin/plugin.json`、`.claude-plugin/plugin.json`，因此只维护一份清单；从 GitHub 仓库添加插件目录后安装 | [ZCode 插件](https://zcode.z.ai/en/docs/plugin) |
+| opencode | 插件是 JS/TS 模块，不读插件包；Skill 放入或指向 `.opencode/skills`、`.claude/skills`、`.agents/skills` 之一，MCP 写入 `opencode.json` 的 `mcp.servers`（`"type": "remote"`、`"oauth": false`、`"Authorization": "Bearer {env:ONTOFOUNDRY_TOKEN}"`） | [Skills](https://opencode.ai/docs/skills)、[MCP](https://opencode.ai/docs/mcp-servers) |
+
+插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。 这些约束由后端测试在 CI 中检查（见计划步骤二），超限时测试失败，不会发布出被客户端忽略的 Skill。
+
+无法访问 GitHub 的现场使用离线包：离线包附带 `plugins/ontofoundry` 和 `.claude-plugin/marketplace.json`，Claude Code 用本地目录添加插件目录（`/plugin marketplace add <本地目录>`），ZCode 用“添加插件目录 → 本地目录”，opencode 按 README 指向本地 Skill 目录。
+
+以下两点官方文档未写明，在实施步骤一中联验：ZCode 是否读取 `.claude-plugin/marketplace.json`（其文档只写“仓库根目录的 `marketplace.json`”）；ZCode 敏感 `userConfig` 暂不能在界面填写时，令牌如何提供。联验不通过时按结果调整本节，再进入步骤二。
+
+## 9. 版本一致性
+
+首版不新增版本协议。每个检索结果组和 `get_ontology` 响应都带 `version_id`，`list_spaces` 带当前 `version_id`；每个工具结果的 `_meta` 另按 SL-05 列出涉及空间的版本：
+
+```json
+"_meta": {
+  "io.modelcontextprotocol/serverInfo": { "name": "ontofoundry", "version": "0.1.0" },
+  "io.github.opendata-lab.ontofoundry/versions": [
+    { "workspace_id": "<星港采购空间 ID>", "version_id": "<版本 ID>", "version_number": 13 }
+  ]
+}
+```
+
+`list_spaces` 列出全部返回的空间，`search_ontology` 列出各组空间，`get_ontology` 和 `submit_feedback` 列出所涉空间；未发布空间的两个版本字段为 `null`。旧版协议的响应同样附带，实施时按对应版本的 `schema.ts` 核对结果类型允许 `_meta`。外部 Skill 规定：
+
+- 同一轮回答使用的定义来自同一空间的同一 `version_id`；发现版本变化时重新检索和读取。
+- 回答中注明采用的空间和版本；跨空间的命中分别说明口径，不合并。
+- 生成查询前可用 `list_spaces` 复核相关空间的当前版本。
+
+### 9.1 本地缓存（SL-06）
+
+已发布版本不可变，同一空间同一 `version_id` 下的定义永远不变，因此由 Skill 在本地缓存读取结果，只在版本变化时更新，服务端不新增条件读取接口。
+
+| 规则 | 内容 |
+|---|---|
+| 位置 | 用户目录 `~/.ontofoundry/cache/`，不放在项目目录，避免进入版本库 |
+| 键 | `<workspace_id>/<version_id>/`；其下按元素 ID 存 `get_ontology` 返回的元素，按检索参数（检索词、`kinds`、`expand`、`limit`）存 `search_ontology` 的该空间结果组 |
+| 何时核对版本 | 每个用户问题开始时调用一次 `list_spaces`；同一问题内不再重复核对 |
+| 命中 | 空间仍在 `list_spaces` 中且 `version_id` 与缓存目录相同时，直接使用缓存，不再调用检索和读取 |
+| 更新 | `version_id` 变化时重新检索和读取，写入新版本目录，并删除该空间的旧版本目录 |
+| 失效 | 空间不再出现在 `list_spaces`（被移出或空间删除）时删除该空间的缓存，不再使用 |
+| 不缓存 | 翻页游标、错误结果、`submit_feedback` |
+
+例如用户上午问“净采购额”，智能体检索并读取后缓存到采购空间第 13 版目录；下午再问，`list_spaces` 显示仍是第 13 版，智能体直接用缓存回答，只调用一次 `list_spaces`。管理员发布第 14 版后，下一个问题核对到版本变化，智能体重新读取并清掉第 13 版缓存。
+
+缓存内容是该用户有权看到的定义，含 `mappings:read` 时还包括物理映射和 SQL 参考。缓存同时记下写入时 `list_spaces` 返回的 `permissions`；权限变化（如去掉“读取映射”或换用另一个令牌）时，Skill 清空全部缓存后重新读取。缓存效果可在调用记录（第 6 节）中按用户统计调用次数核实。
+
+## 10. 与现有架构的关系
 
 | 层次 | 首版影响 |
 |---|---|
-| MCP 与认证 | 同一个 API 应用新增网关、PAT 鉴权和令牌管理接口。两个入口复用本体读取服务，各自注册工具和鉴权依赖。 |
-| 平台数据库 | 通过 Alembic 新增个人令牌表，引用现有用户。工作空间、成员、核心模型和发布记录沿用现有结构。 |
-| DataAgent 与查询 | DataAgent 自动生成的 MCP 地址及建模运行的版本固定机制继续走单空间入口。外部 Agent 可结合已有查询平台执行实际取数。 |
-| 部署 | 同一应用和数据库升级。若反向代理按路径放行，增加新地址并回归旧地址。已有客户端无需更新配置。 |
+| MCP 与鉴权 | 新增网关路由、个人令牌鉴权依赖和令牌管理接口；单空间入口的路由、鉴权和工具不变。 |
+| 读取服务 | 复用 `mcp_ontology` 与 `ontology_search`，不改其授权规则；跨空间检索由网关逐个空间调用单空间检索后分组。 |
+| 数据库 | Alembic 新增个人令牌表、网关调用记录表和反馈表，引用用户表和空间表；其他表不变，无需迁移数据。 |
+| 平台界面 | 页头用户名新增菜单，进入“个人中心”（`/me`，含个人信息和个人令牌，第 4.6 节）。左侧菜单“空间设置”分组改名“管理中心”，含“空间设置”和“用户反馈”，整组只对空间管理员可见；成员不再能打开空间设置页。其他页面不变。 |
+| DataAgent | 继续使用单空间入口、固定令牌和建模运行凭据，配置不变。 |
+| 部署 | 同一应用升级。随附的 nginx 已整体转发 `/api/`；自建反向代理若按路径放行，需加入 `/api/v1/ontology/mcp`。 |
 
-固定令牌设计的 MT-03 继续适用于原有单空间入口。新增网关可以独立扩展工具及认证方式。需要更改已有工具行为时，通过新增工具或接口版本由客户端选择接入。后续若支持 MCP OAuth，可沿用网关地址和工具契约，兼容现有 PAT。结构化写入另行设计权限与建模会话上下文，复用提案试应用、人工审阅与发布流程。
+## 11. 后续方向（未确认）
 
----
+以下方向未确认，不在首版范围；开工前各自按 AGENTS.md 说明来源、语义还是执行、删掉会失去什么，并写设计和计划。详细记录见 [TODO](../TODO.md)“本体 MCP”。
 
-## 10. 后续实施阶段划分
+| 编号 | 方向 | 说明 |
+|---|---|---|
+| SL-04 扩展 | 反馈处理 | 在首版反馈记录上增加状态、回复与通知，并可转为提案或建模会话；不直接改已发布本体 |
+| SL-10 | 查询委派 | 网关把确认后的口径交给查询平台执行；首版由 Agent 自行调用查询工具 |
+| SL-11 | 斜杠命令 | 在 SL-09 的插件内预置检索、指标、空间等命令 |
+| SL-12 | 结构化变更提案 | 外部提交复用 `parse_agent`、`trial_apply`、`store_batch`，需合法的会话与基线上下文，一律经人工审阅 |
+| SL-13 | 接口来源绑定 | 属性绑定业务 API 或 MCP 工具的返回值；与“执行细节不进入模型”的原则相关 |
+| SL-14 | 业务动作 | 实体绑定业务系统的操作工具；与决定 #37（删除业务动作）冲突 |
+| SL-15 | 调用记录转建模输入 | 从调用记录的参数和返回中筛选（检索词、未匹配用语、零命中）后生成建模会话或待处理事项，并设计记录的查看与清理 |
+| SL-16 | MCP 客户端浏览器授权 | **已决定在首版之后实施**：平台按 MCP 授权规范作为授权方（发现元数据、客户端注册、PKCE、访问与刷新令牌），用户经[平台登录](2026-11-12-platform-login.md)后授权客户端；网关地址和工具不变，个人令牌继续可用。ZCode、opencode 文档均支持远程 MCP 的 OAuth，Claude Code 待核实 |
 
-1. 在隔离环境验证现有单空间 MCP 和外部 Skill 的语义交接。
-2. 首版交付 PAT、空间目录、跨空间语义检索和定义读取，沿用已发布 `version_id`。同时按原配置回归 DataAgent 和现有客户端。
-3. 按试点需求排定 OAuth、客户端插件、跨空间排序、条件读取和版本差异。反馈与提案另行接入治理流程。
+不采用：SL-07 废弃标记（元素增加废弃状态和替代项）。定义的删除和变更由发布版本体现，Skill 按版本重新读取即可，不在模型中增加废弃字段（2026-11-12 用户决定）。
 
-首版工具契约见第 7.1 节，交付步骤和验收见[实施计划](../plans/2026-11-11-runtime-agnostic-semantic-layer-plan.md)。
+不采用：SL-08 语义漂移错误（引用的元素已删除或改名时返回专门错误）。现有行为已覆盖：`get_ontology` 对不存在的元素 ID 在 `missing` 中列出，旧版本游标返回 `cursor_invalid`，Skill 每个问题开始时按 `list_spaces` 的版本刷新缓存；元素以 UUID 标识，改名只改 `name`，ID 不变（2026-11-12 用户决定）。
 
----
+## 12. 参考
 
-## 11. 远景演进：全域业务语义中枢（表 + API/MCP + 动作，SL-13、SL-14）
-
-我们对本体语义层的定位不仅是“分析型数仓表上的 SQL 翻译器”，而是**全域业务语义中枢（Enterprise Semantic Hub）**。
-
-### 11.1 数据源的双模态：从 Table 到 API / 外部 MCP
-* **物理表来源（Table-backed）**：适合大规模、批处理与 OLAP 分析型数据（如历史订单表、账单表）。
-* **接口/工具来源（API/MCP-backed）**：业务应用（如 CRM、ERP、工单系统）通过自身的 OpenAPI 或 MCP 接口接入平台。
-  * 实体属性既可以绑定物理表列，也可以绑定实时 API 的输出字段（例如：`Customer.live_credit_score` 绑定调用风控系统的 MCP 接口实时获取最新分值）。
-  * 平台将数据集绑定扩展支持 `source_kind: api` 或 `source_kind: mcp_tool`。
-
-### 11.2 读写完整生命周期：状态（State）与动作（Action）
-* **读语义（State）**：实体属性、关系图谱与聚合指标。
-* **操作语义（Action）**：业务应用暴露的 MCP 操作工具（如 `approve_refund(order_id)`、`lock_account(user_id)`）。
-  * 平台管理“什么实体支持什么动作、动作的参数约束与前置规则（Rules）”。
-  * 智能体不仅能查询“这个客户有哪些逾期订单”，还能在本体规则校验通过后，调用绑定的业务应用 MCP 工具发起操作。
-* **定位升维**：这一特性让平台与 Cube、dbt 等传统 SQL 语义层拉开差异，接近 Palantir Foundry 操作型本体（Operational Ontology）的定位。该方向待评审，与决定 #37 冲突，需单独设计。
+- [Palantir Ontology MCP 概览](https://palantir.com/docs/foundry/ontology-mcp/overview/)、[鉴权与授权](https://palantir.com/docs/foundry/ontology-mcp/authentication-and-authorization/)：一个 MCP 服务器对应一个本体，令牌权限取用户权限、应用限制和操作范围的交集。
+- [Claude Code MCP 配置](https://code.claude.com/docs/en/mcp)、[Claude Code Skill 配置](https://code.claude.com/docs/en/skills)
