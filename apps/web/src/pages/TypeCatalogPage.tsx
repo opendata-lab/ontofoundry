@@ -16,6 +16,7 @@ import { useElementDetail } from "../hooks/useElementDetail";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY, byId, effectiveLinks, effectiveProperties, isA, metricDatasetId } from "../lib/coreModel";
 import { isForwardReading, renderLinkReading } from "../lib/linkReadings";
 import { METRIC_KINDS } from "../lib/metricEditing";
@@ -36,6 +37,7 @@ export function TypeCatalogPage({ kind = "object_type" }: { kind?: "object_type"
 
 function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "object_type" | "link_type" }) {
   const { workspace, refresh } = useWorkspaceContext();
+  const { canEdit } = useWorkspacePermissions();
   const { draft, error, load, sessionId, suffix, setDraft } = useSnapshot(workspace);
   const [createValueType, setCreateValueType] = useState(0);
   const [params, setParams] = useSearchParams();
@@ -56,13 +58,13 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const active = usePageActive();
   usePageTab({ title: "本体对象" });
   useEffect(() => {
-    if (!importOpen || !workspace.role) return;
+    if (!importOpen || !canEdit) return;
     let live = true;
     modelingApi.capabilities(workspace.id)
       .then((result) => { if (live) setMaxFileMb(result.max_file_mb); })
       .catch(() => undefined);
     return () => { live = false; };
-  }, [importOpen, workspace.id, workspace.role]);
+  }, [importOpen, workspace.id, canEdit]);
   const openExport = async () => {
     setExporting(true);
     setActionError("");
@@ -139,12 +141,12 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   // Short headers stay on one line when the description column takes the remaining width.
   const table = <Table<CatalogItem> size="middle" rowKey="id" dataSource={filtered} columns={columns}
     onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={filtered.length > 20 ? { pageSize: 20 } : false}
-    locale={{ emptyText: <Empty description={items.length ? "没有匹配的定义" : workspace.role ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} />;
+    locale={{ emptyText: <Empty description={items.length ? "没有匹配的定义" : canEdit ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} />;
   const counts = { entities: draft.object_types.length, values: (draft.value_types ?? []).length, datasets: draft.datasets.length, relations: draft.link_types.length, metrics: draft.metrics.length };
   return <div className="flex h-full min-h-0 flex-col bg-canvas">
     <PageTabs title="本体对象" note={sessionId ? "建模会话草稿" : undefined} actions={<>
       <Button icon={<RefreshCw className="size-icon-sm" />} onClick={load}>刷新</Button>
-      {workspace.role && <>
+      {canEdit && <>
         <Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button>
         <Button icon={<Download className="size-icon-sm" />} disabled={!workspace.version_id} loading={exporting} onClick={() => void openExport()}>导出</Button>
         <Link to={"../delivery" + suffix}><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link>
@@ -158,13 +160,13 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
             options={tags.map((label) => ({ value: label, label }))} onChange={setTag} />}
           <Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={(event) => setQuery(event.target.value)} />
           </>}>
-          {workspace.role && <Button type="primary" icon={<Plus size={15} />} onClick={() => tab === "values" ? setCreateValueType((n) => n + 1) : detail.open({ kind, id: "new", mode: "edit", sessionId })}>新建{LABELS[tab]}</Button>}
+          {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => tab === "values" ? setCreateValueType((n) => n + 1) : detail.open({ kind, id: "new", mode: "edit", sessionId })}>新建{LABELS[tab]}</Button>}
           </PageToolbar>
           <Panel>{key === "values"
           ? <ValueTypeCatalog workspace={workspace} draft={draft} sessionId={sessionId} query={query} createRequest={createValueType} onSaved={(next) => { setDraft(next); void refresh?.(); }} />
           : table}</Panel>
         </PageBody> }))} />
-    {workspace.role && <>
+    {canEdit && <>
       <ImportDialog open={active && importOpen} workspaceId={workspace.id} maxFileMb={maxFileMb} onClose={() => setImportOpen(false)}
         onConfirmed={(result) => { setImportOpen(false); navigate(`../builder?session=${result.session_id}&panel=proposals`); }} />
       <ExportDialog open={active && exportOpen} workspaceId={workspace.id} versions={versions} initialVersionId={workspace.version_id ?? undefined} onClose={() => setExportOpen(false)} />

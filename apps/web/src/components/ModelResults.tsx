@@ -95,6 +95,7 @@ export function ModelResults({
   running = false,
   loading = false,
   busy = false,
+  canEdit = true,
 }: {
   session: ModelingSession | null;
   proposals?: ProposalsState;
@@ -102,6 +103,7 @@ export function ModelResults({
   /** The selected session has not arrived yet. */
   loading?: boolean;
   busy?: boolean;
+  canEdit?: boolean;
 }) {
   const [params, setParams] = useSearchParams();
   // Draft rows and graph nodes open in place, like the semantic view.
@@ -186,7 +188,7 @@ export function ModelResults({
                     label: (
                       <span className="inline-flex items-center gap-2">提案 {pending > 0 && <StatusMark state="pending" label={pending} />}</span>
                     ),
-                    children: <ProposalPanel session={session} proposals={proposals} running={running} loading={loading} />,
+                    children: <ProposalPanel session={session} proposals={proposals} running={running} loading={loading} canEdit={canEdit} />,
                   },
                 ]
               : []),
@@ -215,7 +217,7 @@ export function ModelResults({
                     <div className="flex min-w-0 items-center gap-2">
                       <Input.Search allowClear size="small" aria-label="搜索模型" placeholder="搜索名称、英文标识、描述"
                         className="min-w-0 flex-1" value={query} onChange={(event) => setQuery(event.target.value)} />
-                      {publish}
+                      {canEdit && publish}
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 overflow-auto">

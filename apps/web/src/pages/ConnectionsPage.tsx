@@ -4,18 +4,18 @@ import { Plus } from "lucide-react";
 import { useRef } from "react";
 import { DataConnections } from "../components/DataConnections";
 import { usePageTab } from "../hooks/usePageTab";
-import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 
 /** Connections are managed separately from the evolving ontology mappings. */
 export function ConnectionsPage() {
-  const { workspace } = useWorkspaceContext();
+  const { canManage } = useWorkspacePermissions();
   const openDialog = useRef<(() => void) | null>(null);
   usePageTab({ title: "数据连接" });
   return (
     <div className="flex h-full min-h-0 flex-col bg-canvas">
       <PageHeader title="数据连接" />
       <PageBody>
-        {workspace.role === "admin" && (
+        {canManage && (
           <PageToolbar>
           <Button type="primary" icon={<Plus size={14} />} onClick={() => openDialog.current?.()}>
             添加连接

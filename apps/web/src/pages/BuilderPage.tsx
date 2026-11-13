@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { datasetApi, modelingApi } from "../api/client";
 import type { Capabilities, Material, RegisteredTable, SessionMode } from "../api/types";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import type { AgentConversationElement, CompleteDetail, ErrorDetail, PlanOpenDetail, RunChangeDetail } from "../types/agent-conversation";
 import { PageBody, PageHeader, Panel, PanelToolbar, SectionTitle } from "../components/layout";
 import { ModelResults } from "../components/ModelResults";
@@ -55,6 +56,7 @@ const MODE_ITEMS = (Object.keys(MODES) as SessionMode[]).map((key) => ({
 
 export function BuilderPage() {
   const { workspace } = useWorkspaceContext();
+  const { canEdit } = useWorkspacePermissions();
   const model = useModeling(workspace.id, true, true);
   const { session, sessionId, setSession, error, setError } = model;
   useErrorMessage(error);
@@ -65,6 +67,7 @@ export function BuilderPage() {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [materialMode, setMaterialMode] = useState("upload");
+  const effectiveMaterialMode = canEdit ? materialMode : "library";
   // A session's mode is fixed once its conversation starts; before a session
   // exists, the choice is held here and used to create it.
   const [newMode, setNewMode] = useState<SessionMode>("model");
@@ -144,10 +147,11 @@ export function BuilderPage() {
   };
   // Sending waits for DataAgent to be configured, the previous run and its
   // result, pending proposals and uploads. The SDK itself requires some text.
-  const blocked = !capabilities?.agent_configured || running || resultPending || !!session?.pending_proposal_count || busy || uploading;
+  const blocked = !canEdit || !capabilities?.agent_configured || running || resultPending || !!session?.pending_proposal_count || busy || uploading;
   // Why sending is refused, shown above the input. A live run needs no note:
   // the composer shows its stop button.
-  const blockedReason = running ? ""
+  const blockedReason = !canEdit ? ""
+    : running ? ""
     : capabilities && !capabilities.agent_configured ? "请先在空间设置中配置 DataAgent"
     : resultPending ? "上一轮结果还在处理，请稍候"
     : session?.pending_proposal_count ? "请先处理完待审提案，或在提案上修订"
@@ -324,18 +328,20 @@ export function BuilderPage() {
                 </section>
                 <section className="flex shrink-0 flex-col gap-3">
                   <SectionTitle title="业务知识" />
-                  <Segmented
-                    size="small"
-                    aria-label="建模材料来源"
-                    className="max-w-full self-start overflow-x-auto"
-                    value={materialMode}
-                    onChange={(v) => setMaterialMode(String(v))}
-                    options={[
-                      { value: "upload", label: "上传业务知识" },
-                      { value: "library", label: "选择已上传材料" },
-                    ]}
-                  />
-                  {materialMode === "upload" && (
+                  {canEdit && (
+                    <Segmented
+                      size="small"
+                      aria-label="建模材料来源"
+                      className="max-w-full self-start overflow-x-auto"
+                      value={materialMode}
+                      onChange={(v) => setMaterialMode(String(v))}
+                      options={[
+                        { value: "upload", label: "上传业务知识" },
+                        { value: "library", label: "选择已上传材料" },
+                      ]}
+                    />
+                  )}
+                  {canEdit && effectiveMaterialMode === "upload" && (
                     <Upload.Dragger
                       className="block w-full [&_.ant-upload-drag]:h-auto"
                       aria-label="上传业务知识材料"
@@ -361,7 +367,7 @@ export function BuilderPage() {
                       </div>
                     </Upload.Dragger>
                   )}
-                  {materialMode === "library" && (
+                  {effectiveMaterialMode === "library" && (
                     <div className="flex flex-col gap-1">
                       {!materials.length && (
                         <Typography.Text type="secondary" className="text-xs">
@@ -372,7 +378,7 @@ export function BuilderPage() {
                         <Checkbox
                           key={m.id}
                           checked={!!session?.material_ids.includes(m.id)}
-                          disabled={busy || running}
+                          disabled={!canEdit || busy || running}
                           onChange={() =>
                             act(async () => {
                               const s = await model.ensure();
@@ -430,7 +436,7 @@ export function BuilderPage() {
                             <Checkbox
                               key={tableKey(t)}
                               checked
-                              disabled={busy || running}
+                              disabled={!canEdit || busy || running}
                               onChange={() =>
                                 act(async () => {
                                   const s = await model.ensure();
@@ -476,20 +482,22 @@ export function BuilderPage() {
                       </div>
                     );
                   })()}
-                  <TableMaterialPicker
-                    workspaceId={workspace.id}
-                    sessionId={session?.id}
-                    tableScope={session?.table_scope ?? "all"}
-                    linked={session?.linked_tables ?? []}
-                    disabled={busy || running}
-                    onTablesLoaded={setRegisteredTables}
-                    onSave={(patch) =>
-                      act(async () => {
-                        const current = await model.ensure();
-                        setSession(await modelingApi.save(current, current.draft, patch));
-                      })
-                    }
-                  />
+                  {canEdit && (
+                    <TableMaterialPicker
+                      workspaceId={workspace.id}
+                      sessionId={session?.id}
+                      tableScope={session?.table_scope ?? "all"}
+                      linked={session?.linked_tables ?? []}
+                      disabled={busy || running}
+                      onTablesLoaded={setRegisteredTables}
+                      onSave={(patch) =>
+                        act(async () => {
+                          const current = await model.ensure();
+                          setSession(await modelingApi.save(current, current.draft, patch));
+                        })
+                      }
+                    />
+                  )}
                 </section>
               </div>
             )}
@@ -497,29 +505,35 @@ export function BuilderPage() {
           <Panel fill className="min-w-0">
             <PanelToolbar extra={<>
               <SessionPicker session={session} sessionId={sessionId} sessions={model.sessions} onSelect={model.select} presentation="dialog" disabled={busy || uploading} />
-              <Tooltip title="新建会话">
-                <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
-                  onClick={() => act(async () => { await model.create(undefined, mode); })} />
-              </Tooltip>
-              {session && !session.abandoned_at && (
-                <Popconfirm
-                  title="放弃这个会话？"
-                  description={`将丢弃本会话 ${session.draft.material_objects.filter((o) => o.state === "staged").length + session.draft.material_links.filter((l) => l.state === "staged").length} 条待发布实例；已发布的本体和已生效的实例不受影响。放弃后不能再在本会话中建模或发布。`}
-                  okText="放弃会话"
-                  okButtonProps={{ danger: true }}
-                  cancelText="取消"
-                  onConfirm={() => act(async () => {
-                    await modelingApi.abandon(session);
-                    setSession(await modelingApi.get(session.workspace_id, session.id));
-                  })}
-                >
-                  <Tooltip title="放弃会话">
-                    <Button size="small" type="text" aria-label="放弃会话" icon={<Ban size={15} />} disabled={busy || uploading || running} />
+              {canEdit && (
+                <>
+                  <Tooltip title="新建会话">
+                    <Button size="small" type="text" aria-label="新建会话" icon={<Plus size={15} />} disabled={busy || uploading}
+                      onClick={() => act(async () => { await model.create(undefined, mode); })} />
                   </Tooltip>
-                </Popconfirm>
+                  {session && !session.abandoned_at && (
+                    <Popconfirm
+                      title="放弃这个会话？"
+                      description={`将丢弃本会话 ${session.draft.material_objects.filter((o) => o.state === "staged").length + session.draft.material_links.filter((l) => l.state === "staged").length} 条待发布实例；已发布的本体和已生效的实例不受影响。放弃后不能再在本会话中建模或发布。`}
+                      okText="放弃会话"
+                      okButtonProps={{ danger: true }}
+                      cancelText="取消"
+                      onConfirm={() => act(async () => {
+                        await modelingApi.abandon(session);
+                        setSession(await modelingApi.get(session.workspace_id, session.id));
+                      })}
+                    >
+                      <Tooltip title="放弃会话">
+                        <Button size="small" type="text" aria-label="放弃会话" icon={<Ban size={15} />} disabled={busy || uploading || running} />
+                      </Tooltip>
+                    </Popconfirm>
+                  )}
+                </>
               )}
             </>}>
-              {modeLocked ? (
+              {!canEdit ? (
+                <Typography.Text type="secondary" className="text-xs whitespace-nowrap">{MODES[mode].label} · 只读</Typography.Text>
+              ) : modeLocked ? (
                 <Typography.Text type="secondary" className="text-xs whitespace-nowrap" role="status">{MODES[mode].label} · 模式已固定</Typography.Text>
               ) : (
                 <Dropdown trigger={["click"]} disabled={busy || uploading}
@@ -538,7 +552,7 @@ export function BuilderPage() {
               That object is null while a session loads, and an endpoint that
               momentarily goes empty reads as a conversation switch — the
               element would clear itself and reload for no reason. */}
-            <dataagent-conversation ref={conversation} placeholder={mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…"} className={CONVERSATION}>
+            <dataagent-conversation ref={conversation} disabled={!canEdit || !!session?.abandoned_at} placeholder={canEdit ? (mode === "model" ? "描述你希望构建或调整的本体…" : "输入你想了解的本体问题…") : "只读模式下不可发送消息"} className={CONVERSATION}>
               <BuilderConversationEmpty mode={mode} />
               {blockedReason && (
                 <div slot="composer-overlay" className="px-1 pb-1">
@@ -551,7 +565,7 @@ export function BuilderPage() {
             <div className="flex min-h-0 w-builder-results flex-none flex-col overflow-hidden">
               {openPlan
                 ? <PlanPanel plan={openPlan} onClose={() => setOpenPlan(null)} />
-                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} />}
+                : <ModelResults session={session} proposals={proposals} running={running || resultPending} loading={!!sessionId && !session} busy={busy || uploading} canEdit={canEdit} />}
             </div>
           )}
         </div>

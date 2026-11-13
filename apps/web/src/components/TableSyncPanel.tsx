@@ -88,6 +88,6 @@ export function TableSyncPanel({ workspaceId, initialConnection, initialSchema =
         </Popconfirm>
       ) }] : [])]} />
   </div></Panel>
-    {detail && <TableDetailDialog workspaceId={workspaceId} connectionId={connectionId} schema={detail.schema} table={detail} onClose={() => setDetail(null)} />}
+    {detail && <TableDetailDialog workspaceId={workspaceId} connectionId={connectionId} schema={detail.schema} table={detail} canEdit={canManage} onClose={() => setDetail(null)} />}
   </>;
 }

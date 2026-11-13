@@ -319,3 +319,20 @@ it("disables decisions while a run is occupied", () => {
   renderWithProviders(<ProposalPanel session={session()} proposals={state()} running />);
   expect(screen.getByRole("button", { name: "全部接受（4）" })).toBeDisabled();
 });
+
+it("hides batch, card and detail edit actions when canEdit is false", async () => {
+  renderWithProviders(
+    <MemoryRouter>
+      <ProposalPanel session={session()} proposals={state()} running={false} canEdit={false} />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByRole("button", { name: /全部接受/ })).toBeNull();
+  expect(screen.queryByRole("checkbox", { name: "选择当前筛选的全部提案" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /接受/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /拒绝/ })).toBeNull();
+  fireEvent.click(screen.getAllByRole("article")[0]);
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).queryByRole("button", { name: /接受/ })).toBeNull();
+  expect(within(dialog).queryByRole("button", { name: /拒绝/ })).toBeNull();
+  expect(within(dialog).getByRole("button", { name: "关闭" })).toBeInTheDocument();
+});

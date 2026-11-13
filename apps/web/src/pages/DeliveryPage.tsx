@@ -14,6 +14,7 @@ import { PublishPanel } from "../components/publish/PublishPanel";
 import { useModeling } from "../hooks/useModeling";
 import { usePageTab } from "../hooks/usePageTab";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 
 const { Text } = Typography;
 
@@ -46,9 +47,11 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 
 export function DeliveryPage() {
   const { workspace, refresh } = useWorkspaceContext();
-  const model = useModeling(workspace.id, !!workspace.role, true);
+  const { canEdit, canRead } = useWorkspacePermissions();
+  const model = useModeling(workspace.id, canEdit, true);
   const [params, setParams] = useSearchParams();
-  const tab: PageTab = (params.get("tab") as PageTab | null) ?? (workspace.role ? "publish" : "history");
+  const requestedTab = params.get("tab") as PageTab | null;
+  const tab: PageTab = !canEdit && (!requestedTab || requestedTab === "publish") ? "history" : (requestedTab ?? "publish");
   const setTab = (next: PageTab) =>
     setParams(
       (p) => {
@@ -108,11 +111,11 @@ export function DeliveryPage() {
       <PageTabs
         title="本体发布"
         note={workspace.current_version && <StatusMark state="mapped" label={`当前 v${workspace.current_version}`} />}
-        actions={workspace.role && <Button disabled={!versions.length} onClick={() => openExport(versions[0]?.version_id)}>导出文件</Button>}
+        actions={canRead && <Button disabled={!versions.length} onClick={() => openExport(versions[0]?.version_id)}>导出文件</Button>}
             activeKey={tab}
             onChange={(key) => setTab(key as PageTab)}
             items={[
-              ...(workspace.role
+              ...(canEdit
                 ? [
                     {
                       key: "publish",
@@ -135,7 +138,7 @@ export function DeliveryPage() {
                 label: "版本历史",
                 children: (
                   <div className="flex flex-col gap-3">
-                    {workspace.role && versions.length > 0 && (
+                    {canRead && versions.length > 0 && (
                       <div className="px-4 pt-4">
                         <HistoryComparison workspaceId={workspace.id} versions={versions} onExport={openExport} />
                       </div>
@@ -164,7 +167,7 @@ export function DeliveryPage() {
                           key: "published",
                           render: (_, v) => new Date(v.published_at).toLocaleString("zh-CN", { hour12: false }),
                         },
-                        ...(workspace.role ? [{ title: "操作", key: "export", render: (_: unknown, v: VersionSummary) => <Button size="small" onClick={() => openExport(v.version_id)}>导出此版本</Button> }] : []),
+                        ...(canRead ? [{ title: "操作", key: "export", render: (_: unknown, v: VersionSummary) => <Button size="small" onClick={() => openExport(v.version_id)}>导出此版本</Button> }] : []),
                       ]}
                     />
                   </div>

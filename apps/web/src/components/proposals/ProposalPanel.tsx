@@ -17,6 +17,7 @@ type Props = {
   running: boolean;
   /** The session is still loading. */
   loading?: boolean;
+  canEdit?: boolean;
 };
 type StatusFilter = "pending" | "accepted" | "rejected";
 const STATUSES: { key: StatusFilter; label: string }[] = [
@@ -72,7 +73,7 @@ export function ProposalPanel(props: Props) {
   );
 }
 
-function ProposalReview({ session, proposals, running }: Props & { session: ModelingSession }) {
+function ProposalReview({ session, proposals, running, canEdit = true }: Props & { session: ModelingSession }) {
   const { detail } = proposals;
   const [reportOpen, setReportOpen] = useState(false);
   const producer = detail?.producer;
@@ -177,8 +178,8 @@ function ProposalReview({ session, proposals, running }: Props & { session: Mode
   return (
     <div className="flex h-full min-h-0 flex-col" aria-label="提案审核面板" aria-busy={busy}>
       {importSource && <>
-        <PanelToolbar><Typography.Text type="secondary">文件导入 · {importSource.adapter}</Typography.Text><Button size="small" onClick={() => setReportOpen(true)}>查看导入报告与补全</Button></PanelToolbar>
-        <ImportReportDialog open={reportOpen} source={importSource} session={session} onClose={() => setReportOpen(false)} onChanged={(result) => { proposals.select(result.batch_id); proposals.reload(); }} />
+        <PanelToolbar><Typography.Text type="secondary">文件导入 · {importSource.adapter}</Typography.Text>{canEdit && <Button size="small" onClick={() => setReportOpen(true)}>查看导入报告与补全</Button>}</PanelToolbar>
+        {canEdit && <ImportReportDialog open={reportOpen} source={importSource} session={session} onClose={() => setReportOpen(false)} onChanged={(result) => { proposals.select(result.batch_id); proposals.reload(); }} />}
       </>}
       {running && <Alert type="info" showIcon message="正在生成提案…" />}
       {!running && failedRun(session) && <Alert type="error" showIcon message={failedRun(session)} />}
@@ -229,67 +230,69 @@ function ProposalReview({ session, proposals, running }: Props & { session: Mode
           }))}
         />
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2">
-        <Checkbox
-          aria-label="选择当前筛选的全部提案"
-          disabled={!visible.length}
-          checked={visible.length > 0 && selectedVisible === visible.length}
-          indeterminate={selectedVisible > 0 && selectedVisible < visible.length}
-          onChange={(e) =>
-            setSelected((current) => {
-              const next = new Set(current);
-              for (const item of visible) {
-                if (e.target.checked) next.add(item.id);
-                else next.delete(item.id);
-              }
-              return next;
-            })
-          }
-        >
-          {selectedIds.length ? `已选 ${selectedIds.length} 项` : "选择当前结果"}
-        </Checkbox>
-        <div className="ml-auto flex gap-1">
-          {selectedIds.length ? (
-            <>
-              <Button
-                size="small"
-                disabled={busy || !selectedIds.some((id) => byId.get(id)?.status === "pending" && !acceptanceBlock(byId.get(id)!, byId))}
-                onClick={() => void submit(selectedIds, "accept")}
-              >
-                接受选中
-              </Button>
-              <Button size="small" danger disabled={busy || !decisionIds(items, selectedIds, "reject").length} onClick={() => void submit(selectedIds, "reject")}>
-                拒绝选中
-              </Button>
-              <Button size="small" type="text" onClick={() => setSelected(new Set())}>
-                取消选择
-              </Button>
-            </>
-          ) : (
-            <Tooltip title={acceptable.length ? "接受全部待审提案及其依赖，不受当前筛选影响" : "没有待审提案"}>
-              <span className="inline-flex">
+      {canEdit && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2">
+          <Checkbox
+            aria-label="选择当前筛选的全部提案"
+            disabled={!visible.length}
+            checked={visible.length > 0 && selectedVisible === visible.length}
+            indeterminate={selectedVisible > 0 && selectedVisible < visible.length}
+            onChange={(e) =>
+              setSelected((current) => {
+                const next = new Set(current);
+                for (const item of visible) {
+                  if (e.target.checked) next.add(item.id);
+                  else next.delete(item.id);
+                }
+                return next;
+              })
+            }
+          >
+            {selectedIds.length ? `已选 ${selectedIds.length} 项` : "选择当前结果"}
+          </Checkbox>
+          <div className="ml-auto flex gap-1">
+            {selectedIds.length ? (
+              <>
                 <Button
                   size="small"
-                  type="primary"
-                  disabled={busy || !acceptable.length}
-                  onClick={() => void submit(acceptable.map((item) => item.id), "accept")}
+                  disabled={busy || !selectedIds.some((id) => byId.get(id)?.status === "pending" && !acceptanceBlock(byId.get(id)!, byId))}
+                  onClick={() => void submit(selectedIds, "accept")}
                 >
-                  全部接受（{acceptable.length}）
+                  接受选中
                 </Button>
-              </span>
-            </Tooltip>
-          )}
-          <Dropdown
-            trigger={["click"]}
-            menu={{
-              items: [{ key: "reject-all", label: "全部拒绝", danger: true, disabled: busy || !rejectable.length }],
-              onClick: () => setConfirmReject(true),
-            }}
-          >
-            <Button size="small" aria-label="更多批量操作" icon={<MoreHorizontal size={14} />} />
-          </Dropdown>
+                <Button size="small" danger disabled={busy || !decisionIds(items, selectedIds, "reject").length} onClick={() => void submit(selectedIds, "reject")}>
+                  拒绝选中
+                </Button>
+                <Button size="small" type="text" onClick={() => setSelected(new Set())}>
+                  取消选择
+                </Button>
+              </>
+            ) : (
+              <Tooltip title={acceptable.length ? "接受全部待审提案及其依赖，不受当前筛选影响" : "没有待审提案"}>
+                <span className="inline-flex">
+                  <Button
+                    size="small"
+                    type="primary"
+                    disabled={busy || !acceptable.length}
+                    onClick={() => void submit(acceptable.map((item) => item.id), "accept")}
+                  >
+                    全部接受（{acceptable.length}）
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [{ key: "reject-all", label: "全部拒绝", danger: true, disabled: busy || !rejectable.length }],
+                onClick: () => setConfirmReject(true),
+              }}
+            >
+              <Button size="small" aria-label="更多批量操作" icon={<MoreHorizontal size={14} />} />
+            </Dropdown>
+          </div>
         </div>
-      </div>
+      )}
       <div className="relative min-h-0 flex-1 overflow-auto" role="list" aria-busy={proposals.loading}>
         {proposals.loading && (
           <div className="absolute inset-0 z-10 flex justify-center bg-surface/60 pt-8" role="status" aria-label="正在加载提案">
@@ -304,6 +307,7 @@ function ProposalReview({ session, proposals, running }: Props & { session: Mode
               items={items}
               technical={technicalName(item, items, session.draft)}
               busy={busy}
+              canEdit={canEdit}
               error={proposals.itemErrors[item.id]}
               blocked={acceptanceBlock(item, byId)}
               actions={actions}
@@ -350,6 +354,7 @@ function ProposalReview({ session, proposals, running }: Props & { session: Mode
           draft={session.draft}
           technical={technicalName(openItem, items, session.draft)}
           busy={busy}
+          canEdit={canEdit}
           error={proposals.itemErrors[openItem.id]}
           actions={actions}
           onRevise={(candidate, after) =>

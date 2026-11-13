@@ -61,6 +61,7 @@ export function workspace(extra: Partial<Workspace> = {}): Workspace {
     description: "",
     role: "admin",
     visibility: "member",
+    is_public: false,
     current_version: 1,
     version_id: "v1",
     version_sha256: "a".repeat(64),

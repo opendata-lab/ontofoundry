@@ -14,6 +14,7 @@ import { useElementDetail } from "../hooks/useElementDetail";
 import { usePageTab } from "../hooks/usePageTab";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
+import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { bindingMode, byId, effectiveProperties, effectiveSources, isA, linkDisplayName, mappingFor } from "../lib/coreModel";
 import { documentDisplayText, documentSearchText } from "../lib/instanceDisplay";
 import { instanceCanvas, instanceNeighborhood, type InstanceEdge, type InstanceNode } from "../lib/instanceGraph";
@@ -44,7 +45,8 @@ const cell = (value: Scalar | undefined) =>
   );
 
 export function InstancesPage() {
-  const { workspace } = useWorkspaceContext();
+  const { workspace, user } = useWorkspaceContext();
+  const { canRead } = useWorkspacePermissions();
   const { typeId = "", objectId } = useParams();
   const navigate = useNavigate();
   const detail = useElementDetail();
@@ -56,7 +58,7 @@ export function InstancesPage() {
     (objectId && objectId !== "database" && (params.get("source") === "database" || objectId.startsWith("db.")) ? objectId : null);
   const databaseDetail = (objectId === "database" && (keyParam !== null || refParam !== null)) || Boolean(refParam);
   const snapshotDate = params.get("date");
-  const { draft, error, load, suffix } = useSnapshot(workspace);
+  const { draft, error, load, suffix } = useSnapshot(workspace, user);
   const [source, setSource] = useState<"document" | "database">(params.get("source") === "database" ? "database" : "document");
   const [depth, setDepth] = useState(1);
   const [query, setQuery] = useState("");
@@ -81,7 +83,7 @@ export function InstancesPage() {
     Boolean(draft) &&
     (sessionId
       ? mode === "independent" || mode === "shared_parent"
-      : !workspace.role && !draft!.mappings.length
+      : !canRead && !draft!.mappings.length
         ? true
         : mode !== "unbound");
   const mapping = useMemo(

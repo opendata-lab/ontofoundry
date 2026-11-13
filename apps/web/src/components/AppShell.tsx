@@ -2,6 +2,7 @@ import { definitionReads } from "../api/definitionReads";
 import {
   Box,
   Database,
+  Info,
   Network,
   Search,
   Settings,
@@ -10,7 +11,6 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Globe,
-  LogOut,
   Plug,
 } from "lucide-react";
 import {
@@ -18,19 +18,22 @@ import {
   useParams,
   Link,
   useLocation,
-  useNavigate,
   Navigate,
 } from "react-router-dom";
-import { App, Avatar, Button, Dropdown, Tooltip } from "antd";
+import { Button, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, api } from "../api/client";
 import type { User, Workspace } from "../api/types";
 import { WorkspaceContextProvider } from "../hooks/useWorkspaceContext";
+import { getWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { OntologySearchDialog } from "./OntologySearchDialog";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { Brand } from "./Brand";
 import { ErrorSurface, LoadingSurface } from "./AsyncState";
-import { ApplicationFrame } from "./layout";
+import { NoAccessResult } from "./NoAccessResult";
+import { PlatformFrame } from "./PlatformFrame";
+import { UserMenu } from "./UserMenu";
+import { ApplicationFrame, DirectoryFrame } from "./layout";
 
 // Follow the workflow: inspect, build and publish; connect data before mapping.
 const navigation = [
@@ -51,29 +54,46 @@ const navigation = [
   },
   { group: "空间设置", items: [{ to: "settings", label: "空间设置", icon: Settings }] },
 ];
-/** What a reader without a workspace role may open: the published ontology,
- * and the release page, whose history and service tabs need no role. */
-const READER_PAGES = ["view", "objects", "relations", "delivery"];
+
 export function AppShell() {
   const { workspaceId = "" } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
-  const { message } = App.useApp();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [searching, setSearching] = useState(false);
-  const [loggingOut, setLoggingOut] = useState(false);
   const load = useCallback(() => {
     setError("");
-    Promise.all([api.workspace(workspaceId), api.me()])
-      .then(([w, u]) => {
-        definitionReads.authorize(u.id, w.id, [w.role, w.visibility].join(":"));
+    setAccessDenied(false);
+    void Promise.allSettled([api.workspace(workspaceId), api.me()]).then(
+      ([wsResult, meResult]) => {
+        if (meResult.status === "fulfilled") setUser(meResult.value);
+        if (wsResult.status === "rejected") {
+          const reason = wsResult.reason;
+          if (reason instanceof ApiError && (reason.status === 403 || reason.status === 404)) {
+            setAccessDenied(true);
+            return;
+          }
+          setError(reason instanceof Error ? reason.message : "加载工作空间失败");
+          return;
+        }
+        if (meResult.status === "rejected") {
+          const reason = meResult.reason;
+          setError(reason instanceof Error ? reason.message : "加载用户信息失败");
+          return;
+        }
+        const w = wsResult.value;
+        const u = meResult.value;
+        definitionReads.authorize(
+          u.id,
+          w.id,
+          [w.role, w.visibility, w.is_public, u.is_platform_admin].join(":"),
+        );
         setWorkspace(w);
-        setUser(u);
-      })
-      .catch((e: Error) => setError(e.message));
+      },
+    );
   }, [workspaceId]);
   useEffect(load, [load]);
   useEffect(() => {
@@ -93,22 +113,6 @@ export function AppShell() {
     return () => window.removeEventListener("resize", fit);
   }, []);
   const openSearch = useCallback(() => setSearching(true), []);
-  const handleLogout = useCallback(async () => {
-    if (loggingOut) return;
-    setLoggingOut(true);
-    try {
-      await api.logout();
-      navigate("/login", { replace: true });
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
-        navigate("/login", { replace: true });
-        return;
-      }
-      void message.error(e instanceof Error ? e.message : "退出登录失败，请重试");
-    } finally {
-      setLoggingOut(false);
-    }
-  }, [loggingOut, message, navigate]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -119,11 +123,21 @@ export function AppShell() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [openSearch]);
+  if (accessDenied) {
+    const content = <NoAccessResult subtitle="该工作空间不存在，或你不是该私有空间的成员。" />;
+    if (user) return <PlatformFrame user={user}>{content}</PlatformFrame>;
+    return (
+      <DirectoryFrame header={<Link to="/"><Brand /></Link>}>
+        {content}
+      </DirectoryFrame>
+    );
+  }
   if (error) return <ErrorSurface message={error} retry={load} />;
   if (location.pathname.replace(/\/$/, "") === `/workspaces/${workspaceId}`)
     return <Navigate to={`/workspaces/${workspaceId}/view`} replace />;
   if (!workspace || workspace.id !== workspaceId || !user)
     return <LoadingSurface label="正在读取工作空间…" />;
+  const permissions = getWorkspacePermissions(workspace, user);
   return (
     <ApplicationFrame
       collapsed={collapsed}
@@ -141,28 +155,7 @@ export function AppShell() {
               {workspace.name}
               <ChevronDown className="size-icon" />
             </Link>
-            <Dropdown
-              trigger={["click"]}
-              menu={{
-                items: [{ key: "logout", label: "退出登录", icon: <LogOut className="size-icon-sm" /> }],
-                onClick: ({ key }) => {
-                  if (key === "logout") void handleLogout();
-                },
-              }}
-            >
-              <Button
-                type="text"
-                aria-label={user.display_name || "用户菜单"}
-                loading={loggingOut}
-                className="flex items-center gap-2 px-2 text-xs text-inherit"
-              >
-                <Avatar className="size-6 bg-accent text-xs leading-6 text-accent-ink">
-                  {user.display_name.slice(0, 1).toUpperCase() || "A"}
-                </Avatar>
-                <span>{user.display_name}</span>
-                <ChevronDown className="size-icon" />
-              </Button>
-            </Dropdown>
+            <UserMenu user={user} />
           </div>
         </>
       }
@@ -170,7 +163,9 @@ export function AppShell() {
         <>
           <nav aria-label="工作空间导航" className="flex flex-col gap-4">
             {navigation.map(({ group, items }) => {
-              const visible = items.filter((n) => workspace.role || READER_PAGES.includes(n.to));
+              const visible = items.filter((n) =>
+                n.to === "settings" ? permissions.canManage : true,
+              );
               if (!visible.length) return null;
               // A group of one item needs no heading: the item names itself.
               const heading = visible.length > 1 || visible[0].label !== group;
@@ -215,7 +210,20 @@ export function AppShell() {
       }
     >
       <WorkspaceContextProvider.Provider value={{ workspace, user, refresh: load }}>
-        <WorkspaceTabs key={`${user.id}:${workspaceId}`} workspaceId={workspaceId} userId={user.id} />
+        <div className="flex h-full min-h-0 flex-col">
+          {permissions.readOnlyBanner && (
+            <div
+              role="status"
+              className="flex shrink-0 items-center gap-2 border-b border-rule bg-accent-soft px-5 py-2 text-xs text-ink-2"
+            >
+              <Info size={14} className="shrink-0 text-accent" aria-hidden="true" />
+              <span>{permissions.readOnlyBanner}</span>
+            </div>
+          )}
+          <div className="flex min-h-0 flex-1 flex-col">
+            <WorkspaceTabs key={`${user.id}:${workspaceId}`} workspaceId={workspaceId} userId={user.id} />
+          </div>
+        </div>
       </WorkspaceContextProvider.Provider>
       <OntologySearchDialog workspaceId={workspaceId} open={searching} onClose={() => setSearching(false)} />
     </ApplicationFrame>

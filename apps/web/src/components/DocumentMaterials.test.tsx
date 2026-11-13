@@ -42,4 +42,15 @@ describe("document materials", () => {
     expect(await screen.findByText("表结构收据 · 虚构采购库 · 2026-10-21")).toBeInTheDocument();
     expect(screen.queryByText("虚构采购说明.md")).toBeNull();
   });
+
+  it.each([
+    ["viewer member", { role: "viewer" as const, is_public: false, visibility: "member" as const }],
+    ["public non-member", { role: null, is_public: true, visibility: "public" as const }],
+  ])("hides upload, archive and delete actions for %s", async (_label, patch) => {
+    renderWithProviders(<DocumentMaterials workspace={{ id: "w", ...patch } as Workspace} />);
+    expect(await screen.findByText("虚构采购说明.md")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /上传文档/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /归档/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /删除/ })).toBeNull();
+  });
 });

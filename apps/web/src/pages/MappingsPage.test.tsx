@@ -9,10 +9,10 @@ import { useSourceIssues } from "../components/proposals/ProposalSourceIssues";
 import { MappingsPage } from "./MappingsPage";
 import { DatasetLocationFields } from "../components/elements/DatasetLocationFields";
 
-const { workspace } = vi.hoisted(() => ({
-  workspace: { id: "w", role: "admin", current_version: 1, version_id: "v1" },
+const ctx = vi.hoisted(() => ({
+  workspace: { id: "w", role: "admin" as string | null, is_public: false, visibility: "member" as "member" | "public", current_version: 1, version_id: "v1" },
 }));
-vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace, refresh: vi.fn() }) }));
+vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace: ctx.workspace, refresh: vi.fn() }) }));
 vi.mock("../hooks/usePageTab", () => ({ usePageTab: vi.fn(), usePageActive: () => true }));
 const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }));
 vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams()], useNavigate: () => navigate }));
@@ -73,6 +73,7 @@ const job = (patch: Partial<SyncJob>): SyncJob => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  ctx.workspace = { id: "w", role: "admin", is_public: false, visibility: "member", current_version: 1, version_id: "v1" };
   vi.mocked(catalogApi.connections).mockResolvedValue({ items: [{ id: "c", name: "主库", kind: "postgresql" } as never] });
   vi.mocked(catalogApi.schemas).mockResolvedValue({ items: ["crm", "sales"] });
   vi.mocked(catalogApi.tables).mockResolvedValue({
@@ -296,5 +297,16 @@ describe("data management page", () => {
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     await screen.findByRole("checkbox", { name: "crm.contacts" });
     expect(catalogApi.tables).toHaveBeenCalledWith("w", "c", { schema_name: "crm" });
+  });
+
+  it.each([
+    ["viewer member", { role: "viewer" as const, is_public: false, visibility: "member" as const }],
+    ["public non-member", { role: null, is_public: true, visibility: "public" as const }],
+  ])("hides table sync and remove actions for %s", async (_label, patch) => {
+    ctx.workspace = { ...ctx.workspace, ...patch };
+    renderWithProviders(<MappingsPage />);
+    expect(await screen.findByText("contacts")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "同步数据表" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "移除 contacts" })).toBeNull();
   });
 });

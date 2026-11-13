@@ -56,6 +56,16 @@ import type {
   User,
   AuthOptions,
   LocalLoginRequest,
+  Member,
+  AddMemberRequest,
+  WorkspaceUserSearchItem,
+  MeWorkspace,
+  AdminUser,
+  CreateAdminUserRequest,
+  AdminWorkspace,
+  UpsertUserWorkspaceResponse,
+  UpdateWorkspaceRequest,
+  WorkspaceRole,
   ValidationIssue,
   ValidationReport,
   VersionSummary,
@@ -219,6 +229,7 @@ export const logout = async () => {
 
 export const api = {
   me: () => request<User>("/api/v1/auth/me"),
+  meWorkspaces: () => request<Items<MeWorkspace>>("/api/v1/me/workspaces"),
   authOptions,
   loginLocal,
   logout,
@@ -228,6 +239,26 @@ export const api = {
   createWorkspace: (payload: { name: string; slug: string; description: string }) =>
     request<Workspace>("/api/v1/workspaces", json("POST", payload)),
   workspace: (workspaceId: string) => request<Workspace>("/api/v1/workspaces/" + workspaceId),
+  updateWorkspace: (workspaceId: string, body: UpdateWorkspaceRequest) =>
+    request<Workspace>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, json("PATCH", body)),
+  members: (workspaceId: string) =>
+    request<Items<Member>>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/members`),
+  addMember: (workspaceId: string, body: AddMemberRequest) =>
+    request<Member>(`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/members`, json("POST", body)),
+  updateMemberRole: (workspaceId: string, memberId: number | string, role: WorkspaceRole) =>
+    request<Member>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(String(memberId))}`,
+      json("PATCH", { role }),
+    ),
+  removeMember: (workspaceId: string, memberId: number | string) =>
+    request<void>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(String(memberId))}`,
+      { method: "DELETE" },
+    ),
+  searchWorkspaceUsers: (workspaceId: string, q?: string) =>
+    request<Items<WorkspaceUserSearchItem>>(
+      `/api/v1/workspaces/${encodeURIComponent(workspaceId)}/users/search` + query({ q }),
+    ),
   overview: (workspaceId: string) =>
     request<WorkspaceOverview>("/api/v1/workspaces/" + workspaceId + "/overview"),
   version: (workspaceId: string, versionId?: string) =>
@@ -283,6 +314,23 @@ export const api = {
   comparison: (workspaceId: string, rightId: string, leftId?: string) =>
     request<Comparison>(
       `/api/v1/workspaces/${workspaceId}/version-comparison` + query({ right_id: rightId, left_id: leftId }),
+    ),
+};
+
+export const adminApi = {
+  users: (q?: string) => request<Items<AdminUser>>("/api/v1/admin/users" + query({ q })),
+  createUser: (body: CreateAdminUserRequest) =>
+    request<AdminUser>("/api/v1/admin/users", json("POST", body)),
+  workspaces: () => request<Items<AdminWorkspace>>("/api/v1/admin/workspaces"),
+  setUserWorkspace: (userId: string, workspaceId: string, role: WorkspaceRole) =>
+    request<UpsertUserWorkspaceResponse>(
+      `/api/v1/admin/users/${encodeURIComponent(userId)}/workspaces/${encodeURIComponent(workspaceId)}`,
+      json("PUT", { role }),
+    ),
+  removeUserWorkspace: (userId: string, workspaceId: string) =>
+    request<void>(
+      `/api/v1/admin/users/${encodeURIComponent(userId)}/workspaces/${encodeURIComponent(workspaceId)}`,
+      { method: "DELETE" },
     ),
 };
 

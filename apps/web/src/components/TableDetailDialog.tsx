@@ -11,8 +11,8 @@ const cell = (value: unknown) => value === null || value === undefined ? <span c
   : typeof value === "object" ? JSON.stringify(value) : String(value);
 
 /** One synced table: catalog facts, columns and the first rows from the source. */
-export function TableDetailDialog({ workspaceId, connectionId, schema, table, onClose }: {
-  workspaceId: string; connectionId: string; schema: string; table: AssetTable; onClose: () => void;
+export function TableDetailDialog({ workspaceId, connectionId, schema, table, canEdit = true, onClose }: {
+  workspaceId: string; connectionId: string; schema: string; table: AssetTable; canEdit?: boolean; onClose: () => void;
 }) {
   const [tab, setTab] = useState("info");
   const [rows, setRows] = useState<TableRows | null>(null);
@@ -92,7 +92,7 @@ export function TableDetailDialog({ workspaceId, connectionId, schema, table, on
               : <Typography.Text type="secondary" className="text-xs">已发布本体中没有定义引用它</Typography.Text>}
           </section>
         ))}
-        {!!impact?.some((i) => i.affected.length) && (
+        {canEdit && !!impact?.some((i) => i.affected.length) && (
           <div><Button type="primary" loading={starting} onClick={() => void startModeling()}>发起局部建模</Button></div>
         )}
       </div> },

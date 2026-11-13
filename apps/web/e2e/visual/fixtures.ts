@@ -162,6 +162,7 @@ const FIXTURE_WORKSPACE: Workspace = {
   version_id: "ver-visual-demo-3",
   version_sha256: "a".repeat(64),
   updated_at: "2026-10-16T08:00:00Z",
+  is_public: false,
   role: "admin",
   visibility: "member",
   object_type_count: FIXTURE_DRAFT.object_types.length,
@@ -189,8 +190,9 @@ const FIXTURE_WORKSPACES: Workspace[] = [
     name: "青禾供应链示例空间",
     slug: "qinghe-supply-demo",
     description: "供访客查看的虚构本体",
+    is_public: true,
     role: null,
-    visibility: "published_only",
+    visibility: "public",
     object_type_count: 6,
     link_type_count: 4,
   },
@@ -218,8 +220,8 @@ const FIXTURE_CONNECTIONS: DataConnection[] = [
 ];
 
 const FIXTURE_MEMBERS: Member[] = [
-  { id: 1, user_id: "user-visual-demo", name: "林晓", subject: "demo:linxiao", role: "admin" },
-  { id: 2, user_id: "user-visual-member", name: "陈宁", subject: "demo:chenning", role: "member" },
+  { id: 1, user_id: "user-visual-demo", username: "linxiao", display_name: "林晓", role: "admin", last_login_at: "2026-11-12T08:00:00Z" },
+  { id: 2, user_id: "user-visual-member", username: "chenning", display_name: "陈宁", role: "member", last_login_at: "2026-11-12T08:00:00Z" },
 ];
 
 const FIXTURE_HEALTH: DataAgentHealth = {
@@ -266,7 +268,7 @@ const FIXTURE_VERSIONS: VersionSummary[] = [3, 2, 1].map((version) => ({
 export async function mockMappingsApi(page: Page) {
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
   const responses: Record<string, unknown> = {
-    "/api/v1/auth/me": { id: "user-visual-demo", subject: "demo:linxiao", display_name: "林晓", email: null },
+    "/api/v1/auth/me": { id: "user-visual-demo", username: "linxiao", display_name: "林晓", email: null, is_platform_admin: false, local_account: true },
     "/api/v1/workspaces": { items: FIXTURE_WORKSPACES },
     [base]: FIXTURE_WORKSPACE,
     [`${base}/published-snapshot`]: FIXTURE_DRAFT,
