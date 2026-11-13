@@ -306,6 +306,7 @@ plugins/
 | Claude Code | 添加 `opendata-lab/ontofoundry` 插件目录后安装；令牌通过插件 `userConfig` 的敏感项填入，`.mcp.json` 中引用为 `Bearer ${user_config.ontofoundry_token}` | [插件](https://code.claude.com/docs/en/plugins)、[插件参考](https://code.claude.com/docs/en/plugins-reference) |
 | ZCode | 清单查找顺序为 `.zcode-plugin/plugin.json`、`.claude-plugin/plugin.json`，因此只维护一份清单；从 GitHub 仓库添加插件目录后安装 | [ZCode 插件](https://zcode.z.ai/en/docs/plugin) |
 | opencode | 插件是 JS/TS 模块，不读插件包；Skill 放入或指向 `.opencode/skills`、`.claude/skills`、`.agents/skills` 之一，MCP 写入 `opencode.json` 的 `mcp.servers`（`"type": "remote"`、`"oauth": false`、`"Authorization": "Bearer {env:ONTOFOUNDRY_TOKEN}"`） | [Skills](https://opencode.ai/docs/skills)、[MCP](https://opencode.ai/docs/mcp-servers) |
+| Codex | 不读插件包；Skill 放入项目 `.agents/skills/`（或 `~/.agents/skills/`），MCP 写入 `~/.codex/config.toml` 的 `[mcp_servers.ontofoundry]`（`url`、`bearer_token_env_var = "ONTOFOUNDRY_TOKEN"`）。2026-11-13 用户同意作为验证客户端，步骤一已实测 | [Skills](https://developers.openai.com/codex/skills)、[MCP](https://developers.openai.com/codex/mcp) |
 
 插件不带本地工具代码，工具全部来自网关。SKILL.md 只用 `name`、`description` 两个通用字段，描述不超过 1024 字符（ZCode 超长会忽略该 Skill）。 这些约束由后端测试在 CI 中检查（见计划步骤二），超限时测试失败，不会发布出被客户端忽略的 Skill。
 
