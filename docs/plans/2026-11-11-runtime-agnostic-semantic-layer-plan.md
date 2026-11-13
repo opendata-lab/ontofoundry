@@ -44,11 +44,11 @@
 3. **成员检查与跨空间检索**：每次调用和翻页前检查成员关系，失败返回 `workspace_unavailable`；`search_ontology` 先解析目标空间（显式列表或全部成员空间），超过 10 个返回 `search_limit_exceeded`／`workspace_count`；逐个调用单空间检索并按空间名称分组，合计超过 110,000 字节返回 `search_limit_exceeded`／`response_size`。
 4. **调用记录**：按设计第 6 节，鉴权后执行工具前插入 `started` 行并单独提交，返回后更新同一行；记录写入失败只记错误日志，不影响工具返回。
 5. **版本元数据**：按设计 SL-05 在每个工具结果的 `_meta` 加入 `io.github.opendata-lab.ontofoundry/versions`，与 `io.modelcontextprotocol/serverInfo` 并列；按协议版本的 `schema.ts` 核对旧版响应也允许 `_meta`。
-6. **反馈**：按设计第 7 节实现 `submit_feedback`（成员检查、元素归属与长度校验、服务端填写 `version_id`），新增 `GET /api/v1/workspaces/{workspace_id}/feedback`（登录会话、空间管理员、游标分页）；前端新增 `pages/FeedbackPage.tsx` 和路由 `feedback`，在 `components/AppShell.tsx` 把“空间设置”分组改名为“管理中心”，其下为“空间设置”和“用户反馈”两个二级菜单，菜单项支持仅管理员可见（现有菜单只区分成员与只读访问者）；同步更新 `AppShell.test.tsx` 和受影响的导航截图基准；页面用 `PageHeader`、`Panel` 和 Ant Design `Table`，沿用列表页布局，不新增布局模式，接口调用走 `api/client.ts` 并补充前端类型；Skill 写入第 7.2 节反馈规则和第 9.1 节缓存规则。
+6. **反馈**：按设计第 7 节实现 `submit_feedback`（成员检查、元素归属与长度校验、服务端填写 `version_id`），新增 `GET /api/v1/workspaces/{workspace_id}/feedback`（登录会话、空间管理员、游标分页）；前端新增 `pages/FeedbackPage.tsx` 和路由 `feedback`，在 `components/AppShell.tsx` 把“空间设置”分组改名为“管理中心”，其下为“空间设置”和“用户反馈”两个二级菜单，整组仅空间管理员可见（现有菜单只区分成员与只读访问者，需新增管理员判断），`settings` 与 `feedback` 路由对非管理员显示无权限；同步更新 `AppShell.test.tsx` 和受影响的导航截图基准；页面用 `PageHeader`、`Panel` 和 Ant Design `Table`，沿用列表页布局，不新增布局模式，接口调用走 `api/client.ts` 并补充前端类型；Skill 写入第 7.2 节反馈规则和第 9.1 节缓存规则。
 7. **测试**：新增 `tests/test_personal_tokens.py`、`tests/test_ontology_gateway.py`、`tests/test_feedback.py`，覆盖第 4 节验收中可自动化的场景；新增 `tests/test_plugin_package.py` 检查插件包（插件目录整体随安装分发，测试不放在插件目录内）：`plugin.json` 与 `marketplace.json` 可解析且 `name` 合法，`.mcp.json` 中没有明文令牌，`skills/` 下每个 Skill 是一层目录、`SKILL.md` 含 `name` 和 `description`、`name` 与目录名一致、`description` 不超过 1024 字符；单空间入口现有测试保持通过。完成全部修改后统一运行后端测试和 `make lint`。
 8. **插件与文档**：`plugins/ontofoundry/.mcp.json` 改为网关地址和个人令牌；`plugins/ontofoundry/README.md` 写明令牌签发、三种客户端的安装与配置；AGENTS.md 增加 `plugins/` 的说明（外部客户端插件的源码位置，改动后同步版本号）；`docs/concepts/` 只描述模型概念，本次不变。随附的 `apps/web/nginx.conf` 已整体转发 `/api/`，无需修改。
 
-前端只调整导航分组并增加“用户反馈”页面：令牌通过接口签发，个人设置页面按试点反馈排期。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖管理员可见菜单与页面、成员和只读访问者看不到菜单且直接访问显示无权限。
+前端只调整导航分组并增加“用户反馈”页面：令牌通过接口签发，个人设置页面按试点反馈排期。界面改动按 AGENTS.md 在 1440×900 下截图对比并运行 `npm run test:visual`，前端测试覆盖管理员可见“管理中心”及两个页面，成员和只读访问者看不到该分组、直接访问两个地址均显示无权限。
 
 ## 4. 验收
 
@@ -64,7 +64,8 @@
 | 两次读取之间发布新版本 | 旧游标失效，响应 `version_id` 更新 | 是 |
 | 版本元数据 | 每个工具结果的 `_meta` 含 `io.github.opendata-lab.ontofoundry/versions`，与正文中的 `version_id` 一致 | 是 |
 | 提交反馈 | 成员提交后记录原话、说明、相关元素和服务端填写的版本；非成员、跨空间元素、空文本或超长被拒绝 | 是 |
-| 查看反馈 | 空间管理员在“管理中心 → 用户反馈”看到时间倒序的反馈列表；成员在“管理中心”下只看到“空间设置”；成员、只读访问者和其他空间管理员看不到菜单，接口返回 403 | 是 |
+| 管理中心 | 空间管理员看到“管理中心”（空间设置、用户反馈）；成员和只读访问者看不到该分组，直接访问显示无权限 | 是 |
+| 查看反馈 | 空间管理员在“管理中心 → 用户反馈”看到时间倒序的反馈列表；成员、只读访问者和其他空间管理员看不到菜单，接口返回 403 | 是 |
 | Skill 提交反馈 | 用户纠正口径时，智能体提交一次反馈，`user_text` 为用户原话 | 联验 |
 | Skill 本地缓存 | 版本未变时第二次问同一定义只调用一次 `list_spaces`；发布新版本后下一个问题重新读取并删除旧版本缓存；被移出空间后该空间缓存被删除。调用记录中的调用次数与预期一致 | 联验 |
 | 调用记录 | 成功和失败的调用各一行，空间与版本、参数、完整返回、错误码和消息齐全；完整返回与客户端收到的一致；工具执行中抛出未处理异常时该行停在 `started`；鉴权失败不写入；不含令牌和游标原文 | 是 |
