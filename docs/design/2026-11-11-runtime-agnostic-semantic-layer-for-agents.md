@@ -21,7 +21,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | SL-01 | **兼容单空间 MCP，新增用户网关**：现有按空间配置的 MCP 地址、凭据、工具和协议不变。新增 `/api/v1/ontology/mcp`，提供 `list_spaces`、`search_ontology`、`get_ontology` 三个只读工具（支持跨空间检索），以及只写入反馈记录的 `submit_feedback`（SL-04）。网关不执行业务数据查询，不提供实例与文档事实工具。两个入口共用现有本体读取服务。来源：现有 MCP；属于接入方式，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-02 | **个人访问令牌（PAT）**：网关只接受绑定用户的个人令牌，每次调用按该用户当前的空间成员关系和令牌权限授权。权限必含 `ontology:read`，可选 `mappings:read`（返回物理映射和 SQL 参考），签发后可增减可选权限。令牌不过期，用户可随时撤销。用户登录后在“个人中心 → 个人令牌”中自行签发、查看、修改权限和撤销；登录方式见[平台登录](2026-11-12-platform-login.md)。来源：常见个人访问令牌机制；属于接入鉴权。 | 2026-11-12 用户确认；不过期 2026-11-12 用户确认 |
 | SL-03 | **网关调用记录**：每次工具调用在数据库存一条记录：调用者、令牌、工具、读取的空间及其版本、调用参数、完整返回内容、结果状态与错误、耗时，另有扩展字段；只原样记录请求和返回，服务端不另行加工统计。记录异步写入，任何情况下都不影响工具调用的结果和耗时（第 6 节）。不存令牌。用于审计、改进工具，并为日后把外部提问转成建模输入（第 11 节 SL-15）保留素材。来源：固定令牌无法追溯调用者的缺口；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认；入库、字段及保存完整返回 2026-11-12 用户确认 |
-| SL-04 | **反馈记录**：用户在外部智能体中纠正错误或提出建议时，智能体按 Skill 调用 `submit_feedback`，记录用户原话和智能体生成的说明，归属到相关空间。首版只记录，不做状态流转、不改本体、不生成提案；该空间管理员在左侧菜单“管理中心 → 用户反馈”查看。来源：外部使用中发现的口径问题需要回到建模者手中；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认 |
+| SL-04 | **反馈记录**：用户在外部智能体中纠正错误或提出建议时，智能体按 Skill 调用 `submit_feedback`，记录用户原话和智能体生成的说明，归属到相关空间。首版只记录，不做状态流转、不改本体、不生成提案；该空间管理员和平台管理员在左侧菜单“管理中心 → 用户反馈”查看。来源：外部使用中发现的口径问题需要回到建模者手中；属于平台运行记录，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-05 | **结果附带版本元数据**：每个工具结果的 `_meta` 中加入 `io.github.opendata-lab.ontofoundry/versions`，列出本次涉及的每个空间的 `workspace_id`、`version_id`、`version_number`。结果正文仍保留 `workspace_id`、`version_id`，因为 MCP 规范没有规定客户端是否把 `_meta` 交给模型。来源：MCP 规范的 `_meta` 字段（键名按反向域名前缀）；属于接口元数据，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-06 | **Skill 本地缓存**：Skill 把读取到的定义按空间和 `version_id` 缓存在本地，每个问题开始时用一次 `list_spaces` 核对版本，未变化时直接用缓存，变化时才重新读取，减少调用次数。服务端不新增条件读取接口。来源：已发布版本不可变；属于客户端行为，不进入本体模型。 | 2026-11-12 用户确认 |
 | SL-09 | **客户端插件**：仓库根目录新建 `plugins/ontofoundry/`，采用 Claude Code 插件格式（ZCode 兼容读取），包含网关 MCP 配置和外部 Skill；仓库根目录的 `.claude-plugin/marketplace.json` 列出该插件，用户按仓库名添加。opencode 没有插件包格式，直接使用同一个 Skill 目录并按说明配置 MCP。`integrations/dataagent` 保持不变。来源：Claude Code 与 ZCode 的插件规范、Agent Skills 格式；属于客户端分发，不进入本体模型。 | 2026-11-12 用户确认 |
@@ -81,9 +81,9 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 网关身份沿用现有 `Principal`：用户为令牌所属用户，`service_token_id` 为 `pat:<令牌 ID>`，`scopes` 为令牌权限，不绑定空间。现有读取服务据此裁剪物理投影（`can_read_mappings` 对带 `service_token_id` 的身份检查 `mappings:read`），游标的授权指纹也包含令牌 ID 和范围，所以不同令牌的游标不能混用。
 
-### 4.3 成员检查
+### 4.3 读取权限检查
 
-每次调用、每次翻页前，网关先确认用户当前可阅读目标空间（成员，或空间公开，见[用户管理与空间公开](2026-11-12-user-management.md) UM-07），再调用读取服务。用户被移出空间或空间改为私有后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
+每次调用、每次翻页前，网关先确认用户当前可阅读目标空间（任一角色的成员、空间公开，或平台管理员，即 `can_read_workspace`，见[用户管理与空间公开](2026-11-12-user-management.md) UM-02、UM-07），再调用读取服务。用户被移出空间或空间改为私有后，该空间立即从目录和默认检索中消失，显式请求返回统一的空间不可访问错误，不区分空间不存在和无权访问。
 
 ### 4.4 数据表
 
@@ -155,7 +155,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | `GET /api/v1/auth/tokens` | 无 | `{"items": [{"id", "name", "permissions", "created_at", "updated_at", "last_used_at"}]}`，只列未撤销令牌，按创建时间倒序 | — |
 | `PATCH /api/v1/auth/tokens/{token_id}` | `{"permissions": [...]}` 或 `{"name": "..."}` | 更新后的令牌元数据 | 不存在、已撤销或不属于本人：`404`；权限不合法：`422` |
 | `DELETE /api/v1/auth/tokens/{token_id}` | 无 | `204` | 不存在或不属于本人：`404` |
-| `GET /api/v1/workspaces/{workspace_id}/feedback` | `cursor`、`limit`（默认 20，最多 100） | `{"items": [{"id", "created_at", "user": {"id", "display_name"}, "kind", "user_text", "agent_text", "elements": [{"id", "name", "display_name"}], "version_number"}], "next_cursor"}`；元素名按当前发布版本解析，已不存在的元素只有 `id` | 非该空间管理员：`403` |
+| `GET /api/v1/workspaces/{workspace_id}/feedback` | `cursor`、`limit`（默认 20，最多 100） | `{"items": [{"id", "created_at", "user": {"id", "display_name"}, "kind", "user_text", "agent_text", "elements": [{"id", "name", "display_name"}], "version_number"}], "next_cursor"}`；元素名按当前发布版本解析，已不存在的元素只有 `id` | 非该空间管理员且非平台管理员：`403` |
 
 错误体沿用现有 `ServiceError` 约定（英文 `code`、中文 `message`）。
 
@@ -180,7 +180,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | 工具 | 入参 | 行为 |
 |---|---|---|
 | `list_spaces` | 无 | 列出用户当前可阅读的空间（成员空间和公开空间）：`workspace_id`、名称、角色（非成员的公开空间为 `public`）、`version_id`、`version_number`，未发布的空间两个版本字段为 `null`；另返回当前令牌的 `permissions`。只查成员关系和发布版本号，不加载版本快照（不复用会统计元素数的 `workspace_summary`），因为 Skill 每个问题都会调用。 |
-| `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索全部成员空间。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
+| `search_ontology` | `query`；可选 `workspace_ids`、`kinds`、`expand`、`limit`、`cursor`。除 `workspace_ids` 外与单空间入口相同 | 省略 `workspace_ids` 时检索用户有成员角色的全部空间；公开空间和平台管理员仅凭配置可读的空间不进入默认检索，需显式传入（它们出现在 `list_spaces` 中），避免默认检索因空间过多触发上限。结果按空间分组，每组即单空间检索的结果（`workspace_id`、`version_id`、`items`、`total`、`next_cursor`、`retrieval`、`unmatched_terms`），组内排序不变，`limit` 按组生效；组按空间名称排序，不做跨空间统一排序。续页时传入该组的 `next_cursor`，`workspace_ids` 只含该组空间，其余参数不变。 |
 | `get_ontology` | `workspace_id`；其余参数与单空间入口相同（`ids`、`kinds`、`include`、`limit`、`cursor`） | 读取一个空间的已发布定义和有权限的投影，响应带 `workspace_id`、`version_id`，分页和字段分段沿用现有规则。 |
 | `submit_feedback` | `workspace_id`、`kind`（`correction` 纠正／`suggestion` 建议）、`user_text`、`agent_text`；可选 `element_ids`（最多 20 个） | 按第 7 节写入一条反馈，返回 `feedback_id`、`workspace_id`、`version_id`、`created_at`。只新增记录，不改本体。 |
 
@@ -190,13 +190,13 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 | 情况 | 工具错误 `code` |
 |---|---|
-| 显式请求的空间不存在或用户不是成员（含 `workspace_ids` 中任一个） | `workspace_unavailable` |
+| 显式请求的空间不存在或用户不可阅读（含 `workspace_ids` 中任一个） | `workspace_unavailable` |
 | 检索涉及的空间超过 10 个 | `search_limit_exceeded`，`reason` 为 `workspace_count`，`limit` 为 10 |
 | 各组结果合计超过 110,000 字节（与现有工具的单次响应预算相同） | `search_limit_exceeded`，`reason` 为 `response_size` |
 | 游标无效或已失效（版本更新、成员或令牌变化） | `cursor_invalid`（沿用现有） |
 | 某个空间的单空间检索出错（如单页超过预算的 `response_too_large`） | 该错误的 `code`，整次失败 |
 
-超限或出错时整次返回错误，不返回部分结果。用户没有任何成员空间时，`list_spaces` 和默认检索返回空列表。Agent 可用 `list_spaces` 选出相关空间后显式传入 `workspace_ids`，或降低 `limit` 后重试。
+超限或出错时整次返回错误，不返回部分结果。用户没有任何可阅读空间时，`list_spaces` 返回空列表；没有成员空间时默认检索返回空列表。Agent 可用 `list_spaces` 选出相关空间后显式传入 `workspace_ids`，或降低 `limit` 后重试。
 
 例如用户是虚构星港采购空间和星港销售空间的成员，检索“订单金额”返回两组结果，各自带空间和版本；Agent 按空间分别展示两个定义，由用户确认采用哪一个。
 
@@ -237,7 +237,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 ### 6.1 查看：用户审计
 
-“管理中心”新增“用户审计”（`/workspaces/<id>/audit`），只对该空间管理员显示，看到涉及本空间的网关调用（`ontology_gateway_call_workspaces` 中有本空间的记录），时间倒序、分页。记录异步写入，通常在调用后数秒内出现。
+“管理中心”新增“用户审计”（`/workspaces/<id>/audit`），只对该空间管理员和平台管理员显示，看到涉及本空间的网关调用（`ontology_gateway_call_workspaces` 中有本空间的记录），时间倒序、分页。记录异步写入，通常在调用后数秒内出现。
 
 | 列 | 内容 |
 |---|---|
@@ -263,7 +263,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | `GET /api/v1/workspaces/{workspace_id}/gateway-calls` | 参数 `user_id`、`tool`、`outcome`、`from`、`to`、`cursor`、`limit`（默认 20，最多 100）；返回 `{"items": [{"id", "created_at", "user": {"id", "display_name"}, "tool", "summary", "outcome", "error_code", "duration_ms", "version_number"}], "next_cursor"}` |
 | `GET /api/v1/workspaces/{workspace_id}/gateway-calls/{call_id}` | 返回请求、本空间部分的返回、结果与错误、耗时、版本；调用不涉及本空间时 `404` |
 
-两者都要求登录会话和该空间管理员角色，否则 `403`。
+两者都要求登录会话和管理权限（该空间管理员或平台管理员，`can_manage_workspace`），否则 `403`。
 
 ## 7. 反馈（SL-04）
 
@@ -272,7 +272,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 | 字段 | 内容 |
 |---|---|
 | `id`、`created_at` | 记录标识和时间 |
-| `workspace_id` | 反馈所属空间，提交者须是成员 |
+| `workspace_id` | 反馈所属空间，提交者须可阅读该空间（含公开空间的非成员） |
 | `user_id`、`token_id` | 提交者和令牌 |
 | `kind` | `correction`（用户指出错误）或 `suggestion`（用户提出建议） |
 | `user_text` | 用户原话，逐字引用，不改写，最多 4,000 字 |
@@ -283,7 +283,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 例如在虚构星港销售空间，用户说“净销售额应该再扣掉运费，你算的不对”。智能体提交 `kind` 为 `correction`，`user_text` 为这句话原文，`agent_text` 为“回答采用的指标‘净销售额’（第 7 版）口径为已付款金额减退款金额，用户认为还应扣除运费”，`element_ids` 为该指标 ID。
 
-`workspace_id` 不存在、用户不是成员时返回 `workspace_unavailable`；`element_ids` 含不属于该空间的元素、文本为空或超长时返回 `invalid_arguments`。反馈调用与其他工具一样写入调用记录（第 6 节）。
+`workspace_id` 不存在、用户不可阅读该空间时返回 `workspace_unavailable`；`element_ids` 含不属于该空间的元素、文本为空或超长时返回 `invalid_arguments`。反馈调用与其他工具一样写入调用记录（第 6 节）。
 
 ### 7.2 Skill 规则
 
@@ -295,7 +295,7 @@ DataAgent 通过每个工作空间各自的 MCP 地址读取本体，使用部�
 
 ### 7.3 查看
 
-左侧菜单原“空间设置”分组改为“管理中心”，下设二级菜单“空间设置”（原页面）、“用户反馈”（`/workspaces/<id>/feedback`）和“用户审计”（第 6.1 节）。整个“管理中心”只对该空间管理员显示；成员和只读访问者看不到该分组，直接访问两个地址时显示无权限。成员因此不再能查看空间设置页上的只读内容（空间信息、成员列表、DataAgent 连通性），这些内容原本也只有管理员能修改（2026-11-12 用户决定）。页面沿用现有列表页布局（`PageHeader` 加 `Panel` 内的 Ant Design `Table`），时间倒序，显示时间、提交者、类型、用户原话、智能体说明、相关元素（按当前发布版本显示名称，元素已删除时显示 ID）和提交时版本号；分页，只读。接口 `GET /api/v1/workspaces/{workspace_id}/feedback`，要求登录会话和该空间管理员角色。
+左侧菜单原“空间设置”分组改为“管理中心”，下设二级菜单“空间设置”（原页面）、“用户反馈”（`/workspaces/<id>/feedback`）和“用户审计”（第 6.1 节）。整个“管理中心”只对该空间管理员和平台管理员显示；可编辑、可查看成员和公开空间的非成员看不到该分组，直接访问两个地址时显示无权限。成员因此不再能查看空间设置页上的只读内容（空间信息、成员列表、DataAgent 连通性），这些内容原本也只有管理员能修改（2026-11-12 用户决定）。页面沿用现有列表页布局（`PageHeader` 加 `Panel` 内的 Ant Design `Table`），时间倒序，显示时间、提交者、类型、用户原话、智能体说明、相关元素（按当前发布版本显示名称，元素已删除时显示 ID）和提交时版本号；分页，只读。接口 `GET /api/v1/workspaces/{workspace_id}/feedback`，要求登录会话和管理权限（该空间管理员或平台管理员）。
 
 ## 8. 客户端插件（SL-09）
 
@@ -366,7 +366,7 @@ plugins/
 | MCP 与鉴权 | 新增网关路由、个人令牌鉴权依赖和令牌管理接口；单空间入口的路由、鉴权和工具不变。 |
 | 读取服务 | 复用 `mcp_ontology` 与 `ontology_search`，不改其授权规则；跨空间检索由网关逐个空间调用单空间检索后分组。 |
 | 数据库 | Alembic 新增个人令牌表、网关调用记录表和反馈表，引用用户表和空间表；其他表不变，无需迁移数据。 |
-| 平台界面 | 页头用户名新增菜单，进入“个人中心”（`/me`，含个人信息和个人令牌，第 4.6 节）。左侧菜单“空间设置”分组改名“管理中心”，含“空间设置”“用户反馈”和“用户审计”，整组只对空间管理员可见；成员不再能打开空间设置页。其他页面不变。 |
+| 平台界面 | “个人中心”（`/me`）已随用户管理上线，本次增加“个人令牌”页签（第 4.6 节）。左侧菜单“空间设置”分组改名“管理中心”，含“空间设置”“用户反馈”和“用户审计”，整组只对空间管理员和平台管理员可见。其他页面不变。 |
 | DataAgent | 继续使用单空间入口、固定令牌和建模运行凭据，配置不变。 |
 | 部署 | 同一应用升级。随附的 nginx 已整体转发 `/api/`；自建反向代理若按路径放行，需加入 `/api/v1/ontology/mcp`。 |
 
