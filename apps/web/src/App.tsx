@@ -6,6 +6,7 @@ import {
 import { lazy, Suspense } from "react";
 import { LoadingSurface, RouteErrorSurface } from "./components/AsyncState";
 import { AppShell } from "./components/AppShell";
+import { LoginPage } from "./pages/LoginPage";
 
 const WorkspaceDirectoryPage = lazy(() =>
   import("./pages/WorkspaceDirectoryPage").then((m) => ({
@@ -24,6 +25,7 @@ const router = createBrowserRouter([
           </Suspense>
         ),
       },
+      { path: "/login", element: <LoginPage /> },
       { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],

@@ -10,6 +10,7 @@ import {
   PanelLeftOpen,
   ChevronDown,
   Globe,
+  LogOut,
   Plug,
 } from "lucide-react";
 import {
@@ -17,11 +18,12 @@ import {
   useParams,
   Link,
   useLocation,
+  useNavigate,
   Navigate,
 } from "react-router-dom";
-import { Avatar, Button, Tooltip } from "antd";
+import { App, Avatar, Button, Dropdown, Tooltip } from "antd";
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../api/client";
+import { ApiError, api } from "../api/client";
 import type { User, Workspace } from "../api/types";
 import { WorkspaceContextProvider } from "../hooks/useWorkspaceContext";
 import { OntologySearchDialog } from "./OntologySearchDialog";
@@ -55,11 +57,14 @@ const READER_PAGES = ["view", "objects", "relations", "delivery"];
 export function AppShell() {
   const { workspaceId = "" } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { message } = App.useApp();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const load = useCallback(() => {
     setError("");
     Promise.all([api.workspace(workspaceId), api.me()])
@@ -88,6 +93,22 @@ export function AppShell() {
     return () => window.removeEventListener("resize", fit);
   }, []);
   const openSearch = useCallback(() => setSearching(true), []);
+  const handleLogout = useCallback(async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await api.logout();
+      navigate("/login", { replace: true });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      void message.error(e instanceof Error ? e.message : "退出登录失败，请重试");
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [loggingOut, message, navigate]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -120,12 +141,28 @@ export function AppShell() {
               {workspace.name}
               <ChevronDown className="size-icon" />
             </Link>
-            <span className="flex items-center gap-2">
-              <Avatar className="size-6 bg-accent text-xs leading-6 text-accent-ink">
-                {user.display_name.slice(0, 1).toUpperCase() || "A"}
-              </Avatar>
-              {user.display_name}
-            </span>
+            <Dropdown
+              trigger={["click"]}
+              menu={{
+                items: [{ key: "logout", label: "退出登录", icon: <LogOut className="size-icon-sm" /> }],
+                onClick: ({ key }) => {
+                  if (key === "logout") void handleLogout();
+                },
+              }}
+            >
+              <Button
+                type="text"
+                aria-label={user.display_name || "用户菜单"}
+                loading={loggingOut}
+                className="flex items-center gap-2 px-2 text-xs text-inherit"
+              >
+                <Avatar className="size-6 bg-accent text-xs leading-6 text-accent-ink">
+                  {user.display_name.slice(0, 1).toUpperCase() || "A"}
+                </Avatar>
+                <span>{user.display_name}</span>
+                <ChevronDown className="size-icon" />
+              </Button>
+            </Dropdown>
           </div>
         </>
       }

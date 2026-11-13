@@ -19,6 +19,7 @@ const user: User = { id: "user-demo", subject: "demo:user", display_name: "林�
 function show() {
   const router = createMemoryRouter([
     { path: "/workspaces/:workspaceId/*", element: <AppShell /> },
+    { path: "/login", element: <p>登录页</p> },
   ], { initialEntries: ["/workspaces/ws-shell-demo/mappings"] });
   renderWithProviders(<RouterProvider router={router} />);
   return router;
@@ -27,6 +28,7 @@ function show() {
 beforeEach(() => {
   vi.spyOn(api, "workspace").mockResolvedValue(workspace);
   vi.spyOn(api, "me").mockResolvedValue(user);
+  vi.spyOn(api, "logout").mockResolvedValue(undefined);
   vi.spyOn(api, "searchOntology").mockResolvedValue({
     workspace_id: workspace.id, version_id: "version-demo", retrieval: { keyword: true, vector: false },
     items: [
@@ -90,5 +92,22 @@ describe("应用框架", () => {
     fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
     await screen.findByRole("navigation", { name: "工作空间导航" });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("顶栏用户菜单仅包含退出登录，点击后调用 logout 并跳转到登录页", async () => {
+    const router = show();
+    const userButton = await screen.findByRole("button", { name: "林晓" });
+    fireEvent.click(userButton);
+
+    const menu = await screen.findByRole("menu");
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toHaveTextContent("退出登录");
+
+    fireEvent.click(items[0]);
+    await waitFor(() => {
+      expect(api.logout).toHaveBeenCalledTimes(1);
+      expect(router.state.location.pathname).toBe("/login");
+    });
   });
 });
