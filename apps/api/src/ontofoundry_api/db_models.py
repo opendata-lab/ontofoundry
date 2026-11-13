@@ -573,3 +573,67 @@ class InstanceHistoryRecord(Base):
     proposal_item_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     actor: Mapped[str] = mapped_column(String(36))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class PersonalAccessTokenRecord(Base):
+    __tablename__ = "personal_access_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    permissions: Mapped[list] = mapped_column(JSON)
+    token_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OntologyGatewayCallRecord(Base):
+    __tablename__ = "ontology_gateway_calls"
+    __table_args__ = (
+        Index("ix_gateway_calls_user_created", "user_id", "created_at"),
+        Index("ix_gateway_calls_created", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"))
+    token_id: Mapped[str] = mapped_column(String(36), ForeignKey("personal_access_tokens.id"))
+    request_id: Mapped[str] = mapped_column(String(100))
+    tool: Mapped[str] = mapped_column(String(64))
+    arguments: Mapped[dict] = mapped_column(JSON)
+    response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    outcome: Mapped[str] = mapped_column(String(16))
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class OntologyGatewayCallWorkspaceRecord(Base):
+    __tablename__ = "ontology_gateway_call_workspaces"
+    __table_args__ = (Index("ix_gateway_call_workspaces_space_created", "workspace_id", "created_at"),)
+
+    call_id: Mapped[str] = mapped_column(String(36), ForeignKey("ontology_gateway_calls.id"), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    version_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class OntologyFeedbackRecord(Base):
+    __tablename__ = "ontology_feedback"
+    __table_args__ = (Index("ix_ontology_feedback_space_created", "workspace_id", "created_at"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id"))
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"))
+    token_id: Mapped[str] = mapped_column(String(36), ForeignKey("personal_access_tokens.id"))
+    kind: Mapped[str] = mapped_column(String(16))
+    user_text: Mapped[str] = mapped_column(Text)
+    agent_text: Mapped[str] = mapped_column(Text)
+    element_ids: Mapped[list] = mapped_column(JSON)
+    version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

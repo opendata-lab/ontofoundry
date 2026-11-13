@@ -164,6 +164,8 @@ def test_cutover_cleans_every_content_table_and_preserves_configuration():
         "request_id": "proposal_decision_requests",
         "item_id": "proposal_items",
         "job_id": "metadata_sync_jobs",
+        "token_id": "personal_access_tokens",
+        "call_id": "ontology_gateway_calls",
     }
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")

@@ -57,6 +57,9 @@ echo "==> 导出镜像"
 echo "==> 复制部署文件"
 cp "$REPO_ROOT/scripts/offline-compose.yaml" "$OUT_DIR/compose.yaml"
 mkdir -p "$OUT_DIR/deploy/docker/ontofoundry"
+mkdir -p "$OUT_DIR/plugins" "$OUT_DIR/.claude-plugin"
+cp -R "$REPO_ROOT/plugins/ontofoundry" "$OUT_DIR/plugins/"
+cp "$REPO_ROOT/.claude-plugin/marketplace.json" "$OUT_DIR/.claude-plugin/marketplace.json"
 # Copy only shipped defaults and examples, never local credentials or hooks.
 for config_file in ontofoundry_config.py ontofoundry_config_docker.py.example custom_sso_user_info.py.example .gitignore; do
   cp "$REPO_ROOT/deploy/docker/ontofoundry/$config_file" "$OUT_DIR/deploy/docker/ontofoundry/"
@@ -142,6 +145,7 @@ cat > "$OUT_DIR/README.md" <<'DOC'
 | `images/infra.tar` | postgres:17-alpine |
 | `compose.yaml` | 部署编排 |
 | `deploy/docker/ontofoundry/` | 登录基础配置、现场覆盖示例、SSO 钩子示例 |
+| `plugins/ontofoundry/`、`.claude-plugin/marketplace.json` | 外部客户端插件与本地插件目录 |
 
 nginx、node、python 已经烘在自有镜像的层里，不需要单独提供。
 

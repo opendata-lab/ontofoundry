@@ -189,6 +189,10 @@ jobs:
           test -f images/infra.tar
           test -f compose.yaml
           test -f install.sh
+          test -f plugins/ontofoundry/.claude-plugin/plugin.json
+          test -f plugins/ontofoundry/.mcp.json
+          test -f plugins/ontofoundry/skills/ontology-grounding/SKILL.md
+          test -f .claude-plugin/marketplace.json
           test ! -e integrations
           # The package connects to an external DataAgent (ONTOFOUNDRY_DATAAGENT_*
           # settings are expected) but must never bundle one: no agent service

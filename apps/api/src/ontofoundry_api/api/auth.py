@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import secrets
 import time
 from dataclasses import dataclass, replace
@@ -14,21 +15,32 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ontofoundry_api.api.service_validation import ServiceValidationRoute
 from ontofoundry_api.config import Settings
 from ontofoundry_api.contracts.auth import AuthOptions, LocalLoginRequest, OAuthOption
+from ontofoundry_api.contracts.gateway import (
+    TokenCreate,
+    TokenCreated,
+    TokenItem,
+    TokenList,
+    TokenPatch,
+)
 from ontofoundry_api.contracts.users import CurrentUser
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import UserRecord, WorkspaceMemberRecord
+from ontofoundry_api.services import personal_tokens
 from ontofoundry_api.services.auth import login_local, login_oauth, require_provider
 from ontofoundry_api.services.auth_config import (
     AuthConfig,
     is_local_account,
     is_platform_admin,
 )
-from ontofoundry_api.services.errors import OAuthLoginError
+from ontofoundry_api.services.errors import InvalidCredentialsError, OAuthLoginError
 from ontofoundry_api.services.workspaces import ensure_dev_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+token_router = APIRouter(prefix="/tokens", route_class=ServiceValidationRoute)
+logger = logging.getLogger(__name__)
 NONCE_COOKIE = "ontofoundry_oauth_nonce"
 STATE_TTL_SECONDS = 600
 
@@ -250,6 +262,59 @@ def ontology_directory_principal(
     return _ontology_principal(request, session, workspace_id=None)
 
 
+def gateway_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    try:
+        if scheme.lower() != "bearer":
+            raise InvalidCredentialsError("网关需要个人令牌", code="INVALID_PERSONAL_TOKEN")
+        item = personal_tokens.validate(session, token)
+    except InvalidCredentialsError:
+        logger.warning("Gateway authentication failed")
+        raise
+    user = session.get(UserRecord, item.user_id)
+    if user is None:
+        logger.warning("Gateway authentication failed: token owner missing")
+        raise InvalidCredentialsError("个人令牌所属用户不存在", code="INVALID_PERSONAL_TOKEN")
+    from ontofoundry_api.db_models import utc_now
+
+    request.app.state.gateway_recorder.touch(item.id, utc_now())
+    return replace(
+        _principal(user, request),
+        service_token_id=f"pat:{item.id}",
+        scopes=frozenset(item.permissions),
+    )
+
+
+@token_router.post("", status_code=201, response_model=TokenCreated)
+def create_token(
+    body: TokenCreate,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    return personal_tokens.create(db, user.id, body)
+
+
+@token_router.get("", response_model=TokenList)
+def list_tokens(db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    return {"items": personal_tokens.list_tokens(db, user.id)}
+
+
+@token_router.patch("/{token_id}", response_model=TokenItem)
+def patch_token(
+    token_id: str,
+    body: TokenPatch,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    return personal_tokens.patch(db, user.id, token_id, body)
+
+
+@token_router.delete("/{token_id}", status_code=204)
+def revoke_token(token_id: str, db: Session = Depends(get_db), user: Principal = Depends(current_principal)):
+    personal_tokens.revoke(db, user.id, token_id)
+    return Response(status_code=204)
+
+
 @router.get("/me", response_model=CurrentUser)
 def me(principal: Principal = Depends(current_principal)) -> dict:
     return {
@@ -365,3 +430,6 @@ async def callback(
 def logout(request: Request) -> Response:
     request.session.clear()
     return Response(status_code=204)
+
+
+router.include_router(token_router)

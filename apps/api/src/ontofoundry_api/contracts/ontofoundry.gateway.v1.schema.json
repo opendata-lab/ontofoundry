@@ -1,0 +1,664 @@
+{
+  "$defs": {
+    "CallWorkspace": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "version_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version_number"
+      ],
+      "title": "CallWorkspace",
+      "type": "object"
+    },
+    "CallWorkspaceDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Name"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Id"
+        },
+        "version_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Number"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "version_number",
+        "version_id"
+      ],
+      "title": "CallWorkspaceDetail",
+      "type": "object"
+    },
+    "FeedbackElement": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "FeedbackElement",
+      "type": "object"
+    },
+    "FeedbackItem": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_text": {
+          "title": "Agent Text",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "elements": {
+          "items": {
+            "$ref": "#/$defs/FeedbackElement"
+          },
+          "title": "Elements",
+          "type": "array"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "correction",
+            "suggestion"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/$defs/GatewayUser"
+        },
+        "user_text": {
+          "title": "User Text",
+          "type": "string"
+        },
+        "version_number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Number"
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "user",
+        "kind",
+        "user_text",
+        "agent_text",
+        "elements",
+        "version_number"
+      ],
+      "title": "FeedbackItem",
+      "type": "object"
+    },
+    "FeedbackList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/FeedbackItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor"
+      ],
+      "title": "FeedbackList",
+      "type": "object"
+    },
+    "GatewayCallDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "additionalProperties": true,
+          "title": "Arguments",
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration Ms"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Code"
+        },
+        "error_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Message"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "started",
+            "ok",
+            "error"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "request_id": {
+          "title": "Request Id",
+          "type": "string"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Response"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/$defs/GatewayUser"
+        },
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/CallWorkspaceDetail"
+          },
+          "title": "Workspaces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "user",
+        "tool",
+        "request_id",
+        "workspaces",
+        "arguments",
+        "response",
+        "outcome",
+        "error_code",
+        "error_message",
+        "duration_ms"
+      ],
+      "title": "GatewayCallDetail",
+      "type": "object"
+    },
+    "GatewayCallItem": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration Ms"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error Code"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "started",
+            "ok",
+            "error"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/$defs/GatewayUser"
+        },
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/CallWorkspace"
+          },
+          "title": "Workspaces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "created_at",
+        "user",
+        "tool",
+        "workspaces",
+        "summary",
+        "outcome",
+        "error_code",
+        "duration_ms"
+      ],
+      "title": "GatewayCallItem",
+      "type": "object"
+    },
+    "GatewayCallList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/GatewayCallItem"
+          },
+          "title": "Items",
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Next Cursor"
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor"
+      ],
+      "title": "GatewayCallList",
+      "type": "object"
+    },
+    "GatewayUser": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "display_name"
+      ],
+      "title": "GatewayUser",
+      "type": "object"
+    },
+    "TokenCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 100,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "enum": [
+              "ontology:read",
+              "mappings:read"
+            ],
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "permissions"
+      ],
+      "title": "TokenCreate",
+      "type": "object"
+    },
+    "TokenCreated": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "enum": [
+              "ontology:read",
+              "mappings:read"
+            ],
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "token": {
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "permissions",
+        "created_at",
+        "token"
+      ],
+      "title": "TokenCreated",
+      "type": "object"
+    },
+    "TokenItem": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_used_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Used At"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "permissions": {
+          "items": {
+            "enum": [
+              "ontology:read",
+              "mappings:read"
+            ],
+            "type": "string"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "permissions",
+        "created_at",
+        "updated_at",
+        "last_used_at"
+      ],
+      "title": "TokenItem",
+      "type": "object"
+    },
+    "TokenList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/TokenItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "TokenList",
+      "type": "object"
+    },
+    "TokenPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "ontology:read",
+                  "mappings:read"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permissions"
+        }
+      },
+      "title": "TokenPatch",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.gateway.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/TokenCreate"
+    },
+    {
+      "$ref": "#/$defs/TokenPatch"
+    },
+    {
+      "$ref": "#/$defs/TokenCreated"
+    },
+    {
+      "$ref": "#/$defs/TokenItem"
+    },
+    {
+      "$ref": "#/$defs/TokenList"
+    },
+    {
+      "$ref": "#/$defs/FeedbackList"
+    },
+    {
+      "$ref": "#/$defs/GatewayCallList"
+    },
+    {
+      "$ref": "#/$defs/GatewayCallDetail"
+    }
+  ]
+}
