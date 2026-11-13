@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.core import Metric, SimpleMetric, Strict
+from ontofoundry_api.services.access import require_read
 from ontofoundry_api.services.metric_preview import preview_metric
 
 router = APIRouter(
@@ -38,4 +39,5 @@ def preview(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
+    require_read(db, str(workspace_id), user)
     return preview_metric(db, workspace_id, user, body, request.app.state.settings)

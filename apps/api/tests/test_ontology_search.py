@@ -497,7 +497,7 @@ def test_new_head_invalidates_cursor_and_mcp_pinned_version_is_preserved(client,
         == 422
     )
     assert not rest(client, options)["items"]
-    high = Principal(id=DEV_USER_ID, subject="fictional", display_name="虚构", email=None)
+    high = Principal(id=DEV_USER_ID, username="fictional", display_name="虚构", email=None, is_platform_admin=True)
     with client.app.state.session_factory() as db:
         pinned = replace(high, pinned_version_id=old["version_id"])
         value = invoke(

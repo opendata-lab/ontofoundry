@@ -25,6 +25,11 @@ class ServiceError(Exception):
         self.details = details or {}
 
 
+class ForbiddenError(ServiceError):
+    status_code = 403
+    code = "FORBIDDEN"
+
+
 class NotFoundError(ServiceError):
     status_code = 404
     code = "NOT_FOUND"

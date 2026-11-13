@@ -9,7 +9,11 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.api.auth import Principal, ontology_principal
 from ontofoundry_api.contracts.exports import ExportPreview
 from ontofoundry_api.database import get_db
-from ontofoundry_api.services.access import require_instances, require_mappings
+from ontofoundry_api.services.access import (
+    require_instances,
+    require_mappings,
+    require_read,
+)
 from ontofoundry_api.services.exports import download_export, export_snapshot
 
 router = APIRouter(
@@ -32,6 +36,7 @@ def preview(
     db: Session = Depends(get_db),
     user: Principal = Depends(ontology_principal),
 ):
+    require_read(db, str(workspace_id), user)
     permissions(db, str(workspace_id), user)
     return export_snapshot(
         db, request.app.state.settings, str(workspace_id), adapter_id, str(version_id)
@@ -48,6 +53,7 @@ def download(
     db: Session = Depends(get_db),
     user: Principal = Depends(ontology_principal),
 ):
+    require_read(db, str(workspace_id), user)
     permissions(db, str(workspace_id), user)
     data, description = download_export(
         db,

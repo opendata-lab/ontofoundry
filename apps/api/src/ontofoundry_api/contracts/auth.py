@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
+from ontofoundry_api.contracts.users import CurrentUser
+
 
 class OAuthOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -27,5 +29,5 @@ def auth_schema() -> dict:
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "ontofoundry.auth.v1.schema.json",
-        **TypeAdapter(AuthOptions | LocalLoginRequest).json_schema(),
+        **TypeAdapter(AuthOptions | LocalLoginRequest | CurrentUser).json_schema(),
     }

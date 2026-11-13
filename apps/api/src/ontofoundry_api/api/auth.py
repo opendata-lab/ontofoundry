@@ -16,13 +16,15 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.config import Settings
 from ontofoundry_api.contracts.auth import AuthOptions, LocalLoginRequest, OAuthOption
+from ontofoundry_api.contracts.users import CurrentUser
 from ontofoundry_api.database import get_db
-from ontofoundry_api.db_models import (
-    UserRecord,
-    WorkspaceMemberRecord,
-)
+from ontofoundry_api.db_models import UserRecord, WorkspaceMemberRecord
 from ontofoundry_api.services.auth import login_local, login_oauth, require_provider
-from ontofoundry_api.services.auth_config import AuthConfig
+from ontofoundry_api.services.auth_config import (
+    AuthConfig,
+    is_local_account,
+    is_platform_admin,
+)
 from ontofoundry_api.services.errors import OAuthLoginError
 from ontofoundry_api.services.workspaces import ensure_dev_user
 
@@ -34,9 +36,11 @@ STATE_TTL_SECONDS = 600
 @dataclass(frozen=True)
 class Principal:
     id: str
-    subject: str
+    username: str
     display_name: str
     email: str | None
+    is_platform_admin: bool = False
+    local_account: bool = False
     service_token_id: str | None = None
     service_workspace_id: str | None = None
     scopes: frozenset[str] = frozenset()
@@ -53,10 +57,12 @@ def _auth_config(request: Request) -> AuthConfig:
     return request.app.state.auth_config
 
 
-def _principal(user: UserRecord) -> Principal:
+def _principal(user: UserRecord, request: Request) -> Principal:
     return Principal(
         id=user.id,
-        subject=user.subject,
+        username=user.username,
+        is_platform_admin=is_platform_admin(user.username, _auth_config(request), dev_mode=_settings(request).auth_mode == "dev"),
+        local_account=is_local_account(user.username, _auth_config(request)),
         display_name=user.display_name,
         email=user.email,
     )
@@ -72,12 +78,12 @@ def current_principal(
             status_code=401, detail="服务令牌仅用于只读本体服务，管理操作需要用户登录"
         )
     if settings.auth_mode == "dev":
-        return _principal(ensure_dev_user(session))
+        return _principal(ensure_dev_user(session), request)
     user_id = request.session.get("user_id")
     user = session.get(UserRecord, user_id) if user_id else None
     if user is None:
         raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
-    return _principal(user)
+    return _principal(user, request)
 
 
 def _b64encode(value: bytes) -> str:
@@ -156,15 +162,15 @@ def _run_principal(
         or item.dataagent_run_token != grant.run_token
         or item.task_status not in ACTIVE_RUN_STATUSES
         or not __import__(
-            "ontofoundry_api.services.workspaces", fromlist=["membership_role"]
-        ).membership_role(session, grant.workspace_id, grant.user_id)
+            "ontofoundry_api.services.access", fromlist=["can_read_workspace"]
+        ).can_read_workspace(session, grant.workspace_id, grant.user_id)
     ):
         raise HTTPException(401, "建模运行凭据无效、已失效或不属于当前空间")
     user = session.get(UserRecord, grant.user_id)
     if not user:
         raise HTTPException(401, "运行发起用户不存在")
     return replace(
-        _principal(user),
+        _principal(user, request),
         service_token_id=f"run:{grant.run_token}",
         service_workspace_id=grant.workspace_id,
         scopes=frozenset(["ontology:read", "instances:read", "mappings:read"]),
@@ -176,7 +182,7 @@ def _run_principal(
 STATIC_SCOPES = frozenset(["ontology:read", "mappings:read", "instances:read"])
 
 
-def _static_principal(session: Session, workspace_id: str | None) -> Principal:
+def _static_principal(session: Session, workspace_id: str | None, request: Request) -> Principal:
     """The fixed MCP token reads one workspace as its earliest admin, read-only."""
     if workspace_id is None:
         raise HTTPException(401, "固定 MCP 令牌只能用于指定空间的本体接口")
@@ -192,7 +198,7 @@ def _static_principal(session: Session, workspace_id: str | None) -> Principal:
     if not user:
         raise HTTPException(401, "该空间没有管理员，固定 MCP 令牌无法访问")
     return replace(
-        _principal(user),
+        _principal(user, request),
         service_token_id="static",
         service_workspace_id=workspace_id,
         scopes=STATIC_SCOPES,
@@ -216,27 +222,26 @@ def _ontology_principal(
             return _run_principal(request, session, token, workspace_id)
         static = _settings(request).mcp_token
         if static and scheme.lower() == "bearer" and hmac.compare_digest(token.encode(), static.encode()):
-            return _static_principal(session, workspace_id)
+            return _static_principal(session, workspace_id, request)
         # Only the deployment's fixed token and modeling run credentials are accepted.
         raise HTTPException(401, "本体令牌无效")
     return current_principal(request, session)
 
 
 def ontology_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
-    return _ontology_principal(
-        request,
-        session,
-        workspace_id=request.path_params.get("workspace_id"),
-    )
+    principal = _ontology_principal(request, session, workspace_id=request.path_params.get("workspace_id"))
+    from ontofoundry_api.services.access import require_read
+
+    require_read(session, request.path_params["workspace_id"], principal)
+    return principal
 
 
 def mcp_principal(request: Request, session: Session = Depends(get_db)) -> Principal:
-    return _ontology_principal(
-        request,
-        session,
-        workspace_id=request.path_params.get("workspace_id"),
-        allow_run=True,
-    )
+    principal = _ontology_principal(request, session, workspace_id=request.path_params.get("workspace_id"), allow_run=True)
+    from ontofoundry_api.services.access import require_read
+
+    require_read(session, request.path_params["workspace_id"], principal)
+    return principal
 
 
 def ontology_directory_principal(
@@ -245,11 +250,13 @@ def ontology_directory_principal(
     return _ontology_principal(request, session, workspace_id=None)
 
 
-@router.get("/me")
+@router.get("/me", response_model=CurrentUser)
 def me(principal: Principal = Depends(current_principal)) -> dict:
     return {
         "id": principal.id,
-        "subject": principal.subject,
+        "username": principal.username,
+        "is_platform_admin": principal.is_platform_admin,
+        "local_account": principal.local_account,
         "display_name": principal.display_name,
         "email": principal.email,
     }

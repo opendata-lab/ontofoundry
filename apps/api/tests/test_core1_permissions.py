@@ -11,13 +11,13 @@ def test_low_scope_never_receives_physical_or_fact_content(client):
     wid = str(DEMO_WORKSPACE_ID)
     low = Principal(
         id=DEV_USER_ID,
-        subject="test",
+        username="test",
         display_name="test",
         email=None,
         service_token_id="fictional-token",
         scopes=frozenset({"ontology:read"}),
     )
-    high = Principal(id=DEV_USER_ID, subject="test", display_name="test", email=None)
+    high = Principal(id=DEV_USER_ID, username="test", display_name="test", email=None)
     with client.app.state.session_factory() as db:
         args = {"include": ["semantic", "physical", "rules", "adjacency"]}
         directory = invoke(db, wid, high, "get_ontology", {}, client.app.state.settings)

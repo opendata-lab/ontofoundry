@@ -15,6 +15,7 @@ from ontofoundry_api.contracts.materials import MaterialOverview
 from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.contracts.read_models import read_models_schema
+from ontofoundry_api.contracts.users import users_schema
 
 TARGET = Path(__file__).with_name("ontofoundry.proposals.v1.schema.json")
 READ_TARGET = Path(__file__).with_name("ontofoundry.api-read.v1.schema.json")
@@ -22,6 +23,13 @@ MATERIAL_TARGET = Path(__file__).with_name("ontofoundry.materials.v1.schema.json
 
 
 def export(*, check=False):
+    users_target = Path(__file__).with_name("ontofoundry.users.v1.schema.json")
+    users_payload = json.dumps(users_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if check:
+        if not users_target.exists() or users_target.read_text() != users_payload:
+            raise SystemExit("用户管理接口 schema 与模型不一致，请重新生成")
+    else:
+        users_target.write_text(users_payload)
     auth_target = Path(__file__).with_name("ontofoundry.auth.v1.schema.json")
     auth_payload = json.dumps(auth_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if check:

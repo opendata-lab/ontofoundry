@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, mcp_principal
 from ontofoundry_api.database import get_db
+from ontofoundry_api.services.access import require_read
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.mcp_ontology import INPUTS, invoke
 
@@ -79,6 +80,7 @@ async def rpc(
     db: Session = Depends(get_db),
     principal: Principal = Depends(mcp_principal),
 ):
+    require_read(db, workspace_id, principal)
     raw = bytearray()
     async for chunk in request.stream():
         raw.extend(chunk)

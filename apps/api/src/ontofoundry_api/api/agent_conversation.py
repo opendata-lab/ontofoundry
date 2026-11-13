@@ -20,7 +20,6 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.api.modeling import (
     get_modeling_session,
-    require_member,
     session_draft,
     version_snapshot_sha256,
 )
@@ -33,6 +32,7 @@ from ontofoundry_api.db_models import (
     utc_now,
 )
 from ontofoundry_api.domain.snapshot import draft_sha256
+from ontofoundry_api.services.access import require_edit, require_read
 from ontofoundry_api.services.dataagent import (
     ACTIVE_TASK_STATUSES,
     DataAgentClient,
@@ -58,13 +58,16 @@ from ontofoundry_api.services.modeling_input import (
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
 from ontofoundry_api.services.proposals import proposal_context
 from ontofoundry_api.services.request_material import store_request_material
-from ontofoundry_api.services.run_credentials import RunGrant
-from ontofoundry_api.services.run_credentials import access_file as mcp_access_file
-from ontofoundry_api.services.run_credentials import issue as issue_run_credential
-from ontofoundry_api.services.run_status import (
-    ACTIVE_RUN_STATUSES,
-    to_run_status,
+from ontofoundry_api.services.run_credentials import (
+    RunGrant,
 )
+from ontofoundry_api.services.run_credentials import (
+    access_file as mcp_access_file,
+)
+from ontofoundry_api.services.run_credentials import (
+    issue as issue_run_credential,
+)
+from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES, to_run_status
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +273,7 @@ async def snapshot(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     if not item.dataagent_topic_id:
         return {"messages": [], "run": None}
@@ -295,7 +298,7 @@ async def send_message(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     from ontofoundry_api.services.session_gate import lock_session, require_draft_edit
     item = lock_session(db, workspace_id, session_id)
     require_draft_edit(db, item)
@@ -700,7 +703,7 @@ async def events(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> StreamingResponse:
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     _require_configured(request)
     if not item.dataagent_task_id:
@@ -781,7 +784,7 @@ async def cancel(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     _require_configured(request)
     if item.dataagent_task_id and body.task_id != item.dataagent_task_id:
@@ -817,7 +820,7 @@ async def interact(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> dict[str, Any]:
-    require_member(db, workspace_id, user.id)
+    require_edit(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     _require_configured(request)
     if item.dataagent_task_id and body.task_id != item.dataagent_task_id:
@@ -842,7 +845,7 @@ async def download_file(
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ) -> Response:
-    require_member(db, workspace_id, user.id)
+    require_read(db, str(workspace_id), user)
     item = get_modeling_session(db, workspace_id, session_id)
     _require_configured(request)
     if not item.dataagent_topic_id:

@@ -1,0 +1,706 @@
+{
+  "$defs": {
+    "AdminUser": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Email"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_login_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Login At"
+        },
+        "local_account": {
+          "title": "Local Account",
+          "type": "boolean"
+        },
+        "platform_admin": {
+          "title": "Platform Admin",
+          "type": "boolean"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/UserWorkspace"
+          },
+          "title": "Workspaces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "display_name",
+        "email",
+        "local_account",
+        "platform_admin",
+        "last_login_at",
+        "workspaces"
+      ],
+      "title": "AdminUser",
+      "type": "object"
+    },
+    "AdminUsers": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AdminUser"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "AdminUsers",
+      "type": "object"
+    },
+    "AdminWorkspace": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_public": {
+          "title": "Is Public",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "is_public"
+      ],
+      "title": "AdminWorkspace",
+      "type": "object"
+    },
+    "AdminWorkspaces": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/AdminWorkspace"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "AdminWorkspaces",
+      "type": "object"
+    },
+    "Assignment": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "workspace_id": {
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id",
+        "role"
+      ],
+      "title": "Assignment",
+      "type": "object"
+    },
+    "CurrentUser": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Email"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_platform_admin": {
+          "title": "Is Platform Admin",
+          "type": "boolean"
+        },
+        "local_account": {
+          "title": "Local Account",
+          "type": "boolean"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "display_name",
+        "email",
+        "is_platform_admin",
+        "local_account"
+      ],
+      "title": "CurrentUser",
+      "type": "object"
+    },
+    "MemberCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "user_id"
+      ],
+      "title": "MemberCreate",
+      "type": "object"
+    },
+    "MemberItem": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "last_login_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Login At"
+        },
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "user_id",
+        "username",
+        "display_name",
+        "role",
+        "last_login_at"
+      ],
+      "title": "MemberItem",
+      "type": "object"
+    },
+    "MemberList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MemberItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "MemberList",
+      "type": "object"
+    },
+    "MyWorkspace": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_public": {
+          "title": "Is Public",
+          "type": "boolean"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role",
+        "is_public"
+      ],
+      "title": "MyWorkspace",
+      "type": "object"
+    },
+    "MyWorkspaces": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MyWorkspace"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "MyWorkspaces",
+      "type": "object"
+    },
+    "RoleUpdate": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "RoleUpdate",
+      "type": "object"
+    },
+    "SpaceUpdate": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 1200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "is_public": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Public"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        }
+      },
+      "title": "SpaceUpdate",
+      "type": "object"
+    },
+    "UserCreate": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Display Name",
+          "type": "string"
+        },
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Email"
+        },
+        "username": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "display_name"
+      ],
+      "title": "UserCreate",
+      "type": "object"
+    },
+    "UserSearchItem": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "last_login_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Login At"
+        },
+        "username": {
+          "title": "Username",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "display_name",
+        "last_login_at"
+      ],
+      "title": "UserSearchItem",
+      "type": "object"
+    },
+    "UserSearchList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/UserSearchItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "UserSearchList",
+      "type": "object"
+    },
+    "UserWorkspace": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "enum": [
+            "admin",
+            "member",
+            "viewer"
+          ],
+          "title": "Role",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "role"
+      ],
+      "title": "UserWorkspace",
+      "type": "object"
+    },
+    "WorkspaceItem": {
+      "additionalProperties": false,
+      "properties": {
+        "current_version": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Current Version"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "is_public": {
+          "title": "Is Public",
+          "type": "boolean"
+        },
+        "link_type_count": {
+          "title": "Link Type Count",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "object_type_count": {
+          "title": "Object Type Count",
+          "type": "integer"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "enum": [
+                "admin",
+                "member",
+                "viewer"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Role"
+        },
+        "slug": {
+          "title": "Slug",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Id"
+        },
+        "version_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Version Sha256"
+        },
+        "visibility": {
+          "enum": [
+            "member",
+            "public"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "slug",
+        "name",
+        "description",
+        "is_public",
+        "role",
+        "visibility",
+        "current_version",
+        "version_id",
+        "version_sha256",
+        "object_type_count",
+        "link_type_count",
+        "updated_at"
+      ],
+      "title": "WorkspaceItem",
+      "type": "object"
+    },
+    "WorkspaceList": {
+      "additionalProperties": false,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "title": "WorkspaceList",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.users.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/CurrentUser"
+    },
+    {
+      "$ref": "#/$defs/UserCreate"
+    },
+    {
+      "$ref": "#/$defs/RoleUpdate"
+    },
+    {
+      "$ref": "#/$defs/MemberCreate"
+    },
+    {
+      "$ref": "#/$defs/MemberList"
+    },
+    {
+      "$ref": "#/$defs/MemberItem"
+    },
+    {
+      "$ref": "#/$defs/UserSearchList"
+    },
+    {
+      "$ref": "#/$defs/MyWorkspaces"
+    },
+    {
+      "$ref": "#/$defs/AdminUsers"
+    },
+    {
+      "$ref": "#/$defs/AdminUser"
+    },
+    {
+      "$ref": "#/$defs/AdminWorkspaces"
+    },
+    {
+      "$ref": "#/$defs/Assignment"
+    },
+    {
+      "$ref": "#/$defs/SpaceUpdate"
+    },
+    {
+      "$ref": "#/$defs/WorkspaceItem"
+    },
+    {
+      "$ref": "#/$defs/WorkspaceList"
+    }
+  ]
+}

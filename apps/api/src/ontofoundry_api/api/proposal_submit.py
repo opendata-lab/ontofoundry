@@ -6,10 +6,10 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import ModelingSessionRecord
+from ontofoundry_api.services.access import can_edit_workspace
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.proposal_submit import submit_result
 from ontofoundry_api.services.run_credentials import verify
-from ontofoundry_api.services.workspaces import membership_role
 
 router = APIRouter(
     prefix="/api/v1/ontology/workspaces/{workspace_id}/runs", tags=["proposals"]
@@ -43,7 +43,7 @@ async def submit_proposals(
     if (
         session is None
         or session.workspace_id != workspace_id
-        or not membership_role(db, workspace_id, grant.user_id)
+        or not can_edit_workspace(db, workspace_id, grant.user_id)
     ):
         raise _invalid()
     raw = await request.body()

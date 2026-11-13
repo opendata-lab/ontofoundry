@@ -89,7 +89,7 @@ def test_download_rechecks_instance_mapping_and_workspace_permissions(client):
     def principal(scopes):
         return Principal(
             id=DEV_USER_ID,
-            subject="fictional-token-owner",
+            username="fictional-token-owner",
             display_name="虚构签发人",
             email=None,
             service_token_id="fictional-token",
@@ -112,11 +112,11 @@ def test_download_rechecks_instance_mapping_and_workspace_permissions(client):
         assert client.get(result["download_url"]).status_code == 200
         client.app.dependency_overrides[ontology_principal] = lambda: Principal(
             id=str(uuid4()),
-            subject="fictional-outsider",
+            username="fictional-outsider",
             display_name="虚构访客",
             email=None,
         )
-        assert client.get(result["download_url"]).status_code == 403
+        assert client.get(result["download_url"]).status_code == 404
     finally:
         client.app.dependency_overrides.clear()
 
