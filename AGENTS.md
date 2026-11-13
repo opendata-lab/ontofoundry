@@ -28,6 +28,10 @@
 - 界面改动提交前，对受影响页面在 1440×900 下截图，与基准或改前截图对比，按设计第 3 节检查容器层级、对齐线、字号档位、状态显示和表格密度；运行 `npm run test:visual`。
 - 生成 id 用 `lib/id.ts` 的 `newId()`，不直接用 `crypto.randomUUID`：现场部署通过局域网 IP 的 HTTP 访问，是非安全上下文。前端或部署改动要用局域网 IP 验证一次。
 
+## 外部客户端插件
+
+- `plugins/ontofoundry/` 是给 Claude Code、ZCode、opencode 的插件源码（Skill 与 MCP 配置），仓库根目录 `.claude-plugin/marketplace.json` 是插件目录。改动后提高 `plugin.json` 的 `version`，并运行 `claude plugin validate plugins/ontofoundry`。
+
 ## DataAgent 集成
 
 - 平台只引用 DataAgent 上已有的 Agent，不创建或修改它。Agent 提示词以 `integrations/dataagent/agents/*.md` 为准，改动后要同步到 DataAgent 管理后台并发布。

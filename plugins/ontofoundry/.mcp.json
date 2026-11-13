@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "ontofoundry": {
+      "type": "http",
+      "url": "${user_config.ontofoundry_mcp_url}",
+      "headers": { "Authorization": "Bearer ${user_config.ontofoundry_token}" }
+    }
+  }
+}

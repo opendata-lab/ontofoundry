@@ -1,0 +1,14 @@
+{
+  "name": "ontofoundry",
+  "owner": {
+    "name": "opendata-lab"
+  },
+  "description": "OntoFoundry client plugins for external agents (Claude Code, ZCode).",
+  "plugins": [
+    {
+      "name": "ontofoundry",
+      "source": "./plugins/ontofoundry",
+      "description": "Read published OntoFoundry ontology definitions (metrics, objects, mappings) before answering data questions, and report user corrections back to the platform."
+    }
+  ]
+}
