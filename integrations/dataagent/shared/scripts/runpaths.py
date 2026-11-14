@@ -85,7 +85,7 @@ def usage(work_pack="<工作包>"):
         f"检查片段：{command('check_part.py', '--work-pack', work_pack, '01')}",
         f"合并：{command('prepare_result.py', '--work-pack', work_pack, 'modeling/parts/')}",
         f"读材料：{command('read_input.py', '<材料路径>')}",
-        f"读已有元素：{command('show_element.py', '--work-pack', work_pack, '<名称或id>')}",
+        f"读已有元素（一次可查多个）：{command('show_element.py', '--work-pack', work_pack, '<名称或id>', '<名称2>')}",
     ]
 
 

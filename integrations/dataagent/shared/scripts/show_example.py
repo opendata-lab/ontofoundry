@@ -8,6 +8,28 @@ from runpaths import HintParser, command, error, without_material_hashes
 EXAMPLES = Path(__file__).resolve().parents[1] / "references/examples"
 LIMIT = 8 * 1024
 KIT = EXAMPLES.parent / "extract-kit"
+# The full extract reads principles, guide, values and parts 01–05. One output
+# above DataAgent's 16 KB inline limit is folded to a file, so it comes in two
+# pages that each stay well below it (four calls before).
+EXTRACT_PAGES = {
+    "1": [("原则", "principles.md"), ("固定包说明", "extract-kit/guide.md"), ("取值速查", "extract-kit/values.json"),
+          ("片段 01", "extract-kit/01.json"), ("片段 02", "extract-kit/02.json")],
+    "2": [("片段 03", "extract-kit/03.json"), ("片段 04", "extract-kit/04.json"), ("片段 05", "extract-kit/05.json")],
+}
+PAGE_LIMIT = 14 * 1024
+
+
+def extract_page(page):
+    """Concatenate one page of the extract reading with plain section headers."""
+    sections = []
+    for title, name in EXTRACT_PAGES[page]:
+        content = (EXAMPLES.parent / name).read_text().rstrip("\n")
+        if name.endswith(".json"):
+            content = json.dumps(without_material_hashes(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
+        sections.append(f"===== {title}（{name.rsplit('/', 1)[-1]}）=====\n{content}")
+    if page == "1":
+        sections.append("下一页：" + command("show_example.py", "--extract", "2"))
+    return "\n".join(sections)
 VARIANTS = {
     "metric": {
         "ratio": ("metrics.json", [0, 1, 2, 3]),
@@ -85,11 +107,23 @@ def main():
     fixed.add_argument("--incremental-guide", action="store_true", help="增量查询与写法说明")
     fixed.add_argument("--values", action="store_true", help="契约取值速查")
     fixed.add_argument("--guide", action="store_true", help="固定包说明与确定的读取参数")
+    fixed.add_argument("--extract", choices=sorted(EXTRACT_PAGES), help="全量抽取要读的全部内容，分两页：1 原则、说明、取值、01–02；2 为 03–05")
     parser.add_argument("--operation", default="create")
     parser.add_argument("--variant", help="可选分支，如 metric 的 ratio／expression、dataset 的 query")
     parser.add_argument("--with-deps", action="store_true", help="附带依赖元素，输出可直接整批检查的完整正例")
     args = parser.parse_args()
     try:
+        if args.extract:
+            if args.target_kinds or args.variant or args.with_deps or args.operation != "create":
+                raise ValueError("--extract 不能与类型、操作或分支查询混用")
+            content = extract_page(args.extract)
+            size = len((content + "\n").encode())
+            if size > PAGE_LIMIT:
+                print(error("EXAMPLE_TOO_LARGE", f"抽取第 {args.extract} 页有 {size} 字节，超过 {PAGE_LIMIT} 字节",
+                            "未回显内容；这是技能自身的问题，需要维护者拆小", retry=False))
+                return 1
+            print(content)
+            return 0
         if args.part or args.values or args.guide or args.incremental_guide:
             if args.target_kinds or args.variant or args.with_deps or args.operation != "create":
                 raise ValueError("固定包入口不能与类型、操作或分支查询混用")
@@ -97,6 +131,10 @@ def main():
             content = (KIT / filename).read_text().rstrip("\n")
             if filename.endswith(".json"):
                 content = json.dumps(without_material_hashes(json.loads(content)), ensure_ascii=False, separators=(",", ":"))
+            if args.incremental_guide:
+                # The incremental step always needs the update example next; one call, not two.
+                update = json.dumps(without_material_hashes(json.loads((KIT / "update.json").read_text())), ensure_ascii=False, separators=(",", ":"))
+                content += "\n===== 增量补齐正例（update.json，同 --part update）=====\n" + update
             size = len((content + "\n").encode())
             if size > LIMIT:
                 print(error("EXAMPLE_TOO_LARGE", f"固定包 {filename} 有 {size} 字节，超过单次 {LIMIT} 字节上限",

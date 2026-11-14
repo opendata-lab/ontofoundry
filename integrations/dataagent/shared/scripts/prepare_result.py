@@ -221,6 +221,51 @@ def submit_failure_detail(exc, url, authorization):
     return f"{type(exc).__name__}: {reason}；目标 {target}"
 
 
+LATEST_CHECK = Path("modeling/checks/latest-content-check.json")
+# Rejections about the run or its budget say nothing about the content; they
+# must not replace the last report that does.
+NOT_CONTENT = {"REPAIR_BUDGET_EXHAUSTED", "RUN_NOT_CURRENT", "RUN_ALREADY_SUBMITTED", "RUN_NOT_ACTIVE"}
+SHOWN_BYTES = 2700
+
+
+def save_latest_check(source, errors, candidate):
+    """Keep the last content check where a later run (resume) can find it."""
+    try:
+        atomic_write(workspace_path(str(LATEST_CHECK)), encode({
+            "source": source, "candidate": relative(candidate), "errors": errors,
+        }))
+    except (OSError, ValueError):
+        print(notice("LATEST_CHECK_NOT_SAVED", "最近一次检查报告未另存", "不影响本轮"))
+
+
+def archive_submitted(pack):
+    """After the platform stored the batch, move its fragments out of the way so
+    no later merge can submit them again."""
+    token = str((pack.get("run") or {}).get("run_token") or "unknown")
+    target = Path("modeling/submitted") / token
+    moved = 0
+    try:
+        # The whole run's work, so the next run starts clean and is not told
+        # that "previous work was moved" after a success.
+        for name in ("parts", "checks", "plan.md", "notes.md", "entities.json", "issues.json"):
+            source = Path("modeling") / name
+            if source.is_dir() and any(source.iterdir()):
+                (target / name).mkdir(parents=True, exist_ok=True)
+                for item in source.iterdir():
+                    item.replace(target / name / item.name)
+                moved += 1
+            elif source.is_file():
+                target.mkdir(parents=True, exist_ok=True)
+                source.replace(target / name)
+                moved += 1
+    except OSError as exc:
+        print(notice("SUBMITTED_PARTS_NOT_MOVED", f"已入库，但片段未能移到 {relative(target)}（{type(exc).__name__}）",
+                     "提案已入库，照常作答；下一轮初始化会整体归档"))
+        return
+    if moved:
+        print(f"本轮成果已移到 {relative(target)}/，下一轮不会重复提交。")
+
+
 def platform_submit(pack, candidate, retry_command):
     """Submit to the platform, which checks and stores in one step (SC-05).
     Never duplicate graph rules here: the platform's verdict is the only one."""
@@ -300,8 +345,17 @@ def platform_submit(pack, candidate, retry_command):
     print(f"平台检查未通过，未入库。最终文件未替换。完整报告：{relative(report_path)}")
     if isinstance(report.get("repair_used"), int) and isinstance(report.get("repair_limit"), int):
         print(f"修正轮次：已用 {report['repair_used']}/{report['repair_limit']}（平台计数，本地检查不计）")
+    if not {problem.get("code") for problem in report["errors"]} & NOT_CONTENT:
+        save_latest_check("platform", report["errors"], candidate)
+    # Print a bounded summary: every repeated line is replayed in later turns.
+    shown = []
     for problem in report["errors"]:
-        print(problem["message"])
+        if len("\n".join([*shown, problem["message"]]).encode()) > SHOWN_BYTES:
+            break
+        shown.append(problem["message"])
+    print("\n".join(shown))
+    if len(shown) < len(report["errors"]):
+        print(f"共 {len(report['errors'])} 条，已显示 {len(shown)} 条；其余见完整报告：" + command("read_input.py", relative(report_path), "--pointer", f"/errors/{len(shown)}"))
     print("下一步：修正片段后重试 " + retry_command)
     return False
 
@@ -419,6 +473,11 @@ def main():
         candidate, args.schema, args.context, origins=origins
     )
     if checked:
+        try:
+            local = json.loads(Path(str(candidate) + ".errors.json").read_bytes())
+            save_latest_check("local", local.get("errors") or [], candidate)
+        except (OSError, ValueError):
+            pass
         return checked
     retry_command = (
         command("prepare_result.py", "--work-pack", args.work_pack)
@@ -437,6 +496,7 @@ def main():
     if not platform_submit(pack, candidate, retry_command):
         return 1
     atomic_write(output, candidate.read_bytes())
+    archive_submitted(pack)
     print(f"已保存结果留档：{relative(output)}；提案已入库，等待用户审核")
     return 0
 
