@@ -1,0 +1,1793 @@
+{
+  "actual_total": 64,
+  "expected_total": 62,
+  "actual_counts": {
+    "object_type": 6,
+    "property": 30,
+    "value_type": 3,
+    "link_type": 6,
+    "dataset": 5,
+    "mapping": 5,
+    "metric": 3,
+    "rule": 6
+  },
+  "expected_counts": {
+    "dataset": 5,
+    "mapping": 5,
+    "link_type": 6,
+    "object_type": 6,
+    "property": 30,
+    "value_type": 2,
+    "rule": 5,
+    "metric": 3
+  },
+  "operations": [
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "门店",
+      "after": {
+        "id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "name": "store",
+        "display_name": "门店",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "1f84d7ec-b4ff-5e7d-8bcb-7c9cece98fa9",
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "209382bd-214d-53f6-8476-18a430509e1a",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 5,
+              "line_end": 5
+            },
+            "quote": "星河零售的线下门店，用门店编号唯一识别，记录门店名称、所在城市和开业日期。"
+          },
+          {
+            "kind": "material",
+            "id": "4ffeda3a-3524-550b-b38d-13387d10ea52",
+            "material_id": "142e9bae-3dd6-4a70-8f71-aa5c7efbd017",
+            "material_sha256": "6049b7dc772701a818128d0b9e082818d6607dbd13bb70c0d4172d911d8761e6",
+            "locator": {
+              "heading": "xinghe_retail.stores",
+              "line_start": 34,
+              "line_end": 34
+            },
+            "quote": "门店"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "门店编号",
+      "after": {
+        "id": "2530c7f2-b071-54d9-8e18-c9998848ad8c",
+        "owner_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "name": "store_id",
+        "display_name": "门店编号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "门店名称",
+      "after": {
+        "id": "1f84d7ec-b4ff-5e7d-8bcb-7c9cece98fa9",
+        "owner_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "name": "store_name",
+        "display_name": "门店名称",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "所在城市",
+      "after": {
+        "id": "036b6e02-a1dd-5a3e-a6ec-c0b6bed29029",
+        "owner_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "name": "city",
+        "display_name": "所在城市",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "开业日期",
+      "after": {
+        "id": "1f6c8e78-4ae3-588f-a685-8df4b47aa730",
+        "owner_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "name": "opened_on",
+        "display_name": "开业日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "会员",
+      "after": {
+        "id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "member",
+        "display_name": "会员",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "a241e13d-b117-5b76-adcf-e84db5017ab4",
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "0b3f5ac8-dd1f-513f-adea-1b3d367f3f0b",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 6,
+              "line_end": 6
+            },
+            "quote": "在门店办理会员卡的顾客，用会员编号唯一识别，记录姓名、会员等级、常住城市和入会日期。"
+          },
+          {
+            "kind": "material",
+            "id": "7b3bf20a-dc47-59c3-96e9-2a7a8635058f",
+            "material_id": "142e9bae-3dd6-4a70-8f71-aa5c7efbd017",
+            "material_sha256": "6049b7dc772701a818128d0b9e082818d6607dbd13bb70c0d4172d911d8761e6",
+            "locator": {
+              "heading": "xinghe_retail.members",
+              "line_start": 1,
+              "line_end": 1
+            },
+            "quote": "会员"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "会员编号",
+      "after": {
+        "id": "5719141a-91ba-59b2-b108-6d6182545ddd",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "member_id",
+        "display_name": "会员编号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "会员姓名",
+      "after": {
+        "id": "a241e13d-b117-5b76-adcf-e84db5017ab4",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "member_name",
+        "display_name": "会员姓名",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "会员等级",
+      "after": {
+        "id": "5e65ad55-29e5-5dc9-8544-3343db9a3662",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "member_level",
+        "display_name": "会员等级",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": "19650b77-6516-5ee9-a0b7-1e58df61dc52",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "常住城市",
+      "after": {
+        "id": "815556b6-2c21-5ec2-b818-74b617d8f09f",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "city",
+        "display_name": "常住城市",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "入会日期",
+      "after": {
+        "id": "d61df2ee-8b6f-5490-91c6-c056b6f97a89",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "joined_on",
+        "display_name": "入会日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "开卡门店",
+      "after": {
+        "id": "5d55fd9e-3f13-55d7-9260-902cd29836b7",
+        "owner_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "name": "home_store_id",
+        "display_name": "开卡门店",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "商品 SKU",
+      "after": {
+        "id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "name": "product",
+        "display_name": "商品 SKU",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": "6c931165-222e-5a25-8f62-478f6279e5e6",
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "4089f892-2986-54f1-a054-4284600b3b8a",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 7,
+              "line_end": 7
+            },
+            "quote": "门店销售的商品，用商品编码唯一识别，记录商品名称、品类和标价。"
+          },
+          {
+            "kind": "material",
+            "id": "941316bb-52e5-543a-b39c-61fe722c0bbe",
+            "material_id": "142e9bae-3dd6-4a70-8f71-aa5c7efbd017",
+            "material_sha256": "6049b7dc772701a818128d0b9e082818d6607dbd13bb70c0d4172d911d8761e6",
+            "locator": {
+              "heading": "xinghe_retail.products",
+              "line_start": 27,
+              "line_end": 27
+            },
+            "quote": "商品"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "商品编码",
+      "after": {
+        "id": "e847747c-6097-54c8-a7ae-5b4ffe6a6c3f",
+        "owner_type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "name": "sku",
+        "display_name": "商品编码",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "商品名称",
+      "after": {
+        "id": "6c931165-222e-5a25-8f62-478f6279e5e6",
+        "owner_type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "name": "product_name",
+        "display_name": "商品名称",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "品类",
+      "after": {
+        "id": "051d17ad-a162-561f-817f-962568816fe8",
+        "owner_type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "name": "category",
+        "display_name": "品类",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": "66ed5ec6-bfea-55c0-a6b8-672c6d7dc765",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "标价",
+      "after": {
+        "id": "b5feba8e-2eb6-59b3-89de-c90140ad371c",
+        "owner_type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "name": "list_price",
+        "display_name": "标价",
+        "description": "",
+        "value_kind": "decimal",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "订单",
+      "after": {
+        "id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "order",
+        "display_name": "订单",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "899c02b8-52e8-557e-b210-db6acd7dc2ea",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 8,
+              "line_end": 8
+            },
+            "quote": "顾客在门店的一次购买，用订单号唯一识别，记录下单日期、订单状态和实付金额。"
+          },
+          {
+            "kind": "material",
+            "id": "b8e56604-cab1-5a72-8984-aac22a1f6bdf",
+            "material_id": "142e9bae-3dd6-4a70-8f71-aa5c7efbd017",
+            "material_sha256": "6049b7dc772701a818128d0b9e082818d6607dbd13bb70c0d4172d911d8761e6",
+            "locator": {
+              "heading": "xinghe_retail.orders",
+              "line_start": 18,
+              "line_end": 18
+            },
+            "quote": "订单"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "订单号",
+      "after": {
+        "id": "1e4a34da-d8f8-576a-b86d-80780185df8b",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "order_no",
+        "display_name": "订单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "下单会员",
+      "after": {
+        "id": "0f0bc532-8df4-50aa-bb0b-6ede6a853c0f",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "member_id",
+        "display_name": "下单会员",
+        "description": "散客下单不记录会员",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "成交门店",
+      "after": {
+        "id": "a35e07a4-187f-5285-970c-147ab6c3762a",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "store_id",
+        "display_name": "成交门店",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "下单日期",
+      "after": {
+        "id": "5967f151-b253-5b83-b8e0-780214ae932a",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "order_date",
+        "display_name": "下单日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "订单状态",
+      "after": {
+        "id": "69929eb2-ad63-52bb-9101-ebb282e9dd5e",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "status",
+        "display_name": "订单状态",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": "a8334131-44a5-5aed-b03b-73f799a0c1a4",
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "实付金额",
+      "after": {
+        "id": "2e6a3d11-0c7b-59b3-b52d-6d174511a3ae",
+        "owner_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "name": "pay_amount",
+        "display_name": "实付金额",
+        "description": "",
+        "value_kind": "decimal",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "订单明细",
+      "after": {
+        "id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "order_item",
+        "display_name": "订单明细",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "bec1897a-645f-5d09-826e-b5748013f7ef",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 9,
+              "line_end": 9
+            },
+            "quote": "订单中的每一行商品，由订单号和行号共同识别，记录购买的商品、数量和成交单价。"
+          },
+          {
+            "kind": "material",
+            "id": "86dd701d-380f-538b-a537-8b20f6aa6395",
+            "material_id": "142e9bae-3dd6-4a70-8f71-aa5c7efbd017",
+            "material_sha256": "6049b7dc772701a818128d0b9e082818d6607dbd13bb70c0d4172d911d8761e6",
+            "locator": {
+              "heading": "xinghe_retail.order_items",
+              "line_start": 10,
+              "line_end": 10
+            },
+            "quote": "订单明细"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "订单号",
+      "after": {
+        "id": "aa5dd8dc-d2a2-52b4-b3be-23763cb519e9",
+        "owner_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "order_no",
+        "display_name": "订单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "行号",
+      "after": {
+        "id": "ec45a95b-0847-58f0-9338-b3c01750fda3",
+        "owner_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "line_no",
+        "display_name": "行号",
+        "description": "",
+        "value_kind": "integer",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "商品编码",
+      "after": {
+        "id": "70b64e8d-093d-5f46-b613-3ee674387ae1",
+        "owner_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "sku",
+        "display_name": "商品编码",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "数量",
+      "after": {
+        "id": "7e23ef15-8fb8-5727-a56d-ba3830fcc303",
+        "owner_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "qty",
+        "display_name": "数量",
+        "description": "",
+        "value_kind": "integer",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "成交单价",
+      "after": {
+        "id": "145ff6e7-6a97-5e0e-9ca8-6a97ec7ee2ae",
+        "owner_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "name": "unit_price",
+        "display_name": "成交单价",
+        "description": "",
+        "value_kind": "decimal",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "object_type",
+      "operation": "create",
+      "display_name": "退款",
+      "after": {
+        "id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "refund",
+        "display_name": "退款",
+        "description": "",
+        "synonyms": [],
+        "tags": [],
+        "extends": null,
+        "title_property_id": null,
+        "derived_by": [],
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "3473ca70-8b35-54e1-bfc7-4767a1f13fd2",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 10,
+              "line_end": 10
+            },
+            "quote": "针对已完成订单的退款，用退款单号唯一识别，记录退款日期、退款金额和退款原因。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "退款单号",
+      "after": {
+        "id": "03d9ce7f-2d21-5638-9249-fc964a5d61ec",
+        "owner_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "refund_no",
+        "display_name": "退款单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": true,
+        "unique": true,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "原订单号",
+      "after": {
+        "id": "f8984578-79ec-5f9c-aee6-8b61753ddc9c",
+        "owner_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "order_no",
+        "display_name": "原订单号",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": true,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "退款日期",
+      "after": {
+        "id": "97bd7445-bd85-5b9e-9dab-390dad8ba302",
+        "owner_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "refund_on",
+        "display_name": "退款日期",
+        "description": "",
+        "value_kind": "date",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "退款金额",
+      "after": {
+        "id": "8f854a04-6cc7-50a3-9ed2-a9143867e9ac",
+        "owner_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "refund_amount",
+        "display_name": "退款金额",
+        "description": "",
+        "value_kind": "decimal",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "property",
+      "operation": "create",
+      "display_name": "退款原因",
+      "after": {
+        "id": "862bd95c-c78f-521f-82cc-5c83aa12324c",
+        "owner_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "name": "reason",
+        "display_name": "退款原因",
+        "description": "",
+        "value_kind": "string",
+        "value_type_id": null,
+        "required": false,
+        "identifier": false,
+        "unique": false,
+        "synonyms": [],
+        "evidence": []
+      }
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "display_name": "会员等级",
+      "after": {
+        "id": "19650b77-6516-5ee9-a0b7-1e58df61dc52",
+        "name": "member_level",
+        "display_name": "会员等级",
+        "description": "",
+        "value_kind": "string",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "display_name": "商品品类",
+      "after": {
+        "id": "66ed5ec6-bfea-55c0-a6b8-672c6d7dc765",
+        "name": "product_category",
+        "display_name": "商品品类",
+        "description": "",
+        "value_kind": "string",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "value_type",
+      "operation": "create",
+      "display_name": "订单状态",
+      "after": {
+        "id": "a8334131-44a5-5aed-b03b-73f799a0c1a4",
+        "name": "order_status",
+        "display_name": "订单状态",
+        "description": "",
+        "value_kind": "string",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "开卡门店",
+      "after": {
+        "id": "bb571b9a-ff78-5455-98bf-04f06bad7aab",
+        "display_name": "开卡门店",
+        "name": "member_home_store",
+        "description": "",
+        "verbalizes": [
+          "{source}在{target}开卡",
+          "{target}是{source}的开卡门店"
+        ],
+        "synonyms": [],
+        "source_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "target_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "5d55fd9e-3f13-55d7-9260-902cd29836b7"
+          ],
+          "target_property_ids": [
+            "2530c7f2-b071-54d9-8e18-c9998848ad8c"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "a4cdb786-f976-5574-a831-0bdc385e3eab",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 14,
+              "line_end": 14
+            },
+            "quote": "会员在门店开卡：一位会员对应一家开卡门店，一家门店可以有多位会员。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "下单会员",
+      "after": {
+        "id": "5be0224b-4e61-5598-9ea2-5c62080a9070",
+        "display_name": "下单会员",
+        "name": "order_member",
+        "description": "",
+        "verbalizes": [
+          "{source}由{target}下单",
+          "{target}可以下多笔{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "target_type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "0f0bc532-8df4-50aa-bb0b-6ede6a853c0f"
+          ],
+          "target_property_ids": [
+            "5719141a-91ba-59b2-b108-6d6182545ddd"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "ec939613-035c-5dd4-aea3-78577fc7da4e",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 15,
+              "line_end": 15
+            },
+            "quote": "会员下单：一位会员可以下多笔订单；一笔订单最多属于一位会员。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "成交门店",
+      "after": {
+        "id": "a439c6fc-dbef-558c-9497-a5fdfa70e487",
+        "display_name": "成交门店",
+        "name": "order_store",
+        "description": "",
+        "verbalizes": [
+          "{source}在{target}成交",
+          "{target}有多笔{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "target_type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "a35e07a4-187f-5285-970c-147ab6c3762a"
+          ],
+          "target_property_ids": [
+            "2530c7f2-b071-54d9-8e18-c9998848ad8c"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "fd78646c-2d56-51fc-9231-8f8c961970a2",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 16,
+              "line_end": 16
+            },
+            "quote": "订单在门店成交：每笔订单都在一家门店成交。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "属于订单",
+      "after": {
+        "id": "b1ff4534-1a98-57a0-b9fc-1e6d28fdbdb9",
+        "display_name": "属于订单",
+        "name": "order_item_order",
+        "description": "",
+        "verbalizes": [
+          "{source}属于{target}",
+          "{target}包含{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "target_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "aa5dd8dc-d2a2-52b4-b3be-23763cb519e9"
+          ],
+          "target_property_ids": [
+            "1e4a34da-d8f8-576a-b86d-80780185df8b"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "57689048-9210-5987-be23-2d856ac4f782",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 17,
+              "line_end": 17
+            },
+            "quote": "订单包含订单明细，每行明细对应一个商品。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "对应商品",
+      "after": {
+        "id": "4a18cb6d-f15c-5567-b665-bed175ed76ae",
+        "display_name": "对应商品",
+        "name": "order_item_product",
+        "description": "",
+        "verbalizes": [
+          "{source}对应的商品是{target}",
+          "{target}出现在{source}中"
+        ],
+        "synonyms": [],
+        "source_type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "target_type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "70b64e8d-093d-5f46-b613-3ee674387ae1"
+          ],
+          "target_property_ids": [
+            "e847747c-6097-54c8-a7ae-5b4ffe6a6c3f"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "d4c91c1d-365d-5e56-880a-f841785d43eb",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 17,
+              "line_end": 17
+            },
+            "quote": "订单包含订单明细，每行明细对应一个商品。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "link_type",
+      "operation": "create",
+      "display_name": "针对原订单",
+      "after": {
+        "id": "f14e9f0a-b018-5aa4-ab9c-dbed8afc1f76",
+        "display_name": "针对原订单",
+        "name": "refund_order",
+        "description": "",
+        "verbalizes": [
+          "{source}针对原订单{target}",
+          "{target}可以有多笔{source}"
+        ],
+        "synonyms": [],
+        "source_type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "target_type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "source_role_name": null,
+        "target_role_name": null,
+        "multiplicity": "many_to_one",
+        "tags": [],
+        "data_join": {
+          "kind": "direct",
+          "source_property_ids": [
+            "f8984578-79ec-5f9c-aee6-8b61753ddc9c"
+          ],
+          "target_property_ids": [
+            "1e4a34da-d8f8-576a-b86d-80780185df8b"
+          ]
+        },
+        "evidence": [
+          {
+            "kind": "material",
+            "id": "72535170-a5f4-518a-85f9-8079bc0ca3b3",
+            "material_id": "aab13a41-ef56-493f-a0f1-8cee5ebba302",
+            "material_sha256": "732e10acaec202ddedae42af8ddfdaada22d10e036441d29571f8bf45addd9c0",
+            "locator": {
+              "heading": null,
+              "line_start": 18,
+              "line_end": 18
+            },
+            "quote": "退款针对原订单：一笔订单可以有多笔退款。"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "门店数据",
+      "after": {
+        "id": "d6939e52-b55e-5d95-b3c1-72d261fa670a",
+        "name": "stores",
+        "display_name": "门店数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "stores",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "store_id",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "门店编号"
+          },
+          {
+            "name": "store_name",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "门店名称"
+          },
+          {
+            "name": "city",
+            "physical_type": "VARCHAR(32) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "所在城市"
+          },
+          {
+            "name": "opened_on",
+            "physical_type": "DATE",
+            "comment": "开业日期"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "门店",
+      "after": {
+        "id": "e0a132d8-bad1-5a4e-ad03-92a8726add87",
+        "type_id": "dbd96922-8932-5445-8dbc-7beda2cf3465",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "d6939e52-b55e-5d95-b3c1-72d261fa670a",
+            "key_columns": [
+              "store_id"
+            ]
+          }
+        ],
+        "fields": {
+          "store_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "store_id"
+          },
+          "store_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "store_name"
+          },
+          "city": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "city"
+          },
+          "opened_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "opened_on"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "会员数据",
+      "after": {
+        "id": "e440e419-81e0-5889-b0fa-5471d795480c",
+        "name": "members",
+        "display_name": "会员数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "members",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "member_id",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员编号"
+          },
+          {
+            "name": "member_name",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员姓名"
+          },
+          {
+            "name": "member_level",
+            "physical_type": "VARCHAR(8) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "会员等级：普通/银卡/金卡"
+          },
+          {
+            "name": "city",
+            "physical_type": "VARCHAR(32) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "常住城市"
+          },
+          {
+            "name": "joined_on",
+            "physical_type": "DATE",
+            "comment": "入会日期"
+          },
+          {
+            "name": "home_store_id",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "开卡门店"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "会员",
+      "after": {
+        "id": "d1cf18fb-5be9-5586-a616-ad064ae57edd",
+        "type_id": "1edf056e-679e-5b37-8318-59afc223461a",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "e440e419-81e0-5889-b0fa-5471d795480c",
+            "key_columns": [
+              "member_id"
+            ]
+          }
+        ],
+        "fields": {
+          "member_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_id"
+          },
+          "member_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_name"
+          },
+          "member_level": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_level"
+          },
+          "city": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "city"
+          },
+          "joined_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "joined_on"
+          },
+          "home_store_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "home_store_id"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "商品 SKU 数据",
+      "after": {
+        "id": "e558171a-cf51-5917-be0d-01187cd54e92",
+        "name": "products",
+        "display_name": "商品 SKU 数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "products",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "sku",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "商品编码"
+          },
+          {
+            "name": "product_name",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "商品名称"
+          },
+          {
+            "name": "category",
+            "physical_type": "VARCHAR(32) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "品类"
+          },
+          {
+            "name": "list_price",
+            "physical_type": "DECIMAL(10, 2)",
+            "comment": "标价"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "商品 SKU",
+      "after": {
+        "id": "7d483794-7ec2-5c0f-998e-06960b6e4417",
+        "type_id": "24c4d696-1c6f-5e7c-b2a9-72066b0c9ee0",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "e558171a-cf51-5917-be0d-01187cd54e92",
+            "key_columns": [
+              "sku"
+            ]
+          }
+        ],
+        "fields": {
+          "sku": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "sku"
+          },
+          "product_name": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "product_name"
+          },
+          "category": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "category"
+          },
+          "list_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "list_price"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "订单数据",
+      "after": {
+        "id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+        "name": "orders",
+        "display_name": "订单数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "orders",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单号"
+          },
+          {
+            "name": "member_id",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "下单会员，散客为空"
+          },
+          {
+            "name": "store_id",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "成交门店"
+          },
+          {
+            "name": "order_date",
+            "physical_type": "DATE",
+            "comment": "下单日期"
+          },
+          {
+            "name": "status",
+            "physical_type": "VARCHAR(8) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单状态：已完成/已取消/待支付"
+          },
+          {
+            "name": "pay_amount",
+            "physical_type": "DECIMAL(12, 2)",
+            "comment": "实付金额"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "订单",
+      "after": {
+        "id": "4be3bcda-7c90-5e66-a72a-db56d2a00087",
+        "type_id": "7869f71f-fe76-503f-ae80-1d0bda575190",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+            "key_columns": [
+              "order_no"
+            ]
+          }
+        ],
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "member_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "member_id"
+          },
+          "store_id": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "store_id"
+          },
+          "order_date": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_date"
+          },
+          "status": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "status"
+          },
+          "pay_amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "pay_amount"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "订单明细数据",
+      "after": {
+        "id": "2bf509b8-916d-56af-97e9-5d2fa2ea0d63",
+        "name": "order_items",
+        "display_name": "订单明细数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "order_items",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "订单号"
+          },
+          {
+            "name": "line_no",
+            "physical_type": "INTEGER",
+            "comment": "行号"
+          },
+          {
+            "name": "sku",
+            "physical_type": "VARCHAR(16) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "商品编码"
+          },
+          {
+            "name": "qty",
+            "physical_type": "INTEGER",
+            "comment": "数量"
+          },
+          {
+            "name": "unit_price",
+            "physical_type": "DECIMAL(10, 2)",
+            "comment": "成交单价"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "订单明细",
+      "after": {
+        "id": "68cbf394-892f-54c4-a7ba-310077f7678e",
+        "type_id": "964adace-9377-5787-a460-dfde1fdd55c3",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "2bf509b8-916d-56af-97e9-5d2fa2ea0d63",
+            "key_columns": [
+              "order_no",
+              "line_no"
+            ]
+          }
+        ],
+        "fields": {
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "line_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "line_no"
+          },
+          "sku": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "sku"
+          },
+          "qty": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "qty"
+          },
+          "unit_price": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "unit_price"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "销售额",
+      "after": {
+        "id": "c2934a3a-c8c7-5f63-9a6a-7a350e384899",
+        "name": "sales_amount",
+        "display_name": "销售额",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+          "column": "pay_amount"
+        },
+        "filters": [
+          {
+            "column": {
+              "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+              "column": "status"
+            },
+            "operator": "eq",
+            "values": [
+              "已完成"
+            ]
+          }
+        ],
+        "time_field": {
+          "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+          "column": "order_date"
+        }
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "成交订单数",
+      "after": {
+        "id": "2d3bae6d-0fc2-53c7-8364-c1bdd98b42bb",
+        "name": "paid_order_count",
+        "display_name": "成交订单数",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+        "aggregation": "count",
+        "measure": null,
+        "filters": [
+          {
+            "column": {
+              "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+              "column": "status"
+            },
+            "operator": "eq",
+            "values": [
+              "已完成"
+            ]
+          }
+        ],
+        "time_field": {
+          "dataset_id": "23d43dfa-a910-5c64-a01b-2f00c8da6c87",
+          "column": "order_date"
+        }
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "客单价",
+      "after": {
+        "id": "6901b479-5bd9-5e75-b2bf-78945e177a19",
+        "name": "avg_order_value",
+        "display_name": "客单价",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "ratio",
+        "numerator_id": "c2934a3a-c8c7-5f63-9a6a-7a350e384899",
+        "denominator_id": "2d3bae6d-0fc2-53c7-8364-c1bdd98b42bb"
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "会员等级取值",
+      "after": {
+        "id": "c49ebea3-0441-5b28-9c12-bd5331ddff07",
+        "name": "member_level_values",
+        "display_name": "会员等级取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "19650b77-6516-5ee9-a0b7-1e58df61dc52",
+        "rule_kind": "constraint",
+        "expression": "member_level IN ('普通', '银卡', '金卡')",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "商品品类取值",
+      "after": {
+        "id": "f37ed792-acb9-5044-a3c4-0d4661514065",
+        "name": "product_category_values",
+        "display_name": "商品品类取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "66ed5ec6-bfea-55c0-a6b8-672c6d7dc765",
+        "rule_kind": "constraint",
+        "expression": "product_category IN ('饮品', '烘焙', '生鲜')",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "订单状态取值",
+      "after": {
+        "id": "6500bced-db4f-5407-b1c1-ea302aaa6e1e",
+        "name": "order_status_values",
+        "display_name": "订单状态取值",
+        "description": "",
+        "owner_kind": "value_type",
+        "owner_id": "a8334131-44a5-5aed-b03b-73f799a0c1a4",
+        "rule_kind": "constraint",
+        "expression": "order_status IN ('已完成', '已取消', '待支付')",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "实付金额非负",
+      "after": {
+        "id": "8f173c72-23df-50a8-ad08-207098ab503c",
+        "name": "pay_amount_nonnegative",
+        "display_name": "实付金额非负",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "2e6a3d11-0c7b-59b3-b52d-6d174511a3ae",
+        "rule_kind": "constraint",
+        "expression": "order.pay_amount >= 0",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "明细数量非负",
+      "after": {
+        "id": "d7371b48-e4a4-5e08-95a8-e2c696031753",
+        "name": "qty_nonnegative",
+        "display_name": "明细数量非负",
+        "description": "",
+        "owner_kind": "property",
+        "owner_id": "7e23ef15-8fb8-5727-a56d-ba3830fcc303",
+        "rule_kind": "constraint",
+        "expression": "order_item.qty >= 0",
+        "evidence": []
+      }
+    },
+    {
+      "kind": "rule",
+      "operation": "create",
+      "display_name": "退款金额不超过原订单实付金额",
+      "after": {
+        "id": "98c5e5bd-7515-5826-baa8-55d70f217af1",
+        "name": "refund_amount_limit",
+        "display_name": "退款金额不超过原订单实付金额",
+        "description": "",
+        "owner_kind": "link_type",
+        "owner_id": "f14e9f0a-b018-5aa4-ab9c-dbed8afc1f76",
+        "rule_kind": "constraint",
+        "expression": "refund.refund_amount <= refund.refund_order.pay_amount",
+        "evidence": []
+      }
+    }
+  ],
+  "scope": "按类型数量、操作与定义记录比较。全量排除未同步 refunds 数据集，增量 refunds 数据集预期为新增。"
+}

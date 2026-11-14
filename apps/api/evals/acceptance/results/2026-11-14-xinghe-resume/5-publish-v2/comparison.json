@@ -1,0 +1,15 @@
+{
+  "expected_version": 2,
+  "actual_version": 2,
+  "publishable": true,
+  "accepted_count": 7,
+  "counts": {
+    "object_types": 6,
+    "link_types": 6,
+    "attributes": 30,
+    "rules": 6,
+    "metrics": 7,
+    "datasets": 7,
+    "mappings": 6
+  }
+}

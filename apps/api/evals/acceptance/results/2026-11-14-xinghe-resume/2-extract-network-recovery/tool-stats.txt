@@ -1,0 +1,17 @@
+== [LOCAL_PATH]/conversation.json
+turns 31  tool calls 38  tool output 41762 B  usage {'cache_creation_input_tokens': 0, 'cache_read_input_tokens': 719872, 'input_tokens': 22314, 'output_tokens': 21052}
+    7  bash:read_input.py
+    7  write
+    3  bash:init_workflow.py
+    3  bash:show_example.py
+    3  bash:check_part.py
+    3  bash:prepare_result.py
+    2  read:SKILL.md
+    2  read:plan.md
+    2  bash:cd
+    1  bash:show_element.py
+    1  AskUserQuestion
+    1  read:resume.md
+    1  read:extract.md
+    1  edit
+    1  read:finish.md

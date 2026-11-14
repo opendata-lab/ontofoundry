@@ -245,6 +245,8 @@ def run_paths(work_pack, pack):
     lines.append(f"- 模板：概念清单 {protocol}/entities.json；问题清单 {protocol}/issues.json（计划获批准后再写）")
     lines.append("- 概念清单写 modeling/entities.json，问题清单写 modeling/issues.json（与 plan.md 同级，不放 parts/）")
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
+    # Seen in a real run: piping into head cut the examples, and --help cost calls.
+    lines.append("- 技能脚本的输出已控制在一次能完整显示的大小：不要接 head、tail 截断，也不必先查 --help，参数照下面的命令写")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
     lines += ["  " + line for line in reading_commands(pack)]
