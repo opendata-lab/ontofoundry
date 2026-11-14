@@ -123,7 +123,11 @@ def proposal_context(manifest: dict[str, Any], draft: dict[str, Any]) -> dict[st
     """What the agent reads: which run this is, the pinned draft and the
     instance baseline. Hashes and before-images are the platform's (SC-08)."""
     return {
-        "run": {k: manifest[k] for k in ("run_token", "workspace_id", "session_id")},
+        "run": {
+            **{k: manifest[k] for k in ("run_token", "workspace_id", "session_id")},
+            # Set only when the previous run's work may be kept (modeling resume).
+            **({"resume": manifest["resume"]} if manifest.get("resume") else {}),
+        },
         "draft": draft,
         "instance_baseline": manifest.get("instance_baseline", {"change_sequence": 0, "items": []}),
     }

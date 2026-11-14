@@ -1,0 +1,15 @@
+{
+  "status": "done",
+  "turns_delta": 4,
+  "tool_calls_delta": 3,
+  "tool_output_bytes_delta": 2729,
+  "tool_calls_by_kind_delta": {
+    "bash:init_workflow.py": 1,
+    "bash:check_part.py": 1,
+    "bash:prepare_result.py": 1
+  },
+  "reused_parts": true,
+  "write_or_edit_calls": 0,
+  "repair_used": 0,
+  "repair_limit": 3
+}

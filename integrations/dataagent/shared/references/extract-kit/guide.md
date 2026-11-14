@@ -1,6 +1,6 @@
 # 固定抽取写法包
 
-分别调用 `show_example.py --guide`、`--values`、`--part 01` 至 `--part 05`，同回合可并行，不合并 stdout；每次 ≤8 KiB。01–05 为引用闭合的裸 items 数组。澄页图书馆仅示范写法，定义取本轮输入。结果只写 items；before、hash 与 material_sha256 由平台按本轮上下文补齐，片段不写。client_ref 引用本批；fields 键为属性英文标识；source_id 为映射局部字面量。
+全量抽取用 `show_example.py --extract 1`、`--extract 2` 两次读完原则、本说明、取值速查和 01–05（同回合可并行，每页低于 DataAgent 16 KB 的直接显示上限）；单独的 `--guide`、`--values`、`--part NN` 只用于定点补查，每次 ≤8 KiB。01–05 为引用闭合的裸 items 数组。澄页图书馆仅示范写法，定义取本轮输入。结果只写 items；before、hash 与 material_sha256 由平台按本轮上下文补齐，片段不写。client_ref 引用本批；fields 键为属性英文标识；source_id 为映射局部字面量。
 
 - 01：单标识 required/unique/identifier；复合分量 required/identifier、不 unique。材料或表结构明确给出名称属性（如注释为“名称”的列）就设 title_property_id；没有名称属性可不设，按标识显示，不从字段名猜。值类型含基础类型及独立约束；属性用 value_type_id 引用，基础类型一致。必填不按 nullable 推导，值域不含必填；矛盾交人工审阅。
 - 02：direct 两组属性逐对对应；many_to_one 多端指向至多一端，反向不另建关系。可空引用不加 required；无 join_type。direct 的 target_property_ids 及映射表的 source_key/target_key 必须是端点的唯一属性（unique）或完整标识；关联列不唯一时不写 data_join，在说明里列为候选。

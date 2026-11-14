@@ -12,6 +12,7 @@ from test_workflow import BASE, SCHEMA_PATH, SKILL, prepare
 
 init_workflow = importlib.import_module("init_workflow")
 read_input = importlib.import_module("read_input")
+show_example = importlib.import_module("show_example")
 SKILLS = BASE / "skills"
 LINK = re.compile(r"\]\(([^)]+\.md)\)")
 
@@ -113,6 +114,12 @@ def test_prepare_takes_the_work_pack_short_names_and_default_parts(tmp_path, mon
     write_json(parts / "03-mappings.json", items[5:])
     assert invoke(monkeypatch, prepare, "--work-pack", pack) == 0
     default = (tmp_path / "output/result.json").read_bytes()
+    # A stored batch moves its fragments away so no later merge resubmits them.
+    assert not list(parts.glob("*.json"))
+    assert len(list((tmp_path / "modeling/submitted/unknown/parts").glob("*.json"))) == 3
+    write_json(parts / "01-types.json", items[:4])
+    write_json(parts / "02-datasets.json", items[4:5])
+    write_json(parts / "03-mappings.json", items[5:])
     assert invoke(monkeypatch, prepare, "--work-pack", pack, "01", "02", "03-mappings") == 0
     assert (tmp_path / "output/result.json").read_bytes() == default
     assert json.loads(default)["items"] == items
@@ -296,25 +303,146 @@ def test_facts_method_belongs_to_entity_extraction_on_both_routes():
     assert "不在 ontology-discovery" in discovery and "不在 ontology-discovery" in facts
 
 
-def test_a_new_run_moves_the_last_runs_fragments_but_the_same_run_keeps_them(tmp_path, monkeypatch, capsys):
+def _init(tmp_path, monkeypatch, capsys, token, resume=None, *extra):
+    run = {"run_token": token, **({"resume": {"previous_run_token": resume}} if resume else {})}
+    write_json(tmp_path / "uploads/pack.json", {"run": run})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json", *extra) == 0
+    return capsys.readouterr().out
+
+
+def _work(tmp_path):
+    write_json(tmp_path / "modeling/parts/01-types.json", [{"operation": "create"}, {"operation": "create"}])
+    write_json(tmp_path / "modeling/entities.json", {"items": []})
+    write_json(tmp_path / "modeling/checks/latest-content-check.json", {"source": "platform", "errors": [{"message": "x"}]})
+
+
+def test_the_same_run_keeps_its_work_and_a_new_run_archives_all_of_it(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "uploads").mkdir()
-    def run(token):
-        write_json(tmp_path / "uploads/pack.json", {"run": {"run_token": token}})
-        assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
-        return capsys.readouterr().out
-    run("first")
-    write_json(tmp_path / "modeling/parts/01-types.json", [{"operation": "create"}])
-    # The same run again (repairs happen inside the run): fragments stay.
-    assert "PREVIOUS_PARTS_MOVED" not in run("first")
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    # The same run again (repairs happen inside the run): everything stays.
+    out = _init(tmp_path, monkeypatch, capsys, "first")
+    assert "PREVIOUS_PARTS_MOVED" not in out and "PREVIOUS_WORK_KEPT" not in out
     assert (tmp_path / "modeling/parts/01-types.json").exists()
-    # A new request: the last run's fragments move out of the way.
-    out = run("second")
+    # A new run that is not a continuation: parts, checks, plan, notes and scope move together.
+    out = _init(tmp_path, monkeypatch, capsys, "second")
     assert "PREVIOUS_PARTS_MOVED" in out and "modeling/previous/first" in out
     assert not list((tmp_path / "modeling/parts").glob("*.json"))
-    assert (tmp_path / "modeling/previous/first/parts/01-types.json").exists()
+    assert not (tmp_path / "modeling/entities.json").exists()
+    for kept in ("parts/01-types.json", "entities.json", "checks/latest-content-check.json", "plan.md", "notes.md"):
+        assert (tmp_path / "modeling/previous/first" / kept).exists(), kept
+    # Fresh templates are written for the new run.
+    assert (tmp_path / "modeling/plan.md").exists() and (tmp_path / "modeling/notes.md").exists()
 
 
+def test_a_continuation_keeps_the_work_and_prints_what_is_there(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert "PREVIOUS_WORK_KEPT" in out and "resume.md" in out
+    assert "01-types.json：2 条" in out and "1 个错误" in out and "entities.json：有" in out
+    assert (tmp_path / "modeling/parts/01-types.json").exists()
+    assert (tmp_path / "modeling/.run_token").read_text() == "second"
+    # Initialising the continued run again keeps it (same token now).
+    assert "PREVIOUS_PARTS_MOVED" not in _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert (tmp_path / "modeling/parts/01-types.json").exists()
+
+
+def test_a_resume_naming_another_run_does_not_keep_the_work(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    assert "PREVIOUS_PARTS_MOVED" in _init(tmp_path, monkeypatch, capsys, "third", "second")
+    assert not list((tmp_path / "modeling/parts").glob("*.json"))
+
+
+def test_restart_archives_kept_work(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    _init(tmp_path, monkeypatch, capsys, "second", "first")
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first", "--restart")
+    assert "PREVIOUS_PARTS_MOVED" in out
+    assert not list((tmp_path / "modeling/parts").glob("*.json"))
+
+
+def test_resume_matches_any_run_of_the_chain_and_points_the_plan_at_this_run(tmp_path, monkeypatch, capsys):
+    # Run 2 failed before it initialised: the files still carry run 1's token.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    (tmp_path / "modeling/plan.md").write_text("场景：全量\n工作包：uploads/old-pack.json\n")
+    write_json(tmp_path / "uploads/pack.json", {"run": {"run_token": "third", "resume": {
+        "previous_run_token": "second", "previous_run_tokens": ["first", "second"]}}})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
+    out = capsys.readouterr().out
+    assert "PREVIOUS_WORK_KEPT" in out and (tmp_path / "modeling/parts/01-types.json").exists()
+    assert "工作包：uploads/pack.json" in (tmp_path / "modeling/plan.md").read_text()
+
+
+def test_resume_summary_shows_kinds_and_first_errors(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    write_json(tmp_path / "modeling/parts/04-metrics-rules.json", [{"target_kind": "metric"}, {"target_kind": "rule"}])
+    write_json(tmp_path / "modeling/checks/latest-content-check.json", {"source": "platform", "errors": [
+        {"message": "错误 [MAPPING_COLUMN]：列 pay_amt 不存在"}, {"message": "e2"}, {"message": "e3"}, {"message": "e4"}]})
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first")
+    assert "metric 1" in out and "rule 1" in out
+    assert "列 pay_amt 不存在" in out and "e3" in out and "e4" not in out
+
+
+def test_restart_files_the_earlier_runs_work_under_its_own_token_in_a_new_folder(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    _init(tmp_path, monkeypatch, capsys, "first")
+    _work(tmp_path)
+    (tmp_path / "modeling/previous/first").mkdir(parents=True)
+    _init(tmp_path, monkeypatch, capsys, "second", "first")
+    out = _init(tmp_path, monkeypatch, capsys, "second", "first", "--restart")
+    assert "modeling/previous/first-2" in out
+    assert (tmp_path / "modeling/previous/first-2/parts/01-types.json").exists()
+
+
+def test_request_materials_are_labelled_not_to_be_read(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads").mkdir()
+    write_json(tmp_path / "uploads/pack.json", {"run": {"run_token": "first"}, "materials": [
+        {"id": "m-req", "path": "uploads/req.md", "lines": 1, "from_request": True},
+        {"id": "m-doc", "path": "uploads/doc.md", "lines": 30}]})
+    assert invoke(monkeypatch, init_workflow, "--work-pack", "uploads/pack.json") == 0
+    out = capsys.readouterr().out
+    assert "用户消息原文：uploads/req.md" in out and "不必再读" in out
+    assert "材料：uploads/doc.md" in out
+
+
+def test_incremental_guide_includes_the_update_example(capsys, monkeypatch):
+    assert invoke(monkeypatch, show_example, "--incremental-guide") == 0
+    out = capsys.readouterr().out
+    assert "update.json" in out and len(out.encode()) <= show_example.LIMIT
+
+
+def test_notes_template_sets_no_byte_target():
+    # A "≤2 KB" target made a real run spend five calls trimming bytes.
+    assert "KB" not in (SKILLS.parent / "shared/scripts/init_workflow.py").read_text().split("notes.md")[1][:200]
+
+
+def test_extract_reading_comes_in_two_pages_below_the_inline_limit(capsys, monkeypatch):
+    for page in ("1", "2"):
+        assert invoke(monkeypatch, show_example, "--extract", page) == 0
+        out = capsys.readouterr().out
+        assert len(out.encode()) < 16 * 1024
+        if page == "1":
+            assert "principles.md" in out and "guide.md" in out and "values.json" in out and "01.json" in out
+            assert "--extract 2" in out
+        else:
+            assert "03.json" in out and "05.json" in out
 
 
 def test_table_search_matches_any_word_and_ranks_by_matches(tmp_path, monkeypatch, capsys):

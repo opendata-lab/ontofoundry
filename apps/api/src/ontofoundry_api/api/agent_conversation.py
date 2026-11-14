@@ -56,7 +56,7 @@ from ontofoundry_api.services.modeling_input import (
     upload_work_pack,
 )
 from ontofoundry_api.services.modeling_runs import _persist_task_projection
-from ontofoundry_api.services.proposals import proposal_context
+from ontofoundry_api.services.proposals import proposal_context, submitted_batch
 from ontofoundry_api.services.request_material import store_request_material
 from ontofoundry_api.services.run_credentials import (
     RunGrant,
@@ -355,6 +355,9 @@ async def send_message(
         "source_session_revision": expected_revision + 1,
         "source_draft_sha256": draft_sha256(draft),
         "materials": [{"id": m.id, "sha256": m.sha256} for m in materials],
+        # The user's own messages saved as materials: the agent already has
+        # the text, so they are neither "new material" nor part of the baseline.
+        "request_material_ids": [m.id for m in materials if getattr(m, "origin", None) == "conversation_request"],
         "producer": {
             "agent_id": request.app.state.settings.dataagent_agent_id,
             # The agent picks among its mounted skills per task.
@@ -386,6 +389,27 @@ async def send_message(
         # uploaded path and digest; submissions never consult fresh metadata.
         manifest["table_snapshot"] = json.loads(tables_body)
         manifest["table_scope"] = table_scope_summary(table_catalog, item.table_scope, len(skipped))
+
+    if proposals:
+        manifest["baseline"] = modeling_baseline(manifest, materials)
+        previous_token = str(previous_manifest.get("run_token") or "")
+        # Keep the previous run's work only while it can still be valid: same
+        # baseline and nothing of it stored (design MR-01, MR-02, MR-05). How
+        # to continue is the agent's decision.
+        if (
+            previous_token
+            and item.dataagent_task_mode == "model"
+            and previous_manifest.get("baseline") == manifest["baseline"]
+            and submitted_batch(db, workspace_id, session_id, previous_token) is None
+        ):
+            # A run that failed before it initialised never claimed the
+            # workspace, so the files may still carry any earlier token of
+            # the same unbroken chain; the agent's script matches any of them.
+            chain = list((previous_manifest.get("resume") or {}).get("previous_run_tokens") or [])
+            manifest["resume"] = {
+                "previous_run_token": previous_token,
+                "previous_run_tokens": [*chain, previous_token],
+            }
 
     changed = db.execute(
         update(ModelingSessionRecord)
@@ -484,6 +508,8 @@ async def send_message(
                 material_path_by_id[material.id] = path_in_topic
                 newly_uploaded.append(material.id)
             metadata = {"id": material.id, "sha256": material.sha256}
+            if material.id in manifest["request_material_ids"]:
+                metadata["from_request"] = True
             material_indices.append(
                 material_index(metadata, source_bytes, path_in_topic)
                 if proposals
@@ -857,3 +883,23 @@ async def download_file(
     except DataAgentError as exc:
         _raise_dataagent(exc)
     return Response(content=content, media_type=content_type)
+
+
+def modeling_baseline(manifest: dict, materials: list) -> str:
+    """Digest of what a run's modeling depends on (design MR-01).
+
+    The session revision is left out because every message bumps it; the
+    user's own request texts are left out because the agent reads the new
+    message itself and decides what it changes.
+    """
+    basis = {
+        "base_version_id": manifest.get("base_version_id"),
+        "base_version_sha256": manifest.get("base_version_sha256"),
+        "draft_sha256": manifest.get("source_draft_sha256"),
+        "materials": sorted(
+            (m.id, m.sha256) for m in materials if getattr(m, "origin", None) != "conversation_request"
+        ),
+        "tables": manifest.get("table_snapshot"),
+        "instances": manifest.get("instance_baseline"),
+    }
+    return hashlib.sha256(json.dumps(basis, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()

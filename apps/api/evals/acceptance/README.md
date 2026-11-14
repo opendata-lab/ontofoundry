@@ -7,5 +7,8 @@
 | `results/2026-10-22-xinghe-retail-4` | 星河零售：计划、抽取 64 条提案、发布，三轮问数（最终两题全对） |
 | `results/2026-11-05-xinghe-clean` | 星河零售干净环境基线：全量 40 轮 64 条、增量 11 轮 8 条、两题问数全对，¥0.41；步骤见 `xinghe-retail/README.md` |
 | `results/2026-11-05-xinghe-rerun` | 同一基线在 #33 之后复跑：全量 30 轮（基线 40）、提交 2 次、修正 1/3，增量 10 轮，问数全对，¥0.38 |
+| `results/2026-11-14-xinghe-resume` | 续做与减少工具调用（PR #64）：全量 31 轮 38 次调用、1 次提交 0 修正，网络中断后续做 4 轮入库；增量 9 轮 11 次；¥0.11；未做问数 |
+
+`tool_stats.py <conversation.json> [--calls]` 统计一次对话的轮数和工具调用。
 
 概念范围评测的存档在 `../concept_scope/results/`。

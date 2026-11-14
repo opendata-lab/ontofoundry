@@ -13,4 +13,4 @@
 | material_object | 材料明确陈述的文档实例 | `extract-facts` |
 | material_link | 两个文档实例之间的关系实例 | 同上 |
 
-抽取轮唯一阅读路线见 SKILL.md：输入 → principles → `show_example.py --guide`、`--values`、`--part 01` 至 `--part 05` → 写后检查。表中方法仅供独立任务定点查询，不构成抽取轮第二套必读。协议模板只用于计划／确认；抽取包是裸 items 数组。Schema 只给检查器；未覆盖写法定点查正例，仍无覆盖则交付合法范围并说明缺项，不读或遍历 Schema。定义方法与 modeling-patterns 在 ontology-discovery；extract-facts 在 entity-extraction。
+抽取轮唯一阅读路线见 SKILL.md：输入 → `show_example.py --extract 1`、`--extract 2`（含原则、说明、取值与 01–05）→ 写后检查。表中方法仅供独立任务定点查询，不构成抽取轮第二套必读。协议模板只用于计划／确认；抽取包是裸 items 数组。Schema 只给检查器；未覆盖写法定点查正例，仍无覆盖则交付合法范围并说明缺项，不读或遍历 Schema。定义方法与 modeling-patterns 在 ontology-discovery；extract-facts 在 entity-extraction。

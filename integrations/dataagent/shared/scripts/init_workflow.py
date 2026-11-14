@@ -1,11 +1,16 @@
 """Create the modeling/ workspace skeleton; existing files are never overwritten.
 
-The user approves the concept or issue list inside the run (the plan card),
-so there is no earlier plan to restore.
+Earlier work in modeling/ is kept only while it can still be valid: within the
+same run, or when the platform marks this run as a continuation (work pack
+run.resume: same baseline, nothing stored). Everything else is archived so the
+default merge never resubmits another run's fragments. How to continue is the
+agent's decision (references/steps/resume.md), not this script's.
 """
 
 import json
 import os
+import re
+from collections import Counter
 from pathlib import Path
 
 from runpaths import HintParser, command, error, notice, relative, usage
@@ -40,33 +45,117 @@ def write_new(path, text):
 
 RUN_MARK = ROOT / ".run_token"
 PREVIOUS = ROOT / "previous"
+LATEST_CHECK = ROOT / "checks" / "latest-content-check.json"
+# Everything one run's modeling depends on; kept or archived together so a
+# plan or scope file never outlives the fragments it describes.
+WORK_FILES = ("parts", "checks", "plan.md", "notes.md", "entities.json", "issues.json")
 
 
 def run_token(pack):
     return str((pack.get("run") or {}).get("run_token") or "")
 
 
-def archive_previous_parts(pack):
-    """Move another run's fragments out of modeling/parts/ before this run starts.
+def resume_tokens(pack):
+    """Every earlier run of the unbroken chain whose work may be continued."""
+    resume = (pack.get("run") or {}).get("resume") or {}
+    if not isinstance(resume, dict):
+        return []
+    tokens = [str(t) for t in resume.get("previous_run_tokens") or [] if t]
+    single = str(resume.get("previous_run_token") or "")
+    return tokens or ([single] if single else [])
 
-    The DataAgent topic keeps its workspace across turns, so a new request
-    (e.g. an incremental change) found the last run's 01–05 fragments and the
-    default merge would have resubmitted them. Repairs happen inside the same
-    run (same token), so its own fragments stay.
-    """
+
+def has_work():
+    for name in WORK_FILES:
+        path = ROOT / name
+        if path.is_file() or (path.is_dir() and any(path.iterdir())):
+            return True
+    return False
+
+
+def archive_work(previous):
+    """Move every work file of an earlier run to a new modeling/previous/<token>/."""
+    target, number = PREVIOUS / (previous or "unknown"), 1
+    while target.exists():  # never mix two runs' files in one folder
+        number += 1
+        target = PREVIOUS / f"{previous or 'unknown'}-{number}"
+    for name in WORK_FILES:
+        source = ROOT / name
+        if source.is_dir() and any(source.iterdir()):
+            (target / name).mkdir(parents=True, exist_ok=True)
+            for item in source.iterdir():
+                item.replace(target / name / item.name)
+        elif source.is_file():
+            target.mkdir(parents=True, exist_ok=True)
+            source.replace(target / name)
+    return target
+
+
+def settle_previous_work(pack, restart=False):
+    """Return ("same" | "resume" | "archived" | "fresh", archive dir or None)."""
     token = run_token(pack)
     previous = RUN_MARK.read_text().strip() if RUN_MARK.exists() else ""
-    fragments = sorted((ROOT / "parts").glob("*.json")) if (ROOT / "parts").is_dir() else []
-    if not fragments or previous == token:
-        return None
-    target = PREVIOUS / (previous or "unknown")
-    for folder in ("parts", "checks"):
-        source = ROOT / folder
-        if source.is_dir() and any(source.iterdir()):
-            (target / folder).mkdir(parents=True, exist_ok=True)
-            for item in source.iterdir():
-                item.replace(target / folder / item.name)
-    return target
+    if not has_work():
+        return "fresh", None
+    if restart:
+        # By now this run has usually claimed the files; they are the earlier run's work.
+        earlier = (resume_tokens(pack) or [previous])[-1] if previous == token else previous
+        return "archived", archive_work(earlier or token)
+    if previous == token:
+        return "same", None
+    if previous and previous in resume_tokens(pack):
+        return "resume", None
+    return "archived", archive_work(previous)
+
+
+def point_plan_at(work_pack):
+    """A kept plan names the earlier run's work pack, whose submit credential
+    is no longer current; this run's commands must use its own."""
+    plan = ROOT / "plan.md"
+    if plan.is_file():
+        text = plan.read_text()
+        plan.write_text(re.sub(r"(?m)^工作包：.*$", lambda _: f"工作包：{work_pack}", text, count=1))
+
+
+def resume_summary():
+    """What the earlier run left, so the agent can decide without opening files."""
+    lines = ["上一轮未入库，基线未变，已保留其成果："]
+    parts = sorted((ROOT / "parts").glob("*.json")) if (ROOT / "parts").is_dir() else []
+    newest = 0.0
+    for part in parts:
+        newest = max(newest, part.stat().st_mtime)
+        try:
+            items = json.loads(part.read_bytes())
+            kinds = Counter(i.get("target_kind", "?") for i in items if isinstance(i, dict))
+            detail = "、".join(f"{k} {n}" for k, n in kinds.most_common())
+            lines.append(f"- {relative(part)}：{len(items)} 条" + (f"（{detail}）" if detail else ""))
+        except (OSError, ValueError, TypeError):
+            lines.append(f"- {relative(part)}：无法读取（按缺失处理）")
+    if not parts:
+        lines.append("- 片段：无")
+    for name in ("entities.json", "issues.json", "plan.md", "notes.md"):
+        if (ROOT / name).is_file():
+            extra = ""
+            if name == "entities.json":
+                try:
+                    extra = f"（范围 {len(json.loads((ROOT / name).read_bytes()).get('items') or [])} 项）"
+                except (OSError, ValueError, AttributeError):
+                    extra = "（无法读取）"
+            lines.append(f"- modeling/{name}：有{extra}")
+    if LATEST_CHECK.is_file():
+        try:
+            report = json.loads(LATEST_CHECK.read_bytes())
+            errors = report.get("errors") or []
+            stale = "；之后片段又改过，报告可能过时，先重新检查" if newest > LATEST_CHECK.stat().st_mtime else ""
+            lines.append(f"- 最近一次内容检查（{report.get('source', '?')}）：{len(errors)} 个错误{stale}；全文 {relative(LATEST_CHECK)}")
+            for error_item in errors[:3]:
+                text = error_item.get("message") if isinstance(error_item, dict) else str(error_item)
+                lines.append("  · " + " ".join(str(text).split())[:200])
+        except (OSError, ValueError):
+            lines.append(f"- 最近一次内容检查：{relative(LATEST_CHECK)}（无法读取）")
+    else:
+        lines.append("- 最近一次内容检查：无")
+    return "\n".join(lines)
 
 
 def done(created):
@@ -76,6 +165,7 @@ def done(created):
 def main():
     parser = HintParser(description="建立 modeling/ 骨架与计划模板；幂等，不覆盖已有文件")
     parser.add_argument("--work-pack", required=True)
+    parser.add_argument("--restart", action="store_true", help="放弃保留的成果：整体归档后从头开始")
     args = parser.parse_args()
     created, step = [], f"读取工作包 {args.work_pack}"
     try:
@@ -89,8 +179,10 @@ def main():
         # Output filenames are supplied by the platform; never infer them.
         if pack.get("result_file"):
             Path(pack["result_file"]).parent.mkdir(parents=True, exist_ok=True)
-        step = "整理上一轮的片段"
-        archived = archive_previous_parts(pack)
+        step = "整理上一轮的成果"
+        state, archived = settle_previous_work(pack, restart=args.restart)
+        if state == "resume":
+            point_plan_at(args.work_pack)
         step = "创建 modeling/ 与输出目录"
         for folder in (ROOT, ROOT / "parts", ROOT / "checks", ROOT / "tmp"):
             folder.mkdir(parents=True, exist_ok=True)
@@ -105,7 +197,8 @@ def main():
         step = "写入 modeling/plan.md 与 notes.md"
         if write_new(ROOT / "plan.md", plan):
             created.append("modeling/plan.md（模板）")
-        if write_new(ROOT / "notes.md", "# 证据对照与判断（≤2 KB，上下文压缩后先读）\n"):
+        # No byte limit: a hard number made the agent spend calls trimming bytes.
+        if write_new(ROOT / "notes.md", "# 证据对照与判断（只记要点，上下文压缩后先读）\n"):
             created.append("modeling/notes.md")
     except json.JSONDecodeError as exc:
         print(error("JSON_INVALID", f"{step}失败：第 {exc.lineno} 行第 {exc.colno} 列 {exc.msg}", done(created),
@@ -119,8 +212,13 @@ def main():
         print(error("INIT_FAILED", f"{step}失败：{type(exc).__name__}", done(created), retry=False))
         return 1
     print("modeling/ 已就绪" + ("；新建：" + "、".join(created) if created else "；文件均已存在，未覆盖"))
-    if archived:
-        print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的片段与检查报告已移到 {archived}/，本轮从空的 modeling/parts/ 开始",
+    if state == "resume":
+        steps = relative(Path(__file__).resolve().parents[1] / "references" / "steps")
+        print(resume_summary())
+        print(notice("PREVIOUS_WORK_KEPT", "本轮可在上一轮成果上继续",
+                     f"先读 {steps}/resume.md，按用户这条消息决定：修正后提交、补写缺少的部分、按新要求改受影响的部分，或运行 init_workflow.py --restart 从头开始"))
+    elif archived:
+        print(notice("PREVIOUS_PARTS_MOVED", f"上一轮的成果已移到 {archived}/，本轮从空的 modeling/ 开始",
                      "只写本轮的变化；已入库的定义用 show_element.py 查，不必读该目录"))
     print(run_paths(args.work_pack, pack))
     return 0
@@ -130,7 +228,9 @@ def run_paths(work_pack, pack):
     """This run's files and commands; copy them rather than composing paths."""
     lines = ["本轮路径（相对工作区，直接复制）：", f"- 工作包：{work_pack}"]
     for material in pack.get("materials") or []:
-        if material.get("path"):
+        if material.get("path") and material.get("from_request"):
+            lines.append(f"- 用户消息原文：{material['path']}（id {material.get('id', '?')}；内容就是本轮或之前的消息，引证时用这个 id，不必再读）")
+        elif material.get("path"):
             lines.append(f"- 材料：{material['path']}（id {material.get('id', '?')}，{material.get('lines', '?')} 行）")
     for table in pack.get("tables") or []:
         if isinstance(table, dict) and table.get("key"):
@@ -145,6 +245,8 @@ def run_paths(work_pack, pack):
     lines.append(f"- 模板：概念清单 {protocol}/entities.json；问题清单 {protocol}/issues.json（计划获批准后再写）")
     lines.append("- 概念清单写 modeling/entities.json，问题清单写 modeling/issues.json（与 plan.md 同级，不放 parts/）")
     lines.append("- 片段写 modeling/parts/，临时文件写 modeling/tmp/；业务文件用工作区相对路径，不用 /tmp 或 ../（DataAgent 会拦截），技能脚本照下面的命令写")
+    # Seen in a real run: piping into head cut the examples, and --help cost calls.
+    lines.append("- 技能脚本的输出已控制在一次能完整显示的大小：不要接 head、tail 截断，也不必先查 --help，参数照下面的命令写")
     lines.append("常用命令：")
     lines += ["  " + line for line in usage(work_pack)]
     lines += ["  " + line for line in reading_commands(pack)]
