@@ -12,6 +12,7 @@ from check_result import (
     validate_file,
 )
 from column_refs import local_column_messages
+from function_refs import function_messages
 from runpaths import (
     PARTS,
     HintParser,
@@ -480,8 +481,9 @@ def main():
         except (OSError, ValueError):
             pass
         return checked
-    # Column names and query locations are checked here, free of repair rounds (design MS-02).
-    column_problems = local_column_messages(batch["items"], pack.get("tables_file"))
+    # Column names, query locations and platform-rejected functions are checked here,
+    # free of repair rounds (design MS-02, MS-07).
+    column_problems = local_column_messages(batch["items"], pack.get("tables_file")) + function_messages(batch["items"])
     if column_problems:
         save_latest_check("local", column_problems, candidate)
         print(f"本地检查未通过（不计修正轮次），未提交：{len(column_problems)} 处")

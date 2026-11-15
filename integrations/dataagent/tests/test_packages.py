@@ -120,7 +120,7 @@ def _pack(tmp_path):
 
 
 def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_path):
-    generate(SOURCE, tmp_path)
+    generate(SOURCE, tmp_path, functions_file=tmp_path / "platform_functions.json")
     source = json.loads(SOURCE.read_bytes())
     for name, targets in TARGETS.items():
         generated = tmp_path / name / "output-schema.json"
@@ -148,7 +148,7 @@ def test_extraction_schemas_are_generated_and_preserve_platform_contract(tmp_pat
     source["properties"]["items"]["maxItems"] = 97
     modified = tmp_path / "modified.json"
     modified.write_text(json.dumps(source))
-    generate(modified, tmp_path / "changed")
+    generate(modified, tmp_path / "changed", functions_file=tmp_path / "changed.json")
     for name in TARGETS:
         schema = json.loads((tmp_path / "changed" / name / "output-schema.json").read_bytes())
         assert schema["properties"]["items"]["maxItems"] == 97

@@ -19,6 +19,7 @@ from check_result import (
     schema_errors,
 )
 from column_refs import local_column_messages
+from function_refs import function_messages
 from material_coverage import coverage_hints
 from prepare_result import PrepareInputError, assemble, effective_ref
 from runpaths import (
@@ -166,7 +167,7 @@ def main():
             continue
         checked.append(path)
         report = check_fragment(items, context, schema)
-        report["errors"] += duplicate_refs(path, items)
+        report["errors"] += duplicate_refs(path, items) + function_messages(items)
         if args.work_pack:
             report["errors"] += local_column_messages(items, pack.get("tables_file"))
         report_path = Path(args.reports) / f"{path.stem}.json"

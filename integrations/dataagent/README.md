@@ -15,7 +15,7 @@ build_packages.py             组装包，复制共享资源
 plugin.json、install.sh、迁移说明.md
 ```
 
-`shared/references/` 包含 core-model、principles、quick-reference、examples（含 protocol）、extract-kit、steps/finish.md（合并修正输出，两个建模技能共用）；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、check_part、runpaths、check_result、prepare_result。源码只存一份，构建时复制到三个包，每个安装目录均可独立运行。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
+`shared/references/` 包含 core-model、principles、quick-reference、examples（含 protocol）、extract-kit、steps/finish.md（合并修正输出，两个建模技能共用）；`shared/scripts/` 包含 init_workflow、read_input、show_element、show_example、check_part、runpaths、check_result、prepare_result 等；`platform_functions.json`（平台拒绝的函数名）与 `table_format.py` 由 generate_output_schemas.py 从平台代码生成，平台改动函数白名单后重新运行 `make -C integrations/dataagent schemas`。源码只存一份，构建时复制到三个包，每个安装目录均可独立运行。各技能的专属方法与 output-schema.json 保留在各自源码目录。不要直接安装未组装的 skills 源码。
 
 ## 入口与步骤（2026-10-22）
 

@@ -307,7 +307,7 @@ column_refs = importlib.import_module("column_refs")
 prepare_result = importlib.import_module("prepare_result")
 
 
-def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None):
+def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None, query_sql="SELECT 1 AS n"):
     """Retail tables, the expander's 01/03, and a hand-written 04 metric."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "modeling/parts").mkdir(parents=True)
@@ -319,10 +319,11 @@ def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None):
         "name": "sales", "display_name": "销售额", "kind": "simple", "dataset_id": ref, "aggregation": "sum",
         "measure": {"dataset_id": ref, "column": metric_column}, "time_field": {"dataset_id": ref, "column": "order_date"}}}
     extra = []
-    if query_schema:
+    if query_schema or query_sql != "SELECT 1 AS n":
         extra.append({"operation": "create", "target_kind": "dataset", "client_ref": "ds_events", "after": {
-            "name": "events", "display_name": "事件", "source_kind": "query", "connection_id": "c", "schema_name": query_schema,
-            "query_sql": "SELECT 1 AS n", "columns": [{"name": "n"}]}})
+            "name": "events", "display_name": "事件", "source_kind": "query", "connection_id": "c",
+            **({"schema_name": query_schema} if query_schema else {}),
+            "query_sql": query_sql, "columns": [{"name": "n"}]}})
     (tmp_path / "modeling/parts/04-metrics-rules.json").write_text(json.dumps([*extra, metric], ensure_ascii=False))
     pack = tmp_path / "pack.json"
     pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
@@ -330,12 +331,13 @@ def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None):
     return pack
 
 
-@pytest.mark.parametrize("column, query_schema, code", [
-    ("amount", None, "COLUMN_UNKNOWN"),          # the real slip: refund_amount written as amount
-    ("pay_amount", "retail", "QUERY_DATASET_LOCATION"),
+@pytest.mark.parametrize("column, query_schema, query_sql, code", [
+    ("amount", None, "SELECT 1 AS n", "COLUMN_UNKNOWN"),          # the real slip: refund_amount written as amount
+    ("pay_amount", "retail", "SELECT 1 AS n", "QUERY_DATASET_LOCATION"),
+    ("pay_amount", None, "SELECT GREATEST(1, 2) AS n", "FUNCTION_UNSUPPORTED"),  # cost a repair round on 2026-11-15
 ])
-def test_wrong_columns_and_query_locations_fail_locally(tmp_path, monkeypatch, capsys, column, query_schema, code):
-    pack = column_workspace(tmp_path, monkeypatch, column, query_schema)
+def test_wrong_columns_and_query_locations_fail_locally(tmp_path, monkeypatch, capsys, column, query_schema, query_sql, code):
+    pack = column_workspace(tmp_path, monkeypatch, column, query_schema, query_sql)
     monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), "04"])
     assert check_part.main() == 1
     out = capsys.readouterr().out
