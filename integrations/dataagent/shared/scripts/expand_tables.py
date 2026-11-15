@@ -24,6 +24,7 @@ from table_summary import comment_values, load_tables
 ENTITIES = Path("modeling/entities.json")
 TYPES_PART = PARTS / "01-types.json"
 DATASETS_PART = PARTS / "03-datasets.json"
+LINKS_PART = PARTS / "02-links.json"
 IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SEPARATORS = re.compile(r"[：:，,（(；;]")
 KINDS = [
@@ -178,7 +179,7 @@ def expand(spec, tables, texts):
                 notes.append(f"值类型 {vt['name']} 的列 {ref_col} 不属于任何展开的实体，未绑定")
             bound[ref_col] = (ref, value_kind(column.get("type")))
 
-    shared_datasets = {}
+    shared_datasets, columns_to_props, key_props = {}, {}, {}
     refs = {i["name"]: f"实体 {i['name']} " for i in entities}
     repeated = {n for n in (t["table_name"] for t in tables.values()) if sum(t["table_name"] == n for t in tables.values()) > 1}
     for item in entities:
@@ -204,6 +205,8 @@ def expand(spec, tables, texts):
         if excluded & set(pk):
             raise SpecError(f"{name} 不能排除主键列 {', '.join(sorted(excluded & set(pk)))}")
         fields = {}
+        columns_to_props[name] = {}
+        key_props[name] = []
         for column in table["columns"]:
             col = column["name"]
             if col in excluded:
@@ -236,6 +239,9 @@ def expand(spec, tables, texts):
             refs[prop_ref] = f" {name}.{prop_name} "
             types.append({"operation": "create", "target_kind": "property", "client_ref": prop_ref, "after": prop})
             fields[prop_name] = {"kind": "column", "source_id": "main", "column": col}
+            columns_to_props[name][col] = prop_name
+            if col in pk:
+                key_props[name].append(prop_name)
         title = item.get("title_property")
         if title:
             title_name = (overrides.get(title) or {}).get("name") or title
@@ -258,11 +264,91 @@ def expand(spec, tables, texts):
             "type_id": {"client_ref": name}, "binding_mode": "independent",
             "sources": [{"id": "main", "dataset_id": {"client_ref": ds_ref}, "key_columns": list(pk)}],
             "fields": fields}})
-    used = {t["key"] for t in backed.values()}
+    links = expand_links(spec.get("links") or [], tables, columns_to_props, key_props, refs, shared_datasets, datasets)
+    used = {t["key"] for t in backed.values()} | {resolve_table(link["via"], tables)["key"] for link in spec.get("links") or [] if link.get("via")}
     skipped = [f"{t['key']} {t['table_name']}" for t in tables.values() if t["key"] not in used]
     if skipped:
         notes.append("未展开为实体的表（有意排除可忽略；关联表等在 02、03b 里手写）：" + "、".join(skipped))
-    return types, datasets, notes
+    return types, datasets, notes, links
+
+
+MULTIPLICITIES = {"one_to_one", "many_to_one", "many_to_many"}  # one-to-many is built from the many side
+
+
+def as_list(value):
+    return [value] if isinstance(value, str) else list(value or [])
+
+
+def expand_links(specs, tables, columns_to_props, key_props, refs, shared_datasets, datasets):
+    """One short entry per link -> link_type items; the agent still names them,
+    picks ends, cardinality and readings (design 2026-11-15, compact links)."""
+    items = []
+
+    def props(entity, names, what):
+        if entity not in columns_to_props:
+            raise SpecError(f"关系 {what} 的端点 {entity} 不是展开出的有表实体；这条关系写在 02b-links.json")
+        known = columns_to_props[entity]
+        found = []
+        for name in names:
+            prop = name if name in known.values() else known.get(name)
+            if prop is None:
+                raise SpecError(f"关系 {what}：{entity} 没有属性或列 {name}")
+            found.append({"client_ref": f"{entity}_{prop}"})
+        return found
+
+    for link in specs:
+        name = link.get("name")
+        what = name or link.get("display_name") or "?"
+        if not IDENTIFIER.match(name or ""):
+            raise SpecError(f"关系 {what} 的 name 只能用字母、数字、下划线")
+        if name in refs:
+            raise SpecError(f"关系 {name} 与{refs[name]}重名，换一个 name")
+        refs[name] = f" 关系 {name} "
+        if link.get("multiplicity") not in MULTIPLICITIES:
+            raise SpecError(f"关系 {name} 的 multiplicity 应为 {'、'.join(sorted(MULTIPLICITIES))}")
+        source, target = link.get("from"), link.get("to")
+        after = {"name": name, "display_name": link.get("display_name") or name,
+                 "source_type_id": {"client_ref": source}, "target_type_id": {"client_ref": target},
+                 "multiplicity": link["multiplicity"]}
+        for key, field in (("description", "description"), ("reads", "verbalizes"), ("synonyms", "synonyms")):
+            if link.get(key):
+                after[field] = link[key]
+        if link.get("via"):
+            table = resolve_table(link["via"], tables)
+            if table is None:
+                raise SpecError(f"关系 {name} 的关联表 {link['via']} 不在本轮表结构里")
+            columns = {c["name"] for c in table["columns"]}
+            via_from, via_to = as_list(link.get("via_from")), as_list(link.get("via_to"))
+            missing = [c for c in via_from + via_to if c not in columns]
+            if missing or not via_from or not via_to:
+                raise SpecError(f"关系 {name}：关联表 {table['key']} 需给 via_from、via_to，且是它的列（缺 {', '.join(missing) or '列名'}）")
+            source_key = props(source, link.get("from_on") or key_props.get(source, []), name)
+            target_key = props(target, link.get("to_on") or key_props.get(target, []), name)
+            if len(source_key) != len(via_from) or len(target_key) != len(via_to):
+                raise SpecError(f"关系 {name}：via_from、via_to 的列数要与两端的标识（或 from_on、to_on）一致")
+            ds_ref = shared_datasets.get(table["key"])
+            if ds_ref is None:
+                ds_ref = shared_datasets[table["key"]] = "ds_" + table["table_name"]
+                datasets.append({"operation": "create", "target_kind": "dataset", "client_ref": ds_ref, "after": {
+                    "name": table["table_name"], "display_name": (table.get("comment") or table["table_name"])[:60],
+                    "source_kind": "table", "connection_id": table["connection_id"],
+                    "schema_name": table.get("schema_name"), "table_name": table["table_name"],
+                    **({"dialect": table["dialect"]} if table.get("dialect") else {})}})
+            after["data_join"] = {"kind": "mapping_table", "dataset_id": {"client_ref": ds_ref},
+                                  "source_columns": via_from, "target_columns": via_to,
+                                  "source_key": {"kind": "properties", "property_ids": source_key},
+                                  "target_key": {"kind": "properties", "property_ids": target_key}}
+        else:
+            on = as_list(link.get("on"))
+            if not on:
+                raise SpecError(f"关系 {name} 缺 on（源端的关联列），或用 via 指定关联表")
+            source_props = props(source, on, name)
+            target_props = props(target, as_list(link.get("to_on")) or key_props.get(target, []), name)
+            if len(source_props) != len(target_props):
+                raise SpecError(f"关系 {name}：on 有 {len(source_props)} 列，目标端标识有 {len(target_props)} 个；用 to_on 指明目标属性")
+            after["data_join"] = {"kind": "direct", "source_property_ids": source_props, "target_property_ids": target_props}
+        items.append({"operation": "create", "target_kind": "link_type", "client_ref": name, "after": after})
+    return items
 
 
 def main():
@@ -276,7 +362,7 @@ def main():
         pack = json.loads(Path(args.work_pack).read_bytes())
         tables = {t["key"]: t for t in load_tables(pack["tables_file"])}
         spec = json.loads(ENTITIES.read_bytes())
-        types, datasets, notes = expand(spec, tables, material_lines(pack))
+        types, datasets, notes, links = expand(spec, tables, material_lines(pack))
     except SpecError as exc:
         print(error("SPEC_INVALID", str(exc), "未写任何片段", "改 modeling/entities.json 后重新运行：" + command("expand_tables.py", "--work-pack", args.work_pack)))
         return 1
@@ -287,16 +373,20 @@ def main():
     PARTS.mkdir(parents=True, exist_ok=True)
     atomic_write(TYPES_PART, json.dumps(types, ensure_ascii=False, indent=1).encode())
     atomic_write(DATASETS_PART, json.dumps(datasets, ensure_ascii=False, indent=1).encode())
+    written = [TYPES_PART, DATASETS_PART]
+    if "links" in spec:  # only then does the script own 02-links.json
+        atomic_write(LINKS_PART, json.dumps(links, ensure_ascii=False, indent=1).encode())
+        written.append(LINKS_PART)
     counts = {}
-    for item in types + datasets:
+    for item in types + datasets + links:
         counts[item["target_kind"]] = counts.get(item["target_kind"], 0) + 1
-    print(f"已写 {TYPES_PART}、{DATASETS_PART}：" + "，".join(f"{k} {v}" for k, v in counts.items()))
-    print("这两个文件每次运行都会重写；手写的类型、属性放 01b-*.json，查询数据集、多表映射放 03b-*.json")
+    print("已写 " + "、".join(map(str, written)) + "：" + "，".join(f"{k} {v}" for k, v in counts.items()))
+    print("这些文件每次运行都会重写；手写的类型、属性放 01b-*.json，特殊关系放 02b-*.json，查询数据集、多表映射放 03b-*.json")
     for note in notes:
         print("- " + note)
     sys.stdout.flush()
     checked = subprocess.run([sys.executable, str(Path(__file__).with_name("check_part.py")), "--work-pack", args.work_pack,
-                              str(TYPES_PART), str(DATASETS_PART)], check=False)
+                              *map(str, written)], check=False)
     return checked.returncode
 
 

@@ -63,7 +63,7 @@ def shape(items, kind):
 
 
 def test_expansion_matches_the_hand_written_retail_fixture():
-    types, datasets, notes = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    types, datasets, notes, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
     expected_types = fixture("01-types.json")
     # refund has no synced table: its properties come from the material and are written by hand (01b).
     hand = {k: v for k, v in shape(expected_types, "property").items() if k[0] != "refund"}
@@ -79,7 +79,7 @@ def test_expansion_matches_the_hand_written_retail_fixture():
 
 
 def test_comment_tail_becomes_the_description_not_the_display_name():
-    types, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
     member_id = next(i["after"] for i in types if i["client_ref"] == "order_member_id")
     assert (member_id["display_name"], member_id["description"]) == ("下单会员", "散客为空")
     level = next(i["after"] for i in types if i["client_ref"] == "member_member_level")
@@ -88,7 +88,7 @@ def test_comment_tail_becomes_the_description_not_the_display_name():
 
 def test_material_basis_is_quoted_from_the_material_line():
     texts = {MATERIAL_ID: (RETAIL / "material.md").read_text().splitlines()}
-    types, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), texts)
+    types, _, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), texts)
     evidence = next(i for i in types if i["client_ref"] == "member")["after"]["evidence"][0]
     assert evidence["locator"] == {"line_start": 6, "line_end": 6} and evidence["quote"] == texts[MATERIAL_ID][5].strip()
     store = next(i for i in types if i["client_ref"] == "store")["after"]["evidence"][0]
@@ -114,7 +114,7 @@ def test_booleans_exclusions_and_renames_follow_the_spec_only():
     spec = {"items": [{"name": "product", "display_name": "商品", "table": "t10", "boolean_columns": ["is_fresh"],
                        "exclude_columns": ["barcode"], "properties": {"spec": {"name": "pack_spec", "display_name": "包装规格"}}},
                       {"name": "brand", "display_name": "品牌", "table": "t8"}]}
-    types, datasets, notes = expand_tables.expand(spec, qinghe, {})
+    types, datasets, notes, _ = expand_tables.expand(spec, qinghe, {})
     props = {i["after"]["name"]: i["after"] for i in types if i["target_kind"] == "property"
              and i["after"]["owner_type_id"]["client_ref"] == "product"}
     assert props["is_fresh"]["value_kind"] == "boolean" and "barcode" not in props
@@ -215,7 +215,7 @@ def prop(types, ref):
 
 
 def test_open_lists_keep_their_text_and_covered_tails_are_dropped():
-    types, _, _ = qinghe_expand(
+    types, _, _, _ = qinghe_expand(
         [{"name": "price_change", "display_name": "调价", "table": "t31"},
          {"name": "product", "display_name": "商品", "table": "t10", "boolean_columns": ["is_fresh"]}],
         [{"name": "storage_mode", "columns": ["t10.storage_type"]}])
@@ -231,7 +231,7 @@ def test_generated_ref_clashes_are_reported_not_merged():
 
 
 def test_value_type_decides_kind_and_keys_cannot_be_overridden():
-    types, _, _ = qinghe_expand(
+    types, _, _, _ = qinghe_expand(
         [{"name": "store", "display_name": "门店", "table": "t2",
           "properties": {"status": {"value_kind": "integer"}, "store_id": {"unique": False}}}],
         [{"name": "store_status", "columns": ["t2.status"]}])
@@ -250,7 +250,7 @@ def test_every_bound_column_is_checked(value_type, message):
 
 
 def test_numeric_values_are_not_quoted():
-    types, _, _ = qinghe_expand([{"name": "category", "display_name": "品类", "table": "t7"}],
+    types, _, _, _ = qinghe_expand([{"name": "category", "display_name": "品类", "table": "t7"}],
                                 [{"name": "category_level", "columns": ["t7.level"], "values": [1, 2]}])
     assert prop(types, "vt_category_level_values")["expression"] == "category_level IN (1, 2)"
 
@@ -259,7 +259,7 @@ def test_table_basis_by_name_and_line_ranges():
     texts = {MATERIAL_ID: ["第一行", "第二行", "第三行"]}
     spec = {"items": [{"name": "order", "display_name": "订单", "table": "orders",
                        "basis": [{"table": "orders"}, {"material_id": MATERIAL_ID, "line": "2-3"}]}]}
-    types, _, _ = expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
+    types, _, _, _ = expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
     table_ev, material_ev = prop(types, "order")["evidence"]
     assert table_ev["ref"] == "t3" and material_ev["locator"] == {"line_start": 2, "line_end": 3}
     assert material_ev["quote"] == "第二行 第三行"
@@ -273,7 +273,7 @@ def test_same_table_name_in_two_schemas_gets_two_datasets():
     other = json.loads(json.dumps(copy[2]))
     other.update(key="t9", schema_name="archive")
     pool = {t["key"]: t for t in [*copy, other]}
-    _, datasets, _ = expand_tables.expand({"items": [
+    _, datasets, _, _ = expand_tables.expand({"items": [
         {"name": "order", "display_name": "订单", "table": "t3"},
         {"name": "old_order", "display_name": "归档订单", "table": "t9"}]}, pool, {})
     names = [d["after"]["name"] for d in datasets if d["target_kind"] == "dataset"]
@@ -311,7 +311,7 @@ def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None):
     """Retail tables, the expander's 01/03, and a hand-written 04 metric."""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "modeling/parts").mkdir(parents=True)
-    types, datasets, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    types, datasets, _, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
     (tmp_path / "modeling/parts/01-types.json").write_text(json.dumps(types, ensure_ascii=False))
     (tmp_path / "modeling/parts/03-datasets.json").write_text(json.dumps(datasets, ensure_ascii=False))
     ref = {"client_ref": "ds_orders"}
@@ -354,3 +354,72 @@ def test_correct_columns_pass_and_unknown_datasets_are_not_guessed(tmp_path, mon
     existing = [{"target_kind": "metric", "client_ref": "m", "after": {
         "measure": {"dataset_id": "6f0e2d4a-0000-4000-8000-000000000001", "column": "whatever"}}}]
     assert column_refs.column_errors(existing, {}) == []  # an existing dataset by id: the platform decides
+
+
+RETAIL_LINKS = [
+    {"name": "member_home_store", "display_name": "开卡门店", "from": "member", "to": "store", "multiplicity": "many_to_one",
+     "on": "home_store_id", "reads": ["{source}在门店开卡{target}", "{target}对应{source}"]},
+    {"name": "order_member", "display_name": "下单会员", "from": "order", "to": "member", "multiplicity": "many_to_one", "on": "member_id"},
+    {"name": "order_store", "display_name": "成交门店", "from": "order", "to": "store", "multiplicity": "many_to_one", "on": "store_id"},
+    {"name": "line_order", "display_name": "属于订单", "from": "order_item", "to": "order", "multiplicity": "many_to_one", "on": "order_no"},
+    {"name": "line_product", "display_name": "对应商品", "from": "order_item", "to": "product", "multiplicity": "many_to_one", "on": ["sku"]},
+]
+
+
+def test_compact_links_match_the_hand_written_fixture():
+    spec = {**RETAIL_SPEC, "links": RETAIL_LINKS}
+    _, _, _, links = expand_tables.expand(spec, tables(RETAIL / "tables.json"), {})
+    expected = {x["after"]["name"]: x["after"] for x in fixture("02-links.json")}
+    assert len(links) == 5
+    for item in links:
+        after, want = item["after"], expected[item["after"]["name"]]
+        for key in ("source_type_id", "target_type_id", "multiplicity", "data_join"):
+            assert after[key] == want[key], (after["name"], key)
+    assert links[0]["after"]["verbalizes"] == expected["member_home_store"]["verbalizes"]
+    size = len(json.dumps(RETAIL_LINKS, ensure_ascii=False).encode())
+    assert size * 2 < len(json.dumps(links, ensure_ascii=False).encode())  # the point: much less to write
+
+
+def test_link_through_a_junction_table_gets_its_dataset():
+    spec = {"items": [{"name": "promotion", "display_name": "促销活动", "table": "t25"},
+                      {"name": "product", "display_name": "商品", "table": "t10"}],
+            "links": [{"name": "promoted_product", "display_name": "参与商品", "from": "promotion", "to": "product",
+                       "multiplicity": "many_to_many", "via": "t26", "via_from": "promotion_id", "via_to": "sku"}]}
+    _, datasets, notes, links = expand_tables.expand(spec, tables(FIXTURES / "qinghe-tables.json"), {})
+    join = links[0]["after"]["data_join"]
+    assert join["kind"] == "mapping_table" and join["dataset_id"] == {"client_ref": "ds_promotion_products"}
+    assert join["source_key"]["property_ids"] == [{"client_ref": "promotion_promotion_id"}]
+    assert join["target_key"]["property_ids"] == [{"client_ref": "product_sku"}]
+    assert any(d["client_ref"] == "ds_promotion_products" for d in datasets)
+    assert not any("t26 promotion_products" in n for n in notes)  # used, so not listed as left out
+
+
+@pytest.mark.parametrize("change, message", [
+    (lambda link: link.update(multiplicity="one_to_many"), "multiplicity"),
+    (lambda link: link.update(on="nope"), "没有属性或列"),
+    (lambda link: link.update(to="refund"), "02b-links"),
+    (lambda link: link.update(name="order"), "重名"),
+    (lambda link: link.pop("on"), "缺 on"),
+])
+def test_link_spec_mistakes_are_reported(change, message):
+    links = json.loads(json.dumps(RETAIL_LINKS))
+    change(links[1])
+    with pytest.raises(expand_tables.SpecError, match=message):
+        expand_tables.expand({**RETAIL_SPEC, "links": links}, tables(RETAIL / "tables.json"), {})
+
+
+def test_links_file_is_written_only_when_the_spec_has_links(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "modeling/parts").mkdir(parents=True)
+    (tmp_path / "modeling/parts/02-links.json").write_text("[]  ")
+    pack = tmp_path / "pack.json"
+    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
+                                "schema_file": str(SCHEMA_PATH)}))
+    monkeypatch.setattr(sys, "argv", ["expand_tables.py", "--work-pack", str(pack)])
+    (tmp_path / "modeling/entities.json").write_text(json.dumps(RETAIL_SPEC, ensure_ascii=False))
+    expand_tables.main()
+    assert (tmp_path / "modeling/parts/02-links.json").read_text() == "[]  "  # hand-written file untouched
+    (tmp_path / "modeling/entities.json").write_text(json.dumps({**RETAIL_SPEC, "links": RETAIL_LINKS}, ensure_ascii=False))
+    expand_tables.main()
+    assert len(json.loads((tmp_path / "modeling/parts/02-links.json").read_text())) == 5
+    assert "02-links.json" in capsys.readouterr().out
