@@ -1,0 +1,3380 @@
+[
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_regions",
+  "after": {
+   "name": "regions",
+   "display_name": "大区数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "regions",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "region_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "大区编号"
+    },
+    {
+     "name": "region_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "大区名称"
+    },
+    {
+     "name": "manager_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "大区经理"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_region",
+  "after": {
+   "type_id": {
+    "client_ref": "region"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_regions"
+     },
+     "key_columns": [
+      "region_id"
+     ]
+    }
+   ],
+   "fields": {
+    "region_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "region_id"
+    },
+    "region_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "region_name"
+    },
+    "manager_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "manager_name"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_stores",
+  "after": {
+   "name": "stores",
+   "display_name": "门店数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "stores",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "门店编号"
+    },
+    {
+     "name": "store_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "门店名称"
+    },
+    {
+     "name": "region_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "所属大区"
+    },
+    {
+     "name": "city",
+     "physical_type": "VARCHAR(32)",
+     "comment": "城市"
+    },
+    {
+     "name": "address",
+     "physical_type": "VARCHAR(128)",
+     "comment": "地址"
+    },
+    {
+     "name": "store_type",
+     "physical_type": "VARCHAR(8)",
+     "comment": "门店类型：标准店/社区店/旗舰店"
+    },
+    {
+     "name": "area_sqm",
+     "physical_type": "DECIMAL(8, 2)",
+     "comment": "经营面积（平方米）"
+    },
+    {
+     "name": "opened_on",
+     "physical_type": "DATE",
+     "comment": "开业日期"
+    },
+    {
+     "name": "closed_on",
+     "physical_type": "DATE",
+     "comment": "闭店日期，营业中为空"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：营业/装修/闭店"
+    },
+    {
+     "name": "manager_emp_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "店长工号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_store",
+  "after": {
+   "type_id": {
+    "client_ref": "store"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_stores"
+     },
+     "key_columns": [
+      "store_id"
+     ]
+    }
+   ],
+   "fields": {
+    "store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_id"
+    },
+    "store_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_name"
+    },
+    "region_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "region_id"
+    },
+    "city": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "city"
+    },
+    "address": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "address"
+    },
+    "store_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_type"
+    },
+    "area_sqm": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "area_sqm"
+    },
+    "opened_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "opened_on"
+    },
+    "closed_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "closed_on"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    },
+    "manager_emp_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "manager_emp_id"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_warehouses",
+  "after": {
+   "name": "warehouses",
+   "display_name": "仓库数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "warehouses",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "wh_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "仓库编号"
+    },
+    {
+     "name": "wh_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "仓库名称"
+    },
+    {
+     "name": "city",
+     "physical_type": "VARCHAR(32)",
+     "comment": "城市"
+    },
+    {
+     "name": "wh_type",
+     "physical_type": "VARCHAR(8)",
+     "comment": "仓库类型：常温/冷链"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_warehouse",
+  "after": {
+   "type_id": {
+    "client_ref": "warehouse"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_warehouses"
+     },
+     "key_columns": [
+      "wh_id"
+     ]
+    }
+   ],
+   "fields": {
+    "wh_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "wh_id"
+    },
+    "wh_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "wh_name"
+    },
+    "city": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "city"
+    },
+    "wh_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "wh_type"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_employees",
+  "after": {
+   "name": "employees",
+   "display_name": "员工数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "employees",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "emp_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "工号"
+    },
+    {
+     "name": "emp_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "姓名"
+    },
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "所在门店，总部员工为空"
+    },
+    {
+     "name": "position",
+     "physical_type": "VARCHAR(16)",
+     "comment": "岗位：店长/收银/理货/采购/仓管"
+    },
+    {
+     "name": "hired_on",
+     "physical_type": "DATE",
+     "comment": "入职日期"
+    },
+    {
+     "name": "left_on",
+     "physical_type": "DATE",
+     "comment": "离职日期"
+    },
+    {
+     "name": "phone_masked",
+     "physical_type": "VARCHAR(16)",
+     "comment": "手机号（脱敏）"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_employee",
+  "after": {
+   "type_id": {
+    "client_ref": "employee"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_employees"
+     },
+     "key_columns": [
+      "emp_id"
+     ]
+    }
+   ],
+   "fields": {
+    "emp_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "emp_id"
+    },
+    "emp_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "emp_name"
+    },
+    "store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_id"
+    },
+    "position": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "position"
+    },
+    "hired_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "hired_on"
+    },
+    "left_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "left_on"
+    },
+    "phone_masked": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "phone_masked"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_products",
+  "after": {
+   "name": "products",
+   "display_name": "商品数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "products",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "product_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "商品名称"
+    },
+    {
+     "name": "barcode",
+     "physical_type": "VARCHAR(20)",
+     "comment": "条码"
+    },
+    {
+     "name": "category_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "二级品类"
+    },
+    {
+     "name": "brand_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "品牌"
+    },
+    {
+     "name": "supplier_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "主供应商"
+    },
+    {
+     "name": "spec",
+     "physical_type": "VARCHAR(32)",
+     "comment": "规格"
+    },
+    {
+     "name": "unit",
+     "physical_type": "VARCHAR(8)",
+     "comment": "销售单位"
+    },
+    {
+     "name": "shelf_life_days",
+     "physical_type": "INTEGER",
+     "comment": "保质期（天）"
+    },
+    {
+     "name": "storage_type",
+     "physical_type": "VARCHAR(8)",
+     "comment": "储存方式：常温/冷藏/冷冻"
+    },
+    {
+     "name": "list_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "零售价"
+    },
+    {
+     "name": "member_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "会员价"
+    },
+    {
+     "name": "cost_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "进价"
+    },
+    {
+     "name": "is_fresh",
+     "physical_type": "INTEGER",
+     "comment": "是否生鲜：1 是 0 否"
+    },
+    {
+     "name": "launched_on",
+     "physical_type": "DATE",
+     "comment": "上架日期"
+    },
+    {
+     "name": "delisted_on",
+     "physical_type": "DATE",
+     "comment": "下架日期"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：在售/停售/淘汰"
+    },
+    {
+     "name": "tax_rate",
+     "physical_type": "DECIMAL(4, 2)",
+     "comment": "税率"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_product",
+  "after": {
+   "type_id": {
+    "client_ref": "product"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_products"
+     },
+     "key_columns": [
+      "sku"
+     ]
+    }
+   ],
+   "fields": {
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "product_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "product_name"
+    },
+    "barcode": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "barcode"
+    },
+    "category_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "category_id"
+    },
+    "brand_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "brand_id"
+    },
+    "supplier_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "supplier_id"
+    },
+    "spec": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "spec"
+    },
+    "unit": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "unit"
+    },
+    "shelf_life_days": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "shelf_life_days"
+    },
+    "storage_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "storage_type"
+    },
+    "list_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "list_price"
+    },
+    "member_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "member_price"
+    },
+    "cost_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "cost_price"
+    },
+    "is_fresh": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "is_fresh"
+    },
+    "launched_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "launched_on"
+    },
+    "delisted_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "delisted_on"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    },
+    "tax_rate": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "tax_rate"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_categories",
+  "after": {
+   "name": "categories",
+   "display_name": "品类数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "categories",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "category_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "品类编号"
+    },
+    {
+     "name": "category_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "品类名称"
+    },
+    {
+     "name": "parent_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "上级品类，一级品类为空"
+    },
+    {
+     "name": "level",
+     "physical_type": "INTEGER",
+     "comment": "层级：1 一级，2 二级"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_category",
+  "after": {
+   "type_id": {
+    "client_ref": "category"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_categories"
+     },
+     "key_columns": [
+      "category_id"
+     ]
+    }
+   ],
+   "fields": {
+    "category_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "category_id"
+    },
+    "category_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "category_name"
+    },
+    "parent_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "parent_id"
+    },
+    "level": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "level"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_brands",
+  "after": {
+   "name": "brands",
+   "display_name": "品牌数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "brands",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "brand_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "品牌编号"
+    },
+    {
+     "name": "brand_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "品牌名称"
+    },
+    {
+     "name": "is_private_label",
+     "physical_type": "INTEGER",
+     "comment": "是否自有品牌：1 是 0 否"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_brand",
+  "after": {
+   "type_id": {
+    "client_ref": "brand"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_brands"
+     },
+     "key_columns": [
+      "brand_id"
+     ]
+    }
+   ],
+   "fields": {
+    "brand_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "brand_id"
+    },
+    "brand_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "brand_name"
+    },
+    "is_private_label": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "is_private_label"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_suppliers",
+  "after": {
+   "name": "suppliers",
+   "display_name": "供应商数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "suppliers",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "supplier_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "供应商编号"
+    },
+    {
+     "name": "supplier_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "供应商名称"
+    },
+    {
+     "name": "city",
+     "physical_type": "VARCHAR(32)",
+     "comment": "所在城市"
+    },
+    {
+     "name": "settle_days",
+     "physical_type": "INTEGER",
+     "comment": "账期（天）"
+    },
+    {
+     "name": "contact_masked",
+     "physical_type": "VARCHAR(16)",
+     "comment": "联系电话（脱敏）"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：合作中/暂停/终止"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_supplier",
+  "after": {
+   "type_id": {
+    "client_ref": "supplier"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_suppliers"
+     },
+     "key_columns": [
+      "supplier_id"
+     ]
+    }
+   ],
+   "fields": {
+    "supplier_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "supplier_id"
+    },
+    "supplier_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "supplier_name"
+    },
+    "city": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "city"
+    },
+    "settle_days": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "settle_days"
+    },
+    "contact_masked": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "contact_masked"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_price_changes",
+  "after": {
+   "name": "price_changes",
+   "display_name": "调价记录数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "price_changes",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "change_id",
+     "physical_type": "VARCHAR(20)",
+     "comment": "调价单号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "门店，全国统一调价为空"
+    },
+    {
+     "name": "old_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "原价"
+    },
+    {
+     "name": "new_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "新价"
+    },
+    {
+     "name": "effective_at",
+     "physical_type": "DATETIME",
+     "comment": "生效时间"
+    },
+    {
+     "name": "reason",
+     "physical_type": "VARCHAR(32)",
+     "comment": "原因：促销/成本变动/临期"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_price_change",
+  "after": {
+   "type_id": {
+    "client_ref": "price_change"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_price_changes"
+     },
+     "key_columns": [
+      "change_id"
+     ]
+    }
+   ],
+   "fields": {
+    "change_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "change_id"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_id"
+    },
+    "old_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "old_price"
+    },
+    "new_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "new_price"
+    },
+    "effective_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "effective_at"
+    },
+    "reason": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "reason"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_purchase_orders",
+  "after": {
+   "name": "purchase_orders",
+   "display_name": "采购单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "purchase_orders",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "po_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "采购单号"
+    },
+    {
+     "name": "supplier_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "供应商"
+    },
+    {
+     "name": "wh_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "收货仓库"
+    },
+    {
+     "name": "ordered_at",
+     "physical_type": "DATETIME",
+     "comment": "下单时间"
+    },
+    {
+     "name": "expected_on",
+     "physical_type": "DATE",
+     "comment": "预计到货日期"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：草稿/已下单/部分到货/已完成/已取消"
+    },
+    {
+     "name": "total_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "采购总额"
+    },
+    {
+     "name": "buyer_emp_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "采购员工号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_purchase_order",
+  "after": {
+   "type_id": {
+    "client_ref": "purchase_order"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_purchase_orders"
+     },
+     "key_columns": [
+      "po_no"
+     ]
+    }
+   ],
+   "fields": {
+    "po_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "po_no"
+    },
+    "supplier_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "supplier_id"
+    },
+    "wh_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "wh_id"
+    },
+    "ordered_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "ordered_at"
+    },
+    "expected_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "expected_on"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    },
+    "total_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "total_amount"
+    },
+    "buyer_emp_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "buyer_emp_id"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_purchase_order_items",
+  "after": {
+   "name": "purchase_order_items",
+   "display_name": "采购单明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "purchase_order_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "po_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "采购单号"
+    },
+    {
+     "name": "line_no",
+     "physical_type": "INTEGER",
+     "comment": "行号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "qty",
+     "physical_type": "INTEGER",
+     "comment": "采购数量"
+    },
+    {
+     "name": "unit_cost",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "采购单价"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_purchase_order_item",
+  "after": {
+   "type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_purchase_order_items"
+     },
+     "key_columns": [
+      "po_no",
+      "line_no"
+     ]
+    }
+   ],
+   "fields": {
+    "po_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "po_no"
+    },
+    "line_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "line_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty"
+    },
+    "unit_cost": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "unit_cost"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_receipts",
+  "after": {
+   "name": "receipts",
+   "display_name": "入库单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "receipts",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "receipt_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "入库单号"
+    },
+    {
+     "name": "po_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "来源采购单"
+    },
+    {
+     "name": "wh_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "入库仓库"
+    },
+    {
+     "name": "received_at",
+     "physical_type": "DATETIME",
+     "comment": "入库时间"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：待验收/已入库"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_receipt",
+  "after": {
+   "type_id": {
+    "client_ref": "receipt"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_receipts"
+     },
+     "key_columns": [
+      "receipt_no"
+     ]
+    }
+   ],
+   "fields": {
+    "receipt_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "receipt_no"
+    },
+    "po_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "po_no"
+    },
+    "wh_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "wh_id"
+    },
+    "received_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "received_at"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_receipt_items",
+  "after": {
+   "name": "receipt_items",
+   "display_name": "入库明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "receipt_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "receipt_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "入库单号"
+    },
+    {
+     "name": "line_no",
+     "physical_type": "INTEGER",
+     "comment": "行号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "qty_received",
+     "physical_type": "INTEGER",
+     "comment": "实收数量"
+    },
+    {
+     "name": "qty_rejected",
+     "physical_type": "INTEGER",
+     "comment": "拒收数量"
+    },
+    {
+     "name": "batch_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "批次号"
+    },
+    {
+     "name": "produced_on",
+     "physical_type": "DATE",
+     "comment": "生产日期"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_receipt_item",
+  "after": {
+   "type_id": {
+    "client_ref": "receipt_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_receipt_items"
+     },
+     "key_columns": [
+      "receipt_no",
+      "line_no"
+     ]
+    }
+   ],
+   "fields": {
+    "receipt_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "receipt_no"
+    },
+    "line_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "line_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "qty_received": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty_received"
+    },
+    "qty_rejected": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty_rejected"
+    },
+    "batch_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "batch_no"
+    },
+    "produced_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "produced_on"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_transfers",
+  "after": {
+   "name": "transfers",
+   "display_name": "调拨单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "transfers",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "transfer_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "调拨单号"
+    },
+    {
+     "name": "from_wh_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "发货仓库"
+    },
+    {
+     "name": "to_store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "收货门店"
+    },
+    {
+     "name": "shipped_at",
+     "physical_type": "DATETIME",
+     "comment": "发货时间"
+    },
+    {
+     "name": "arrived_at",
+     "physical_type": "DATETIME",
+     "comment": "到店时间"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：在途/已到店/已取消"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_transfer",
+  "after": {
+   "type_id": {
+    "client_ref": "transfer"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_transfers"
+     },
+     "key_columns": [
+      "transfer_no"
+     ]
+    }
+   ],
+   "fields": {
+    "transfer_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "transfer_no"
+    },
+    "from_wh_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "from_wh_id"
+    },
+    "to_store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "to_store_id"
+    },
+    "shipped_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "shipped_at"
+    },
+    "arrived_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "arrived_at"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_transfer_items",
+  "after": {
+   "name": "transfer_items",
+   "display_name": "调拨明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "transfer_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "transfer_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "调拨单号"
+    },
+    {
+     "name": "line_no",
+     "physical_type": "INTEGER",
+     "comment": "行号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "qty",
+     "physical_type": "INTEGER",
+     "comment": "调拨数量"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_transfer_item",
+  "after": {
+   "type_id": {
+    "client_ref": "transfer_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_transfer_items"
+     },
+     "key_columns": [
+      "transfer_no",
+      "line_no"
+     ]
+    }
+   ],
+   "fields": {
+    "transfer_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "transfer_no"
+    },
+    "line_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "line_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_inventory_daily",
+  "after": {
+   "name": "inventory_daily",
+   "display_name": "库存快照数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "inventory_daily",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "snapshot_date",
+     "physical_type": "DATE",
+     "comment": "快照日期"
+    },
+    {
+     "name": "location_type",
+     "physical_type": "VARCHAR(8)",
+     "comment": "库存地点类型：仓库/门店"
+    },
+    {
+     "name": "location_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "仓库或门店编号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "on_hand_qty",
+     "physical_type": "INTEGER",
+     "comment": "日末库存数量"
+    },
+    {
+     "name": "on_hand_cost",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "日末库存成本"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_inventory_snapshot",
+  "after": {
+   "type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_inventory_daily"
+     },
+     "key_columns": [
+      "snapshot_date",
+      "location_type",
+      "location_id",
+      "sku"
+     ]
+    }
+   ],
+   "fields": {
+    "snapshot_date": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "snapshot_date"
+    },
+    "location_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "location_type"
+    },
+    "location_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "location_id"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "on_hand_qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "on_hand_qty"
+    },
+    "on_hand_cost": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "on_hand_cost"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_stocktakes",
+  "after": {
+   "name": "stocktakes",
+   "display_name": "盘点单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "stocktakes",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "stocktake_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "盘点单号"
+    },
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "盘点门店"
+    },
+    {
+     "name": "counted_on",
+     "physical_type": "DATE",
+     "comment": "盘点日期"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：盘点中/已确认"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_stocktake",
+  "after": {
+   "type_id": {
+    "client_ref": "stocktake"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_stocktakes"
+     },
+     "key_columns": [
+      "stocktake_no"
+     ]
+    }
+   ],
+   "fields": {
+    "stocktake_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "stocktake_no"
+    },
+    "store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_id"
+    },
+    "counted_on": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "counted_on"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_stocktake_items",
+  "after": {
+   "name": "stocktake_items",
+   "display_name": "盘点明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "stocktake_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "stocktake_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "盘点单号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "book_qty",
+     "physical_type": "INTEGER",
+     "comment": "账面数量"
+    },
+    {
+     "name": "counted_qty",
+     "physical_type": "INTEGER",
+     "comment": "实盘数量"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_stocktake_item",
+  "after": {
+   "type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_stocktake_items"
+     },
+     "key_columns": [
+      "stocktake_no",
+      "sku"
+     ]
+    }
+   ],
+   "fields": {
+    "stocktake_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "stocktake_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "book_qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "book_qty"
+    },
+    "counted_qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "counted_qty"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_sales_orders",
+  "after": {
+   "name": "sales_orders",
+   "display_name": "销售订单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "sales_orders",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "成交门店"
+    },
+    {
+     "name": "member_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "会员，散客为空"
+    },
+    {
+     "name": "channel",
+     "physical_type": "VARCHAR(8)",
+     "comment": "渠道：门店/小程序/外卖"
+    },
+    {
+     "name": "cashier_emp_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "收银员工号，线上订单为空"
+    },
+    {
+     "name": "ordered_at",
+     "physical_type": "DATETIME",
+     "comment": "下单时间"
+    },
+    {
+     "name": "paid_at",
+     "physical_type": "DATETIME",
+     "comment": "支付时间"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：待支付/已完成/已取消"
+    },
+    {
+     "name": "gross_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "商品原价合计"
+    },
+    {
+     "name": "discount_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "促销优惠"
+    },
+    {
+     "name": "coupon_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "优惠券抵扣"
+    },
+    {
+     "name": "pay_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "实付金额"
+    },
+    {
+     "name": "is_delivery",
+     "physical_type": "INTEGER",
+     "comment": "是否配送到家：1 是 0 否"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_sales_order",
+  "after": {
+   "type_id": {
+    "client_ref": "sales_order"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_sales_orders"
+     },
+     "key_columns": [
+      "order_no"
+     ]
+    }
+   ],
+   "fields": {
+    "order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "order_no"
+    },
+    "store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_id"
+    },
+    "member_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "member_id"
+    },
+    "channel": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "channel"
+    },
+    "cashier_emp_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "cashier_emp_id"
+    },
+    "ordered_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "ordered_at"
+    },
+    "paid_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "paid_at"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    },
+    "gross_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "gross_amount"
+    },
+    "discount_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "discount_amount"
+    },
+    "coupon_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "coupon_amount"
+    },
+    "pay_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "pay_amount"
+    },
+    "is_delivery": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "is_delivery"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_sales_order_items",
+  "after": {
+   "name": "sales_order_items",
+   "display_name": "订单明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "sales_order_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "line_no",
+     "physical_type": "INTEGER",
+     "comment": "行号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "qty",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "数量（称重商品可为小数）"
+    },
+    {
+     "name": "list_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "零售价"
+    },
+    {
+     "name": "deal_price",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "成交单价"
+    },
+    {
+     "name": "discount_amount",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "行优惠"
+    },
+    {
+     "name": "promotion_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "参与的促销活动"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_sales_order_item",
+  "after": {
+   "type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_sales_order_items"
+     },
+     "key_columns": [
+      "order_no",
+      "line_no"
+     ]
+    }
+   ],
+   "fields": {
+    "order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "order_no"
+    },
+    "line_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "line_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty"
+    },
+    "list_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "list_price"
+    },
+    "deal_price": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "deal_price"
+    },
+    "discount_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "discount_amount"
+    },
+    "promotion_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "promotion_id"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_payments",
+  "after": {
+   "name": "payments",
+   "display_name": "支付记录数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "payments",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "payment_no",
+     "physical_type": "VARCHAR(24)",
+     "comment": "支付流水号"
+    },
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "pay_method",
+     "physical_type": "VARCHAR(8)",
+     "comment": "支付方式：现金/微信/支付宝/储值卡"
+    },
+    {
+     "name": "amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "支付金额"
+    },
+    {
+     "name": "paid_at",
+     "physical_type": "DATETIME",
+     "comment": "支付时间"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_payment",
+  "after": {
+   "type_id": {
+    "client_ref": "payment"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_payments"
+     },
+     "key_columns": [
+      "payment_no"
+     ]
+    }
+   ],
+   "fields": {
+    "payment_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "payment_no"
+    },
+    "order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "order_no"
+    },
+    "pay_method": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "pay_method"
+    },
+    "amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "amount"
+    },
+    "paid_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "paid_at"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_members",
+  "after": {
+   "name": "members",
+   "display_name": "会员数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "members",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "member_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "会员编号"
+    },
+    {
+     "name": "member_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "姓名"
+    },
+    {
+     "name": "gender",
+     "physical_type": "VARCHAR(4)",
+     "comment": "性别"
+    },
+    {
+     "name": "birth_month",
+     "physical_type": "INTEGER",
+     "comment": "生日月份"
+    },
+    {
+     "name": "mobile_masked",
+     "physical_type": "VARCHAR(16)",
+     "comment": "手机号（脱敏）"
+    },
+    {
+     "name": "level_code",
+     "physical_type": "VARCHAR(8)",
+     "comment": "会员等级"
+    },
+    {
+     "name": "points",
+     "physical_type": "INTEGER",
+     "comment": "当前积分"
+    },
+    {
+     "name": "city",
+     "physical_type": "VARCHAR(32)",
+     "comment": "常住城市"
+    },
+    {
+     "name": "register_store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "注册门店"
+    },
+    {
+     "name": "register_channel",
+     "physical_type": "VARCHAR(8)",
+     "comment": "注册渠道：门店/小程序/APP"
+    },
+    {
+     "name": "registered_at",
+     "physical_type": "DATETIME",
+     "comment": "注册时间"
+    },
+    {
+     "name": "last_order_at",
+     "physical_type": "DATETIME",
+     "comment": "最近下单时间"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：正常/冻结/注销"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_member",
+  "after": {
+   "type_id": {
+    "client_ref": "member"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_members"
+     },
+     "key_columns": [
+      "member_id"
+     ]
+    }
+   ],
+   "fields": {
+    "member_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "member_id"
+    },
+    "member_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "member_name"
+    },
+    "gender": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "gender"
+    },
+    "birth_month": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "birth_month"
+    },
+    "mobile_masked": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "mobile_masked"
+    },
+    "level_code": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "level_code"
+    },
+    "points": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "points"
+    },
+    "city": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "city"
+    },
+    "register_store_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "register_store_id"
+    },
+    "register_channel": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "register_channel"
+    },
+    "registered_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "registered_at"
+    },
+    "last_order_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "last_order_at"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_member_levels",
+  "after": {
+   "name": "member_levels",
+   "display_name": "会员等级数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "member_levels",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "level_code",
+     "physical_type": "VARCHAR(8)",
+     "comment": "等级代码"
+    },
+    {
+     "name": "level_name",
+     "physical_type": "VARCHAR(16)",
+     "comment": "等级名称：普通/银卡/金卡/黑卡"
+    },
+    {
+     "name": "min_points",
+     "physical_type": "INTEGER",
+     "comment": "达到该等级所需积分"
+    },
+    {
+     "name": "discount_rate",
+     "physical_type": "DECIMAL(4, 2)",
+     "comment": "会员折扣率"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_member_level",
+  "after": {
+   "type_id": {
+    "client_ref": "member_level"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_member_levels"
+     },
+     "key_columns": [
+      "level_code"
+     ]
+    }
+   ],
+   "fields": {
+    "level_code": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "level_code"
+    },
+    "level_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "level_name"
+    },
+    "min_points": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "min_points"
+    },
+    "discount_rate": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "discount_rate"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_coupons",
+  "after": {
+   "name": "coupons",
+   "display_name": "优惠券数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "coupons",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "coupon_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "券编号"
+    },
+    {
+     "name": "coupon_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "券名称"
+    },
+    {
+     "name": "face_value",
+     "physical_type": "DECIMAL(8, 2)",
+     "comment": "面额"
+    },
+    {
+     "name": "threshold_amount",
+     "physical_type": "DECIMAL(8, 2)",
+     "comment": "使用门槛"
+    },
+    {
+     "name": "valid_from",
+     "physical_type": "DATE",
+     "comment": "有效期开始"
+    },
+    {
+     "name": "valid_to",
+     "physical_type": "DATE",
+     "comment": "有效期结束"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_coupon",
+  "after": {
+   "type_id": {
+    "client_ref": "coupon"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_coupons"
+     },
+     "key_columns": [
+      "coupon_id"
+     ]
+    }
+   ],
+   "fields": {
+    "coupon_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "coupon_id"
+    },
+    "coupon_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "coupon_name"
+    },
+    "face_value": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "face_value"
+    },
+    "threshold_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "threshold_amount"
+    },
+    "valid_from": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "valid_from"
+    },
+    "valid_to": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "valid_to"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_coupon_issues",
+  "after": {
+   "name": "coupon_issues",
+   "display_name": "优惠券发放数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "coupon_issues",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "issue_no",
+     "physical_type": "VARCHAR(24)",
+     "comment": "发放编号"
+    },
+    {
+     "name": "coupon_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "券编号"
+    },
+    {
+     "name": "member_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "领券会员"
+    },
+    {
+     "name": "issued_at",
+     "physical_type": "DATETIME",
+     "comment": "发放时间"
+    },
+    {
+     "name": "used_at",
+     "physical_type": "DATETIME",
+     "comment": "核销时间"
+    },
+    {
+     "name": "used_order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "核销订单"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：未使用/已使用/已过期"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_coupon_issue",
+  "after": {
+   "type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_coupon_issues"
+     },
+     "key_columns": [
+      "issue_no"
+     ]
+    }
+   ],
+   "fields": {
+    "issue_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "issue_no"
+    },
+    "coupon_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "coupon_id"
+    },
+    "member_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "member_id"
+    },
+    "issued_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "issued_at"
+    },
+    "used_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "used_at"
+    },
+    "used_order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "used_order_no"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_promotions",
+  "after": {
+   "name": "promotions",
+   "display_name": "促销活动数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "promotions",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "promotion_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "活动编号"
+    },
+    {
+     "name": "promotion_name",
+     "physical_type": "VARCHAR(64)",
+     "comment": "活动名称"
+    },
+    {
+     "name": "promo_type",
+     "physical_type": "VARCHAR(16)",
+     "comment": "类型：满减/折扣/第二件半价"
+    },
+    {
+     "name": "start_at",
+     "physical_type": "DATETIME",
+     "comment": "开始时间"
+    },
+    {
+     "name": "end_at",
+     "physical_type": "DATETIME",
+     "comment": "结束时间"
+    },
+    {
+     "name": "store_scope",
+     "physical_type": "VARCHAR(16)",
+     "comment": "适用门店范围：全部/指定大区"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_promotion",
+  "after": {
+   "type_id": {
+    "client_ref": "promotion"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_promotions"
+     },
+     "key_columns": [
+      "promotion_id"
+     ]
+    }
+   ],
+   "fields": {
+    "promotion_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "promotion_id"
+    },
+    "promotion_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "promotion_name"
+    },
+    "promo_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "promo_type"
+    },
+    "start_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "start_at"
+    },
+    "end_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "end_at"
+    },
+    "store_scope": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "store_scope"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_refunds",
+  "after": {
+   "name": "refunds",
+   "display_name": "退款单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "refunds",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "refund_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "退款单号"
+    },
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "原订单号"
+    },
+    {
+     "name": "refund_type",
+     "physical_type": "VARCHAR(8)",
+     "comment": "退款类型：整单/部分"
+    },
+    {
+     "name": "applied_at",
+     "physical_type": "DATETIME",
+     "comment": "申请时间"
+    },
+    {
+     "name": "approved_at",
+     "physical_type": "DATETIME",
+     "comment": "审核通过时间"
+    },
+    {
+     "name": "refund_amount",
+     "physical_type": "DECIMAL(12, 2)",
+     "comment": "退款金额"
+    },
+    {
+     "name": "reason",
+     "physical_type": "VARCHAR(64)",
+     "comment": "退款原因"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：待审核/已退款/已驳回"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_refund",
+  "after": {
+   "type_id": {
+    "client_ref": "refund"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_refunds"
+     },
+     "key_columns": [
+      "refund_no"
+     ]
+    }
+   ],
+   "fields": {
+    "refund_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "refund_no"
+    },
+    "order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "order_no"
+    },
+    "refund_type": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "refund_type"
+    },
+    "applied_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "applied_at"
+    },
+    "approved_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "approved_at"
+    },
+    "refund_amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "refund_amount"
+    },
+    "reason": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "reason"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_refund_items",
+  "after": {
+   "name": "refund_items",
+   "display_name": "退款明细数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "refund_items",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "refund_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "退款单号"
+    },
+    {
+     "name": "line_no",
+     "physical_type": "INTEGER",
+     "comment": "行号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    },
+    {
+     "name": "qty",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "退货数量"
+    },
+    {
+     "name": "amount",
+     "physical_type": "DECIMAL(10, 2)",
+     "comment": "退款金额"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_refund_item",
+  "after": {
+   "type_id": {
+    "client_ref": "refund_item"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_refund_items"
+     },
+     "key_columns": [
+      "refund_no",
+      "line_no"
+     ]
+    }
+   ],
+   "fields": {
+    "refund_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "refund_no"
+    },
+    "line_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "line_no"
+    },
+    "sku": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "sku"
+    },
+    "qty": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "qty"
+    },
+    "amount": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "amount"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_deliveries",
+  "after": {
+   "name": "deliveries",
+   "display_name": "配送单数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "deliveries",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "delivery_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "配送单号"
+    },
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "rider_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "骑手"
+    },
+    {
+     "name": "dispatched_at",
+     "physical_type": "DATETIME",
+     "comment": "出发时间"
+    },
+    {
+     "name": "promised_at",
+     "physical_type": "DATETIME",
+     "comment": "承诺送达时间"
+    },
+    {
+     "name": "delivered_at",
+     "physical_type": "DATETIME",
+     "comment": "实际送达时间"
+    },
+    {
+     "name": "distance_km",
+     "physical_type": "DECIMAL(6, 2)",
+     "comment": "配送距离（公里）"
+    },
+    {
+     "name": "delivery_fee",
+     "physical_type": "DECIMAL(8, 2)",
+     "comment": "配送费"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：配送中/已送达/异常"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_delivery",
+  "after": {
+   "type_id": {
+    "client_ref": "delivery"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_deliveries"
+     },
+     "key_columns": [
+      "delivery_no"
+     ]
+    }
+   ],
+   "fields": {
+    "delivery_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "delivery_no"
+    },
+    "order_no": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "order_no"
+    },
+    "rider_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "rider_id"
+    },
+    "dispatched_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "dispatched_at"
+    },
+    "promised_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "promised_at"
+    },
+    "delivered_at": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "delivered_at"
+    },
+    "distance_km": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "distance_km"
+    },
+    "delivery_fee": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "delivery_fee"
+    },
+    "status": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "status"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_riders",
+  "after": {
+   "name": "riders",
+   "display_name": "骑手数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "riders",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "rider_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "骑手编号"
+    },
+    {
+     "name": "rider_name",
+     "physical_type": "VARCHAR(32)",
+     "comment": "姓名"
+    },
+    {
+     "name": "partner_company",
+     "physical_type": "VARCHAR(64)",
+     "comment": "所属配送商"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "mapping",
+  "client_ref": "map_rider",
+  "after": {
+   "type_id": {
+    "client_ref": "rider"
+   },
+   "binding_mode": "independent",
+   "sources": [
+    {
+     "id": "main",
+     "dataset_id": {
+      "client_ref": "ds_riders"
+     },
+     "key_columns": [
+      "rider_id"
+     ]
+    }
+   ],
+   "fields": {
+    "rider_id": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "rider_id"
+    },
+    "rider_name": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "rider_name"
+    },
+    "partner_company": {
+     "kind": "column",
+     "source_id": "main",
+     "column": "partner_company"
+    }
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_promotion_products",
+  "after": {
+   "name": "promotion_products",
+   "display_name": "促销商品数据",
+   "source_kind": "table",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "schema_name": "qinghe_mart",
+   "table_name": "promotion_products",
+   "dialect": "mysql",
+   "columns": [
+    {
+     "name": "promotion_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "活动编号"
+    },
+    {
+     "name": "sku",
+     "physical_type": "VARCHAR(16)",
+     "comment": "商品编码"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_sales_order_net",
+  "after": {
+   "name": "sales_order_net",
+   "display_name": "订单净销售额与毛利数据",
+   "source_kind": "query",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "dialect": "mysql",
+   "query_sql": "SELECT o.order_no, o.store_id, o.member_id, o.channel, o.ordered_at, o.pay_amount, COALESCE(r.refund_amount, 0) AS refund_amount, o.pay_amount - COALESCE(r.refund_amount, 0) AS net_amount, COALESCE(c.cost_amount, 0) AS cost_amount, o.pay_amount - COALESCE(r.refund_amount, 0) - COALESCE(c.cost_amount, 0) AS gross_profit_amount FROM qinghe_mart.sales_orders o LEFT JOIN (SELECT order_no, SUM(refund_amount) AS refund_amount FROM qinghe_mart.refunds WHERE status = '已退款' GROUP BY order_no) r ON r.order_no = o.order_no LEFT JOIN (SELECT i.order_no, SUM(i.qty * p.cost_price) AS cost_amount FROM qinghe_mart.sales_order_items i JOIN qinghe_mart.products p ON p.sku = i.sku GROUP BY i.order_no) c ON c.order_no = o.order_no WHERE o.status = '已完成'",
+   "columns": [
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "store_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "成交门店"
+    },
+    {
+     "name": "member_id",
+     "physical_type": "VARCHAR(16)",
+     "comment": "会员，散客为空"
+    },
+    {
+     "name": "channel",
+     "physical_type": "VARCHAR(8)",
+     "comment": "渠道"
+    },
+    {
+     "name": "ordered_at",
+     "physical_type": "DATETIME",
+     "comment": "下单时间"
+    },
+    {
+     "name": "pay_amount",
+     "physical_type": "DECIMAL(12,2)",
+     "comment": "实付金额"
+    },
+    {
+     "name": "refund_amount",
+     "physical_type": "DECIMAL(12,2)",
+     "comment": "已完成退款金额"
+    },
+    {
+     "name": "net_amount",
+     "physical_type": "DECIMAL(12,2)",
+     "comment": "实付金额减已完成退款"
+    },
+    {
+     "name": "cost_amount",
+     "physical_type": "DECIMAL(16,2)",
+     "comment": "已售商品进价成本"
+    },
+    {
+     "name": "gross_profit_amount",
+     "physical_type": "DECIMAL(16,2)",
+     "comment": "净销售额减进价成本"
+    }
+   ],
+   "description": "按订单粒度合并已完成退款与已售商品进价成本，供销售额、订单数、客单价、毛利与毛利率使用"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_delivery_on_time",
+  "after": {
+   "name": "delivery_on_time",
+   "display_name": "配送准时数据",
+   "source_kind": "query",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "dialect": "mysql",
+   "query_sql": "SELECT delivery_no, order_no, rider_id, status, promised_at, delivered_at, CASE WHEN delivered_at IS NOT NULL AND promised_at IS NOT NULL AND delivered_at <= promised_at THEN 1 ELSE 0 END AS on_time_flag FROM qinghe_mart.deliveries",
+   "columns": [
+    {
+     "name": "delivery_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "配送单号"
+    },
+    {
+     "name": "order_no",
+     "physical_type": "VARCHAR(20)",
+     "comment": "订单号"
+    },
+    {
+     "name": "rider_id",
+     "physical_type": "VARCHAR(8)",
+     "comment": "骑手"
+    },
+    {
+     "name": "status",
+     "physical_type": "VARCHAR(8)",
+     "comment": "状态：配送中/已送达/异常"
+    },
+    {
+     "name": "promised_at",
+     "physical_type": "DATETIME",
+     "comment": "承诺送达时间"
+    },
+    {
+     "name": "delivered_at",
+     "physical_type": "DATETIME",
+     "comment": "实际送达时间"
+    },
+    {
+     "name": "on_time_flag",
+     "physical_type": "INTEGER",
+     "comment": "是否在承诺时间前送达：1 是 0 否"
+    }
+   ],
+   "description": "逐单标注是否在承诺送达时间前送达，供准时送达率使用"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "dataset",
+  "client_ref": "ds_inventory_cost_daily",
+  "after": {
+   "name": "inventory_cost_daily",
+   "display_name": "日库存与成本数据",
+   "source_kind": "query",
+   "connection_id": "9a928b0b-a64e-48a9-989b-109587df6711",
+   "dialect": "mysql",
+   "query_sql": "SELECT d.stat_date, COALESCE(v.inv_cost, 0) AS inv_cost, COALESCE(s.sales_cost, 0) AS sales_cost, COALESCE(l.loss_cost, 0) AS loss_cost FROM (SELECT snapshot_date AS stat_date FROM qinghe_mart.inventory_daily UNION SELECT DATE(ordered_at) AS stat_date FROM qinghe_mart.sales_orders WHERE status = '已完成' UNION SELECT counted_on AS stat_date FROM qinghe_mart.stocktakes WHERE status = '已确认') d LEFT JOIN (SELECT snapshot_date AS stat_date, SUM(on_hand_cost) AS inv_cost FROM qinghe_mart.inventory_daily GROUP BY snapshot_date) v ON v.stat_date = d.stat_date LEFT JOIN (SELECT DATE(o.ordered_at) AS stat_date, SUM(i.qty * p.cost_price) AS sales_cost FROM qinghe_mart.sales_orders o JOIN qinghe_mart.sales_order_items i ON i.order_no = o.order_no JOIN qinghe_mart.products p ON p.sku = i.sku WHERE o.status = '已完成' GROUP BY DATE(o.ordered_at)) s ON s.stat_date = d.stat_date LEFT JOIN (SELECT t.counted_on AS stat_date, SUM((i.book_qty - i.counted_qty) * p.cost_price) AS loss_cost FROM qinghe_mart.stocktakes t JOIN qinghe_mart.stocktake_items i ON i.stocktake_no = t.stocktake_no JOIN qinghe_mart.products p ON p.sku = i.sku WHERE t.status = '已确认' AND i.counted_qty < i.book_qty GROUP BY t.counted_on) l ON l.stat_date = d.stat_date",
+   "columns": [
+    {
+     "name": "stat_date",
+     "physical_type": "DATE",
+     "comment": "统计日期"
+    },
+    {
+     "name": "inv_cost",
+     "physical_type": "DECIMAL(16,2)",
+     "comment": "当日日末库存成本合计"
+    },
+    {
+     "name": "sales_cost",
+     "physical_type": "DECIMAL(16,2)",
+     "comment": "当日销售成本（数量×进价）"
+    },
+    {
+     "name": "loss_cost",
+     "physical_type": "DECIMAL(16,2)",
+     "comment": "当日盘亏成本"
+    }
+   ],
+   "description": "按日合并库存快照成本、销售成本与盘亏成本，供库存周转天数与盘亏损耗率使用"
+  }
+ }
+]

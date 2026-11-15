@@ -1,0 +1,491 @@
+[
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "sales_amount",
+  "after": {
+   "name": "sales_amount",
+   "display_name": "销售额",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_sales_order_net"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "ordered_at"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "net_amount"
+   },
+   "description": "已完成订单实付金额合计减去已完成退款金额；分母为零或为空时按 NULL 处理"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "order_count",
+  "after": {
+   "name": "order_count",
+   "display_name": "订单数",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_sales_order_net"
+   },
+   "aggregation": "count",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "ordered_at"
+   },
+   "description": "已完成订单的数量"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "avg_order_value",
+  "after": {
+   "name": "avg_order_value",
+   "display_name": "客单价",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "sales_amount"
+   },
+   "denominator_id": {
+    "client_ref": "order_count"
+   },
+   "description": "销售额除以订单数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "gross_profit",
+  "after": {
+   "name": "gross_profit",
+   "display_name": "毛利",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_sales_order_net"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "ordered_at"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "gross_profit_amount"
+   },
+   "description": "净销售额减已售商品进价成本"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "gross_margin_rate",
+  "after": {
+   "name": "gross_margin_rate",
+   "display_name": "毛利率",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "gross_profit"
+   },
+   "denominator_id": {
+    "client_ref": "sales_amount"
+   },
+   "description": "毛利除以销售额"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "member_sales_amount",
+  "after": {
+   "name": "member_sales_amount",
+   "display_name": "会员销售额",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_sales_order_net"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "ordered_at"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_sales_order_net"
+    },
+    "column": "net_amount"
+   },
+   "filters": [
+    {
+     "column": {
+      "dataset_id": {
+       "client_ref": "ds_sales_order_net"
+      },
+      "column": "member_id"
+     },
+     "operator": "not_null",
+     "values": []
+    }
+   ],
+   "description": "会员订单（会员编号非空）的销售额"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "member_sales_share",
+  "after": {
+   "name": "member_sales_share",
+   "display_name": "会员销售占比",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "member_sales_amount"
+   },
+   "denominator_id": {
+    "client_ref": "sales_amount"
+   },
+   "description": "会员订单销售额占全部销售额的比例"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "on_time_delivery_count",
+  "after": {
+   "name": "on_time_delivery_count",
+   "display_name": "准时送达单数",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_delivery_on_time"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_delivery_on_time"
+    },
+    "column": "delivered_at"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_delivery_on_time"
+    },
+    "column": "on_time_flag"
+   },
+   "filters": [
+    {
+     "column": {
+      "dataset_id": {
+       "client_ref": "ds_delivery_on_time"
+      },
+      "column": "status"
+     },
+     "operator": "eq",
+     "values": [
+      "已送达"
+     ]
+    }
+   ],
+   "description": "实际送达时间不晚于承诺送达时间的已送达配送单数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "delivered_count",
+  "after": {
+   "name": "delivered_count",
+   "display_name": "已送达配送单数",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_delivery_on_time"
+   },
+   "aggregation": "count",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_delivery_on_time"
+    },
+    "column": "delivered_at"
+   },
+   "filters": [
+    {
+     "column": {
+      "dataset_id": {
+       "client_ref": "ds_delivery_on_time"
+      },
+      "column": "status"
+     },
+     "operator": "eq",
+     "values": [
+      "已送达"
+     ]
+    }
+   ],
+   "description": "状态为已送达的配送单数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "on_time_delivery_rate",
+  "after": {
+   "name": "on_time_delivery_rate",
+   "display_name": "准时送达率",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "on_time_delivery_count"
+   },
+   "denominator_id": {
+    "client_ref": "delivered_count"
+   },
+   "description": "在承诺时间前送达的配送单占已送达配送单的比例"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "coupon_issued_count",
+  "after": {
+   "name": "coupon_issued_count",
+   "display_name": "发放张数",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_coupon_issues"
+   },
+   "aggregation": "count",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_coupon_issues"
+    },
+    "column": "issued_at"
+   },
+   "description": "按发放时间统计的发放总张数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "coupon_used_count",
+  "after": {
+   "name": "coupon_used_count",
+   "display_name": "已使用发放张数",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_coupon_issues"
+   },
+   "aggregation": "count",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_coupon_issues"
+    },
+    "column": "issued_at"
+   },
+   "filters": [
+    {
+     "column": {
+      "dataset_id": {
+       "client_ref": "ds_coupon_issues"
+      },
+      "column": "status"
+     },
+     "operator": "eq",
+     "values": [
+      "已使用"
+     ]
+    }
+   ],
+   "description": "同一发放口径下状态为已使用的张数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "coupon_redemption_rate",
+  "after": {
+   "name": "coupon_redemption_rate",
+   "display_name": "优惠券核销率",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "coupon_used_count"
+   },
+   "denominator_id": {
+    "client_ref": "coupon_issued_count"
+   },
+   "description": "已使用的发放张数占发放总张数的比例"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "avg_inventory_cost",
+  "after": {
+   "name": "avg_inventory_cost",
+   "display_name": "平均库存成本",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_inventory_cost_daily"
+   },
+   "aggregation": "avg",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "stat_date"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "inv_cost"
+   },
+   "description": "统计期内每日日末库存成本合计的平均值"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "avg_daily_sales_cost",
+  "after": {
+   "name": "avg_daily_sales_cost",
+   "display_name": "日均销售成本",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_inventory_cost_daily"
+   },
+   "aggregation": "avg",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "stat_date"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "sales_cost"
+   },
+   "description": "统计期内每日销售成本的平均值，无销售日期按 0 计入"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "inventory_turnover_days",
+  "after": {
+   "name": "inventory_turnover_days",
+   "display_name": "库存周转天数",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "avg_inventory_cost"
+   },
+   "denominator_id": {
+    "client_ref": "avg_daily_sales_cost"
+   },
+   "description": "平均库存成本除以日均销售成本"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "stock_loss_cost",
+  "after": {
+   "name": "stock_loss_cost",
+   "display_name": "盘亏成本",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_inventory_cost_daily"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "stat_date"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "loss_cost"
+   },
+   "description": "实盘数量少于账面数量的差额按进价计算的成本"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "period_sales_cost",
+  "after": {
+   "name": "period_sales_cost",
+   "display_name": "期间销售成本",
+   "kind": "simple",
+   "dataset_id": {
+    "client_ref": "ds_inventory_cost_daily"
+   },
+   "aggregation": "sum",
+   "time_field": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "stat_date"
+   },
+   "measure": {
+    "dataset_id": {
+     "client_ref": "ds_inventory_cost_daily"
+    },
+    "column": "sales_cost"
+   },
+   "description": "统计期内已售商品成本合计"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "metric",
+  "client_ref": "stock_loss_rate",
+  "after": {
+   "name": "stock_loss_rate",
+   "display_name": "盘亏损耗率",
+   "kind": "ratio",
+   "numerator_id": {
+    "client_ref": "stock_loss_cost"
+   },
+   "denominator_id": {
+    "client_ref": "period_sales_cost"
+   },
+   "description": "盘亏成本占同期销售成本的比例"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "sales_order_amount_derivation",
+  "after": {
+   "name": "sales_order_amount_derivation",
+   "display_name": "实付金额构成",
+   "owner_kind": "object_type",
+   "owner_id": {
+    "client_ref": "sales_order"
+   },
+   "rule_kind": "derivation",
+   "expression": "sales_order.pay_amount = sales_order.gross_amount - sales_order.discount_amount - sales_order.coupon_amount",
+   "description": "实付金额由商品原价合计减促销优惠再减优惠券抵扣得到；空值按 0 参与计算，需人工确认是否存在其他调整项"
+  }
+ }
+]

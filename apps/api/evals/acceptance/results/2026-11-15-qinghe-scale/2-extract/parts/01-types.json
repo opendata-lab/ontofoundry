@@ -1,0 +1,4375 @@
+[
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "region",
+  "after": {
+   "name": "region",
+   "display_name": "大区",
+   "title_property_id": {
+    "client_ref": "region_region_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "门店归属一个大区，每个大区有一名大区经理。"
+    },
+    {
+     "kind": "table",
+     "ref": "t23.region_id",
+     "quote": "大区编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "region_region_id",
+  "after": {
+   "name": "region_id",
+   "display_name": "大区编号",
+   "owner_type_id": {
+    "client_ref": "region"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "region_region_name",
+  "after": {
+   "name": "region_name",
+   "display_name": "大区名称",
+   "owner_type_id": {
+    "client_ref": "region"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "region_manager_name",
+  "after": {
+   "name": "manager_name",
+   "display_name": "大区经理",
+   "owner_type_id": {
+    "client_ref": "region"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "store",
+  "after": {
+   "name": "store",
+   "display_name": "门店",
+   "title_property_id": {
+    "client_ref": "store_store_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "门店归属一个大区，每个大区有一名大区经理。门店分标准店、社区店、旗舰店三类，有营业、装修、闭店三种状态；闭店后不再统计到“在营门店”。"
+    },
+    {
+     "kind": "table",
+     "ref": "t29.store_id",
+     "quote": "门店编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_store_id",
+  "after": {
+   "name": "store_id",
+   "display_name": "门店编号",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_store_name",
+  "after": {
+   "name": "store_name",
+   "display_name": "门店名称",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_region_id",
+  "after": {
+   "name": "region_id",
+   "display_name": "所属大区",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_city",
+  "after": {
+   "name": "city",
+   "display_name": "城市",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_address",
+  "after": {
+   "name": "address",
+   "display_name": "地址",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_store_type",
+  "after": {
+   "name": "store_type",
+   "display_name": "门店类型",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_store_format"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_area_sqm",
+  "after": {
+   "name": "area_sqm",
+   "display_name": "经营面积（平方米）",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_opened_on",
+  "after": {
+   "name": "opened_on",
+   "display_name": "开业日期",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_closed_on",
+  "after": {
+   "name": "closed_on",
+   "display_name": "闭店日期",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "date",
+   "description": "营业中为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_status",
+  "after": {
+   "name": "status",
+   "display_name": "门店状态",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_store_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "store_manager_emp_id",
+  "after": {
+   "name": "manager_emp_id",
+   "display_name": "店长工号",
+   "owner_type_id": {
+    "client_ref": "store"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "warehouse",
+  "after": {
+   "name": "warehouse",
+   "display_name": "仓库",
+   "title_property_id": {
+    "client_ref": "warehouse_wh_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 9,
+      "line_end": 9
+     },
+     "quote": "仓库分常温仓和冷链仓，生鲜商品只能存放在冷链仓。"
+    },
+    {
+     "kind": "table",
+     "ref": "t34.wh_id",
+     "quote": "仓库编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "warehouse_wh_id",
+  "after": {
+   "name": "wh_id",
+   "display_name": "仓库编号",
+   "owner_type_id": {
+    "client_ref": "warehouse"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "warehouse_wh_name",
+  "after": {
+   "name": "wh_name",
+   "display_name": "仓库名称",
+   "owner_type_id": {
+    "client_ref": "warehouse"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "warehouse_city",
+  "after": {
+   "name": "city",
+   "display_name": "城市",
+   "owner_type_id": {
+    "client_ref": "warehouse"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "warehouse_wh_type",
+  "after": {
+   "name": "wh_type",
+   "display_name": "仓库类型",
+   "owner_type_id": {
+    "client_ref": "warehouse"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_warehouse_type"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "employee",
+  "after": {
+   "name": "employee",
+   "display_name": "员工",
+   "title_property_id": {
+    "client_ref": "employee_emp_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 8,
+      "line_end": 8
+     },
+     "quote": "每家门店有一名店长（员工）。员工属于门店，总部员工不属于任何门店。"
+    },
+    {
+     "kind": "table",
+     "ref": "t7.emp_id",
+     "quote": "工号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_emp_id",
+  "after": {
+   "name": "emp_id",
+   "display_name": "工号",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_emp_name",
+  "after": {
+   "name": "emp_name",
+   "display_name": "姓名",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_store_id",
+  "after": {
+   "name": "store_id",
+   "display_name": "所在门店",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "string",
+   "description": "总部员工为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_position",
+  "after": {
+   "name": "position",
+   "display_name": "岗位",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_emp_position"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_hired_on",
+  "after": {
+   "name": "hired_on",
+   "display_name": "入职日期",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_left_on",
+  "after": {
+   "name": "left_on",
+   "display_name": "离职日期",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "employee_phone_masked",
+  "after": {
+   "name": "phone_masked",
+   "display_name": "手机号（脱敏）",
+   "owner_type_id": {
+    "client_ref": "employee"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "product",
+  "after": {
+   "name": "product",
+   "display_name": "商品",
+   "title_property_id": {
+    "client_ref": "product_product_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 13,
+      "line_end": 13
+     },
+     "quote": "商品以商品编码（SKU）唯一识别，属于一个二级品类，二级品类归属一级品类。商品有品牌，部分品牌是自有品牌。"
+    },
+    {
+     "kind": "table",
+     "ref": "t14.sku",
+     "quote": "商品编码"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_product_name",
+  "after": {
+   "name": "product_name",
+   "display_name": "商品名称",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_barcode",
+  "after": {
+   "name": "barcode",
+   "display_name": "条码",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_category_id",
+  "after": {
+   "name": "category_id",
+   "display_name": "二级品类",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string",
+   "description": "指向二级品类"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_brand_id",
+  "after": {
+   "name": "brand_id",
+   "display_name": "品牌",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_supplier_id",
+  "after": {
+   "name": "supplier_id",
+   "display_name": "主供应商",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string",
+   "description": "每个商品一个主供应商"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_spec",
+  "after": {
+   "name": "spec",
+   "display_name": "规格",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_unit",
+  "after": {
+   "name": "unit",
+   "display_name": "销售单位",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_shelf_life_days",
+  "after": {
+   "name": "shelf_life_days",
+   "display_name": "保质期（天）",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_storage_type",
+  "after": {
+   "name": "storage_type",
+   "display_name": "储存方式",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_storage_mode"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_list_price",
+  "after": {
+   "name": "list_price",
+   "display_name": "零售价",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_member_price",
+  "after": {
+   "name": "member_price",
+   "display_name": "会员价",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_cost_price",
+  "after": {
+   "name": "cost_price",
+   "display_name": "进价",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_is_fresh",
+  "after": {
+   "name": "is_fresh",
+   "display_name": "是否生鲜",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "boolean"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_launched_on",
+  "after": {
+   "name": "launched_on",
+   "display_name": "上架日期",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_delisted_on",
+  "after": {
+   "name": "delisted_on",
+   "display_name": "下架日期",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_status",
+  "after": {
+   "name": "status",
+   "display_name": "商品状态",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_product_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "product_tax_rate",
+  "after": {
+   "name": "tax_rate",
+   "display_name": "税率",
+   "owner_type_id": {
+    "client_ref": "product"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "category",
+  "after": {
+   "name": "category",
+   "display_name": "品类",
+   "title_property_id": {
+    "client_ref": "category_category_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 13,
+      "line_end": 13
+     },
+     "quote": "商品以商品编码（SKU）唯一识别，属于一个二级品类，二级品类归属一级品类。"
+    },
+    {
+     "kind": "table",
+     "ref": "t2.category_id",
+     "quote": "品类编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "category_category_id",
+  "after": {
+   "name": "category_id",
+   "display_name": "品类编号",
+   "owner_type_id": {
+    "client_ref": "category"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "category_category_name",
+  "after": {
+   "name": "category_name",
+   "display_name": "品类名称",
+   "owner_type_id": {
+    "client_ref": "category"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "category_parent_id",
+  "after": {
+   "name": "parent_id",
+   "display_name": "上级品类",
+   "owner_type_id": {
+    "client_ref": "category"
+   },
+   "value_kind": "string",
+   "description": "一级品类为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "category_level",
+  "after": {
+   "name": "level",
+   "display_name": "层级",
+   "owner_type_id": {
+    "client_ref": "category"
+   },
+   "value_kind": "integer",
+   "description": "1 一级，2 二级"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "brand",
+  "after": {
+   "name": "brand",
+   "display_name": "品牌",
+   "title_property_id": {
+    "client_ref": "brand_brand_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 13,
+      "line_end": 13
+     },
+     "quote": "商品有品牌，部分品牌是自有品牌。"
+    },
+    {
+     "kind": "table",
+     "ref": "t1.brand_id",
+     "quote": "品牌编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "brand_brand_id",
+  "after": {
+   "name": "brand_id",
+   "display_name": "品牌编号",
+   "owner_type_id": {
+    "client_ref": "brand"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "brand_brand_name",
+  "after": {
+   "name": "brand_name",
+   "display_name": "品牌名称",
+   "owner_type_id": {
+    "client_ref": "brand"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "brand_is_private_label",
+  "after": {
+   "name": "is_private_label",
+   "display_name": "是否自有品牌",
+   "owner_type_id": {
+    "client_ref": "brand"
+   },
+   "value_kind": "boolean"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "supplier",
+  "after": {
+   "name": "supplier",
+   "display_name": "供应商",
+   "title_property_id": {
+    "client_ref": "supplier_supplier_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 16,
+      "line_end": 16
+     },
+     "quote": "每个商品有一个主供应商。"
+    },
+    {
+     "kind": "table",
+     "ref": "t30.supplier_id",
+     "quote": "供应商编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_supplier_id",
+  "after": {
+   "name": "supplier_id",
+   "display_name": "供应商编号",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_supplier_name",
+  "after": {
+   "name": "supplier_name",
+   "display_name": "供应商名称",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_city",
+  "after": {
+   "name": "city",
+   "display_name": "所在城市",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_settle_days",
+  "after": {
+   "name": "settle_days",
+   "display_name": "账期（天）",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_contact_masked",
+  "after": {
+   "name": "contact_masked",
+   "display_name": "联系电话（脱敏）",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "supplier_status",
+  "after": {
+   "name": "status",
+   "display_name": "供应商状态",
+   "owner_type_id": {
+    "client_ref": "supplier"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_supplier_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "price_change",
+  "after": {
+   "name": "price_change",
+   "display_name": "调价记录",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 14,
+      "line_end": 14
+     },
+     "quote": "门店可以单独调价，调价记录保留原价、新价和生效时间。"
+    },
+    {
+     "kind": "table",
+     "ref": "t13.change_id",
+     "quote": "调价单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_change_id",
+  "after": {
+   "name": "change_id",
+   "display_name": "调价单号",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_store_id",
+  "after": {
+   "name": "store_id",
+   "display_name": "门店",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "string",
+   "description": "全国统一调价为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_old_price",
+  "after": {
+   "name": "old_price",
+   "display_name": "原价",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_new_price",
+  "after": {
+   "name": "new_price",
+   "display_name": "新价",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_effective_at",
+  "after": {
+   "name": "effective_at",
+   "display_name": "生效时间",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "price_change_reason",
+  "after": {
+   "name": "reason",
+   "display_name": "调价原因",
+   "owner_type_id": {
+    "client_ref": "price_change"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_price_change_reason"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "purchase_order",
+  "after": {
+   "name": "purchase_order",
+   "display_name": "采购单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 20,
+      "line_end": 20
+     },
+     "quote": "采购员向供应商下采购单，货到仓库后生成入库单；入库时可以拒收，拒收数量不计入库存。"
+    },
+    {
+     "kind": "table",
+     "ref": "t18.po_no",
+     "quote": "采购单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_po_no",
+  "after": {
+   "name": "po_no",
+   "display_name": "采购单号",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_supplier_id",
+  "after": {
+   "name": "supplier_id",
+   "display_name": "供应商",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_wh_id",
+  "after": {
+   "name": "wh_id",
+   "display_name": "收货仓库",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_ordered_at",
+  "after": {
+   "name": "ordered_at",
+   "display_name": "下单时间",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_expected_on",
+  "after": {
+   "name": "expected_on",
+   "display_name": "预计到货日期",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_status",
+  "after": {
+   "name": "status",
+   "display_name": "采购单状态",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_purchase_order_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_total_amount",
+  "after": {
+   "name": "total_amount",
+   "display_name": "采购总额",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_buyer_emp_id",
+  "after": {
+   "name": "buyer_emp_id",
+   "display_name": "采购员工号",
+   "owner_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "purchase_order_item",
+  "after": {
+   "name": "purchase_order_item",
+   "display_name": "采购单明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 20,
+      "line_end": 20
+     },
+     "quote": "采购员向供应商下采购单，货到仓库后生成入库单；入库时可以拒收，拒收数量不计入库存。"
+    },
+    {
+     "kind": "table",
+     "ref": "t17.po_no",
+     "quote": "采购单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_item_po_no",
+  "after": {
+   "name": "po_no",
+   "display_name": "采购单号",
+   "owner_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_item_line_no",
+  "after": {
+   "name": "line_no",
+   "display_name": "行号",
+   "owner_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "value_kind": "integer",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_item_qty",
+  "after": {
+   "name": "qty",
+   "display_name": "采购数量",
+   "owner_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "purchase_order_item_unit_cost",
+  "after": {
+   "name": "unit_cost",
+   "display_name": "采购单价",
+   "owner_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "receipt",
+  "after": {
+   "name": "receipt",
+   "display_name": "入库单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 20,
+      "line_end": 20
+     },
+     "quote": "采购员向供应商下采购单，货到仓库后生成入库单；入库时可以拒收，拒收数量不计入库存。"
+    },
+    {
+     "kind": "table",
+     "ref": "t20.receipt_no",
+     "quote": "入库单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_receipt_no",
+  "after": {
+   "name": "receipt_no",
+   "display_name": "入库单号",
+   "owner_type_id": {
+    "client_ref": "receipt"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_po_no",
+  "after": {
+   "name": "po_no",
+   "display_name": "来源采购单",
+   "owner_type_id": {
+    "client_ref": "receipt"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_wh_id",
+  "after": {
+   "name": "wh_id",
+   "display_name": "入库仓库",
+   "owner_type_id": {
+    "client_ref": "receipt"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_received_at",
+  "after": {
+   "name": "received_at",
+   "display_name": "入库时间",
+   "owner_type_id": {
+    "client_ref": "receipt"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_status",
+  "after": {
+   "name": "status",
+   "display_name": "入库单状态",
+   "owner_type_id": {
+    "client_ref": "receipt"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_receipt_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "receipt_item",
+  "after": {
+   "name": "receipt_item",
+   "display_name": "入库明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 20,
+      "line_end": 20
+     },
+     "quote": "入库时可以拒收，拒收数量不计入库存。"
+    },
+    {
+     "kind": "table",
+     "ref": "t19.receipt_no",
+     "quote": "入库单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_receipt_no",
+  "after": {
+   "name": "receipt_no",
+   "display_name": "入库单号",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_line_no",
+  "after": {
+   "name": "line_no",
+   "display_name": "行号",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "integer",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_qty_received",
+  "after": {
+   "name": "qty_received",
+   "display_name": "实收数量",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_qty_rejected",
+  "after": {
+   "name": "qty_rejected",
+   "display_name": "拒收数量",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "integer",
+   "description": "拒收数量不计入库存"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_batch_no",
+  "after": {
+   "name": "batch_no",
+   "display_name": "批次号",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "receipt_item_produced_on",
+  "after": {
+   "name": "produced_on",
+   "display_name": "生产日期",
+   "owner_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "transfer",
+  "after": {
+   "name": "transfer",
+   "display_name": "调拨单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 21,
+      "line_end": 21
+     },
+     "quote": "仓库通过调拨单把商品发往门店，到店后门店库存增加。"
+    },
+    {
+     "kind": "table",
+     "ref": "t33.transfer_no",
+     "quote": "调拨单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_transfer_no",
+  "after": {
+   "name": "transfer_no",
+   "display_name": "调拨单号",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_from_wh_id",
+  "after": {
+   "name": "from_wh_id",
+   "display_name": "发货仓库",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_to_store_id",
+  "after": {
+   "name": "to_store_id",
+   "display_name": "收货门店",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_shipped_at",
+  "after": {
+   "name": "shipped_at",
+   "display_name": "发货时间",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_arrived_at",
+  "after": {
+   "name": "arrived_at",
+   "display_name": "到店时间",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_status",
+  "after": {
+   "name": "status",
+   "display_name": "调拨单状态",
+   "owner_type_id": {
+    "client_ref": "transfer"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_transfer_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "transfer_item",
+  "after": {
+   "name": "transfer_item",
+   "display_name": "调拨明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 21,
+      "line_end": 21
+     },
+     "quote": "仓库通过调拨单把商品发往门店，到店后门店库存增加。"
+    },
+    {
+     "kind": "table",
+     "ref": "t32.transfer_no",
+     "quote": "调拨单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_item_transfer_no",
+  "after": {
+   "name": "transfer_no",
+   "display_name": "调拨单号",
+   "owner_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_item_line_no",
+  "after": {
+   "name": "line_no",
+   "display_name": "行号",
+   "owner_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "value_kind": "integer",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "transfer_item_qty",
+  "after": {
+   "name": "qty",
+   "display_name": "调拨数量",
+   "owner_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "inventory_snapshot",
+  "after": {
+   "name": "inventory_snapshot",
+   "display_name": "库存快照",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 22,
+      "line_end": 22
+     },
+     "quote": "每天日终对每个仓库和门店的每个商品做库存快照，记录数量和成本。"
+    },
+    {
+     "kind": "table",
+     "ref": "t8.snapshot_date",
+     "quote": "快照日期"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_snapshot_date",
+  "after": {
+   "name": "snapshot_date",
+   "display_name": "快照日期",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "date",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_location_type",
+  "after": {
+   "name": "location_type",
+   "display_name": "库存地点类型",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "value_type_id": {
+    "client_ref": "vt_inventory_location_type"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_location_id",
+  "after": {
+   "name": "location_id",
+   "display_name": "仓库或门店编号",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "description": "按地点类型分别指向仓库编号或门店编号"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_on_hand_qty",
+  "after": {
+   "name": "on_hand_qty",
+   "display_name": "日末库存数量",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "inventory_snapshot_on_hand_cost",
+  "after": {
+   "name": "on_hand_cost",
+   "display_name": "日末库存成本",
+   "owner_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "stocktake",
+  "after": {
+   "name": "stocktake",
+   "display_name": "盘点单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 23,
+      "line_end": 23
+     },
+     "quote": "门店定期盘点，实盘数量少于账面数量的部分算“盘亏”，盘亏成本计入损耗。"
+    },
+    {
+     "kind": "table",
+     "ref": "t28.stocktake_no",
+     "quote": "盘点单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_stocktake_no",
+  "after": {
+   "name": "stocktake_no",
+   "display_name": "盘点单号",
+   "owner_type_id": {
+    "client_ref": "stocktake"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_store_id",
+  "after": {
+   "name": "store_id",
+   "display_name": "盘点门店",
+   "owner_type_id": {
+    "client_ref": "stocktake"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_counted_on",
+  "after": {
+   "name": "counted_on",
+   "display_name": "盘点日期",
+   "owner_type_id": {
+    "client_ref": "stocktake"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_status",
+  "after": {
+   "name": "status",
+   "display_name": "盘点单状态",
+   "owner_type_id": {
+    "client_ref": "stocktake"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_stocktake_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "stocktake_item",
+  "after": {
+   "name": "stocktake_item",
+   "display_name": "盘点明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 23,
+      "line_end": 23
+     },
+     "quote": "实盘数量少于账面数量的部分算“盘亏”"
+    },
+    {
+     "kind": "table",
+     "ref": "t27.stocktake_no",
+     "quote": "盘点单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_item_stocktake_no",
+  "after": {
+   "name": "stocktake_no",
+   "display_name": "盘点单号",
+   "owner_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_item_book_qty",
+  "after": {
+   "name": "book_qty",
+   "display_name": "账面数量",
+   "owner_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "stocktake_item_counted_qty",
+  "after": {
+   "name": "counted_qty",
+   "display_name": "实盘数量",
+   "owner_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "sales_order",
+  "after": {
+   "name": "sales_order",
+   "display_name": "销售订单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 27,
+      "line_end": 27
+     },
+     "quote": "顾客在门店、小程序或外卖渠道下单。会员下单记会员编号，散客为空。"
+    },
+    {
+     "kind": "table",
+     "ref": "t26.order_no",
+     "quote": "订单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_order_no",
+  "after": {
+   "name": "order_no",
+   "display_name": "订单号",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_store_id",
+  "after": {
+   "name": "store_id",
+   "display_name": "成交门店",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_member_id",
+  "after": {
+   "name": "member_id",
+   "display_name": "会员",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string",
+   "description": "散客为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_channel",
+  "after": {
+   "name": "channel",
+   "display_name": "渠道",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_sales_channel"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_cashier_emp_id",
+  "after": {
+   "name": "cashier_emp_id",
+   "display_name": "收银员工号",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string",
+   "description": "线上订单为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_ordered_at",
+  "after": {
+   "name": "ordered_at",
+   "display_name": "下单时间",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_paid_at",
+  "after": {
+   "name": "paid_at",
+   "display_name": "支付时间",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_status",
+  "after": {
+   "name": "status",
+   "display_name": "订单状态",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_sales_order_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_gross_amount",
+  "after": {
+   "name": "gross_amount",
+   "display_name": "商品原价合计",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_discount_amount",
+  "after": {
+   "name": "discount_amount",
+   "display_name": "促销优惠",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_coupon_amount",
+  "after": {
+   "name": "coupon_amount",
+   "display_name": "优惠券抵扣",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_pay_amount",
+  "after": {
+   "name": "pay_amount",
+   "display_name": "实付金额",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_is_delivery",
+  "after": {
+   "name": "is_delivery",
+   "display_name": "是否配送到家",
+   "owner_type_id": {
+    "client_ref": "sales_order"
+   },
+   "value_kind": "boolean"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "sales_order_item",
+  "after": {
+   "name": "sales_order_item",
+   "display_name": "订单明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 30,
+      "line_end": 30
+     },
+     "quote": "订单明细记录参与了哪个活动。"
+    },
+    {
+     "kind": "table",
+     "ref": "t25.order_no",
+     "quote": "订单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_order_no",
+  "after": {
+   "name": "order_no",
+   "display_name": "订单号",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_line_no",
+  "after": {
+   "name": "line_no",
+   "display_name": "行号",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "integer",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_qty",
+  "after": {
+   "name": "qty",
+   "display_name": "数量",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "decimal",
+   "description": "称重商品可为小数"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_list_price",
+  "after": {
+   "name": "list_price",
+   "display_name": "零售价",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_deal_price",
+  "after": {
+   "name": "deal_price",
+   "display_name": "成交单价",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_discount_amount",
+  "after": {
+   "name": "discount_amount",
+   "display_name": "行优惠",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "sales_order_item_promotion_id",
+  "after": {
+   "name": "promotion_id",
+   "display_name": "参与的促销活动",
+   "owner_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "payment",
+  "after": {
+   "name": "payment",
+   "display_name": "支付记录",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 28,
+      "line_end": 28
+     },
+     "quote": "一单可以用多种方式支付。"
+    },
+    {
+     "kind": "table",
+     "ref": "t12.payment_no",
+     "quote": "支付流水号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "payment_payment_no",
+  "after": {
+   "name": "payment_no",
+   "display_name": "支付流水号",
+   "owner_type_id": {
+    "client_ref": "payment"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "payment_order_no",
+  "after": {
+   "name": "order_no",
+   "display_name": "订单号",
+   "owner_type_id": {
+    "client_ref": "payment"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "payment_pay_method",
+  "after": {
+   "name": "pay_method",
+   "display_name": "支付方式",
+   "owner_type_id": {
+    "client_ref": "payment"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_payment_method"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "payment_amount",
+  "after": {
+   "name": "amount",
+   "display_name": "支付金额",
+   "owner_type_id": {
+    "client_ref": "payment"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "payment_paid_at",
+  "after": {
+   "name": "paid_at",
+   "display_name": "支付时间",
+   "owner_type_id": {
+    "client_ref": "payment"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "member",
+  "after": {
+   "name": "member",
+   "display_name": "会员",
+   "title_property_id": {
+    "client_ref": "member_member_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 29,
+      "line_end": 29
+     },
+     "quote": "会员分普通、银卡、金卡、黑卡四个等级，按积分升级。会员可以领取优惠券，下单时核销。"
+    },
+    {
+     "kind": "table",
+     "ref": "t10.member_id",
+     "quote": "会员编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_member_id",
+  "after": {
+   "name": "member_id",
+   "display_name": "会员编号",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_member_name",
+  "after": {
+   "name": "member_name",
+   "display_name": "姓名",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_gender",
+  "after": {
+   "name": "gender",
+   "display_name": "性别",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_birth_month",
+  "after": {
+   "name": "birth_month",
+   "display_name": "生日月份",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_mobile_masked",
+  "after": {
+   "name": "mobile_masked",
+   "display_name": "手机号（脱敏）",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_level_code",
+  "after": {
+   "name": "level_code",
+   "display_name": "会员等级",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_points",
+  "after": {
+   "name": "points",
+   "display_name": "当前积分",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_city",
+  "after": {
+   "name": "city",
+   "display_name": "常住城市",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_register_store_id",
+  "after": {
+   "name": "register_store_id",
+   "display_name": "注册门店",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_register_channel",
+  "after": {
+   "name": "register_channel",
+   "display_name": "注册渠道",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_member_register_channel"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_registered_at",
+  "after": {
+   "name": "registered_at",
+   "display_name": "注册时间",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_last_order_at",
+  "after": {
+   "name": "last_order_at",
+   "display_name": "最近下单时间",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_status",
+  "after": {
+   "name": "status",
+   "display_name": "会员状态",
+   "owner_type_id": {
+    "client_ref": "member"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_member_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "member_level",
+  "after": {
+   "name": "member_level",
+   "display_name": "会员等级",
+   "title_property_id": {
+    "client_ref": "member_level_level_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 29,
+      "line_end": 29
+     },
+     "quote": "会员分普通、银卡、金卡、黑卡四个等级，按积分升级。"
+    },
+    {
+     "kind": "table",
+     "ref": "t9.level_code",
+     "quote": "等级代码"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_level_level_code",
+  "after": {
+   "name": "level_code",
+   "display_name": "等级代码",
+   "owner_type_id": {
+    "client_ref": "member_level"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_level_level_name",
+  "after": {
+   "name": "level_name",
+   "display_name": "等级名称",
+   "owner_type_id": {
+    "client_ref": "member_level"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_level_min_points",
+  "after": {
+   "name": "min_points",
+   "display_name": "达到该等级所需积分",
+   "owner_type_id": {
+    "client_ref": "member_level"
+   },
+   "value_kind": "integer"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "member_level_discount_rate",
+  "after": {
+   "name": "discount_rate",
+   "display_name": "会员折扣率",
+   "owner_type_id": {
+    "client_ref": "member_level"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "coupon",
+  "after": {
+   "name": "coupon",
+   "display_name": "优惠券",
+   "title_property_id": {
+    "client_ref": "coupon_coupon_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 29,
+      "line_end": 29
+     },
+     "quote": "会员可以领取优惠券，下单时核销。"
+    },
+    {
+     "kind": "table",
+     "ref": "t4.coupon_id",
+     "quote": "券编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_coupon_id",
+  "after": {
+   "name": "coupon_id",
+   "display_name": "券编号",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_coupon_name",
+  "after": {
+   "name": "coupon_name",
+   "display_name": "券名称",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_face_value",
+  "after": {
+   "name": "face_value",
+   "display_name": "面额",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_threshold_amount",
+  "after": {
+   "name": "threshold_amount",
+   "display_name": "使用门槛",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_valid_from",
+  "after": {
+   "name": "valid_from",
+   "display_name": "有效期开始",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_valid_to",
+  "after": {
+   "name": "valid_to",
+   "display_name": "有效期结束",
+   "owner_type_id": {
+    "client_ref": "coupon"
+   },
+   "value_kind": "date"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "coupon_issue",
+  "after": {
+   "name": "coupon_issue",
+   "display_name": "优惠券发放",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 29,
+      "line_end": 29
+     },
+     "quote": "会员可以领取优惠券，下单时核销。"
+    },
+    {
+     "kind": "table",
+     "ref": "t3.issue_no",
+     "quote": "发放编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_issue_no",
+  "after": {
+   "name": "issue_no",
+   "display_name": "发放编号",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_coupon_id",
+  "after": {
+   "name": "coupon_id",
+   "display_name": "券编号",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_member_id",
+  "after": {
+   "name": "member_id",
+   "display_name": "领券会员",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_issued_at",
+  "after": {
+   "name": "issued_at",
+   "display_name": "发放时间",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_used_at",
+  "after": {
+   "name": "used_at",
+   "display_name": "核销时间",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "datetime",
+   "description": "未核销为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_used_order_no",
+  "after": {
+   "name": "used_order_no",
+   "display_name": "核销订单",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "string",
+   "description": "未核销为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "coupon_issue_status",
+  "after": {
+   "name": "status",
+   "display_name": "优惠券发放状态",
+   "owner_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_coupon_issue_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "promotion",
+  "after": {
+   "name": "promotion",
+   "display_name": "促销活动",
+   "title_property_id": {
+    "client_ref": "promotion_promotion_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 30,
+      "line_end": 30
+     },
+     "quote": "促销活动分满减、折扣、第二件半价，活动关联参与的商品。"
+    },
+    {
+     "kind": "table",
+     "ref": "t16.promotion_id",
+     "quote": "活动编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_promotion_id",
+  "after": {
+   "name": "promotion_id",
+   "display_name": "活动编号",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_promotion_name",
+  "after": {
+   "name": "promotion_name",
+   "display_name": "活动名称",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_promo_type",
+  "after": {
+   "name": "promo_type",
+   "display_name": "类型",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_promotion_type"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_start_at",
+  "after": {
+   "name": "start_at",
+   "display_name": "开始时间",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_end_at",
+  "after": {
+   "name": "end_at",
+   "display_name": "结束时间",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "promotion_store_scope",
+  "after": {
+   "name": "store_scope",
+   "display_name": "适用门店范围",
+   "owner_type_id": {
+    "client_ref": "promotion"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_promotion_store_scope"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "refund",
+  "after": {
+   "name": "refund",
+   "display_name": "退款单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 31,
+      "line_end": 31
+     },
+     "quote": "退款分整单退和部分退，审核通过后才算退款完成。"
+    },
+    {
+     "kind": "table",
+     "ref": "t22.refund_no",
+     "quote": "退款单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_refund_no",
+  "after": {
+   "name": "refund_no",
+   "display_name": "退款单号",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_order_no",
+  "after": {
+   "name": "order_no",
+   "display_name": "原订单号",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_refund_type",
+  "after": {
+   "name": "refund_type",
+   "display_name": "退款类型",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_refund_scope"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_applied_at",
+  "after": {
+   "name": "applied_at",
+   "display_name": "申请时间",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_approved_at",
+  "after": {
+   "name": "approved_at",
+   "display_name": "审核通过时间",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "datetime",
+   "description": "未审核通过为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_refund_amount",
+  "after": {
+   "name": "refund_amount",
+   "display_name": "退款金额",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_reason",
+  "after": {
+   "name": "reason",
+   "display_name": "退款原因",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_status",
+  "after": {
+   "name": "status",
+   "display_name": "退款单状态",
+   "owner_type_id": {
+    "client_ref": "refund"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_refund_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "refund_item",
+  "after": {
+   "name": "refund_item",
+   "display_name": "退款明细",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 31,
+      "line_end": 31
+     },
+     "quote": "退款分整单退和部分退，审核通过后才算退款完成。"
+    },
+    {
+     "kind": "table",
+     "ref": "t21.refund_no",
+     "quote": "退款单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_item_refund_no",
+  "after": {
+   "name": "refund_no",
+   "display_name": "退款单号",
+   "owner_type_id": {
+    "client_ref": "refund_item"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_item_line_no",
+  "after": {
+   "name": "line_no",
+   "display_name": "行号",
+   "owner_type_id": {
+    "client_ref": "refund_item"
+   },
+   "value_kind": "integer",
+   "identifier": true,
+   "required": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_item_sku",
+  "after": {
+   "name": "sku",
+   "display_name": "商品编码",
+   "owner_type_id": {
+    "client_ref": "refund_item"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_item_qty",
+  "after": {
+   "name": "qty",
+   "display_name": "退货数量",
+   "owner_type_id": {
+    "client_ref": "refund_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "refund_item_amount",
+  "after": {
+   "name": "amount",
+   "display_name": "退款金额",
+   "owner_type_id": {
+    "client_ref": "refund_item"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "delivery",
+  "after": {
+   "name": "delivery",
+   "display_name": "配送单",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 35,
+      "line_end": 35
+     },
+     "quote": "选择配送到家的订单会生成配送单，由合作配送商的骑手送达。配送单有承诺送达时间。"
+    },
+    {
+     "kind": "table",
+     "ref": "t5.delivery_no",
+     "quote": "配送单号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_delivery_no",
+  "after": {
+   "name": "delivery_no",
+   "display_name": "配送单号",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_order_no",
+  "after": {
+   "name": "order_no",
+   "display_name": "订单号",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_rider_id",
+  "after": {
+   "name": "rider_id",
+   "display_name": "骑手",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_dispatched_at",
+  "after": {
+   "name": "dispatched_at",
+   "display_name": "出发时间",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_promised_at",
+  "after": {
+   "name": "promised_at",
+   "display_name": "承诺送达时间",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "datetime"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_delivered_at",
+  "after": {
+   "name": "delivered_at",
+   "display_name": "实际送达时间",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "datetime",
+   "description": "未送达为空"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_distance_km",
+  "after": {
+   "name": "distance_km",
+   "display_name": "配送距离（公里）",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_delivery_fee",
+  "after": {
+   "name": "delivery_fee",
+   "display_name": "配送费",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "decimal"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "delivery_status",
+  "after": {
+   "name": "status",
+   "display_name": "配送单状态",
+   "owner_type_id": {
+    "client_ref": "delivery"
+   },
+   "value_kind": "string",
+   "value_type_id": {
+    "client_ref": "vt_delivery_status"
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "object_type",
+  "client_ref": "rider",
+  "after": {
+   "name": "rider",
+   "display_name": "骑手",
+   "title_property_id": {
+    "client_ref": "rider_rider_name"
+   },
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 35,
+      "line_end": 35
+     },
+     "quote": "由合作配送商的骑手送达"
+    },
+    {
+     "kind": "table",
+     "ref": "t24.rider_id",
+     "quote": "骑手编号"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "rider_rider_id",
+  "after": {
+   "name": "rider_id",
+   "display_name": "骑手编号",
+   "owner_type_id": {
+    "client_ref": "rider"
+   },
+   "value_kind": "string",
+   "identifier": true,
+   "required": true,
+   "unique": true
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "rider_rider_name",
+  "after": {
+   "name": "rider_name",
+   "display_name": "姓名",
+   "owner_type_id": {
+    "client_ref": "rider"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "property",
+  "client_ref": "rider_partner_company",
+  "after": {
+   "name": "partner_company",
+   "display_name": "所属配送商",
+   "owner_type_id": {
+    "client_ref": "rider"
+   },
+   "value_kind": "string"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_store_format",
+  "after": {
+   "name": "store_format",
+   "display_name": "门店类型",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "门店分标准店、社区店、旗舰店三类"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_store_format_values",
+  "after": {
+   "name": "store_format_values",
+   "display_name": "门店类型取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_store_format"
+   },
+   "rule_kind": "constraint",
+   "expression": "store_format IN ('标准店', '社区店', '旗舰店')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_store_status",
+  "after": {
+   "name": "store_status",
+   "display_name": "门店状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 7,
+      "line_end": 7
+     },
+     "quote": "有营业、装修、闭店三种状态"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_store_status_values",
+  "after": {
+   "name": "store_status_values",
+   "display_name": "门店状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_store_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "store_status IN ('营业', '装修', '闭店')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_warehouse_type",
+  "after": {
+   "name": "warehouse_type",
+   "display_name": "仓库类型",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 9,
+      "line_end": 9
+     },
+     "quote": "仓库分常温仓和冷链仓"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_warehouse_type_values",
+  "after": {
+   "name": "warehouse_type_values",
+   "display_name": "仓库类型取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_warehouse_type"
+   },
+   "rule_kind": "constraint",
+   "expression": "warehouse_type IN ('常温', '冷链')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_emp_position",
+  "after": {
+   "name": "emp_position",
+   "display_name": "员工岗位",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t7.position",
+     "quote": "岗位：店长/收银/理货/采购/仓管"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_emp_position_values",
+  "after": {
+   "name": "emp_position_values",
+   "display_name": "员工岗位取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_emp_position"
+   },
+   "rule_kind": "constraint",
+   "expression": "emp_position IN ('店长', '收银', '理货', '采购', '仓管')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_storage_mode",
+  "after": {
+   "name": "storage_mode",
+   "display_name": "储存方式",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t14.storage_type",
+     "quote": "储存方式：常温/冷藏/冷冻"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_storage_mode_values",
+  "after": {
+   "name": "storage_mode_values",
+   "display_name": "储存方式取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_storage_mode"
+   },
+   "rule_kind": "constraint",
+   "expression": "storage_mode IN ('常温', '冷藏', '冷冻')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_product_status",
+  "after": {
+   "name": "product_status",
+   "display_name": "商品状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t14.status",
+     "quote": "状态：在售/停售/淘汰"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_product_status_values",
+  "after": {
+   "name": "product_status_values",
+   "display_name": "商品状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_product_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "product_status IN ('在售', '停售', '淘汰')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_supplier_status",
+  "after": {
+   "name": "supplier_status",
+   "display_name": "供应商状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t30.status",
+     "quote": "状态：合作中/暂停/终止"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_supplier_status_values",
+  "after": {
+   "name": "supplier_status_values",
+   "display_name": "供应商状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_supplier_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "supplier_status IN ('合作中', '暂停', '终止')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_price_change_reason",
+  "after": {
+   "name": "price_change_reason",
+   "display_name": "调价原因",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 14,
+      "line_end": 14
+     },
+     "quote": "门店可以单独调价，调价记录保留原价、新价和生效时间。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_price_change_reason_values",
+  "after": {
+   "name": "price_change_reason_values",
+   "display_name": "调价原因取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_price_change_reason"
+   },
+   "rule_kind": "constraint",
+   "expression": "price_change_reason IN ('促销', '成本变动', '临期')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_purchase_order_status",
+  "after": {
+   "name": "purchase_order_status",
+   "display_name": "采购单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t18.status",
+     "quote": "状态：草稿/已下单/部分到货/已完成/已取消"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_purchase_order_status_values",
+  "after": {
+   "name": "purchase_order_status_values",
+   "display_name": "采购单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_purchase_order_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "purchase_order_status IN ('草稿', '已下单', '部分到货', '已完成', '已取消')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_receipt_status",
+  "after": {
+   "name": "receipt_status",
+   "display_name": "入库单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t20.status",
+     "quote": "状态：待验收/已入库"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_receipt_status_values",
+  "after": {
+   "name": "receipt_status_values",
+   "display_name": "入库单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_receipt_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "receipt_status IN ('待验收', '已入库')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_transfer_status",
+  "after": {
+   "name": "transfer_status",
+   "display_name": "调拨单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t33.status",
+     "quote": "状态：在途/已到店/已取消"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_transfer_status_values",
+  "after": {
+   "name": "transfer_status_values",
+   "display_name": "调拨单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_transfer_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "transfer_status IN ('在途', '已到店', '已取消')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_inventory_location_type",
+  "after": {
+   "name": "inventory_location_type",
+   "display_name": "库存地点类型",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 22,
+      "line_end": 22
+     },
+     "quote": "每天日终对每个仓库和门店的每个商品做库存快照，记录数量和成本。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_inventory_location_type_values",
+  "after": {
+   "name": "inventory_location_type_values",
+   "display_name": "库存地点类型取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_inventory_location_type"
+   },
+   "rule_kind": "constraint",
+   "expression": "inventory_location_type IN ('仓库', '门店')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_stocktake_status",
+  "after": {
+   "name": "stocktake_status",
+   "display_name": "盘点单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t28.status",
+     "quote": "状态：盘点中/已确认"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_stocktake_status_values",
+  "after": {
+   "name": "stocktake_status_values",
+   "display_name": "盘点单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_stocktake_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "stocktake_status IN ('盘点中', '已确认')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_sales_channel",
+  "after": {
+   "name": "sales_channel",
+   "display_name": "销售渠道",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 27,
+      "line_end": 27
+     },
+     "quote": "顾客在门店、小程序或外卖渠道下单。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_sales_channel_values",
+  "after": {
+   "name": "sales_channel_values",
+   "display_name": "销售渠道取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_sales_channel"
+   },
+   "rule_kind": "constraint",
+   "expression": "sales_channel IN ('门店', '小程序', '外卖')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_sales_order_status",
+  "after": {
+   "name": "sales_order_status",
+   "display_name": "订单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 28,
+      "line_end": 28
+     },
+     "quote": "订单状态有待支付、已完成、已取消，只有已完成的订单计入销售。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_sales_order_status_values",
+  "after": {
+   "name": "sales_order_status_values",
+   "display_name": "订单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_sales_order_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "sales_order_status IN ('待支付', '已完成', '已取消')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_payment_method",
+  "after": {
+   "name": "payment_method",
+   "display_name": "支付方式",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t12.pay_method",
+     "quote": "支付方式：现金/微信/支付宝/储值卡"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_payment_method_values",
+  "after": {
+   "name": "payment_method_values",
+   "display_name": "支付方式取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_payment_method"
+   },
+   "rule_kind": "constraint",
+   "expression": "payment_method IN ('现金', '微信', '支付宝', '储值卡')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_member_status",
+  "after": {
+   "name": "member_status",
+   "display_name": "会员状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t10.status",
+     "quote": "状态：正常/冻结/注销"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_member_status_values",
+  "after": {
+   "name": "member_status_values",
+   "display_name": "会员状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_member_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "member_status IN ('正常', '冻结', '注销')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_member_register_channel",
+  "after": {
+   "name": "member_register_channel",
+   "display_name": "会员注册渠道",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t10.register_channel",
+     "quote": "注册渠道：门店/小程序/APP"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_member_register_channel_values",
+  "after": {
+   "name": "member_register_channel_values",
+   "display_name": "会员注册渠道取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_member_register_channel"
+   },
+   "rule_kind": "constraint",
+   "expression": "member_register_channel IN ('门店', '小程序', 'APP')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_coupon_issue_status",
+  "after": {
+   "name": "coupon_issue_status",
+   "display_name": "优惠券发放状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t3.status",
+     "quote": "状态：未使用/已使用/已过期"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_coupon_issue_status_values",
+  "after": {
+   "name": "coupon_issue_status_values",
+   "display_name": "优惠券发放状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_coupon_issue_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "coupon_issue_status IN ('未使用', '已使用', '已过期')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_promotion_type",
+  "after": {
+   "name": "promotion_type",
+   "display_name": "促销活动类型",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 30,
+      "line_end": 30
+     },
+     "quote": "促销活动分满减、折扣、第二件半价，活动关联参与的商品。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_promotion_type_values",
+  "after": {
+   "name": "promotion_type_values",
+   "display_name": "促销活动类型取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_promotion_type"
+   },
+   "rule_kind": "constraint",
+   "expression": "promotion_type IN ('满减', '折扣', '第二件半价')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_promotion_store_scope",
+  "after": {
+   "name": "promotion_store_scope",
+   "display_name": "促销门店范围",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t16.store_scope",
+     "quote": "适用门店范围：全部/指定大区"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_promotion_store_scope_values",
+  "after": {
+   "name": "promotion_store_scope_values",
+   "display_name": "促销门店范围取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_promotion_store_scope"
+   },
+   "rule_kind": "constraint",
+   "expression": "promotion_store_scope IN ('全部', '指定大区')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_refund_scope",
+  "after": {
+   "name": "refund_scope",
+   "display_name": "退款类型",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 31,
+      "line_end": 31
+     },
+     "quote": "退款分整单退和部分退，审核通过后才算退款完成。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_refund_scope_values",
+  "after": {
+   "name": "refund_scope_values",
+   "display_name": "退款类型取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_refund_scope"
+   },
+   "rule_kind": "constraint",
+   "expression": "refund_scope IN ('整单', '部分')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_refund_status",
+  "after": {
+   "name": "refund_status",
+   "display_name": "退款单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "material",
+     "material_id": "909adfa3-dab6-442a-9c93-4b31121e7b6d",
+     "locator": {
+      "line_start": 31,
+      "line_end": 31
+     },
+     "quote": "退款分整单退和部分退，审核通过后才算退款完成。"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_refund_status_values",
+  "after": {
+   "name": "refund_status_values",
+   "display_name": "退款单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_refund_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "refund_status IN ('待审核', '已退款', '已驳回')"
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "value_type",
+  "client_ref": "vt_delivery_status",
+  "after": {
+   "name": "delivery_status",
+   "display_name": "配送单状态",
+   "value_kind": "string",
+   "evidence": [
+    {
+     "kind": "table",
+     "ref": "t5.status",
+     "quote": "状态：配送中/已送达/异常"
+    }
+   ]
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "rule",
+  "client_ref": "vt_delivery_status_values",
+  "after": {
+   "name": "delivery_status_values",
+   "display_name": "配送单状态取值",
+   "owner_kind": "value_type",
+   "owner_id": {
+    "client_ref": "vt_delivery_status"
+   },
+   "rule_kind": "constraint",
+   "expression": "delivery_status IN ('配送中', '已送达', '异常')"
+  }
+ }
+]
