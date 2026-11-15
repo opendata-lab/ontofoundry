@@ -121,7 +121,7 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
     if _round(manifest, digest) > REPAIR_LIMIT:
         return _rejected(
             "REPAIR_BUDGET_EXHAUSTED",
-            f"本轮修正最多 {REPAIR_LIMIT} 轮，已用完。删去仍不通过的提案组后提交，或在回答中说明未交付项",
+            f"本轮修正最多 {REPAIR_LIMIT} 轮，已用完，结果未提交。请在回答中说明未通过的问题；用户再次发送消息时，可在本轮成果上继续",
             int(manifest.get("repair_used") or 0),
         )
     try:

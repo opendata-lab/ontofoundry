@@ -8,7 +8,7 @@ description: 从文档、表结构发现实体类型、属性、关系、数据�
 
 先在工作区（/mnt/workspace）用 `"$DATAAGENT_PYTHON_BIN"` 运行本技能的 `scripts/init_workflow.py --work-pack <工作包>`，照抄它打印的路径、模板和命令，不必列目录或读源码。
 
-再只读当前一个步骤文件：
+初始化打印“已保留其成果”时先读[续做](references/steps/resume.md)；否则只读当前一个步骤文件：
 - 会新增概念：[计划](references/steps/plan.md)，获批准后同一运行接着读[抽取](references/steps/extract.md)。
 - 不加材料的整体优化：[优化](references/steps/optimize.md)，获批准后接着读[增量](references/steps/incremental.md)。
 - 不新增概念的小改动：[增量](references/steps/incremental.md)。

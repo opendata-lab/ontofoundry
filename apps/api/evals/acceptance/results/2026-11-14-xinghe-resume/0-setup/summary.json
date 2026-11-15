@@ -1,0 +1,16 @@
+{
+  "commit": "b5b10f31d1d7eece78117791f3d4f989d425cdec",
+  "initial_platform_empty": true,
+  "initial_api_running": false,
+  "initial_web_running": false,
+  "synced_tables": [
+    "members",
+    "order_items",
+    "orders",
+    "products",
+    "stores"
+  ],
+  "dataagent_port": 8902,
+  "skills_hash": "6704439c69ac64e4a92204e6bd1a6d2e0e283acd9ac85cb4246f331e94ead854",
+  "alembic": "success"
+}

@@ -1,0 +1,37 @@
+{
+  "status": "published",
+  "version": {
+    "workspace_id": "1ecc34dc-f635-4382-8437-154364f80cf8",
+    "version_id": "dbd3e61d-597e-435e-aa4a-ca1b34a23b2c",
+    "version_sha256": "8f80144f464edf35c49e7eead483798ea55feb28ca9040646cdc1c045684dcc7",
+    "version_content_sha256": "8f80144f464edf35c49e7eead483798ea55feb28ca9040646cdc1c045684dcc7",
+    "normalized_snapshot_sha256": "ab789f54654dce8d0c840d5862b0ac28be37a558d0925cd1c00e958456dc44cb",
+    "version": 1,
+    "status": "published",
+    "message": "星河零售验收发布",
+    "published_at": "2026-11-14T11:44:18.006773+00:00",
+    "validation": {
+      "standard": "core-1",
+      "schema_status": "passed",
+      "semantic_status": "passed",
+      "errors": [],
+      "warnings": [],
+      "publishable": true,
+      "instance_status": "passed"
+    },
+    "counts": {
+      "object_types": 6,
+      "link_types": 6,
+      "attributes": 30,
+      "rules": 6,
+      "metrics": 3,
+      "datasets": 5,
+      "mappings": 5
+    }
+  },
+  "accepted_count": 64,
+  "turns_delta": 0,
+  "tool_calls_delta": 0,
+  "tool_output_bytes_delta": 0,
+  "tool_calls_by_kind_delta": {}
+}

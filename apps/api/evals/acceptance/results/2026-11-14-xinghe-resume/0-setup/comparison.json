@@ -1,0 +1,12 @@
+{
+  "seed_monthly": [
+    "257.20",
+    "174.60",
+    "237.10"
+  ],
+  "seed_total": "668.90",
+  "seed_S03": "317.10",
+  "synced_initial": 5,
+  "synced_after_increment": 6,
+  "status": "verified"
+}

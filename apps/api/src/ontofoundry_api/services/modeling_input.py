@@ -242,7 +242,10 @@ def scenario_facts(
     if not previous.get("input_files"):
         return facts
     before = {m["id"] for m in previous.get("materials") or []}
-    facts["new_material_ids"] = [m["id"] for m in manifest.get("materials") or [] if m["id"] not in before]
+    requests = set(manifest.get("request_material_ids") or [])
+    facts["new_material_ids"] = [
+        m["id"] for m in manifest.get("materials") or [] if m["id"] not in before and m["id"] not in requests
+    ]
     seen = {(t.get("connection"), t.get("table")) for t in previous["input_files"].get("tables") or []}
     facts["new_table_count"] = sum(
         (t.get("connection"), t.get("table")) not in seen for t in tables or []

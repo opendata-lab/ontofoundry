@@ -1,0 +1,236 @@
+{
+  "actual_total": 7,
+  "expected_total": 7,
+  "actual_counts": {
+    "dataset": 2,
+    "mapping": 1,
+    "metric": 4
+  },
+  "expected_counts": {
+    "dataset": 2,
+    "mapping": 1,
+    "metric": 4
+  },
+  "operations": [
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "退款数据",
+      "after": {
+        "id": "1e56a362-d05b-5d09-88ff-712b3c98fbfe",
+        "name": "refunds",
+        "display_name": "退款数据",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "table",
+        "dialect": "mysql",
+        "schema_name": "xinghe_retail",
+        "table_name": "refunds",
+        "query_sql": null,
+        "description": "",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "refund_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "退款单号"
+          },
+          {
+            "name": "order_no",
+            "physical_type": "VARCHAR(20) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "原订单号"
+          },
+          {
+            "name": "refund_date",
+            "physical_type": "DATE",
+            "comment": "退款日期"
+          },
+          {
+            "name": "refund_amount",
+            "physical_type": "DECIMAL(12, 2)",
+            "comment": "退款金额"
+          },
+          {
+            "name": "reason",
+            "physical_type": "VARCHAR(64) COLLATE \"utf8mb4_unicode_ci\"",
+            "comment": "退款原因"
+          }
+        ]
+      }
+    },
+    {
+      "kind": "mapping",
+      "operation": "create",
+      "display_name": "退款",
+      "after": {
+        "id": "1691a64b-c87e-585e-aae7-59257a15d143",
+        "type_id": "fa436f54-81c5-57f3-ac23-e96e838e810d",
+        "binding_mode": "independent",
+        "sources": [
+          {
+            "id": "main",
+            "dataset_id": "1e56a362-d05b-5d09-88ff-712b3c98fbfe",
+            "key_columns": [
+              "refund_no"
+            ]
+          }
+        ],
+        "fields": {
+          "refund_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_no"
+          },
+          "order_no": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "order_no"
+          },
+          "refund_on": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_date"
+          },
+          "refund_amount": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "refund_amount"
+          },
+          "reason": {
+            "kind": "column",
+            "source_id": "main",
+            "column": "reason"
+          }
+        },
+        "membership_source_id": null,
+        "inherited_link_bindings": {}
+      }
+    },
+    {
+      "kind": "dataset",
+      "operation": "create",
+      "display_name": "退款与销售额事件",
+      "after": {
+        "id": "483a5909-0c99-593c-81c7-052d86829807",
+        "name": "refund_sales_ledger",
+        "display_name": "退款与销售额事件",
+        "connection_id": "56a05b13-3eb9-4646-a26e-a6e9b3435139",
+        "source_kind": "query",
+        "dialect": "mysql",
+        "schema_name": null,
+        "table_name": null,
+        "query_sql": "SELECT r.refund_date AS event_on, r.refund_amount AS refund_total, 0 AS sales_total FROM xinghe_retail.refunds r UNION ALL SELECT o.order_date AS event_on, 0 AS refund_total, o.pay_amount AS sales_total FROM xinghe_retail.orders o WHERE o.status = '已完成'",
+        "description": "退款按退款日期、销售额按下单日期各自落在事件日期；两支互不关联，避免重复累计；离线声明列，不声称真实探测成功",
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "event_on",
+            "physical_type": "DATE",
+            "comment": ""
+          },
+          {
+            "name": "refund_total",
+            "physical_type": "DECIMAL(12,2)",
+            "comment": ""
+          },
+          {
+            "name": "sales_total",
+            "physical_type": "DECIMAL(12,2)",
+            "comment": ""
+          }
+        ]
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "退款金额",
+      "after": {
+        "id": "026e73d6-4a41-56dc-a4d8-fd6a49a138d8",
+        "name": "refund_amount",
+        "display_name": "退款金额",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "1e56a362-d05b-5d09-88ff-712b3c98fbfe",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "1e56a362-d05b-5d09-88ff-712b3c98fbfe",
+          "column": "refund_amount"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "1e56a362-d05b-5d09-88ff-712b3c98fbfe",
+          "column": "refund_date"
+        }
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "事件退款金额",
+      "after": {
+        "id": "8a994bf6-184a-5c13-8e4d-5f5b080866ff",
+        "name": "ledger_refund_amount",
+        "display_name": "事件退款金额",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+          "column": "refund_total"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+          "column": "event_on"
+        }
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "事件销售额",
+      "after": {
+        "id": "03797828-0e63-5347-8aef-43c1d9be41de",
+        "name": "ledger_sales_amount",
+        "display_name": "事件销售额",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "simple",
+        "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+        "aggregation": "sum",
+        "measure": {
+          "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+          "column": "sales_total"
+        },
+        "filters": [],
+        "time_field": {
+          "dataset_id": "483a5909-0c99-593c-81c7-052d86829807",
+          "column": "event_on"
+        }
+      }
+    },
+    {
+      "kind": "metric",
+      "operation": "create",
+      "display_name": "退款率",
+      "after": {
+        "id": "88dd62b4-6a74-5a67-a5ea-606eef54c678",
+        "name": "refund_rate",
+        "display_name": "退款率",
+        "description": "",
+        "synonyms": [],
+        "evidence": [],
+        "kind": "ratio",
+        "numerator_id": "8a994bf6-184a-5c13-8e4d-5f5b080866ff",
+        "denominator_id": "03797828-0e63-5347-8aef-43c1d9be41de"
+      }
+    }
+  ],
+  "scope": "按类型数量、操作与定义记录比较。全量排除未同步 refunds 数据集，增量 refunds 数据集预期为新增。"
+}
