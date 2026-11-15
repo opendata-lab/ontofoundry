@@ -1,6 +1,6 @@
 # 表多时降低建模成本、补上语义质量
 
-日期：2026-11-15。状态：已确认方向，待实施。来源：用户反馈“关联表多时建模太久”（2026-11-15）；先测量再设计。Claude 与 Gemini 4 Argon 分别起草，Claude 核对源码后合并，记录见 `~/.agents/handoffs/2026-11-15-codex-qinghe-scale-measure/`、`2026-11-15-gemini-modeling-cost-design/`。
+日期：2026-11-15。状态：已实施（PR #66）；回归见 `apps/api/evals/acceptance/results/2026-11-15-modeling-scale-regression-2/`，输出 token 未达目标，遗留项见 `docs/TODO.md`“建模质量”。来源：用户反馈“关联表多时建模太久”（2026-11-15）；先测量再设计。Claude 与 Gemini 4 Argon 分别起草，Claude 核对源码后合并，记录见 `~/.agents/handoffs/2026-11-15-codex-qinghe-scale-measure/`、`2026-11-15-gemini-modeling-cost-design/`。
 
 实施见[计划](../plans/2026-11-15-modeling-scale-plan.md)。
 
