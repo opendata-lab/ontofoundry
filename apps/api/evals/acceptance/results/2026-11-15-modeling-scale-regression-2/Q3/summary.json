@@ -1,0 +1,95 @@
+{
+  "run": "Q3",
+  "full_including_plan": {
+    "turns": 32,
+    "tool_calls": 37,
+    "observed_wall_seconds": 242.513259,
+    "dataagent_wall_seconds": 231.0,
+    "usage": {
+      "cache_read_input_tokens": 1398144,
+      "input_tokens": 41791,
+      "output_tokens": 46699
+    },
+    "proposal_counts": {
+      "value_type": 24,
+      "rule": 30,
+      "object_type": 31,
+      "property": 205,
+      "link_type": 46,
+      "dataset": 38,
+      "mapping": 31,
+      "metric": 25
+    },
+    "platform_submit_counts": {
+      "calls": 2,
+      "passed": 1,
+      "rejected": 1,
+      "error_codes": [
+        "ELEMENT_INVALID"
+      ]
+    },
+    "repair_used": 1,
+    "tool_output_utf8_bytes": 103441,
+    "tool_output_characters_reported_as_bytes_by_tool_stats": 75536
+  },
+  "incremental": null,
+  "steps": [
+    "full",
+    "plan",
+    "setup",
+    "publish-v1"
+  ],
+  "balance_before_CNY": "6.93",
+  "balance_after_CNY": "6.87",
+  "balance_difference_CNY": "0.06",
+  "balance_note": "Shared provider balance observations include delayed settlement. Per-run and per-step differences do not establish exclusive cost attribution.",
+  "fixed_reply_policy_followed": true,
+  "protocol_deviation": null,
+  "required_product_rename_applied": null,
+  "baseline": {
+    "full_turns": 38,
+    "full_calls": 39,
+    "dataagent_wall_seconds": 314,
+    "output_tokens": 42191,
+    "proposals": 405
+  },
+  "recent_PR_baselines": {
+    "Q1": {
+      "turns": 54,
+      "tool_calls": 56,
+      "dataagent_wall_seconds": 377,
+      "output_tokens": 66600,
+      "repairs": 3
+    },
+    "Q2": {
+      "turns": 40,
+      "tool_calls": 45,
+      "dataagent_wall_seconds": 280,
+      "output_tokens": 53600,
+      "repairs": 0
+    },
+    "X1_full": {
+      "turns": 34,
+      "tool_calls": 36,
+      "output_tokens": 16500
+    },
+    "X2_full": {
+      "turns": 26,
+      "tool_calls": 32,
+      "output_tokens": 14300
+    },
+    "X1_incremental": {
+      "turns": 14,
+      "tool_calls": 14,
+      "repairs": 1
+    },
+    "X2_incremental": {
+      "turns": 11,
+      "tool_calls": 12,
+      "repairs": 1
+    }
+  },
+  "protocol_conformant": true,
+  "approval_stop": "text plan",
+  "fixed_approval_reply": "可以，按计划继续。"
+}

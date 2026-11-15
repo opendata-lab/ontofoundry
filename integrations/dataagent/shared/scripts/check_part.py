@@ -18,8 +18,18 @@ from check_result import (
     mapping_local_errors,
     schema_errors,
 )
+from column_refs import local_column_messages
+from material_coverage import coverage_hints
 from prepare_result import PrepareInputError, assemble, effective_ref
-from runpaths import PARTS, HintParser, command, error, existing, fragment_paths, plan_not_approved
+from runpaths import (
+    PARTS,
+    HintParser,
+    command,
+    error,
+    existing,
+    fragment_paths,
+    plan_not_approved,
+)
 
 SUMMARY_LIMIT = 4000
 NAMED_KINDS = {"object_type", "property", "value_type", "link_type", "metric", "dataset", "rule"}
@@ -116,7 +126,7 @@ def main():
     parser.add_argument("--context")
     parser.add_argument("--schema")
     parser.add_argument("--reports", default="modeling/checks")
-    parser.add_argument("fragments", nargs="+")
+    parser.add_argument("fragments", nargs="*", help="不写则检查 modeling/parts/ 下全部片段")
     args = parser.parse_args()
     if refusal := plan_not_approved():
         print(refusal)
@@ -136,8 +146,8 @@ def main():
         print(error("INPUT_UNREADABLE", f"读取 {which} 失败：{type(exc).__name__}", "未检查任何片段",
                     "路径照 init_workflow 打印的本轮工作包复制"))
         return 1
-    failed, lines = False, []
-    for raw, path in ((name, p) for name in args.fragments for p in fragment_paths(name)):
+    failed, lines, checked = False, [], []
+    for raw, path in ((name, p) for name in args.fragments or [str(PARTS)] for p in fragment_paths(name)):
         try:
             items = json.loads(path.read_bytes())
         except FileNotFoundError:
@@ -154,8 +164,11 @@ def main():
             failed = True
             lines.append(error("READ_FAILED", f"无法读取 {path}：{type(exc).__name__}", "未检查", retry=False))
             continue
+        checked.append(path)
         report = check_fragment(items, context, schema)
         report["errors"] += duplicate_refs(path, items)
+        if args.work_pack:
+            report["errors"] += local_column_messages(items, pack.get("tables_file"))
         report_path = Path(args.reports) / f"{path.stem}.json"
         try:
             atomic_write(report_path, encode(report))
@@ -176,6 +189,9 @@ def main():
         if report["pending_refs"]:
             lines.append("  待合并检查的跨片段引用：" + "、".join(report["pending_refs"]))
         lines += ["  " + h for h in report["hints"][:5]]
+    if args.work_pack and any(p.name.startswith("04") for p in checked):
+        # Semantic coverage is a reminder once metrics and rules exist (MS-04), never an error.
+        lines += coverage_hints(pack)
     # Cut at whole lines so a path or command is never half printed.
     kept, size = [], 0
     for line in lines:

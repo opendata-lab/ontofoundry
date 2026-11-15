@@ -167,7 +167,7 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
                 assert "r.assessed_on AS event_on" in after["query_sql"]
                 shapes.add("UNION各带日期")
             else:
-                assert after["columns"], "table datasets only for synced tables"
+                assert "columns" not in after, "the platform fills table columns (MS-02)"
                 shapes.add("表列")
         if kind == "mapping":
             shapes.add("复合键映射" if len(after["sources"][0]["key_columns"]) > 1 else "普通映射")
@@ -202,6 +202,10 @@ def test_kit_explicit_shape_inventory_and_fixture_coverage():
     for version in ("conservative", "supplemented"):
         for part in load_parts(RETAIL / version):
             for item in part:
+                if item["target_kind"] == "dataset" and item["after"].get("source_kind", "table") == "table":
+                    # Older fixtures list table columns; the platform fills them now (MS-02).
+                    item = deepcopy(item)
+                    item["after"].pop("columns", None)
                 assert atoms(item) <= covered, (version, item["client_ref"], atoms(item) - covered)
 
 

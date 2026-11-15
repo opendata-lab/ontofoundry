@@ -1,6 +1,6 @@
 # 表多时降低建模成本、补上语义质量
 
-日期：2026-11-15。状态：已确认方向，待实施。来源：用户反馈“关联表多时建模太久”（2026-11-15）；先测量再设计。Claude 与 Gemini 4 Argon 分别起草，Claude 核对源码后合并，记录见 `~/.agents/handoffs/2026-11-15-codex-qinghe-scale-measure/`、`2026-11-15-gemini-modeling-cost-design/`。
+日期：2026-11-15。状态：已实施（PR #66）；回归见 `apps/api/evals/acceptance/results/2026-11-15-modeling-scale-regression-2/`，输出 token 未达目标，遗留项见 `docs/TODO.md`“建模质量”。来源：用户反馈“关联表多时建模太久”（2026-11-15）；先测量再设计。Claude 与 Gemini 4 Argon 分别起草，Claude 核对源码后合并，记录见 `~/.agents/handoffs/2026-11-15-codex-qinghe-scale-measure/`、`2026-11-15-gemini-modeling-cost-design/`。
 
 实施见[计划](../plans/2026-11-15-modeling-scale-plan.md)。
 
@@ -31,20 +31,22 @@
 | 编号 | 决定 | 状态 |
 |---|---|---|
 | MS-01 | **技能自带展开脚本**：Agent 在 `modeling/entities.json` 里每个实体写一行（对应哪张表、名称属性、排除的列、要改的显示名、布尔列、补充说明），`expand_tables.py` 据此生成属性、表数据集和单表映射。来源：Foundry、Fabric IQ 的“由表建对象”向导；属于执行辅助，不新增模型字段。删掉它只是退回手写，模型表达力不变。 | 2026-11-15 方向确认 |
-| MS-02 | **表数据集不写列**：`source_kind=table` 的数据集提案可以不带 `columns`，平台在提案校验前按本轮表快照补齐（与试应用时覆盖一致），本地检查按 `tables.json` 补齐。存储里的数据集仍保存列。查询数据集照旧声明列。来源：AGENTS.md“能推导的不存”。 | 2026-11-15 用户决定 |
+| MS-02 | **表数据集不写列**：`source_kind=table` 的数据集提案可以不带 `columns`，平台在提案校验前按本轮表快照补齐（与试应用时覆盖一致；本地检查不读数据集列，无需补）。存储里的数据集仍保存列。查询数据集照旧声明列。来源：AGENTS.md“能推导的不存”。 | 2026-11-15 用户决定 |
 | MS-03 | **取值由 Agent 确认、脚本展开**：表摘要标出注释形如“状态：营业/装修/闭店”的列作为候选；Agent 在 `entities.json` 列出采纳的值类型和取值，脚本生成值类型和归属它的取值约束（`docs/concepts/value-types.md`，对应 Ossie `ValueType.requires`）。不全自动：注释里也有开放的举例（调价原因“促销/成本变动/临期”）和整数布尔（“1 是 0 否”）。 | 2026-11-15 方向确认 |
 | MS-04 | **语义清单与材料覆盖检查**：计划获批后，Agent 在 `entities.json` 写 `planned_metrics`、`planned_rules`（每条注明落点：指标、规则、数据集过滤、派生或暂缓）；`check_part.py` 对照片段列出未兑现的项，并列出材料中像指标口径或业务规则、却没有任何提案引作证据的行。**只提醒，不阻止提交**；没覆盖的由 Agent 补提案或在回答里说明。 | 2026-11-15 用户决定 |
 | MS-05 | **初始化列出表**：`init_workflow.py` 从表结构文件每表打印一行（键、表名、注释、主键、列数、外键或同名键候选、取值候选、`tmp_`/`_bak_`/`log` 这类非业务迹象），34 表约 4 KB；计划和抽取不再分批检索。 | 2026-11-15 方向确认（修复缺陷） |
 | MS-06 | **补示例和三条语义要点**：抽取示例加一条关联表关系；说明里补三条：比率指标分子分母的日期集合要对齐；多态外键（类型列＋编号列）拆成明确的关系或按类型过滤的数据集，不只写在描述里；材料明确的业务约束建成规则或派生，不从列名臆造算术规则。 | 2026-11-15 方向确认 |
+
+| MS-07 | **关系也写成短清单**：`entities.json` 顶层 `links` 每条关系一行（name、display_name、from、to、multiplicity、on 或 via/via_from/via_to、reads），展开脚本生成 `02-links.json`；端点无表等特殊关系手写在 `02b`。来源：第一轮回归（`results/2026-11-15-modeling-scale-regression`）里 44 条关系手写 JSON 占 25.5 KB，是最大的一块；名称、读法、基数仍由 Agent 决定。同时说明查询 SQL 与规则表达式可用的函数（回归中 GREATEST、CURDATE 各造成一次修正），并在本地检查列名和查询数据集的表位置，不消耗修正轮次。 | 2026-11-15 用户同意 |
 
 不自动化：哪些表建实体、排除哪些表、关系的名称和读法与基数、指标口径和规则。这些是语义判断，自动做会让本体退化成表字典。关系只给候选（列名等于另一张已建模表的主键），由 Agent 确认。不强制按实体拆片段文件：展开后 01、03 由脚本一次生成，拆分反而增加调用。
 
 ## 3. 机制
 
 1. **`entities.json` 扩展**（`shared/references/examples/protocol/entities.json`）：在现有 `items` 的每个实体上增加可选的 `table`、`title_property`、`exclude_columns`、`boolean_columns`、`properties`（只写要改显示名或补说明的列）；顶层增加 `value_types`、`planned_metrics`、`planned_rules`。只用于技能内部，不进入平台契约。
-2. **展开**（`shared/scripts/expand_tables.py`）：读工作包的表结构文件和 `entities.json`，生成 `modeling/parts/01-types.json` 中的实体类型、属性、值类型及其约束，`03-datasets.json` 中的表数据集（不写列）和单表映射。`client_ref` 按类别加前缀（`vt_`、`ds_`、`map_`、属性为 `实体_列`），避免本次出现的两次重名。属性默认：列名作英文标识，注释“：”之前作显示名，物理类型按 `domain/validation.py` 的 `physical_value_kind` 定基础类型，单列主键设标识、必填、唯一，复合主键设标识、必填，证据为该列。再次运行只覆盖脚本生成的条目，保留 Agent 在同一文件里手写的条目（关系、查询数据集、多表映射、指标、规则）。展开后自动跑一次 `check_part.py`。
-3. **平台补列**（提案入口，校验前）：表数据集缺列时按本轮运行清单的表快照补齐，再做现有的列引用校验，保证映射、关联列检查照常执行；表不在快照里时照旧报错。
-4. **覆盖检查**（`check_part.py`）：材料中含“口径、只有、才算、不计、定义、比例、除以、不足、只能”等词的行，若没有任何提案的证据引用该行，列为“未覆盖”；`planned_metrics`／`planned_rules` 中没有对应条目的也列出。输出每项一行，总长受现有输出上限约束。
+2. **展开**（`shared/scripts/expand_tables.py`）：读工作包的表结构文件和 `entities.json`，生成 `modeling/parts/01-types.json` 中的实体类型、属性、值类型及其约束，`03-datasets.json` 中的表数据集（不写列）和单表映射。`client_ref` 按类别加前缀（`vt_`、`ds_`、`map_`、属性为 `实体_列`），避免本次出现的两次重名。属性默认：列名作英文标识，注释“：”之前作显示名，物理类型按 `domain/validation.py` 的 `physical_value_kind` 定基础类型，单列主键设标识、必填、唯一，复合主键设标识、必填，证据为该列。这两个文件归脚本所有，每次运行整体重写；手写的无表实体和额外属性放 `01b-types.json`，查询数据集、关联表数据集和多表映射放 `03b-datasets.json`，合并时按文件名排在各自之后。展开后自动跑一次 `check_part.py`。
+3. **平台补列**（`services/table_submission.py` 的 `prepare_table_submission`，校验前）：表数据集缺列时按本轮运行清单的表快照补齐，再做现有的列引用校验，保证映射、关联列检查照常执行；表不在快照里时照旧报错。
+4. **覆盖检查**（`check_part.py` 检查含 04 的片段时，`shared/scripts/material_coverage.py`）：材料中含“口径、只有、才算、不计、定义、比例、除以、不足、只能”等词的行，若没有任何提案的证据引用该行，列为“未覆盖”；`planned_metrics`／`planned_rules` 中没有对应条目的也列出。输出每项一行，总长受现有输出上限约束。
 5. **步骤调整**（`ontology-discovery` 的 `plan.md`、`extract.md`，共享 `guide.md`）：抽取顺序改为写 `entities.json` → 展开 → 关系、查询数据集、指标和规则 → 检查覆盖 → 提交。SKILL.md 与步骤文件仍受 `offline_budget.py` 限额约束。
 
 ## 4. 验收

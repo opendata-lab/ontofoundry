@@ -346,7 +346,12 @@ def test_library_base_is_independent_and_incremental_references_are_explicit():
         base.append(subset)
     material = (KIT / "material.md").read_bytes()
     accepted = parse(prepare.assemble(initial, base), initial, material, "11111111-1111-4111-8111-111111111111")
-    assert apply_items(initial["draft"], accepted.items) == ctx["draft"]
+    applied = apply_items(initial["draft"], accepted.items)
+    # Table datasets omit columns; the platform fills them from the synced table (design MS-02).
+    for dataset in applied["datasets"]:
+        if dataset.get("source_kind", "table") == "table" and dataset.get("columns") is None:
+            dataset["columns"] = next(d["columns"] for d in ctx["draft"]["datasets"] if d["id"] == dataset["id"])
+    assert applied == ctx["draft"]
     refs = json.loads((library / "v1-refs.json").read_bytes())
     assert refs == {i.client_ref: i.target_id for i in accepted.items}
     assert set(ctx["element_hashes"]).isdisjoint(context()["element_hashes"])
