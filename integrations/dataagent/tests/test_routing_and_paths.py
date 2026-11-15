@@ -89,13 +89,15 @@ def test_init_works_from_another_folder_and_lists_inputs(tmp_path, monkeypatch, 
     write_json(workspace / "uploads/pack.json", {
         "result_file": "output/result.json",
         "materials": [{"id": "m-1", "path": "uploads/fictional.md", "lines": 21}],
-        "tables": [{"key": "t1", "table": "fictional.orders", "comment": "订单"}],
+        "tables_file": "uploads/tables.json",
     })
+    write_json(workspace / "uploads/tables.json", {"tables": [
+        {"key": "t1", "table_name": "orders", "comment": "订单", "primary_key": ["order_no"], "columns": [{"name": "order_no"}]}]})
     monkeypatch.chdir(skill)  # e.g. the read-only skill folder
     assert invoke(monkeypatch, init_workflow, "--work-pack", str(workspace / "uploads/pack.json")) == 0
     out = capsys.readouterr().out
     assert (workspace / "modeling/parts").is_dir() and not (skill / "modeling").exists()
-    for text in ("uploads/fictional.md（id m-1，21 行）", "表 t1：fictional.orders 订单"):
+    for text in ("uploads/fictional.md（id m-1，21 行）", "关联表 1 张", "t1 orders 订单 · PK order_no · 1 列"):
         assert text in out, text
     assert "MCP 访问文件只供 prepare_result 使用" in out
 
@@ -165,7 +167,10 @@ def test_init_prints_search_instead_of_reading_all_tables(tmp_path, monkeypatch,
     assert "--search-tables" in out and "--tables " not in out
     # Only one example describe for planned candidates, never a batch over every table.
     describes = [line for line in out.splitlines() if "--describe-tables" in line]
-    assert len(describes) == 1 and "t1,t3" in describes[0] and "t90" not in out
+    assert len(describes) == 1 and "t1,t3" in describes[0] and "t90" not in describes[0]
+    # Every table gets one bounded line instead (design 2026-11-15 MS-05).
+    listed = [line for line in out.splitlines() if line.startswith("  t") or line.startswith("  …其余")]
+    assert listed and len("\n".join(listed).encode()) <= 6200
     assert "python、cat、grep" in out
 
 

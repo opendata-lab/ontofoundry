@@ -101,6 +101,13 @@ def prepare_table_submission(db, settings, session, raw):
                     status_code=422,
                 )
             used.add(table["key"])
+            if after.get("source_kind", "table") == "table" and after.get("columns") is None:
+                # Derivable from the pinned snapshot (design MS-02); filled before
+                # validation so mapping and join column checks still run.
+                after["columns"] = [
+                    {"name": c["name"], "physical_type": c.get("type"), "comment": c.get("comment") or ""}
+                    for c in table["columns"]
+                ]
     if not used:
         return raw
     # One receipt per batch, using only referenced tables, in pinned key order.

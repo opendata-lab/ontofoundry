@@ -18,8 +18,17 @@ from check_result import (
     mapping_local_errors,
     schema_errors,
 )
+from material_coverage import coverage_hints
 from prepare_result import PrepareInputError, assemble, effective_ref
-from runpaths import PARTS, HintParser, command, error, existing, fragment_paths, plan_not_approved
+from runpaths import (
+    PARTS,
+    HintParser,
+    command,
+    error,
+    existing,
+    fragment_paths,
+    plan_not_approved,
+)
 
 SUMMARY_LIMIT = 4000
 NAMED_KINDS = {"object_type", "property", "value_type", "link_type", "metric", "dataset", "rule"}
@@ -136,7 +145,7 @@ def main():
         print(error("INPUT_UNREADABLE", f"读取 {which} 失败：{type(exc).__name__}", "未检查任何片段",
                     "路径照 init_workflow 打印的本轮工作包复制"))
         return 1
-    failed, lines = False, []
+    failed, lines, checked = False, [], []
     for raw, path in ((name, p) for name in args.fragments for p in fragment_paths(name)):
         try:
             items = json.loads(path.read_bytes())
@@ -154,6 +163,7 @@ def main():
             failed = True
             lines.append(error("READ_FAILED", f"无法读取 {path}：{type(exc).__name__}", "未检查", retry=False))
             continue
+        checked.append(path)
         report = check_fragment(items, context, schema)
         report["errors"] += duplicate_refs(path, items)
         report_path = Path(args.reports) / f"{path.stem}.json"
@@ -176,6 +186,9 @@ def main():
         if report["pending_refs"]:
             lines.append("  待合并检查的跨片段引用：" + "、".join(report["pending_refs"]))
         lines += ["  " + h for h in report["hints"][:5]]
+    if args.work_pack and any(p.name.startswith("04") for p in checked):
+        # Semantic coverage is a reminder once metrics and rules exist (MS-04), never an error.
+        lines += coverage_hints(pack)
     # Cut at whole lines so a path or command is never half printed.
     kept, size = [], 0
     for line in lines:

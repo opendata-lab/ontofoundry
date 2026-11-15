@@ -216,3 +216,45 @@ def test_query_cte_only_uses_in_scope_physical_tables(client):
     )
     report = client.post(url, json={"items": [item]}, headers=headers).json()
     assert report["passed"], report
+
+
+def mapped(connection, column):
+    """An object type mapped to fiction_orders through a column-less table dataset."""
+    return [
+        dataset(connection),
+        create("order", "object_type", {"name": "fiction_order", "display_name": "虚构订单"}),
+        create("order_no", "property", {"name": "order_no", "display_name": "订单号", "owner_type_id": {"client_ref": "order"},
+                                        "value_kind": "string", "identifier": True, "required": True, "unique": True}),
+        create("order_map", "mapping", {"type_id": {"client_ref": "order"}, "binding_mode": "independent",
+                                        "sources": [{"id": "main", "dataset_id": {"client_ref": "source"}, "key_columns": [column]}],
+                                        "fields": {"order_no": {"kind": "column", "source_id": "main", "column": column}}}),
+    ]
+
+
+def test_table_dataset_without_columns_gets_the_pinned_columns(client):
+    # Design 2026-11-15 MS-02: derivable columns are filled before validation.
+    session, url, headers, connection, tables = pinned(client)
+    key = tables[0]["primary_key"][0]
+    report = client.post(url, json={"items": mapped(connection, key)}, headers=headers).json()
+    assert report["passed"], report
+    source = next(i for i in stored(client, session["id"])[1] if i.client_ref == "source")
+    assert source.after_json["columns"] == [
+        {"name": c["name"], "physical_type": c["type"], "comment": c.get("comment") or ""} for c in tables[0]["columns"]]
+
+
+def test_filled_columns_still_catch_a_mapping_to_a_missing_column(client):
+    session, url, headers, connection, _ = pinned(client)
+    report = client.post(url, json={"items": mapped(connection, "no_such_column")}, headers=headers).json()
+    assert not report["passed"]
+    assert "no_such_column" in json.dumps(report, ensure_ascii=False)
+
+
+def test_declared_columns_are_replaced_by_the_synced_ones_anyway(client):
+    # Why the agent need not write them: the platform keeps the synced structure.
+    session, url, headers, connection, tables = pinned(client)
+    items = mapped(connection, tables[0]["primary_key"][0])
+    items[0]["after"]["columns"] = [{"name": tables[0]["primary_key"][0], "physical_type": "VARCHAR(20)", "comment": "自填"}]
+    report = client.post(url, json={"items": items}, headers=headers).json()
+    assert report["passed"], report
+    source = next(i for i in stored(client, session["id"])[1] if i.client_ref == "source")
+    assert [c["name"] for c in source.after_json["columns"]] == [c["name"] for c in tables[0]["columns"]]

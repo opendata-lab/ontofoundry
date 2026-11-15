@@ -1,10 +1,11 @@
 # 抽取：按已确认的范围展开
 
-概念清单已获批准（modeling/entities.json）。按清单展开属性、关系、数据集、映射、指标、规则和实例，不再改范围；“已有”概念用 show_element 取 id 引用，只为“新增”写 create；清单外的新概念写进回答的未交付项，留待下次确认。
+清单已获批准（modeling/entities.json），不再改范围；“已有”概念用 show_element 取 id，只为“新增”写 create；清单外的新概念列为未交付项。
 
-1. 读齐 modeling/plan.md 与 entities.json、材料（`read_input.py <材料>` 保留行号）、列（计划候选用 `read_input.py <tables_file> --describe-tables t1,t3`，续读照提示；不全量读表）。
-2. 同回合执行 `show_example.py --extract 1`、`--extract 2`，不另读 principles.md 或逐个 `--part`。已读不重读。
-3. 修订计划与笔记，写 01。按 01-types、02-links、03-datasets、04-metrics-rules、05-facts 写 modeling/parts/<名称>.json 裸数组，无实例写 []；实例方法读 `entity-extraction/references/extract-facts.md`（不在 ontology-discovery）；清单 examples 的具体事物在 05 作文档实例。写完 01–02、03–05 各 `check_part.py --work-pack <工作包> <片段...>` 一次，只看摘要，不另写 python 自检。notes 只记要点，压缩后先读 plan/notes。
-4. 未覆盖写法按报错命令或 `<target_kind> --operation create|update|delete` 定点查正例，无覆盖则说明缺项。复杂继承读[模式](../modeling-patterns.md)，交换读[Ossie](../reading-ossie.md)，转换读[补全](../import-completion.md)。MCP 访问文件只给 prepare_result，不读不打印。文本按 --start/--end 续页；JSON／CSV 先 --outline，再 --pointer／--rows／--query 定点读。Schema 给检查器。
+1. 读 plan.md、entities.json、材料（read_input.py 保留行号）；看列时一次 `--describe-tables t1,t3,…`。同回合执行 `show_example.py --extract 1`、`--extract 2`。
+2. 在 entities.json 每个有表的实体上补 `table`、`title_property`，按需 `exclude_columns`、`boolean_columns`、`properties`（只写要改的列）；顶层 `value_types` 只收取值候选里确属统一值域的列。运行 `expand_tables.py --work-pack <工作包>` 生成并检查 01-types、03-datasets；报错改 entities.json 重跑，不手改这两个文件。无表实体和额外属性写 01b-types.json，查询、关联表数据集和多表映射写 03b-datasets.json。
+3. 写 02-links（关联候选只是提示，名称、读法、基数自己定）、04-metrics-rules、05-facts（无实例写 []；实例方法在 `entity-extraction/references/extract-facts.md`，不在 ontology-discovery）。精力留给关系、指标、规则，不写生成脚本或 python 自检。
+4. `check_part.py --work-pack <工作包>` 一次检查其余片段；含 04 时列出未被引用的材料口径行和未兑现的计划：补提案，或在回答里说明为何不建。notes 只记要点。
+5. 未覆盖写法按报错命令或 `<target_kind> --operation create|update|delete` 定点查。复杂继承读[模式](../modeling-patterns.md)，交换读[Ossie](../reading-ossie.md)，转换读[补全](../import-completion.md)。
 
 完成后读[收尾](finish.md)。

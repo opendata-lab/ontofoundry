@@ -14,6 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from runpaths import HintParser, command, error, notice, relative, usage
+from table_summary import load_tables, summary_lines
 
 ROOT = Path("modeling")
 PLAN_TEMPLATE = """场景：全量｜增量｜优化｜小改动（选一个，删去其余）
@@ -232,9 +233,7 @@ def run_paths(work_pack, pack):
             lines.append(f"- 用户消息原文：{material['path']}（id {material.get('id', '?')}；内容就是本轮或之前的消息，引证时用这个 id，不必再读）")
         elif material.get("path"):
             lines.append(f"- 材料：{material['path']}（id {material.get('id', '?')}，{material.get('lines', '?')} 行）")
-    for table in pack.get("tables") or []:
-        if isinstance(table, dict) and table.get("key"):
-            lines.append(f"- 表 {table['key']}：{table.get('table', '')} {table.get('comment') or ''}".rstrip())
+    lines += table_list(pack.get("tables_file"))
     lines.append("- 本轮只用以上材料与表结构，没有业务库查询通道；MCP 访问文件只供 prepare_result 使用，不打开、不打印")
     for label, key in (("表结构", "tables_file"), ("结果", "result_file")):
         if pack.get(key):
@@ -253,6 +252,19 @@ def run_paths(work_pack, pack):
     return "\n".join(lines)
 
 
+def table_list(tables_file):
+    """Every linked table on one line, so planning needs no table search."""
+    if not tables_file:
+        return []
+    try:
+        tables = load_tables(tables_file)
+    except (OSError, ValueError):
+        return [f"- 表结构文件 {tables_file} 读不了，改用下面的检索命令"]
+    if not tables:
+        return []
+    return [f"- 关联表 {len(tables)} 张（候选只是提示，由你按材料确认）："] + ["  " + line for line in summary_lines(tables)]
+
+
 def reading_commands(pack):
     """Exact reader commands for this run's tables and structured materials.
 
@@ -263,10 +275,10 @@ def reading_commands(pack):
     tables = pack.get("tables_file")
     if tables:
         total = (pack.get("table_scope") or {}).get("total")
-        lines.append("检索表（用需求和材料里的业务词；表超过 30 张时必须给词）：" + command("read_input.py", tables, "--search-tables", "业务词1 业务词2"))
-        lines.append("看候选表的列（只看计划要用的表）：" + command("read_input.py", tables, "--describe-tables", "t1,t3"))
+        lines.append("表已在上面逐张列出；只有列表被截断时才检索：" + command("read_input.py", tables, "--search-tables", "业务词1 业务词2"))
+        lines.append("要看列时一次给多张：" + command("read_input.py", tables, "--describe-tables", "t1,t3"))
         if total:
-            lines.append(f"本轮表范围共 {total} 张；不要全部列出或全部读列")
+            lines.append(f"本轮表范围共 {total} 张；计划只凭上面的表清单定范围，不逐张读列")
     for number, material in enumerate(pack.get("materials") or [], 1):
         path = material.get("path") or ""
         if path.lower().endswith((".json", ".csv")):
