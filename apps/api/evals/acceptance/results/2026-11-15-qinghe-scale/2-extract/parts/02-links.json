@@ -1,0 +1,1469 @@
+[
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "store_region",
+  "after": {
+   "name": "store_in_region",
+   "display_name": "归属大区",
+   "source_type_id": {
+    "client_ref": "store"
+   },
+   "target_type_id": {
+    "client_ref": "region"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}归属{target}",
+    "{target}下辖{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "store_region_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "region_region_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "employee_store",
+  "after": {
+   "name": "employed_at",
+   "display_name": "所属门店",
+   "source_type_id": {
+    "client_ref": "employee"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "employee_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "store_manager",
+  "after": {
+   "name": "store_manager",
+   "display_name": "店长",
+   "source_type_id": {
+    "client_ref": "store"
+   },
+   "target_type_id": {
+    "client_ref": "employee"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}的店长是{target}",
+    "{target}担任{source}的店长"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "store_manager_emp_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "employee_emp_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "product_category",
+  "after": {
+   "name": "in_category",
+   "display_name": "属于品类",
+   "source_type_id": {
+    "client_ref": "product"
+   },
+   "target_type_id": {
+    "client_ref": "category"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "product_category_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "category_category_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "category_parent",
+  "after": {
+   "name": "sub_category_of",
+   "display_name": "上级品类",
+   "source_type_id": {
+    "client_ref": "category"
+   },
+   "target_type_id": {
+    "client_ref": "category"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}的上级品类是{target}",
+    "{target}下有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "category_parent_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "category_category_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "product_brand",
+  "after": {
+   "name": "of_brand",
+   "display_name": "属于品牌",
+   "source_type_id": {
+    "client_ref": "product"
+   },
+   "target_type_id": {
+    "client_ref": "brand"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}下有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "product_brand_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "brand_brand_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "product_supplier",
+  "after": {
+   "name": "from_supplier",
+   "display_name": "主供应商",
+   "source_type_id": {
+    "client_ref": "product"
+   },
+   "target_type_id": {
+    "client_ref": "supplier"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}的主供应商是{target}",
+    "{target}供应{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "product_supplier_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "supplier_supplier_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "price_change_product",
+  "after": {
+   "name": "price_change_of",
+   "display_name": "调价商品",
+   "source_type_id": {
+    "client_ref": "price_change"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}针对{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "price_change_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "price_change_store",
+  "after": {
+   "name": "price_change_store",
+   "display_name": "调价门店",
+   "source_type_id": {
+    "client_ref": "price_change"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}在{target}生效",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "price_change_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "purchase_order_supplier",
+  "after": {
+   "name": "po_supplier",
+   "display_name": "采购供应商",
+   "source_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "target_type_id": {
+    "client_ref": "supplier"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}向{target}采购",
+    "{target}收到{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "purchase_order_supplier_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "supplier_supplier_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "purchase_order_warehouse",
+  "after": {
+   "name": "po_receiving_warehouse",
+   "display_name": "收货仓库",
+   "source_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "target_type_id": {
+    "client_ref": "warehouse"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}的收货仓库是{target}",
+    "{target}收到{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "purchase_order_wh_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "warehouse_wh_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "purchase_order_buyer",
+  "after": {
+   "name": "po_buyer",
+   "display_name": "采购员",
+   "source_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "target_type_id": {
+    "client_ref": "employee"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}由{target}下单",
+    "{target}提交{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "purchase_order_buyer_emp_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "employee_emp_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "purchase_order_item_order",
+  "after": {
+   "name": "po_item_of",
+   "display_name": "属于采购单",
+   "source_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "target_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "purchase_order_item_po_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "purchase_order_po_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "purchase_order_item_product",
+  "after": {
+   "name": "po_item_product",
+   "display_name": "采购商品",
+   "source_type_id": {
+    "client_ref": "purchase_order_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}采购{target}",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "purchase_order_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "receipt_purchase_order",
+  "after": {
+   "name": "receipt_of_po",
+   "display_name": "来源采购单",
+   "source_type_id": {
+    "client_ref": "receipt"
+   },
+   "target_type_id": {
+    "client_ref": "purchase_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}来自{target}",
+    "{target}对应{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "receipt_po_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "purchase_order_po_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "receipt_warehouse",
+  "after": {
+   "name": "receipt_warehouse",
+   "display_name": "入库仓库",
+   "source_type_id": {
+    "client_ref": "receipt"
+   },
+   "target_type_id": {
+    "client_ref": "warehouse"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}入到{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "receipt_wh_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "warehouse_wh_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "receipt_item_receipt",
+  "after": {
+   "name": "receipt_item_of",
+   "display_name": "属于入库单",
+   "source_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "target_type_id": {
+    "client_ref": "receipt"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "receipt_item_receipt_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "receipt_receipt_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "receipt_item_product",
+  "after": {
+   "name": "receipt_item_product",
+   "display_name": "入库商品",
+   "source_type_id": {
+    "client_ref": "receipt_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}是{target}的入库记录",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "receipt_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "transfer_from_warehouse",
+  "after": {
+   "name": "transfer_from",
+   "display_name": "发货仓库",
+   "source_type_id": {
+    "client_ref": "transfer"
+   },
+   "target_type_id": {
+    "client_ref": "warehouse"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}从{target}发货",
+    "{target}发出{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "transfer_from_wh_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "warehouse_wh_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "transfer_to_store",
+  "after": {
+   "name": "transfer_to",
+   "display_name": "收货门店",
+   "source_type_id": {
+    "client_ref": "transfer"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}发往{target}",
+    "{target}收到{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "transfer_to_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "transfer_item_transfer",
+  "after": {
+   "name": "transfer_item_of",
+   "display_name": "属于调拨单",
+   "source_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "target_type_id": {
+    "client_ref": "transfer"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "transfer_item_transfer_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "transfer_transfer_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "transfer_item_product",
+  "after": {
+   "name": "transfer_item_product",
+   "display_name": "调拨商品",
+   "source_type_id": {
+    "client_ref": "transfer_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}调拨{target}",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "transfer_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "inventory_snapshot_product",
+  "after": {
+   "name": "snapshot_of_product",
+   "display_name": "快照商品",
+   "source_type_id": {
+    "client_ref": "inventory_snapshot"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}记录{target}的库存",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "inventory_snapshot_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "stocktake_store",
+  "after": {
+   "name": "stocktake_store",
+   "display_name": "盘点门店",
+   "source_type_id": {
+    "client_ref": "stocktake"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}在{target}执行",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "stocktake_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "stocktake_item_stocktake",
+  "after": {
+   "name": "stocktake_item_of",
+   "display_name": "属于盘点单",
+   "source_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "target_type_id": {
+    "client_ref": "stocktake"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "stocktake_item_stocktake_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "stocktake_stocktake_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "stocktake_item_product",
+  "after": {
+   "name": "stocktake_item_product",
+   "display_name": "盘点商品",
+   "source_type_id": {
+    "client_ref": "stocktake_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}盘点{target}",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "stocktake_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_store",
+  "after": {
+   "name": "order_store",
+   "display_name": "成交门店",
+   "source_type_id": {
+    "client_ref": "sales_order"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}在{target}成交",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_member",
+  "after": {
+   "name": "order_member",
+   "display_name": "下单会员",
+   "source_type_id": {
+    "client_ref": "sales_order"
+   },
+   "target_type_id": {
+    "client_ref": "member"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}由{target}下单",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_member_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "member_member_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_cashier",
+  "after": {
+   "name": "order_cashier",
+   "display_name": "收银员",
+   "source_type_id": {
+    "client_ref": "sales_order"
+   },
+   "target_type_id": {
+    "client_ref": "employee"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}由{target}收银",
+    "{target}处理{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_cashier_emp_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "employee_emp_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_item_order",
+  "after": {
+   "name": "order_item_of",
+   "display_name": "属于订单",
+   "source_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "target_type_id": {
+    "client_ref": "sales_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_item_order_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "sales_order_order_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_item_product",
+  "after": {
+   "name": "order_item_product",
+   "display_name": "订单商品",
+   "source_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}销售{target}",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "sales_order_item_promotion",
+  "after": {
+   "name": "order_item_promotion",
+   "display_name": "参与促销活动",
+   "source_type_id": {
+    "client_ref": "sales_order_item"
+   },
+   "target_type_id": {
+    "client_ref": "promotion"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}参与{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "sales_order_item_promotion_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "promotion_promotion_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "payment_order",
+  "after": {
+   "name": "payment_of_order",
+   "display_name": "所属订单",
+   "source_type_id": {
+    "client_ref": "payment"
+   },
+   "target_type_id": {
+    "client_ref": "sales_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}支付{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "payment_order_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "sales_order_order_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "member_level_link",
+  "after": {
+   "name": "member_of_level",
+   "display_name": "会员等级",
+   "source_type_id": {
+    "client_ref": "member"
+   },
+   "target_type_id": {
+    "client_ref": "member_level"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "member_level_code"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "member_level_level_code"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "member_register_store",
+  "after": {
+   "name": "member_register_store",
+   "display_name": "注册门店",
+   "source_type_id": {
+    "client_ref": "member"
+   },
+   "target_type_id": {
+    "client_ref": "store"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}在{target}注册",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "member_register_store_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "store_store_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "coupon_issue_coupon",
+  "after": {
+   "name": "issue_of_coupon",
+   "display_name": "所属优惠券",
+   "source_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "target_type_id": {
+    "client_ref": "coupon"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}发放的是{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "coupon_issue_coupon_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "coupon_coupon_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "coupon_issue_member",
+  "after": {
+   "name": "issue_member",
+   "display_name": "领券会员",
+   "source_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "target_type_id": {
+    "client_ref": "member"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}发给{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "coupon_issue_member_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "member_member_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "coupon_issue_order",
+  "after": {
+   "name": "issue_used_order",
+   "display_name": "核销订单",
+   "source_type_id": {
+    "client_ref": "coupon_issue"
+   },
+   "target_type_id": {
+    "client_ref": "sales_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}在{target}核销",
+    "{target}核销{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "coupon_issue_used_order_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "sales_order_order_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "refund_order",
+  "after": {
+   "name": "refund_of_order",
+   "display_name": "原订单",
+   "source_type_id": {
+    "client_ref": "refund"
+   },
+   "target_type_id": {
+    "client_ref": "sales_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}针对{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "refund_order_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "sales_order_order_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "refund_item_refund",
+  "after": {
+   "name": "refund_item_of",
+   "display_name": "属于退款单",
+   "source_type_id": {
+    "client_ref": "refund_item"
+   },
+   "target_type_id": {
+    "client_ref": "refund"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}属于{target}",
+    "{target}包含{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "refund_item_refund_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "refund_refund_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "refund_item_product",
+  "after": {
+   "name": "refund_item_product",
+   "display_name": "退款商品",
+   "source_type_id": {
+    "client_ref": "refund_item"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}退{target}",
+    "{target}出现在{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "refund_item_sku"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "product_sku"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "delivery_order",
+  "after": {
+   "name": "delivery_of_order",
+   "display_name": "所属订单",
+   "source_type_id": {
+    "client_ref": "delivery"
+   },
+   "target_type_id": {
+    "client_ref": "sales_order"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}配送{target}",
+    "{target}有{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "delivery_order_no"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "sales_order_order_no"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "delivery_rider",
+  "after": {
+   "name": "delivery_rider",
+   "display_name": "配送骑手",
+   "source_type_id": {
+    "client_ref": "delivery"
+   },
+   "target_type_id": {
+    "client_ref": "rider"
+   },
+   "multiplicity": "many_to_one",
+   "verbalizes": [
+    "{source}由{target}配送",
+    "{target}执行{source}"
+   ],
+   "data_join": {
+    "kind": "direct",
+    "source_property_ids": [
+     {
+      "client_ref": "delivery_rider_id"
+     }
+    ],
+    "target_property_ids": [
+     {
+      "client_ref": "rider_rider_id"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "operation": "create",
+  "target_kind": "link_type",
+  "client_ref": "promotion_product",
+  "after": {
+   "name": "promotion_includes_product",
+   "display_name": "活动参与商品",
+   "source_type_id": {
+    "client_ref": "promotion"
+   },
+   "target_type_id": {
+    "client_ref": "product"
+   },
+   "multiplicity": "many_to_many",
+   "verbalizes": [
+    "{source}包含{target}",
+    "{target}参与{source}"
+   ],
+   "data_join": {
+    "kind": "mapping_table",
+    "dataset_id": {
+     "client_ref": "ds_promotion_products"
+    },
+    "source_columns": [
+     "promotion_id"
+    ],
+    "target_columns": [
+     "sku"
+    ],
+    "source_key": {
+     "kind": "properties",
+     "property_ids": [
+      {
+       "client_ref": "promotion_promotion_id"
+      }
+     ]
+    },
+    "target_key": {
+     "kind": "properties",
+     "property_ids": [
+      {
+       "client_ref": "product_sku"
+      }
+     ]
+    }
+   }
+  }
+ }
+]
