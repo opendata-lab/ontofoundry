@@ -55,6 +55,9 @@ def test_lists_agree_with_the_platform_checks():
     ("rule", {"expression": "note <> 'GREATEST(1, 2)' AND \"now\" (1) IS NULL -- NOW()"}, []),
     ("dataset", {"source_kind": "query", "query_sql": "SELECT COALESCE(a, 0), CURDATE() FROM t"}, []),
     ("metric", {"kind": "expression", "expression": "SUM(o.a) / COUNT(*)"}, []),
+    ("object_type", {"derived_by": [{"kind": "expression", "expression": "NOW() > 1"}]}, [("x", "expression", "NOW")]),
+    # A literal instance value that happens to sit under a property named expression is data.
+    ("material_object", {"values": {"expression": "NOW()"}}, []),
 ])
 def test_rejected_calls(kind, after, expected):
     assert function_refs.function_errors([item(kind, after)]) == expected

@@ -20,24 +20,33 @@ def called(text):
     return {name.upper() for name in CALL.findall(SKIP.sub(" ", text))}
 
 
+def executable_fields(item):
+    """(field, text) for the contract fields the platform parses; literal values elsewhere are data."""
+    after = item.get("after") if isinstance(item.get("after"), dict) else {}
+    kind = item.get("target_kind")
+    if kind == "rule":
+        yield "expression", after.get("expression")
+    elif kind == "dataset":
+        yield "query_sql", after.get("query_sql")
+    elif kind == "object_type":
+        for branch in after.get("derived_by") or []:
+            if isinstance(branch, dict):
+                yield "expression", branch.get("expression")
+    elif kind == "mapping":
+        for field in (after.get("fields") or {}).values():
+            if isinstance(field, dict):
+                yield "expression", field.get("expression")
+
+
 def function_errors(fragment):
-    """(client_ref, field, name) for each rejected function; metric expressions are aggregates and skipped."""
+    """(client_ref, field, name) for each rejected function; metric expressions are aggregates, not checked."""
     found = []
-
-    def walk(value, ref):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                if key in REJECTED and isinstance(child, str):
-                    found.extend((ref, key, name) for name in sorted(called(child) & REJECTED[key]))
-                else:
-                    walk(child, ref)
-        elif isinstance(value, list):
-            for child in value:
-                walk(child, ref)
-
     for item in fragment:
-        if isinstance(item, dict) and item.get("target_kind") != "metric" and isinstance(item.get("after"), dict):
-            walk(item["after"], item.get("client_ref") or "?")
+        if not isinstance(item, dict):
+            continue
+        for field, text in executable_fields(item):
+            if isinstance(text, str):
+                found.extend((item.get("client_ref") or "?", field, name) for name in sorted(called(text) & REJECTED[field]))
     return found
 
 
