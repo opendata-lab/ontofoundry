@@ -301,3 +301,56 @@ def test_check_part_takes_suffixed_short_names_and_defaults_to_all_parts(tmp_pat
         assert check_part.main() == 0
         out = capsys.readouterr().out
         assert {n for n in ("01-types", "01b-types", "02-links") if f"{n}.json：通过" in out} == expected, (args, out)
+
+
+column_refs = importlib.import_module("column_refs")
+prepare_result = importlib.import_module("prepare_result")
+
+
+def column_workspace(tmp_path, monkeypatch, metric_column, query_schema=None):
+    """Retail tables, the expander's 01/03, and a hand-written 04 metric."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "modeling/parts").mkdir(parents=True)
+    types, datasets, _ = expand_tables.expand(RETAIL_SPEC, tables(RETAIL / "tables.json"), {})
+    (tmp_path / "modeling/parts/01-types.json").write_text(json.dumps(types, ensure_ascii=False))
+    (tmp_path / "modeling/parts/03-datasets.json").write_text(json.dumps(datasets, ensure_ascii=False))
+    ref = {"client_ref": "ds_orders"}
+    metric = {"operation": "create", "target_kind": "metric", "client_ref": "sales", "after": {
+        "name": "sales", "display_name": "销售额", "kind": "simple", "dataset_id": ref, "aggregation": "sum",
+        "measure": {"dataset_id": ref, "column": metric_column}, "time_field": {"dataset_id": ref, "column": "order_date"}}}
+    extra = []
+    if query_schema:
+        extra.append({"operation": "create", "target_kind": "dataset", "client_ref": "ds_events", "after": {
+            "name": "events", "display_name": "事件", "source_kind": "query", "connection_id": "c", "schema_name": query_schema,
+            "query_sql": "SELECT 1 AS n", "columns": [{"name": "n"}]}})
+    (tmp_path / "modeling/parts/04-metrics-rules.json").write_text(json.dumps([*extra, metric], ensure_ascii=False))
+    pack = tmp_path / "pack.json"
+    pack.write_text(json.dumps({"tables_file": str(RETAIL / "tables.json"), "context_file": str(RETAIL / "context.json"),
+                                "schema_file": str(SCHEMA_PATH), "result_file": "output/r.json"}))
+    return pack
+
+
+@pytest.mark.parametrize("column, query_schema, code", [
+    ("amount", None, "COLUMN_UNKNOWN"),          # the real slip: refund_amount written as amount
+    ("pay_amount", "retail", "QUERY_DATASET_LOCATION"),
+])
+def test_wrong_columns_and_query_locations_fail_locally(tmp_path, monkeypatch, capsys, column, query_schema, code):
+    pack = column_workspace(tmp_path, monkeypatch, column, query_schema)
+    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), "04"])
+    assert check_part.main() == 1
+    out = capsys.readouterr().out
+    assert code in out and ("pay_amount" in out if code == "COLUMN_UNKNOWN" else True)
+    submitted = []
+    monkeypatch.setattr(prepare_result, "platform_submit", lambda *a: submitted.append(a) or True)
+    monkeypatch.setattr(sys, "argv", ["prepare_result.py", "--work-pack", str(pack)])
+    assert prepare_result.main() == 1 and not submitted
+    assert "不计修正轮次" in capsys.readouterr().out
+
+
+def test_correct_columns_pass_and_unknown_datasets_are_not_guessed(tmp_path, monkeypatch, capsys):
+    pack = column_workspace(tmp_path, monkeypatch, "pay_amount")
+    monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), "04"])
+    assert check_part.main() == 0, capsys.readouterr().out
+    existing = [{"target_kind": "metric", "client_ref": "m", "after": {
+        "measure": {"dataset_id": "6f0e2d4a-0000-4000-8000-000000000001", "column": "whatever"}}}]
+    assert column_refs.column_errors(existing, {}) == []  # an existing dataset by id: the platform decides

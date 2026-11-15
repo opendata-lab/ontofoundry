@@ -1,0 +1,51 @@
+{
+  "run": "Q2",
+  "full_including_plan": {
+    "turns": 40,
+    "tool_calls": 45,
+    "observed_wall_seconds": 283.130159,
+    "dataagent_wall_seconds": 280.0,
+    "usage": {
+      "cache_read_input_tokens": 1985664,
+      "input_tokens": 45471,
+      "output_tokens": 53644
+    },
+    "proposal_counts": {
+      "object_type": 33,
+      "property": 209,
+      "link_type": 47,
+      "dataset": 37,
+      "mapping": 32,
+      "metric": 22,
+      "rule": 6,
+      "material_object": 1
+    },
+    "platform_submit_counts": {
+      "calls": 1,
+      "passed": 1,
+      "rejected": 0,
+      "error_codes": []
+    },
+    "repair_used": 0
+  },
+  "incremental": null,
+  "steps": [
+    "full",
+    "setup",
+    "publish-v1"
+  ],
+  "balance_before_CNY": "7.51",
+  "balance_after_CNY": "7.24",
+  "balance_difference_CNY": "0.27",
+  "balance_note": "Observed shared provider balance difference, delayed settlement prevents exclusive per-run attribution. Initial discarded attempt can be included in later balance deductions.",
+  "protocol_conformant": true,
+  "protocol_deviation": null,
+  "required_product_rename_applied": null,
+  "baseline": {
+    "full_turns": 38,
+    "full_calls": 39,
+    "dataagent_wall_seconds": 314,
+    "output_tokens": 42191,
+    "proposals": 405
+  }
+}

@@ -11,6 +11,7 @@ from check_result import (
     encode,
     validate_file,
 )
+from column_refs import local_column_messages
 from runpaths import (
     PARTS,
     HintParser,
@@ -479,6 +480,14 @@ def main():
         except (OSError, ValueError):
             pass
         return checked
+    # Column names and query locations are checked here, free of repair rounds (design MS-02).
+    column_problems = local_column_messages(batch["items"], pack.get("tables_file"))
+    if column_problems:
+        save_latest_check("local", column_problems, candidate)
+        print(f"本地检查未通过（不计修正轮次），未提交：{len(column_problems)} 处")
+        print("\n".join("  " + line for line in column_problems[:10]))
+        print("改对应片段后重新合并：" + command("prepare_result.py", "--work-pack", args.work_pack or "<工作包>"))
+        return 1
     retry_command = (
         command("prepare_result.py", "--work-pack", args.work_pack)
         if args.work_pack

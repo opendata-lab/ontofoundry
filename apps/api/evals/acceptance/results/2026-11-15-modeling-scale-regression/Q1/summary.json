@@ -1,0 +1,54 @@
+{
+  "run": "Q1",
+  "full_including_plan": {
+    "turns": 54,
+    "tool_calls": 56,
+    "observed_wall_seconds": 379.825979,
+    "dataagent_wall_seconds": 377.0,
+    "usage": {
+      "cache_read_input_tokens": 3398528,
+      "input_tokens": 58839,
+      "output_tokens": 66563
+    },
+    "proposal_counts": {
+      "value_type": 8,
+      "rule": 18,
+      "object_type": 32,
+      "property": 205,
+      "link_type": 46,
+      "dataset": 36,
+      "mapping": 31,
+      "metric": 21
+    },
+    "platform_submit_counts": {
+      "calls": 4,
+      "passed": 1,
+      "rejected": 3,
+      "error_codes": [
+        "ELEMENT_INVALID",
+        "SQL_UNSUPPORTED"
+      ]
+    },
+    "repair_used": 3
+  },
+  "incremental": null,
+  "steps": [
+    "full",
+    "setup",
+    "publish-v1"
+  ],
+  "balance_before_CNY": "8.04",
+  "balance_after_CNY": "7.72",
+  "balance_difference_CNY": "0.32",
+  "balance_note": "Observed shared provider balance difference, delayed settlement prevents exclusive per-run attribution. Initial discarded attempt can be included in later balance deductions.",
+  "protocol_conformant": false,
+  "protocol_deviation": "Agent skipped plan approval and harness did not send prescribed approval reply",
+  "required_product_rename_applied": null,
+  "baseline": {
+    "full_turns": 38,
+    "full_calls": 39,
+    "dataagent_wall_seconds": 314,
+    "output_tokens": 42191,
+    "proposals": 405
+  }
+}
