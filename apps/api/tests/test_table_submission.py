@@ -249,11 +249,13 @@ def test_filled_columns_still_catch_a_mapping_to_a_missing_column(client):
     assert "no_such_column" in json.dumps(report, ensure_ascii=False)
 
 
-def test_declared_columns_are_replaced_by_the_synced_ones_anyway(client):
-    # Why the agent need not write them: the platform keeps the synced structure.
+@pytest.mark.parametrize("declared", ["stale", "empty"])
+def test_declared_columns_are_replaced_by_the_synced_ones(client, declared):
+    # Copied or empty lists (e.g. from show_element) never stand in for the synced structure.
     session, url, headers, connection, tables = pinned(client)
     items = mapped(connection, tables[0]["primary_key"][0])
-    items[0]["after"]["columns"] = [{"name": tables[0]["primary_key"][0], "physical_type": "VARCHAR(20)", "comment": "自填"}]
+    items[0]["after"]["columns"] = [] if declared == "empty" else [
+        {"name": tables[0]["primary_key"][0], "physical_type": "VARCHAR(20)", "comment": "自填"}]
     report = client.post(url, json={"items": items}, headers=headers).json()
     assert report["passed"], report
     source = next(i for i in stored(client, session["id"])[1] if i.client_ref == "source")

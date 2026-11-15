@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 from check_result import atomic_write
-from runpaths import PARTS, HintParser, command, error
+from runpaths import PARTS, HintParser, command, error, plan_not_approved
 from table_summary import comment_values, load_tables
 
 ENTITIES = Path("modeling/entities.json")
@@ -46,14 +46,18 @@ def value_kind(physical_type):
     return next((kind for names, kind in KINDS if name in names), "string")
 
 
-def split_comment(comment):
-    """'会员，散客为空' -> ('会员', '散客为空'); a listed value domain is not repeated as a description."""
+def split_comment(comment, covered=False):
+    """'会员，散客为空' -> ('会员', '散客为空').
+
+    covered: the tail is already said elsewhere (a bound value type, a boolean
+    column), so it is not repeated; an open list such as 原因：促销/临期 stays.
+    """
     comment = " ".join((comment or "").split())
     match = SEPARATORS.search(comment)
     if not match:
         return comment, ""
     head, rest = comment[: match.start()].strip(), comment[match.end():].strip(" ）)")
-    return head or comment, "" if comment_values(comment) else rest
+    return head or comment, "" if covered else rest
 
 
 def material_lines(pack):
@@ -67,33 +71,47 @@ def material_lines(pack):
     return lines
 
 
-def evidence(basis, table, texts):
+def evidence(basis, table, texts, tables):
     found = []
     for entry in basis if isinstance(basis, list) else []:
         if not isinstance(entry, dict):
             continue
         if entry.get("material_id") and entry.get("line"):
-            line = int(entry["line"])
+            match = re.fullmatch(r"\s*(\d+)\s*(?:[-–~]\s*(\d+))?\s*", str(entry["line"]))
+            if not match:
+                raise SpecError(f"basis 的行号 {entry['line']!r} 应写成 12 或 12-15")
+            start, end = int(match.group(1)), int(match.group(2) or match.group(1))
             text = texts.get(entry["material_id"], [])
-            quote = text[line - 1].strip() if 0 < line <= len(text) else ""
+            if text and not 0 < start <= end <= len(text):
+                raise SpecError(f"basis 行号 {entry['line']} 超出材料 {entry['material_id']} 的 {len(text)} 行")
+            quote = " ".join(line.strip() for line in text[start - 1:end]) if text else ""
             found.append({"kind": "material", "material_id": entry["material_id"],
-                          "locator": {"line_start": line, "line_end": line}, "quote": quote[:2000]})
+                          "locator": {"line_start": start, "line_end": end}, "quote": quote[:2000]})
         elif entry.get("table"):
-            found.append({"kind": "table", "ref": entry["table"], "quote": entry.get("quote") or entry["table"]})
+            source = resolve_table(entry["table"], tables)
+            if source is None:
+                raise SpecError(f"basis 的表 {entry['table']} 不在本轮表结构里")
+            found.append({"kind": "table", "ref": source["key"], "quote": source.get("comment") or source["table_name"]})
     if not found and table:
         found.append({"kind": "table", "ref": table["key"], "quote": table.get("comment") or table["table_name"]})
     return found
+
+
+def resolve_table(key, tables):
+    """A table by key (t2), name (stores) or qualified name (shop.stores)."""
+    if key in tables:
+        return tables[key]
+    return next((t for t in tables.values() if key in (t.get("table_name"), t.get("table"))), None)
 
 
 def source_table(item, tables):
     key = item.get("table") or (item["tables"][0] if len(item.get("tables") or []) == 1 else None)
     if key is None:
         return None
-    if key not in tables:
-        key = next((k for k, t in tables.items() if key in (t.get("table_name"), t.get("table"))), key)
-    if key not in tables:
+    table = resolve_table(key, tables)
+    if table is None:
         raise SpecError(f"{item['name']} 的表 {key} 不在本轮表结构里；可用 {', '.join(list(tables)[:40])}")
-    return tables[key]
+    return table
 
 
 def expand(spec, tables, texts):
@@ -103,9 +121,9 @@ def expand(spec, tables, texts):
     def claim(name, what):
         if not IDENTIFIER.match(name or ""):
             raise SpecError(f"{what} 的英文标识 {name!r} 只能用字母、数字、下划线，且不以数字开头")
-        other = names.setdefault(name.lower(), what)
-        if other != what:
-            raise SpecError(f"英文标识 {name} 被 {other} 和 {what} 同时使用；实体类型与值类型共用标识，改其中一个")
+        if name.lower() in names:
+            raise SpecError(f"英文标识 {name} 被 {names[name.lower()]} 和 {what} 同时使用；实体类型与值类型共用标识，改其中一个")
+        names[name.lower()] = what
 
     entities = [i for i in spec.get("items") or [] if i.get("status", "new") == "new"]
     backed = {}
@@ -127,19 +145,27 @@ def expand(spec, tables, texts):
         columns = vt.get("columns") or ([vt["column"]] if vt.get("column") else [])
         if not columns:
             raise SpecError(f"值类型 {vt['name']} 缺 columns（如 [\"t2.status\"]）")
-        first = columns[0]
-        key, _, col = first.partition(".")
-        table = tables.get(key)
-        column = next((c for c in (table or {}).get("columns", []) if c["name"] == col), None)
-        if column is None:
-            raise SpecError(f"值类型 {vt['name']} 的列 {first} 不存在")
+        found = []
+        for ref_col in columns:
+            key, _, col = ref_col.partition(".")
+            column = next((c for c in (tables.get(key) or {}).get("columns", []) if c["name"] == col), None)
+            if column is None:
+                raise SpecError(f"值类型 {vt['name']} 的列 {ref_col} 不存在")
+            found.append(column)
+        kinds = {value_kind(c.get("type")) for c in found}
+        if len(kinds) > 1:
+            raise SpecError(f"值类型 {vt['name']} 的列 {', '.join(columns)} 基础类型不同（{', '.join(sorted(kinds))}），不能共用")
+        first, column = columns[0], found[0]
         values = vt.get("values") or comment_values(column.get("comment"))
         if not values:
             raise SpecError(f"值类型 {vt['name']}：列 {first} 的注释里没有可识别的取值，请写 values")
         ref = "vt_" + vt["name"]
-        quoted = ", ".join("'" + str(v).replace("'", "''") + "'" for v in values)
+        numeric = value_kind(column.get("type")) in {"integer", "decimal", "float"}
+        if numeric and not all(re.fullmatch(r"-?\d+(\.\d+)?", str(v)) for v in values):
+            raise SpecError(f"值类型 {vt['name']} 是数值列，取值 {values} 不全是数字；请写 values")
+        quoted = ", ".join(str(v) if numeric else "'" + str(v).replace("'", "''") + "'" for v in values)
         types.append({"operation": "create", "target_kind": "value_type", "client_ref": ref, "after": {
-            "name": vt["name"], "display_name": vt.get("display_name") or split_comment(column.get("comment"))[0],
+            "name": vt["name"], "display_name": vt.get("display_name") or split_comment(column.get("comment"), True)[0],
             "value_kind": value_kind(column.get("type")),
             **({"description": vt["description"]} if vt.get("description") else {}),
             "evidence": [{"kind": "table", "ref": first, "quote": column.get("comment") or col}]}})
@@ -153,13 +179,15 @@ def expand(spec, tables, texts):
             bound[ref_col] = (ref, value_kind(column.get("type")))
 
     shared_datasets = {}
+    refs = {i["name"]: f"实体 {i['name']} " for i in entities}
+    repeated = {n for n in (t["table_name"] for t in tables.values()) if sum(t["table_name"] == n for t in tables.values()) > 1}
     for item in entities:
         name = item["name"]
         obj = {"name": name, "display_name": item.get("display_name")}
         if item.get("description"):
             obj["description"] = item["description"]
         table = backed.get(name)
-        obj["evidence"] = evidence(item.get("basis"), table, texts)
+        obj["evidence"] = evidence(item.get("basis"), table, texts, tables)
         types.append({"operation": "create", "target_kind": "object_type", "client_ref": name, "after": obj})
         if not table:
             notes.append(f"{name} 没有对应的表，属性请写在 01b 片段里")
@@ -182,27 +210,31 @@ def expand(spec, tables, texts):
                 continue
             extra = overrides.get(col) or {}
             prop_name = extra.get("name") or col
-            display, description = split_comment(column.get("comment"))
+            bound_to = bound.get(f"{table['key']}.{col}")
+            display, description = split_comment(column.get("comment"), covered=bool(bound_to) or col in flags)
             prop = {"name": prop_name, "display_name": extra.get("display_name") or display or col,
                     "owner_type_id": {"client_ref": name}, "value_kind": value_kind(column.get("type"))}
             if not IDENTIFIER.match(prop_name):
                 raise SpecError(f"{name}.{col} 不能直接作英文标识，请在 properties 里给 name")
             if col in flags:
                 prop["value_kind"] = "boolean"
-            if f"{table['key']}.{col}" in bound:
-                vt_ref, vt_kind = bound[f"{table['key']}.{col}"]
-                prop["value_type_id"] = {"client_ref": vt_ref}
-                prop["value_kind"] = vt_kind
-            if col in pk:
-                prop.update(identifier=True, required=True)
-                if len(pk) == 1:
-                    prop["unique"] = True
-            for key in ("value_kind", "required", "unique", "synonyms"):
+            if "value_kind" in extra:
+                prop["value_kind"] = extra["value_kind"]
+            if bound_to:  # the value type fixes the base kind
+                prop["value_type_id"] = {"client_ref": bound_to[0]}
+                prop["value_kind"] = bound_to[1]
+            for key in ("required", "unique", "synonyms"):
                 if key in extra:
                     prop[key] = extra[key]
+            if col in pk:  # identifiers are fixed by the key, not by overrides
+                prop.update(identifier=True, required=True, unique=len(pk) == 1)
             if extra.get("description") or description:
                 prop["description"] = extra.get("description") or description
-            types.append({"operation": "create", "target_kind": "property", "client_ref": f"{name}_{prop_name}", "after": prop})
+            prop_ref = f"{name}_{prop_name}"
+            if prop_ref in refs:
+                raise SpecError(f"{name}.{prop_name} 生成的 client_ref {prop_ref} 与{refs[prop_ref]}重名；在 properties 里给该列另起 name")
+            refs[prop_ref] = f" {name}.{prop_name} "
+            types.append({"operation": "create", "target_kind": "property", "client_ref": prop_ref, "after": prop})
             fields[prop_name] = {"kind": "column", "source_id": "main", "column": col}
         title = item.get("title_property")
         if title:
@@ -212,8 +244,11 @@ def expand(spec, tables, texts):
             obj["title_property_id"] = {"client_ref": f"{name}_{title_name}"}
         ds_ref = shared_datasets.get(table["key"])
         if ds_ref is None:
-            ds_ref = shared_datasets[table["key"]] = "ds_" + table["table_name"]
-            dataset = {"name": table["table_name"], "display_name": (item.get("display_name") or name) + "数据",
+            ds_name = table["table_name"]
+            if ds_name in repeated:  # the same table name in two schemas or connections
+                ds_name = re.sub(r"\W", "_", f"{table.get('schema_name') or table['key']}_{ds_name}")
+            ds_ref = shared_datasets[table["key"]] = "ds_" + ds_name
+            dataset = {"name": ds_name, "display_name": (item.get("display_name") or name) + "数据",
                        "source_kind": "table", "connection_id": table["connection_id"],
                        "schema_name": table.get("schema_name"), "table_name": table["table_name"]}
             if table.get("dialect"):
@@ -234,6 +269,9 @@ def main():
     parser = HintParser(description="按 modeling/entities.json 展开 01-types 与 03-datasets 的机械部分并检查")
     parser.add_argument("--work-pack", required=True)
     args = parser.parse_args()
+    if refusal := plan_not_approved():
+        print(refusal)
+        return 2
     try:
         pack = json.loads(Path(args.work_pack).read_bytes())
         tables = {t["key"]: t for t in load_tables(pack["tables_file"])}

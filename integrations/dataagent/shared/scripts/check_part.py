@@ -125,7 +125,7 @@ def main():
     parser.add_argument("--context")
     parser.add_argument("--schema")
     parser.add_argument("--reports", default="modeling/checks")
-    parser.add_argument("fragments", nargs="+")
+    parser.add_argument("fragments", nargs="*", help="不写则检查 modeling/parts/ 下全部片段")
     args = parser.parse_args()
     if refusal := plan_not_approved():
         print(refusal)
@@ -146,7 +146,7 @@ def main():
                     "路径照 init_workflow 打印的本轮工作包复制"))
         return 1
     failed, lines, checked = False, [], []
-    for raw, path in ((name, p) for name in args.fragments for p in fragment_paths(name)):
+    for raw, path in ((name, p) for name in args.fragments or [str(PARTS)] for p in fragment_paths(name)):
         try:
             items = json.loads(path.read_bytes())
         except FileNotFoundError:

@@ -187,7 +187,7 @@ def test_coverage_lists_uncited_rule_lines_and_unmet_plans(tmp_path, monkeypatch
     assert "L22" not in text and "L26" not in text  # cited through a line range
     assert "成交订单数（计划为 metric order_count）" in text and "销售额（" not in text
     assert "refund_note" not in text  # deferred on purpose
-    assert text.count(MATERIAL_ID[:8]) == len([l for l in text.splitlines() if " L" in l])  # request copy not scanned
+    assert text.count(MATERIAL_ID[:8]) == len([line for line in text.splitlines() if " L" in line])  # request copy not scanned
 
 
 def test_check_part_prints_coverage_only_with_04_and_never_fails_for_it(tmp_path, monkeypatch, capsys):
@@ -202,3 +202,102 @@ def test_check_part_prints_coverage_only_with_04_and_never_fails_for_it(tmp_path
     check_part.main()
     out = capsys.readouterr().out
     assert "没有提案引作证据" in out and "L32" in out
+
+
+# Review findings (Gemini Argon, 2026-11-15) — each pinned by one case.
+
+def qinghe_expand(items, value_types=()):
+    return expand_tables.expand({"items": items, "value_types": list(value_types)}, tables(FIXTURES / "qinghe-tables.json"), {})
+
+
+def prop(types, ref):
+    return next(i["after"] for i in types if i["client_ref"] == ref)
+
+
+def test_open_lists_keep_their_text_and_covered_tails_are_dropped():
+    types, _, _ = qinghe_expand(
+        [{"name": "price_change", "display_name": "调价", "table": "t31"},
+         {"name": "product", "display_name": "商品", "table": "t10", "boolean_columns": ["is_fresh"]}],
+        [{"name": "storage_mode", "columns": ["t10.storage_type"]}])
+    assert prop(types, "price_change_reason")["description"] == "促销/成本变动/临期"  # not a value type
+    assert "description" not in prop(types, "product_is_fresh")  # "1 是 0 否" says nothing for a boolean
+    assert "description" not in prop(types, "product_storage_type")  # values live on the value type
+
+
+def test_generated_ref_clashes_are_reported_not_merged():
+    with pytest.raises(expand_tables.SpecError, match="重名"):
+        qinghe_expand([{"name": "member", "display_name": "会员", "table": "t6", "properties": {"level_code": {"name": "level"}}},
+                       {"name": "member_level", "display_name": "会员等级", "table": "t5"}])
+
+
+def test_value_type_decides_kind_and_keys_cannot_be_overridden():
+    types, _, _ = qinghe_expand(
+        [{"name": "store", "display_name": "门店", "table": "t2",
+          "properties": {"status": {"value_kind": "integer"}, "store_id": {"unique": False}}}],
+        [{"name": "store_status", "columns": ["t2.status"]}])
+    assert prop(types, "store_status")["value_kind"] == "string"
+    assert prop(types, "store_store_id")["unique"] is True
+
+
+@pytest.mark.parametrize("value_type, message", [
+    ({"name": "any_status", "columns": ["t2.status", "t2.nope"]}, "不存在"),
+    ({"name": "mixed", "columns": ["t2.status", "t2.area_sqm"], "values": ["a", "b"]}, "基础类型不同"),
+    ({"name": "level_no", "columns": ["t7.level"], "values": ["一级", "二级"]}, "不全是数字"),
+])
+def test_every_bound_column_is_checked(value_type, message):
+    with pytest.raises(expand_tables.SpecError, match=message):
+        qinghe_expand([{"name": "store", "display_name": "门店", "table": "t2"}], [value_type])
+
+
+def test_numeric_values_are_not_quoted():
+    types, _, _ = qinghe_expand([{"name": "category", "display_name": "品类", "table": "t7"}],
+                                [{"name": "category_level", "columns": ["t7.level"], "values": [1, 2]}])
+    assert prop(types, "vt_category_level_values")["expression"] == "category_level IN (1, 2)"
+
+
+def test_table_basis_by_name_and_line_ranges():
+    texts = {MATERIAL_ID: ["第一行", "第二行", "第三行"]}
+    spec = {"items": [{"name": "order", "display_name": "订单", "table": "orders",
+                       "basis": [{"table": "orders"}, {"material_id": MATERIAL_ID, "line": "2-3"}]}]}
+    types, _, _ = expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
+    table_ev, material_ev = prop(types, "order")["evidence"]
+    assert table_ev["ref"] == "t3" and material_ev["locator"] == {"line_start": 2, "line_end": 3}
+    assert material_ev["quote"] == "第二行 第三行"
+    spec["items"][0]["basis"] = [{"material_id": MATERIAL_ID, "line": 9}]
+    with pytest.raises(expand_tables.SpecError, match="超出材料"):
+        expand_tables.expand(spec, tables(RETAIL / "tables.json"), texts)
+
+
+def test_same_table_name_in_two_schemas_gets_two_datasets():
+    copy = json.loads((RETAIL / "tables.json").read_text())["tables"]
+    other = json.loads(json.dumps(copy[2]))
+    other.update(key="t9", schema_name="archive")
+    pool = {t["key"]: t for t in [*copy, other]}
+    _, datasets, _ = expand_tables.expand({"items": [
+        {"name": "order", "display_name": "订单", "table": "t3"},
+        {"name": "old_order", "display_name": "归档订单", "table": "t9"}]}, pool, {})
+    names = [d["after"]["name"] for d in datasets if d["target_kind"] == "dataset"]
+    assert len(set(names)) == 2 and "archive_orders" in names
+
+
+def test_expander_waits_for_plan_approval(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DATAAGENT_PLAN_STATE", "pending")
+    monkeypatch.setattr(sys, "argv", ["expand_tables.py", "--work-pack", "pack.json"])
+    assert expand_tables.main() == 2
+    assert "PLAN_NOT_APPROVED" in capsys.readouterr().out and not (tmp_path / "modeling").exists()
+
+
+def test_check_part_takes_suffixed_short_names_and_defaults_to_all_parts(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "modeling/parts").mkdir(parents=True)
+    for name in ("01-types", "01b-types", "02-links"):
+        (tmp_path / f"modeling/parts/{name}.json").write_text("[]")
+    pack = tmp_path / "pack.json"
+    pack.write_text(json.dumps({"context_file": str(RETAIL / "context.json"), "schema_file": str(SCHEMA_PATH)}))
+    for args, expected in ((["01b"], {"01b-types"}), ([], {"01-types", "01b-types", "02-links"}),
+                           (["modeling/parts"], {"01-types", "01b-types", "02-links"})):
+        monkeypatch.setattr(sys, "argv", ["check_part.py", "--work-pack", str(pack), *args])
+        assert check_part.main() == 0
+        out = capsys.readouterr().out
+        assert {n for n in ("01-types", "01b-types", "02-links") if f"{n}.json：通过" in out} == expected, (args, out)

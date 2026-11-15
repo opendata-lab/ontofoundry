@@ -8,6 +8,7 @@ scripts print the exact commands for the current workspace instead.
 
 import argparse
 import os
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -82,7 +83,8 @@ def notice(code, what, next_step=None):
 def usage(work_pack="<工作包>"):
     """The commands every step uses, filled with this run's work pack when known."""
     return [
-        f"检查片段：{command('check_part.py', '--work-pack', work_pack, '01')}",
+        f"检查片段（不写片段名则检查 modeling/parts/ 全部）：{command('check_part.py', '--work-pack', work_pack, '01')}",
+        f"按 entities.json 展开 01、03（抽取时）：{command('expand_tables.py', '--work-pack', work_pack)}",
         f"合并：{command('prepare_result.py', '--work-pack', work_pack, 'modeling/parts/')}",
         f"读材料：{command('read_input.py', '<材料路径>')}",
         f"读已有元素（一次可查多个）：{command('show_element.py', '--work-pack', work_pack, '<名称或id>', '<名称2>')}",
@@ -114,9 +116,11 @@ class HintParser(argparse.ArgumentParser):
 def fragment_paths(raw):
     """A file or directory path, or a short name: "01" → modeling/parts/01-*.json, "01-types" → its .json."""
     path = Path(raw)
+    if path.is_dir():
+        return sorted(p for p in path.glob("*.json") if p.is_file()) or [path]
     if path.exists():
         return [path]
-    if raw.isdigit():
+    if re.fullmatch(r"\d+[a-z]?", raw):  # "01" → 01-types.json; "01b" → 01b-types.json
         return sorted(PARTS.glob(f"{raw}-*.json")) or [path]
     named = PARTS / f"{raw.removesuffix('.json')}.json"
     return [named] if named.is_file() else [path]
