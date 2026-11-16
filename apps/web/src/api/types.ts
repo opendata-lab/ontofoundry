@@ -518,6 +518,8 @@ export type DuplicateCandidate = {
 };
 export type ProposalItem = {
   source_diagnostics?: DatasetDiagnostic[];
+  /** What must change before this proposal can be accepted; derived on read. */
+  acceptance_issues?: string[];
   id: UUID;
   batch_id: UUID;
   ordinal: number;

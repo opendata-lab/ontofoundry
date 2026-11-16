@@ -141,6 +141,8 @@ def _item_view(item, statuses, dependencies, elements, context) -> dict[str, Any
         "reason": item.reason or "",
         "atomic_group_id": item.atomic_group_id,
         "duplicate_candidates": context.duplicates(item),
+        # What must change before this proposal can be accepted (AC-05).
+        "acceptance_issues": context.acceptance(item),
         # Review hints derived on read, never stored (AR-04).
         "similar_definitions": context.alignment.similar_definitions(item),
         "physical_differences": context.alignment.physical_differences(item, elements),
@@ -236,13 +238,13 @@ def read_batch(
     items = _batch_items(db, [batch.id], workspace_id, session_id)
     dependencies = dependency_map(db, [batch.id], workspace_id, session_id)
     statuses = effective_statuses(items)
-    elements = _session_elements(
-        instance_store.session_snapshot(db, workspace_id, session_id, draft)
-    )
+    snapshot = instance_store.session_snapshot(db, workspace_id, session_id, draft)
+    elements = _session_elements(snapshot)
     for item in items:
         element = item.after_json or item.before_json
         if element:
             elements[str(element["id"])] = (item.target_kind, element)
+    from ontofoundry_api.services.acceptance_issues import AcceptanceIssues
     from ontofoundry_api.services.dataset_proposals import DiagnosticsContext
     from ontofoundry_api.services.instance_duplicates import DuplicateCandidates
     from ontofoundry_api.services.proposal_alignment import AlignmentContext
@@ -256,6 +258,7 @@ def read_batch(
         duplicates=DuplicateCandidates(db, workspace_id, session),
         peers=_atomic_peers(db, workspace_id, session_id, items),
     )
+    context.acceptance = AcceptanceIssues(context.diagnostics.draft, snapshot, items)
     return {
         **_batch_summary(batch, items, statuses, session),
         "items": [_item_view(i, statuses, dependencies, elements, context) for i in items],

@@ -381,6 +381,28 @@ def _resolve(
     return _check_ast(text, references, replacements, aggregate=dataset_id is not None)
 
 
+# Roots that yield a number, text or other non-boolean value. Columns, CASE,
+# COALESCE and unknown functions may well be boolean, so they are not rejected.
+_NOT_A_CONDITION = (exp.Add, exp.Sub, exp.Mul, exp.Div, exp.IntDiv, exp.Mod, exp.Neg, exp.DPipe)
+_MAYBE_A_CONDITION = (exp.Case, exp.If, exp.Coalesce, exp.Nullif, exp.Anonymous, exp.Cast, exp.RegexpLike)
+# Checked first: sqlglot models AND/OR (and some predicates) as functions too.
+_CONDITION = (exp.Predicate, exp.Connector, exp.Not, exp.Boolean, exp.In, exp.Between, exp.Is)
+
+
+def require_condition(resolved: ResolvedExpression) -> ResolvedExpression:
+    """Constraints and membership conditions must evaluate to true or false (AC-09)."""
+    root = resolved.ast
+    while isinstance(root, exp.Paren):
+        root = root.this
+    if isinstance(root, _CONDITION):
+        return resolved
+    if isinstance(root, (*_NOT_A_CONDITION, exp.Literal)) or (
+        isinstance(root, exp.Func) and not isinstance(root, _MAYBE_A_CONDITION)
+    ):
+        raise ExpressionError(f"必须是条件（结果为真或假）：{resolved.text}")
+    return resolved
+
+
 def rule_context(draft: CoreDraft, rule: Rule) -> UUID:
     index = draft_index(draft)
     try:

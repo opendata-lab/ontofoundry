@@ -201,6 +201,23 @@ describe("proposal review", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
+  it("marks proposals that cannot be accepted yet and lists them under 待补全", () => {
+    const incomplete = item({
+      id: "metric-gap",
+      target_kind: "metric",
+      display_name: "销售额",
+      after: element({ display_name: "销售额", name: "revenue", kind: "simple" }),
+      acceptance_issues: ["指标 销售额：请先同步数据集 orders 的表结构，列无法验证"],
+    });
+    const list = [...items, incomplete];
+    panel(state({ detail: batch(list), batches: [batch(list)] }));
+    fireEvent.click(screen.getByRole("tab", { name: /待补全\s*1/ }));
+    const [card] = screen.getAllByRole("article");
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(within(card).getByText("待补全")).toBeInTheDocument();
+    expect(within(card).getByRole("button", { name: /^接受 / })).toBeDisabled();
+  });
+
   it("folds properties under their object, opened one object at a time, and filters by category tiles", () => {
     panel();
     const tiles = screen.getByLabelText("提案分类");

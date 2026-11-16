@@ -285,7 +285,24 @@
         "schema_name": "crm",
         "table_name": "customers",
         "description": "虚构示例数据集。",
-        "snapshot_date_column": null
+        "snapshot_date_column": null,
+        "columns": [
+          {
+            "name": "customer_id",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "customer_no",
+            "physical_type": "varchar",
+            "comment": "示例登记列"
+          },
+          {
+            "name": "total_spent",
+            "physical_type": "decimal",
+            "comment": "示例登记列"
+          }
+        ]
       }
     ],
     "mappings": [

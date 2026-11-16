@@ -67,17 +67,17 @@ def value_issues(
     for attribute in draft.effective_properties(type_id):
         value = values.get(attribute.name)
         code = None
-        # A fact taken from a document is identified by what the text says and
-        # where; documents rarely carry system numbers. A missing value is
-        # something to complete later, not a reason to block the model. A value
-        # of the wrong kind, though, is wrong. A blank string is a missing value,
-        # never a type error.
+        # A proposal may leave a required value to complete later; an accepted
+        # instance may not (AC-02). A blank string is a missing value, never a
+        # type error.
         missing = value is None or (isinstance(value, str) and not value.strip())
         if missing and (attribute.required or attribute.identifier):
             code, severity, message = (
                 "INSTANCE_REQUIRED",
-                "warning",
-                f"{attribute.display_name or attribute.name} 待补全：原文未提供",
+                "error" if strict else "warning",
+                f"{attribute.display_name or attribute.name}（{attribute.name}）待补全"
+                if strict
+                else f"{attribute.display_name or attribute.name} 待补全：原文未提供",
             )
         elif not missing and not valid_value(
             attribute.value_kind, value, strict=strict
