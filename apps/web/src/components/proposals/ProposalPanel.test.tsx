@@ -123,6 +123,8 @@ const panel = (proposals = state(), s = session()) =>
     </MemoryRouter>,
   );
 const row = (name: string) => screen.getByRole("article", { name: new RegExp(name) });
+/** Properties start folded under their object; open every object to see them. */
+const expandObjects = () => screen.queryAllByRole("button", { name: /^展开 .* 的属性/ }).forEach((button) => fireEvent.click(button));
 
 describe("run outcome", () => {
   it("says why the latest run produced no proposals", () => {
@@ -165,6 +167,7 @@ describe("fetching", () => {
 describe("proposal review", () => {
   it("shows pending rows with technical identity, change summary and kind", () => {
     panel();
+    expandObjects();
     expect(screen.getAllByRole("article")).toHaveLength(4);
     expect(within(row("supplier")).getByText("旧供应商名称")).toBeInTheDocument();
     expect(within(row("supplier")).getByText("供应商").tagName).toBe("STRONG");
@@ -175,6 +178,7 @@ describe("proposal review", () => {
   it("accepts a property together with the object it depends on", async () => {
     const proposals = state();
     panel(proposals);
+    expandObjects();
     fireEvent.click(within(row("order_no")).getByRole("button", { name: "接受 订单号" }));
     await waitFor(() =>
       expect(proposals.decide).toHaveBeenCalledWith([
@@ -197,7 +201,7 @@ describe("proposal review", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
-  it("groups each object with its properties under 全部 and filters by category tiles", () => {
+  it("folds properties under their object, opened one object at a time, and filters by category tiles", () => {
     panel();
     const tiles = screen.getByLabelText("提案分类");
     // Counts follow the status tab: the rejected object is not counted under 待审.
@@ -206,22 +210,26 @@ describe("proposal review", () => {
     expect(within(tiles).getByRole("button", { name: "属性 1" })).toBeInTheDocument();
     expect(within(tiles).getByRole("button", { name: "指标 1" })).toBeInTheDocument();
     expect(within(tiles).queryByRole("button", { name: /^关系/ })).toBeNull();
-    // One group per object holding the object and its properties, then the other kinds.
+    // One group per object (its card, then its properties folded under it), then the other kinds.
     const sections = screen.getAllByRole("region");
     expect(sections.map((section) => section.getAttribute("aria-label"))).toEqual(["采购订单提案", "供应商提案", "指标提案"]);
-    const order = within(sections[0]).getAllByRole("article").map((card) => card.getAttribute("aria-label") ?? "");
-    expect(order).toHaveLength(2);
-    expect(order[0]).toMatch(/purchase_order/);
-    expect(order[1]).toMatch(/order_no/);
-    // Collapsing a group hides its cards, not the others.
-    fireEvent.click(within(sections[0]).getByRole("button", { name: /^采购订单/ }));
-    expect(within(screen.getByRole("region", { name: "采购订单提案" })).queryAllByRole("article")).toHaveLength(0);
-    expect(screen.getAllByRole("article")).toHaveLength(2);
-    fireEvent.click(within(screen.getByRole("region", { name: "采购订单提案" })).getByRole("button", { name: /^采购订单/ }));
-    // 属性 keeps the object groups but lists properties only; 实体 is a plain list.
+    expect(within(sections[0]).getAllByRole("article")).toHaveLength(1);
+    expect(within(sections[0]).getByRole("article").getAttribute("aria-label")).toMatch(/purchase_order/);
+    // Opening one object shows its property, indented below; the others stay closed.
+    const expand = within(sections[0]).getByRole("button", { name: "展开 采购订单 的属性（1）" });
+    expect(expand).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(expand);
+    const opened = within(screen.getByRole("region", { name: "采购订单提案" })).getAllByRole("article");
+    expect(opened.map((card) => card.getAttribute("aria-label") ?? "")).toEqual([expect.stringMatching(/purchase_order/), expect.stringMatching(/order_no/)]);
+    fireEvent.click(within(screen.getByRole("region", { name: "采购订单提案" })).getByRole("button", { name: "收起 采购订单 的属性（1）" }));
+    expect(within(screen.getByRole("region", { name: "采购订单提案" })).getAllByRole("article")).toHaveLength(1);
+    // 属性 lists properties under their objects, already open; the object row does not claim it is unchanged.
     fireEvent.click(within(tiles).getByRole("button", { name: "属性 1" }));
-    expect(screen.getAllByRole("region").map((section) => section.getAttribute("aria-label"))).toEqual(["采购订单提案"]);
-    expect(screen.getAllByRole("article")).toHaveLength(1);
+    const propertyView = screen.getByRole("region", { name: "采购订单提案" });
+    expect(screen.getAllByRole("region")).toHaveLength(1);
+    expect(within(propertyView).getAllByRole("article")).toHaveLength(1);
+    expect(within(propertyView).queryByText("已有对象，本批未修改")).toBeNull();
+    // 实体 is a plain list without groups.
     fireEvent.click(within(tiles).getByRole("button", { name: "实体 2" }));
     expect(screen.queryAllByRole("region")).toHaveLength(0);
     expect(screen.getAllByRole("article")).toHaveLength(2);
@@ -271,6 +279,7 @@ describe("proposal review", () => {
       physical_differences: [{ path: "required", declared: "required", observed: "nullable", column: "supplier_name", table: "fiction_orders", schema: "public", connection_name: "虚构采购库", observed_at: null }],
     });
     panel(state({ detail: batch([proposal]) }));
+    expandObjects();
     fireEvent.click(row("supplier_name"));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("可能已有的定义")).toBeInTheDocument();
@@ -340,6 +349,7 @@ describe("proposal review", () => {
 it("disables decisions for historical batches", () => {
   const detail = { ...batch(), read_only: true };
   panel(state({ detail }));
+  expandObjects();
   expect(screen.getByText("新一轮已开始，此批次只读")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "全部接受（4）" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "接受 订单号" })).toBeDisabled();

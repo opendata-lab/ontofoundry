@@ -36,7 +36,9 @@ const matchesStatus = (item: ProposalItem, status: StatusFilter) =>
 const failedRun = (session: ModelingSession | null | undefined) =>
   session?.result_state === "failed_permanent" ? session.task_detail || "本轮没有产出提案" : "";
 
-type ProposalGroup = { key: string; title: string; tone: string; members: ProposalItem[] };
+type ProposalGroup =
+  | { type: "object"; key: string; title: string; changed: boolean; objects: ProposalItem[]; properties: ProposalItem[] }
+  | { type: "kind"; key: string; title: string; tone: string; members: ProposalItem[] };
 
 const elementField = (item: ProposalItem, key: string) => {
   const value = (item.after ?? item.before) as unknown as Record<string, unknown> | null;
@@ -55,22 +57,25 @@ function ownerTitle(id: string, items: ProposalItem[], draft: Draft, fallback: s
 }
 
 function proposalGroups(visible: ProposalItem[], others: ElementCategory[], items: ProposalItem[], draft: Draft): ProposalGroup[] {
-  const byOwner = new Map<string, ProposalItem[]>();
+  const byOwner = new Map<string, { objects: ProposalItem[]; properties: ProposalItem[] }>();
   for (const item of visible) {
     if (item.target_kind !== "object_type" && item.target_kind !== "property") continue;
     const owner = ownerOf(item);
-    byOwner.set(owner, [...(byOwner.get(owner) ?? []), item]);
+    const entry = byOwner.get(owner) ?? { objects: [], properties: [] };
+    (item.target_kind === "object_type" ? entry.objects : entry.properties).push(item);
+    byOwner.set(owner, entry);
   }
-  const objectGroups = [...byOwner].map(([owner, members]) => ({
+  const objectGroups: ProposalGroup[] = [...byOwner].map(([owner, entry]) => ({
+    type: "object",
     key: `object:${owner}`,
-    title: ownerTitle(owner, items, draft, members.find((m) => m.owner_label)?.owner_label ?? ""),
-    tone: "text-object",
-    // The object first, then its properties.
-    members: [...members].sort((a, b) => Number(a.target_kind !== "object_type") - Number(b.target_kind !== "object_type")),
+    title: ownerTitle(owner, items, draft, entry.properties.find((m) => m.owner_label)?.owner_label ?? ""),
+    // The batch also changes the object itself, even when a filter hides that card.
+    changed: items.some((candidate) => candidate.target_kind === "object_type" && candidate.target_id === owner),
+    ...entry,
   }));
-  const kindGroups = others
+  const kindGroups: ProposalGroup[] = others
     .filter((category) => category.key !== "object_type" && category.key !== "property")
-    .map((category) => ({ key: category.key, title: category.text, tone: category.tone, members: visible.filter((item) => item.target_kind === category.key) }))
+    .map((category) => ({ type: "kind" as const, key: category.key, title: category.text, tone: category.tone, members: visible.filter((item) => item.target_kind === category.key) }))
     .filter((group) => group.members.length);
   return [...objectGroups, ...kindGroups];
 }
@@ -113,7 +118,8 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const categories = ELEMENT_CATEGORIES.filter((category) => items.some((item) => item.target_kind === category.key));
   const [kind, setKind] = useState<TargetKind | null>(null);
-  const [collapsed, setCollapsed] = useState(new Set<string>());
+  // Groups the reviewer flipped from their default: objects start closed (open under 属性), kind groups open.
+  const [toggled, setToggled] = useState(new Set<string>());
   const [status, setStatus] = useState<StatusFilter>("pending");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(new Set<string>());
@@ -142,6 +148,15 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
   // Under 全部 and 属性, each object is a group holding its own proposal and its
   // properties; the other kinds follow as one group per kind, in tile order.
   const groups = kind && kind !== "property" ? null : proposalGroups(visible, kind ? [] : categories, items, session.draft);
+  // A search opens objects too, so a matching property is never hidden behind a closed object.
+  const isOpen = (group: ProposalGroup) => (group.type === "object" ? kind === "property" || terms.length > 0 : true) !== toggled.has(group.key);
+  const flip = (key: string) =>
+    setToggled((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const openItem = openId ? byId.get(openId) : undefined;
   useEffect(() => {
     if (!toast || undoBusy) return;
@@ -344,28 +359,43 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
         )}
         {visible.length || proposals.loading ? (
           groups ? (
-            groups.map(({ key, title, tone, members }) => {
-              const open = !collapsed.has(key);
+            groups.map((group) => {
+              const open = isOpen(group);
+              if (group.type === "kind")
+                return (
+                  <section key={group.key} aria-label={`${group.title}提案`}>
+                    <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                      className="sticky top-0 z-1 flex w-full items-center gap-2 border-b border-rule bg-surface-raised px-4 py-1.5 text-left text-xs font-semibold text-ink-2">
+                      {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span className={group.tone}>{group.title}</span>
+                      <span className="tabular-nums text-muted">{group.members.length}</span>
+                    </button>
+                    {open && group.members.map(renderCard)}
+                  </section>
+                );
+              const toggle = group.properties.length > 0 && (
+                <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
+                  aria-label={`${open ? "收起" : "展开"} ${group.title} 的属性（${group.properties.length}）`}
+                  className="flex w-full items-center gap-1.5 border-b border-rule-soft bg-surface px-4 py-1 pl-10 text-left text-xs text-attribute hover:bg-surface-soft">
+                  {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  属性 <span className="tabular-nums">{group.properties.length}</span>
+                </button>
+              );
               return (
-                <section key={key} aria-label={`${title}提案`}>
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    className="sticky top-0 z-1 flex w-full items-center gap-2 border-b border-rule bg-surface-raised px-4 py-1.5 text-left text-xs font-semibold text-ink-2"
-                    onClick={() =>
-                      setCollapsed((current) => {
-                        const next = new Set(current);
-                        if (open) next.add(key);
-                        else next.delete(key);
-                        return next;
-                      })
-                    }
-                  >
-                    {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span className={`min-w-0 truncate ${tone}`}>{title}</span>
-                    <span className="tabular-nums text-muted">{members.length}</span>
-                  </button>
-                  {open && members.map(renderCard)}
+                <section key={group.key} aria-label={`${group.title}提案`}>
+                  {group.objects.length ? (
+                    group.objects.map(renderCard)
+                  ) : (
+                    // Properties of an object this batch leaves unchanged still need a parent row.
+                    <div className="flex items-center gap-2 border-b border-rule-soft bg-surface-raised px-4 py-2 text-xs">
+                      <span className="font-semibold text-object">{group.title}</span>
+                      {!group.changed && <span className="text-muted">已有对象，本批未修改</span>}
+                    </div>
+                  )}
+                  {toggle}
+                  {open && group.properties.length > 0 && (
+                    <div className="ml-6 border-l-2 border-attribute-soft">{group.properties.map(renderCard)}</div>
+                  )}
                 </section>
               );
             })
