@@ -1,12 +1,12 @@
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ontofoundry_api.api.auth import Principal, current_principal
-from ontofoundry_api.contracts.dataset_sources import LinkedTable
 from ontofoundry_api.contracts.instances import AbandonSessionRead
+from ontofoundry_api.contracts.session_writes import SessionMode, SessionPatch, SessionRead
 from ontofoundry_api.database import get_db
 from ontofoundry_api.domain.models import Strict
 from ontofoundry_api.services import sessions as session_service
@@ -15,22 +15,9 @@ from ontofoundry_api.services.access import require_edit, require_read
 router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["sessions"])
 
 
-SessionMode = Literal["model", "chat"]
-
-
 class SessionCreate(BaseModel):
     title: str = Field(default="新的建模会话", min_length=1, max_length=240)
     mode: SessionMode = "model"
-
-
-class DraftSave(Strict):
-    revision: int
-    draft: dict
-    title: str | None = Field(default=None, min_length=1, max_length=240)
-    material_ids: list[str] | None = None
-    table_scope: Literal["all", "selected"] | None = None
-    linked_tables: list[LinkedTable] | None = None
-    mode: SessionMode | None = None
 
 
 class SessionPublish(Strict):
@@ -106,6 +93,16 @@ def create_session(
     )
 
 
+@router.get("/sessions/personal", response_model=SessionRead)
+def personal_session(
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    user: Principal = Depends(current_principal),
+):
+    require_edit(db, str(workspace_id), user)
+    return session_service.personal_session(workspace_id, db, user)
+
+
 @router.get("/sessions/{session_id}")
 async def read_session(
     workspace_id: str,
@@ -128,11 +125,11 @@ async def read_session(
     return session_service.session_response(db, item)
 
 
-@router.put("/sessions/{session_id}")
+@router.patch("/sessions/{session_id}", response_model=SessionRead)
 def save_session(
     workspace_id: str,
     session_id: str,
-    body: DraftSave,
+    body: SessionPatch,
     request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),

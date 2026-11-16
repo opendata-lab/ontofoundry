@@ -36,6 +36,25 @@ def test_revised_content_is_what_gets_accepted(client):
     assert (obj["display_name"], obj["description"]) == ("审阅后名称", "审阅后描述")
 
 
+def test_pending_revision_uses_shared_proposal_check(client, monkeypatch):
+    from ontofoundry_api.services import changes
+
+    session = create_session(client)
+    target = session["draft"]["object_types"][0]
+    [item] = seed_batch(client, session, [update("object_type", target, description="原提案")])["items"]
+    check_proposal = changes.check_proposal
+    checked = []
+
+    def counted(db, workspace_id, current_session, items, settings, **kwargs):
+        checked.append([proposal.id for proposal in items])
+        return check_proposal(db, workspace_id, current_session, items, settings, **kwargs)
+
+    monkeypatch.setattr(changes, "check_proposal", counted)
+    response = revise(client, session, item, {"description": "经统一入口修订"})
+    assert response.status_code == 200, response.text
+    assert checked == [[item["id"]]]
+
+
 def test_identity_and_evidence_stay_with_the_proposal(client):
     session = create_session(client)
     items = seed_batch(client, session, chain(session))["items"]

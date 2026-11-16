@@ -222,7 +222,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sessions.router)
     app.include_router(metrics.router)
     app.include_router(proposals.router)
-    app.include_router(proposals.element_router)
     app.include_router(materials.router)
     app.include_router(imports.router)
     app.include_router(exports.router)

@@ -12,6 +12,7 @@ import { PageBody, PageTabs, PageToolbar, Panel, StatusMark } from "../component
 import { useElementDetail } from "../hooks/useElementDetail";
 import { useErrorMessage } from "../hooks/useErrorMessage";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
+import { usePersonalSession } from "../hooks/usePersonalSession";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
 import { MULTIPLICITY } from "../lib/coreModel";
@@ -50,6 +51,7 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
   const detail = useElementDetail();
   const navigate = useNavigate();
   const active = usePageActive();
+  const personalSession = usePersonalSession(workspace.id, canEdit && active, attempt);
   usePageTab({ title: "本体对象" });
   useEffect(() => {
     if (!active || !versionId) return;
@@ -112,7 +114,16 @@ export function PublishedTypeCatalogPage({ initialKind }: { initialKind: "object
   return <div className="flex h-full min-h-0 flex-col bg-canvas">
     <PageTabs title="本体对象" actions={<>
       <Button icon={<RefreshCw className="size-icon-sm" />} onClick={() => void reload()}>刷新</Button>
-      {canEdit && <><Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button><Button icon={<Download className="size-icon-sm" />} disabled={!versionId} loading={exporting} onClick={() => void openExport()}>导出</Button><Link to="../delivery"><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link></>}
+      {canEdit && <>
+        <Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button>
+        <Button icon={<Download className="size-icon-sm" />} disabled={!versionId} loading={exporting} onClick={() => void openExport()}>导出</Button>
+        {personalSession && personalSession.unpublished_change_count > 0 && (
+          <Text type="secondary" className="whitespace-nowrap text-xs">{personalSession.unpublished_change_count} 项待发布</Text>
+        )}
+        <Link to={personalSession && personalSession.unpublished_change_count > 0 ? `../delivery?session=${personalSession.id}` : "../delivery"}>
+          <Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button>
+        </Link>
+      </>}
     </>} activeKey={tab} onChange={next => { setQuery(""); setTag(undefined); reset(); setParams(current => { const value = new URLSearchParams(current); value.set("catalogTab", next); return value; }, { replace: true }); }} items={(Object.keys(LABELS) as Tab[]).map(key => ({ key, label: `${LABELS[key]} ${result?.counts[COUNT[key]] ?? 0}`, children: key !== tab ? null : <PageBody>
       <PageToolbar extra={<>{(tab === "entities" || tab === "relations") && <Select aria-label="标签筛选" allowClear placeholder="按标签筛选" className="w-40" value={tag} options={(result?.tags ?? []).map(label => ({ value: label, label }))} onChange={value => { setTag(value); reset(); }} />}<Input type="search" prefix={<Search size={14} />} allowClear aria-label="搜索目录" placeholder="名称、标识或描述" className="w-60" value={query} onChange={event => { setQuery(event.target.value); reset(); }} /></>}>
         {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => detail.open({ kind, id: "new", mode: "edit", sessionId: null })}>新建{LABELS[tab]}</Button>}

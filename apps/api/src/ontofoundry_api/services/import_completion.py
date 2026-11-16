@@ -531,7 +531,8 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         lookup=material_lookup(db, settings, workspace_id),
         evidence_by_target=evidence,
     )
-    from ontofoundry_api.services.proposal_apply import save_pending, trial_apply
+    from ontofoundry_api.services.changes import check_proposal
+    from ontofoundry_api.services.proposal_apply import save_pending
     rows = batch_items(db, [batch_id], workspace_id, session.id)
     pending = {row.target_id: row for row in rows if row.status == "pending"}
     remap = {}
@@ -546,7 +547,7 @@ def complete_import(db, settings, workspace_id, actor_id, adapter_id, import_id,
         remap[old_id] = item.id
     for item in parsed.items:
         item.depends_on = [remap.get(dep, dep) for dep in item.depends_on]
-    trial = trial_apply(db, workspace_id, session, parsed.items, settings)
+    trial = check_proposal(db, workspace_id, session, parsed.items, settings)
     save_pending(db, session, batch_id, trial)
     session.revision += 1
     record.completions_json = [

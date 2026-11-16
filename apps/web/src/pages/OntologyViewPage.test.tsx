@@ -1,8 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, modelingApi } from "../api/client";
 import type { Workspace, WorkspaceOverview } from "../api/types";
+import { notifyOntologySaved } from "../lib/elementInspector";
+import { modelingSession } from "../test/apiRecords";
 import { draftGraph } from "../lib/semanticExplorer";
 import { example } from "../test/drafts";
 import { renderWithProviders } from "../test/renderWithProviders";
@@ -92,5 +94,17 @@ describe("ontology view", () => {
     show();
     expect(api.overview).not.toHaveBeenCalled();
     expect(screen.getByText("工作空间还没有已发布本体")).toBeInTheDocument();
+  });
+
+  it("points at the saved personal session without reloading the published overview", async () => {
+    show();
+    await screen.findByText("资源管理器");
+    expect(api.overview).toHaveBeenCalledTimes(1);
+    act(() => notifyOntologySaved({
+      workspaceId: "w",
+      session: modelingSession({ id: "personal-1", workspace_id: "w", unpublished_change_count: 2 }),
+    }));
+    expect(await screen.findByRole("link", { name: "有未发布的草稿修改 · 去发布" })).toHaveAttribute("href", "/delivery?session=personal-1");
+    expect(api.overview).toHaveBeenCalledTimes(1);
   });
 });

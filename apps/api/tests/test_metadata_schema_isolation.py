@@ -220,12 +220,18 @@ def test_new_server_connection_through_sync_details_dataset_edit_and_builder_lin
         assert data.status_code == 200, data.text
         assert data.json()["items"] == [row]
         # Save creation, then edit the same dataset to the other database.
-        draft = {**session["draft"], "datasets": [dataset]}
+        draft = {**session["draft"], "datasets": [
+            *[d for d in session["draft"]["datasets"] if d["id"] != dataset_id], dataset,
+        ]}
         linked = [{"connection_id": server.id, "schema_name": schema, "table_name": "fiction_shared"}]
-        saved = client.put(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "draft": draft, "linked_tables": linked})
+        from test_element_save import submit
+        saved = submit(client, draft, session=session, kind="dataset", target_id=dataset_id)
         assert saved.status_code == 200, saved.text
         session = saved.json()
-        assert session["draft"]["datasets"][0]["schema_name"] == schema
+        saved = client.patch(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "linked_tables": linked})
+        assert saved.status_code == 200, saved.text
+        session = saved.json()
+        assert next(d for d in session["draft"]["datasets"] if d["id"] == dataset_id)["schema_name"] == schema
         assert session["linked_tables"] == linked
         catalog = client.get(ROOT + "/registered-tables", params={"session_id": session["id"]})
         assert catalog.status_code == 200, catalog.text

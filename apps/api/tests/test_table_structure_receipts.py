@@ -167,9 +167,8 @@ def test_origin_read_contract_and_cited_receipt_usage_archive_and_delete_protect
     session = create_session(client)
     prop = session["draft"]["properties"][0]
     prop["evidence"] = [evidence(material, text)]
-    saved = client.put(ROOT + f"/sessions/{session['id']}", json={
-        "revision": session["revision"], "draft": session["draft"],
-    })
+    from test_element_save import submit
+    saved = submit(client, session["draft"], session=session, target_id=prop["owner_type_id"])
     assert saved.status_code == 200, saved.text
     listed = {item["id"]: item for item in client.get(ROOT + "/materials").json()["items"]}
     assert listed[material.id]["origin"] == "table_receipt"

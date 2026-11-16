@@ -9,12 +9,13 @@ import {
   type AffectedItem,
   type Dataset,
   type Draft,
-  type ElementSave,
-  type ElementSaveImpact,
   type LinkType,
   type Metric,
   type ModelingSession,
   type ObjectType,
+  type SessionElementSave,
+  type SessionElementSaveImpact,
+  type SessionElementSavePreview,
   type TargetKind,
 } from "../../api/types";
 import { PageTabContext, usePageActive } from "../../hooks/usePageTab";
@@ -52,9 +53,10 @@ type Element = ObjectType | LinkType | Metric | Dataset;
 type Loaded = { draft: Draft; session: ModelingSession | null; versionId: string | null; complete: boolean };
 type Resolved = { kind: InspectKind; element: Element | undefined; tab?: ElementTab; factId?: string };
 type ImpactPreview = {
-  candidate: ElementSave;
+  sessionId: string;
+  candidate: SessionElementSavePreview;
   signature: string;
-  items: ElementSaveImpact["affected_items"];
+  items: SessionElementSaveImpact["affected_items"];
 };
 
 const KINDS = new Set([
@@ -333,13 +335,23 @@ export function ElementView({
   const [expanded, setExpanded] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [versionChanged, setVersionChanged] = useState(false);
+  const pendingSave = useRef<{
+    candidateSignature: string;
+    fullSignature: string;
+    sessionId: string;
+    payload: SessionElementSave;
+  } | null>(null);
+  const hasSession = Boolean(sessionId || loaded?.session);
   useEffect(() => {
     const published = (event: Event) => {
-      if (!sessionId && !busy && (event as CustomEvent<OntologySaved>).detail.workspaceId === workspace.id) setVersionChanged(true);
+      const detailEvent = (event as CustomEvent<OntologySaved>).detail;
+      if (!hasSession && !busy && detailEvent.workspaceId === workspace.id && detailEvent.session === null) {
+        setVersionChanged(true);
+      }
     };
     window.addEventListener(ONTOLOGY_SAVED, published);
     return () => window.removeEventListener(ONTOLOGY_SAVED, published);
-  }, [workspace.id, sessionId, busy]);
+  }, [workspace.id, hasSession, busy]);
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(""), 2200);
@@ -362,6 +374,9 @@ export function ElementView({
             throw new Error("待发布内容已变化，请关闭弹窗并重新预览");
           source = { draft: { ...preview.merged_model, material_objects: session.draft.material_objects, material_links: session.draft.material_links }, session: null, versionId: preview.current_version_id, complete: true };
         } else source = { draft: session.draft, session, versionId: current.version_id, complete: true };
+      } else if ((creating || startEditing) && canEdit) {
+        const session = await modelingApi.personal(workspace.id);
+        source = { draft: session.draft, session, versionId: current.version_id, complete: true };
       } else {
         const fixed = requestedVersionId ?? current.version_id;
         if (!fixed && !creating) throw new Error("还没有发布内容");
@@ -380,6 +395,7 @@ export function ElementView({
         value = upsert(value, COLLECTION[kind], blank(value, kind, effectiveId, owner) as never);
       }
       if (live) {
+        pendingSave.current = null;
         propertyBindings.current.clear();
         draftRef.current = value;
         setLoaded(source);
@@ -461,6 +477,7 @@ export function ElementView({
   }, [loaded, selectedTab, id, kind, requestedTab]);
 
   const discard = () => {
+    pendingSave.current = null;
     propertyBindings.current.clear();
     const nextDraft = loaded?.draft ?? null;
     draftRef.current = nextDraft;
@@ -482,7 +499,13 @@ export function ElementView({
   // References always lead to a detail page; a page keeps its own edits meanwhile.
   const openPage = (request: ElementRequest) => {
     if (modal) close();
-    detail.open({ ...request, sessionId, previewHash: previewHash ?? undefined, versionId: loaded?.versionId ?? undefined });
+    const activeSessionId = loaded?.session?.id ?? sessionId;
+    detail.open({
+      ...request,
+      sessionId: activeSessionId,
+      previewHash: previewHash ?? undefined,
+      versionId: activeSessionId ? undefined : (loaded?.versionId ?? undefined),
+    });
   };
   const open = (request: ElementRequest) => {
     if (busy) return;
@@ -494,8 +517,8 @@ export function ElementView({
   };
   const buildCandidate = (
     sourceDraft: Draft | null = draftRef.current,
-  ): { candidate: ElementSave; problem: string | null; signature: string } | null => {
-    if (!sourceDraft || !loaded?.complete || !member || previewHash) return null;
+  ): { sessionId: string; candidate: SessionElementSavePreview; problem: string | null; signature: string } | null => {
+    if (!sourceDraft || !loaded?.complete || !loaded.session || !member || previewHash) return null;
     const currentResolved = resolve(sourceDraft, requestedKind, effectiveId);
     const currentKind: InspectKind =
       currentResolved?.kind ??
@@ -506,25 +529,45 @@ export function ElementView({
       currentKind === "metric"
         ? upsert(sourceDraft, "metrics", storedMetric(currentElement as Metric))
         : sourceDraft;
+    const candidate: SessionElementSavePreview = {
+      target_kind: currentKind,
+      target_id: currentElement.id,
+      expected_session_revision: loaded.session.revision,
+      draft: value,
+    };
     return {
+      sessionId: loaded.session.id,
       problem: saveProblem(value, currentKind, currentElement),
-      signature: JSON.stringify(value),
-      candidate: {
-        target_kind: currentKind,
-        target_id: currentElement.id,
-        expected_current_version_id: loaded.versionId,
-        session_id: loaded.session?.id ?? null,
-        expected_session_revision: loaded.session?.revision ?? null,
-        draft: value,
-      },
+      signature: JSON.stringify(candidate),
+      candidate,
     };
   };
-  const performSave = async (payload: ElementSave) => {
-    const result = await modelingApi.saveElement(workspace.id, payload);
+  const sendSaveRequest = async (
+    targetSessionId: string,
+    requestPayload: SessionElementSave,
+    candidateSignature: string,
+    fullSignature: string,
+  ) => {
+    pendingSave.current = {
+      candidateSignature,
+      fullSignature,
+      sessionId: targetSessionId,
+      payload: requestPayload,
+    };
+    let result: ModelingSession;
+    try {
+      result = await modelingApi.saveElement(workspace.id, targetSessionId, requestPayload);
+    } catch (e) {
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 408 && e.status !== 429) {
+        pendingSave.current = null;
+      }
+      throw e;
+    }
+    pendingSave.current = null;
     const next: Loaded = {
-      draft: result.session?.draft ?? result.draft,
-      session: result.session,
-      versionId: result.version.version_id,
+      draft: result.draft,
+      session: result,
+      versionId: loaded?.versionId ?? result.base_version_id,
       complete: true,
     };
     draftRef.current = next.draft;
@@ -539,10 +582,26 @@ export function ElementView({
       setBusy(false);
     });
     reportElement?.({ dirty: false, busy: false });
-    notifyOntologySaved({ workspaceId: workspace.id, session: result.session });
+    notifyOntologySaved({ workspaceId: workspace.id, session: result });
     refresh();
-    setNotice("已保存");
-    if (creating || requestedVersionId) onCreated({ kind, id: payload.target_id, tab: selectedTab, sessionId, versionId: result.version.version_id });
+    setNotice("已保存到草稿");
+    if (creating || (variant === "page" && !sessionId)) {
+      onCreated({ kind, id: requestPayload.target_id, tab: selectedTab, sessionId: result.id });
+    }
+  };
+  const performSave = async (
+    targetSessionId: string,
+    payload: SessionElementSavePreview,
+    candidateSignature: string,
+    affectedItems?: AffectedItem[],
+  ) => {
+    const savePayload = affectedItems ? { ...payload, affected_items: affectedItems } : payload;
+    const fullSignature = JSON.stringify({ sessionId: targetSessionId, ...savePayload });
+    const key =
+      pendingSave.current?.fullSignature === fullSignature
+        ? pendingSave.current.payload.idempotency_key
+        : newId();
+    await sendSaveRequest(targetSessionId, { ...savePayload, idempotency_key: key }, candidateSignature, fullSignature);
   };
   const runPreviewAndSave = async () => {
     let current = buildCandidate();
@@ -556,9 +615,19 @@ export function ElementView({
     setError(null);
     setNotice("");
     try {
+      // Retry an unacknowledged save directly so a lost response still hits the server's idempotency receipt.
+      if (
+        pendingSave.current &&
+        pendingSave.current.candidateSignature === current.signature &&
+        pendingSave.current.sessionId === current.sessionId
+      ) {
+        const pending = pendingSave.current;
+        await sendSaveRequest(pending.sessionId, pending.payload, pending.candidateSignature, pending.fullSignature);
+        return;
+      }
       while (current) {
         const requestSignature = current.signature;
-        const impact = await modelingApi.previewElementSave(workspace.id, current.candidate);
+        const impact = await modelingApi.previewElementSave(workspace.id, current.sessionId, current.candidate);
         const latest = buildCandidate();
         if (!latest) return;
         if (latest.problem) {
@@ -573,13 +642,14 @@ export function ElementView({
         }
         if (impact.affected_items.length > 0) {
           setImpactPreview({
+            sessionId: latest.sessionId,
             candidate: latest.candidate,
             signature: latest.signature,
             items: impact.affected_items,
           });
           return;
         }
-        await performSave(latest.candidate);
+        await performSave(latest.sessionId, latest.candidate, latest.signature);
         return;
       }
     } catch (e) {
@@ -620,7 +690,7 @@ export function ElementView({
     setNotice("");
     try {
       setImpactPreview(null);
-      await performSave({ ...built.candidate, affected_items });
+      await performSave(built.sessionId, built.candidate, built.signature, affected_items);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -633,10 +703,18 @@ export function ElementView({
     editRead.current.pending = true;
     setBusy(true);
     try {
-      const baseline = loaded.complete ? loaded.draft : await modelingApi.snapshot(workspace.id, loaded.versionId);
-      if (revision !== editRead.current.revision) return;
+      let session = loaded.session;
+      let baseline = loaded.draft;
+      if (!session) {
+        session = await modelingApi.personal(workspace.id);
+        if (revision !== editRead.current.revision) return;
+        baseline = session.draft;
+      } else if (!loaded.complete) {
+        baseline = await modelingApi.snapshot(workspace.id, loaded.versionId);
+        if (revision !== editRead.current.revision) return;
+      }
       const copy = structuredClone(baseline);
-      setLoaded({ ...loaded, draft: baseline, complete: true });
+      setLoaded({ ...loaded, draft: baseline, session, complete: true });
       draftRef.current = copy;
       setDraft(copy);
       setEditing(true);
@@ -660,14 +738,16 @@ export function ElementView({
   const change = (next: Draft) => {
     if (draftRef.current) next = preservePropertyBindings(draftRef.current, next, propertyBindings.current);
     draftRef.current = next;
+    pendingSave.current = null;
     setDraft(next);
     setDirty(true);
     setNotice("");
     setImpactPreview(null);
   };
+  const activeSessionId = previewHash ? null : (loaded?.session?.id ?? sessionId);
   const panel: PanelProps | null =
     draft && (object || link)
-      ? { draft, type: (object ?? link)!, editing, canEdit: canEdit && !previewHash, sessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
+      ? { draft, type: (object ?? link)!, editing, canEdit: canEdit && !previewHash, sessionId: activeSessionId, versionId: loaded?.versionId ?? undefined, partialRead: loaded?.complete === false, change, open }
       : null;
   const Icon = { object_type: Box, link_type: GitBranch, metric: Sigma, dataset: Database }[kind];
   const record = draft && object ? objectMapping(draft, object) : null;
@@ -680,7 +760,7 @@ export function ElementView({
       : NOUN[kind];
   // Without a display name the title already is the identifier; show it once.
   const technical = element && "display_name" in element && element.display_name ? element.name : "";
-  const readScope = JSON.stringify([workspace.id, kind, element?.id, loaded?.versionId, sessionId, loaded?.session?.revision, previewHash]);
+  const readScope = JSON.stringify([workspace.id, kind, element?.id, loaded?.versionId, activeSessionId, loaded?.session?.revision, previewHash]);
   const contentFor = (tab: ElementTab) => {
     const panelActive = active && tab === selectedTab;
     if (!draft || !element) return null;
@@ -733,7 +813,7 @@ export function ElementView({
   // re-measures them (rc-table forces a full-page layout on mount), which over
   // a large ontology view cost about a second per switch.
   const [visited, setVisited] = useState<ElementTab[]>([]);
-  const elementKey = `${readScope}:${editing}`;
+  const elementKey = JSON.stringify([workspace.id, kind, element?.id, loaded?.versionId, sessionId, previewHash]);
   useEffect(() => setVisited([]), [elementKey]);
   useEffect(() => {
     if (tabs.length && !visited.includes(selectedTab)) setVisited((current) => [...current, selectedTab]);
@@ -741,7 +821,7 @@ export function ElementView({
   const content = !tabs.length || kind === "dataset"
     ? contentFor(selectedTab)
     : (visited.includes(selectedTab) ? visited : [...visited, selectedTab]).map((tab) => (
-        <div key={`${readScope}:${tab}`} hidden={tab !== selectedTab} className="min-w-0">{contentFor(tab)}</div>
+        <div key={`${elementKey}:${tab}`} hidden={tab !== selectedTab} className="min-w-0">{contentFor(tab)}</div>
       ));
   useLayoutEffect(() => {
     reportElement?.(modal ? { dirty, busy } : { title: displayName(element) || title, dirty, busy });
@@ -909,7 +989,7 @@ export function ElementView({
     );
     const pageNote = (
       <span className="flex items-center gap-3">
-        {previewHash ? "待发布预览" : sessionId ? "建模会话草稿" : null}
+        {previewHash ? "待发布预览" : loaded?.session ? "建模会话草稿" : null}
       </span>
     );
     const pageContent = <PageBody>{separateBlocks ? main : <Panel fill>{main}</Panel>}</PageBody>;

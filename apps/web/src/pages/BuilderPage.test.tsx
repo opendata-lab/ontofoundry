@@ -36,7 +36,7 @@ vi.mock("../api/client", () => ({
       skills: [],
     }),
     upload: vi.fn(),
-    save: vi.fn(),
+    updateSettings: vi.fn(),
   },
   catalogApi: {
     connections: vi.fn().mockResolvedValue({ items: [] }),
@@ -165,7 +165,7 @@ it("uploads business knowledge files through Upload.Dragger and switches to the 
     sha256: "f".repeat(64),
   };
   vi.mocked(modelingApi.upload).mockResolvedValue(uploaded);
-  vi.mocked(modelingApi.save).mockResolvedValue({ ...session(), material_ids: ["m-new"] });
+  vi.mocked(modelingApi.updateSettings).mockResolvedValue({ ...session(), material_ids: ["m-new"] });
   const { container } = renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
@@ -182,7 +182,7 @@ it("uploads business knowledge files through Upload.Dragger and switches to the 
   fireEvent.change(fileInput, { target: { files: [file] } });
 
   await waitFor(() => expect(modelingApi.upload).toHaveBeenCalledWith("w1", file));
-  expect(modelingApi.save).toHaveBeenCalled();
+  expect(modelingApi.updateSettings).toHaveBeenCalled();
   expect(await screen.findByText("采购制度.md")).toBeInTheDocument();
 });
 
@@ -298,7 +298,7 @@ it("adds no platform message or retry button for a failed run", async () => {
 
 it("switches an unstarted session's mode and shows chat without builder side panels", async () => {
   const chat = { ...session(), mode: "chat" as const };
-  vi.mocked(modelingApi.save).mockResolvedValue(chat);
+  vi.mocked(modelingApi.updateSettings).mockResolvedValue(chat);
   renderWithProviders(
     <MemoryRouter>
       <BuilderPage />
@@ -307,7 +307,7 @@ it("switches an unstarted session's mode and shows chat without builder side pan
   expect(screen.getByRole("heading", { name: "构建配置" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "选择会话模式" }));
   fireEvent.click(await screen.findByText("日常模式"));
-  await waitFor(() => expect(modelingApi.save).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }), expect.anything(), { mode: "chat" }));
+  await waitFor(() => expect(modelingApi.updateSettings).toHaveBeenCalledWith(expect.objectContaining({ id: "s1" }), { mode: "chat" }));
   expect(context.model.setSession).toHaveBeenCalledWith(chat);
 });
 
@@ -362,7 +362,7 @@ it("lists removable tables when 1 to 5 tables are selected", async () => {
   };
   context.model.session = currentSession;
   context.model.ensure = vi.fn().mockResolvedValue(currentSession);
-  vi.mocked(modelingApi.save).mockResolvedValue({
+  vi.mocked(modelingApi.updateSettings).mockResolvedValue({
     ...currentSession,
     linked_tables: [{ connection_id: "c1", schema_name: "dw", table_name: "customers" }],
   });
@@ -378,9 +378,8 @@ it("lists removable tables when 1 to 5 tables are selected", async () => {
 
   fireEvent.click(ordersBox);
   await waitFor(() => {
-    expect(modelingApi.save).toHaveBeenCalledWith(
+    expect(modelingApi.updateSettings).toHaveBeenCalledWith(
       currentSession,
-      currentSession.draft,
       {
         table_scope: "selected",
         linked_tables: [{ connection_id: "c1", schema_name: "dw", table_name: "customers" }],

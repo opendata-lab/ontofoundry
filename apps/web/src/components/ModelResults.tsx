@@ -154,11 +154,19 @@ export function ModelResults({
   const count = (k: TargetKind) => (draft ? rowsOf(draft, k).length : 0);
   const warnings = session?.result_warnings ?? [];
   const graph = draft ? (session?.graph?.nodes.length ? (session.graph as TypeGraph) : draftGraph(draft)) : null;
-  const canPublish = !!session && !!session.latest_batch_id && session.base_diff.length > 0 && !running && !busy;
-  const publish = <Tooltip title={canPublish ? undefined : running || busy ? "建模完成后再发布" : "接受提案并形成草稿修改后可发布"}>
-    <Button size="small" type="primary" className="shrink-0" icon={<Rocket size={14} />} disabled={!canPublish}
-      onClick={() => { if (session) navigate("../delivery?session=" + session.id); }}>发布本体</Button>
-  </Tooltip>;
+  const unpublishedCount = session?.unpublished_change_count ?? 0;
+  const canPublish = !!session && (unpublishedCount > 0 || (!!session.latest_batch_id && session.base_diff.length > 0)) && !running && !busy;
+  const publish = (
+    <span className="inline-flex shrink-0 items-center gap-2">
+      {unpublishedCount > 0 && (
+        <Text type="secondary" className="whitespace-nowrap text-xs">{unpublishedCount} 项待发布</Text>
+      )}
+      <Tooltip title={canPublish ? undefined : running || busy ? "建模完成后再发布" : "形成草稿修改后可发布"}>
+        <Button size="small" type="primary" className="shrink-0" icon={<Rocket size={14} />} disabled={!canPublish}
+          onClick={() => { if (session) navigate("../delivery?session=" + session.id); }}>发布本体</Button>
+      </Tooltip>
+    </span>
+  );
   return (
     <aside className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
       {warnings.map((text) => (

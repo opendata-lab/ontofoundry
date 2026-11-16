@@ -134,7 +134,7 @@ def test_renaming_a_type_named_like_a_function_keeps_the_function():
 
 def test_changing_a_used_types_base_kind_revises_its_properties_in_one_save(client):
     from test_element_save import submit
-    from test_modeling import ONTOLOGY, ROOT
+    from test_modeling import ROOT
 
     session = create_session(client)
     raw = session["draft"]
@@ -146,10 +146,11 @@ def test_changing_a_used_types_base_kind_revises_its_properties_in_one_save(clie
     latest = published_snapshot(client, ROOT)
     latest["value_types"][0]["value_kind"] = "decimal"
     next(p for p in latest["properties"] if p["id"] == str(LEVEL))["value_kind"] = "decimal"
+    session = client.get(ROOT + "/sessions/personal").json()
     preview = client.post(
-        ROOT + "/element-saves/preview",
+        ROOT + f"/sessions/{session['id']}/element-saves/preview",
         json={"target_kind": "value_type", "target_id": str(LEVEL_TYPE),
-              "expected_current_version_id": client.get(ONTOLOGY + "/version").json()["version_id"], "draft": latest},
+              "expected_session_revision": session["revision"], "draft": latest},
     )
     assert preview.status_code == 200, preview.text
     saved = submit(client, latest, kind="value_type", target_id=str(LEVEL_TYPE))

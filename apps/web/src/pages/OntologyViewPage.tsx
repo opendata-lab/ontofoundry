@@ -38,14 +38,28 @@ export function OntologyViewPage() {
       active = false;
     };
   }, [workspace.id, workspace.current_version, attempt]);
-  // Element saves publish right away; reread so new metrics and datasets show up.
+  // Element saves land in a session draft without publishing; refresh the draft
+  // banner when a session is updated, and reload the published view on publish.
   useEffect(() => {
     const saved = (event: Event) => {
-      if ((event as CustomEvent<OntologySaved>).detail.workspaceId === workspace.id) load();
+      const detail = (event as CustomEvent<OntologySaved>).detail;
+      if (detail.workspaceId !== workspace.id) return;
+      if (!detail.session) {
+        load();
+        return;
+      }
+      if (detail.session.unpublished_change_count > 0) {
+        setDraftSession(detail.session.id);
+      } else if (canEdit) {
+        modelingApi
+          .sessions(workspace.id)
+          .then(({ items }) => setDraftSession(items.find((item) => item.has_unpublished_changes)?.id ?? null))
+          .catch(() => undefined);
+      }
     };
     window.addEventListener(ONTOLOGY_SAVED, saved);
     return () => window.removeEventListener(ONTOLOGY_SAVED, saved);
-  }, [workspace.id]);
+  }, [workspace.id, canEdit]);
   // Accepted proposals live in a session until someone publishes it. Point at
   // the most recent session whose draft moved away from its base version, so
   // its changes do not look lost. Best effort: the hint never blocks the view.

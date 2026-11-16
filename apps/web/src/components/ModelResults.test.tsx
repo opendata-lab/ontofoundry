@@ -23,6 +23,7 @@ function session(extra: Partial<ModelingSession> = {}): ModelingSession {
     graph: { workspace_id: "w", version_id: "", version_sha256: "", nodes: [], edges: [] },
     base_diff: [],
     pending_proposal_count: 0,
+    unpublished_change_count: 0,
     latest_batch_id: null,
     result_warnings: [],
     ...extra,
@@ -110,5 +111,11 @@ describe("modeling results", () => {
     expect(screen.getAllByText("共用父对象数据").length).toBeGreaterThan(0);
     expect(screen.queryByText("independent")).not.toBeInTheDocument();
     expect(screen.queryByText("shared_parent")).not.toBeInTheDocument();
+  });
+
+  it("shows the unpublished change count next to the publish button", () => {
+    show(session({ unpublished_change_count: 3 }));
+    expect(screen.getByText("3 项待发布")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "发布本体" })).toBeEnabled();
   });
 });

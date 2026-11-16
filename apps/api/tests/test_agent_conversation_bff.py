@@ -1161,9 +1161,9 @@ def test_mode_changes_until_the_conversation_starts(client):
     assert session["mode"] == "model"
 
     def put(current, mode):
-        return client.put(
+        return client.patch(
             ROOT + f"/sessions/{current['id']}",
-            json={"revision": current["revision"], "draft": current["draft"], "mode": mode},
+            json={"revision": current["revision"], "mode": mode},
         )
 
     switched = put(session, "chat")

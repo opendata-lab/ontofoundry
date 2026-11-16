@@ -35,7 +35,7 @@ export function TableDetailDialog({ workspaceId, connectionId, schema, table, ca
     setStarting(true);
     try {
       const session = await modelingApi.create(workspaceId, `结构变化：${table.name}`);
-      await modelingApi.save(session, session.draft, { linked_tables: [{ connection_id: connectionId, schema_name: schema, table_name: table.name }] });
+      await modelingApi.updateSettings(session, { linked_tables: [{ connection_id: connectionId, schema_name: schema, table_name: table.name }] });
       onClose();
       navigate(`/workspaces/${workspaceId}/builder?session=${session.id}`);
     } catch (e) {

@@ -138,10 +138,10 @@ def _undone_instance(db: Session, item) -> bool:
 
 
 def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str, settings):
+    from ontofoundry_api.services.changes import check_accept
     from ontofoundry_api.services.proposal_apply import (
         apply_trial,
         stored_items,
-        trial_apply,
         trial_pending,
     )
     from ontofoundry_api.services.session_gate import (
@@ -305,8 +305,8 @@ def decide(db: Session, workspace_id: str, session_id: str, body, actor_id: str,
         _apply(draft, _inverse(item, {}))
     trial = None
     if accepted_items:
-        trial = trial_apply(db, workspace_id, session, stored_items(accepted_items, dependencies), settings,
-                            draft=definitions(draft), accepting=True)
+        trial = check_accept(db, workspace_id, session, stored_items(accepted_items, dependencies), settings,
+                             draft=definitions(draft))
         draft = trial.candidate
     changed_items = [*undone_items, *accepted_items]
     if changed_items:

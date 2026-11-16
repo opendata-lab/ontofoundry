@@ -5,7 +5,6 @@ from uuid import UUID
 
 from pydantic import Field, JsonValue, TypeAdapter
 
-from ontofoundry_api.contracts.instances import InstancePublishImpact
 from ontofoundry_api.domain.core import (
     Aggregation,
     BindingMode,
@@ -57,9 +56,8 @@ class AffectedItemImpact(AffectedItem):
     reason: str
 
 
-class ElementSaveImpact(InstancePublishImpact):
-    current_version_id: str | None
-    session_revision: int | None
+class ElementSaveImpact(Strict):
+    session_revision: int
     affected_items: list[AffectedItemImpact]
 
 

@@ -14,6 +14,7 @@ import { ImportDialog } from "../components/ImportDialog";
 import { PageBody, PageTabs, PageToolbar, Panel, StatusMark } from "../components/layout";
 import { useElementDetail } from "../hooks/useElementDetail";
 import { usePageActive, usePageTab } from "../hooks/usePageTab";
+import { usePersonalSession } from "../hooks/usePersonalSession";
 import { useSnapshot } from "../hooks/useSnapshot";
 import { useWorkspaceContext } from "../hooks/useWorkspaceContext";
 import { useWorkspacePermissions } from "../hooks/useWorkspacePermissions";
@@ -38,7 +39,7 @@ export function TypeCatalogPage({ kind = "object_type" }: { kind?: "object_type"
 function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "object_type" | "link_type" }) {
   const { workspace, refresh } = useWorkspaceContext();
   const { canEdit } = useWorkspacePermissions();
-  const { draft, error, load, sessionId, suffix, setDraft } = useSnapshot(workspace);
+  const { draft, error, load, sessionId, suffix, session, setDraft, setSession } = useSnapshot(workspace);
   const [createValueType, setCreateValueType] = useState(0);
   const [params, setParams] = useSearchParams();
   const requested = params.get("catalogTab");
@@ -56,6 +57,8 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
   const detail = useElementDetail();
   const navigate = useNavigate();
   const active = usePageActive();
+  const [personalRefresh, setPersonalRefresh] = useState(0);
+  const personalSession = usePersonalSession(workspace.id, canEdit && active && !sessionId, personalRefresh);
   usePageTab({ title: "本体对象" });
   useEffect(() => {
     if (!importOpen || !canEdit) return;
@@ -143,13 +146,18 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
     onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })} pagination={filtered.length > 20 ? { pageSize: 20 } : false}
     locale={{ emptyText: <Empty description={items.length ? "没有匹配的定义" : canEdit ? `还没有${LABELS[tab]}定义` : "暂无已发布定义"} /> }} />;
   const counts = { entities: draft.object_types.length, values: (draft.value_types ?? []).length, datasets: draft.datasets.length, relations: draft.link_types.length, metrics: draft.metrics.length };
+  const publishSession = session ?? personalSession;
+  const deliverySuffix = suffix || (publishSession && publishSession.unpublished_change_count > 0 ? `?session=${publishSession.id}` : "");
   return <div className="flex h-full min-h-0 flex-col bg-canvas">
     <PageTabs title="本体对象" note={sessionId ? "建模会话草稿" : undefined} actions={<>
-      <Button icon={<RefreshCw className="size-icon-sm" />} onClick={load}>刷新</Button>
+      <Button icon={<RefreshCw className="size-icon-sm" />} onClick={() => { load(); setPersonalRefresh((n) => n + 1); }}>刷新</Button>
       {canEdit && <>
         <Button icon={<Upload className="size-icon-sm" />} onClick={() => setImportOpen(true)}>导入</Button>
         <Button icon={<Download className="size-icon-sm" />} disabled={!workspace.version_id} loading={exporting} onClick={() => void openExport()}>导出</Button>
-        <Link to={"../delivery" + suffix}><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link>
+        {publishSession && publishSession.unpublished_change_count > 0 && (
+          <Text type="secondary" className="whitespace-nowrap text-xs">{publishSession.unpublished_change_count} 项待发布</Text>
+        )}
+        <Link to={"../delivery" + deliverySuffix}><Button type="primary" icon={<Rocket className="size-icon-sm" />}>发布</Button></Link>
       </>}
     </>} activeKey={tab} onChange={(next) => {
           setQuery(""); setTag(undefined);
@@ -163,7 +171,18 @@ function DraftTypeCatalogPage({ kind: initialKind = "object_type" }: { kind?: "o
           {canEdit && <Button type="primary" icon={<Plus size={15} />} onClick={() => tab === "values" ? setCreateValueType((n) => n + 1) : detail.open({ kind, id: "new", mode: "edit", sessionId })}>新建{LABELS[tab]}</Button>}
           </PageToolbar>
           <Panel>{key === "values"
-          ? <ValueTypeCatalog workspace={workspace} draft={draft} sessionId={sessionId} query={query} createRequest={createValueType} onSaved={(next) => { setDraft(next); void refresh?.(); }} />
+          ? <ValueTypeCatalog workspace={workspace} draft={draft} sessionId={sessionId} query={query} createRequest={createValueType} onSaved={(saved) => {
+            setDraft(saved.draft);
+            setSession?.(saved);
+            if (!sessionId) {
+              setParams((current) => {
+                const value = new URLSearchParams(current);
+                value.set("session", saved.id);
+                return value;
+              }, { replace: true });
+            }
+            void refresh?.();
+          }} />
           : table}</Panel>
         </PageBody> }))} />
     {canEdit && <>

@@ -6,6 +6,7 @@ import {
   importApi,
   instancesApi,
   metricsApi,
+  modelingApi,
   proposalsApi,
   publishApi,
 } from "./client";
@@ -242,5 +243,59 @@ describe("api client endpoint routes (step 1)", () => {
 
   it("verifies catalogApi has no tableMaterial method", () => {
     expect("tableMaterial" in catalogApi).toBe(false);
+  });
+
+  it("routes personal session, PATCH settings, and session-scoped element saves", async () => {
+    const fetcher = vi.fn().mockImplementation(async (url: string) => {
+      if (url.endsWith("/element-saves/preview")) {
+        return new Response(JSON.stringify({ session_revision: 1, affected_items: [] }));
+      }
+      if (url.endsWith("/instance-baseline")) {
+        return new Response(JSON.stringify({ change_sequence: 0, items: [] }));
+      }
+      return new Response(JSON.stringify(session));
+    });
+    vi.stubGlobal("fetch", fetcher);
+
+    await modelingApi.personal("ws-1");
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/v1/workspaces/ws-1/sessions/personal",
+      expect.objectContaining({ method: "GET" }),
+    );
+
+    await modelingApi.updateSettings(session, { mode: "chat" });
+    const patchCall = fetcher.mock.calls.find(([u]) => u === "/api/v1/workspaces/ws-1/sessions/session-1");
+    expect(patchCall).toBeDefined();
+    expect(patchCall![1]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(patchCall![1].body as string)).toEqual({ revision: 1, mode: "chat" });
+
+    await modelingApi.previewElementSave("ws-1", "session-1", {
+      target_kind: "object_type",
+      target_id: "obj-1",
+      expected_session_revision: 1,
+      draft: session.draft,
+    });
+    const previewCall = fetcher.mock.calls.find(([u]) => u === "/api/v1/workspaces/ws-1/sessions/session-1/element-saves/preview");
+    expect(previewCall).toBeDefined();
+    expect(previewCall![1]).toMatchObject({ method: "POST" });
+    const previewBody = JSON.parse(previewCall![1].body as string);
+    expect(previewBody.draft).not.toHaveProperty("material_objects");
+    expect(previewBody.draft).not.toHaveProperty("material_links");
+
+    await modelingApi.saveElement("ws-1", "session-1", {
+      target_kind: "object_type",
+      target_id: "obj-1",
+      expected_session_revision: 1,
+      draft: session.draft,
+    });
+    const saveCall = fetcher.mock.calls.find(([u]) => u === "/api/v1/workspaces/ws-1/sessions/session-1/element-saves");
+    expect(saveCall).toBeDefined();
+    expect(saveCall![1]).toMatchObject({ method: "POST" });
+    const saveBody = JSON.parse(saveCall![1].body as string);
+    expect(saveBody.idempotency_key).toEqual(expect.any(String));
+    expect(saveBody.idempotency_key.length).toBeGreaterThanOrEqual(8);
+    expect(saveBody.idempotency_key.length).toBeLessThanOrEqual(64);
+    expect(saveBody.draft).not.toHaveProperty("material_objects");
+    expect(saveBody.draft).not.toHaveProperty("material_links");
   });
 });

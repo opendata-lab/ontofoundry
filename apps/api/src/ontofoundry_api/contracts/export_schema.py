@@ -16,6 +16,7 @@ from ontofoundry_api.contracts.materials import MaterialOverview
 from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
 from ontofoundry_api.contracts.proposals import result_schema
 from ontofoundry_api.contracts.read_models import read_models_schema
+from ontofoundry_api.contracts.session_writes import session_writes_schema
 from ontofoundry_api.contracts.users import users_schema
 
 TARGET = Path(__file__).with_name("ontofoundry.proposals.v1.schema.json")
@@ -24,6 +25,13 @@ MATERIAL_TARGET = Path(__file__).with_name("ontofoundry.materials.v1.schema.json
 
 
 def export(*, check=False):
+    session_target = Path(__file__).with_name("ontofoundry.session-writes.v1.schema.json")
+    session_payload = json.dumps(session_writes_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    if check:
+        if not session_target.exists() or session_target.read_text() != session_payload:
+            raise SystemExit("会话写入 schema 与模型不一致，请重新生成")
+    else:
+        session_target.write_text(session_payload)
     gateway_target = Path(__file__).with_name("ontofoundry.gateway.v1.schema.json")
     gateway_payload = json.dumps(gateway_schema(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if check:

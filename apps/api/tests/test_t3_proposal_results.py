@@ -302,11 +302,10 @@ def test_material_paths_carry_over_to_later_runs(client, monkeypatch):
         ROOT + "/materials?name=a.md", content="# a\n内容\n".encode()
     ).json()
     session = create_session(client)
-    session = client.put(
+    session = client.patch(
         ROOT + f"/sessions/{session['id']}",
         json={
             "revision": session["revision"],
-            "draft": session["draft"],
             "material_ids": [material["id"]],
             "table_scope": "selected",
             "linked_tables": [],

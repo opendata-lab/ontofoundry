@@ -20,11 +20,10 @@ def overview(client):
 
 
 def save_materials(client, session, material_ids):
-    return client.put(
+    return client.patch(
         ROOT + f"/sessions/{session['id']}",
         json={
             "revision": session["revision"],
-            "draft": session["draft"],
             "material_ids": material_ids,
         },
     )

@@ -65,13 +65,10 @@ def test_save_impact_schema_accepts_server_result_and_rejects_missing_hash():
     edited = deepcopy(raw)
     edited["datasets"][0]["snapshot_date_column"] = "stat_date"
     calculation = calculate_element_save(
-        raw, raw, raw, edited, "dataset", edited["datasets"][0]["id"]
+        raw, edited, "dataset", edited["datasets"][0]["id"]
     )
     response = {
-        "current_version_id": None,
         "session_revision": 3,
-        "instance_change_sequence": 0,
-        "affected_instances": [],
         "affected_items": calculation.affected_items,
     }
     assert len(response["affected_items"]) == 6
