@@ -91,7 +91,7 @@ def _evidence_view(db: Session, workspace_id: str, entries: list[dict]) -> list[
     return views
 
 
-def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignment=None) -> dict[str, Any]:
+def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignment=None, diagnostics=None) -> dict[str, Any]:
     before, after = item.before_json, item.after_json
     element = after or before or {}
     status, reason = statuses[item.id]
@@ -109,7 +109,7 @@ def _item_view(db, workspace_id, item, statuses, dependencies, elements, alignme
     from ontofoundry_api.services.dataset_proposals import proposal_diagnostics
 
     return {
-        "source_diagnostics": proposal_diagnostics(db, workspace_id, item),
+        "source_diagnostics": proposal_diagnostics(db, workspace_id, item, diagnostics),
         "id": item.id,
         "batch_id": item.batch_id,
         "ordinal": item.ordinal,
@@ -244,13 +244,15 @@ def read_batch(
         element = item.after_json or item.before_json
         if element:
             elements[str(element["id"])] = (item.target_kind, element)
+    from ontofoundry_api.services.dataset_proposals import DiagnosticsContext
     from ontofoundry_api.services.proposal_alignment import AlignmentContext
 
     alignment = AlignmentContext(db, workspace_id, draft)
+    diagnostics = DiagnosticsContext(db, workspace_id, session)
     return {
         **_batch_summary(batch, items, statuses, session),
         "items": [
-            _item_view(db, workspace_id, i, statuses, dependencies, elements, alignment)
+            _item_view(db, workspace_id, i, statuses, dependencies, elements, alignment, diagnostics)
             for i in items
         ],
     }
