@@ -61,13 +61,13 @@ def test_numbers_written_as_text_are_rejected_with_the_property_named(values, me
     model = validate_instances(draft, [], [])
     with pytest.raises(ValueError) as error:
         check_accepted_values(model, [instance(type_id, **values)])
-    assert str(error.value) == message
+    assert str(error.value).startswith("member「") and str(error.value).endswith("：" + message)
 
 
 def test_every_wrong_property_is_reported():
     draft, type_id = member_draft()
     model = validate_instances(draft, [], [])
-    with pytest.raises(ValueError, match="会员号.*；余额"):
+    with pytest.raises(ValueError, match="会员号.*；member「42」：余额"):
         check_accepted_values(model, [instance(type_id, member_no="42", balance="1.5")])
 
 
@@ -101,3 +101,22 @@ def test_a_proposal_may_say_text_but_accepting_needs_a_number(client):
     accept_all(client, session, [fact(42)])
     values = [o["values"].get("visits") for o in client.get(ONTOLOGY + "/objects").json()["items"]]
     assert 42 in values
+
+
+def test_each_error_names_its_instance():
+    draft, type_id = member_draft()
+    model = validate_instances(draft, [], [])
+    first, second = instance(type_id, member_no=1, balance="9.9"), instance(type_id, member_no=2, balance="9.9")
+    with pytest.raises(ValueError) as error:
+        check_accepted_values(model, [first, second])
+    assert str(error.value) == (
+        "member「1」：余额（balance）必须是数字，不能写成文本 '9.9'；"
+        "member「2」：余额（balance）必须是数字，不能写成文本 '9.9'"
+    )
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_optional_value_is_missing_not_a_type_error(blank):
+    draft, type_id = member_draft()
+    model = validate_instances(draft, [instance(type_id, member_no=1, balance=blank, joined_at=blank)], [])
+    check_accepted_values(model, [instance(type_id, member_no=1, balance=blank, joined_at=blank)])

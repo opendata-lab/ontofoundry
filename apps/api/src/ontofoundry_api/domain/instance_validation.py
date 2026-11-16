@@ -70,16 +70,16 @@ def value_issues(
         # A fact taken from a document is identified by what the text says and
         # where; documents rarely carry system numbers. A missing value is
         # something to complete later, not a reason to block the model. A value
-        # of the wrong kind, though, is wrong.
-        if (attribute.required or attribute.identifier) and (
-            value is None or (isinstance(value, str) and not value.strip())
-        ):
+        # of the wrong kind, though, is wrong. A blank string is a missing value,
+        # never a type error.
+        missing = value is None or (isinstance(value, str) and not value.strip())
+        if missing and (attribute.required or attribute.identifier):
             code, severity, message = (
                 "INSTANCE_REQUIRED",
                 "warning",
                 f"{attribute.display_name or attribute.name} 待补全：原文未提供",
             )
-        elif value is not None and not valid_value(
+        elif not missing and not valid_value(
             attribute.value_kind, value, strict=strict
         ):
             kind = attribute.value_kind.value
