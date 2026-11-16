@@ -13,9 +13,8 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError, adminApi, api } from "../api/client";
 import type {
   AdminUser,
@@ -30,7 +29,7 @@ import type {
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { NoAccessResult } from "../components/NoAccessResult";
 import { PageHeader } from "../components/PageHeader";
-import { PlatformFrame } from "../components/PlatformFrame";
+import { AccountFrame } from "../components/AccountFrame";
 import {
   PageBody,
   PageToolbar,
@@ -87,7 +86,6 @@ function renderOutcome(outcome: GatewayOutcome, errorCode: string | null) {
 
 /** Platform admin external-agent gateway audit log (/admin/audit). */
 export function AdminAuditPage() {
-  const navigate = useNavigate();
 
   const [me, setMe] = useState<User | null>(null);
   const [forbidden, setForbidden] = useState(false);
@@ -220,9 +218,9 @@ export function AdminAuditPage() {
 
   if (forbidden || !me.is_platform_admin) {
     return (
-      <PlatformFrame user={me}>
+      <AccountFrame user={me}>
         <NoAccessResult subtitle="只有平台管理员（ADMIN_USERS）可以访问用户审计。" />
-      </PlatformFrame>
+      </AccountFrame>
     );
   }
 
@@ -349,164 +347,163 @@ export function AdminAuditPage() {
   ];
 
   return (
-    <PlatformFrame user={me}>
-      <PageHeader
-        title="用户审计"
-        note="查看外部智能体经用户网关发起的跨空间 MCP 调用记录，按开始时间倒序排列（异步写入，调用后数秒内出现）。"
-      >
-        <Button
-          icon={<RefreshCw className="size-icon-sm" />}
-          loading={loadingList}
-          onClick={() => setRefreshTick((n) => n + 1)}
+    <AccountFrame user={me}>
+      <div className="flex h-full min-h-0 flex-col bg-canvas">
+        <PageHeader
+          title="用户审计"
+          note="查看外部智能体经用户网关发起的跨空间 MCP 调用记录，按开始时间倒序排列（异步写入，调用后数秒内出现）。"
         >
-          刷新
-        </Button>
-        <Button icon={<ArrowLeft size={14} />} onClick={() => navigate("/")}>
-          返回工作空间
-        </Button>
-      </PageHeader>
-      <PageBody>
-        <PageToolbar
-          extra={
-            hasFilters ? (
-              <Button size="small" onClick={clearFilters}>
-                重置筛选
-              </Button>
-            ) : null
-          }
-        >
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            aria-label="筛选用户"
-            placeholder="全部用户"
-            className="w-44"
-            value={userId}
-            options={userOptions}
-            onChange={(val) => {
-              setUserId(val);
-              resetPaging();
-            }}
-          />
-          <Select
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            aria-label="筛选空间"
-            placeholder="全部空间"
-            className="w-44"
-            value={workspaceId}
-            options={workspaceOptions}
-            onChange={(val) => {
-              setWorkspaceId(val);
-              resetPaging();
-            }}
-          />
-          <Select
-            allowClear
-            aria-label="筛选工具"
-            placeholder="全部工具"
-            className="w-40"
-            value={tool}
-            options={TOOL_OPTIONS}
-            onChange={(val) => {
-              setTool(val);
-              resetPaging();
-            }}
-          />
-          <Select
-            allowClear
-            aria-label="筛选结果"
-            placeholder="全部结果"
-            className="w-32"
-            value={outcome}
-            options={OUTCOME_OPTIONS}
-            onChange={(val) => {
-              setOutcome(val);
-              resetPaging();
-            }}
-          />
-          <RangePicker
-            showTime
-            allowClear
-            placeholder={["开始时间", "结束时间"]}
-            value={timeRange}
-            onChange={(vals) => {
-              setTimeRange(vals);
-              resetPaging();
-            }}
-          />
-        </PageToolbar>
-
-        {listError && (
-          <Alert
-            type="error"
-            showIcon
-            message={listError}
-            action={
-              <Button size="small" onClick={() => setRefreshTick((n) => n + 1)}>
-                重试
-              </Button>
-            }
-          />
-        )}
-
-        <Panel>
-          <Table<GatewayCallSummary>
-            size="middle"
-            rowKey="id"
+          <Button
+            icon={<RefreshCw className="size-icon-sm" />}
             loading={loadingList}
-            dataSource={calls}
-            columns={columns}
-            pagination={false}
-            onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })}
-            onRow={(record) => ({
-              onClick: () => void openDetail(record.id),
-              className: "cursor-pointer",
-            })}
-            locale={{
-              emptyText: (
-                <Empty
-                  description={
-                    hasFilters ? "没有符合筛选条件的调用记录" : "暂无网关调用记录"
-                  }
-                />
-              ),
-            }}
-          />
-          {(page > 1 || nextCursor) && (
-            <div className="flex items-center justify-end gap-2 border-t border-rule px-4 py-2">
-              <Text type="secondary" className="text-xs">
-                每页 {PAGE_SIZE} 条
-              </Text>
-              <Button
-                size="small"
-                disabled={page <= 1 || loadingList}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                上一页
-              </Button>
-              <span className="tabular-nums text-xs">第 {page} 页</span>
-              <Button
-                size="small"
-                disabled={!nextCursor || loadingList}
-                onClick={() => {
-                  if (!nextCursor) return;
-                  setCursors((prev) => {
-                    const next = prev.slice(0, page);
-                    next[page] = nextCursor;
-                    return next;
-                  });
-                  setPage((p) => p + 1);
-                }}
-              >
-                下一页
-              </Button>
-            </div>
+            onClick={() => setRefreshTick((n) => n + 1)}
+          >
+            刷新
+          </Button>
+        </PageHeader>
+        <PageBody>
+          <PageToolbar
+            extra={
+              hasFilters ? (
+                <Button size="small" onClick={clearFilters}>
+                  重置筛选
+                </Button>
+              ) : null
+            }
+          >
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              aria-label="筛选用户"
+              placeholder="全部用户"
+              className="w-44"
+              value={userId}
+              options={userOptions}
+              onChange={(val) => {
+                setUserId(val);
+                resetPaging();
+              }}
+            />
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              aria-label="筛选空间"
+              placeholder="全部空间"
+              className="w-44"
+              value={workspaceId}
+              options={workspaceOptions}
+              onChange={(val) => {
+                setWorkspaceId(val);
+                resetPaging();
+              }}
+            />
+            <Select
+              allowClear
+              aria-label="筛选工具"
+              placeholder="全部工具"
+              className="w-40"
+              value={tool}
+              options={TOOL_OPTIONS}
+              onChange={(val) => {
+                setTool(val);
+                resetPaging();
+              }}
+            />
+            <Select
+              allowClear
+              aria-label="筛选结果"
+              placeholder="全部结果"
+              className="w-32"
+              value={outcome}
+              options={OUTCOME_OPTIONS}
+              onChange={(val) => {
+                setOutcome(val);
+                resetPaging();
+              }}
+            />
+            <RangePicker
+              showTime
+              allowClear
+              placeholder={["开始时间", "结束时间"]}
+              value={timeRange}
+              onChange={(vals) => {
+                setTimeRange(vals);
+                resetPaging();
+              }}
+            />
+          </PageToolbar>
+
+          {listError && (
+            <Alert
+              type="error"
+              showIcon
+              message={listError}
+              action={
+                <Button size="small" onClick={() => setRefreshTick((n) => n + 1)}>
+                  重试
+                </Button>
+              }
+            />
           )}
-        </Panel>
-      </PageBody>
+
+          <Panel>
+            <Table<GatewayCallSummary>
+              size="middle"
+              rowKey="id"
+              loading={loadingList}
+              dataSource={calls}
+              columns={columns}
+              pagination={false}
+              onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })}
+              onRow={(record) => ({
+                onClick: () => void openDetail(record.id),
+                className: "cursor-pointer",
+              })}
+              locale={{
+                emptyText: (
+                  <Empty
+                    description={
+                      hasFilters ? "没有符合筛选条件的调用记录" : "暂无网关调用记录"
+                    }
+                  />
+                ),
+              }}
+            />
+            {(page > 1 || nextCursor) && (
+              <div className="flex items-center justify-end gap-2 border-t border-rule px-4 py-2">
+                <Text type="secondary" className="text-xs">
+                  每页 {PAGE_SIZE} 条
+                </Text>
+                <Button
+                  size="small"
+                  disabled={page <= 1 || loadingList}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  上一页
+                </Button>
+                <span className="tabular-nums text-xs">第 {page} 页</span>
+                <Button
+                  size="small"
+                  disabled={!nextCursor || loadingList}
+                  onClick={() => {
+                    if (!nextCursor) return;
+                    setCursors((prev) => {
+                      const next = prev.slice(0, page);
+                      next[page] = nextCursor;
+                      return next;
+                    });
+                    setPage((p) => p + 1);
+                  }}
+                >
+                  下一页
+                </Button>
+              </div>
+            )}
+          </Panel>
+        </PageBody>
+      </div>
 
       <Drawer
         open={Boolean(selectedId)}
@@ -603,6 +600,6 @@ export function AdminAuditPage() {
           </div>
         ) : null}
       </Drawer>
-    </PlatformFrame>
+    </AccountFrame>
   );
 }

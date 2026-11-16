@@ -103,6 +103,7 @@ core-1 P0 起前端改用 Ant Design 5 + Tailwind CSS v4。功能迁移完成后
 | `ApplicationFrame` | U1 应用框架：顶栏、可收起侧栏和剩余高度的页面区域；沿用原有窄屏整体缩放 |
 | `AsyncSurface` | U1 加载与错误反馈的 24px 内边距；整页路由错误居中，不额外嵌套面板 |
 | `DirectoryFrame` | U2 工作空间目录的独立顶栏与居中主体，主体内继续使用 `PageHeader` / `PageBody`，宽度与顶栏高度引用 tokens |
+| `AccountFrame` | 个人与平台管理页（2026-11-15 用户决定）：沿用 `ApplicationFrame` 的顶栏与左侧栏，侧栏为“返回工作空间”、个人（个人信息、个人令牌）、平台管理（用户管理、用户审计，仅平台管理员）；页面与工作空间页相同，`PageHeader` + `PageBody` 铺满右侧。原 `/me`、`/me/tokens`、`/admin/users`、`/admin/audit` 地址不变 |
 
 U1 框架页签采用 Ant Design editable-card Tabs，页面仍通过 items.children 渲染。仅页签条使用 `workspace-tab-bar` tokens 类，内容区只以直接子选择器约束剩余高度；页面内 Tabs 不继承框架的尺寸与颜色。框架页签为 14px 正文字号（2026-10-20 由 12px 调大），图标同步使用标准图标尺寸，侧栏为 14px 正文字号，品牌字为 16px；品牌图形保留原有四块菱形构造，装饰尺寸集中在 tokens 中。导航链接仍使用路由链接以保留浏览器链接行为，操作按钮使用 Ant Design。
 

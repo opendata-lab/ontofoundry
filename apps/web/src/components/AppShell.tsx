@@ -35,7 +35,7 @@ import { ErrorSurface, LoadingSurface } from "./AsyncState";
 import { NoAccessResult } from "./NoAccessResult";
 import { PlatformFrame } from "./PlatformFrame";
 import { UserMenu } from "./UserMenu";
-import { ApplicationFrame, DirectoryFrame } from "./layout";
+import { ApplicationFrame, DirectoryFrame, navLinkClass } from "./layout";
 
 type NavItem = {
   to: string;
@@ -163,9 +163,7 @@ export function AppShell() {
       key={to}
       to={`/workspaces/${workspaceId}/${to}`}
       title={collapsed ? label : undefined}
-      className={({ isActive }) =>
-        `app-nav-link flex min-h-10 items-center gap-3 rounded-sm px-3 text-sm ${isActive ? "bg-accent-soft font-semibold text-accent hover:text-accent" : "text-ink-2 hover:bg-surface-soft hover:text-ink"}`
-      }
+      className={({ isActive }) => navLinkClass(isActive)}
     >
       <Icon className="size-icon flex-none" />
       {!collapsed && <span>{label}</span>}

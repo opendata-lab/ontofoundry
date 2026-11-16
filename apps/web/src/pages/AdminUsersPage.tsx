@@ -12,9 +12,8 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { ArrowLeft, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError, adminApi, api } from "../api/client";
 import type {
   AdminUser,
@@ -25,7 +24,7 @@ import type {
 } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
 import { NoAccessResult } from "../components/NoAccessResult";
-import { PlatformFrame } from "../components/PlatformFrame";
+import { AccountFrame } from "../components/AccountFrame";
 import { PageHeader } from "../components/PageHeader";
 import { PageBody, PageToolbar, Panel } from "../components/layout";
 import { ROLE_OPTIONS } from "../hooks/useWorkspacePermissions";
@@ -55,7 +54,6 @@ function adminErrorText(error: unknown, fallback: string) {
 
 /** Platform admin user management and workspace assignment (/admin/users). */
 export function AdminUsersPage() {
-  const navigate = useNavigate();
   const { message } = App.useApp();
 
   const [me, setMe] = useState<User | null>(null);
@@ -143,9 +141,9 @@ export function AdminUsersPage() {
 
   if (forbidden || !me.is_platform_admin) {
     return (
-      <PlatformFrame user={me}>
+      <AccountFrame user={me}>
         <NoAccessResult subtitle="只有平台管理员（ADMIN_USERS）可以访问用户管理。" />
-      </PlatformFrame>
+      </AccountFrame>
     );
   }
 
@@ -228,151 +226,149 @@ export function AdminUsersPage() {
   };
 
   return (
-    <PlatformFrame user={me}>
-      <PageHeader
-        title="用户管理"
-        note="按用户名识别用户，支持预建账号并提前分配空间；平台管理员角色由配置文件 ADMIN_USERS 推导。"
-      >
-        <Button icon={<ArrowLeft size={14} />} onClick={() => navigate("/")}>
-          返回工作空间
-        </Button>
-      </PageHeader>
-      <PageBody>
-        <PageToolbar
-          extra={
-            <>
-              <Text type="secondary" className="text-xs">
-                {users.length} 位用户
-              </Text>
-              <Input
-                type="search"
-                allowClear
-                aria-label="搜索用户名或显示名"
-                prefix={<Search size={14} className="text-muted" />}
-                placeholder="搜索用户名或显示名"
-                className="w-60"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </>
-          }
-        >
-          <Button
-            type="primary"
-            icon={<Plus size={14} />}
-            onClick={() => {
-              setCreateError("");
-              setCreateOpen(true);
-            }}
+    <AccountFrame user={me}>
+      <div className="flex h-full min-h-0 flex-col bg-canvas">
+        <PageHeader
+          title="用户管理"
+          note="按用户名识别用户，支持预建账号并提前分配空间；平台管理员角色由配置文件 ADMIN_USERS 推导。"
+         />
+        <PageBody>
+          <PageToolbar
+            extra={
+              <>
+                <Text type="secondary" className="text-xs">
+                  {users.length} 位用户
+                </Text>
+                <Input
+                  type="search"
+                  allowClear
+                  aria-label="搜索用户名或显示名"
+                  prefix={<Search size={14} className="text-muted" />}
+                  placeholder="搜索用户名或显示名"
+                  className="w-60"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </>
+            }
           >
-            新建用户
-          </Button>
-        </PageToolbar>
-        <Panel>
-          <Table<AdminUser>
-            size="middle"
-            rowKey="id"
-            loading={loadingList}
-            dataSource={users}
-            onHeaderRow={() => ({ className: "text-xs" })}
-            pagination={users.length > 20 ? { pageSize: 20 } : false}
-            locale={{
-              emptyText: <Empty description={query ? "没有匹配的用户" : "暂无用户"} />,
-            }}
-            columns={[
-              {
-                title: "用户名",
-                key: "username",
-                width: 140,
-                render: (_, u) => <code>{u.username}</code>,
-              },
-              {
-                title: "显示名",
-                dataIndex: "display_name",
-                width: 120,
-              },
-              {
-                title: "本地账号",
-                key: "local_account",
-                width: 96,
-                render: (_, u) =>
-                  u.local_account ? "是" : <Text type="secondary">否</Text>,
-              },
-              {
-                title: "平台管理员",
-                key: "platform_admin",
-                width: 120,
-                render: (_, u) =>
-                  u.platform_admin ? (
-                    <Tag className="m-0 border-0 bg-accent-soft text-accent">
-                      平台管理员
-                    </Tag>
-                  ) : (
-                    <Text type="secondary">—</Text>
-                  ),
-              },
-              {
-                title: "所在空间",
-                key: "workspaces",
-                render: (_, u) => {
-                  if (!u.platform_admin && !u.workspaces.length) {
-                    return <Text type="secondary">—</Text>;
-                  }
-                  return (
-                    <span className="flex flex-wrap gap-1">
-                      {u.platform_admin && (
-                        <Tag className="m-0 border-0 bg-accent-soft text-accent">
-                          全部空间（超级管理员）
-                        </Tag>
-                      )}
-                      {u.workspaces.map((ws) => (
-                        <Tag key={ws.id} className="m-0">
-                          {ws.name}
-                        </Tag>
-                      ))}
-                    </span>
-                  );
+            <Button
+              type="primary"
+              icon={<Plus size={14} />}
+              onClick={() => {
+                setCreateError("");
+                setCreateOpen(true);
+              }}
+            >
+              新建用户
+            </Button>
+          </PageToolbar>
+          <Panel>
+            <Table<AdminUser>
+              size="middle"
+              rowKey="id"
+              loading={loadingList}
+              dataSource={users}
+              onHeaderRow={() => ({ className: "text-xs" })}
+              pagination={users.length > 20 ? { pageSize: 20 } : false}
+              locale={{
+                emptyText: <Empty description={query ? "没有匹配的用户" : "暂无用户"} />,
+              }}
+              columns={[
+                {
+                  title: "用户名",
+                  key: "username",
+                  width: 140,
+                  render: (_, u) => <code>{u.username}</code>,
                 },
-              },
-              {
-                title: "最近登录",
-                key: "last_login_at",
-                width: 170,
-                render: (_, u) =>
-                  u.last_login_at ? (
-                    <span className="tabular-nums text-xs">
-                      {formatLoginTime(u.last_login_at)}
-                    </span>
-                  ) : (
-                    <Text type="secondary" className="text-xs">
-                      尚未登录
-                    </Text>
+                {
+                  title: "显示名",
+                  dataIndex: "display_name",
+                  width: 120,
+                },
+                {
+                  title: "本地账号",
+                  key: "local_account",
+                  width: 96,
+                  render: (_, u) =>
+                    u.local_account ? "是" : <Text type="secondary">否</Text>,
+                },
+                {
+                  title: "平台管理员",
+                  key: "platform_admin",
+                  width: 120,
+                  render: (_, u) =>
+                    u.platform_admin ? (
+                      <Tag className="m-0 border-0 bg-accent-soft text-accent">
+                        平台管理员
+                      </Tag>
+                    ) : (
+                      <Text type="secondary">—</Text>
+                    ),
+                },
+                {
+                  title: "所在空间",
+                  key: "workspaces",
+                  render: (_, u) => {
+                    if (!u.platform_admin && !u.workspaces.length) {
+                      return <Text type="secondary">—</Text>;
+                    }
+                    return (
+                      <span className="flex flex-wrap gap-1">
+                        {u.platform_admin && (
+                          <Tag className="m-0 border-0 bg-accent-soft text-accent">
+                            全部空间（超级管理员）
+                          </Tag>
+                        )}
+                        {u.workspaces.map((ws) => (
+                          <Tag key={ws.id} className="m-0">
+                            {ws.name}
+                          </Tag>
+                        ))}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  title: "最近登录",
+                  key: "last_login_at",
+                  width: 170,
+                  render: (_, u) =>
+                    u.last_login_at ? (
+                      <span className="tabular-nums text-xs">
+                        {formatLoginTime(u.last_login_at)}
+                      </span>
+                    ) : (
+                      <Text type="secondary" className="text-xs">
+                        尚未登录
+                      </Text>
+                    ),
+                },
+                {
+                  title: "操作",
+                  key: "actions",
+                  width: 100,
+                  align: "right",
+                  render: (_, u) => (
+                    <Button
+                      type="link"
+                      size="small"
+                      onClick={() => {
+                        setDrawerError("");
+                        setAddWsId(undefined);
+                        setAddRole("member");
+                        setDrawerUserId(u.id);
+                      }}
+                    >
+                      分配空间
+                    </Button>
                   ),
-              },
-              {
-                title: "操作",
-                key: "actions",
-                width: 100,
-                align: "right",
-                render: (_, u) => (
-                  <Button
-                    type="link"
-                    size="small"
-                    onClick={() => {
-                      setDrawerError("");
-                      setAddWsId(undefined);
-                      setAddRole("member");
-                      setDrawerUserId(u.id);
-                    }}
-                  >
-                    分配空间
-                  </Button>
-                ),
-              },
-            ]}
-          />
-        </Panel>
-      </PageBody>
+                },
+              ]}
+            />
+          </Panel>
+        </PageBody>
+      </div>
 
       <Modal
         open={createOpen}
@@ -579,6 +575,6 @@ export function AdminUsersPage() {
           </div>
         )}
       </Drawer>
-    </PlatformFrame>
+    </AccountFrame>
   );
 }

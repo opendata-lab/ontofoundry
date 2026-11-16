@@ -15,7 +15,7 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ArrowLeft, Check, Copy, Pencil, Plus } from "lucide-react";
+import { Check, Copy, Pencil, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, api } from "../api/client";
@@ -27,10 +27,10 @@ import type {
   User,
 } from "../api/types";
 import { ErrorSurface, LoadingSurface } from "../components/AsyncState";
-import { PlatformFrame } from "../components/PlatformFrame";
+import { AccountFrame } from "../components/AccountFrame";
 import {
   PageBody,
-  PageTabs,
+  PageHeader,
   PageToolbar,
   Panel,
   PanelToolbar,
@@ -439,177 +439,163 @@ export function MePage() {
   ];
 
   return (
-    <PlatformFrame user={user}>
-      <PageTabs
-        title="个人中心"
-        note="查看本人账号与空间成员身份，或签发外部智能体网关个人令牌。"
-        actions={
-          <Button icon={<ArrowLeft size={14} />} onClick={() => navigate("/")}>
-            返回工作空间
-          </Button>
-        }
-        activeKey={activeTab}
-        onChange={(key) => navigate(key === "tokens" ? "/me/tokens" : "/me")}
-        items={[
-          {
-            key: "profile",
-            label: "个人信息",
-            children: (
-              <PageBody>
-                <Panel className="mx-auto w-full max-w-settings">
-                  <PanelToolbar>
-                    <SectionTitle title="个人信息" />
-                  </PanelToolbar>
-                  <div className="p-4">
-                    <Descriptions column={2} size="small" colon={false}>
-                      <Descriptions.Item label="用户名">
-                        <code>{user.username}</code>
-                      </Descriptions.Item>
-                      <Descriptions.Item label="显示名">{user.display_name}</Descriptions.Item>
-                      <Descriptions.Item label="邮箱">
-                        {user.email || <Text type="secondary">—</Text>}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="本地账号">
-                        {user.local_account ? "是" : "否"}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </div>
-                </Panel>
-                <Panel className="mx-auto w-full max-w-settings">
-                  <PanelToolbar
-                    extra={
-                      user.is_platform_admin ? (
-                        <Tag className="m-0 border-0 bg-accent-soft text-accent">
-                          全部空间（超级管理员）
-                        </Tag>
-                      ) : null
-                    }
-                  >
-                    <SectionTitle
-                      title="所在空间及角色"
-                      note={
-                        user.is_platform_admin
-                          ? `超级管理员可管理全部空间 · 成员记录 ${workspaces.length} 条`
-                          : `${workspaces.length} 个已加入的工作空间`
-                      }
-                    />
-                  </PanelToolbar>
-                  <Table<MeWorkspace>
-                    size="middle"
-                    rowKey="id"
-                    pagination={false}
-                    dataSource={workspaces}
-                    onHeaderRow={() => ({ className: "text-xs" })}
-                    locale={{
-                      emptyText: (
-                        <Empty description="暂未加入任何工作空间，请联系空间管理员或平台管理员分配。" />
-                      ),
-                    }}
-                    columns={[
-                      {
-                        title: "工作空间",
-                        key: "name",
-                        render: (_, ws) => (
-                          <span className="inline-flex items-center gap-2">
-                            <strong className="text-ink">{ws.name}</strong>
-                            {ws.is_public && (
-                              <Tag className="m-0 border-0 bg-accent-soft text-accent">公开</Tag>
-                            )}
-                          </span>
-                        ),
-                      },
-                      {
-                        title: "空间角色",
-                        key: "role",
-                        width: 140,
-                        render: (_, ws) => (
-                          <Tag
-                            className={
-                              ws.role === "admin"
-                                ? "m-0 border-0 bg-accent-soft text-accent"
-                                : "m-0 border-rule bg-surface-soft text-ink-2"
-                            }
-                          >
-                            {ROLE_LABELS[ws.role] ?? ws.role}
-                          </Tag>
-                        ),
-                      },
-                      {
-                        title: "",
-                        key: "enter",
-                        width: 110,
-                        align: "right",
-                        render: (_, ws) => (
-                          <Button
-                            type="link"
-                            size="small"
-                            onClick={() => navigate(`/workspaces/${ws.id}/view`)}
-                          >
-                            进入空间
-                          </Button>
-                        ),
-                      },
-                    ]}
-                  />
-                </Panel>
-              </PageBody>
-            ),
-          },
-          {
-            key: "tokens",
-            label: "个人令牌",
-            children: (
-              <PageBody>
-                <div className="mx-auto flex w-full max-w-settings flex-col gap-4">
-                  <PageToolbar
-                    extra={
-                      <Text type="secondary" className="text-xs">
-                        {tokens.length} 个有效令牌 · 永不过期，可随时撤销
-                      </Text>
-                    }
-                  >
-                    <Button
-                      type="primary"
-                      icon={<Plus size={14} />}
-                      onClick={openCreateModal}
-                    >
-                      新建令牌
+    <AccountFrame user={user}>
+      <div className="flex h-full min-h-0 flex-col bg-canvas">
+        {activeTab === "tokens" ? (
+          <>
+            <PageHeader title="个人令牌" note="外部智能体网关使用的个人令牌。" />
+          <PageBody>
+            <div className="flex flex-col gap-4">
+              <PageToolbar
+                extra={
+                  <Text type="secondary" className="text-xs">
+                    {tokens.length} 个有效令牌 · 永不过期，可随时撤销
+                  </Text>
+                }
+              >
+                <Button
+                  type="primary"
+                  icon={<Plus size={14} />}
+                  onClick={openCreateModal}
+                >
+                  新建令牌
+                </Button>
+              </PageToolbar>
+              {tokensError && (
+                <Alert
+                  type="error"
+                  showIcon
+                  message={tokensError}
+                  action={
+                    <Button size="small" onClick={() => void loadTokens()}>
+                      重试
                     </Button>
-                  </PageToolbar>
-                  {tokensError && (
-                    <Alert
-                      type="error"
-                      showIcon
-                      message={tokensError}
-                      action={
-                        <Button size="small" onClick={() => void loadTokens()}>
-                          重试
-                        </Button>
-                      }
-                    />
-                  )}
-                  <Panel>
-                    <Table<PersonalToken>
-                      size="middle"
-                      rowKey="id"
-                      loading={tokensLoading}
-                      pagination={false}
-                      dataSource={tokens}
-                      onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })}
-                      locale={{
-                        emptyText: (
-                          <Empty description="暂无个人令牌，点击「新建令牌」签发后即可在外部智能体中使用。" />
-                        ),
-                      }}
-                      columns={tokenColumns}
-                    />
-                  </Panel>
-                </div>
-              </PageBody>
-            ),
-          },
-        ]}
-      />
+                  }
+                />
+              )}
+              <Panel>
+                <Table<PersonalToken>
+                  size="middle"
+                  rowKey="id"
+                  loading={tokensLoading}
+                  pagination={false}
+                  dataSource={tokens}
+                  onHeaderRow={() => ({ className: "text-xs whitespace-nowrap" })}
+                  locale={{
+                    emptyText: (
+                      <Empty description="暂无个人令牌，点击「新建令牌」签发后即可在外部智能体中使用。" />
+                    ),
+                  }}
+                  columns={tokenColumns}
+                />
+              </Panel>
+            </div>
+          </PageBody>
+          </>
+        ) : (
+          <>
+            <PageHeader title="个人信息" note="本人账号与所在空间的成员身份。" />
+          <PageBody>
+            <Panel className="w-full max-w-settings">
+              <PanelToolbar>
+                <SectionTitle title="个人信息" />
+              </PanelToolbar>
+              <div className="p-4">
+                <Descriptions column={2} size="small" colon={false}>
+                  <Descriptions.Item label="用户名">
+                    <code>{user.username}</code>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="显示名">{user.display_name}</Descriptions.Item>
+                  <Descriptions.Item label="邮箱">
+                    {user.email || <Text type="secondary">—</Text>}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="本地账号">
+                    {user.local_account ? "是" : "否"}
+                  </Descriptions.Item>
+                </Descriptions>
+              </div>
+            </Panel>
+            <Panel className="w-full max-w-settings">
+              <PanelToolbar
+                extra={
+                  user.is_platform_admin ? (
+                    <Tag className="m-0 border-0 bg-accent-soft text-accent">
+                      全部空间（超级管理员）
+                    </Tag>
+                  ) : null
+                }
+              >
+                <SectionTitle
+                  title="所在空间及角色"
+                  note={
+                    user.is_platform_admin
+                      ? `超级管理员可管理全部空间 · 成员记录 ${workspaces.length} 条`
+                      : `${workspaces.length} 个已加入的工作空间`
+                  }
+                />
+              </PanelToolbar>
+              <Table<MeWorkspace>
+                size="middle"
+                rowKey="id"
+                pagination={false}
+                dataSource={workspaces}
+                onHeaderRow={() => ({ className: "text-xs" })}
+                locale={{
+                  emptyText: (
+                    <Empty description="暂未加入任何工作空间，请联系空间管理员或平台管理员分配。" />
+                  ),
+                }}
+                columns={[
+                  {
+                    title: "工作空间",
+                    key: "name",
+                    render: (_, ws) => (
+                      <span className="inline-flex items-center gap-2">
+                        <strong className="text-ink">{ws.name}</strong>
+                        {ws.is_public && (
+                          <Tag className="m-0 border-0 bg-accent-soft text-accent">公开</Tag>
+                        )}
+                      </span>
+                    ),
+                  },
+                  {
+                    title: "空间角色",
+                    key: "role",
+                    width: 140,
+                    render: (_, ws) => (
+                      <Tag
+                        className={
+                          ws.role === "admin"
+                            ? "m-0 border-0 bg-accent-soft text-accent"
+                            : "m-0 border-rule bg-surface-soft text-ink-2"
+                        }
+                      >
+                        {ROLE_LABELS[ws.role] ?? ws.role}
+                      </Tag>
+                    ),
+                  },
+                  {
+                    title: "",
+                    key: "enter",
+                    width: 110,
+                    align: "right",
+                    render: (_, ws) => (
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={() => navigate(`/workspaces/${ws.id}/view`)}
+                      >
+                        进入空间
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            </Panel>
+          </PageBody>
+          </>
+        )}
+      </div>
       <Modal
         open={createOpen}
         title={createdToken ? "令牌已生成" : "新建令牌"}
@@ -694,6 +680,6 @@ export function MePage() {
           </Form>
         )}
       </Modal>
-    </PlatformFrame>
+    </AccountFrame>
   );
 }
