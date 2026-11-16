@@ -397,3 +397,39 @@ def test_document_proposal_labels_use_candidate_titles_and_endpoints(client):
     labels = {item["client_ref"]: item["display_name"] for item in batch["items"]}
     assert labels["lan"] == "小岚" and labels["zhou"] == "小舟"
     assert labels["fact-link"] == "小岚 → 小舟"
+
+
+def test_batch_read_builds_the_candidate_once_and_keeps_item_diagnostics(client, monkeypatch):
+    """A batch read used to rebuild the candidate graph per item (quadratic in batch size)."""
+    from ontofoundry_api.db_models import ProposalItemRecord
+    from ontofoundry_api.services import dataset_proposals
+
+    session = create_session(client)
+    sales = next(d for d in session["draft"]["datasets"] if d["name"] == "sales")
+
+    def metric(ref, name):
+        return create(ref, "metric", {
+            "name": name, "display_name": name, "kind": "simple", "dataset_id": sales["id"],
+            "aggregation": "sum", "measure": {"dataset_id": sales["id"], "column": "amount"},
+        })
+
+    batch = seed_batch(client, session, [*chain(session), metric("m1", "total_a"), metric("m2", "total_b")])
+
+    # The source is unavailable, so both metrics carry a real diagnostic.
+    builds, checks = [], []
+    original = dataset_proposals.candidate_for
+    monkeypatch.setattr(dataset_proposals, "candidate_for", lambda db, s: builds.append(1) or original(db, s))
+    monkeypatch.setattr(dataset_proposals, "check_dataset", lambda db, ws, dataset: checks.append(str(dataset.id)) or {
+        "valid": False, "columns": None, "diagnostics": [{"code": "CONNECTION_UNBOUND", "severity": "error", "path": "/connection_id", "message": "x"}]})
+    read = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{batch['id']}").json()
+    assert len(builds) == 1 and checks == [sales["id"]]  # one candidate, one check per dataset
+
+    # Same diagnostics as computing each item on its own.
+    with client.app.state.session_factory() as db:
+        expected = {
+            item.id: dataset_proposals.proposal_diagnostics(db, session["workspace_id"], item)
+            for item in db.scalars(select(ProposalItemRecord).where(ProposalItemRecord.batch_id == batch["id"]))
+        }
+    assert {i["id"]: i["source_diagnostics"] for i in read["items"]} == expected
+    metrics = [i["source_diagnostics"] for i in read["items"] if i["target_kind"] == "metric"]
+    assert [[d["code"] for d in diags] for diags in metrics] == [["DATASET_SOURCE_BLOCKED"]] * 2

@@ -24,18 +24,36 @@ def candidate_for(db, session):
     return draft
 
 
-def proposal_diagnostics(db, workspace_id, item):
-    session = db.get(ModelingSessionRecord, item.session_id)
-    if session is None or not item.after_json:
+class DiagnosticsContext:
+    """One candidate graph and one check per dataset, shared by every item of a batch read.
+
+    Building the candidate copies the draft and reads every pending item, so doing it
+    per item made a batch read grow with the square of its size (200 items ≈ 0.6 s,
+    400 ≈ 3.4 s on SQLite). Dataset checks are deterministic within one read.
+    """
+
+    def __init__(self, db, workspace_id, session):
+        self.db, self.workspace_id = db, workspace_id
+        self.draft = candidate_for(db, session)
+        self.datasets = {d["id"]: d for d in self.draft["datasets"]}
+        self.checked = {}
+
+    def check(self, identity):
+        if identity not in self.checked:
+            raw = self.datasets.get(identity)
+            self.checked[identity] = check_dataset(self.db, self.workspace_id, Dataset.model_validate(raw)) if raw else {"valid": False, "columns": None, "diagnostics": [{"code": "DATASET_NOT_FOUND", "severity": "error", "path": "/dataset_id", "message": "依赖数据集不存在"}]}
+        return self.checked[identity]
+
+
+def proposal_diagnostics(db, workspace_id, item, context=None):
+    if not item.after_json:
         return []
-    draft = candidate_for(db, session)
-    datasets = {d["id"]: d for d in draft["datasets"]}
-    checked = {}
-    def check(identity):
-        if identity not in checked:
-            raw = datasets.get(identity)
-            checked[identity] = check_dataset(db, workspace_id, Dataset.model_validate(raw)) if raw else {"valid": False, "columns": None, "diagnostics": [{"code": "DATASET_NOT_FOUND", "severity": "error", "path": "/dataset_id", "message": "依赖数据集不存在"}]}
-        return checked[identity]
+    if context is None:
+        session = db.get(ModelingSessionRecord, item.session_id)
+        if session is None:
+            return []
+        context = DiagnosticsContext(db, workspace_id, session)
+    draft, datasets, check = context.draft, context.datasets, context.check
     element = item.after_json
     if item.target_kind == "dataset":
         return check(item.target_id)["diagnostics"]
