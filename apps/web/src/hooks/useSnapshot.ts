@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, modelingApi } from "../api/client";
-import type { Draft, User, Workspace } from "../api/types";
+import type { Draft, ModelingSession, User, Workspace } from "../api/types";
 import { emptyDraft } from "../lib/coreModel";
 import { usePageActive } from "./usePageTab";
 import { getWorkspacePermissions } from "./useWorkspacePermissions";
@@ -18,6 +18,7 @@ export function useSnapshot(workspace: Workspace, user?: User | null) {
   const [params] = useSearchParams();
   const sid = params.get("session");
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [session, setSession] = useState<ModelingSession | null>(null);
   const [error, setError] = useState("");
   const request = useRef(0);
   const invalidate = useCallback(() => {
@@ -27,8 +28,12 @@ export function useSnapshot(workspace: Workspace, user?: User | null) {
     const revision = ++request.current;
     setError("");
     setDraft(null);
-    const accept = (next: Draft) => {
-      if (revision === request.current) setDraft(next);
+    if (!sid) setSession(null);
+    const accept = (next: Draft, nextSession: ModelingSession | null = null) => {
+      if (revision === request.current) {
+        setDraft(next);
+        setSession(nextSession);
+      }
     };
     const fail = (error: Error) => {
       if (revision === request.current) setError(error.message);
@@ -36,9 +41,9 @@ export function useSnapshot(workspace: Workspace, user?: User | null) {
     if (sid && canRead)
       modelingApi
         .get(workspace.id, sid)
-        .then((s) => accept(s.draft))
+        .then((s) => accept(s.draft, s))
         .catch(fail);
-    else if (canRead) modelingApi.snapshot(workspace.id, workspace.version_id).then(accept).catch(fail);
+    else if (canRead) modelingApi.snapshot(workspace.id, workspace.version_id).then((d) => accept(d)).catch(fail);
     else if (!workspace.version_id) accept(emptyDraft(workspace.id));
     else
       api
@@ -57,7 +62,8 @@ export function useSnapshot(workspace: Workspace, user?: User | null) {
       if (sid && detail.session?.id === sid) {
         request.current++;
         setDraft(detail.session.draft);
-      } else if (active && !sid) load();
+        setSession(detail.session);
+      } else if (active && !sid && !detail.session) load();
     };
     window.addEventListener(ONTOLOGY_SAVED, saved);
     return () => window.removeEventListener(ONTOLOGY_SAVED, saved);
@@ -65,6 +71,8 @@ export function useSnapshot(workspace: Workspace, user?: User | null) {
   return {
     draft,
     setDraft,
+    session,
+    setSession,
     error,
     load,
     sessionId: sid,

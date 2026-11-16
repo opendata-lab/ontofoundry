@@ -1,0 +1,2458 @@
+{
+  "$defs": {
+    "AffectedItem": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_target_hash": {
+          "title": "Expected Target Hash",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "expected_target_hash"
+      ],
+      "title": "AffectedItem",
+      "type": "object"
+    },
+    "Aggregation": {
+      "enum": [
+        "sum",
+        "avg",
+        "median",
+        "min",
+        "max",
+        "count",
+        "count_distinct"
+      ],
+      "title": "Aggregation",
+      "type": "string"
+    },
+    "BindingMode": {
+      "enum": [
+        "independent",
+        "shared_parent"
+      ],
+      "title": "BindingMode",
+      "type": "string"
+    },
+    "ColumnBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "kind": {
+          "const": "column",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Source Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "source_id",
+        "column"
+      ],
+      "title": "ColumnBinding",
+      "type": "object"
+    },
+    "ColumnReference": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Column",
+          "type": "string"
+        },
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "column"
+      ],
+      "title": "ColumnReference",
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "properties": {
+        "column": {
+          "$ref": "#/$defs/ColumnReference"
+        },
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "column",
+        "operator"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "CoreDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "datasets": {
+          "items": {
+            "$ref": "#/$defs/Dataset"
+          },
+          "title": "Datasets",
+          "type": "array"
+        },
+        "link_types": {
+          "items": {
+            "$ref": "#/$defs/LinkType"
+          },
+          "title": "Link Types",
+          "type": "array"
+        },
+        "mappings": {
+          "items": {
+            "$ref": "#/$defs/DataMapping"
+          },
+          "title": "Mappings",
+          "type": "array"
+        },
+        "metrics": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "expression": "#/$defs/ExpressionMetric",
+                "ratio": "#/$defs/RatioMetric",
+                "simple": "#/$defs/SimpleMetric"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/SimpleMetric"
+              },
+              {
+                "$ref": "#/$defs/RatioMetric"
+              },
+              {
+                "$ref": "#/$defs/ExpressionMetric"
+              }
+            ]
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "object_types": {
+          "items": {
+            "$ref": "#/$defs/ObjectType"
+          },
+          "title": "Object Types",
+          "type": "array"
+        },
+        "properties": {
+          "items": {
+            "$ref": "#/$defs/Property"
+          },
+          "title": "Properties",
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/Rule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "core-1",
+          "default": "core-1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "value_types": {
+          "items": {
+            "$ref": "#/$defs/ValueType"
+          },
+          "title": "Value Types",
+          "type": "array"
+        },
+        "workspace_id": {
+          "format": "uuid",
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workspace_id"
+      ],
+      "title": "CoreDraft",
+      "type": "object"
+    },
+    "DataMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_mode": {
+          "$ref": "#/$defs/BindingMode"
+        },
+        "fields": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "column": "#/$defs/ColumnBinding",
+                "expression": "#/$defs/ExpressionBinding"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ColumnBinding"
+              },
+              {
+                "$ref": "#/$defs/ExpressionBinding"
+              }
+            ]
+          },
+          "title": "Fields",
+          "type": "object"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "inherited_link_bindings": {
+          "additionalProperties": {
+            "discriminator": {
+              "mapping": {
+                "direct": "#/$defs/DirectJoin",
+                "mapping_table": "#/$defs/MappingTableJoin"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DirectJoin"
+              },
+              {
+                "$ref": "#/$defs/MappingTableJoin"
+              }
+            ]
+          },
+          "propertyNames": {
+            "format": "uuid"
+          },
+          "title": "Inherited Link Bindings",
+          "type": "object"
+        },
+        "membership_source_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Membership Source Id"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/MappingSource"
+          },
+          "maxItems": 64,
+          "title": "Sources",
+          "type": "array"
+        },
+        "type_id": {
+          "format": "uuid",
+          "title": "Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "type_id",
+        "binding_mode"
+      ],
+      "title": "DataMapping",
+      "type": "object"
+    },
+    "Dataset": {
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DatasetColumn"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Columns"
+        },
+        "connection_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Connection Id"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "dialect": {
+          "anyOf": [
+            {
+              "maxLength": 40,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dialect"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "query_sql": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query Sql"
+        },
+        "schema_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schema Name"
+        },
+        "snapshot_date_column": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Date Column"
+        },
+        "source_kind": {
+          "default": "table",
+          "enum": [
+            "table",
+            "query"
+          ],
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "table_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Name"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Dataset",
+      "type": "object"
+    },
+    "DatasetColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "comment": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Comment",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "physical_type": {
+          "anyOf": [
+            {
+              "maxLength": 120,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Physical Type"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DatasetColumn",
+      "type": "object"
+    },
+    "DerivedExpression": {
+      "additionalProperties": false,
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "DerivedExpression",
+      "type": "object"
+    },
+    "DerivedSimple": {
+      "additionalProperties": false,
+      "description": "One membership branch: every condition must hold (AND).",
+      "properties": {
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/PathCondition"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        },
+        "kind": {
+          "const": "simple",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "conditions"
+      ],
+      "title": "DerivedSimple",
+      "type": "object"
+    },
+    "DirectJoin": {
+      "additionalProperties": false,
+      "description": "Source properties equal target properties, pair by pair.",
+      "properties": {
+        "kind": {
+          "const": "direct",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Property Ids",
+          "type": "array"
+        },
+        "target_property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "source_property_ids",
+        "target_property_ids"
+      ],
+      "title": "DirectJoin",
+      "type": "object"
+    },
+    "ElementSave": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_items": {
+          "items": {
+            "$ref": "#/$defs/AffectedItem"
+          },
+          "title": "Affected Items",
+          "type": "array"
+        },
+        "draft": {
+          "additionalProperties": true,
+          "title": "Draft",
+          "type": "object"
+        },
+        "expected_session_revision": {
+          "minimum": 0,
+          "title": "Expected Session Revision",
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "maxLength": 64,
+          "minLength": 8,
+          "title": "Idempotency Key",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "object_type",
+            "link_type",
+            "metric",
+            "dataset",
+            "mapping",
+            "value_type"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "expected_session_revision",
+        "draft",
+        "idempotency_key"
+      ],
+      "title": "ElementSave",
+      "type": "object"
+    },
+    "ElementSavePreview": {
+      "additionalProperties": false,
+      "properties": {
+        "affected_items": {
+          "items": {
+            "$ref": "#/$defs/AffectedItem"
+          },
+          "title": "Affected Items",
+          "type": "array"
+        },
+        "draft": {
+          "additionalProperties": true,
+          "title": "Draft",
+          "type": "object"
+        },
+        "expected_session_revision": {
+          "minimum": 0,
+          "title": "Expected Session Revision",
+          "type": "integer"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "target_kind": {
+          "enum": [
+            "object_type",
+            "link_type",
+            "metric",
+            "dataset",
+            "mapping",
+            "value_type"
+          ],
+          "title": "Target Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_kind",
+        "target_id",
+        "expected_session_revision",
+        "draft"
+      ],
+      "title": "ElementSavePreview",
+      "type": "object"
+    },
+    "EvidenceLocator": {
+      "additionalProperties": false,
+      "properties": {
+        "heading": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Heading"
+        },
+        "line_end": {
+          "minimum": 1,
+          "title": "Line End",
+          "type": "integer"
+        },
+        "line_start": {
+          "minimum": 1,
+          "title": "Line Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "line_start",
+        "line_end"
+      ],
+      "title": "EvidenceLocator",
+      "type": "object"
+    },
+    "ExpressionBinding": {
+      "additionalProperties": false,
+      "description": "A same-row expression over this object's own sources (`source.column`).",
+      "properties": {
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "expression"
+      ],
+      "title": "ExpressionBinding",
+      "type": "object"
+    },
+    "ExpressionMetric": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "expression",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "time_field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "value_kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ValueKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "dataset_id",
+        "expression"
+      ],
+      "title": "ExpressionMetric",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LinkStep": {
+      "additionalProperties": false,
+      "properties": {
+        "direction": {
+          "enum": [
+            "forward",
+            "reverse"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "link_type_id": {
+          "format": "uuid",
+          "title": "Link Type Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "link_type_id",
+        "direction"
+      ],
+      "title": "LinkStep",
+      "type": "object"
+    },
+    "LinkType": {
+      "additionalProperties": false,
+      "properties": {
+        "data_join": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "direct": "#/$defs/DirectJoin",
+                  "mapping_table": "#/$defs/MappingTableJoin"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/DirectJoin"
+                },
+                {
+                  "$ref": "#/$defs/MappingTableJoin"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Join"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "multiplicity": {
+          "$ref": "#/$defs/Multiplicity"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "source_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Role Name"
+        },
+        "source_type_id": {
+          "format": "uuid",
+          "title": "Source Type Id",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "target_role_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Role Name"
+        },
+        "target_type_id": {
+          "format": "uuid",
+          "title": "Target Type Id",
+          "type": "string"
+        },
+        "verbalizes": {
+          "items": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": "^(?=[\\s\\S]*\\{source\\})(?=[\\s\\S]*\\{target\\})(?:[^{}]|\\{(?:source|target)\\})*$",
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Verbalizes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "source_type_id",
+        "target_type_id",
+        "multiplicity"
+      ],
+      "title": "LinkType",
+      "type": "object"
+    },
+    "LinkedTable": {
+      "additionalProperties": false,
+      "description": "A registered table a modeling session works from (not a dataset yet).",
+      "properties": {
+        "connection_id": {
+          "maxLength": 36,
+          "minLength": 1,
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "schema_name": {
+          "default": "",
+          "maxLength": 240,
+          "title": "Schema Name",
+          "type": "string"
+        },
+        "table_name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "title": "Table Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "table_name"
+      ],
+      "title": "LinkedTable",
+      "type": "object"
+    },
+    "ManualEvidence": {
+      "additionalProperties": false,
+      "description": "A member vouching for a fact. Author and time are written by the server.",
+      "properties": {
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "created_by": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Created By",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "manual",
+          "default": "manual",
+          "title": "Kind",
+          "type": "string"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ManualEvidence",
+      "type": "object"
+    },
+    "MappingKey": {
+      "additionalProperties": false,
+      "description": "The end object's main source `key_columns`.",
+      "properties": {
+        "kind": {
+          "const": "mapping_key",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "MappingKey",
+      "type": "object"
+    },
+    "MappingSource": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "key_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Key Columns",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "dataset_id"
+      ],
+      "title": "MappingSource",
+      "type": "object"
+    },
+    "MappingTableJoin": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "mapping_table",
+          "title": "Kind",
+          "type": "string"
+        },
+        "source_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Source Columns",
+          "type": "array"
+        },
+        "source_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Source Key"
+        },
+        "target_columns": {
+          "items": {
+            "maxLength": 240,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Target Columns",
+          "type": "array"
+        },
+        "target_key": {
+          "discriminator": {
+            "mapping": {
+              "mapping_key": "#/$defs/MappingKey",
+              "properties": "#/$defs/PropertiesKey"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/MappingKey"
+            },
+            {
+              "$ref": "#/$defs/PropertiesKey"
+            }
+          ],
+          "title": "Target Key"
+        }
+      },
+      "required": [
+        "kind",
+        "dataset_id",
+        "source_columns",
+        "target_columns",
+        "source_key",
+        "target_key"
+      ],
+      "title": "MappingTableJoin",
+      "type": "object"
+    },
+    "MaterialEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "material",
+          "default": "material",
+          "title": "Kind",
+          "type": "string"
+        },
+        "locator": {
+          "$ref": "#/$defs/EvidenceLocator"
+        },
+        "material_id": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Material Id",
+          "type": "string"
+        },
+        "material_sha256": {
+          "title": "Material Sha256",
+          "type": "string"
+        },
+        "quote": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Quote",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "material_id",
+        "material_sha256",
+        "locator"
+      ],
+      "title": "MaterialEvidence",
+      "type": "object"
+    },
+    "Multiplicity": {
+      "description": "No one_to_many: a one-to-many link is built from the many side.",
+      "enum": [
+        "one_to_one",
+        "many_to_one",
+        "many_to_many"
+      ],
+      "title": "Multiplicity",
+      "type": "string"
+    },
+    "ObjectType": {
+      "additionalProperties": false,
+      "properties": {
+        "derived_by": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "expression": "#/$defs/DerivedExpression",
+                "simple": "#/$defs/DerivedSimple"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/DerivedSimple"
+              },
+              {
+                "$ref": "#/$defs/DerivedExpression"
+              }
+            ]
+          },
+          "maxItems": 20,
+          "title": "Derived By",
+          "type": "array"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "extends": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Extends"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tags",
+          "type": "array"
+        },
+        "title_property_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Property Id"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "ObjectType",
+      "type": "object"
+    },
+    "Operator": {
+      "enum": [
+        "eq",
+        "ne",
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "in",
+        "not_in",
+        "between",
+        "is_null",
+        "not_null"
+      ],
+      "title": "Operator",
+      "type": "string"
+    },
+    "Path": {
+      "additionalProperties": false,
+      "description": "From a context object, through links, to one property. Ontology rules and\nmembership conditions only; metrics never use paths.",
+      "properties": {
+        "links": {
+          "items": {
+            "$ref": "#/$defs/LinkStep"
+          },
+          "maxItems": 8,
+          "title": "Links",
+          "type": "array"
+        },
+        "property_id": {
+          "format": "uuid",
+          "title": "Property Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "property_id"
+      ],
+      "title": "Path",
+      "type": "object"
+    },
+    "PathCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "operator": {
+          "$ref": "#/$defs/Operator"
+        },
+        "path": {
+          "$ref": "#/$defs/Path"
+        },
+        "values": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "maxItems": 200,
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "operator"
+      ],
+      "title": "PathCondition",
+      "type": "object"
+    },
+    "PropertiesKey": {
+      "additionalProperties": false,
+      "description": "A single unique property or the end object's complete identifier.",
+      "properties": {
+        "kind": {
+          "const": "properties",
+          "title": "Kind",
+          "type": "string"
+        },
+        "property_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 16,
+          "minItems": 1,
+          "title": "Property Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "property_ids"
+      ],
+      "title": "PropertiesKey",
+      "type": "object"
+    },
+    "Property": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "identifier": {
+          "default": false,
+          "title": "Identifier",
+          "type": "boolean"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_type_id": {
+          "format": "uuid",
+          "title": "Owner Type Id",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "unique": {
+          "default": false,
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind"
+        },
+        "value_type_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type Id"
+        }
+      },
+      "required": [
+        "id",
+        "owner_type_id",
+        "name",
+        "value_kind"
+      ],
+      "title": "Property",
+      "type": "object"
+    },
+    "RatioMetric": {
+      "additionalProperties": false,
+      "description": "dataset_id, time_field and value_kind come from the two components.",
+      "properties": {
+        "denominator_id": {
+          "format": "uuid",
+          "title": "Denominator Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "ratio",
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "numerator_id": {
+          "format": "uuid",
+          "title": "Numerator Id",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "numerator_id",
+        "denominator_id"
+      ],
+      "title": "RatioMetric",
+      "type": "object"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "expression": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expression",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "owner_id": {
+          "format": "uuid",
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "$ref": "#/$defs/RuleOwnerKind"
+        },
+        "rule_kind": {
+          "$ref": "#/$defs/RuleKind"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner_kind",
+        "owner_id",
+        "rule_kind",
+        "expression"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "RuleKind": {
+      "enum": [
+        "constraint",
+        "derivation"
+      ],
+      "title": "RuleKind",
+      "type": "string"
+    },
+    "RuleOwnerKind": {
+      "enum": [
+        "object_type",
+        "property",
+        "link_type",
+        "value_type"
+      ],
+      "title": "RuleOwnerKind",
+      "type": "string"
+    },
+    "SessionPatch": {
+      "additionalProperties": false,
+      "properties": {
+        "linked_tables": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/LinkedTable"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Linked Tables"
+        },
+        "material_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Material Ids"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "model",
+                "chat"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        },
+        "revision": {
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "table_scope": {
+          "anyOf": [
+            {
+              "enum": [
+                "all",
+                "selected"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Table Scope"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "revision"
+      ],
+      "title": "SessionPatch",
+      "type": "object"
+    },
+    "SessionRead": {
+      "additionalProperties": false,
+      "properties": {
+        "abandoned_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Abandoned At"
+        },
+        "abandoned_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Abandoned By"
+        },
+        "base_diff": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Base Diff",
+          "type": "array"
+        },
+        "base_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Base Version Id"
+        },
+        "base_version_sha256": {
+          "title": "Base Version Sha256",
+          "type": "string"
+        },
+        "dataagent_run_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataagent Run Token"
+        },
+        "dataagent_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataagent Task Id"
+        },
+        "dataagent_task_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataagent Task Mode"
+        },
+        "dataagent_topic_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dataagent Topic Id"
+        },
+        "draft": {
+          "$ref": "#/$defs/CoreDraft"
+        },
+        "draft_sha256": {
+          "title": "Draft Sha256",
+          "type": "string"
+        },
+        "graph": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Graph",
+          "type": "object"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "import_source": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Import Source"
+        },
+        "last_result_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Result Task Id"
+        },
+        "latest_batch_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Latest Batch Id"
+        },
+        "linked_tables": {
+          "items": {
+            "$ref": "#/$defs/LinkedTable"
+          },
+          "title": "Linked Tables",
+          "type": "array"
+        },
+        "material_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Material Ids",
+          "type": "array"
+        },
+        "mode": {
+          "enum": [
+            "model",
+            "chat"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "pending_proposal_count": {
+          "minimum": 0,
+          "title": "Pending Proposal Count",
+          "type": "integer"
+        },
+        "result_claimed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Result Claimed At"
+        },
+        "result_state": {
+          "title": "Result State",
+          "type": "string"
+        },
+        "result_warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Result Warnings",
+          "type": "array"
+        },
+        "revision": {
+          "title": "Revision",
+          "type": "integer"
+        },
+        "table_scope": {
+          "enum": [
+            "all",
+            "selected"
+          ],
+          "title": "Table Scope",
+          "type": "string"
+        },
+        "task_detail": {
+          "title": "Task Detail",
+          "type": "string"
+        },
+        "task_status": {
+          "title": "Task Status",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "unpublished_change_count": {
+          "minimum": 0,
+          "title": "Unpublished Change Count",
+          "type": "integer"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        },
+        "uploaded_material_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Uploaded Material Ids",
+          "type": "array"
+        },
+        "workspace_id": {
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "workspace_id",
+        "base_version_id",
+        "revision",
+        "base_version_sha256",
+        "draft_sha256",
+        "draft",
+        "material_ids",
+        "table_scope",
+        "linked_tables",
+        "mode",
+        "task_status",
+        "task_detail",
+        "dataagent_topic_id",
+        "dataagent_task_id",
+        "dataagent_task_mode",
+        "dataagent_run_token",
+        "uploaded_material_ids",
+        "last_result_task_id",
+        "result_state",
+        "result_warnings",
+        "result_claimed_at",
+        "updated_at",
+        "abandoned_at",
+        "abandoned_by",
+        "graph",
+        "import_source",
+        "pending_proposal_count",
+        "latest_batch_id",
+        "base_diff",
+        "unpublished_change_count"
+      ],
+      "title": "SessionRead",
+      "type": "object"
+    },
+    "SimpleMetric": {
+      "additionalProperties": false,
+      "description": "value_kind is derived on read and not accepted as input.",
+      "properties": {
+        "aggregation": {
+          "$ref": "#/$defs/Aggregation"
+        },
+        "dataset_id": {
+          "format": "uuid",
+          "title": "Dataset Id",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "filters": {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "maxItems": 50,
+          "title": "Filters",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "simple",
+          "title": "Kind",
+          "type": "string"
+        },
+        "measure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "synonyms": {
+          "items": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Synonyms",
+          "type": "array"
+        },
+        "time_field": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColumnReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "dataset_id",
+        "aggregation"
+      ],
+      "title": "SimpleMetric",
+      "type": "object"
+    },
+    "ValueKind": {
+      "description": "Ossie's seven built-in value types; core-1 adds no others.",
+      "enum": [
+        "string",
+        "integer",
+        "decimal",
+        "float",
+        "boolean",
+        "date",
+        "datetime"
+      ],
+      "title": "ValueKind",
+      "type": "string"
+    },
+    "ValueType": {
+      "additionalProperties": false,
+      "description": "A named value domain shared by properties: base kind plus owned constraint rules.",
+      "properties": {
+        "description": {
+          "default": "",
+          "maxLength": 8000,
+          "title": "Description",
+          "type": "string"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "evidence": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "manual": "#/$defs/ManualEvidence",
+                "material": "#/$defs/MaterialEvidence"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/MaterialEvidence"
+              },
+              {
+                "$ref": "#/$defs/ManualEvidence"
+              }
+            ]
+          },
+          "maxItems": 50,
+          "title": "Evidence",
+          "type": "array"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value_kind": {
+          "$ref": "#/$defs/ValueKind"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "value_kind"
+      ],
+      "title": "ValueType",
+      "type": "object"
+    }
+  },
+  "$id": "ontofoundry.session-writes.v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/SessionPatch"
+    },
+    {
+      "$ref": "#/$defs/ElementSavePreview"
+    },
+    {
+      "$ref": "#/$defs/ElementSave"
+    },
+    {
+      "$ref": "#/$defs/SessionRead"
+    }
+  ]
+}

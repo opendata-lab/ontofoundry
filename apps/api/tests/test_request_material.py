@@ -24,8 +24,8 @@ REQUEST = "  # 云杉维修站\r\n工单 WX-101 已由小岚接单，预计明�
 def create_session(client):
     # These cases exercise document-only inputs, excluding table receipts.
     session = create_modeling_session(client)
-    response = client.put(ROOT + f"/sessions/{session['id']}", json={
-        "revision": session["revision"], "draft": session["draft"],
+    response = client.patch(ROOT + f"/sessions/{session['id']}", json={
+        "revision": session["revision"],
         "table_scope": "selected", "linked_tables": [],
     })
     assert response.status_code == 200, response.text

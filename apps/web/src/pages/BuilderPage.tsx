@@ -143,7 +143,7 @@ export function BuilderPage() {
   const changeMode = (next: SessionMode) => {
     setNewMode(next);
     if (session && session.mode !== next)
-      void act(async () => setSession(await modelingApi.save(session, session.draft, { mode: next })));
+      void act(async () => setSession(await modelingApi.updateSettings(session, { mode: next })));
   };
   // Sending waits for DataAgent to be configured, the previous run and its
   // result, pending proposals and uploads. The SDK itself requires some text.
@@ -164,7 +164,7 @@ export function BuilderPage() {
   const attach = async (material: Material) => {
     const current = await model.ensure();
     setMaterials((ms) => [material, ...ms.filter((m) => m.id !== material.id)]);
-    const saved = await modelingApi.save(current, current.draft, {
+    const saved = await modelingApi.updateSettings(current, {
       material_ids: [...new Set([...current.material_ids, material.id])],
     });
     setSession(saved);
@@ -383,7 +383,7 @@ export function BuilderPage() {
                             act(async () => {
                               const s = await model.ensure();
                               setSession(
-                                await modelingApi.save(s, s.draft, {
+                                await modelingApi.updateSettings(s, {
                                   material_ids: s.material_ids.includes(m.id)
                                     ? s.material_ids.filter((id) => id !== m.id)
                                     : [...s.material_ids, m.id],
@@ -441,7 +441,7 @@ export function BuilderPage() {
                                 act(async () => {
                                   const s = await model.ensure();
                                   setSession(
-                                    await modelingApi.save(s, s.draft, {
+                                    await modelingApi.updateSettings(s, {
                                       table_scope: "selected",
                                       linked_tables: (s.linked_tables ?? []).filter((x) => tableKey(x) !== tableKey(t)),
                                     }),
@@ -493,7 +493,7 @@ export function BuilderPage() {
                       onSave={(patch) =>
                         act(async () => {
                           const current = await model.ensure();
-                          setSession(await modelingApi.save(current, current.draft, patch));
+                          setSession(await modelingApi.updateSettings(current, patch));
                         })
                       }
                     />

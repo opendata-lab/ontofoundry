@@ -21,9 +21,11 @@ import type {
   DecisionResult,
   Draft,
   Presentation,
-  ElementSave,
-  ElementSaveImpact,
-  ElementSaveResult,
+  SessionElementSave,
+  SessionElementSaveImpact,
+  SessionElementSavePreview,
+  SessionElementSaveResult,
+  SessionSettingsPatch,
   FactProposalRevision,
   ISODate,
   InstanceDetail,
@@ -31,7 +33,6 @@ import type {
   InstanceList,
   InstanceNeighborhood,
   Items,
-  LinkedTable,
   SessionMode,
   MappingPreview,
   MappingPreviewRequest,
@@ -128,6 +129,7 @@ export class ApiError extends Error {
   }
 }
 
+import { newId } from "../lib/id";
 import { definitionReads } from "./definitionReads";
 
 const AUTH_NO_REDIRECT_PATHS = new Set([
@@ -399,9 +401,14 @@ export const modelingApi = {
   create: (id: string, title = "新的建模会话", mode: SessionMode = "model") =>
     workspaceRequest<ModelingSession>(id, "/sessions", { title, mode }).then(withSessionInstances),
   get: (id: string, sid: string) => workspaceRequest<ModelingSession>(id, "/sessions/" + sid).then(withSessionInstances),
-  /** Saves the whole session draft; it does not publish. */
-  save: (session: ModelingSession, draft: Draft, extra: { title?: string; material_ids?: string[]; linked_tables?: LinkedTable[]; mode?: SessionMode; table_scope?: "all" | "selected" } = {}) =>
-    request<ModelingSession>(sessionPath(session), json("PUT", { revision: session.revision, draft: definitionsOnly(draft), ...extra })).then(withSessionInstances),
+  /** Gets or creates the current user's personal modeling session in this workspace. */
+  personal: (id: string) => workspaceRequest<ModelingSession>(id, "/sessions/personal").then(withSessionInstances),
+  /** Updates session settings via PATCH; definitions are never written here. */
+  updateSettings: (
+    session: Pick<ModelingSession, "id" | "workspace_id" | "revision">,
+    settings: Omit<SessionSettingsPatch, "revision">,
+  ) =>
+    request<ModelingSession>(sessionPath(session), json("PATCH", { revision: session.revision, ...settings })).then(withSessionInstances),
   /** Abandons a session: drops its staged instances; published content is untouched. */
   abandon: (s: Pick<ModelingSession, "id" | "workspace_id">) =>
     request<{ session_id: string; abandoned_at: string; abandoned_by: string }>(sessionPath(s) + "/abandon", json("POST", {})),
@@ -418,13 +425,28 @@ export const modelingApi = {
     if (after.version_id !== fixed) throw new Error("本体版本已更新，请刷新后查看实例");
     return { ...model, ...instances };
   },
-  /** Previews cross-aggregate impact read-only before saving an element. */
-  previewElementSave: (id: string, payload: ElementSave) =>
-    workspaceRequest<ElementSaveImpact>(id, "/element-saves/preview", payload),
-  /** Saves one aggregate and publishes it right away (current-version CAS). */
-  saveElement: (id: string, payload: ElementSave) =>
-    workspaceRequest<ElementSaveResult>(id, "/element-saves", payload)
-      .then(async (r) => sessionWithInstances({ ...r, draft: await withInstances(r.draft, r.session?.id) })),
+  /** Previews cross-aggregate impact read-only before saving an element into a session. */
+  previewElementSave: (id: string, sessionId: string, payload: SessionElementSavePreview) =>
+    workspaceRequest<SessionElementSaveImpact>(
+      id,
+      `/sessions/${encodeURIComponent(sessionId)}/element-saves/preview`,
+      { ...payload, draft: definitionsOnly(payload.draft) },
+    ),
+  /** Saves one aggregate into a session draft without publishing. */
+  saveElement: (
+    id: string,
+    sessionId: string,
+    payload: Omit<SessionElementSave, "idempotency_key"> & { idempotency_key?: string },
+  ) =>
+    workspaceRequest<SessionElementSaveResult>(
+      id,
+      `/sessions/${encodeURIComponent(sessionId)}/element-saves`,
+      {
+        ...payload,
+        idempotency_key: payload.idempotency_key ?? newId(),
+        draft: definitionsOnly(payload.draft),
+      },
+    ).then(withSessionInstances),
   materials: (id: string) => workspaceRequest<Items<Material>>(id, "/materials"),
   materialOverview: (id: string) => workspaceRequest<Items<ManagedMaterial>>(id, "/materials/overview"),
   materialDownloadUrl: (id: string, materialId: string) => `/api/v1/workspaces/${id}/materials/${materialId}`,

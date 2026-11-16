@@ -68,7 +68,7 @@ READS = [
     ("POST", W + "/mapping-preview"), ("POST", W + "/datasets/validate"),
     ("POST", W + "/datasets/preview"),
     ("POST", "/api/v1/workspaces/{workspace_id}/metrics/preview"),
-    ("POST", W + "/element-saves/preview"), ("POST", S + "/validate"),
+    ("POST", S + "/validate"),
     ("POST", S + "/publish-preview"),
 ]
 MANAGE = [("GET", W + "/feedback"), ("GET", W + "/members"), ("GET", W + "/users/search"),
@@ -186,7 +186,7 @@ def request_options(data, key):
         ("POST", W + "/datasets/preview"): {"dataset": draft["datasets"][0]},
         ("POST", W + "/mapping-preview"): {"mapping": {"id": str(uuid4()), "type_id": ids["type_id"], "binding_mode": "shared_parent"}},
         ("POST", "/api/v1/workspaces/{workspace_id}/metrics/preview"): {"metric": draft["metrics"][0]},
-        ("POST", W + "/element-saves/preview"): {"target_kind": "object_type", "target_id": ids["type_id"], "expected_current_version_id": ids["version_id"], "draft": draft},
+        ("POST", S + "/element-saves/preview"): {"target_kind": "object_type", "target_id": ids["type_id"], "expected_session_revision": data["session"]["revision"], "draft": draft},
         ("POST", S + "/publish-preview"): {"expected_session_revision": data["session"]["revision"]},
     }
     options = {"params": params}

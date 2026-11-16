@@ -1,0 +1,38 @@
+# 写入管线实施计划
+
+日期为 2026-11-16。依据《智能体与平台接口》和《接受时检查》中的已确认决定。每步独立验证，2a 保持智能体提交的鉴权、回执、待审与轮次行为。
+
+## 2a 人工保存与两级检查
+
+- `services/changes.py` 提供 `check_proposal` 和 `check_accept`，复用 `proposal_apply.py` 的结构、引用、图、条件与接受规则。智能体提交、待审修订、导入与事实修订的提案检查统一调用 `check_proposal`。人工保存先计算实际差异，由一次 `check_accept` 完成两级检查，在同一事务里写入自动接受的提案与草稿；接受问题保留逐条列表。
+- `services/element_save.py` 只基于锁定会话草稿计算范围、引用自动重写与影响确认，不合并最新发布版。保留前端 UUID，通过现有证据核定函数确定人工作者。
+- 每个会话保留一个当前未发布人工批次。连续修改同一元素时保留首次 before，更新原提案，保留原子组并合并本次保存交叠的活跃组。若中间有其他已接受修改，创建新提案以保留顺序。回到原值时不计未发布修改，并解除该提案的原子组与依赖边。当前人工批次在新运行开始后仍可决定。发布后再次编辑建立新人工批次。
+- `services/sessions.py`、`api/sessions.py` 增加按需创建的 `GET /sessions/personal`，按工作空间与用户唯一；放弃时解除个人归属，后续按需重建，旧会话与幂等回执保留。`PATCH /sessions/{s}` 只接受 revision、标题、材料、表范围与模式，删除定义覆写入口。会话详情增加从基线差异推导的 `unpublished_change_count`。
+- `api/proposals.py` 将保存及预览移至 `POST /sessions/{s}/element-saves[/preview]`，删除工作空间级入口。保存请求必带会话 revision 和幂等键，成功直接返回更新后的会话。实际差异为空时保持 revision 与更新时间，仍写幂等回执。预览返回 revision 和影响确认项，影响哈希过期返回 `PREVIEW_OUTDATED`。保存不产生版本。
+- 更新 `contracts/` 的 Pydantic 与 JSON Schema，以及前端相应类型。前端页面接入由后续前端任务完成，交接结果首先列明精确契约。
+- 迁移增加个人会话唯一键、当前人工批次指针和保存幂等回执表。已有会话保留为普通会话，历史批次保持原状。
+- 测试覆盖自动接受、同元素连续保存及中间被其他提案修改、回原值、自动引用重写、范围与影响确认、两级检查失败原子性、旧 revision、同键重放及不同内容冲突、个人会话隔离和唯一性、发布后新批次、设置接口拒绝定义、未发布计数。运行任务指定的完整 API 和 DataAgent 测试。
+
+## 2b 追加式变更记录
+
+- `db_models.py` 和 Alembic 新增设计 §5 的 `change_events` 表，记录 proposal、draft、version 三种 subject，关联 actor、run、批次、提案、版本和 cause。
+- `services/changes.py` 统一追加记录，接入人工保存、智能体提交与修订、导入、决定、撤销、合并选择及发布的全部写入路径。与业务事务共同提交。
+- `api/proposals.py` 新增 `GET /sessions/{s}/change-events?target_id=`，补充 Pydantic、JSON Schema 与前端类型，约定稳定排序与分页。
+- 测试覆盖提案与草稿双层记录、修订待审时草稿无变化、级联因果关联、发布边界、回滚不留记录、各写路径覆盖以及不存在更新和删除记录的路径。
+
+## 2c 撤销、待审收敛与发布边界
+
+- `services/changes.py`、`proposal_decisions.py`、`session_gate.py` 实现跨未发布批次的依赖与同目标后继闭包，按新到旧撤销或退回待审，返回完整结果。发布边界前的提案只读。
+- `proposal_submit.py`、`proposal_revision.py`、`import_proposals.py` 和 `proposals.py` 在提交、恢复、退回与导入补全时收敛到唯一待审批次，同目标沿用 target_id、折叠连续修改、带入未提及项、重算依赖和原子组及两级检查。旧 pending 标为 superseded，已决定项保留。
+- `modeling_input.py` 与 `proposal_context` 提供未发布修改和待审上下文。`table_submission.py` 在检查通过后才持久化表结构收据。
+- `sessions.py` 的 `resolve-merge` 经同一管线检查并留痕。发布针对最终合并结果中受影响定义复用接受检查，在同一事务里追加发布边界。
+- `proposal_submit.py` 每次运行总计最多提交 10 轮不同内容，包含首次提交。按现有首次失败后累计修正的计数方式设置 `REPAIR_LIMIT = 9`，重复相同失败沿用回执且不增加计数。2a 保留当前 `REPAIR_LIMIT = 3`，此处调整在 2c 实施。
+- 契约增加 back_to_pending、superseded、级联结果及完整上下文，同步 JSON Schema、Pydantic、前端类型和批次计数。若需要存储边界与批次替代关系，新增 Alembic，复用 2b 发布记录能表达的字段。
+- 测试覆盖跨批次链、依赖与原子组、已只读智能体批次、发布隔离、唯一待审批次并发收敛、target_id 稳定、合并后接受检查、resolve-merge 原子性、收据失败回滚和 10 轮边界。
+
+## 2d 实例生命周期
+
+- `db_models.py`、`instance_store.py`、`instance_proposals.py` 和 `sessions.py` 增加本会话待发布实例内容，已有发布实例与暂存版本分别保存。新增、修改和删除一律暂存，发布时原子生效。
+- Alembic 新增实例暂存存储和工作空间、会话、目标唯一约束，明确历史 active 与 staged 数据的迁移规则。
+- 实例读取契约区分发布视图与会话草稿视图，更新实例基线、revision、发布预览、放弃结果、Pydantic、JSON Schema 和前端类型。发布说明注明接受的实例发布后才对外可见。
+- 测试覆盖定义未变时新增实例仍暂存、发布前修改删除不影响外部读取、多会话隔离、实例与定义一起原子发布、并发 revision、接受和发布检查、放弃与撤销，以及迁移升级和降级。

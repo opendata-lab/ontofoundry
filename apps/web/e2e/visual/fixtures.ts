@@ -425,6 +425,7 @@ const REVIEW_SESSION: ModelingSession = {
   draft_sha256: "d".repeat(64),
   base_version_sha256: "2".repeat(64),
   pending_proposal_count: 3,
+  unpublished_change_count: 1,
   latest_batch_id: REVIEW_BATCH.id,
   base_diff: [{
     element_kind: "object_type",
@@ -568,6 +569,19 @@ ELEMENTS.dataset.columns!.push({ name: "stat_date", physical_type: "date", comme
 export async function mockElementsApi(page: Page, options: { impact?: boolean } = {}) {
   await mockMappingsApi(page);
   const base = `/api/v1/workspaces/${WORKSPACE_ID}`;
+  const personalSession: ModelingSession = {
+    ...REVIEW_SESSION,
+    id: "session-visual-personal",
+    title: "个人建模会话",
+    base_version_id: FIXTURE_WORKSPACE.version_id,
+    revision: 1,
+    draft: ELEMENT_DRAFT,
+    pending_proposal_count: 0,
+    unpublished_change_count: 0,
+    latest_batch_id: null,
+    base_diff: [],
+    material_ids: [],
+  };
   const preview: import("../../src/api/types").MetricPreview = {
     definition_hash: "f".repeat(64),
     context_version: FIXTURE_WORKSPACE.version_id,
@@ -590,12 +604,13 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
       const { pathname } = new URL(route.request().url());
       if (pathname === `${base}/versions/${FIXTURE_WORKSPACE.version_id}/presentation`) {
         await route.fulfill({ json: { version: FIXTURE_VERSIONS[0], model: ELEMENT_DRAFT } });
+      } else if (pathname === `${base}/sessions/personal` || pathname === `${base}/sessions/${personalSession.id}`) {
+        await route.fulfill({ json: personalSession });
       } else if (pathname === `/api/v1/workspaces/${WORKSPACE_ID}/metrics/preview`) {
         await route.fulfill({ json: preview });
-      } else if (pathname === `${base}/element-saves/preview`) {
-        const impact: import("../../src/api/types").ElementSaveImpact = {
-          current_version_id: FIXTURE_WORKSPACE.version_id,
-          session_revision: null,
+      } else if (pathname === `${base}/sessions/${personalSession.id}/element-saves/preview`) {
+        const impact: import("../../src/api/types").SessionElementSaveImpact = {
+          session_revision: personalSession.revision,
           affected_items: options.impact ? [{
             target_kind: "material_object",
             target_id: ELEMENT_DRAFT.material_objects.find((item) => item.type_id === ELEMENTS.object.id)!.id,
@@ -604,6 +619,14 @@ export async function mockElementsApi(page: Page, options: { impact?: boolean } 
           }] : [],
         };
         await route.fulfill({ json: impact });
+      } else if (pathname === `${base}/sessions/${personalSession.id}/element-saves`) {
+        await route.fulfill({
+          json: {
+            ...personalSession,
+            revision: personalSession.revision + 1,
+            unpublished_change_count: 1,
+          },
+        });
       } else {
         await route.fallback();
       }

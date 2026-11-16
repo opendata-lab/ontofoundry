@@ -16,15 +16,10 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.canonical import snapshot_sha256
 from ontofoundry_api.domain.core import CoreDraft
-from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evidence
 from ontofoundry_api.domain.models import OntologyDraft
 from ontofoundry_api.domain.snapshot import draft_sha256, empty_snapshot
 from ontofoundry_api.services.element_diff import element_changes
-from ontofoundry_api.services.element_save import (
-    calculate_element_save,
-)
 from ontofoundry_api.services.errors import ServiceError, SessionRequestError
-from ontofoundry_api.services.materials_lookup import material_lookup
 from ontofoundry_api.services.ontology_query import (
     _all_graph,
     current_version,
@@ -90,15 +85,18 @@ def session_response(db, item) -> dict:
         return pending_summary(db, item.workspace_id, item.id, item.draft_json)
 
     if key is None:
-        return {**data, **summary(), "base_diff": base_diff()}
+        changes = base_diff()
+        return {**data, **summary(), "base_diff": changes, "unpublished_change_count": len(changes)}
+    changes = session_reads.get(
+        (*key, "base_diff", item.base_version_id, item.base_version_sha256), base_diff
+    )
     return {
         **data,
         **session_reads.get(
             (*key, "pending", proposal_state(db, item.workspace_id, item.id)), summary
         ),
-        "base_diff": session_reads.get(
-            (*key, "base_diff", item.base_version_id, item.base_version_sha256), base_diff
-        ),
+        "base_diff": changes,
+        "unpublished_change_count": len(changes),
     }
 
 
@@ -308,156 +306,6 @@ def revised_material_bookkeeping(item, material_ids):
     return values
 
 
-def save_element(
-    workspace_id: str,
-    body,
-    settings,
-    db: Session,
-    user,
-):
-    """One Save action validates and commits an immutable, immediately active version."""
-    space = db.scalar(
-        select(WorkspaceRecord).where(WorkspaceRecord.id == workspace_id).with_for_update()
-    )
-    if space.current_version_id != body.expected_current_version_id:
-        raise ServiceError(
-            "内容已被其他人更新，请重新打开后再保存",
-            code="VERSION_CHANGED",
-            status_code=409,
-        )
-    if body.expected_instance_change_sequence is not None:
-        from ontofoundry_api.services.instance_store import change_sequence
-
-        if body.expected_instance_change_sequence != change_sequence(db, workspace_id):
-            raise ServiceError(
-                "实例集合在预览后已变化，请重新预览",
-                code="PREVIEW_OUTDATED",
-                status_code=409,
-            )
-    latest = version_snapshot(db, workspace_id, space.current_version_id)
-    item = None
-    if body.session_id:
-        item = db.scalar(
-            select(ModelingSessionRecord)
-            .where(
-                ModelingSessionRecord.id == body.session_id,
-                ModelingSessionRecord.workspace_id == workspace_id,
-            )
-            .with_for_update()
-        )
-        if not item:
-            raise SessionRequestError(404, "建模会话不存在")
-        item = lock_session(db, workspace_id, item.id)
-        require_draft_edit(db, item)
-        if item.revision != body.expected_session_revision:
-            raise ServiceError(
-                "内容已变化，请重新打开后再保存",
-                code="SESSION_REVISION_CHANGED",
-                status_code=409,
-            )
-    if bool(body.session_id) != (body.expected_session_revision is not None):
-        raise ServiceError(
-            "会话和 revision 必须同时给出", code="ELEMENT_SCOPE_INVALID", status_code=422
-        )
-    write_revision = item.revision if item else None
-    original = session_draft(item) if item else latest
-    try:
-        if body.draft.get("schema_version") != "core-1":
-            raise ValueError("只接受 core-1 草稿")
-        edited = CoreDraft.model_validate(body.draft).model_dump(mode="json")
-        edited = reconcile_draft_evidence(
-            original,
-            edited,
-            lookup=material_lookup(db, settings, workspace_id),
-            actor_id=user.id,
-            now=utc_now(),
-        )
-        base = version_snapshot(db, workspace_id, item.base_version_id) if item else latest
-        calculation = calculate_element_save(
-            base,
-            latest,
-            original,
-            edited,
-            body.target_kind,
-            body.target_id,
-            affected_items=body.affected_items,
-        )
-        model = OntologyDraft.model_validate(calculation.merged)
-        from ontofoundry_api.services.join_validation import validate_join_columns
-
-        checked_draft = model.model_dump(mode="json")
-        validate_join_columns(
-            db,
-            workspace_id,
-            original,
-            checked_draft,
-            settings,
-        )
-        model = OntologyDraft.model_validate(checked_draft)
-        version = publish_draft(
-            db,
-            workspace_id=workspace_id,
-            draft=model,
-            user_id=user.id,
-            message="保存本体元素",
-            session_id=item.id if item else None,
-            commit=False,
-        )
-        if item:
-            updated_draft = deepcopy(calculation.session_draft)
-            # Server-probed dataset columns go to the session too, so it matches
-            # exactly what was published.
-            probed = {d["id"]: d for d in checked_draft["datasets"]}
-            updated_draft["datasets"] = [
-                {**d, "columns": probed[d["id"]]["columns"]} if d["id"] in probed else d
-                for d in updated_draft["datasets"]
-            ]
-            # CAS also protects SQLite and a proposal decision racing this request.
-            changed = db.execute(
-                update(ModelingSessionRecord)
-                .where(
-                    ModelingSessionRecord.id == item.id,
-                    ModelingSessionRecord.revision == write_revision,
-                )
-                .values(
-                    draft_json=updated_draft,
-                    draft_sha256=snapshot_sha256(updated_draft),
-                    revision=item.revision + 1,
-                    updated_at=utc_now(),
-                )
-            )
-            if changed.rowcount != 1:
-                db.rollback()
-                raise ServiceError(
-                    "内容已变化，请重新打开后再保存",
-                    code="SESSION_REVISION_CHANGED",
-                    status_code=409,
-                )
-        db.commit()
-        if item:
-            db.refresh(item)
-    except (jsonschema.ValidationError, ValidationError, ValueError) as exc:
-        db.rollback()
-        raise ServiceError(
-            "内容校验失败：" + str(exc), code="ELEMENT_VALIDATION_FAILED", status_code=422
-        ) from exc
-    except EvidenceError as exc:
-        db.rollback()
-        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
-    except IntegrityError as exc:
-        db.rollback()
-        raise ServiceError(
-            "内容已被其他人更新，请重新打开后再保存",
-            code="VERSION_CHANGED",
-            status_code=409,
-        ) from exc
-    return {
-        "version": version_summary(version),
-        "draft": model.model_dump(mode="json"),
-        "session": session_response(db, item) if item else None,
-    }
-
-
 def resolve_merge(
     workspace_id: str,
     session_id: str,
@@ -587,6 +435,42 @@ def create_session(
     return session_response(db, item)
 
 
+def personal_session(workspace_id: str, db: Session, user):
+    from ontofoundry_api.services.instance_store import lock_workspace
+
+    space = lock_workspace(db, workspace_id)
+
+    def existing():
+        return db.scalar(select(ModelingSessionRecord).where(
+            ModelingSessionRecord.workspace_id == workspace_id,
+            ModelingSessionRecord.personal_owner_id == user.id,
+        ))
+
+    item = existing()
+    if item is not None and item.abandoned_at is not None:
+        item.personal_owner_id = None
+        db.flush()
+        item = None
+    if item is None:
+        draft = version_snapshot(db, workspace_id, space.current_version_id)
+        item = ModelingSessionRecord(
+            id=str(uuid4()), workspace_id=workspace_id, created_by=user.id,
+            personal_owner_id=user.id, title="个人会话", mode="model",
+            base_version_id=space.current_version_id,
+            base_version_sha256=snapshot_sha256(draft), draft_json=draft,
+            draft_sha256=snapshot_sha256(draft),
+        )
+        db.add(item)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            item = existing()
+            if item is None:
+                raise
+    return session_response(db, item)
+
+
 def save_session(
     workspace_id: str,
     session_id: str,
@@ -595,34 +479,8 @@ def save_session(
     db: Session,
     user,
 ):
-    # revise() waits for the run and the review only when the draft changes.
     item = lock_session(db, workspace_id, session_id)
-    if body.draft.get("workspace_id") != workspace_id:
-        raise ServiceError("草稿空间不匹配", code="WORKSPACE_MISMATCH", status_code=422)
-    if body.draft.get("schema_version") != "core-1":
-        raise ServiceError("只接受 core-1 草稿", code="VALIDATION_FAILED", status_code=422)
-    # Structural schema permits duplicate names/references during editing; publication
-    # applies the domain validators as well. UI readers always get a traversable shape.
-    try:
-        jsonschema.validate(body.draft, CoreDraft.model_json_schema())
-    except jsonschema.ValidationError as exc:
-        raise ServiceError(
-            "草稿结构无效：" + exc.message, code="VALIDATION_FAILED", status_code=422
-        ) from exc
-    try:
-        draft = reconcile_draft_evidence(
-            session_draft(item),
-            deepcopy(body.draft),
-            lookup=material_lookup(db, settings, workspace_id),
-            actor_id=user.id,
-            now=utc_now(),
-        )
-    except EvidenceError as exc:
-        raise ServiceError(str(exc), code=exc.code, status_code=422) from exc
-    from ontofoundry_api.services.join_validation import validate_source_columns
-
-    validate_source_columns(draft)
-    values = {"draft_json": draft}
+    values = {}
     if body.mode is not None and body.mode != item.mode:
         if item.dataagent_topic_id:
             raise ServiceError(
@@ -657,7 +515,6 @@ def save_session(
             linked_table_details(db, workspace_id, linked)
         values.update(table_scope=scope, linked_tables=linked)
     result = revise(db, item, body.revision, **values)
-    result["validation"] = validate_draft(draft, get_workspace(db, workspace_id))
     return result
 
 
@@ -797,6 +654,7 @@ def publish_session(
             session_id=session_id,
             commit=False,
         )
+        item.human_batch_id = None
         item.base_version_id = version.id
         item.base_version_sha256 = snapshot_sha256(model.model_dump(mode="json"))
         # The session continues from exactly what was published: same

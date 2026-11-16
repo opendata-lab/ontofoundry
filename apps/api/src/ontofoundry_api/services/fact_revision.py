@@ -22,10 +22,10 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
     def fail(code, message, status=409):
         raise ServiceError(message, code=code, status_code=status)
 
+    from ontofoundry_api.services.changes import check_proposal
     from ontofoundry_api.services.proposal_apply import (
         save_pending,
         stored_items,
-        trial_apply,
     )
     from ontofoundry_api.services.session_gate import (
         lock_session,
@@ -84,7 +84,7 @@ def revise_fact(db, workspace_id, session_id, proposal_id, body, actor, settings
         elif proposal.after:
             proposal.after = walk_references(proposal.target_kind, proposal.after,
                 lambda value: body.target_id if str(value) == item.target_id else value)
-    trial = trial_apply(db, workspace_id, session, pending, settings)
+    trial = check_proposal(db, workspace_id, session, pending, settings)
     save_pending(db, session, item.batch_id, trial)
     session.revision += 1
     db.commit()

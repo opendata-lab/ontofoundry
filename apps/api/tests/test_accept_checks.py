@@ -7,7 +7,7 @@ import pytest
 from core1_fixtures import example_draft_json
 from test_instance_store import accept_all
 from test_modeling import ROOT, create_session, save
-from test_t4_proposal_decisions import create, decide, seed_batch
+from test_t4_proposal_decisions import create, decide, seed_batch, update
 
 from ontofoundry_api.db_models import DocumentInstanceRecord
 from ontofoundry_api.domain.accept_checks import Change, definition_issues
@@ -128,6 +128,45 @@ def test_a_required_value_may_be_missing_in_a_proposal_but_not_when_accepted(cli
     session, done = accept_all(client, session, [create("c2", "material_object", {"type_id": customer, "values": {"label": "月湾客户"}})])
     [ok] = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{done['id']}").json()["items"]
     assert ok["acceptance_issues"] == []
+
+
+def test_definition_acceptance_issues_remain_separate(client):
+    from pr23_fixtures import example_session
+
+    session = example_session(client, "01-basic-sales", published=True)
+    mapping = session["draft"]["mappings"][0]
+    sources = deepcopy(mapping["sources"])
+    sources[0]["key_columns"] = []
+    batch = seed_batch(client, session, [update("mapping", mapping, sources=sources, fields={}, inherited_link_bindings=[])])
+    [item] = batch["items"]
+    candidate = deepcopy(session["draft"])
+    candidate["mappings"] = [item["after"] if m["id"] == mapping["id"] else m for m in candidate["mappings"]]
+    expected = issues(candidate, [Change("mapping", mapping["id"], item["after"], mapping)])
+    assert len(expected) >= 2
+    assert item["acceptance_issues"] == expected
+    rejected = decide(client, session, [(item["id"], "accept")])
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["issues"] == expected
+
+
+def test_instance_acceptance_issues_remain_separate(client):
+    session = create_session(client)
+    draft = deepcopy(session["draft"])
+    customer = types(session)["customer"]
+    next(p for p in draft["properties"] if p["name"] == "label")["required"] = True
+    draft["properties"].append({
+        "id": str(uuid4()), "owner_type_id": customer, "name": "fiction_grade",
+        "value_kind": "string", "required": True,
+    })
+    session = save(client, session, draft).json()
+    batch = seed_batch(client, session, [create("fiction-customer", "material_object", {"type_id": customer, "values": {}})])
+    [item] = batch["items"]
+    assert len(item["acceptance_issues"]) == 2
+    assert any("（label）" in issue for issue in item["acceptance_issues"])
+    assert any("（fiction_grade）" in issue for issue in item["acceptance_issues"])
+    rejected = decide(client, session, [(item["id"], "accept")])
+    assert rejected.status_code == 422, rejected.text
+    assert rejected.json()["error"]["issues"] == item["acceptance_issues"]
 
 
 def test_a_many_to_one_relation_accepts_only_one_target(client):
@@ -278,6 +317,9 @@ def test_deleting_the_old_target_frees_a_many_to_one_relation(client):
         create("l2", "material_link", {"type_id": buyer["id"], "source_id": ids["s"], "target_id": ids["t2"]}),
     ])
     shown = client.get(ROOT + f"/sessions/{session['id']}/proposal-batches/{change['id']}").json()["items"]
-    assert all(i["acceptance_issues"] == [] for i in shown)
+    # The new relation alone still conflicts. Accepting the independent target
+    # deletion together frees its slot, which the combined decision verifies.
+    assert next(i for i in shown if i["operation"] == "delete")["acceptance_issues"] == []
+    assert next(i for i in shown if i["operation"] == "create")["acceptance_issues"]
     response = decide(client, session, [(i["id"], "accept") for i in change["items"]])
     assert response.status_code == 200, response.text

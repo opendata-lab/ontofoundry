@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from ontofoundry_api.api.auth import Principal, current_principal
 from ontofoundry_api.contracts.proposal_reviews import ProposalBatchSummary
 from ontofoundry_api.contracts.proposal_submit import ProposalSubmitResponse
-from ontofoundry_api.contracts.read_models import AffectedItem, ElementSaveImpact
+from ontofoundry_api.contracts.read_models import ElementSaveImpact
+from ontofoundry_api.contracts.session_writes import (
+    ElementSave,
+    ElementSavePreview,
+    SessionRead,
+)
 from ontofoundry_api.database import get_db
 from ontofoundry_api.db_models import (
     MaterialRecord,
@@ -23,11 +28,9 @@ from ontofoundry_api.db_models import (
 )
 from ontofoundry_api.domain.core import MaterialObject, Strict
 from ontofoundry_api.domain.models import PROPOSAL_COLLECTIONS
-from ontofoundry_api.services import instance_store
-from ontofoundry_api.services import sessions as session_service
+from ontofoundry_api.services import changes, instance_store
 from ontofoundry_api.services.access import can_edit_workspace, require_edit, require_read
 from ontofoundry_api.services.element_diff import element_label, field_changes, owner_label
-from ontofoundry_api.services.element_save import preview_element_save
 from ontofoundry_api.services.errors import ServiceError
 from ontofoundry_api.services.proposal_submit import submit_result
 from ontofoundry_api.services.proposals import (
@@ -45,7 +48,6 @@ from ontofoundry_api.services.sessions import get_modeling_session, session_draf
 router = APIRouter(
     prefix="/api/v1/workspaces/{workspace_id}/sessions/{session_id}", tags=["proposals"]
 )
-element_router = APIRouter(prefix="/api/v1/workspaces/{workspace_id}", tags=["proposals"])
 
 
 def _fail(status: int, code: str, message: str, **details: Any) -> ServiceError:
@@ -227,6 +229,7 @@ def read_batch(
     workspace_id: str,
     session_id: str,
     batch_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
@@ -263,7 +266,7 @@ def read_batch(
         duplicates=DuplicateCandidates(db, workspace_id, session),
         peers=_atomic_peers(db, workspace_id, session_id, items),
     )
-    context.acceptance = AcceptanceIssues(context.diagnostics.draft, snapshot, items)
+    context.acceptance = AcceptanceIssues(db, session, items, dependencies, request.app.state.settings)
     return {
         **_batch_summary(batch, items, statuses, session),
         "items": [_item_view(i, statuses, dependencies, elements, context) for i in items],
@@ -326,7 +329,7 @@ def revise_fact_proposal(
     batch_id = revise_fact(
         db, workspace_id, session_id, proposal_id, body, user, request.app.state.settings
     )
-    return read_batch(workspace_id, session_id, batch_id, db, user)
+    return read_batch(workspace_id, session_id, batch_id, request, db, user)
 
 
 class ProposalContentRevision(BaseModel):
@@ -389,46 +392,30 @@ def revise_dataset_source(
     )
 
 
-class ElementSave(Strict):
-    target_kind: Literal[
-        "object_type", "link_type", "metric", "dataset", "mapping", "value_type"
-    ]
-    target_id: str
-    expected_current_version_id: str | None
-    session_id: str | None = None
-    expected_session_revision: int | None = None
-    draft: dict
-    affected_items: list[AffectedItem] = Field(default_factory=list)
-    expected_instance_change_sequence: int | None = None
-
-
-@element_router.post("/element-saves/preview", response_model=ElementSaveImpact)
+@router.post("/element-saves/preview", response_model=ElementSaveImpact)
 def preview_element(
     workspace_id: str,
-    body: ElementSave,
+    session_id: str,
+    body: ElementSavePreview,
+    request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
-    require_read(db, str(workspace_id), user)
-    return preview_element_save(db, workspace_id, body)
+    require_edit(db, str(workspace_id), user)
+    return changes.preview_element_save(db, workspace_id, session_id, body, request.app.state.settings, user.id)
 
 
-@element_router.post("/element-saves")
+@router.post("/element-saves", response_model=SessionRead)
 def save_element(
     workspace_id: str,
+    session_id: str,
     body: ElementSave,
     request: Request,
     db: Session = Depends(get_db),
     user: Principal = Depends(current_principal),
 ):
     require_edit(db, str(workspace_id), user)
-    return session_service.save_element(
-        workspace_id=workspace_id,
-        body=body,
-        settings=request.app.state.settings,
-        db=db,
-        user=user,
-    )
+    return changes.save_element(db, workspace_id, session_id, body, request.app.state.settings, user.id)
 
 
 MAX_RESULT_BYTES = 8 * 1024 * 1024

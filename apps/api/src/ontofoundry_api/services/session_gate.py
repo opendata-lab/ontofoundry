@@ -10,7 +10,7 @@ from ontofoundry_api.services.instance_store import lock_workspace, require_open
 from ontofoundry_api.services.run_status import ACTIVE_RUN_STATUSES
 
 
-def lock_session(db, workspace_id, session_id):
+def lock_session(db, workspace_id, session_id, *, allow_abandoned=False):
     lock_workspace(db, workspace_id)
     session = db.scalar(select(ModelingSessionRecord).where(
         ModelingSessionRecord.id == session_id,
@@ -18,7 +18,8 @@ def lock_session(db, workspace_id, session_id):
     ).with_for_update().execution_options(populate_existing=True))
     if session is None:
         raise NotFoundError("会话不存在")
-    require_open_session(session)
+    if not allow_abandoned:
+        require_open_session(session)
     return session
 
 
@@ -65,10 +66,11 @@ def require_draft_edit(db, session):
 
 def require_current_batch(db, session, batch_id):
     batch = db.get(ProposalBatchRecord, batch_id)
-    revision = (session.run_manifest_json or {}).get("source_session_revision", -1)
-    if batch is None or revision > batch.source_session_revision:
+    if batch is None or batch_read_only(session, batch):
         raise ConflictError("新一轮已开始，旧批次只读", code="PROPOSAL_BATCH_READ_ONLY")
 
 
 def batch_read_only(session, batch):
+    if batch.id == session.human_batch_id:
+        return False
     return (session.run_manifest_json or {}).get("source_session_revision", -1) > batch.source_session_revision

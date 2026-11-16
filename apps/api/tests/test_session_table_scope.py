@@ -63,8 +63,8 @@ def test_save_scope_defaults_transitions_and_revision_conflict(client):
     assert saved["table_scope"] == "selected"
 
     def save(current, **scope):
-        return client.put(ROOT + f"/sessions/{current['id']}", json={
-            "revision": current["revision"], "draft": current["draft"], **scope,
+        return client.patch(ROOT + f"/sessions/{current['id']}", json={
+            "revision": current["revision"], **scope,
         })
 
     unchanged = save(saved).json()

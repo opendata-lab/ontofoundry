@@ -314,6 +314,9 @@ def test_shared_publish_blocks_interpreting_definition_changes(client, change, r
         response = publish(client, session)
     else:
         response = submit(client, draft, target_id=customer["id"])
+        if change != "delete_type":
+            assert response.status_code == 200, response.text
+            response = publish(client, response.json())
     expected = (
         "ELEMENT_NOT_FOUND"
         if route == "element" and change == "delete_type"
@@ -858,10 +861,8 @@ def test_relation_endpoint_definition_change_blocks_both_publish_paths(client):
     draft = deepcopy(session["draft"])
     draft["link_types"][0]["source_type_id"] = customer["element"]["type_id"]
     direct = submit(client, draft, kind="link_type", target_id=draft["link_types"][0]["id"])
-    assert (
-        direct.status_code == 409
-        and direct.json()["error"]["code"] == "INSTANCE_REFERENCES_BLOCK_PUBLISH"
-    )
+    assert direct.status_code == 200, direct.text
+    assert publish(client, direct.json()).json()["error"]["code"] == "INSTANCE_REFERENCES_BLOCK_PUBLISH"
     session = save(client, session, draft).json()
     assert (
         publish(client, session).json()["error"]["code"]
@@ -869,31 +870,21 @@ def test_relation_endpoint_definition_change_blocks_both_publish_paths(client):
     )
 
 
-def test_element_save_preview_lists_instances_and_checks_sequence(client):
+def test_element_save_defers_instance_impact_to_publish_preview(client):
+    from test_element_save import save_body
+
     session = create_session(client)
     draft = deepcopy(session["draft"])
     next(p for p in draft["properties"] if p["name"] == "label")["name"] = "customer_name"
-    body = {
-        "target_kind": "object_type",
-        "target_id": draft["object_types"][0]["id"],
-        "expected_current_version_id": session["base_version_id"],
-        "draft": draft,
-    }
-    response = client.post(ROOT + "/element-saves/preview", json=body)
+    body = save_body(client, session, draft, target_id=draft["object_types"][0]["id"])
+    response = client.post(ROOT + f"/sessions/{session['id']}/element-saves/preview",
+                           json={k: v for k, v in body.items() if k != "idempotency_key"})
     assert response.status_code == 200, response.text
-    impact = response.json()
-    assert impact["affected_instances"]
-    accept_all(client, session, [create_instance(session)])
-    refused = client.post(
-        ROOT + "/element-saves",
-        json={
-            **body,
-            "expected_instance_change_sequence": impact["instance_change_sequence"],
-        },
-    )
-    assert (
-        refused.status_code == 409 and refused.json()["error"]["code"] == "PREVIEW_OUTDATED"
-    )
+    saved = client.post(ROOT + f"/sessions/{session['id']}/element-saves", json=body)
+    assert saved.status_code == 200, saved.text
+    impact = preview(client, saved.json())
+    assert impact.status_code == 200, impact.text
+    assert impact.json()["affected_instances"]
 
 
 def test_abandoned_session_cannot_write_and_staged_history_is_scoped(client):

@@ -19,6 +19,7 @@ export function modelingSession(
     draft_sha256: "d".repeat(64),
     base_version_sha256: "b".repeat(64),
     pending_proposal_count: 0,
+    unpublished_change_count: 0,
     latest_batch_id: null,
     base_diff: [],
     graph: {

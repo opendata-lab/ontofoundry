@@ -28,10 +28,10 @@ from ontofoundry_api.domain.canonical import canonical, element_sha256
 from ontofoundry_api.domain.evidence import EvidenceError, check_material_evidence
 from ontofoundry_api.domain.instances import (
     INSTANCE_KINDS,
-    check_accepted_values,
     combined_snapshot,
     definitions,
     instance_hash,
+    instance_value_errors,
     validate_instances,
 )
 from ontofoundry_api.domain.models import (
@@ -39,6 +39,7 @@ from ontofoundry_api.domain.models import (
     ELEMENT_MODELS,
     PROPOSAL_COLLECTIONS,
     ElementKind,
+    MaterialObject,
     OntologyDraft,
 )
 from ontofoundry_api.services import instance_store
@@ -134,16 +135,21 @@ def _instances(model, candidate, items, accepting=False):
     ids = (changed & set(objects)) | {end for link in links for end in (link["source_id"], link["target_id"])}
     validate_instances(model, [objects[key] for key in ids if key in objects], links)
     if accepting:
-        check_accepted_values(model, [objects[key] for key in changed if key in objects])
+        issues = [
+            issue
+            for key in sorted(changed & objects.keys())
+            for issue in instance_value_errors(model, MaterialObject.model_validate(objects[key]), strict=True)
+        ]
         # Relations whose endpoint this accept deletes go with it.
         surviving = [
             link for link in candidate.get("material_links", [])
             if link["source_id"] in objects and link["target_id"] in objects
             and not {link["source_id"], link["target_id"]} & deleted
         ]
-        issues = link_count_issues(model, objects, surviving, changed - deleted)
+        issues.extend(link_count_issues(model, objects, surviving, changed - deleted))
         if issues:
-            raise ValueError("；".join(issues))
+            raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
+                               status_code=422, details={"issues": issues})
 
 
 def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, draft=None, accepting=False):
@@ -212,7 +218,8 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
                 for i in items if i.target_kind not in INSTANCE_KINDS
             ])
             if issues:
-                raise ValueError("；".join(issues))
+                raise ServiceError("候选图校验未通过：" + "；".join(issues), code="VALIDATION_FAILED",
+                                   status_code=422, details={"issues": issues})
         _evidence(db, workspace_id, before, candidate, items, lookup)
         check_identities(db, workspace_id, element_kinds(candidate))
         published = instance_store.published_model(db, workspace_id)
@@ -236,6 +243,7 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
 
 
 def parse_agent(db, settings, session, raw, context):
+    from ontofoundry_api.services.changes import check_proposal
     from ontofoundry_api.services.table_submission import prepare_table_submission
 
     try:
@@ -246,7 +254,7 @@ def parse_agent(db, settings, session, raw, context):
         problems = getattr(exc, "problems", None) or [(exc.code, str(exc))]
         raise ServiceError(str(exc), code=exc.code, status_code=422,
                            details={"problems": problems}) from exc
-    trial = trial_apply(db, context.workspace_id, session, parsed.items, settings)
+    trial = check_proposal(db, context.workspace_id, session, parsed.items, settings)
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 
 
@@ -286,6 +294,7 @@ def save_pending(db, session, batch_id, trial):
 
 
 def trial_pending(db, session, batch_id, settings, changes=None):
+    from ontofoundry_api.services.changes import check_proposal
     from ontofoundry_api.services.proposals import batch_items, dependency_map
     rows = batch_items(db, [batch_id], session.workspace_id, session.id)
     deps = dependency_map(db, [batch_id], session.workspace_id, session.id)
@@ -293,7 +302,7 @@ def trial_pending(db, session, batch_id, settings, changes=None):
     for item in items:
         if changes and item.id in changes:
             item.after = changes[item.id]
-    return trial_apply(db, session.workspace_id, session, items, settings)
+    return check_proposal(db, session.workspace_id, session, items, settings)
 
 
 def apply_trial(db, workspace_id, session_id, trial, accepted, actor, lookup):

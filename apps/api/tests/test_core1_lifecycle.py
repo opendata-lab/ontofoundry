@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from core1_fixtures import example_draft_json, example_names
 from dataset_binding import bind_datasets
-from test_modeling import create_session, published_snapshot
+from test_modeling import create_session, published_snapshot, save
 from test_t4_proposal_decisions import decide, seed_batch, update
 
 
@@ -31,10 +31,7 @@ def test_all_examples_save_publish_read(client, name):
         for e in draft[collection]:
             e["evidence"] = []
     bind_datasets(client, draft, session["workspace_id"])
-    saved = client.put(
-        root + f"/sessions/{session['id']}",
-        json={"revision": session["revision"], "draft": draft},
-    )
+    saved = save(client, session, draft)
     assert saved.status_code == 200, saved.text
     session = saved.json()
     preview = client.post(

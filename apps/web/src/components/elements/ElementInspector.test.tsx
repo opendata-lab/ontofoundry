@@ -2,10 +2,11 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, ApiError, instancesApi, modelingApi } from "../../api/client";
-import type { Draft, ElementSaveResult, InstanceList, Workspace } from "../../api/types";
+import { api, ApiError, catalogApi, instancesApi, modelingApi } from "../../api/client";
+import type { Draft, InstanceList, ModelingSession, Workspace } from "../../api/types";
 import { PageTabContext } from "../../hooks/usePageTab";
 import { WorkspaceContextProvider } from "../../hooks/useWorkspaceContext";
+import { modelingSession } from "../../test/apiRecords";
 import { example } from "../../test/drafts";
 import { renderWithProviders } from "../../test/renderWithProviders";
 import { legacyInspectRequest, notifyOntologySaved, type ElementRequest } from "../../lib/elementInspector";
@@ -20,6 +21,7 @@ vi.mock("../../api/client", async (importOriginal) => {
       ...original.modelingApi,
       snapshot: vi.fn(),
       get: vi.fn(),
+      personal: vi.fn(),
       previewElementSave: vi.fn(),
       saveElement: vi.fn(),
     },
@@ -50,6 +52,8 @@ function show(draft: Draft, query: string, role: Workspace["role"] = "admin", ve
   const request = legacyInspectRequest(new URLSearchParams(query))!;
   if (versionId) request.versionId = versionId;
   vi.mocked(modelingApi.snapshot).mockResolvedValue(draft);
+  vi.mocked(modelingApi.personal).mockResolvedValue(modelingSession({ id: "personal-s1", workspace_id: "w", revision: 3 }, draft));
+  vi.mocked(modelingApi.get).mockImplementation(async (_w, sid) => modelingSession({ id: sid, workspace_id: "w", revision: 5 }, draft));
   vi.mocked(api.elementPresentation).mockResolvedValue({ model: draft, version_id: "v1", workspace_id: "w", complete: false, representation: "element-1" } as never);
   vi.mocked(api.elementDocuments).mockResolvedValue({ material_objects: draft.material_objects, material_links: draft.material_links, version_id: "v1", workspace_id: "w" } as never);
   vi.mocked(api.presentation).mockResolvedValue({ model: draft, version: {} as never });
@@ -70,19 +74,15 @@ function show(draft: Draft, query: string, role: Workspace["role"] = "admin", ve
   return router;
 }
 
-const saved = (draft: Draft): ElementSaveResult => ({
-  version: { version_id: "v2" } as never,
-  draft,
-  session: null,
-});
+const saved = (draft: Draft, id = "personal-s1", revision = 4): ModelingSession =>
+  modelingSession({ id, workspace_id: "w", revision, unpublished_change_count: 1 }, draft);
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.workspace).mockResolvedValue(workspace);
   vi.mocked(instancesApi.list).mockResolvedValue({ items: [], snapshot_dates: [], next_cursor: null, truncated: false } as unknown as InstanceList);
   vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
-    current_version_id: "v1",
-    session_revision: null,
+    session_revision: 3,
     affected_items: [],
   });
 });
@@ -97,9 +97,10 @@ describe("object popup", () => {
     const graph = await within(dialog).findByLabelText(`${customer.display_name || customer.name}的关系图`);
     const layout = dialog.querySelector(".object-overview-columns");
     fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
+    await waitFor(() => expect(modelingApi.personal).toHaveBeenCalledWith("w"));
+    expect(await within(dialog).findByRole("textbox", { name: "名称" })).toBeEnabled();
     expect(within(dialog).getByLabelText(`${customer.display_name || customer.name}的关系图`)).toBe(graph);
     expect(dialog.querySelector(".object-overview-columns")).toBe(layout);
-    expect(await within(dialog).findByRole("textbox", { name: "名称" })).toBeEnabled();
   });
   it("shows the populated tabs, mapping status and column bindings", async () => {
     const draft = example("01-basic-sales");
@@ -132,45 +133,46 @@ describe("object popup", () => {
     await waitFor(() => expect(within(dialog).getByText("main.customer_id")).toBe(binding));
   });
 
-  it("edits the object and saves only its aggregate against the current version", async () => {
+  it("edits the object and saves only its aggregate into the personal session without publishing", async () => {
     const draft = example("01-basic-sales");
     const customer = draft.object_types.find((o) => o.name === "customer")!;
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=basic`);
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(await within(dialog).findByRole("button", { name: "编辑" }));
     fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "重要客户" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, sid, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(sid).toBe("personal-s1");
     expect(payload).toMatchObject({
       target_kind: "object_type",
       target_id: customer.id,
-      expected_current_version_id: "v1",
-      session_id: null,
-      expected_session_revision: null,
+      expected_session_revision: 3,
+      idempotency_key: expect.any(String),
     });
+    expect(payload.idempotency_key!.length).toBeGreaterThanOrEqual(8);
     expect((payload.draft.object_types.find((o) => o.id === customer.id)?.display_name || payload.draft.object_types.find((o) => o.id === customer.id)?.name)).toBe("重要客户");
-    expect(await screen.findByRole("status")).toHaveTextContent("已保存");
+    expect(await screen.findByRole("status")).toHaveTextContent("已保存到草稿");
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("keeps edits and explains a version conflict", async () => {
+  it("keeps edits and explains a session revision conflict", async () => {
     const draft = example("01-basic-sales");
     const customer = draft.object_types[0];
-    vi.mocked(modelingApi.saveElement).mockRejectedValue(new ApiError("当前版本已变化", 409, "VERSION_CHANGED"));
+    vi.mocked(modelingApi.saveElement).mockRejectedValue(new ApiError("草稿已更新，请重新打开后再保存", 409, "SESSION_REVISION_CHANGED"));
     show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "改名" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
-    expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/草稿已更新，请重新打开后再保存。你的修改仍保留/)).toBeInTheDocument();
     expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("改名");
   });
 
   it("edits a child's member conditions on the direct parent's properties", async () => {
     const draft = example("06-inheritance");
     const vip = draft.object_types.find((o) => o.name === "vip_party")!;
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     expect(await within(dialog).findByText("哪些当事人属于VIP当事人")).toBeInTheDocument();
@@ -178,7 +180,7 @@ describe("object popup", () => {
     fireEvent.change(within(dialog).getByRole("textbox", { name: "条件 1 的值" }), { target: { value: "SVIP" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
-    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, , payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     expect(payload.draft.object_types.find((o) => o.id === vip.id)?.derived_by).toEqual([
       { kind: "simple", conditions: [{ path: { links: [], property_id: expect.any(String) }, operator: "eq", values: ["SVIP"] }] },
     ]);
@@ -213,7 +215,7 @@ describe("object popup", () => {
     const draft = example("06-inheritance");
     const vip = draft.object_types.find((o) => o.name === "vip_party")!;
     expect(draft.mappings.find((m) => m.type_id === vip.id)?.binding_mode).toBe("shared_parent");
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${vip.id}&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByText("哪些当事人属于VIP当事人");
@@ -221,7 +223,7 @@ describe("object popup", () => {
     fireEvent.mouseDown(parentField.querySelector(".ant-select-clear")!);
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
-    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, , payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     const updatedVip = payload.draft.object_types.find((o) => o.id === vip.id)!;
     expect(updatedVip.extends).toBeNull();
     expect(updatedVip.derived_by).toEqual([]);
@@ -243,7 +245,7 @@ describe("relation, metric and dataset popups", () => {
 
   it("creates a metric from the form, supports equal bounds in between filter, and shows expression result type wording", async () => {
     const draft = example("01-basic-sales");
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, "inspect=metric:new&inspectMode=edit");
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(await within(dialog).findByRole("textbox", { name: "指标名称" }), { target: { value: "客户数" } });
@@ -264,7 +266,8 @@ describe("relation, metric and dataset popups", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalled());
-    const [, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, sid, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(sid).toBe("personal-s1");
     expect(payload.target_kind).toBe("metric");
     const metric = payload.draft.metrics.find((m) => m.id === payload.target_id)!;
     expect(metric).toMatchObject({
@@ -335,7 +338,7 @@ describe("element save impact preview", () => {
     const customer = draft.object_types.find((object) => object.name === "customer")!;
     const property = draft.properties.find((value) => value.owner_type_id === customer.id && value.name === "customer_no")!;
     const mapping = draft.mappings.find((value) => value.type_id === customer.id)!;
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${property.id}"]`)).not.toBeNull());
@@ -355,7 +358,7 @@ describe("element save impact preview", () => {
     expect(within(dialog).queryByRole("button", { name: /解除.*绑定/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-    const candidate = vi.mocked(modelingApi.saveElement).mock.calls[0][1].draft.mappings.find((value) => value.id === mapping.id)!;
+    const candidate = vi.mocked(modelingApi.saveElement).mock.calls[0][2].draft.mappings.find((value) => value.id === mapping.id)!;
     expect(candidate.fields).not.toHaveProperty(property.name);
     expect(candidate.fields.name).toEqual(mapping.fields.name);
   });
@@ -365,7 +368,7 @@ describe("element save impact preview", () => {
     const note = draft.properties.find((p) => p.owner_type_id === vip.id)!;
     const mapping = draft.mappings.find((m) => m.type_id === vip.id)!;
     expect(mapping.sources).toEqual([]);
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${vip.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${note.id}"]`)).not.toBeNull());
@@ -379,7 +382,7 @@ describe("element save impact preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
-    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+    for (const [, , payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
       expect(payload.draft.mappings.find((m) => m.id === mapping.id)!.fields).toEqual({
         note2: { kind: "column", source_id: "main", column: editColumn ? "party_name" : "vip_note" },
       });
@@ -391,7 +394,7 @@ describe("element save impact preview", () => {
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     const customerNo = draft.properties.find((p) => p.owner_type_id === customer.id && p.name === "customer_no")!;
     const mapping = draft.mappings.find((m) => m.type_id === customer.id)!;
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
     await waitFor(() => expect(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)).not.toBeNull());
@@ -402,7 +405,7 @@ describe("element save impact preview", () => {
       fireEvent.change(technical, { target: { value } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+    for (const [, , payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
       const fields = payload.draft.mappings.find((m) => m.id === mapping.id)!.fields;
       expect(fields.name2).toEqual(mapping.fields.customer_no);
       expect(fields.name).toEqual(mapping.fields.name);
@@ -415,11 +418,10 @@ describe("element save impact preview", () => {
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
-      current_version_id: "v1",
-      session_revision: null,
+      session_revision: 3,
       affected_items: [],
     });
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
@@ -432,9 +434,11 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
-    const [, previewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
-    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
-    expect(previewPayload).toEqual(savePayload);
+    const [, previewSessionId, previewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, saveSessionId, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    expect(previewSessionId).toBe("personal-s1");
+    expect(saveSessionId).toBe("personal-s1");
+    expect(savePayload).toEqual({ ...previewPayload, idempotency_key: expect.any(String) });
     expect(savePayload).not.toHaveProperty("affected_items");
     expect(savePayload.draft.properties.find((p) => p.id === customerNo.id)?.name).toBe("customer_code");
   });
@@ -446,8 +450,7 @@ describe("element save impact preview", () => {
     const customerFact = draft.material_objects.find((f) => f.type_id === customer.id)!;
     const h = "1".repeat(64);
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
-      current_version_id: "v1",
-      session_revision: null,
+      session_revision: 3,
       affected_items: [
         {
           target_kind: "material_object",
@@ -457,7 +460,7 @@ describe("element save impact preview", () => {
         },
       ],
     });
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
@@ -486,7 +489,7 @@ describe("element save impact preview", () => {
 
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
     expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
-    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, , savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     expect(savePayload.affected_items).toEqual([
       {
         target_kind: "material_object",
@@ -501,8 +504,7 @@ describe("element save impact preview", () => {
     const draft = example("07-instances-and-evidence");
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     vi.mocked(modelingApi.previewElementSave).mockResolvedValue({
-      current_version_id: "v1",
-      session_revision: null,
+      session_revision: 3,
       affected_items: [{
         target_kind: "material_object",
         target_id: draft.material_objects.find((f) => f.type_id === customer.id)!.id,
@@ -524,7 +526,7 @@ describe("element save impact preview", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
     await screen.findByText("确认后这些元素会随本次保存一并改写");
     expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2);
-    const [, payload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
+    const [, , payload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
     expect((payload.draft.object_types.find((o) => o.id === customer.id)?.display_name || payload.draft.object_types.find((o) => o.id === customer.id)?.name)).toBe("星河重点客户");
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
   });
@@ -534,7 +536,7 @@ describe("element save impact preview", () => {
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     vi.mocked(modelingApi.previewElementSave).mockRejectedValue(
-      new ApiError("当前版本已变化", 409, "VERSION_CHANGED"),
+      new ApiError("草稿已更新，请重新打开后再保存", 409, "SESSION_REVISION_CHANGED"),
     );
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
@@ -545,7 +547,7 @@ describe("element save impact preview", () => {
     fireEvent.change(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" }), { target: { value: "customer_code" } });
     fireEvent.click(screen.getByRole("button", { name: "保存" }));
 
-    expect(await within(dialog).findByText(/当前版本已变化。你的修改仍保留/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/草稿已更新，请重新打开后再保存。你的修改仍保留/)).toBeInTheDocument();
     expect(screen.queryByText("确认后这些元素会随本次保存一并改写")).not.toBeInTheDocument();
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
     expect(within(dialog.querySelector(`[data-element-id="${customerNo.id}"]`)!.closest("tr")!).getByRole("textbox", { name: "属性英文标识" })).toHaveValue("customer_code");
@@ -556,13 +558,11 @@ describe("element save impact preview", () => {
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     const customerNo = draft.properties.find((p) => p.name === "customer_no")!;
     let resolveFirstPreview!: (value: {
-      current_version_id: string | null;
-      session_revision: number | null;
+      session_revision: number;
       affected_items: [];
     }) => void;
     let resolveSecondPreview!: (value: {
-      current_version_id: string | null;
-      session_revision: number | null;
+      session_revision: number;
       affected_items: [];
     }) => void;
     vi.mocked(modelingApi.previewElementSave)
@@ -578,7 +578,7 @@ describe("element save impact preview", () => {
             resolveSecondPreview = resolve;
           }),
       );
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
 
     show(draft, `inspect=object_type:${customer.id}&inspectTab=properties&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
@@ -608,8 +608,7 @@ describe("element save impact preview", () => {
 
     // Resolve the first preview with no affected items (the direct-save branch)
     resolveFirstPreview({
-      current_version_id: "v1",
-      session_revision: null,
+      session_revision: 3,
       affected_items: [],
     });
 
@@ -617,8 +616,8 @@ describe("element save impact preview", () => {
     await waitFor(() => expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(2));
     expect(modelingApi.saveElement).not.toHaveBeenCalled();
 
-    const [, firstPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
-    const [, secondPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
+    const [, , firstPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[0];
+    const [, , secondPreviewPayload] = vi.mocked(modelingApi.previewElementSave).mock.calls[1];
     expect(firstPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("string");
     expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.value_kind).toBe("integer");
     expect(secondPreviewPayload.draft.properties.find((p) => p.id === customerNo.id)?.name).toBe(
@@ -626,13 +625,12 @@ describe("element save impact preview", () => {
     );
 
     resolveSecondPreview({
-      current_version_id: "v1",
-      session_revision: null,
+      session_revision: 3,
       affected_items: [],
     });
 
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-    const [, savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+    const [, , savePayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
     const savedProp = savePayload.draft.properties.find((p) => p.id === customerNo.id);
     expect(savedProp?.name).toBe("customer_code");
     expect(savedProp?.value_kind).toBe("integer");
@@ -645,9 +643,9 @@ describe("retained popup editing and request lifecycle", () => {
     const draft = example("01-basic-sales");
     const customer = draft.object_types.find((o) => o.name === "customer")!;
     const property = draft.properties.find((p) => p.owner_type_id === customer.id)!;
-    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => {
-      if (action === "conflict") throw new ApiError("当前版本已变化", 409, "VERSION_CHANGED");
-      return saved(payload.draft);
+    vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => {
+      if (action === "conflict") throw new ApiError("草稿已更新，请重新打开后再保存", 409, "SESSION_REVISION_CHANGED");
+      return saved(payload.draft, sid);
     });
     show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
     const dialog = await screen.findByRole("dialog");
@@ -659,7 +657,7 @@ describe("retained popup editing and request lifecycle", () => {
     expect(within(dialog).getByRole("textbox", { name: "名称" })).toHaveValue("星舟客户");
     if (action === "cancel") {
       fireEvent.click(within(dialog).getByRole("button", { name: "取消" }));
-      await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(modelingApi.personal).toHaveBeenCalledTimes(2));
       await within(dialog).findByRole("button", { name: "编辑" });
       fireEvent.click(within(dialog).getByRole("tab", { name: /^字段/ }));
       await within(dialog).findByText(property.display_name || property.name);
@@ -671,7 +669,7 @@ describe("retained popup editing and request lifecycle", () => {
     }
     fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
     await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-    for (const [, payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
+    for (const [, , payload] of [...vi.mocked(modelingApi.previewElementSave).mock.calls, ...vi.mocked(modelingApi.saveElement).mock.calls]) {
       expect(payload.draft.object_types.find((o) => o.id === customer.id)?.display_name).toBe("星舟客户");
       expect(payload.draft.properties.find((p) => p.id === property.id)?.display_name).toBe("星舟编号");
     }
@@ -737,21 +735,21 @@ describe("retained popup editing and request lifecycle", () => {
 });
 
 
-it("loads a complete independent baseline before editing an incomplete view", async () => {
+it("loads the personal session baseline before editing an incomplete view", async () => {
   const draft = example("01-basic-sales");
   const object = draft.object_types[0];
-  vi.mocked(modelingApi.saveElement).mockImplementation(async (_, payload) => saved(payload.draft));
+  vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
   show(draft, `inspect=object_type:${object.id}`);
   vi.mocked(api.elementPresentation).mockResolvedValue({ model: { ...draft, object_types: [object] }, version_id: "v1", workspace_id: "w", complete: false, representation: "element-1" } as never);
   const dialog = await screen.findByRole("dialog");
   await within(dialog).findByRole("button", { name: "编辑" });
-  expect(modelingApi.snapshot).not.toHaveBeenCalled();
+  expect(modelingApi.personal).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
-  await waitFor(() => expect(modelingApi.snapshot).toHaveBeenCalledWith("w", "v1"));
+  await waitFor(() => expect(modelingApi.personal).toHaveBeenCalledWith("w"));
   fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "星舟客户" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
   await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
-  const payload = vi.mocked(modelingApi.saveElement).mock.calls[0][1];
+  const payload = vi.mocked(modelingApi.saveElement).mock.calls[0][2];
   expect(payload.draft.object_types).toHaveLength(draft.object_types.length);
   expect(draft.object_types[0].display_name).not.toBe("星舟客户");
 });
@@ -772,4 +770,131 @@ it("keeps a pinned view until an explicit refresh moves every definition to the 
   fireEvent.click(await within(dialog).findByRole("button", { name: "版本已更新，刷新" }));
   await waitFor(() => expect(api.elementPresentation).toHaveBeenLastCalledWith("w", "object_type", object.id, "v2"));
   expect((await within(dialog).findAllByText("星舟新版客户")).length).toBeGreaterThan(0);
+});
+
+it("creates an element outside a session into the personal session, navigates with its id, and reuses idempotency key on retry", async () => {
+  const draft = example("01-basic-sales");
+  vi.mocked(modelingApi.saveElement)
+    .mockRejectedValueOnce(new Error("网络超时"))
+    .mockImplementationOnce(async (_, sid, payload) => saved(payload.draft, sid));
+  const router = show(draft, "inspect=object_type:new&inspectMode=edit");
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "新对象" } });
+  fireEvent.change(within(dialog).getByRole("textbox", { name: "英文标识" }), { target: { value: "new_object" } });
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  expect(await within(dialog).findByText("网络超时")).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(2));
+  expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+  expect(modelingApi.personal).toHaveBeenCalledWith("w");
+  const [, firstSid, firstPayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+  const [, secondSid, secondPayload] = vi.mocked(modelingApi.saveElement).mock.calls[1];
+  expect(firstSid).toBe("personal-s1");
+  expect(secondSid).toBe("personal-s1");
+  expect(secondPayload.idempotency_key).toBe(firstPayload.idempotency_key);
+  expect(router.state.location.pathname).toBe("/workspaces/w/objects");
+  // ElementModal updates request with the personal sessionId and no versionId.
+  await waitFor(() => expect(modelingApi.get).toHaveBeenCalledWith("w", "personal-s1"));
+});
+
+it("saves inside an explicit session without fetching the personal session", async () => {
+  const draft = example("01-basic-sales");
+  const customer = draft.object_types[0];
+  vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid, 6));
+  show(draft, `inspect=object_type:${customer.id}&inspectSession=s-explicit&inspectMode=edit`);
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "会话内客户" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+  expect(modelingApi.personal).not.toHaveBeenCalled();
+  expect(modelingApi.get).toHaveBeenCalledWith("w", "s-explicit");
+  const [, sid, payload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+  expect(sid).toBe("s-explicit");
+  expect(payload.expected_session_revision).toBe(5);
+});
+
+it("resends the exact pending save without re-previewing when the response is lost after commit", async () => {
+  const draft = example("07-instances-and-evidence");
+  const customer = draft.object_types.find((o) => o.name === "customer")!;
+  const customerFact = draft.material_objects.find((f) => f.type_id === customer.id)!;
+  const h = "2".repeat(64);
+  let previewCalls = 0;
+  vi.mocked(modelingApi.previewElementSave).mockImplementation(async () => {
+    previewCalls += 1;
+    if (previewCalls === 1) {
+      return {
+        session_revision: 3,
+        affected_items: [{
+          target_kind: "material_object",
+          target_id: customerFact.id,
+          expected_target_hash: h,
+          reason: "同步依赖",
+        }],
+      };
+    }
+    throw new ApiError("草稿已更新", 409, "SESSION_REVISION_CHANGED");
+  });
+  vi.mocked(modelingApi.saveElement)
+    .mockRejectedValueOnce(new Error("网络超时"))
+    .mockImplementationOnce(async (_, sid, payload) => saved(payload.draft, sid));
+
+  show(draft, `inspect=object_type:${customer.id}&inspectMode=edit`);
+  const dialog = await screen.findByRole("dialog");
+  fireEvent.change(await within(dialog).findByRole("textbox", { name: "名称" }), { target: { value: "幂等重试客户" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+
+  const confirmDialog = (await screen.findByText("确认后这些元素会随本次保存一并改写")).closest<HTMLElement>('[role="dialog"]')!;
+  fireEvent.click(within(confirmDialog).getByRole("button", { name: "确认保存" }));
+  expect(await within(dialog).findByText("网络超时")).toBeInTheDocument();
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(2));
+  expect(modelingApi.previewElementSave).toHaveBeenCalledTimes(1);
+  const [, , firstPayload] = vi.mocked(modelingApi.saveElement).mock.calls[0];
+  const [, , secondPayload] = vi.mocked(modelingApi.saveElement).mock.calls[1];
+  expect(secondPayload).toEqual(firstPayload);
+  expect(secondPayload.affected_items).toEqual([{
+    target_kind: "material_object",
+    target_id: customerFact.id,
+    expected_target_hash: h,
+  }]);
+});
+
+it("uses the personal session mapping preview in ElementInstances after saving an existing element opened outside a session", async () => {
+  const draft = example("01-basic-sales");
+  draft.material_objects = [];
+  const customer = draft.object_types.find((o) => o.name === "customer")!;
+  vi.mocked(catalogApi.mappingPreview).mockResolvedValue({
+    items: [],
+    has_more: false,
+    source: "database",
+    snapshot_dates: [],
+  });
+  vi.mocked(modelingApi.saveElement).mockImplementation(async (_, sid, payload) => saved(payload.draft, sid));
+
+  show(draft, `inspect=object_type:${customer.id}&inspectTab=properties`);
+  const dialog = await screen.findByRole("dialog");
+  await waitFor(() => expect(instancesApi.list).toHaveBeenCalledTimes(1));
+  expect(catalogApi.mappingPreview).not.toHaveBeenCalled();
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "编辑" }));
+  await waitFor(() => expect(modelingApi.personal).toHaveBeenCalledWith("w"));
+  const saveButton = await within(dialog).findByRole("button", { name: "保存" });
+  const propId = draft.properties.find((p) => p.owner_type_id === customer.id)!.id;
+  await waitFor(() => expect(dialog.querySelector(`[data-element-id="${propId}"]`)).not.toBeNull());
+  const row = dialog.querySelector<HTMLElement>(`[data-element-id="${propId}"]`)!;
+  fireEvent.click(row);
+  fireEvent.change(within(row.closest("tr")!).getByRole("textbox", { name: "属性名称" }), { target: { value: "客户新名称" } });
+  await waitFor(() => expect(saveButton).toBeEnabled());
+  fireEvent.click(saveButton);
+
+  await waitFor(() => expect(modelingApi.saveElement).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(catalogApi.mappingPreview).toHaveBeenCalled());
+  expect(vi.mocked(catalogApi.mappingPreview).mock.calls[0][1]).toMatchObject({
+    session_id: "personal-s1",
+    mapping: { type_id: customer.id },
+  });
+  expect(instancesApi.list).toHaveBeenCalledTimes(1);
 });

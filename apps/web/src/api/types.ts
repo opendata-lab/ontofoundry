@@ -405,6 +405,7 @@ export type ModelingSession = {
   draft_sha256: SHA256;
   base_version_sha256: SHA256;
   pending_proposal_count: number;
+  unpublished_change_count: number;
   latest_batch_id: UUID | null;
   base_diff: ElementChange[];
   graph: Omit<TypeGraph, "version_id"> & { version_id: UUID | "" };
@@ -486,6 +487,30 @@ export type AffectedItem = {
   expected_target_hash: SHA256;
 };
 export type ElementSaveKind = "object_type" | "link_type" | "metric" | "dataset" | "mapping" | "value_type";
+export type SessionSettingsPatch = {
+  revision: number;
+  title?: string | null;
+  material_ids?: string[] | null;
+  table_scope?: "all" | "selected" | null;
+  linked_tables?: LinkedTable[] | null;
+  mode?: SessionMode | null;
+};
+
+export type SessionElementSavePreview = {
+  target_kind: ElementSaveKind;
+  target_id: UUID;
+  expected_session_revision: number;
+  draft: Draft;
+  affected_items?: AffectedItem[];
+};
+export type SessionElementSave = SessionElementSavePreview & { idempotency_key: string };
+export type SessionElementSaveImpact = {
+  session_revision: number;
+  affected_items: (AffectedItem & { reason: string })[];
+};
+export type SessionElementSaveResult = ModelingSession;
+
+/** @deprecated Workspace save contract, retained until the frontend migration. */
 export type ElementSave = {
   target_kind: ElementSaveKind;
   target_id: UUID;

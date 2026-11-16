@@ -1,21 +1,36 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
+import { modelingApi } from "../api/client";
 import { example } from "../test/drafts";
-import { workspace } from "../test/apiRecords";
+import { modelingSession, workspace } from "../test/apiRecords";
 import { renderWithProviders } from "../test/renderWithProviders";
 import { TypeCatalogPage } from "./TypeCatalogPage";
+
+const snapshotMock = vi.hoisted(() => ({
+  draft: null as unknown,
+  session: null as ReturnType<typeof modelingSession> | null,
+  sessionId: "session-demo",
+  suffix: "?session=session-demo",
+  load: vi.fn(),
+  setDraft: vi.fn(),
+  setSession: vi.fn(),
+  error: "",
+}));
 
 vi.mock("../hooks/useWorkspaceContext", () => ({ useWorkspaceContext: () => ({ workspace: workspace() }) }));
 vi.mock("../hooks/useSnapshot", () => ({
   useSnapshot: () => ({
-    draft: example("06-inheritance"),
-    sessionId: "session-demo",
-    suffix: "?session=session-demo",
-    load: vi.fn(),
+    ...snapshotMock,
+    draft: snapshotMock.draft ?? example("06-inheritance"),
   }),
 }));
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  snapshotMock.draft = null;
+  snapshotMock.session = null;
+  vi.restoreAllMocks();
+});
 
 it("preserves inherited counts, session detail links and search in the object table", () => {
   renderWithProviders(
@@ -55,6 +70,17 @@ it("shows a relation's identifier, meaning, multiplicity and the basic detail ta
 });
 
 
+it("shows the unpublished change count next to the publish button", () => {
+  snapshotMock.session = modelingSession({ id: "session-demo", unpublished_change_count: 2 });
+  renderWithProviders(
+    <MemoryRouter initialEntries={["/objects?session=session-demo"]}>
+      <TypeCatalogPage kind="object_type" />
+    </MemoryRouter>,
+  );
+  expect(screen.getByText("2 项待发布")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "发布" })).toHaveAttribute("href", "/delivery?session=session-demo");
+});
+
 it("searches the optional Chinese relation name and keeps its English identifier", async () => {
   const snapshotModule = await import("../hooks/useSnapshot");
   const draft = example("06-inheritance");
@@ -64,4 +90,26 @@ it("searches the optional Chinese relation name and keeps its English identifier
   fireEvent.change(screen.getByRole("searchbox", { name: "搜索目录" }), { target: { value: "签约方" } });
   const link = screen.getByRole("link", { name: "签约方" });
   expect(within(link.closest("tr")!).getByText("signer")).toBeInTheDocument();
+});
+
+it("shows personal unpublished count on the value types tab when opened without a session query", async () => {
+  const snapshotModule = await import("../hooks/useSnapshot");
+  const draft = example("06-inheritance");
+  vi.spyOn(snapshotModule, "useSnapshot").mockReturnValue({
+    ...snapshotModule.useSnapshot(workspace()),
+    draft,
+    session: null,
+    sessionId: null,
+    suffix: "",
+  });
+  vi.spyOn(modelingApi, "personal").mockResolvedValue(
+    modelingSession({ id: "personal-vt", workspace_id: workspace().id, unpublished_change_count: 4 }),
+  );
+  renderWithProviders(
+    <MemoryRouter initialEntries={["/objects?catalogTab=values"]}>
+      <TypeCatalogPage kind="object_type" />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText("4 项待发布")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "发布" })).toHaveAttribute("href", "/delivery?session=personal-vt");
 });

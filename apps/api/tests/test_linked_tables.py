@@ -4,7 +4,7 @@ import json
 from uuid import uuid4
 
 from dataset_binding import bind_datasets
-from test_modeling import ROOT, create_session
+from test_modeling import ROOT, create_session, save
 
 from ontofoundry_api.db_models import ConnectionRecord, MetadataSnapshotRecord
 from ontofoundry_api.services.dataset_sources import linked_table_details
@@ -59,9 +59,9 @@ def link(connection_id, table):
 
 
 def save_links(client, session, tables):
-    return client.put(
+    return client.patch(
         ROOT + f"/sessions/{session['id']}",
-        json={"revision": session["revision"], "draft": session["draft"], "linked_tables": tables},
+        json={"revision": session["revision"], "linked_tables": tables},
     )
 
 
@@ -74,7 +74,7 @@ def test_registered_tables_list_only_present_tables_with_dataset_usage(client):
          "schema_name": "retail", "table_name": "orders", "columns": None}
     )
     bind_datasets(client, draft)
-    saved = client.put(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "draft": draft})
+    saved = save(client, session, draft)
     assert saved.status_code == 200, saved.text
     response = client.get(ROOT + f"/registered-tables?session_id={session['id']}")
     assert response.status_code == 200, response.text
@@ -132,7 +132,7 @@ def test_publish_rechecks_datasets_saved_directly_into_the_session(client):
             "query_sql": "SELECT id FROM retail.payments",
         }
     )
-    saved = client.put(ROOT + f"/sessions/{session['id']}", json={"revision": session["revision"], "draft": draft})
+    saved = save(client, session, draft)
     assert saved.status_code == 200, saved.text
     session = saved.json()
     preview = client.post(ROOT + f"/sessions/{session['id']}/publish-preview", json={"expected_session_revision": session["revision"]})

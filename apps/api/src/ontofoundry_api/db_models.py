@@ -107,10 +107,14 @@ class ModelingSessionRecord(Base):
     # a session of their own workspace.
     __table_args__ = (
         UniqueConstraint("workspace_id", "id", name="uq_modeling_sessions_ws_id"),
+        UniqueConstraint("workspace_id", "personal_owner_id", name="uq_personal_session"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"))
+    # AI-03/AI-08 workflow bookkeeping, outside the semantic model.
+    personal_owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    human_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     abandoned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     abandoned_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     title: Mapped[str] = mapped_column(String(240), default="新的建模会话")
@@ -636,4 +640,24 @@ class OntologyFeedbackRecord(Base):
     element_ids: Mapped[list] = mapped_column(JSON)
     version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ElementSaveRequestRecord(Base):
+    __tablename__ = "element_save_requests"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "session_id", "idempotency_key", name="uq_element_save_key"),
+        ForeignKeyConstraint(
+            ["workspace_id", "session_id"],
+            ["modeling_sessions.workspace_id", "modeling_sessions.id"],
+            name="fk_element_save_session",
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(String(36))
+    session_id: Mapped[str] = mapped_column(String(36))
+    idempotency_key: Mapped[str] = mapped_column(String(64))
+    request_sha256: Mapped[str] = mapped_column(String(64))
+    response_json: Mapped[dict] = mapped_column(JSON)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)

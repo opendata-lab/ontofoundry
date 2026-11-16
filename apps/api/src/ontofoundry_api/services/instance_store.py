@@ -677,6 +677,7 @@ def abandon(db, workspace_id, session_id, actor):
                 operation="abandon_session",
             )
     session.abandoned_at, session.abandoned_by = utc_now(), actor
+    session.personal_owner_id = None
     session.dataagent_run_token = None
     session.task_status, session.result_state = "cancelled", "failed_permanent"
     session.run_manifest_json = {

@@ -1,5 +1,5 @@
 // Registered datasets: labels, blank forms and catalog registration.
-import { api, modelingApi } from "../api/client";
+import { modelingApi } from "../api/client";
 import type { AssetTable, DataConnection, Dataset, Draft, Workspace } from "../api/types";
 import { upsert } from "./coreModel";
 import { newId } from "./id";
@@ -63,19 +63,18 @@ export function datasetFromTable(connection: DataConnection, table: AssetTable, 
 }
 
 /**
- * Registers a dataset as its own element save. In a session the save also
- * returns the session, which keeps its other unpublished changes.
+ * Registers a dataset as a session element save (never publishes). Outside a
+ * session it targets the user's personal session in this workspace.
  */
-export async function registerDataset(workspace: Workspace, draft: Draft, sessionId: string | null, dataset: Dataset) {
-  const session = sessionId ? await modelingApi.get(workspace.id, sessionId) : null;
-  const base = session?.draft ?? draft;
-  const current = await api.workspace(workspace.id);
-  return modelingApi.saveElement(workspace.id, {
+export async function registerDataset(workspace: Workspace, _draft: Draft, sessionId: string | null, dataset: Dataset) {
+  const session = sessionId
+    ? await modelingApi.get(workspace.id, sessionId)
+    : await modelingApi.personal(workspace.id);
+  return modelingApi.saveElement(workspace.id, session.id, {
     target_kind: "dataset",
     target_id: dataset.id,
-    expected_current_version_id: current.version_id,
-    session_id: session?.id ?? null,
-    expected_session_revision: session?.revision ?? null,
-    draft: upsert(base, "datasets", dataset),
+    expected_session_revision: session.revision,
+    idempotency_key: newId(),
+    draft: upsert(session.draft, "datasets", dataset),
   });
 }
