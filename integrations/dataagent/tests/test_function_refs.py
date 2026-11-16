@@ -93,3 +93,15 @@ def test_a_malformed_mapping_is_reported_not_crashed():
     context = json.loads((BASE / "tests/fixtures/extract-retail/context.json").read_bytes())
     report = check_part.check_fragment([item("mapping", {"sources": [{}]})], context, schema)
     assert report["errors"] and all("/items/0" in e for e in report["errors"])
+
+
+def test_metrics_and_rules_without_material_evidence_are_hinted():
+    cited = {"kind": "material", "material_id": "m1", "locator": {"line_start": 3, "line_end": 3}}
+    items = [
+        item("metric", {"name": "sales", "evidence": [cited]}, "a"),
+        item("metric", {"name": "repeat_rate"}, "b"),
+        item("rule", {"name": "rejected_not_stocked", "owner_kind": "property", "evidence": [{"kind": "table", "ref": "t1", "quote": "x"}]}, "c"),
+        item("rule", {"name": "level_values", "owner_kind": "value_type"}, "d"),
+        {"operation": "update", "target_kind": "metric", "target_id": "x", "after": {"name": "old"}},
+    ]
+    assert check_part.uncited_definitions(items) == ["repeat_rate", "rejected_not_stocked"]
