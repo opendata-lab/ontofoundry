@@ -83,11 +83,29 @@ def check_fragment(items, context, schema):
         # Structural helpers assume a schema-valid item; a malformed one is already reported above.
         if not any(re.search(rf"：/items/{n}(?:/|\s|$)", e) for e in errors):
             errors += [diagnostic(f"/items/{n}" + path, *rest, item) for path, *rest in mapping_local_errors(item)]
+    if uncited := uncited_definitions(batch["items"]):
+        shown = "、".join(uncited[:12]) + (f" 等 {len(uncited)} 个" if len(uncited) > 12 else "")
+        hints.insert(0, f"指标或规则没有材料证据：{shown}。材料里有依据就加 evidence（材料 id 与 locator 起止行，原文可省），"
+                        "审阅时才能对照口径；依据只来自表结构或用户要求时可不加。")
     return {
         "errors": errors,
         "pending_refs": sorted(used - defined),
         "hints": hints,
     }
+
+
+def uncited_definitions(items):
+    """New metrics and business rules citing no material line; value-type constraints come from columns."""
+    found = []
+    for item in items:
+        after = item.get("after") if isinstance(item.get("after"), dict) else None
+        if (item.get("operation") != "create" or after is None or item.get("target_kind") not in ("metric", "rule")
+                or after.get("owner_kind") == "value_type"):
+            continue
+        evidence = after.get("evidence") if isinstance(after.get("evidence"), list) else []
+        if not any(isinstance(e, dict) and e.get("kind", "material") == "material" for e in evidence):
+            found.append(after.get("name") or item.get("client_ref") or "?")
+    return found
 
 
 
