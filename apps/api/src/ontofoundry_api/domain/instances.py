@@ -54,9 +54,13 @@ def validate_instances(draft, objects, links):
         names = {p.name for p in index.effective_properties(obj.type_id)}
         if set(obj.values) - names:
             raise ValueError("实例引用了无效属性")
-        issues = value_issues(model, obj.type_id, obj.values, str(obj.id))
-        if any(i["severity"] == "error" for i in issues):
-            raise ValueError("实例属性值类型不符")
+        errors = [
+            i["message"]
+            for i in value_issues(model, obj.type_id, obj.values, str(obj.id))
+            if i["severity"] == "error"
+        ]
+        if errors:
+            raise ValueError("；".join(errors))
     for value in links:
         link = MaterialLink.model_validate(value)
         definition = index.links.get(link.type_id)
@@ -70,6 +74,23 @@ def validate_instances(draft, objects, links):
         ):
             raise ValueError("关系实例端点类型不兼容")
     return model
+
+
+def check_accepted_values(model, objects):
+    """Stricter than `validate_instances`: what an accepted document instance must state.
+
+    Proposals and reads stay lenient so stored instances are never hidden; only the
+    instances being accepted must state numbers as numbers."""
+    errors = [
+        issue["message"]
+        for obj in objects
+        for issue in value_issues(
+            model, UUID(str(obj["type_id"])), obj["values"], str(obj["id"]), numeral_text=False
+        )
+        if issue["severity"] == "error"
+    ]
+    if errors:
+        raise ValueError("；".join(dict.fromkeys(errors)))
 
 
 def interpretation(draft, kind, element, objects):

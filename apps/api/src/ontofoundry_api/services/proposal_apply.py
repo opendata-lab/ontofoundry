@@ -23,6 +23,7 @@ from ontofoundry_api.domain.canonical import canonical, element_sha256
 from ontofoundry_api.domain.evidence import EvidenceError, check_material_evidence
 from ontofoundry_api.domain.instances import (
     INSTANCE_KINDS,
+    check_accepted_values,
     combined_snapshot,
     definitions,
     instance_hash,
@@ -109,7 +110,7 @@ def _evidence(db, workspace_id, before, candidate, items, lookup):
                 check_material_evidence(evidence, lookup, "证据")
 
 
-def _instances(model, candidate, items):
+def _instances(model, candidate, items, accepting=False):
     """Check changed instances together with the relations that touch them.
 
     An instance whose type changes can break a relation the batch does not
@@ -127,6 +128,8 @@ def _instances(model, candidate, items):
     ]
     ids = (changed & set(objects)) | {end for link in links for end in (link["source_id"], link["target_id"])}
     validate_instances(model, [objects[key] for key in ids if key in objects], links)
+    if accepting:
+        check_accepted_values(model, [objects[key] for key in changed if key in objects])
 
 
 def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, draft=None, accepting=False):
@@ -188,7 +191,7 @@ def trial_apply(db, workspace_id, session, items, settings, *, baseline=None, dr
         group_items(before, items, references_resolved=True)
         candidate = apply_items(before, items)
         model = OntologyDraft.model_validate(definitions(candidate))
-        _instances(model, candidate, items)
+        _instances(model, candidate, items, accepting)
         _evidence(db, workspace_id, before, candidate, items, lookup)
         check_identities(db, workspace_id, element_kinds(candidate))
         published = instance_store.published_model(db, workspace_id)

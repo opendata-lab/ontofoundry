@@ -7,24 +7,34 @@ from decimal import Decimal
 
 from ontofoundry_api.domain.models import OntologyDraft
 
+KIND_NAMES = {"string": "文本", "boolean": "布尔值", "date": "日期", "datetime": "日期时间"}
+NUMBER_KINDS = {"integer", "decimal", "float"}
 
-def valid_value(kind: str, value) -> bool:
+
+def valid_value(kind: str, value, *, numeral_text: bool = True) -> bool:
+    """`numeral_text`: whether a plain numeral written as text counts as a number.
+
+    Database rows carry decimals as text to keep their precision, so reads allow it.
+    Document instances are written by agents and people and must state numbers as
+    numbers, so a stored value compares and computes as one."""
     if kind == "string":
         return isinstance(value, str)
     if kind == "boolean":
         return type(value) is bool
-    # Documents state numbers as text; a plain numeral is unambiguous, so it is
-    # a valid value as written (checked, never converted). "约240元" is not.
     if kind == "integer":
         return type(value) is int or (
-            isinstance(value, str) and bool(re.fullmatch(r"-?\d+", value))
+            numeral_text and isinstance(value, str) and bool(re.fullmatch(r"-?\d+", value))
         )
     if kind in ("decimal", "float"):
         return (
             type(value) is int
             or (type(value) is float and math.isfinite(value))
             or (isinstance(value, Decimal) and value.is_finite())
-            or (isinstance(value, str) and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value)))
+            or (
+                numeral_text
+                and isinstance(value, str)
+                and bool(re.fullmatch(r"-?\d+(?:\.\d+)?", value))
+            )
         )
     if kind == "date" and type(value) is date:
         return True
@@ -52,7 +62,9 @@ def valid_value(kind: str, value) -> bool:
     return False
 
 
-def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list[dict]:
+def value_issues(
+    draft: OntologyDraft, type_id, values: dict, path: str, *, numeral_text: bool = True
+) -> list[dict]:
     issues = []
     for attribute in draft.effective_properties(type_id):
         value = values.get(attribute.name)
@@ -69,11 +81,17 @@ def value_issues(draft: OntologyDraft, type_id, values: dict, path: str) -> list
                 "warning",
                 f"{attribute.display_name or attribute.name} 待补全：原文未提供",
             )
-        elif value is not None and not valid_value(attribute.value_kind, value):
+        elif value is not None and not valid_value(
+            attribute.value_kind, value, numeral_text=numeral_text
+        ):
+            kind = attribute.value_kind.value
+            expected = {"integer": "整数", "decimal": "数字", "float": "数字"}.get(kind) or KIND_NAMES.get(kind, kind)
+            if kind in NUMBER_KINDS and isinstance(value, str):
+                expected += f"，不能写成文本 {value!r}"
             code, severity, message = (
                 "INSTANCE_VALUE_TYPE",
                 "error",
-                f"{attribute.display_name or attribute.name} 必须是 {attribute.value_kind} 类型",
+                f"{attribute.display_name or attribute.name}（{attribute.name}）必须是{expected}",
             )
         if code:
             issues.append(
