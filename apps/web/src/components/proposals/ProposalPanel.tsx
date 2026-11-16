@@ -376,7 +376,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
               const toggle = group.properties.length > 0 && (
                 <button type="button" aria-expanded={open} onClick={() => flip(group.key)}
                   aria-label={`${open ? "收起" : "展开"} ${group.title} 的属性（${group.properties.length}）`}
-                  className="flex w-full items-center gap-1.5 border-b border-rule-soft bg-surface px-4 py-1 pl-10 text-left text-xs text-attribute hover:bg-surface-soft">
+                  className="flex w-full items-center gap-1.5 border-b border-rule-soft bg-surface px-4 py-1 pl-10 text-left text-xs text-ink-2 hover:bg-surface-soft">
                   {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   属性 <span className="tabular-nums">{group.properties.length}</span>
                 </button>
@@ -394,7 +394,7 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
                   )}
                   {toggle}
                   {open && group.properties.length > 0 && (
-                    <div className="ml-6 border-l-2 border-attribute-soft">{group.properties.map(renderCard)}</div>
+                    <div className="ml-6 border-l-2 border-rule">{group.properties.map(renderCard)}</div>
                   )}
                 </section>
               );
