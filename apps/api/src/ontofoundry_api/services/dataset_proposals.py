@@ -89,7 +89,17 @@ def proposal_diagnostics(db, workspace_id, item, context=None):
     return result
 
 
-def revise_dataset(db, workspace_id, session_id, proposal_id, dataset, expected_revision, settings):
+def revise_dataset(
+    db,
+    workspace_id,
+    session_id,
+    proposal_id,
+    dataset,
+    expected_revision,
+    settings,
+    *,
+    actor_id=None,
+):
     from ontofoundry_api.services.proposal_apply import save_pending, trial_pending
     from ontofoundry_api.services.session_gate import (
         lock_session,
@@ -108,6 +118,14 @@ def revise_dataset(db, workspace_id, session_id, proposal_id, dataset, expected_
     changed = db.execute(update(ModelingSessionRecord).where(ModelingSessionRecord.id == session_id, ModelingSessionRecord.revision == expected_revision).values(revision=expected_revision + 1))
     if changed.rowcount != 1:
         raise DatasetSourceError("会话已更新，请重新读取", code="SESSION_REVISION_CHANGED", status_code=409)
-    save_pending(db, session, item.batch_id, trial)
+    save_pending(
+        db,
+        session,
+        item.batch_id,
+        trial,
+        actor_id=actor_id or session.created_by,
+        actor_kind="human",
+        primary_proposal_id=item.id,
+    )
     db.commit()
     return {"proposal_id": item.id, "session_revision": expected_revision + 1}

@@ -522,6 +522,7 @@ export async function mockReviewApi(page: Page, options: { conflicts?: boolean }
     [`${sessionPath}/publish-preview`]: REVIEW_PREVIEW,
     [`${sessionPath}/proposal-batches`]: { items: [REVIEW_BATCH], next_cursor: null },
     [`${sessionPath}/proposal-batches/${REVIEW_BATCH.id}`]: REVIEW_BATCH,
+    [`${sessionPath}/change-events`]: { items: [], next_cursor: null },
     [`${sessionPath}/agent-conversation`]: { messages: [], run: null },
     [`${base}/capabilities`]: { agent_configured: true, model: "demo-model", max_file_mb: 256, connections_configured: true, skills: [] },
     [`${base}/materials`]: { items: [] },

@@ -661,3 +661,62 @@ class ElementSaveRequestRecord(Base):
     response_json: Mapped[dict] = mapped_column(JSON)
     actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class ChangeEventRecord(Base):
+    """Append-only change log across proposal, draft and version layers (AI-07, AI-12)."""
+
+    __tablename__ = "change_events"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "session_id"],
+            ["modeling_sessions.workspace_id", "modeling_sessions.id"],
+            name="fk_change_event_session",
+        ),
+        CheckConstraint(
+            "actor_kind IN ('human', 'agent', 'import')",
+            name="ck_change_event_actor_kind",
+        ),
+        CheckConstraint(
+            "subject IN ('proposal', 'draft', 'version')",
+            name="ck_change_event_subject",
+        ),
+        CheckConstraint(
+            "(subject = 'proposal' AND action IN ('created','revised','superseded','accepted','rejected','restored','back_to_pending'))"
+            " OR (subject = 'draft' AND action IN ('added','updated','removed'))"
+            " OR (subject = 'version' AND action = 'published')",
+            name="ck_change_event_action",
+        ),
+        CheckConstraint(
+            "(subject = 'version' AND target_kind IS NULL AND target_id IS NULL AND version_id IS NOT NULL)"
+            " OR (subject IN ('proposal', 'draft') AND target_kind IS NOT NULL AND target_id IS NOT NULL)",
+            name="ck_change_event_target",
+        ),
+        Index(
+            "ix_change_events_session_target_at",
+            "workspace_id",
+            "session_id",
+            "target_id",
+            "at",
+            "seq",
+        ),
+        Index("ix_change_events_session_at", "workspace_id", "session_id", "at", "seq"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), nullable=False, index=True)
+    session_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    actor_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    actor_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    run_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    subject: Mapped[str] = mapped_column(String(16), nullable=False)
+    action: Mapped[str] = mapped_column(String(24), nullable=False)
+    target_kind: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    proposal_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    cause_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)

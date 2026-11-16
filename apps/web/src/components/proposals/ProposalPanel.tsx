@@ -456,6 +456,8 @@ function ProposalReview({ session, proposals, running, canEdit = true }: Props &
             })
           }
           workspaceId={session.workspace_id}
+          sessionId={session.id}
+          sessionRevision={session.revision}
           onReviseDataset={(dataset) => proposals.reviseDataset(openItem.id, dataset)}
           onReviseContent={(fields) => proposals.reviseContent(openItem.id, fields)}
           onClose={() => setOpenId(null)}

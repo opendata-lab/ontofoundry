@@ -1,5 +1,7 @@
 """Instance side of mixed proposal acceptance/undo, in the decision transaction."""
 
+from copy import deepcopy
+
 from sqlalchemy import select
 
 from ontofoundry_api.db_models import InstanceHistoryRecord
@@ -51,7 +53,7 @@ def cascade_history(db, workspace_id, item):
     ).all()
 
 
-def apply_changes(db, workspace_id, session_id, combined, accepted, undone, actor, lookup, *, instance_states=None):
+def apply_changes(db, workspace_id, session_id, combined, accepted, undone, actor, lookup, *, instance_states=None, cascades_out=None):
     model = OntologyDraft.model_validate(definitions(combined))
     objects = {o["id"]: o for o in combined.get("material_objects", [])}
     links = list(combined.get("material_links", []))
@@ -115,6 +117,7 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             lookup=lookup,
             model=model,
             validated=instance_states is not None,
+            cascades=cascades_out,
         )
         item.accepted_instance_revision = result["revision"] if not undo else None
         if state == "active":
@@ -123,7 +126,7 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             active.discard(item.target_id)
     for entry in cascades:
         before = entry.before
-        instance_store.write(
+        restored = instance_store.write(
             db,
             workspace_id,
             before["session_id"] or session_id,
@@ -138,4 +141,15 @@ def apply_changes(db, workspace_id, session_id, combined, accepted, undone, acto
             lookup=lookup,
             model=model,
         )
+        if cascades_out is not None:
+            cascades_out.append(
+                {
+                    "action": "added",
+                    "target_kind": "material_link",
+                    "target_id": entry.owner_id,
+                    "proposal_id": entry.proposal_item_id,
+                    "before": None,
+                    "after": deepcopy(restored["element"]),
+                }
+            )
     return model.model_dump(mode="json")

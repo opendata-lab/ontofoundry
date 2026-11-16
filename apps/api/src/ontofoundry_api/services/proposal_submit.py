@@ -102,7 +102,7 @@ def _receipt(db, batch, repair_used=0):
     )
 
 
-def submit_result(db, settings, workspace_id, session_id, run_token, raw):
+def submit_result(db, settings, workspace_id, session_id, run_token, raw, *, actor_id=None):
     """Returns the outcome; the caller has already verified the run credential."""
     session = lock_session(db, workspace_id, session_id)
     if session.dataagent_run_token != run_token:
@@ -118,6 +118,12 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
     if session.task_status not in ACTIVE_RUN_STATUSES:
         return _rejected("RUN_NOT_ACTIVE", "本轮运行已结束，不能再提交结果")
     manifest = dict(session.run_manifest_json or {})
+    resolved_actor = (
+        actor_id
+        or manifest.get("started_by")
+        or ((manifest.get("input_files") or {}).get("mcp_access") or {}).get("user_id")
+        or session.created_by
+    )
     if _round(manifest, digest) > REPAIR_LIMIT:
         return _rejected(
             "REPAIR_BUDGET_EXHAUSTED",
@@ -132,6 +138,7 @@ def submit_result(db, settings, workspace_id, session_id, run_token, raw):
         batch = store_batch(
             db, workspace_id=workspace_id, session_id=session_id,
             task_id=session.dataagent_task_id, manifest=manifest, parsed=parsed,
+            actor_id=resolved_actor, actor_kind="agent",
         )
     except ServiceError as exc:
         db.rollback()

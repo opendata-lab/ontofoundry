@@ -26,6 +26,7 @@
 - `proposal_submit.py`、`proposal_revision.py`、`import_proposals.py` 和 `proposals.py` 在提交、恢复、退回与导入补全时收敛到唯一待审批次，同目标沿用 target_id、折叠连续修改、带入未提及项、重算依赖和原子组及两级检查。旧 pending 标为 superseded，已决定项保留。
 - `modeling_input.py` 与 `proposal_context` 提供未发布修改和待审上下文。`table_submission.py` 在检查通过后才持久化表结构收据。
 - `sessions.py` 的 `resolve-merge` 经同一管线检查并留痕。发布针对最终合并结果中受影响定义复用接受检查，在同一事务里追加发布边界。
+- 2b 评审第 1 项遗留：`resolve-merge` 目前仅写草稿层事件，补齐其提案层 `change_events` 与 `cause_id` 关联随 `resolve-merge` 迁入提案管线一并在 2c 实施。
 - `proposal_submit.py` 每次运行总计最多提交 10 轮不同内容，包含首次提交。按现有首次失败后累计修正的计数方式设置 `REPAIR_LIMIT = 9`，重复相同失败沿用回执且不增加计数。2a 保留当前 `REPAIR_LIMIT = 3`，此处调整在 2c 实施。
 - 契约增加 back_to_pending、superseded、级联结果及完整上下文，同步 JSON Schema、Pydantic、前端类型和批次计数。若需要存储边界与批次替代关系，新增 Alembic，复用 2b 发布记录能表达的字段。
 - 测试覆盖跨批次链、依赖与原子组、已只读智能体批次、发布隔离、唯一待审批次并发收敛、target_id 稳定、合并后接受检查、resolve-merge 原子性、收据失败回滚和 10 轮边界。

@@ -48,6 +48,7 @@ READS = [
     ("GET", W + "/version-comparison"), ("GET", W + "/sessions"), ("GET", S),
     ("GET", S + "/instances"), ("GET", S + "/instance-baseline"),
     ("GET", S + "/proposal-batches"), ("GET", S + "/proposal-batches/{batch_id}"),
+    ("GET", S + "/change-events"),
     ("GET", A), ("GET", A + "/events"),
     ("GET", A + "/files/{rel_path:path}"), ("GET", W + "/instances"),
     ("GET", W + "/instances/{kind}/{instance_id}/history"),

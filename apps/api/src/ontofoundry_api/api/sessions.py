@@ -62,7 +62,11 @@ def resolve_merge(
 ):
     require_edit(db, str(workspace_id), user)
     return session_service.resolve_merge(
-        workspace_id=workspace_id, session_id=session_id, body=body, db=db
+        workspace_id=workspace_id,
+        session_id=session_id,
+        body=body,
+        db=db,
+        user_id=user.id,
     )
 
 

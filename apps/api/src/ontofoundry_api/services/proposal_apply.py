@@ -258,9 +258,20 @@ def parse_agent(db, settings, session, raw, context):
     return ParsedBatch(parsed.id, parsed.result_sha256, trial.items)
 
 
-def save_pending(db, session, batch_id, trial):
+def save_pending(db, session, batch_id, trial, *, actor_id=None, actor_kind="human", primary_proposal_id=None):
+    from ontofoundry_api.services import change_log
     from ontofoundry_api.services.proposals import batch_items
+
     rows = {r.id: r for r in batch_items(db, [batch_id], session.workspace_id, session.id)}
+    before_snaps = {
+        row_id: change_log.proposal_snapshot(
+            status=row.status,
+            operation=row.operation,
+            before=row.before_json,
+            after=row.after_json,
+        )
+        for row_id, row in rows.items()
+    }
     pending_ids = [i.id for i in trial.items]
     decided = {r.fingerprint for r in rows.values() if r.status != "pending" and r.id not in pending_ids}
     if any(item.id not in rows and item.fingerprint in decided for item in trial.items):
@@ -274,8 +285,10 @@ def save_pending(db, session, batch_id, trial):
     for identity in removed:
         rows[identity].status = "rejected"
     ordinal = max((row.ordinal for row in rows.values()), default=-1) + 1
+    touched_rows: list[tuple[ProposalItemRecord, bool]] = []
     for item in trial.items:
         row = rows.get(item.id)
+        created = row is None
         if row is None:
             row = ProposalItemRecord(id=item.id, workspace_id=session.workspace_id,
                 session_id=session.id, batch_id=batch_id, ordinal=ordinal,
@@ -286,11 +299,86 @@ def save_pending(db, session, batch_id, trial):
             setattr(row, attr, getattr(item, attr))
         row.after_json, row.before_json = item.after, item.before
         row.field_changes_json, row.evidence_json = [], item.evidence
+        touched_rows.append((row, created))
     db.flush()
     for item in trial.items:
         for dep in item.depends_on:
             db.add(ProposalItemDependencyRecord(workspace_id=session.workspace_id, session_id=session.id,
                 batch_id=batch_id, item_id=item.id, depends_on_item_id=dep))
+    resolved_actor = actor_id or session.created_by
+    now = utc_now()
+    primary_event_id: str | None = None
+    ordered_touched = sorted(
+        touched_rows, key=lambda pair: 0 if pair[0].id == primary_proposal_id else 1
+    )
+    for row, created in ordered_touched:
+        after_snap = change_log.proposal_snapshot(
+            status=row.status,
+            operation=row.operation,
+            before=row.before_json,
+            after=row.after_json,
+        )
+        if created:
+            event = change_log.record_proposal_event(
+                db,
+                workspace_id=session.workspace_id,
+                session_id=session.id,
+                actor_id=resolved_actor,
+                actor_kind=actor_kind,
+                action="created",
+                target_kind=row.target_kind,
+                target_id=row.target_id,
+                proposal_id=row.id,
+                batch_id=batch_id,
+                before=None,
+                after=after_snap,
+                cause_id=primary_event_id,
+                at=now,
+            )
+            if row.id == primary_proposal_id:
+                primary_event_id = event.id
+        elif canonical(before_snaps[row.id]) != canonical(after_snap):
+            event = change_log.record_proposal_event(
+                db,
+                workspace_id=session.workspace_id,
+                session_id=session.id,
+                actor_id=resolved_actor,
+                actor_kind=actor_kind,
+                action="revised",
+                target_kind=row.target_kind,
+                target_id=row.target_id,
+                proposal_id=row.id,
+                batch_id=batch_id,
+                before=before_snaps[row.id],
+                after=after_snap,
+                cause_id=None if row.id == primary_proposal_id else primary_event_id,
+                at=now,
+            )
+            if row.id == primary_proposal_id:
+                primary_event_id = event.id
+    for identity in removed:
+        row = rows[identity]
+        change_log.record_proposal_event(
+            db,
+            workspace_id=session.workspace_id,
+            session_id=session.id,
+            actor_id=resolved_actor,
+            actor_kind=actor_kind,
+            action="rejected",
+            target_kind=row.target_kind,
+            target_id=row.target_id,
+            proposal_id=row.id,
+            batch_id=batch_id,
+            before=before_snaps[row.id],
+            after=change_log.proposal_snapshot(
+                status=row.status,
+                operation=row.operation,
+                before=row.before_json,
+                after=row.after_json,
+            ),
+            cause_id=primary_event_id,
+            at=now,
+        )
 
 
 def trial_pending(db, session, batch_id, settings, changes=None):
@@ -305,8 +393,8 @@ def trial_pending(db, session, batch_id, settings, changes=None):
     return check_proposal(db, session.workspace_id, session, items, settings)
 
 
-def apply_trial(db, workspace_id, session_id, trial, accepted, actor, lookup):
+def apply_trial(db, workspace_id, session_id, trial, accepted, actor, lookup, *, cascades_out=None):
     from ontofoundry_api.services.instance_proposals import apply_changes
     ordered = sorted(accepted, key=lambda item: 2 if item.target_kind == "material_object" and item.operation == "delete" else 1 if item.target_kind == "material_link" else 0)
     return apply_changes(db, workspace_id, session_id, trial.candidate, ordered, [], actor, lookup,
-                         instance_states=trial.instance_states)
+                         instance_states=trial.instance_states, cascades_out=cascades_out)

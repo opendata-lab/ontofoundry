@@ -346,6 +346,7 @@ async def send_message(
     # so the run's source revision is the one after it.
     manifest = {
         "run_token": run_token,
+        "started_by": user.id,
         "draft_schema_version": "core-1",
         "workspace_id": workspace_id,
         "session_id": session_id,

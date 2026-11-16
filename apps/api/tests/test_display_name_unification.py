@@ -170,7 +170,7 @@ def test_cutover_cleans_every_content_table_and_preserves_configuration():
     with engine.begin() as conn:
         conn.exec_driver_sql("PRAGMA foreign_keys=ON")
         for table in Base.metadata.sorted_tables:
-            if table.name in {"document_instances", "instance_links", "instance_evidence", "instance_history", "element_save_requests"}:
+            if table.name in {"document_instances", "instance_links", "instance_evidence", "instance_history", "element_save_requests", "change_events"}:
                 continue
             row = {}
             for column in table.columns:

@@ -23,6 +23,7 @@ from ontofoundry_api.domain.evidence import EvidenceError, reconcile_draft_evide
 from ontofoundry_api.domain.instances import definitions
 from ontofoundry_api.domain.models import COLLECTIONS, ElementKind
 from ontofoundry_api.domain.snapshot import draft_sha256
+from ontofoundry_api.services import change_log
 from ontofoundry_api.services.element_diff import element_changes, field_changes
 from ontofoundry_api.services.element_save import (
     calculate_element_save,
@@ -149,6 +150,7 @@ def _record_human_changes(db, session, trial, actor, revision):
     item_ids = {}
     groups = {}
     reverted_ids = set()
+    now = utc_now()
     for item in trial.items:
         candidates = [r for r in rows if r.target_id == item.target_id and r.status == "accepted"]
         previous = max(candidates, key=lambda r: r.accepted_revision or -1, default=None)
@@ -156,6 +158,16 @@ def _record_human_changes(db, session, trial, actor, revision):
             previous is not None and previous.accepted_revision is not None
             and canonical(previous.after_json) == canonical(item.before)
             and not _intervening_change(db, session, previous)
+        )
+        previous_snapshot = (
+            change_log.proposal_snapshot(
+                status=previous.status,
+                operation=previous.operation,
+                before=previous.before_json,
+                after=previous.after_json,
+            )
+            if reusable
+            else None
         )
         row = previous if reusable else ProposalItemRecord(
             id=item.id, workspace_id=session.workspace_id, session_id=session.id,
@@ -167,12 +179,51 @@ def _record_human_changes(db, session, trial, actor, revision):
             db.add(row)
             rows.append(row)
         item_ids[item.id] = row.id
+        draft_action = (
+            "removed" if item.after is None else ("added" if item.before is None else "updated")
+        )
         if canonical(row.before_json) == canonical(item.after):
             # Keep the rejected proposal as the prior change's review record.
             row.status, row.accepted_revision = "rejected", None
-            row.decided_at, row.decided_by = utc_now(), actor
+            row.decided_at, row.decided_by = now, actor
             row.atomic_group_id = None
             reverted_ids.add(row.id)
+            proposal_event = change_log.record_proposal_event(
+                db,
+                workspace_id=session.workspace_id,
+                session_id=session.id,
+                actor_id=actor,
+                actor_kind="human",
+                action="rejected",
+                target_kind=row.target_kind,
+                target_id=row.target_id,
+                proposal_id=row.id,
+                batch_id=batch.id,
+                before=previous_snapshot,
+                after=change_log.proposal_snapshot(
+                    status="rejected",
+                    operation=row.operation,
+                    before=row.before_json,
+                    after=row.after_json,
+                ),
+                at=now,
+            )
+            change_log.record_draft_event(
+                db,
+                workspace_id=session.workspace_id,
+                session_id=session.id,
+                actor_id=actor,
+                actor_kind="human",
+                action=draft_action,
+                target_kind=item.target_kind,
+                target_id=item.target_id,
+                proposal_id=row.id,
+                batch_id=batch.id,
+                before=item.before,
+                after=item.after,
+                cause_id=proposal_event.id,
+                at=now,
+            )
             continue
         row.after_json = deepcopy(item.after)
         row.operation = "create" if row.before_json is None else "delete" if item.after is None else "update"
@@ -185,10 +236,46 @@ def _record_human_changes(db, session, trial, actor, revision):
         # Distinct positions in the undo chain can propose the same after-image.
         row.fingerprint = payload_sha256([row.id, item_fingerprint(row.operation, row.target_kind, row.target_id, row.after_json)])
         row.status, row.accepted_revision = "accepted", revision
-        row.decided_by, row.decided_at = actor, utc_now()
+        row.decided_by, row.decided_at = actor, now
         row.atomic_group_id = row.atomic_group_id or item.atomic_group_id
         if item.atomic_group_id:
             groups.setdefault(item.atomic_group_id, []).append(row)
+        proposal_event = change_log.record_proposal_event(
+            db,
+            workspace_id=session.workspace_id,
+            session_id=session.id,
+            actor_id=actor,
+            actor_kind="human",
+            action="revised" if reusable else "created",
+            target_kind=row.target_kind,
+            target_id=row.target_id,
+            proposal_id=row.id,
+            batch_id=batch.id,
+            before=previous_snapshot,
+            after=change_log.proposal_snapshot(
+                status="accepted",
+                operation=row.operation,
+                before=row.before_json,
+                after=row.after_json,
+            ),
+            at=now,
+        )
+        change_log.record_draft_event(
+            db,
+            workspace_id=session.workspace_id,
+            session_id=session.id,
+            actor_id=actor,
+            actor_kind="human",
+            action=draft_action,
+            target_kind=item.target_kind,
+            target_id=item.target_id,
+            proposal_id=row.id,
+            batch_id=batch.id,
+            before=item.before,
+            after=item.after,
+            cause_id=proposal_event.id,
+            at=now,
+        )
     # A later save can overlap several existing groups. Preserve their active
     # peers even when those peers were not edited in this save.
     for members in groups.values():
