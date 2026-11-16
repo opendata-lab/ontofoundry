@@ -105,15 +105,6 @@ def value_issues(
     return issues
 
 
-def instance_issues(draft: OntologyDraft) -> list[dict]:
-    """Errors only: what makes an instance invalid and blocks accepting it."""
-    return [issue for issue in _instance_findings(draft) if issue["severity"] == "error"]
-
-
-def _instance_findings(draft: OntologyDraft) -> list[dict]:
-    return []
-
-
 def completeness_warnings(draft: OntologyDraft) -> list[dict]:
     """A document often names a concept without saying what it records. That
     is a valid model, but it should be finished from a table or by hand."""
@@ -133,14 +124,14 @@ def completeness_warnings(draft: OntologyDraft) -> list[dict]:
     ]
 
 
-def include_instance_validation(report: dict, draft: OntologyDraft) -> dict:
-    findings = _instance_findings(draft)
-    errors = [issue for issue in findings if issue["severity"] == "error"]
-    warnings = [issue for issue in findings if issue["severity"] != "error"]
+def add_definition_warnings(report: dict, draft: OntologyDraft) -> dict:
+    """Completeness hints for a draft report.
+
+    A draft report checks definitions only. Document instances are checked when
+    they are accepted and again at publish, so the report says it did not check
+    them instead of claiming they passed."""
     return {
         **report,
-        "errors": [*report.get("errors", []), *errors],
-        "warnings": [*report.get("warnings", []), *warnings, *completeness_warnings(draft)],
-        "instance_status": "failed" if errors else "passed",
-        "publishable": report["publishable"] and not errors,
+        "warnings": [*report.get("warnings", []), *completeness_warnings(draft)],
+        "instance_status": "not_checked",
     }
